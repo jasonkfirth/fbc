@@ -201,7 +201,11 @@ def repair_sources(work):
 # -------------------------------------------------------------------------
 
 
-def build(package, target, work):
+def build(package, target, work, build_jobs=1):
+    # The command-line pool already limits concurrent libraries. Each nested
+    # CMake build uses one job by default so that limit also bounds compilers.
+    if build_jobs < 1:
+        raise ValueError("build_jobs must be positive")
     directory = work / "build" / target / package
     directory.mkdir(parents=True, exist_ok=True)
     record = {"library": package, "target": target}
@@ -222,7 +226,7 @@ def build(package, target, work):
                      "-DCMAKE_INSTALL_PREFIX=" + str(stage), "-DSDLSOUND_BUILD_SHARED=ON",
                      "-DSDLSOUND_BUILD_STATIC=OFF", "-DSDLSOUND_BUILD_TEST=OFF", "-DSDLSOUND_BUILD_DOCS=OFF"],
                     environment, directory / "configure.log")
-                run(["cmake", "--build", str(directory), "-j3"], environment, directory / "build.log")
+                run(["cmake", "--build", str(directory), "--parallel", str(build_jobs)], environment, directory / "build.log")
                 run(["cmake", "--install", str(directory)], environment, directory / "install.log")
                 library = stage / "lib/libSDL2_sound.so"
             if not library.is_file():
@@ -307,7 +311,7 @@ def build(package, target, work):
                     configure += ["-DCMAKE_SYSTEM_NAME=Windows", "-DCMAKE_C_COMPILER=" + str(llvm / "bin" / (triple + "-clang")),
                                   "-DCMAKE_CXX_COMPILER=" + str(llvm / "bin" / (triple + "-clang++"))]
                 run(configure, environment, dep_build / "configure.log")
-                run(["cmake", "--build", str(dep_build), "-j3"], environment, dep_build / "build.log")
+                run(["cmake", "--build", str(dep_build), "--parallel", str(build_jobs)], environment, dep_build / "build.log")
                 run(["cmake", "--install", str(dep_build)], environment, dep_build / "install.log")
             files = [origin / "src/SDL_shadercross.c"]
             includes = [origin / "include", dependency]

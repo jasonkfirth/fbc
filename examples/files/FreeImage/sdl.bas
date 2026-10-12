@@ -29,7 +29,7 @@ sub main()
 	dim as FIBITMAP ptr dib
 	dim as SDL_Surface ptr srcimg
 
-	dim as string filename = command( )
+	dim as string filename = command(1)
 	if( filename = "" )Then
 		print "usage: freeimage.exe filename.ext"
 		end 1
@@ -43,11 +43,13 @@ sub main()
 		filename = left( filename, len( filename ) - 1 )
 	end if
 
+	FreeImage_Initialise()
 	'' get file type
 	dim fiType as FREE_IMAGE_FORMAT = FreeImage_GetFileType( filename )
 	if fiType = FIF_UNKNOWN then
 		print
 		print "Unknown image format or file not found"
+		FreeImage_DeInitialise()
 		end 1
 	end if
 
@@ -87,6 +89,7 @@ sub main()
 	'' initialise sdl with video support
 	if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) then
 		print "Couldn't initialise SDL"
+		FreeImage_DeInitialise()
 		end 1
 	end if
 
@@ -95,7 +98,26 @@ sub main()
 	if dib = NULL then
 		print "Couldn't load image"
 		SDL_Quit( )
+		FreeImage_DeInitialise()
 		end 1
+	end if
+	'' SDL's packed surfaces describe bitmap pixels, not floating-point TIFF/HDR
+	'' samples. Expand low-bit palettes to 32 bits without losing their colors.
+	if FreeImage_GetImageType(dib) <> FIT_BITMAP then
+		FreeImage_Unload(dib)
+		SDL_Quit()
+		FreeImage_DeInitialise()
+		end 1
+	end if
+	if FreeImage_GetBPP(dib) < 8 then
+		dim expanded as FIBITMAP ptr = FreeImage_ConvertTo32Bits(dib)
+		FreeImage_Unload(dib)
+		dib = expanded
+		if dib = NULL then
+			SDL_Quit()
+			FreeImage_DeInitialise()
+			end 1
+		end if
 	end if
 
 	'' image is upside-down, flip
@@ -103,6 +125,7 @@ sub main()
 		print "Couldn't flip image"
 		FreeImage_Unload( dib )
 		SDL_Quit( )
+		FreeImage_DeInitialise()
 		end 1
 	end if
 
@@ -112,6 +135,7 @@ sub main()
 		print "Couldn't create surface"
 		FreeImage_Unload( dib )
 		SDL_Quit( )
+		FreeImage_DeInitialise()
 		end 1
 	end if
 
@@ -122,6 +146,7 @@ sub main()
 		SDL_FreeSurface( srcimg )
 		FreeImage_Unload( dib )
 		SDL_Quit( )
+		FreeImage_DeInitialise()
 		end 1
 	end if
 
@@ -204,6 +229,7 @@ sub main()
 	SDL_FreeSurface( srcimg )
 	FreeImage_Unload( dib )
 	SDL_Quit( )
+	FreeImage_DeInitialise()
 	if exitStatus then end 1
 end sub
 
@@ -215,12 +241,12 @@ sub blitImage( byval img as SDL_Surface ptr, byval x as integer, byval y as inte
 end sub
 
 '' Convert FreeImage palette to SDL palette
-sub fipal2sdlpal( byval dib as FIBITMAP Ptr, byval surface as SDL_Surface ptr )
+function fipal2sdlpal( byval dib as FIBITMAP Ptr, byval surface as SDL_Surface ptr ) as integer
 	dim intpal(0 to 255) as SDL_Color
 
 	dim as RGBQUAD ptr pal = FreeImage_GetPalette( dib )
 	dim as integer colors = FreeImage_GetColorsUsed( dib )
-	if colors < 0 or colors > 256 or pal = NULL then exit sub
+	if colors <= 0 or colors > 256 or pal = NULL then return 0
 
 	for i as integer = 0 to colors-1
 		intpal(i).r = pal->rgbRed
@@ -229,12 +255,29 @@ sub fipal2sdlpal( byval dib as FIBITMAP Ptr, byval surface as SDL_Surface ptr )
 		pal += 1
 	next
 
-	SDL_SetColors( surface, @intpal(0), 0, colors )
-end sub
+	return SDL_SetColors( surface, @intpal(0), 0, colors )
+end function
 
 '' Convert FreeImage bitmap to SDL surface
 function fibitmap2sdlsurface( byval dib as FIBITMAP Ptr ) as SDL_Surface ptr
 	dim surface as SDL_Surface ptr
+	if dib = NULL then return NULL
+	dim image_width as ulong = FreeImage_GetWidth(dib)
+	dim image_height as ulong = FreeImage_GetHeight(dib)
+	dim image_bits as ulong = FreeImage_GetBPP(dib)
+	dim image_pitch as ulong = FreeImage_GetPitch(dib)
+	const MAX_IMAGE_PIXELS = 16 * 1024 * 1024
+	if image_width = 0 or image_height = 0 or image_pitch = 0 or _
+		culngint(image_width) * image_height > MAX_IMAGE_PIXELS then return NULL
+	'' SDL1 rectangles and surface pitch use 16-bit fields.
+	if image_width > 32767 or image_height > 32767 or image_pitch > 65535 then return NULL
+	select case image_bits
+	case 8, 16, 24, 32
+	case else
+		return NULL
+	end select
+	if FreeImage_GetImageType(dib) <> FIT_BITMAP or FreeImage_GetBits(dib) = NULL then return NULL
+	if image_pitch < culngint(image_width) * (image_bits \ 8) then return NULL
 
 	surface = SDL_CreateRGBSurfaceFrom( _
 				FreeImage_GetBits( dib ), _
@@ -249,13 +292,18 @@ function fibitmap2sdlsurface( byval dib as FIBITMAP Ptr ) as SDL_Surface ptr
 
 	if( surface <> NULL ) then
 		if( FreeImage_GetPalette( dib ) <> NULL ) then
-			fipal2sdlpal( dib, surface )
+			if fipal2sdlpal(dib, surface) = 0 then
+				SDL_FreeSurface(surface)
+				return NULL
+			end if
 		end if
 	end if
 
 	function = surface
 end function
 
+#ifndef IMAGE_EXAMPLE_NO_MAIN
 main()
+#endif
 
 '' End of sdl.bas

@@ -1,118 +1,168 @@
 {{fbdoc item="title" value="FMOD"}}----
-Audio library supporting just about any format.
+Classic FMOD 3.75 audio API using FSOUND and FMUSIC functions.
 
 Website: https://www.fmod.com/core
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux i386
 Headers to include: fmod.bi
 Header version: 3.75
 Examples: in examples/sound/FMOD/
 
+{{fbdoc item="section" value="SDK and executable architecture"}}
+	These examples require the classic 3.75 SDK matching ##fmod.bi##. The publisher's Windows archive contains ##fmod.dll## for i386 and ##fmod64.dll## for x86-64. The archived Linux ##libfmod-3.75.so## is an i386 binary, so a 64-bit Linux PC needs a 32-bit executable and the matching FreeBASIC runtime. Do not mix executable and library architectures.
+
+	Archived publisher downloads are available at https://web.archive.org/web/20060924103009/http://www.fmod.org/files/fmodapi375win.zip and https://web.archive.org/web/20070101000000/http://www.fmod.org/files/fmodapi375linux.tar.gz.
+
+	The binding uses the library name ##fmod##. A GNU import library for Windows x86-64 must refer to ##fmod64.dll## and be available under that link name, for example ##libfmod.dll.a## in a directory selected with ##-p##. On Linux, provide ##libfmod.so## as a link to the genuine versioned SDK library. The original binary remains unchanged.
+
+	The Linux SDK's default output route is OSS. It requires a working ##/dev/dsp## character device, supplied by an OSS driver or a compatible driver such as osspd with its ALSA backend. No-sound initialization can qualify decoding or metadata, but does not demonstrate audio output.
+
+{{fbdoc item="section" value="Examples and metadata ownership"}}
+	The module example accepts an optional filename and otherwise uses the bundled module relative to its normal example directory. The two MP3 players require an audio filename argument. Set ##FB_EXAMPLE_AUTOPLAY=1## to perform a bounded playback check without keyboard input. File, playback and cleanup failures return a nonzero exit status.
+
+	Both MP3 players share ##examples/sound/FMOD/fmod_tags.bi##. FMOD returns borrowed metadata byte ranges which remain valid while the stream is open. C ##int## outputs use FreeBASIC ##Long##, including in 64-bit executables. The helper copies text to an owned UTF-8 string, checks each byte boundary, and limits each metadata value to 4 KiB.
+
+	ID3v2 text frames include an encoding byte. The helper supports Latin-1, UTF-16 with a byte-order mark, UTF-16 big endian and UTF-8, returning the first text value. Missing tags, unknown encodings, malformed Unicode and over-budget values yield an empty string. See https://id3.org/id3v2.3.0 and https://id3.org/id3v2.4.0-structure for the text frame definitions.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/fmod1.bas"}}%%(freebasic)
-#include once "fmod.bi"
+'' examples/manual/libraries/fmod1.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'FMOD'
+'' Purpose: Play a module with the classic FMOD 3.75 API.
+'' Responsibilities: File selection, playback errors and owned module cleanup.
+'' This example contains no module decoder or audio driver implementation.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibfmod
+'' --------
 
-const SOUND_FILE = "test.mod"
+#include Once "fmod.bi"
 
-if (FSOUND_GetVersion() < FMOD_VERSION) then
-	print "FMOD version mismatch"
-	end 1
-end if
+Dim As String sound_file = Command(1)
+If sound_file = "" Then sound_file = ExePath() & "/../../sound/data/dne_trtn.mod"
 
-if (FSOUND_Init(44100, 32, 0) = 0) then
-	print "Could not initialize FMOD"
-	end 1
-end if
+If (FSOUND_GetVersion() < FMOD_VERSION) Then
+	Print "FMOD version mismatch"
+	End 1
+End If
 
-dim as FMUSIC_MODULE ptr song = FMUSIC_LoadSong(SOUND_FILE)
-if (song = 0) then
-	print "FMOD could not load '" & SOUND_FILE & "'"
+If (FSOUND_Init(44100, 32, 0) = 0) Then
+	Print "Could not initialize FMOD: "; FSOUND_GetError()
+	End 1
+End If
+
+Dim As FMUSIC_MODULE Ptr song = FMUSIC_LoadSong(StrPtr(sound_file))
+If (song = 0) Then
+	Print "FMOD could not load '" & sound_file & "'"
 	FSOUND_Close()
-	end 1
-end if
+	End 1
+End If
 
-FMUSIC_PlaySong(song)
+If FMUSIC_PlaySong(song) = 0 Then
+	Print "Could not start playback: "; FSOUND_GetError()
+	FMUSIC_FreeSong(song)
+	FSOUND_Close()
+	End 1
+End If
 
-print "Sound playing; waiting for keypress to stop and exit..."
-sleep
+Dim As Integer playback_error = 0
+If Environ("FB_EXAMPLE_AUTOPLAY") = "1" Then
+	Sleep 1200, 1
+	If FMUSIC_IsPlaying(song) = 0 OrElse FMUSIC_GetTime(song) <= 0 Then playback_error = 1
+Else
+	Print "Sound playing; waiting for keypress to stop and exit..."
+	Sleep
+End If
 
-FMUSIC_FreeSong(song)
+If FMUSIC_IsPlaying(song) Then
+	If FMUSIC_StopSong(song) = 0 Then playback_error = 1
+End If
+If FMUSIC_FreeSong(song) = 0 Then playback_error = 1
 FSOUND_Close()
+If playback_error Then End 1
+Print "FMOD playback completed."
+
+'' end of fmod1.bas
 %%
 
 {{fbdoc item="filename" value="examples/manual/libraries/fmod2.bas"}}%%(freebasic)
+'' examples/manual/libraries/fmod2.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'FMOD'
+'' Purpose: Play an MP3 and read its optional ID3 metadata.
+'' Responsibilities: File errors, bounded tag text and owned stream cleanup.
+'' This example contains no MPEG decoder or audio driver implementation.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibfmod
+'' --------
+
 '' mp3 player based on FMOD
 
-#include once "fmod.bi"
+#include Once "fmod.bi"
+#include Once "../../sound/FMOD/fmod_tags.bi"
 
-const SOUND_FILE = "test.mp3"
+Dim As String sound_file = Command(1)
+If sound_file = "" Then
+	Print "Usage: fmod2 <audio-file>"
+	End 1
+End If
 
-sub print_all_tags(byval stream as FSOUND_STREAM ptr)
-	dim as integer count = 0
-	FSOUND_Stream_GetNumTagFields(stream, @count)
-
-	for i as integer = 0 to (count - 1)
-		dim as integer tagtype, taglen
-		dim as zstring ptr tagname, tagvalue
-		FSOUND_Stream_GetTagField(stream, i, @tagtype, @tagname, @tagvalue, @taglen)
-		print left(*tagname, taglen)
-	next
-end sub
-
-function get_tag _
-	( _
-		byval stream as FSOUND_STREAM ptr, _
-		byval tagv1 as zstring ptr, _
-		byval tagv2 as zstring ptr _
-	) as string
-
-	dim tagname as zstring ptr, taglen as integer
-
-	FSOUND_Stream_FindTagField(stream, FSOUND_TAGFIELD_ID3V1, tagv1, @tagname, @taglen)
-	if (taglen = 0) then 
-		FSOUND_Stream_FindTagField(stream, FSOUND_TAGFIELD_ID3V2, tagv2, @tagname, @taglen)
-	end if
-
-	return left(*tagname, taglen)
-end function
-
-	if (FSOUND_GetVersion < FMOD_VERSION) then
-		print "FMOD version " + str(FMOD_VERSION) + " or greater required!"
-		end 1
-	end If 
-
-	if (FSOUND_Init(44100, 4, 0) = 0) then
-		print "Could not initialize FMOD"
-		end 1
-	end if
-
-	FSOUND_Stream_SetBufferSize(50)
-
-	dim as FSOUND_STREAM ptr stream = FSOUND_Stream_Open(SOUND_FILE, FSOUND_MPEGACCURATE, 0, 0)
-	if (stream = 0) then 
-		print "FMOD could not load '" & SOUND_FILE & "'"
-		FSOUND_Close()
-		end 1
-	end if
-
-	'' Read out mp3 tags to show some meta information
-	print "Title:", get_tag(stream, "TITLE", "TIT2")
-	print "Album:", get_tag(stream, "ALBUM", "TALB")
-	print "Artist:", get_tag(stream, "ARTIST", "TPE1")
-	''print_all_tags(stream)
-
-	print "Playing mp3, press a key to exit..."
-	FSOUND_Stream_Play(FSOUND_FREE, stream)
-
-	while (inkey() = "")
-		if (FSOUND_Stream_GetPosition(stream) >= FSOUND_Stream_GetLength(stream)) then
-			exit while
-		end if
-		sleep 50, 1
-	wend
-   
-	FSOUND_Stream_Stop(stream)
-	FSOUND_Stream_Close(stream)
+If (FSOUND_GetVersion() < FMOD_VERSION) Then
+	Print "FMOD version mismatch"
+	End 1
+End If
+If (FSOUND_Init(44100, 4, 0) = 0) Then
+	Print "Could not initialize FMOD: "; FSOUND_GetError()
+	End 1
+End If
+If FSOUND_Stream_SetBufferSize(50) = 0 Then
 	FSOUND_Close()
+	End 1
+End If
+
+Dim As FSOUND_STREAM Ptr fmod_stream = FSOUND_Stream_Open(StrPtr(sound_file), FSOUND_MPEGACCURATE, 0, 0)
+If (fmod_stream = 0) Then
+	Print "FMOD could not load '" & sound_file & "'"
+	FSOUND_Close()
+	End 1
+End If
+
+'' Copy and decode the borrowed metadata while the stream remains open.
+'' An absent or invalid text field yields an empty string.
+Print "Title:", get_tag(fmod_stream, "TITLE", "TIT2")
+Print "Album:", get_tag(fmod_stream, "ALBUM", "TALB")
+Print "Artist:", get_tag(fmod_stream, "ARTIST", "TPE1")
+''print_all_tags(fmod_stream)
+
+Dim As Long stream_channel = FSOUND_Stream_Play(FSOUND_FREE, fmod_stream)
+If stream_channel < 0 Then
+	Print "Could not start playback: "; FSOUND_GetError()
+	FSOUND_Stream_Close(fmod_stream)
+	FSOUND_Close()
+	End 1
+End If
+
+Dim As Integer playback_error = 0
+If Environ("FB_EXAMPLE_AUTOPLAY") = "1" Then
+	Sleep 1200, 1
+	If FSOUND_Stream_GetPosition(fmod_stream) = 0 Then playback_error = 1
+Else
+	Print "Playing MP3, press a key to exit..."
+	While Inkey() = ""
+		If FSOUND_IsPlaying(stream_channel) = 0 Then Exit While
+		Sleep 50, 1
+	Wend
+End If
+If FSOUND_IsPlaying(stream_channel) Then
+	If FSOUND_Stream_Stop(fmod_stream) = 0 Then playback_error = 1
+End If
+If FSOUND_Stream_Close(fmod_stream) = 0 Then playback_error = 1
+FSOUND_Close()
+If playback_error Then End 1
+Print "FMOD playback completed."
+
+'' end of fmod2.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

@@ -7,20 +7,35 @@ Headers to include: cairo/cairo.bi
 Header version: 1.14.2
 Examples: yes, in examples/graphics/cairo/
 
+The framebuffer example was checked with the real Cairo 1.18.4 SDK on Win32 and Win64. The framebuffer is borrowed by ##cairo_image_surface_create_for_data## and must remain valid until the surface is destroyed. Use the actual pitch returned by ##ScreenInfo##.
+
+Cairo error objects can be non-null. Check ##cairo_surface_status## and ##cairo_status## before drawing and after completion. Hold ##ScreenLock## during framebuffer writes and flush the surface before making the result visible. Release both the drawing context and the caller's surface reference; destroying the context alone retains that surface reference.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/cairo.bas"}}%%(freebasic)
 '' Example showing cairo being used to draw into the FB graphics window
-#include once "cairo/cairo.bi"
+#include Once "cairo/cairo.bi"
 
 Const SCREEN_W = 400
 Const SCREEN_H = 300
 
-ScreenRes SCREEN_W, SCREEN_H, 32
+If ScreenRes(SCREEN_W, SCREEN_H, 32) <> 0 Then End 1
+Dim image_pitch As Long
+ScreenInfo , , , , image_pitch
 
 '' Create a cairo drawing context, using the FB screen as surface.
-var surface = cairo_image_surface_create_for_data(ScreenPtr(), CAIRO_FORMAT_ARGB32, SCREEN_W, SCREEN_H, SCREEN_W * SizeOf(ULong))
+Var surface = cairo_image_surface_create_for_data(ScreenPtr(), CAIRO_FORMAT_ARGB32, SCREEN_W, SCREEN_H, image_pitch)
+If cairo_surface_status(surface) <> CAIRO_STATUS_SUCCESS Then
+    cairo_surface_destroy(surface)
+    End 1
+End If
 
-var c = cairo_create(surface)
+Var c = cairo_create(surface)
+If cairo_status(c) <> CAIRO_STATUS_SUCCESS Then
+    cairo_destroy(c)
+    cairo_surface_destroy(surface)
+    End 1
+End If
 
 ScreenLock()
 
@@ -35,12 +50,22 @@ cairo_move_to(c, 0, 0)
 cairo_line_to(c, SCREEN_W - 1, SCREEN_H - 1)
 cairo_stroke(c)
 
+cairo_surface_flush(surface)
+Dim draw_status As cairo_status_t = cairo_status(c)
 ScreenUnlock()
+If draw_status <> CAIRO_STATUS_SUCCESS Then
+    cairo_destroy(c)
+    cairo_surface_destroy(surface)
+    End 1
+End If
 
-sleep
+Sleep
 
 '' Clean up the cairo context
 cairo_destroy(c)
+cairo_surface_destroy(surface)
+
+'' end of cairo.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

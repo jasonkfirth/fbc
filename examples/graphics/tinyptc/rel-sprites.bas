@@ -1,3 +1,9 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: rel-sprites.bas
+'' Purpose: Render this demonstration through the TinyPTC display.
+'' Responsibilities: Own the display loop and packed 32-bit pixel storage.
+'' This file contains no reusable display implementation.
+
 '//TinyPTC relGFX style
 '//Relsoft 2004
 '//v3cz0r is da man!
@@ -10,17 +16,17 @@
 ' Demo declarations
 ' -------------------------------------------------------------------------
 
-declare sub cls_sprite(target())
-declare sub put_pixel(target(), byval x as integer, byval y as integer, byval col as integer)
-declare sub draw_line(target(), byval x as integer, byval y as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
-declare sub draw_line_h ( target(), byval x1 as integer, byval y as integer, byval x2 as integer, byval col as integer)
-declare sub draw_line_v ( target(), byval x as integer, byval y1 as integer, byval y2 as integer, byval col as integer)
-declare sub draw_rect_fill(target(), byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
-declare sub draw_rect(target(), byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
-declare sub put_sprite (target(), byval x as integer, byval y as integer, sprite_data())
-declare sub put_sprite_mask (target(), byval x as integer, byval y as integer, sprite_data())
-declare sub get_sprite( target() as integer, byval x1 as integer, byval y1 as integer _
-                        , byval x2 as integer, byval y2 as integer, sprite_data() as integer)
+declare sub cls_sprite(target() as ulong)
+declare sub put_pixel(target() as ulong, byval x as integer, byval y as integer, byval col as integer)
+declare sub draw_line(target() as ulong, byval x as integer, byval y as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
+declare sub draw_line_h ( target() as ulong, byval x1 as integer, byval y as integer, byval x2 as integer, byval col as integer)
+declare sub draw_line_v ( target() as ulong, byval x as integer, byval y1 as integer, byval y2 as integer, byval col as integer)
+declare sub draw_rect_fill(target() as ulong, byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
+declare sub draw_rect(target() as ulong, byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
+declare sub put_sprite (target() as ulong, byval x as integer, byval y as integer, sprite_data() as ulong)
+declare sub put_sprite_mask (target() as ulong, byval x as integer, byval y as integer, sprite_data() as ulong)
+declare sub get_sprite( target() as ulong, byval x1 as integer, byval y1 as integer _
+                        , byval x2 as integer, byval y2 as integer, sprite_data() as ulong)
 declare function size_of_image(byval x1 as integer, byval y1 as integer, byval x2 as integer _
                                , byval y2 as integer)
 
@@ -43,11 +49,11 @@ const SPR_SIZE = SPR_WID * SPR_HEI
 ' The display, lookup, and sprite arrays are initialized by the main demo and
 ' passed to helpers that can draw into an arbitrary array of the same layout.
 '' FB-LINTER: DISABLE-NEXT-LINE FBL301
-dim shared buffer( 0 to SCR_SIZE-1 ) as integer
+dim shared buffer( 0 to SCR_SIZE-1 ) as ulong
 dim shared Lcos(0 to 359) as single
 dim shared Lsin(0 to 359) as single
-'dim shared sprite(0 to (SPR_SIZE - 1) + 2) as integer
-redim shared sprite(0 to size_of_image(0, 0, SPR_WID - 1, SPR_HEI -1)) as integer
+'dim shared sprite(0 to (SPR_SIZE - 1) + 2) as ulong
+redim shared sprite(0 to size_of_image(0, 0, SPR_WID - 1, SPR_HEI -1)) as ulong
 
 dim frame as long
 dim col as integer
@@ -124,13 +130,13 @@ ptc_close
 ' Drawing helpers
 ' -------------------------------------------------------------------------
 
-private sub put_pixel(target(), byval x as integer, byval y as integer, byval col as integer)
+private sub put_pixel(target() as ulong, byval x as integer, byval y as integer, byval col as integer)
     target(y * SCR_WIDTH + x) = col
 end sub
 
-private sub cls_sprite(target())
+private sub cls_sprite(target() as ulong)
     dim i as long
-    dim b as integer ptr
+    dim b as ulong ptr
 
 	b = @target(0)
 	for i = 0 to SCR_SIZE - 1
@@ -139,7 +145,7 @@ private sub cls_sprite(target())
 	next i
 end sub
 
-private sub draw_line(target(), byval x as integer, byval y as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
+private sub draw_line(target() as ulong, byval x as integer, byval y as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
 
     dim i as integer
     dim slope as integer
@@ -205,7 +211,7 @@ private sub draw_line(target(), byval x as integer, byval y as integer, byval x2
 
 end sub
 
-private sub draw_line_h ( target(), byval x1 as integer, byval y as integer, byval x2 as integer, byval col as integer)
+private sub draw_line_h ( target() as ulong, byval x1 as integer, byval y as integer, byval x2 as integer, byval col as integer)
 
     const SCR_X_MAX = SCR_WIDTH - 1
     const SCR_Y_MAX = SCR_HEIGHT - 1
@@ -249,7 +255,7 @@ private sub draw_line_h ( target(), byval x1 as integer, byval y as integer, byv
 
 end sub
 
-private sub draw_line_v ( target(), byval x as integer, byval y1 as integer, byval y2 as integer, byval col as integer)
+private sub draw_line_v ( target() as ulong, byval x as integer, byval y1 as integer, byval y2 as integer, byval col as integer)
 
     const SCR_X_MAX = SCR_WIDTH - 1
     const SCR_Y_MAX = SCR_HEIGHT - 1
@@ -294,7 +300,7 @@ private sub draw_line_v ( target(), byval x as integer, byval y1 as integer, byv
 end sub
 
 
-private sub draw_rect_fill(target(), byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
+private sub draw_rect_fill(target() as ulong, byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
 
     const SCR_X_MAX = SCR_WIDTH - 1
     const SCR_Y_MAX = SCR_HEIGHT - 1
@@ -361,7 +367,7 @@ private sub draw_rect_fill(target(), byval x1 as integer, byval y1 as integer, b
 
 end sub
 
-private sub draw_rect(target(), byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
+private sub draw_rect(target() as ulong, byval x1 as integer, byval y1 as integer, byval x2 as integer, byval y2 as integer, byval col as integer)
     draw_line_h target(), x1, y1, x2, col
     draw_line_v target(), x1, y1, y2, col
     draw_line_h target(), x1, y2, x2, col
@@ -382,7 +388,7 @@ private function size_of_image(byval x1 as integer, byval y1 as integer, byval x
 
 end function
 
-private sub put_sprite (target(), byval x as integer, byval y as integer, sprite_data())
+private sub put_sprite (target() as ulong, byval x as integer, byval y as integer, sprite_data() as ulong)
 
 
     const SCR_X_MAX = SCR_WIDTH - 1
@@ -435,7 +441,7 @@ private sub put_sprite (target(), byval x as integer, byval y as integer, sprite
         if (wid <= 0) then exit sub
     end if
 
-    dim b as integer ptr, s as integer ptr
+    dim b as ulong ptr, s as ulong ptr
     offset = y * SCR_WIDTH + x
 
     for hcounter = 1 to hei
@@ -453,7 +459,7 @@ private sub put_sprite (target(), byval x as integer, byval y as integer, sprite
 
 end sub
 
-private sub put_sprite_mask (target(), byval x as integer, byval y as integer, sprite_data())
+private sub put_sprite_mask (target() as ulong, byval x as integer, byval y as integer, sprite_data() as ulong)
 
 
     const SCR_X_MAX = SCR_WIDTH - 1
@@ -507,7 +513,7 @@ private sub put_sprite_mask (target(), byval x as integer, byval y as integer, s
         if (wid <= 0) then exit sub
     end if
 
-    dim b as integer ptr, s as integer ptr
+    dim b as ulong ptr, s as ulong ptr
     offset = y * SCR_WIDTH + x
 
     for hcounter = 1 to hei
@@ -527,8 +533,8 @@ private sub put_sprite_mask (target(), byval x as integer, byval y as integer, s
 end sub
 
 
-private sub get_sprite( target() as integer, byval x1 as integer, byval y1 as integer _
-                        , byval x2 as integer, byval y2 as integer, sprite_data() as integer)
+private sub get_sprite( target() as ulong, byval x1 as integer, byval y1 as integer _
+                        , byval x2 as integer, byval y2 as integer, sprite_data() as ulong)
 
     const SCR_X_MAX = SCR_WIDTH - 1
     const SCR_Y_MAX = SCR_HEIGHT - 1
@@ -589,7 +595,7 @@ private sub get_sprite( target() as integer, byval x1 as integer, byval y1 as in
     sprite_data(0) = wid
     sprite_data(1) = hite
 
-    dim b as integer ptr, s as integer ptr
+    dim b as ulong ptr, s as ulong ptr
     soffset = 2
     offset = y1 * SCR_WIDTH + x1
 
@@ -606,3 +612,5 @@ private sub get_sprite( target() as integer, byval x1 as integer, byval y1 as in
     next ycounter
 
 end sub
+
+'' end of rel-sprites.bas

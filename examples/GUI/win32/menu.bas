@@ -1,5 +1,8 @@
-''
-'' menu demo
+'' FreeBASIC Win32 examples
+'' File: menu.bas
+'' Purpose: Build nested menus and display the last menu selection.
+'' Responsibilities: Validate command IDs before indexing the menu table.
+'' This file contains no file operations or control notification handlers.
 ''
 
 #include once "windows.bi"
@@ -51,7 +54,8 @@ declare function        WinMain     ( byval hInstance as HINSTANCE, _
                                       byval iCmdShow as integer ) as integer
 
 	''
-	'' globals
+	'' One GUI thread owns the tables below. SetMenu attaches the menu tree
+	'' to the window, whose destruction releases that tree.
 	''
 	dim shared submenuTB(0 to MAXMENUS) as TMENU
 	dim shared menuitemTB(0 to MAXMENUITEMS-1) as TMENUITEM
@@ -79,7 +83,6 @@ function WndProc ( byval hWnd as HWND, _
 
     static lastmenuid as integer
     dim wmId as integer, wmEvent as integer
-    dim menu as HMENU
 
     function = 0
 
@@ -103,7 +106,11 @@ function WndProc ( byval hWnd as HWND, _
 			wmId    = loword( wParam )
 			wmEvent = hiword( wParam )
 
-			menu = GetMenu( hWnd )
+			'' WM_COMMAND also carries control and accelerator notifications.
+			'' Accept only menu commands assigned by init_menus.
+			if( lParam <> 0 or wmEvent <> 0 ) then exit function
+			if( wmId < MENUID_BASE or wmId >= MENUID_BASE + MAXMENUITEMS ) then exit function
+			if( menuitemTB(wmId-MENUID_BASE).title = "" ) then exit function
 
 			''
 			'' parse the menu selections
@@ -180,7 +187,7 @@ function WinMain ( byval hInstance as HINSTANCE, _
     dim appName as string
     dim hWnd as HWND
 
-    function = 0
+    function = 1
 
     ''
     '' Setup window class
@@ -227,16 +234,24 @@ function WinMain ( byval hInstance as HINSTANCE, _
                            null )
 
 
+    if( hWnd = NULL ) then exit function
     ShowWindow( hWnd, iCmdShow )
     UpdateWindow( hWnd )
 
     ''
     '' Process windows messages
     ''
-    while( GetMessage( @wMsg, null, 0, 0 ) <> false )
+    '' GetMessage returns -1 for an error, zero for WM_QUIT, or a message.
+    do
+        dim received as BOOL = GetMessage( @wMsg, null, 0, 0 )
+        if( received = -1 ) then
+            DestroyWindow( hWnd )
+            return 1
+        end if
+        if( received = 0 ) then exit do
         TranslateMessage( @wMsg )
         DispatchMessage( @wMsg )
-    wend
+    loop
 
     ''
     '' Program has ended
@@ -322,3 +337,5 @@ sub init_menus( byval hWnd as HWND )
     DrawMenuBar( hWnd )
 
 end sub
+
+'' end of menu.bas

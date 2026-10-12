@@ -195,5 +195,7 @@ Print u2.d
 	- ##[[KeyPgRandom|Random]]##
 	- ##[[KeyPgFreefile|Freefile]]##
 	- ##[[ProPgFileIO|File I/O methods comparison]]##
+	- ##[[KeyPgDeserialize|Deserialize]]##
+	- ##[[ProPgSerialization|Compiler-assisted serialization]]##
 
 {{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

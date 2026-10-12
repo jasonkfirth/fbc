@@ -2,6 +2,9 @@
 ''
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'gsl, The GNU Scientific Library'
+'' Purpose: Evaluate a power and a hypotenuse through GSL.
+'' Responsibilities: Demonstrate the native double-valued math interface.
+'' This example contains no allocated matrices or scientific solver state.
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibgsl
 '' --------
@@ -10,7 +13,8 @@
 #include "gsl/gsl_math.bi"
 
 '' Raise the value of 3.141 to the fourth power
-? "3.141 ^ 4 = "; gsl_pow_4(3.141)
+' The D0 suffix supplies a Double literal without rounding through Single.
+? "3.141 ^ 4 = "; gsl_pow_4(3.141D0)
 ?
 
 '' Find the hypotenuse of a right triangle with sides 3 and 4
@@ -18,3 +22,4 @@
 ?
 
 Sleep
+'' end of gsl1.bas

@@ -108,6 +108,7 @@ sub fbcDriverPrintOptions( byval verbose as integer )
 	print "  -p <path>        Add a library search path"
 	print "  -pic             Generate position-independent code (Haiku executables, Unix shared libs)"
 	print "  -pp              Write out preprocessed input file (.pp.bas) only"
+	print "  -pp-lines        Preprocess with logical source file and line mappings"
 	print "  -prefix <path>   Set the compiler prefix path"
 	print "  -print host|target  Display host/target system name"
 	print "  -print fblibdir  Display the compiler's lib/ path"

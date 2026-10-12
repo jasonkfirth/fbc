@@ -1,0 +1,108 @@
+{{fbdoc item="title" value="SERIALIZE"}}----
+Encodes a supported value or whole array as an owned binary string
+
+{{fbdoc item="syntax"}}##
+	#include once "fbserialize.bi"
+	//payload// = **Serialize**( //value// )
+	//payload// = **Serialize**( //array//() )
+##
+{{fbdoc item="param"}}
+	##//value//##
+		A supported variable, member, dereference or function result. A ##Const## source is allowed.
+	##//array//()##
+		A whole fixed or dynamic array, selected using empty parentheses.
+
+{{fbdoc item="ret"}}
+	An owned binary ##[[KeyPgString|String]]## containing a complete version 1 serialization payload. Success sets ##[[KeyPgErr|Err]]## to zero. Failure returns an empty string and sets ##Err## to ##FB_SERIALIZE_INVALID## (1) or ##FB_SERIALIZE_OUT_OF_MEMORY## (4), declared by ##fbserialize.bi##. Even an empty source string produces a nonempty payload on success.
+
+{{fbdoc item="desc"}}
+	The compiler supplies traversal instructions for the source type. Public fields of ordinary UDTs, nested UDTs, fixed and dynamic arrays, and owned string contents are encoded automatically. No field registration or handwritten member codec is needed.
+	
+	Supported values include ##Boolean##, signed and unsigned integer types, enums, ##Single##, ##Double##, ##String## and fixed ##String * N##. Strings preserve embedded null bytes; fixed strings preserve every stored byte. UDT padding, pointers and runtime descriptors are not included in the payload.
+	
+	Raw or procedure pointers, ##ByRef## fields, bitfields, unions, inheritance, non-public fields, ##ZString##, ##WString##, ##UString## and UDTs with user-defined constructors, destructors or operators are rejected at compilation. Compiler-generated lifetime operations for strings and arrays are supported.
+	
+	The payload uses little-endian logical values and an exact structural schema. Native ##Integer## and ##UInteger## values use 64 wire bits, allowing compatible 32-bit and 64-bit applications to exchange values within the reader's range. See ##[[ProPgSerialization|Compiler-assisted serialization]]## for schemas, bounds, limits and versioning.
+	
+	##Serialize## does not perform file or network I/O. Pass the binary string's ##[[KeyPgLen|Len]]## together with its bytes to interfaces which need a byte count. The caller must synchronize access if another thread can modify the source during encoding.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/manual/udt/serialize.bas"}}%%(freebasic)
+'' examples/manual/udt/serialize.bas
+''
+'' FreeBASIC Manual: SERIALIZE
+'' Purpose: Make an independent snapshot of a record with owned members.
+'' Responsibilities: Nested records, strings, arrays and deep ownership.
+'' This example intentionally contains no file or network transport.
+'' --------
+
+#include once "fbserialize.bi"
+
+Type Item
+    label_text As String
+    quantity As Integer
+End Type
+
+Type PlayerState
+    player_name As String
+    health As Integer
+    inventory(Any) As Item
+End Type
+
+Dim As PlayerState original, restored
+original.player_name = "Player One"
+original.health = 100
+ReDim original.inventory(-2 To 0)
+original.inventory(-2).label_text = "Potion"
+original.inventory(-2).quantity = 3
+
+Dim As String payload = Serialize(original)
+If Err <> 0 Then
+    Print "Serialize failed: "; Err
+    End 1
+End If
+
+If Deserialize(payload, restored) = 0 Then
+    Print "Deserialize failed: "; Err
+    End 1
+End If
+
+'' The restored record owns its strings and arrays. Changing the source
+'' and releasing its array and the payload do not change the restored data.
+original.player_name = "Changed"
+original.inventory(-2).label_text = "Used"
+original.inventory(-2).quantity = 0
+Erase original.inventory
+payload = ""
+
+'' Check restored bounds before accessing an element of the owned array.
+If LBound(restored.inventory) <> -2 OrElse UBound(restored.inventory) <> 0 Then End 1
+If restored.player_name <> "Player One" OrElse restored.health <> 100 Then End 1
+If restored.inventory(-2).label_text <> "Potion" Then End 1
+If restored.inventory(-2).quantity <> 3 Then End 1
+
+Print restored.player_name
+Print restored.inventory(-2).label_text
+Print restored.inventory(-2).quantity
+
+'' end of serialize.bas
+%%
+	Output:
+%%Player One
+Potion
+ 3
+%%
+
+{{fbdoc item="lang"}}
+	- Available in the ##[[CompilerOptlang|-lang fb]]## and ##[[CompilerOptlang|-lang fblite]]## dialects; unavailable in ##[[CompilerOptlang|-lang qb]]##.
+
+{{fbdoc item="diff"}}
+	- New to ##""FreeBASIC""##. The public name is an opt-in macro from ##fbserialize.bi##. Without this include, an application may still use ##Serialize## as its own identifier.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDeserialize|Deserialize]]##
+	- ##[[ProPgSerialization|Compiler-assisted serialization]]##
+	- ##[[KeyPgPutfileio|Put (File I/O)]]##
+	- ##[[KeyPgErr|Err]]##
+
+{{fbdoc item="back" value="ProPgSerialization|Compiler-assisted serialization"}}{{fbdoc item="back" value="CatPgUserDefTypes|User Defined Types"}}

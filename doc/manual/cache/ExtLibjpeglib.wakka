@@ -7,4 +7,14 @@ Headers to include: jpeglib.bi
 Header version: 6.2, 7.0, 8.4, 9.0 (#define ""__JPEGLIB_VER__"" to one of 6,7,8,9 if needed; default = 9)
 Example Usage: yes, in examples/files/jpeglib
 
+Select the binding version to match the library's ##JPEG_LIB_VERSION##. Version 6 selects 62, version 7 selects 70, version 8 selects 80 and version 9 selects 90. These decoder structures are ABI dependent. Successful linking does not prove that the selected version matches the DLL.
+
+The Windows example was checked against libjpeg-turbo 3.2.0 with JPEG ABI 80 on Win32 and Win64. Build this SDK configuration with ##fbc -d __JPEGLIB_VER__=8 example.bas##. Native C checks compared the decoder and error-manager layouts, including Windows' one-byte JPEG boolean. The optional first and second command-line arguments select the grayscale and RGB input files.
+
+The loader owns its file, decoder, scanline and partial FB image until decoding succeeds. Its error callback uses ##setjmp##/##longjmp## to leave a failed decoder and release those resources. The resource state lives on the heap, and no managed FB string is created across the jump. Win64 jump storage is allocated separately to retain the CRT's required alignment.
+
+##ImageInfo## supplies the actual pixel address and padded row stride in both ##fb## and ##fblite## dialects. Pixel data must not be addressed by adding one byte to the image-header pointer. The loader advances each output row by the returned pitch, including grayscale rows with alignment padding.
+
+This display example accepts grayscale and RGB output, limits decoded images to 16 million pixels and rejects CMYK/YCCK output. Indexed output requires a matching grayscale palette. Malformed inputs return no image; the original program reports failure with a nonzero exit status.
+
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

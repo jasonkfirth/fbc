@@ -1,5 +1,7 @@
-'' CGUI Example program showing how open a window with one close button. The program is 100% meaningless.
-
+'' CGUI Example: hello.bas
+'' Purpose: Open a dialogue and create further dialogues from its buttons.
+'' Responsibilities: Native CGUI event processing and close callbacks.
+'' This example contains no custom renderer or application data persistence.
 
 #include once "allegro.bi"
 #include once "cgui.bi"
@@ -15,7 +17,7 @@ sub stop_program cdecl (byval userdata as any ptr)
 end sub
 
 sub close_window cdecl (byval userdata as any ptr)
-   '' This terminates the top level of event proscessing
+   '' This terminates the top level of event processing.
    StopProcessEvents()
    CloseWin(NULL)
 end sub
@@ -37,6 +39,10 @@ sub make_a_window( )
    ProcessEvents()
 end sub
 
-   InitCgui(1024, 768, 15)
+   '' CGUI defaults to fullscreen on Windows. Request a window explicitly
+   '' so this introductory example can run beside other desktop programs.
+   If InitCguiWindowedMode() = 0 Then End 1
    make_a_window()
+   DeInitCgui()
    END_OF_MAIN()
+'' end of hello.bas

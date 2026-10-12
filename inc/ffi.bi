@@ -1,4 +1,9 @@
 '' FreeBASIC binding for libffi-3.3
+'' File: ffi.bi
+'' Purpose: Declare the native libffi call and closure interfaces.
+'' Responsibilities: Target ABI types and modern x86 closure layouts.
+'' This file contains no call engine or executable memory allocator.
+'' The x86 trampoline layout below matches libffi 3.4 and newer.
 ''
 '' based on the C header files:
 ''   -----------------------------------------------------------------*-C-*-
@@ -226,13 +231,17 @@ end enum
 #endif
 
 #ifndef __FB_64BIT__
-	const FFI_TRAMPOLINE_SIZE = 12
+	#ifdef X86_ANY
+		const FFI_TRAMPOLINE_SIZE = 16
+	#else
+		const FFI_TRAMPOLINE_SIZE = 12
+	#endif
 #endif
 
 #if (not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
 	const FFI_NATIVE_RAW_API = 1
 #elseif defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
-	const FFI_TRAMPOLINE_SIZE = 24
+	const FFI_TRAMPOLINE_SIZE = 32
 	const FFI_NATIVE_RAW_API = 0
 #elseif (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	const FFI_TRAMPOLINE_CLOSURE_OFFSET = FFI_TRAMPOLINE_SIZE
@@ -250,55 +259,63 @@ end type
 
 type ffi_type as _ffi_type
 #define FFI_API
-extern ffi_type_void as ffi_type
-extern ffi_type_uint8 as ffi_type
-extern ffi_type_uchar alias "ffi_type_uint8" as ffi_type
-extern ffi_type_sint8 as ffi_type
-extern ffi_type_schar alias "ffi_type_sint8" as ffi_type
-extern ffi_type_uint16 as ffi_type
-extern ffi_type_ushort alias "ffi_type_uint16" as ffi_type
-extern ffi_type_sint16 as ffi_type
-extern ffi_type_sshort alias "ffi_type_sint16" as ffi_type
-extern ffi_type_uint32 as ffi_type
-extern ffi_type_uint alias "ffi_type_uint32" as ffi_type
+'' GAS must access DLL data through the import address table. Direct
+'' references can exceed the 2 GiB relocation range under Win64 ASLR.
+#if defined(__FB_WIN32__) and (not defined(FFI_STATIC_BUILD))
+	#define FFI_EXTERN extern import
+#else
+	#define FFI_EXTERN extern
+#endif
+
+FFI_EXTERN ffi_type_void as ffi_type
+FFI_EXTERN ffi_type_uint8 as ffi_type
+FFI_EXTERN ffi_type_uchar alias "ffi_type_uint8" as ffi_type
+FFI_EXTERN ffi_type_sint8 as ffi_type
+FFI_EXTERN ffi_type_schar alias "ffi_type_sint8" as ffi_type
+FFI_EXTERN ffi_type_uint16 as ffi_type
+FFI_EXTERN ffi_type_ushort alias "ffi_type_uint16" as ffi_type
+FFI_EXTERN ffi_type_sint16 as ffi_type
+FFI_EXTERN ffi_type_sshort alias "ffi_type_sint16" as ffi_type
+FFI_EXTERN ffi_type_uint32 as ffi_type
+FFI_EXTERN ffi_type_uint alias "ffi_type_uint32" as ffi_type
 
 #if (defined(__FB_WIN32__) and defined(__FB_64BIT__)) or (not defined(__FB_64BIT__))
-	extern ffi_type_ulong alias "ffi_type_uint32" as ffi_type
+	FFI_EXTERN ffi_type_ulong alias "ffi_type_uint32" as ffi_type
 #endif
 
-extern ffi_type_sint32 as ffi_type
-extern ffi_type_sint alias "ffi_type_sint32" as ffi_type
+FFI_EXTERN ffi_type_sint32 as ffi_type
+FFI_EXTERN ffi_type_sint alias "ffi_type_sint32" as ffi_type
 
 #if (defined(__FB_WIN32__) and defined(__FB_64BIT__)) or (not defined(__FB_64BIT__))
-	extern ffi_type_slong alias "ffi_type_sint32" as ffi_type
+	FFI_EXTERN ffi_type_slong alias "ffi_type_sint32" as ffi_type
 #endif
 
-extern ffi_type_uint64 as ffi_type
+FFI_EXTERN ffi_type_uint64 as ffi_type
 
 #if defined(__FB_64BIT__) and defined(__FB_UNIX__)
-	extern ffi_type_ulong alias "ffi_type_uint64" as ffi_type
+	FFI_EXTERN ffi_type_ulong alias "ffi_type_uint64" as ffi_type
 #endif
 
-extern ffi_type_sint64 as ffi_type
+FFI_EXTERN ffi_type_sint64 as ffi_type
 
 #if defined(__FB_64BIT__) and defined(__FB_UNIX__)
-	extern ffi_type_slong alias "ffi_type_sint64" as ffi_type
+	FFI_EXTERN ffi_type_slong alias "ffi_type_sint64" as ffi_type
 #endif
 
-extern ffi_type_float as ffi_type
-extern ffi_type_double as ffi_type
-extern ffi_type_pointer as ffi_type
+FFI_EXTERN ffi_type_float as ffi_type
+FFI_EXTERN ffi_type_double as ffi_type
+FFI_EXTERN ffi_type_pointer as ffi_type
 #if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
-	extern ffi_type_longdouble alias "ffi_type_double" as ffi_type
+	FFI_EXTERN ffi_type_longdouble alias "ffi_type_double" as ffi_type
 #else
-	extern ffi_type_longdouble as ffi_type
+	FFI_EXTERN ffi_type_longdouble as ffi_type
 #endif
-extern ffi_type_complex_float as ffi_type
-extern ffi_type_complex_double as ffi_type
+FFI_EXTERN ffi_type_complex_float as ffi_type
+FFI_EXTERN ffi_type_complex_double as ffi_type
 #if defined(__FB_DARWIN__) and defined(__FB_64BIT__) and defined(__FB_ARM__)
-	extern ffi_type_complex_longdouble alias "ffi_type_complex_double" as ffi_type
+	FFI_EXTERN ffi_type_complex_longdouble alias "ffi_type_complex_double" as ffi_type
 #else
-	extern ffi_type_complex_longdouble as ffi_type
+	FFI_EXTERN ffi_type_complex_longdouble as ffi_type
 #endif
 
 type ffi_status as long
@@ -366,7 +383,17 @@ type ffi_closure
 		trampoline_table as any ptr
 		trampoline_table_entry as any ptr
 	#else
-		tramp as zstring * FFI_TRAMPOLINE_SIZE
+		#ifdef X86_ANY
+			' Modern x86 trampolines include CET entry instructions. The C
+			' closure is aligned to 8 bytes; this member adds no storage.
+			union
+				tramp as zstring * FFI_TRAMPOLINE_SIZE
+				ftramp as any ptr
+				_alignment as ulongint
+			end union
+		#else
+			tramp as zstring * FFI_TRAMPOLINE_SIZE
+		#endif
 	#endif
 	cif as ffi_cif ptr
 	fun as sub(byval as ffi_cif ptr, byval as any ptr, byval as any ptr ptr, byval as any ptr)

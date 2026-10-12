@@ -1,3 +1,9 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: rel-blob.bas
+'' Purpose: Render this demonstration through the TinyPTC display.
+'' Responsibilities: Own the display loop and packed 32-bit pixel storage.
+'' This file contains no reusable display implementation.
+
 '//Blobs with moozic
 '//Relsoft 2004
 '//v3cz0r is da man!
@@ -11,10 +17,10 @@
 
 Declare Sub ErrorQuit (byref Message as string)
 
-declare sub cls_(target() as integer)
-declare sub pcopy_ ( dest() as integer, source() as integer)
-declare sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
-declare sub draw_blob(target() as integer, light_map() as integer, _
+declare sub cls_(target() as ulong)
+declare sub pcopy_ ( dest() as ulong, source() as ulong)
+declare sub put_pixel(target() as ulong, byval x as integer, byval y as integer, byval col as integer)
+declare sub draw_blob(target() as ulong, light_map() as ulong, _
                       byval x as integer, byval y as integer)
 
 const SCR_WIDTH = 320  * 2
@@ -32,8 +38,8 @@ const BLOB_HEI = 128
 /' The main display thread owns the framebuffer and the precomputed light map.
  * draw_blob() accepts arrays so its compositor can be reused with like layouts. '/
 '' FB-LINTER: DISABLE-NEXT-LINE FBL301
-	dim shared buffer( 0 to SCR_SIZE-1 ) as integer
-	dim shared light(0 to BLOB_WID - 1, 0 to BLOB_HEI - 1) as integer
+	dim shared buffer( 0 to SCR_SIZE-1 ) as ulong
+	dim shared light(0 to BLOB_WID - 1, 0 to BLOB_HEI - 1) as ulong
 
 	if( ptc_open( "Blob demo(Relsoft)", SCR_WIDTH, SCR_HEIGHT ) = 0 ) then
 		end -1
@@ -101,7 +107,7 @@ End Sub
 '
 '*******************************************************************************************
 
-private sub draw_blob(target() as integer, light_map() as integer, _
+private sub draw_blob(target() as ulong, light_map() as ulong, _
                       byval x as integer, byval y as integer)
 
   const SCR_X_MAX = SCR_WIDTH - 1
@@ -110,7 +116,7 @@ private sub draw_blob(target() as integer, light_map() as integer, _
   dim as integer wid, hei
   dim as integer minx, miny
   dim as integer wtemp, htemp
-  dim as integer ptr offset
+  dim as ulong ptr offset
 
 
   if ubound(light_map, 1) < lbound(light_map, 1) orelse _
@@ -196,16 +202,16 @@ end sub
 'GFX subs/Funks
 '
 '*******************************************************************************************
-private sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
+private sub put_pixel(target() as ulong, byval x as integer, byval y as integer, byval col as integer)
   if (y >= 0) and (y < SCR_HEIGHT) and (x >= 0) and (x < SCR_WIDTH) then
     target(y * SCR_WIDTH + x) = col
   end if
 end sub
 
 
-private sub pcopy_ ( dest() as integer, source() as integer)
-  dim offset1 as integer ptr
-  dim offset2 as integer ptr
+private sub pcopy_ ( dest() as ulong, source() as ulong)
+  dim offset1 as ulong ptr
+  dim offset2 as ulong ptr
   dim i as integer
   offset1 = @dest(0)
   offset2 = @source(0)
@@ -217,8 +223,8 @@ private sub pcopy_ ( dest() as integer, source() as integer)
 
 end sub
 
-private sub cls_(target() as integer)
-  dim offset as integer ptr
+private sub cls_(target() as ulong)
+  dim offset as ulong ptr
   dim i as integer
   offset = @target(0)
   for i = 0 to  SCR_SIZE -1
@@ -227,3 +233,5 @@ private sub cls_(target() as integer)
   next i
 
 end sub
+
+'' end of rel-blob.bas

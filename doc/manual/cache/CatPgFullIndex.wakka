@@ -295,6 +295,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgDefulongint|DEFULONGINT"}}
 	- {{fbdoc item="keyword" value="KeyPgDefushort|DEFUSHORT"}}
 	- {{fbdoc item="keyword" value="KeyPgOpDelete|DELETE (Statement)"}}
+	- {{fbdoc item="keyword" value="KeyPgDeserialize|DESERIALIZE"}}
 	- {{fbdoc item="keyword" value="KeyPgDestructor|DESTRUCTOR"}}
 	- {{fbdoc item="keyword" value="KeyPgModuleDestructor|DESTRUCTOR (Module)"}}
 	- {{fbdoc item="keyword" value="KeyPgDevice|DEVICE"}}
@@ -603,6 +604,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgSeekset|SEEK (Statement)"}}
 	- {{fbdoc item="keyword" value="KeyPgSeekreturn|SEEK (Function)"}}
 	- {{fbdoc item="keyword" value="KeyPgSelectcase|SELECT CASE"}}
+	- {{fbdoc item="keyword" value="KeyPgSerialize|SERIALIZE"}}
 	- {{fbdoc item="keyword" value="KeyPgSetdate|SETDATE"}}
 	- {{fbdoc item="keyword" value="KeyPgSetenviron|SETENVIRON"}}
 	- {{fbdoc item="keyword" value="KeyPgSetmouse|SETMOUSE"}}

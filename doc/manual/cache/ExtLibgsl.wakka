@@ -2,57 +2,99 @@
 Provides a wide range of mathematical routines such as random number generators, special functions and least-squares fitting.
 
 Website: https://www.gnu.org/software/gsl/, Windows port: http://gnuwin32.sourceforge.net/packages/gsl.htm 
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux
 Headers to include: gsl/*.bi
-Header version: 1.6
+Header version: 1.16
 Examples: in examples/math/GSL/
+
+{{fbdoc item="section" value="Matrices and precision"}}
+	##gsl_matrix_alloc## creates an owning allocation. Check its result, check operations which return a status, and release it with ##gsl_matrix_free## before leaving the example. Matrix views borrow their backing storage and must not be freed as independent owning allocations. GSL uses row-major indexing.
+
+	The math and matrix interfaces use ##Double## values. The examples use ##D0## literal suffixes to specify that precision explicitly. GSL's default error handler aborts on library errors; applications requiring recovery must configure a suitable handler before the relevant calls.
+
+	The installed Win64 GSL 2.8 SDK has been checked against native C matrix layouts, both FreeBASIC backends, nine transpose values and the original examples. The final console keypress is exercised in a private test console.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/gsl1.bas"}}%%(freebasic)
+'' examples/manual/libraries/gsl1.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'gsl, The GNU Scientific Library'
+'' Purpose: Evaluate a power and a hypotenuse through GSL.
+'' Responsibilities: Demonstrate the native double-valued math interface.
+'' This example contains no allocated matrices or scientific solver state.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibgsl
+'' --------
+
 '' Elementary math example
 #include "gsl/gsl_math.bi"
 
 '' Raise the value of 3.141 to the fourth power
-? "3.141 ^ 4 = "; gsl_pow_4(3.141)
+' The D0 suffix supplies a Double literal without rounding through Single.
+? "3.141 ^ 4 = "; gsl_pow_4(3.141D0)
 ?
 
-'' Find the hypotenuse of a right triangle with sides 3 and 4 
-? "The hypotenuse of a right triangle with sides of length 3 and 4 is"; gsl_hypot(3,4)
+'' Find the hypotenuse of a right triangle with sides 3 and 4
+? "The hypotenuse of a right triangle with sides of length 3 and 4 is"; gsl_hypot(3, 4)
 ?
 
-sleep
+Sleep
+'' end of gsl1.bas
 %%
 
 {{fbdoc item="filename" value="examples/manual/libraries/gsl2.bas"}}%%(freebasic)
+'' examples/manual/libraries/gsl2.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'gsl, The GNU Scientific Library'
+'' Purpose: Create, print and transpose a small GSL matrix.
+'' Responsibilities: Check allocation and release the owned matrix.
+'' This example contains no matrix views or shared backing storage.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibgsl
+'' --------
+
 '' Matrix example
 #include "gsl/gsl_matrix.bi"
 
-'' gsl uses the c-style row major order, unlike VB or Fortran 
-? "A 3x3 matrix" 
-dim as gsl_matrix ptr m = gsl_matrix_alloc(3, 3)
-for i as integer = 0 to 2
-	for j as integer = 0 to 2
-		gsl_matrix_set (m, i, j, 0.23 + 100*i + j)
-	next
-next
+'' gsl uses the c-style row major order, unlike VB or Fortran
+? "A 3x3 matrix"
+Dim As gsl_matrix Ptr m = gsl_matrix_alloc(3, 3)
+If m = 0 Then
+	Print "Could not allocate the GSL matrix"
+	End 1
+End If
+For i As Integer = 0 To 2
+	For j As Integer = 0 To 2
+		gsl_matrix_set (m, i, j, 0.23D0 + 100*i + j)
+	Next
+Next
 
-for i as integer = 0 to 2
-	for j as integer = 0 to 2
-		print "m(";i;",";j;") = "; gsl_matrix_get (m, i, j)
-	next
-next
+For i As Integer = 0 To 2
+	For j As Integer = 0 To 2
+		Print "m(";i;",";j;") = "; gsl_matrix_get (m, i, j)
+	Next
+Next
 ?
 
-gsl_matrix_transpose(m)
+If gsl_matrix_transpose(m) <> GSL_SUCCESS Then
+	gsl_matrix_free(m)
+	Print "Could not transpose the GSL matrix"
+	End 1
+End If
 
 ? "And its transpose"
-for i as integer = 0 to 2
-	for j as integer = 0 to 2
-		print "m(";i;",";j;") = "; gsl_matrix_get (m, i, j)
-	next
-next
+For i As Integer = 0 To 2
+	For j As Integer = 0 To 2
+		Print "m(";i;",";j;") = "; gsl_matrix_get (m, i, j)
+	Next
+Next
 
-sleep
+' The owning allocation is released before waiting for the final keypress.
+gsl_matrix_free(m)
+Sleep
+'' end of gsl2.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

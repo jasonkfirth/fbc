@@ -1,5 +1,9 @@
-##############################################################################
-# bootstrap-emit.mk
+# Project: FreeBASIC compiler bootstrap
+# File: bootstrap-emit.mk
+# Purpose: Emit C or assembly sources that seed a native compiler build.
+# Responsibilities: Select the stage-zero compiler, target and architecture;
+# emit the compiler sources; and collect the generated bootstrap files.
+# This file intentionally does not build or install the native compiler.
 ##############################################################################
 
 .PHONY: bootstrap-emit bootstrap-emit-source-response
@@ -204,14 +208,16 @@ bootstrap-emit: bootstrap-check
 	@echo "==> Cleaning previous bootstrap output"
 	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm "$(BOOTSTRAP_SRC_RSP)"
 
-	@echo "==> Clearing temporary compiler emission"
-	@for source in $(BOOTSTRAP_COMPILER_SRC); do \
-		emitted=$${source%.bas}; \
-		rm -f "$$emitted.c" "$$emitted.asm" "$$emitted.ll"; \
-	done
-
 	@echo "==> Writing bootstrap source response file"
 	@$(MAKE) bootstrap-emit-source-response
+
+	@echo "==> Clearing temporary compiler emission"
+	@set -e; while IFS=' ' read -r flag source; do \
+		[ "$$flag" = "-b" ] || { echo "ERROR: invalid bootstrap source response entry"; exit 1; }; \
+		source=$${source%$$'\r'}; \
+		emitted=$${source%.bas}; \
+		rm -f "$$emitted.c" "$$emitted.asm" "$$emitted.ll"; \
+	done < "$(BOOTSTRAP_SRC_RSP)"
 
 	@bootstrap_inc="$(BOOTSTRAP_INC_DIR)"; \
 	if [ "$(BOOTSTRAP_HOST_IS_MSYS)" = yes ]; then \
@@ -230,12 +236,14 @@ bootstrap-emit: bootstrap-check
 
 	@echo "==> Collecting emitted sources"
 
-	@for source in $(BOOTSTRAP_COMPILER_SRC); do \
+	@set -e; while IFS=' ' read -r flag source; do \
+		[ "$$flag" = "-b" ] || { echo "ERROR: invalid bootstrap source response entry"; exit 1; }; \
+		source=$${source%$$'\r'}; \
 		emitted=$${source%.bas}; \
 		for extension in c asm ll; do \
 			if [ -f "$$emitted.$$extension" ]; then mv "$$emitted.$$extension" "$(BOOTSTRAP_OUT)/"; fi; \
 		done; \
-	done
+	done < "$(BOOTSTRAP_SRC_RSP)"
 
 	@if ! ls "$(BOOTSTRAP_OUT)"/* >/dev/null 2>&1; then \
 		echo "ERROR: bootstrap emission produced no sources"; \
@@ -249,3 +257,5 @@ bootstrap-emit: bootstrap-check
 ##############################################################################
 # End bootstrap-emit.mk
 ##############################################################################
+
+# end of bootstrap-emit.mk

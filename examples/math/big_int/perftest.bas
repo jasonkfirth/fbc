@@ -1,6 +1,10 @@
 ''***********************************************************************
 ''
 ''    BIG_INT library performance stress-test
+''    File: perftest.bas
+''    Purpose: Measure native arbitrary precision arithmetic operations.
+''    Responsibilities: Library calls and release of formatted number buffers.
+''    This file contains no big_int implementation or library installation.
 ''
 ''    Copyright 2004, 2005 Alexander Valyalkin
 ''
@@ -35,6 +39,7 @@ sub print_num (byval tpl as string, byval num as big_int ptr)
 
     if( big_int_to_str( num, 10, s ) <> 0 ) then
         print "error when converting number [num] to string [s]"
+        big_int_str_destroy( s )
         exit sub
     end if
 
@@ -142,3 +147,5 @@ end sub
 
     print "done, waiting for keypress to exit..."
     sleep
+
+'' end of perftest.bas

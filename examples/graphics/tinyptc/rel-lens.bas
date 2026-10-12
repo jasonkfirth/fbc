@@ -1,3 +1,9 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: rel-lens.bas
+'' Purpose: Render this demonstration through the TinyPTC display.
+'' Responsibilities: Own the display loop and packed 32-bit pixel storage.
+'' This file contains no reusable display implementation.
+
 '//lens mapping cell texture
 '//
 '//
@@ -5,13 +11,13 @@
 
 #include "tinyptc.bi"
 
-declare sub smooth( buffer() as integer)
-declare sub put_pixel(target() as integer, byval x as integer, byval y as integer, _
+declare sub smooth( buffer() as ulong)
+declare sub put_pixel(target() as ulong, byval x as integer, byval y as integer, _
                       byval col as integer)
 declare function dist (byval x as single, byval  y as single, xc() as single, yc() as single) as single
-declare sub do_lens(dest() as integer, source() as integer, _
+declare sub do_lens(dest() as ulong, source() as ulong, _
                     byval x as integer, byval y as integer, byval radius as integer )
-declare sub pcopy_ ( dest() as integer, source() as integer)
+declare sub pcopy_ ( dest() as ulong, source() as ulong)
 
 
 const SCR_WIDTH = 320 * 1
@@ -34,8 +40,8 @@ const YMID = SCR_HEIGHT \ 2
 
 ' The main display loop owns these tables and does not create worker threads.
 '' FB-LINTER: DISABLE-NEXT-LINE FBL301
-	dim shared buffer( 0 to SCR_SIZE-1 ) as integer
-	dim shared texture( 0 to SCR_SIZE-1 ) as integer
+	dim shared buffer( 0 to SCR_SIZE-1 ) as ulong
+	dim shared texture( 0 to SCR_SIZE-1 ) as ulong
 	dim shared distbuffer(0 to SCR_WIDTH - 1, 0 to SCR_HEIGHT - 1) as single
     DIM shared xcoords(0 to maxpoints) as single
     DIM shared ycoords(0 to maxpoints) as single
@@ -158,19 +164,19 @@ END FUNCTION
 ' Lens-renderer helpers
 ' -------------------------------------------------------------------------
 
-private sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
+private sub put_pixel(target() as ulong, byval x as integer, byval y as integer, byval col as integer)
     if cunsg(x) >= SCR_WIDTH or cunsg(y) >= SCR_HEIGHT then exit sub
     target(y * SCR_WIDTH + x) = col
 end sub
 
-private sub pcopy_ ( dest() as integer, source() as integer)
+private sub pcopy_ ( dest() as ulong, source() as ulong)
     dim offset as integer
     for offset = 0 to  SCR_SIZE -1
         dest( offset ) = source( offset )
     next offset
 end sub
 
-Private sub do_lens(dest()as integer, source() as integer, _
+Private sub do_lens(dest() as ulong, source() as ulong, _
                     byval x as integer, byval y as integer, byval radius as integer )
 
     const SCR_X_MAX = SCR_WIDTH - 1
@@ -247,3 +253,5 @@ Private sub do_lens(dest()as integer, source() as integer, _
 
 
 end sub
+
+'' end of rel-lens.bas

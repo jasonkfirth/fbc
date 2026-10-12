@@ -120,11 +120,11 @@ private function hStrLiteralIsAscii _
 
 	for i as integer = 0 to textlen - 1
 		if( cast( ubyte, decoded.data[i] ) > &h7F ) then
-			exit function
+			return FALSE
 		end if
 	next
 
-	function = TRUE
+	return TRUE
 end function
 
 '':::::
@@ -500,8 +500,14 @@ private function hConstBop _
 		case AST_OP_ADD : l->val.i = l->val.i +   r->val.i
 		case AST_OP_SUB : l->val.i = l->val.i -   r->val.i
 		case AST_OP_MUL : l->val.i = l->val.i *   r->val.i
-		case AST_OP_SHL : l->val.i = l->val.i shl r->val.i : assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
-		case AST_OP_SHR : l->val.i = l->val.i shr r->val.i : assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
+		case AST_OP_SHL
+			assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
+			'' Shifting an unsigned payload avoids signed left-shift overflow
+			'' in the C backend. Restore the same bits in the AST value slot.
+			l->val.i = clngint( cunsg( l->val.i ) shl r->val.i )
+		case AST_OP_SHR
+			assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
+			l->val.i = l->val.i shr r->val.i
 		case AST_OP_AND : l->val.i = l->val.i and r->val.i
 		case AST_OP_OR  : l->val.i = l->val.i or  r->val.i
 		case AST_OP_XOR : l->val.i = l->val.i xor r->val.i
@@ -555,18 +561,24 @@ private function hConstBop _
 		l = astConvertRawCONSTi( dtype, subtype, l )
 
 	else
-		'' Unsigned integer BOP
+		'' Unsigned integer BOP. AST constants share a signed 64-bit value
+		'' slot; the explicit conversion retains the unsigned result's bits,
+		'' including values above the signed range, until dtype conversion.
 		select case as const( op )
-		case AST_OP_ADD : l->val.i = cunsg( l->val.i ) +   cunsg( r->val.i )
-		case AST_OP_SUB : l->val.i = cunsg( l->val.i ) -   cunsg( r->val.i )
-		case AST_OP_MUL : l->val.i = cunsg( l->val.i ) *   cunsg( r->val.i )
-		case AST_OP_SHL : l->val.i = cunsg( l->val.i ) shl cunsg( r->val.i ) : assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
-		case AST_OP_SHR : l->val.i = cunsg( l->val.i ) shr cunsg( r->val.i ) : assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
-		case AST_OP_AND : l->val.i = cunsg( l->val.i ) and cunsg( r->val.i )
-		case AST_OP_OR  : l->val.i = cunsg( l->val.i ) or  cunsg( r->val.i )
-		case AST_OP_XOR : l->val.i = cunsg( l->val.i ) xor cunsg( r->val.i )
-		case AST_OP_EQV : l->val.i = cunsg( l->val.i ) eqv cunsg( r->val.i )
-		case AST_OP_IMP : l->val.i = cunsg( l->val.i ) imp cunsg( r->val.i )
+		case AST_OP_ADD : l->val.i = clngint( cunsg( l->val.i ) +   cunsg( r->val.i ) )
+		case AST_OP_SUB : l->val.i = clngint( cunsg( l->val.i ) -   cunsg( r->val.i ) )
+		case AST_OP_MUL : l->val.i = clngint( cunsg( l->val.i ) *   cunsg( r->val.i ) )
+		case AST_OP_SHL
+			assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
+			l->val.i = clngint( cunsg( l->val.i ) shl cunsg( r->val.i ) )
+		case AST_OP_SHR
+			assert( cunsg( r->val.i ) < typeGetBits( l->dtype ) )
+			l->val.i = clngint( cunsg( l->val.i ) shr cunsg( r->val.i ) )
+		case AST_OP_AND : l->val.i = clngint( cunsg( l->val.i ) and cunsg( r->val.i ) )
+		case AST_OP_OR  : l->val.i = clngint( cunsg( l->val.i ) or  cunsg( r->val.i ) )
+		case AST_OP_XOR : l->val.i = clngint( cunsg( l->val.i ) xor cunsg( r->val.i ) )
+		case AST_OP_EQV : l->val.i = clngint( cunsg( l->val.i ) eqv cunsg( r->val.i ) )
+		case AST_OP_IMP : l->val.i = clngint( cunsg( l->val.i ) imp cunsg( r->val.i ) )
 		case AST_OP_NE  : l->val.i = cunsg( l->val.i ) <>  cunsg( r->val.i )
 		case AST_OP_EQ  : l->val.i = cunsg( l->val.i ) =   cunsg( r->val.i )
 		case AST_OP_GT  : l->val.i = cunsg( l->val.i ) >   cunsg( r->val.i )
@@ -583,13 +595,13 @@ private function hConstBop _
 					errReport( FB_ERRMSG_DIVBYZERO )
 				end if
 			elseif( op = AST_OP_INTDIV ) then
-				l->val.i = cunsg( l->val.i ) \   cunsg( r->val.i )
+				l->val.i = clngint( cunsg( l->val.i ) \ cunsg( r->val.i ) )
 			else
 				'' AST integer constants retain 64 bits on 32-bit compiler hosts.
 				dim as ulongint unsigned_left = cunsg( l->val.i )
 				dim as ulongint unsigned_right = cunsg( r->val.i )
 				dim as ulongint unsigned_result = unsigned_left mod unsigned_right
-				l->val.i = unsigned_result
+				l->val.i = clngint( unsigned_result )
 				end if
 			case else
 				errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
@@ -853,7 +865,7 @@ private function hCheckDerefWcharPtr _
 
 	'' Disallow if it's not a DEREF'ed wcharptr
 	if( l->class <> AST_NODECLASS_DEREF ) then
-		exit function
+		return FALSE
 	end if
 
 	'' Disallow if it's a fake dynamic string
@@ -861,7 +873,7 @@ private function hCheckDerefWcharPtr _
 	if( ll ) then
 		if( ll->class = AST_NODECLASS_VAR ) then
 			if( symbGetIsTemporary( ll->sym ) ) then
-				exit function
+				return FALSE
 			end if
 		end if
 	end if
@@ -870,7 +882,7 @@ private function hCheckDerefWcharPtr _
 	'' make a wrong assumption
 	*pldtype = typeJoin( *pldtype, env.target.wchar )
 
-	function = TRUE
+	return TRUE
 end function
 
 '' Convert an expression to the given type, preserving CONST bits, and also
@@ -969,13 +981,13 @@ private function hCheckBopStrings _
 
 	if( astOpIsRelational( op ) and _
 	    (typeGet( ldtype ) = FB_DATATYPE_USTRING or typeGet( rdtype ) = FB_DATATYPE_USTRING) ) then
-		if( typeGet( ldtype ) <> FB_DATATYPE_USTRING and _
+		if( (typeGet( ldtype ) <> FB_DATATYPE_USTRING) andalso _
 		    (ldclass = FB_DATACLASS_STRING or typeGet( ldtype ) = FB_DATATYPE_CHAR) ) then
 			l = rtlToUstr( l )
 			ldtype = astGetFullType( l )
 			ldclass = FB_DATACLASS_STRING
 		end if
-		if( typeGet( rdtype ) <> FB_DATATYPE_USTRING and _
+		if( (typeGet( rdtype ) <> FB_DATATYPE_USTRING) andalso _
 		    (rdclass = FB_DATACLASS_STRING or typeGet( rdtype ) = FB_DATATYPE_CHAR) ) then
 			r = rtlToUstr( r )
 			rdtype = astGetFullType( r )
@@ -1438,7 +1450,9 @@ private sub hPostCheckBop _
 			'' - GAS will show errors if outside 0..255 (byte operand)
 			'' - C backend: anything outside the 0..bitsize-1 range is undefined behaviour
 			assert( typeGetClass( r->dtype ) = FB_DATACLASS_INTEGER )
-			if( cunsg( r->val.i ) >= typeGetBits( ldtype ) ) then
+			'' Negative counts are invalid before interpreting the stored bits
+			'' as an unsigned value; the width is always a positive bit count.
+			if( (r->val.i < 0) orelse (culngint( r->val.i ) >= culngint( typeGetBits( ldtype ) )) ) then
 				errReportWarn( FB_WARNINGMSG_SHIFTEXCEEDSBITSINDATATYPE )
 				r = astNewBOP( AST_OP_AND, r, astNewCONSTi( typeGetBits( ldtype )-1 ) )
 			end if
@@ -1459,6 +1473,19 @@ private enum H_BOP_CONST_ACTION
 	H_BOP_CONST_RETURN
 	H_BOP_CONST_ERROR
 end enum
+
+'' The POW-to-MUL rewrite can duplicate these access forms once their
+'' subexpressions are known to have no side effects. Other classes keep POW.
+private function hIsVariableAccess( byval n as ASTNODE ptr ) as integer
+	if( n = NULL ) then return FALSE
+	select case n->class
+	case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
+	     AST_NODECLASS_FIELD, AST_NODECLASS_DEREF
+		return TRUE
+	case else
+		return FALSE
+	end select
+end function
 
 private function hOptimizeConstBop _
 	( _
@@ -1631,20 +1658,15 @@ private function hOptimizeConstBop _
 			if( r->val.f = 2.0 ) then
 				'' operands will be converted to DOUBLE if not floats..
 				if( l->class = AST_NODECLASS_CONV ) then
-					select case l->l->class
-					case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
-					     AST_NODECLASS_FIELD, AST_NODECLASS_DEREF
+					if( hIsVariableAccess( l->l ) ) then
 						n = l
 						l = l->l
 						astDelNode( n )
 						ldtype = typeJoin( ldtype, astGetFullType( l ) )
-					end select
+					end if
 				end if
 
-				select case l->class
-				case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
-				     AST_NODECLASS_FIELD, AST_NODECLASS_DEREF
-
+				if( hIsVariableAccess( l ) ) then
 					if( astHasSideFx( l ) = FALSE ) then
 						'' POW always promotes operands and its result to float.
 						if( typeGetClass( astGetDataType( l ) ) <> FB_DATACLASS_FPOINT ) then
@@ -1654,7 +1676,7 @@ private function hOptimizeConstBop _
 						r = astCloneTree( l )
 						op = AST_OP_MUL
 					end if
-				end select
+				end if
 			end if
 		end select
 	end if

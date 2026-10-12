@@ -2790,9 +2790,11 @@ declare sub symbDumpNamespace( byval ns as FBSYMBOL ptr )
 declare sub symbDumpChain( byval chain_ as FBSYMCHAIN ptr )
 declare sub symbDumpLookup( byval id as zstring ptr )
 
-'' FBARRAY: 6 pointer/integer fields + the dimTB with 3 integer fields per dimension
-#define symbDescriptorHasRoomFor( sym, dimensions ) (symbGetSizeOf( sym ) >= env.pointersize * (((dimensions) * 3) + 6))
 #endif
+
+'' Assertions can be enabled independently of debug code generation (-eassert).
+'' FBARRAY: 6 pointer/integer fields + the dimTB with 3 integer fields per dimension.
+#define symbDescriptorHasRoomFor( sym, dimensions ) (symbGetSizeOf( sym ) >= env.pointersize * (((dimensions) * 3) + 6))
 
 declare function symbDumpPrettyToStr( byval sym as FBSYMBOL ptr ) as string
 

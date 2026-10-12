@@ -1,3 +1,8 @@
+'' Project: FreeBASIC TinyPTC bindings
+'' File: tinyptc.bi
+'' Purpose: Declare the C framebuffer interface for supported targets.
+'' Responsibilities: Library selection and C-compatible parameter types.
+'' This file contains no display implementation or framebuffer allocation.
 ''
 '' TinyPTC by Gaffer
 '' www.gaffer.org/tinyptc
@@ -13,13 +18,15 @@
 #endif
 
 '' tinyptc api
+'' TinyPTC uses C int dimensions/results and a void pointer to packed 32-bit
+'' 0x00RRGGBB pixels. FreeBASIC Integer is wider on 64-bit targets.
 declare function ptc_open	cdecl alias "ptc_open"		(byval title as zstring ptr, _
-								 byval width as integer, _
-								 byval height as integer ) as integer
+								 byval width as long, _
+								 byval height as long ) as long
 
-declare function ptc_update	cdecl alias "ptc_update"	(byval buffer as integer ptr) as integer
+declare function ptc_update	cdecl alias "ptc_update"	(byval buffer as any ptr) as long
 
-declare function ptc_close	cdecl alias "ptc_close"		() as integer
+declare sub ptc_close	cdecl alias "ptc_close"		()
 
 #ifdef __FB_WIN32__
 # inclib "ddraw"
@@ -33,3 +40,5 @@ declare function ptc_close	cdecl alias "ptc_close"		() as integer
 #else
 # error Platform not supported!
 #endif
+
+'' end of tinyptc.bi

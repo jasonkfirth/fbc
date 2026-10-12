@@ -2,6 +2,9 @@
 ''
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'FMOD'
+'' Purpose: Play an MP3 and read its optional ID3 metadata.
+'' Responsibilities: File errors, bounded tag text and owned stream cleanup.
+'' This example contains no MPEG decoder or audio driver implementation.
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibfmod
 '' --------
@@ -9,73 +12,66 @@
 '' mp3 player based on FMOD
 
 #include Once "fmod.bi"
+#include Once "../../sound/FMOD/fmod_tags.bi"
 
-Const SOUND_FILE = "test.mp3"
+Dim As String sound_file = Command(1)
+If sound_file = "" Then
+	Print "Usage: fmod2 <audio-file>"
+	End 1
+End If
 
-Sub print_all_tags(ByVal fmod_stream As FSOUND_STREAM Ptr)
-	Dim As Integer count = 0
-	FSOUND_Stream_GetNumTagFields(fmod_stream, @count)
+If (FSOUND_GetVersion() < FMOD_VERSION) Then
+	Print "FMOD version mismatch"
+	End 1
+End If
+If (FSOUND_Init(44100, 4, 0) = 0) Then
+	Print "Could not initialize FMOD: "; FSOUND_GetError()
+	End 1
+End If
+If FSOUND_Stream_SetBufferSize(50) = 0 Then
+	FSOUND_Close()
+	End 1
+End If
 
-	For i As Integer = 0 To (count - 1)
-		Dim As Integer tagtype, taglen
-		Dim As ZString Ptr tagname, tagvalue
-		FSOUND_Stream_GetTagField(fmod_stream, i, @tagtype, @tagname, @tagvalue, @taglen)
-		Print Left(*tagname, taglen)
-	Next
-End Sub
+Dim As FSOUND_STREAM Ptr fmod_stream = FSOUND_Stream_Open(StrPtr(sound_file), FSOUND_MPEGACCURATE, 0, 0)
+If (fmod_stream = 0) Then
+	Print "FMOD could not load '" & sound_file & "'"
+	FSOUND_Close()
+	End 1
+End If
 
-Function get_tag _
-	( _
-		ByVal fmod_stream As FSOUND_STREAM Ptr, _
-		ByVal tagv1 As ZString Ptr, _
-		ByVal tagv2 As ZString Ptr _
-	) As String
+'' Copy and decode the borrowed metadata while the stream remains open.
+'' An absent or invalid text field yields an empty string.
+Print "Title:", get_tag(fmod_stream, "TITLE", "TIT2")
+Print "Album:", get_tag(fmod_stream, "ALBUM", "TALB")
+Print "Artist:", get_tag(fmod_stream, "ARTIST", "TPE1")
+''print_all_tags(fmod_stream)
 
-	Dim tagname As ZString Ptr, taglen As Integer
-
-	FSOUND_Stream_FindTagField(fmod_stream, FSOUND_TAGFIELD_ID3V1, tagv1, @tagname, @taglen)
-	If (taglen = 0) Then
-		FSOUND_Stream_FindTagField(fmod_stream, FSOUND_TAGFIELD_ID3V2, tagv2, @tagname, @taglen)
-	End If
-
-	Return Left(*tagname, taglen)
-End Function
-
-	If (FSOUND_GetVersion < FMOD_VERSION) Then
-		Print "FMOD version " + Str(FMOD_VERSION) + " or greater required!"
-		End 1
-	End If
-
-	If (FSOUND_Init(44100, 4, 0) = 0) Then
-		Print "Could not initialize FMOD"
-		End 1
-	End If
-
-	FSOUND_Stream_SetBufferSize(50)
-
-	Dim As FSOUND_STREAM Ptr fmod_stream = FSOUND_Stream_Open(SOUND_FILE, FSOUND_MPEGACCURATE, 0, 0)
-	If (fmod_stream = 0) Then
-		Print "FMOD could not load '" & SOUND_FILE & "'"
-		FSOUND_Close()
-		End 1
-	End If
-
-	'' Read out mp3 tags to show some meta information
-	Print "Title:", get_tag(fmod_stream, "TITLE", "TIT2")
-	Print "Album:", get_tag(fmod_stream, "ALBUM", "TALB")
-	Print "Artist:", get_tag(fmod_stream, "ARTIST", "TPE1")
-	''print_all_tags(fmod_stream)
-
-	Print "Playing mp3, press a key to exit..."
-	FSOUND_Stream_Play(FSOUND_FREE, fmod_stream)
-
-	While (Inkey() = "")
-		If (FSOUND_Stream_GetPosition(fmod_stream) >= FSOUND_Stream_GetLength(fmod_stream)) Then
-			Exit While
-		End If
-		Sleep 50, 1
-	Wend
-
-	FSOUND_Stream_Stop(fmod_stream)
+Dim As Long stream_channel = FSOUND_Stream_Play(FSOUND_FREE, fmod_stream)
+If stream_channel < 0 Then
+	Print "Could not start playback: "; FSOUND_GetError()
 	FSOUND_Stream_Close(fmod_stream)
 	FSOUND_Close()
+	End 1
+End If
+
+Dim As Integer playback_error = 0
+If Environ("FB_EXAMPLE_AUTOPLAY") = "1" Then
+	Sleep 1200, 1
+	If FSOUND_Stream_GetPosition(fmod_stream) = 0 Then playback_error = 1
+Else
+	Print "Playing MP3, press a key to exit..."
+	While Inkey() = ""
+		If FSOUND_IsPlaying(stream_channel) = 0 Then Exit While
+		Sleep 50, 1
+	Wend
+End If
+If FSOUND_IsPlaying(stream_channel) Then
+	If FSOUND_Stream_Stop(fmod_stream) = 0 Then playback_error = 1
+End If
+If FSOUND_Stream_Close(fmod_stream) = 0 Then playback_error = 1
+FSOUND_Close()
+If playback_error Then End 1
+Print "FMOD playback completed."
+
+'' end of fmod2.bas

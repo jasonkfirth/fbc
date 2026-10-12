@@ -1,3 +1,9 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: ptc_test.bas
+'' Purpose: Render this demonstration through the TinyPTC display.
+'' Responsibilities: Own the display loop and packed 32-bit pixel storage.
+'' This file contains no reusable display implementation.
+
 ''
 '' ordinary TinyPTC test, based on the original
 ''
@@ -10,7 +16,7 @@ const SCR_SIZE = SCR_WIDTH*SCR_HEIGHT
 
 '' The TinyPTC update call consumes this module-owned framebuffer.
 '' FB-LINTER: DISABLE-NEXT-LINE FBL301
-dim shared buffer( 0 to SCR_SIZE-1 ) as integer
+dim shared buffer( 0 to SCR_SIZE-1 ) as ulong
 
 sub main()
     dim n as integer, carry as integer, index as integer, seed as integer
@@ -41,3 +47,5 @@ sub main()
 end sub
 
 main()
+
+'' end of ptc_test.bas

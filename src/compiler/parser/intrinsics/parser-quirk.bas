@@ -197,6 +197,9 @@ function cQuirkFunction(byval sym as FBSYMBOL ptr) as ASTNODE ptr
 	end if
 
 	select case as const tk
+	case FB_TK_SERIALIZE, FB_TK_DESERIALIZE
+		funcexpr = cSerializationFunct( tk )
+
 	case FB_TK_MKD, FB_TK_MKS, FB_TK_MKI, FB_TK_MKL, _
 	     FB_TK_MKSHORT, FB_TK_MKLONGINT
 		funcexpr = cMKXFunct(tk)

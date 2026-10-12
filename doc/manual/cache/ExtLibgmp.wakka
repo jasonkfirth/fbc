@@ -2,26 +2,76 @@
 Free library for arbitrary precision arithmetic, operating on signed integers, rational numbers, and floating point numbers.
 
 Website: https://www.gmplib.org
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux
 Headers to include: gmp.bi
-Header version: 4.1.4
+Header version: 6.0.0
+
+{{fbdoc item="section" value="Native types and ownership"}}
+	The Win64 SDK uses 64-bit ##mp_limb_t## values while C ##long## remains 32-bit. ##mp_bitcnt_t##, ##mp_size_t## and ##mp_exp_t## keep their C widths. Use the binding's named types for limb pointers and low-level calls; FreeBASIC ##Integer## is not a general replacement for a C type.
+
+	##mpz_get_str(0, ...)## allocates through GMP's current allocator. Release such a string through the corresponding registered GMP free function, obtained with ##mp_get_memory_functions##. The example supplies a FreeBASIC-owned buffer instead, sized by ##mpz_sizeinbase## plus two bytes for a sign and terminating zero, and releases it with ##Deallocate##. Release initialized number internals with ##mpz_clear## before freeing the caller's number buffer.
+
+	The installed GMP 6.3.0 SDK has been checked against native C layouts and actual high-bit limb arguments and carry returns on Win32 and Win64, with both FreeBASIC backends. The decimal example's complete 19,729-digit result is checked independently.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/gmp.bas"}}%%(freebasic)
-#include once "gmp.bi"
+'' examples/manual/libraries/gmp.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'gmp, The GNU Multiple Precision Arithmetic Library'
+'' Purpose: Compute and print 2^65536 through the native GMP library.
+'' Responsibilities: Own the number buffer and decimal output storage.
+'' This example contains no custom GMP allocator or limb arithmetic.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibgmp
+'' --------
+''
+'' Ownership:
+''
+'' The example owns the __mpz_struct buffer allocated for bignum and the
+'' output string supplied to mpz_get_str().  Each is released on its matching
+'' successful allocation path.
 
-dim as mpz_ptr bignum = allocate(sizeof(__mpz_struct))
-mpz_init_set_si(bignum, 2)
-mpz_pow_ui(bignum, bignum, 65536)
+#include Once "gmp.bi"
 
-print "2^65536 = ";
-dim as zstring ptr s = mpz_get_str(0, 10, bignum)
-print *s;
-deallocate(s)
-print
+Dim As Integer status = 0
+Dim As mpz_ptr bignum = Allocate(SizeOf(__mpz_struct))
+If bignum = 0 Then
+	Print "Unable to allocate the GMP number."
+	status = 1
+Else
+	mpz_init_set_si(bignum, 2)
+	mpz_pow_ui(bignum, bignum, 65536)
 
-mpz_clear(bignum)
-deallocate(bignum)
+	Print "2^65536 = ";
+	' GMP can use a custom allocator. Supply our own output buffer so that
+	' Deallocate() never receives memory owned by the library's allocator.
+	' Two extra bytes cover a possible sign and the terminating zero.
+	Dim As UInteger digits = mpz_sizeinbase(bignum, 10)
+	Dim As ZString Ptr s
+	If digits > 0 AndAlso digits <= CUInt(-1) - 2 Then s = Allocate(digits + 2)
+	If s <> 0 Then
+		If mpz_get_str(s, 10, bignum) <> 0 Then
+			Print *s;
+		Else
+			Print "<conversion failed>";
+			status = 1
+		End If
+		Deallocate(s)
+		s = 0
+	Else
+		Print "<output allocation failed>";
+		status = 1
+	End If
+	Print
+
+	mpz_clear(bignum)
+	Deallocate(bignum)
+	bignum = 0
+End If
+
+End status
+'' end of examples/manual/libraries/gmp.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

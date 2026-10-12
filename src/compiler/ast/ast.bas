@@ -628,9 +628,20 @@ function astGetInverseLogOp _
 end function
 
 function astLoad( byval n as ASTNODE ptr ) as IRVREG ptr
-	if( n ) then
-		function = ast_loadcallbacks(n->class)( n )
+	if( n = NULL ) then
+		return NULL
 	end if
+	'' Only lowered node classes have loaders. Diagnose an invalid or
+	'' unlowered tree before indexing the table or calling a null entry.
+	if( (n->class < 0) orelse (n->class >= AST_CLASSES) ) then
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		return NULL
+	end if
+	if( ast_loadcallbacks(n->class) = NULL ) then
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		return NULL
+	end if
+	return ast_loadcallbacks(n->class)( n )
 end function
 
 '' end of ast/ast.bas

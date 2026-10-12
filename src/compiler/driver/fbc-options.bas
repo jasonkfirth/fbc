@@ -471,6 +471,7 @@ enum
 	OPT_WL
 	OPT_X
 	OPT_Z
+	OPT_PP_LINES
 	OPT__COUNT
 end enum
 
@@ -565,7 +566,8 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_WC           affects second stage compile
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_WL           affects link
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_X            affects output file
-	( TRUE , TRUE , TRUE , TRUE  )  _ '' OPT_Z            affects various - code generation
+	( TRUE , TRUE , TRUE , TRUE  ), _ '' OPT_Z            affects various - code generation
+	( FALSE, FALSE, FALSE, TRUE  )  _ '' OPT_PP_LINES     mapped preprocessor output
 }
 
 '' -------------------------------------------------------------------------
@@ -911,10 +913,13 @@ private sub hHandleOptPipeline _
 	case OPT_PIC
 		fbSetOption( FB_COMPOPT_PIC, TRUE )
 
-	case OPT_PP
+	case OPT_PP, OPT_PP_LINES
 		'' Preprocessing stops before code generation without changing the
 		'' output type selected for the module.
 		fbSetOption( FB_COMPOPT_PPONLY, TRUE )
+		if( optid = OPT_PP_LINES ) then
+			fbSetOption( FB_COMPOPT_PPONLY, FB_PPONLY_LINES )
+		end if
 		fbc.emitasmonly = TRUE
 
 	case OPT_PREFIX
@@ -1162,7 +1167,7 @@ private sub handleOpt _
 	case OPT_G, OPT_GEN to OPT_O
 		hHandleOptFilesAndOutput( optid, arg, is_source )
 
-	case OPT_OPTIMIZE to OPT_S, OPT_SHOWINCLUDES to OPT_TARGET
+	case OPT_OPTIMIZE to OPT_S, OPT_SHOWINCLUDES to OPT_TARGET, OPT_PP_LINES
 		hHandleOptPipeline( optid, arg, is_source )
 
 	case OPT_TITLE to OPT_Z
@@ -1271,6 +1276,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 		ONECHAR(OPT_P)
 		CHECK("pic", OPT_PIC)
 		CHECK("pp", OPT_PP)
+		CHECK("pp-lines", OPT_PP_LINES)
 		CHECK("prefix", OPT_PREFIX)
 		CHECK("print", OPT_PRINT)
 		CHECK("profile", OPT_PROFILE)

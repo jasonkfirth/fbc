@@ -1,0 +1,40 @@
+Allegro 4 native Windows rendering repair
+File: allegro4-win64-gdi.txt
+Purpose: Describe the companion patch and its qualification requirements.
+This file contains no substitute renderer or FreeBASIC ABI workaround.
+
+Source: https://github.com/liballeg/allegro4
+Revision: d4a10d1f2113b776b6b36742fca9f97d5708533b (4.4.4)
+
+Apply allegro4-win64-gdi.patch with git apply --check first, then git apply,
+from the root of a private extracted source tree. Rebuild the native library.
+Do not replace an installed SDK as part of qualification.
+
+Windows uses a 32-bit unsigned long on both Win32 and Win64. The GDI screen
+constructor cast its allocation address to unsigned long, and the shared
+monochrome glyph renderer stored scanline addresses in unsigned long. Both
+discard the upper address bits on Win64. The patch uses the uintptr_t type
+already required by Allegro's bitmap/bank APIs and checks the GDI allocation
+before constructing a screen bitmap. The public ABI remains unchanged.
+
+The MinGW platform header also declared ALLEGRO_I386 on Win64. This enabled
+32-bit stack-argument shortcuts in the triangle and 3D polygon routines.
+Win64 passes some arguments in registers and reserves wider stack slots.
+The patch declares ALLEGRO_AMD64 when _WIN64 is set and retains ALLEGRO_I386
+on Win32. That selects the existing portable implementations on Win64.
+
+A plain native C window program reproduced the unpatched failure before any
+test input or frame capture. Exception unwinding identified get_dib_from_bitmap
+and _linear_draw_glyph8. The original DLL is retained in the private build's
+baseline directory. Debugger runs alone are insufficient: low heap addresses
+can conceal the truncation.
+
+tests/bindings/allegro-glyph.c checks actual native glyph pixels at 8, 15, 16,
+24 and 32-bit depths and bounded triangle drawing at each depth. On Win64 it
+requires bitmap storage above 4 GiB. Compile
+it against the full native SDK and run it with that SDK's DLL directory first
+in PATH. The unpatched DLL must fail and the repaired DLL must pass. Also run
+the five original graphics/Allegro examples, checking actual drawn frames and
+normal input-driven exits. Keep compiler, DLL and source hashes with results.
+
+end of allegro4-win64-gdi.txt

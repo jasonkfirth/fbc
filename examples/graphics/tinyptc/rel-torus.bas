@@ -1,7 +1,13 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: rel-torus.bas
+'' Purpose: Render this demonstration through the TinyPTC display.
+'' Responsibilities: Own the display loop and packed 32-bit pixel storage.
+'' This file contains no reusable display implementation.
+
 #include "tinyptc.bi"
 
-declare sub smooth(target() as integer)
-declare sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
+declare sub smooth(target() as ulong)
+declare sub put_pixel(target() as ulong, byval x as integer, byval y as integer, byval col as integer)
 declare sub domain
 
 const SCR_WIDTH = 320
@@ -17,7 +23,7 @@ const YMID = SCR_HEIGHT \2
 
    ' The single display loop owns the framebuffer and trigonometric lookup tables.
    '' FB-LINTER: DISABLE-NEXT-LINE FBL301
-dim shared buffer( 0 to SCR_SIZE-1 ) as integer
+dim shared buffer( 0 to SCR_SIZE-1 ) as ulong
 dim shared Lcos(0 to 359) as single
 dim shared Lsin(0 to 359) as single
 
@@ -119,7 +125,7 @@ end sub
 ' Torus-renderer helpers
 ' -------------------------------------------------------------------------
 
-private sub put_pixel(target() as integer, byval x as integer, byval y as integer, byval col as integer)
+private sub put_pixel(target() as ulong, byval x as integer, byval y as integer, byval col as integer)
 
     if( y > 0 and y < SCR_HEIGHT-1 ) then
 			if( x > 0 and x < SCR_WIDTH-1 ) then
@@ -130,7 +136,7 @@ private sub put_pixel(target() as integer, byval x as integer, byval y as intege
 end sub
 
 
-private sub smooth(target() as integer)
+private sub smooth(target() as ulong)
 
     dim as integer firstpixel, maxpixel, offset, pixel, r, g, b, nr, ng, nb
 
@@ -172,3 +178,5 @@ private sub smooth(target() as integer)
     next offset
 
 end sub
+
+'' end of rel-torus.bas

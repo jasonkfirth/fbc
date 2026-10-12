@@ -102,10 +102,13 @@ const INVALID               = -1
 
 '' compiler options corresponding to the FBCMMLINEOPT struct
 '' (for use with the public fbSet/GetOption() interface)
+'' Mapped preprocessing retains logical locations for compiler-backed replay.
+const FB_PPONLY_LINES = 2
+
 enum FB_COMPOPT
 	'' compiler output file type
 	FB_COMPOPT_OUTTYPE              '' FB_OUTTYPE_*
-	FB_COMPOPT_PPONLY               '' boolean: TRUE for preprocessor-only mode
+	FB_COMPOPT_PPONLY               '' TRUE for plain output, FB_PPONLY_LINES for mapped output
 
 	'' backend, target, code generation
 	FB_COMPOPT_BACKEND              '' FB_BACKEND_*
@@ -358,7 +361,7 @@ end enum
 type FBCMMLINEOPT
 	'' compiler output file type
 	outtype         as FB_OUTTYPE
-	pponly          as integer              '' TRUE for preprocessor-only mode
+	pponly          as integer              '' TRUE for plain output, FB_PPONLY_LINES for mapped output
 
 	'' backend, target, code generation
 	backend         as FB_BACKEND           '' backend (-gen gas/gcc)

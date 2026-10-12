@@ -1,0 +1,267 @@
+{{fbdoc item="title" value="Compiler-assisted serialization"}}----
+Portable snapshots of ordinary values, strings, arrays and public UDT fields
+
+{{fbdoc item="syntax"}}##
+	#include once "fbserialize.bi"
+	//payload// = Serialize( //source// )
+	//success// = Deserialize( //payload//, //destination// )
+##
+{{fbdoc item="desc"}}
+	##[[KeyPgSerialize|Serialize]]## converts a supported value to an owned binary string. ##[[KeyPgDeserialize|Deserialize]]## reconstructs it with independent ownership and leaves the destination unchanged on failure. Both names are macros supplied by ##fbserialize.bi## and require a compiler and runtime built with serialization support.
+	
+	The compiler determines the type's public data structure and emits target-specific traversal instructions together with a portable schema. The runtime executes those instructions without a reflection registry or manual field registration. Ordinary assignment, UDT memory layouts and the existing ##[[KeyPgPutfileio|Put]]## and ##[[KeyPgGetfileio|Get]]## file operations retain their existing behavior.
+
+{{fbdoc item="section" value="Supported data and ownership"}}
+	Supported data consists of ##Boolean##, all signed and unsigned integer types, enums, IEEE ##Single## and ##Double##, dynamic ##String##, fixed ##String * N##, nested ordinary UDTs, fixed arrays, dynamic arrays and arrays of UDTs. Packed UDTs are supported. Only public data fields are traversed.
+	
+	Owned string and dynamic array contents are copied recursively. Embedded null bytes and fixed-string spaces are preserved. The source, payload and reconstructed destination have separate lifetimes. See the deep ownership example on ##[[KeyPgSerialize|Serialize]]## and the whole-array failure example on ##[[KeyPgDeserialize|Deserialize]]##.
+	
+	Pointers, procedure pointers, ##ByRef## fields, bitfields, unions, inheritance, non-public fields, ##ZString##, ##WString##, ##UString## and UDTs with user-defined constructors, destructors or operators are rejected at compilation. Convert external objects or pointer graphs into supported wire records with an explicit application codec. Compiler-generated string/array lifetime operations are supported. A ##Const## source is allowed; a destination containing ##Const## fields is not.
+	
+	Sources and destinations must contain valid FreeBASIC values, not descriptors overwritten with raw bytes. Callers must synchronize accesses when other threads can modify the same values. Each codec call owns its traversal and allocation state.
+
+{{fbdoc item="section" value="Scalars, fixed strings and fixed arrays"}}
+	A scalar uses the same API as a record. Fixed strings retain every stored byte, including padding and embedded nulls. Fixed arrays use empty parentheses and require matching element types, dimensions and bounds in the destination. This example checks each reconstructed byte and array element.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/manual/array/serialization-fixed.bas"}}%%(freebasic)
+'' examples/manual/array/serialization-fixed.bas
+''
+'' FreeBASIC Manual: Compiler-assisted serialization
+'' Purpose: Round-trip scalar values, fixed strings and fixed arrays.
+'' Responsibilities: Preserve stored bytes, array bounds and element order.
+'' This example intentionally contains no dynamic records or transport code.
+'' --------
+
+#include once "fbserialize.bi"
+
+Dim As Long original_number = -42, restored_number
+Dim As String payload = Serialize(original_number)
+If Err <> 0 Then End 1
+If Deserialize(payload, restored_number) = 0 Then End 1
+If restored_number <> original_number Then End 1
+Print "Number: "; restored_number
+
+'' A fixed string includes its stored padding, as well as embedded nulls.
+Dim As String * 6 original_text, restored_text
+original_text = "A" & Chr(0) & "B"
+payload = Serialize(original_text)
+If Err <> 0 Then End 1
+If Deserialize(payload, restored_text) = 0 Then End 1
+For position As Integer = 1 To Len(original_text)
+    If Asc(restored_text, position) <> Asc(original_text, position) Then End 1
+Next position
+Print "Fixed string bytes: "; Len(restored_text)
+Print "Embedded null byte: "; Asc(restored_text, 2)
+
+'' Fixed arrays require the same element type, dimensions and bounds.
+Dim original_values(-1 To 0, 2 To 4) As Long
+Dim restored_values(-1 To 0, 2 To 4) As Long
+Dim As Integer row, column
+For row = -1 To 0
+    For column = 2 To 4
+        original_values(row, column) = row * 10 + column
+    Next column
+Next row
+
+payload = Serialize(original_values())
+If Err <> 0 Then End 1
+If Deserialize(payload, restored_values()) = 0 Then End 1
+For row = -1 To 0
+    For column = 2 To 4
+        If restored_values(row, column) <> original_values(row, column) Then End 1
+    Next column
+Next row
+Print "Array corners: "; restored_values(-1, 2); " / "; restored_values(0, 4)
+
+'' end of serialization-fixed.bas
+%%
+
+{{fbdoc item="section" value="Schema compatibility and wire format"}}
+	Every version 1 payload begins with four ASCII bytes ##FBS1##, a little-endian unsigned 32-bit schema byte count, the exact schema bytes without a terminator, then the logical contents in declaration or array storage order. No padding, pointers, native offsets or descriptor bytes are sent.
+	
+	The schema includes member names and order, scalar types, enum member names and values, fixed string lengths, array kinds, fixed bounds and declared ranks. UDT names, packing and native ##Integer## width do not affect compatibility. Structurally identical records may have different UDT names. Schema comparison uses all bytes rather than only a hash.
+	
+	- Fixed-width integers use their declared 1, 2, 4 or 8 wire bytes. Signed values use two's complement.
+	- ##Integer##, ##UInteger## and enums use 64 wire bits. A narrower reader rejects values outside its native range.
+	- ##Boolean## uses one byte, either 0 or 1.
+	- ##Single## and ##Double## use their 4-byte and 8-byte IEEE representations, preserving signed zero and NaN bits.
+	- Dynamic strings use an unsigned 32-bit byte length followed by that many bytes. Fixed strings use exactly their declared byte count.
+	- UDTs and inline fixed arrays contain consecutive logical fields or elements.
+	- Descriptor-backed arrays, including root arrays, store a one-byte allocated rank, or zero for an unallocated array. Allocated arrays then store signed 64-bit lower and upper bounds for each dimension, followed by elements with the last dimension varying fastest.
+	
+	All multibyte wire values use little-endian order. This representation permits compatible 32-bit and 64-bit applications to exchange data. Strings contain bytes rather than a declared text encoding; applications must agree on an encoding such as UTF-8 when text crosses systems. Unsupported versions, mismatched schemas, invalid bounds, truncated input and trailing bytes are rejected.
+
+{{fbdoc item="section" value="Limits and errors"}}
+	Version 1 enforces these per-call limits before or during traversal:
+	
+	- Complete payload: 16 MiB.
+	- Aggregate decode allocations, including metadata and scratch storage: 64 MiB.
+	- Canonical schema: 64 KiB.
+	- Traversal instructions: 4,096.
+	- Nested instruction depth: 32 levels.
+	- Array dimensions: 8.
+	- Array elements and total encode/decode value visits: 1,048,576.
+	
+	The compiler rejects types exceeding its schema, instruction or depth limits. The runtime checks counts, extent products and native integer/bound conversions before allocating or reconstructing descriptors. Each successful call sets ##[[KeyPgErr|Err]]## to zero. Check ##Err## immediately after ##Serialize##; check the return value from ##Deserialize## before using the reconstructed value. Both operations report ##FB_SERIALIZE_INVALID## (1) or ##FB_SERIALIZE_OUT_OF_MEMORY## (4) on failure.
+
+{{fbdoc item="section" value="Binary files and transport framing"}}
+	The codec handles memory buffers. The application handles files, sockets, message boundaries and transport errors. A binary string can contain null bytes; pass its full byte length to APIs instead of treating it as a terminated string. Supply exactly one complete payload to ##Deserialize##. Streams carrying multiple payloads need application framing, such as a length prefix with a checked maximum.
+	
+	This example writes one payload to a new or empty file, then reads the full file with a size limit and an exact byte-count check. Run it with a path argument, for example ##serialization saved-state.bin##. It leaves that file available for inspection and refuses to overwrite a nonempty file.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/manual/fileio/serialization.bas"}}%%(freebasic)
+'' examples/manual/fileio/serialization.bas
+''
+'' FreeBASIC Manual: Compiler-assisted serialization
+'' Purpose: Carry a serialized record through an ordinary binary file.
+'' Responsibilities: File errors, bounded reads and exact byte counts.
+'' Ownership: Each opened file handle is closed by this program.
+'' The caller owns the output file, which is left in place for inspection.
+'' This example intentionally contains no stream or socket framing.
+'' --------
+
+#include once "fbserialize.bi"
+
+Type SavedState
+    title As String
+    score As Long
+End Type
+
+Dim As String filename = Command(1)
+If filename = "" Then
+    Print "Usage: serialization <new-or-empty-file>"
+    End 1
+End If
+
+Dim As SavedState original, restored
+original.title = "Saved" & Chr(0) & "game"
+original.score = 42
+Dim As String payload = Serialize(original)
+If Err <> 0 Then End 1
+
+Dim As Integer file_number = FreeFile()
+If Open(filename For Binary Access Read Write As #file_number) <> 0 Then End 1
+
+'' Use a new or empty file so older trailing bytes cannot survive a write.
+If Lof(file_number) <> 0 Then
+    Close #file_number
+    Print "Choose a new or empty file."
+    End 1
+End If
+If Put(#file_number, , payload) <> 0 Then
+    Close #file_number
+    End 1
+End If
+If Close(file_number) <> 0 Then End 1
+
+file_number = FreeFile()
+If Open(filename For Binary Access Read As #file_number) <> 0 Then End 1
+
+'' Bound the allocation before reading. Version 1 accepts at most 16 MiB.
+Dim As LongInt byte_count = Lof(file_number)
+If byte_count <= 0 OrElse byte_count > 16 * 1024 * 1024 Then
+    Close #file_number
+    End 1
+End If
+Dim As String received = Space(CInt(byte_count))
+Dim As UInteger bytes_read
+Dim As Integer read_error = Get(#file_number, , received, , bytes_read)
+Dim As Integer close_error = Close(file_number)
+If read_error <> 0 OrElse close_error <> 0 Then End 1
+If bytes_read <> byte_count Then End 1
+
+If Deserialize(received, restored) = 0 Then
+    Print "Deserialize failed: "; Err
+    End 1
+End If
+Print "Title bytes: "; Len(restored.title)
+Print "Score: "; restored.score
+
+'' end of serialization.bas
+%%
+
+{{fbdoc item="section" value="Application record versions"}}
+	The codec format version is separate from an application's record version. Changing a member name, type or order changes the schema, so decoding directly into a revised type fails. Keep a stable envelope with an application version and binary string payload. Decode the envelope, select the matching old or new wire record, then migrate explicitly.
+	
+	This example writes a version 1 record and supplies the new version 2 field's default when reading it. Keep old wire definitions as long as old data must remain readable. Unknown application versions are rejected.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/manual/proguide/serialization-version.bas"}}%%(freebasic)
+'' examples/manual/proguide/serialization-version.bas
+''
+'' FreeBASIC Manual: Compiler-assisted serialization
+'' Purpose: Read an older application record through a stable envelope.
+'' Responsibilities: Version dispatch and explicit field migration.
+'' This example intentionally contains no automatic schema conversion.
+'' --------
+
+#include once "fbserialize.bi"
+
+'' Keep this envelope definition stable across application versions.
+Type Envelope
+    version As ULong
+    payload As String
+End Type
+
+Type PlayerV1
+    player_name As String
+    score As Long
+End Type
+
+Type PlayerV2
+    player_name As String
+    score As Long
+    level As Long
+End Type
+
+Dim As PlayerV1 old_player
+old_player.player_name = "Player One"
+old_player.score = 42
+
+Dim As Envelope outgoing
+outgoing.version = 1
+outgoing.payload = Serialize(old_player)
+If Err <> 0 Then End 1
+Dim As String packet = Serialize(outgoing)
+If Err <> 0 Then End 1
+
+Dim As Envelope incoming
+If Deserialize(packet, incoming) = 0 Then End 1
+
+'' Decode into the selected wire type first. The application supplies
+'' defaults for added fields instead of asking the codec to guess them.
+Dim As PlayerV2 current_player
+Select Case incoming.version
+Case 1
+    Dim As PlayerV1 previous_player
+    If Deserialize(incoming.payload, previous_player) = 0 Then End 1
+    current_player.player_name = previous_player.player_name
+    current_player.score = previous_player.score
+    current_player.level = 1
+Case 2
+    If Deserialize(incoming.payload, current_player) = 0 Then End 1
+Case Else
+    Print "Unsupported application version: "; incoming.version
+    End 1
+End Select
+
+Print current_player.player_name
+Print "Score: "; current_player.score
+Print "Level: "; current_player.level
+
+'' end of serialization-version.bas
+%%
+
+{{fbdoc item="lang"}}
+	- Available in ##[[CompilerOptlang|-lang fb]]## and ##[[CompilerOptlang|-lang fblite]]##; unavailable in ##[[CompilerOptlang|-lang qb]]##.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgSerialize|Serialize]]##
+	- ##[[KeyPgDeserialize|Deserialize]]##
+	- ##[[KeyPgPutfileio|Put (File I/O)]]##
+	- ##[[KeyPgGetfileio|Get (File I/O)]]##
+	- ##[[ProPgFbnetwire|fbnetwire.bi portable wire helpers]]##
+
+{{fbdoc item="back" value="DocToc|Table of Contents"}}{{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

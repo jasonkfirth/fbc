@@ -1,0 +1,5 @@
+{
+  "examples/database/mysql_test.bas": {
+    "fbc_args": ["-p", "/usr/local/lib/mariadb"]
+  }
+}

@@ -1,10 +1,31 @@
 {{fbdoc item="title" value="PDFlib"}}----
 Portable library for dynamically generating PDF documents
 
-Website: http://www.pdflib.com
-Platforms supported: ""Win32"", Linux
+Website: https://www.pdflib.com
+Platforms supported: ""Win32"", ""Win64"", Linux
 Headers to include: pdflib.bi
 Header version: 4.0.2
 Examples: in examples/files/pdflib/
+
+{{fbdoc item="section" value="Choosing a matching SDK"}}
+	This header describes PDFlib 4.0.2. Later PDFlib releases change API names and argument types; a modern library cannot be substituted just by renaming its archive. The library and its compression/image dependencies must also match the executable's target architecture.
+
+	The original 4.0.2 source is available from the [[https://sourceforge.net/projects/gnuwin32/files/pdflib-lite/4.0.2/|GnuWin32 PDFlib archive]]. The source ZIP is ##pdflib-4.0.2-src.zip##, with SHA-256 ##f1fb0952dcd7387fed48607a83da89bf8e854bf39ff6299b801a33367d08fc27##. Retain the publisher's license files when building or redistributing this SDK.
+
+	Native Windows 32-bit and 64-bit and Linux amd64 qualification covers file output, a streaming output callback and in-memory output, with text and GIF images. The source archive has a failed-file-open cleanup defect; ##build_scripts/patches/pdflib4-open-file-cleanup.patch## repairs it for a private SDK build. The unpatched library can retain document allocations after ##PDF_open_file## fails and ##PDF_delete## is called.
+
+	The bundled TIFF header also assumes that C ##long## occupies four bytes. On Linux amd64 it occupies eight bytes, although TIFF file fields remain 32 bits. Apply ##build_scripts/patches/pdflib4-tiff-lp64.patch## when building that dependency from this archive on an LP64 target. The patch selects the type from the actual C width and preserves the Windows layout. Native checks cover an independently encoded odd-width TIFF, guarded scanlines and decoded pixels, as well as independently parsed and rendered PDF output.
+
+{{fbdoc item="section" value="C types, callbacks and ownership"}}
+	PDFlib's C ##int## parameters and results use FreeBASIC ##Long##, including the negative error results. C ##long## uses ##clong## from ##crt/long.bi##, which follows the target ABI. Callback byte counts use native unsigned ##UInteger## for C ##size_t##. Allocation and reallocation callbacks return pointers, and a write callback returns the number of bytes actually accepted.
+
+	Keep callbacks and their application data valid until ##PDF_delete##. ##PDF_new2## may call the allocator with a null PDF pointer before the object exists. Return from a nonfatal error handler, but terminate or unwind on a fatal error, as required by PDFlib. A custom handler must not return into a failed operation.
+
+	##PDF_get_buffer## returns borrowed bytes belonging to the PDF object. Copy the exact returned byte count before another PDFlib operation or deletion. The data is binary and can contain null bytes. Close each image handle after its last placement, then end the page, close the document and delete the object.
+
+{{fbdoc item="section" value="Running the example"}}
+	Build ##examples/files/pdflib/test.bas## with a matching PDFlib 4.0.2 SDK. It accepts an optional output filename and GIF logo filename, for example ##test result.pdf path/to/fblogo.gif##. The default output is ##pdflib_test.pdf##; the library opens it for writing and replaces its previous contents.
+
+	The example checks object creation, file-open errors and font handles. A missing logo is reported and the page is generated without it. Resource filenames are limited to 1023 bytes to fit the version 4 filename buffers. Set ##FB_EXAMPLE_AUTOPLAY=1## for a bounded run without the final keyboard pause.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

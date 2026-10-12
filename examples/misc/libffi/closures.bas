@@ -1,13 +1,26 @@
+'' FreeBASIC libffi closure example
+'' File: closures.bas
+'' Purpose: Bind a C-style function pointer to a generic closure callback.
+'' Responsibilities: Typed return storage, borrowed call data and cleanup.
+'' This example contains no native trampoline implementation.
+
 #include "ffi.bi"
 
 ' Acts like puts with the file given at time of enclosure.
 Sub Printer cdecl(ByVal cif As ffi_cif Ptr, ByVal ret As Any Ptr, ByVal args As Any Ptr Ptr, ByVal File As Any Ptr)
-    Print #*CPtr(Integer Ptr, file), **CPtr(ZString Ptr Ptr, args[0])
-    *CPtr(UInteger Ptr, ret) = 42
+    ' libffi supplies ffi_arg storage even for a 32-bit integer return.
+    If ret = 0 Then Exit Sub
+    *CPtr(ffi_arg Ptr, ret) = 0
+    If args = 0 OrElse File = 0 OrElse args[0] = 0 Then Exit Sub
+    Dim s As ZString Ptr = *CPtr(ZString Ptr Ptr, args[0])
+    If s = 0 Then Exit Sub
+    Print #*CPtr(Integer Ptr, File), *s
+    *CPtr(ffi_arg Ptr, ret) = 42
 End Sub
 
 ' Allocate the closure and function binding
-Dim PrinterBinding As Function(ByVal s As ZString Ptr) As Integer
+Dim status As Integer = 1
+Dim PrinterBinding As Function Cdecl(ByVal s As ZString Ptr) As ULong
 Dim closure As ffi_closure Ptr
 closure = ffi_closure_alloc(SizeOf(ffi_closure), @PrinterBinding)
 
@@ -41,9 +54,10 @@ If closure <> 0 Then
             )
             If prep_result = FFI_OK Then
                 ' Call binding as a natural function call
-                Dim Result As Integer
+                Dim Result As ULong
                 Result = PrinterBinding("Hello World!")
                 Print Using "Returned &"; Result
+            If Result = 42 Then status = 0
             End If
 
             Close ConsoleFile
@@ -58,4 +72,6 @@ If closure <> 0 Then
     ffi_closure_free(closure)
 End If
 
+If status <> 0 Then Print "libffi closure example failed"
+End status
 ' end of closures.bas

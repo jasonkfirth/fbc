@@ -829,9 +829,14 @@ private sub hMangleVariable( byval sym as FBSYMBOL ptr )
 
 		select case( env.clopt.target )
 		case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN
-			'' Win32 import? Add same prefix as done by gcc
+			'' Import address table symbols follow the target's PE ABI.
+			'' 32-bit C names have a leading underscore; Win64 names do not.
 			if( symbIsImport( sym ) ) then
-				mangled += "_imp__"
+				if( env.pointersize = 8 ) then
+					mangled += "__imp_"
+				else
+					mangled += "_imp__"
+				end if
 			end if
 		end select
 

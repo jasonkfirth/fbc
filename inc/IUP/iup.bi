@@ -1,4 +1,8 @@
 '' FreeBASIC binding for iup-3.15
+'' File: iup.bi
+'' Purpose: Declare the public IUP API and its platform link dependencies.
+'' Responsibilities: Opaque handles, C callbacks and selected GTK backend.
+'' This file contains no widget implementation or application event loop.
 ''
 '' based on the C header files:
 ''   Copyright (C) 1994-2015 Tecgraf, PUC-Rio.
@@ -39,9 +43,20 @@
 	#inclib "shell32"
 	#inclib "uuid"
 #else
-	#inclib "gtk-x11-2.0"
-	#inclib "gdk-x11-2.0"
-	#inclib "pangox-1.0"
+	'' IUP's C API is independent of its GTK backend. Select the backend
+	'' matching the C library, using the same macro as gtk/gtk.bi. Linking
+	'' a GTK 3 build must not introduce the old GTK 2 or Pango X libraries.
+	#ifdef __USE_GTK3__
+		#inclib "gtk-3"
+		#inclib "gdk-3"
+		#inclib "pangocairo-1.0"
+		#inclib "cairo"
+		#inclib "X11"
+	#else
+		#inclib "gtk-x11-2.0"
+		#inclib "gdk-x11-2.0"
+		#inclib "pangox-1.0"
+	#endif
 	#inclib "gdk_pixbuf-2.0"
 	#inclib "pango-1.0"
 	#inclib "gobject-2.0"
@@ -372,3 +387,5 @@ enum
 end enum
 
 end extern
+
+'' end of iup.bi

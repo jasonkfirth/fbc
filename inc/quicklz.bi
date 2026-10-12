@@ -1,3 +1,9 @@
+'' FreeBASIC QuickLZ binding
+'' File: quicklz.bi
+'' Purpose: Declare the QuickLZ 1.5.0 C interface and state layouts.
+'' Responsibilities: Fixed-width hash entries and native buffer lengths.
+'' This file contains no compression implementation or input validation.
+
 #ifndef QLZ_HEADER
 #define QLZ_HEADER
 
@@ -51,7 +57,9 @@
 #error QLZ_COMPRESSION_LEVEL must be 1, 2 or 3
 #endif
 
-type ui32 as uinteger
+'' C unsigned int is 32-bit on both Win64 and Unix64. The compact 64-bit
+'' hash entry stores a 32-bit offset, not a native pointer or size_t.
+type ui32 as ulong
 type ui16 as ushort
 
 ' Decrease QLZ_POINTERS for level 3 to increase compression speed. Do not touch any other values!
@@ -76,7 +84,7 @@ type qlz_hash_compress
 #if QLZ_COMPRESSION_LEVEL = 1
 	cache as ui32
 #if defined(QLZ_PTR_64) and QLZ_STREAMING_BUFFER = 0
-	offset as uinteger
+	offset as ulong
 #else
 	offset as const ubyte ptr
 #endif
@@ -129,10 +137,12 @@ extern "C"
 ' Public functions of QuickLZ
 declare function qlz_size_decompressed(byval source as const ubyte ptr) as size_t
 declare function qlz_size_compressed(byval source as const ubyte ptr) as size_t
-declare function qlz_compress(byval source as const any ptr, byval destination as const ubyte ptr, byval size as size_t, byval state as qlz_state_compress ptr) as size_t
+declare function qlz_compress(byval source as const any ptr, byval destination as ubyte ptr, byval size as size_t, byval state as qlz_state_compress ptr) as size_t
 declare function qlz_decompress(byval source as const ubyte ptr, byval destination as any ptr, byval state as qlz_state_decompress ptr) as size_t
-declare function qlz_get_setting(byval setting as integer) as integer
+declare function qlz_get_setting(byval setting as long) as long
 
 end extern
 
 #endif
+
+'' end of quicklz.bi

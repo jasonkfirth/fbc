@@ -9,7 +9,12 @@
 #ifndef __mysql_bi__
 #define __mysql_bi__
 
-#inclib "mysqlclient"
+#if defined(__FB_FREEBSD__)
+	'' The FreeBSD ports connector provides the MySQL-compatible libmariadb ABI.
+	#inclib "mariadb"
+#else
+	#inclib "mysqlclient"
+#endif
 
 #ifndef __MYSQL_BASIC_TYPES__
 #define __MYSQL_BASIC_TYPES__

@@ -48,6 +48,7 @@ constructor CHttpStream _
 	)
 
 	ctx = new CHttpStreamCtx_
+	if( ctx = NULL ) then return
 
 	if( http = NULL ) then
 		http = new CHttp
@@ -70,6 +71,7 @@ destructor CHttpStream _
 		_
 	)
 
+	if( ctx = NULL ) then return
 	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 		deallocate( ctx->stream.buffer )
 	end if
@@ -123,6 +125,7 @@ private function recv_cb cdecl _
 	end if
 
 	dim as size_t data_end = memstream->pos + bytes
+	if( data_end > (maximum_size shr 1) ) then return 0
 
 	if( data_end >= memstream->size ) then
 		dim as size_t growth
@@ -178,6 +181,7 @@ function CHttpStream.receive _
 
 	dim as CURL ptr curl
 
+	if( ctx = NULL ) then return FALSE
 	if( ctx->http = NULL ) then
 		return FALSE
 	end if
@@ -204,19 +208,22 @@ function CHttpStream.receive _
 	dim as clong follow_location = 1
 	dim as clong maximum_redirects = 16
 
-	curl_easy_setopt( curl, CURLOPT_URL, url )
+	dim as CURLcode transfer_result = CURLE_FAILED_INIT
+	do
+		if( url = NULL ) then exit do
+		if( url[0] = 0 ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_URL, url ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects ) <> CURLE_OK ) then exit do
+		if( referer <> NULL ) then
+			if( curl_easy_setopt( curl, CURLOPT_REFERER, referer ) <> CURLE_OK ) then exit do
+		end if
+		if( curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, @recv_cb ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_WRITEDATA, @ctx->stream ) <> CURLE_OK ) then exit do
+		transfer_result = curl_easy_perform( curl )
+	loop while FALSE
 
-	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
-	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
-
-	if( referer <> NULL ) then
-		curl_easy_setopt( curl, CURLOPT_REFERER, referer )
-	end if
-
-	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, @recv_cb )
-	curl_easy_setopt( curl, CURLOPT_WRITEDATA, @ctx->stream )
-
-	if( curl_easy_perform( curl ) <> 0 ) then
+	if( transfer_result <> CURLE_OK ) then
 		if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 			deallocate( ctx->stream.buffer )
 		end if
@@ -241,12 +248,16 @@ function CHttpStream.read _
 		byval is_binary as integer _
 	) as string
 
+	if( ctx = NULL ) then return ""
 	if( ctx->stream.buffer <> NULL ) then
 		if( is_binary = FALSE ) then
 			function = *cptr(zstring ptr, ctx->stream.buffer)
 		else
-			dim as string res = space( ctx->stream.pos + 1 )
-			memcpy( strptr( res ), ctx->stream.buffer, ctx->stream.pos + 1 )
+			'' The C terminator is storage, not part of the response body.
+			if( ctx->stream.pos > (cast( size_t, -1 ) shr 1) ) then return ""
+			dim as string res = space( ctx->stream.pos )
+			if( len( res ) <> ctx->stream.pos ) then return ""
+			if( ctx->stream.pos <> 0 ) then memcpy( strptr( res ), ctx->stream.buffer, ctx->stream.pos )
 			function = res
 		end if
 
@@ -303,6 +314,20 @@ private function send_cb cdecl _
 
 end function
 
+/' libcurl requests a rewind when it has to resend an upload. Only an
+   absolute offset into the caller-owned buffer is supported here. '/
+private function seek_cb cdecl ( byval userdata as any ptr, _
+                                byval offset as curl_off_t, _
+                                byval origin as long ) as long
+	dim memstream as CStream ptr = userdata
+	if( memstream = NULL or origin <> SEEK_SET or offset < 0 ) then return CURL_SEEKFUNC_CANTSEEK
+	dim total as size_t = memstream->pos + memstream->size
+	if( offset > total ) then return CURL_SEEKFUNC_FAIL
+	memstream->pos = offset
+	memstream->size = total - memstream->pos
+	return CURL_SEEKFUNC_OK
+end function
+
 '':::::
 function CHttpStream.send _
 	( _
@@ -314,68 +339,70 @@ function CHttpStream.send _
 	) as integer
 
 	dim as CURL ptr curl
-
-	if( ctx->http = NULL ) then
-		return FALSE
-	end if
-
-	if( bytes <= 0 ) then
-		return TRUE
-	end if
-
-	if( data_ = NULL ) then
-		return FALSE
-	end if
-
+	if( ctx = NULL ) then return FALSE
+	if( ctx->http = NULL ) then return FALSE
+	if( url = NULL ) then return FALSE
+	if( url[0] = 0 or bytes < 0 ) then return FALSE
+	if( bytes > 0 andalso data_ = NULL ) then return FALSE
 	curl = ctx->http->getHandle( )
-	if( curl = NULL ) then
-		return FALSE
-	end if
+	if( curl = NULL ) then return FALSE
 
-	''
 	if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then
 		deallocate( ctx->stream.buffer )
 	end if
-	ctx->stream.buffer = data_
-	ctx->stream.size = bytes
-	ctx->stream.pos = 0
-	ctx->stream.owns_buffer = FALSE
-
-	''
-	if( doreset ) then
-		curl_easy_reset( curl )
-	end if
-
-	dim as clong follow_location = 1
-	dim as clong maximum_redirects = 16
-
-	curl_easy_setopt( curl, CURLOPT_URL, url )
-
-	curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location )
-	curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects )
-
-	if( referer <> NULL ) then
-		curl_easy_setopt( curl, CURLOPT_REFERER, referer )
-	end if
-
-	curl_easy_setopt( curl, CURLOPT_READFUNCTION, @send_cb )
-	curl_easy_setopt( curl, CURLOPT_READDATA, @ctx->stream )
-
-	dim as CURLcode transfer_result = curl_easy_perform( curl )
-
-	'' send() borrows the caller's buffer only for the synchronous transfer.
-	'' Clear the pointer before any later receive, send, or destructor can see
-	'' memory that this object does not own.
 	ctx->stream.buffer = NULL
 	ctx->stream.size = 0
 	ctx->stream.pos = 0
 	ctx->stream.owns_buffer = FALSE
 
-	if( transfer_result <> 0 ) then
+	'' Upload callbacks borrow the caller's bytes only during easy_perform.
+	'' Response callbacks use the separate owned receive buffer in ctx.
+	dim upload as CStream
+	upload.buffer = data_
+	upload.size = bytes
+	upload.pos = 0
+	upload.owns_buffer = FALSE
+	if( doreset ) then curl_easy_reset( curl )
+	dim as clong follow_location = 1, maximum_redirects = 16, upload_mode = 1
+	dim as curl_off_t upload_size = bytes
+	dim as CURLcode transfer_result = CURLE_FAILED_INIT
+	do
+		if( curl_easy_setopt( curl, CURLOPT_URL, url ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, follow_location ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_MAXREDIRS, maximum_redirects ) <> CURLE_OK ) then exit do
+		if( referer <> NULL ) then
+			if( curl_easy_setopt( curl, CURLOPT_REFERER, referer ) <> CURLE_OK ) then exit do
+		end if
+		'' CURLOPT_UPLOAD enables the read callback and selects PUT for HTTP.
+		if( curl_easy_setopt( curl, CURLOPT_UPLOAD, upload_mode ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_INFILESIZE_LARGE, upload_size ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_READFUNCTION, @send_cb ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_READDATA, @upload ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_SEEKFUNCTION, @seek_cb ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_SEEKDATA, @upload ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, @recv_cb ) <> CURLE_OK ) then exit do
+		if( curl_easy_setopt( curl, CURLOPT_WRITEDATA, @ctx->stream ) <> CURLE_OK ) then exit do
+		transfer_result = curl_easy_perform( curl )
+	loop while FALSE
+
+	'' easy handles retain callback pointers. Remove the stack address even on
+	'' failure, and restore GET mode before another receive without a reset.
+	curl_easy_setopt( curl, CURLOPT_READFUNCTION, cast( any ptr, NULL ) )
+	curl_easy_setopt( curl, CURLOPT_READDATA, cast( any ptr, NULL ) )
+	curl_easy_setopt( curl, CURLOPT_SEEKFUNCTION, cast( any ptr, NULL ) )
+	curl_easy_setopt( curl, CURLOPT_SEEKDATA, cast( any ptr, NULL ) )
+	upload_mode = 0
+	curl_easy_setopt( curl, CURLOPT_UPLOAD, upload_mode )
+	if( transfer_result <> CURLE_OK ) then
+		if( ctx->stream.buffer <> NULL andalso ctx->stream.owns_buffer ) then deallocate( ctx->stream.buffer )
+		ctx->stream.buffer = NULL
+		ctx->stream.size = 0
+		ctx->stream.pos = 0
+		ctx->stream.owns_buffer = FALSE
 		return FALSE
 	end if
-
-	function = TRUE
+	if( ctx->stream.buffer <> NULL ) then ctx->stream.buffer[ctx->stream.pos] = 0
+	return TRUE
 
 end function
 

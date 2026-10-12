@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
+import json
 import os
 import platform
 import re
@@ -110,6 +112,7 @@ EXTERNAL_TEXT_MARKERS = (
     "ode/",
     "openal",
     "pcre",
+    "pdflib.bi",
     "png.bi",
     "portaudio",
     "postgres",
@@ -173,6 +176,52 @@ HELPER_MODULES = {
     "examples/threads/timer-lib/timer.bas",
 }
 
+# These .bas files are included after declarations in their owning program.
+# Compile the owner for each fragment so the receipt proves the actual build
+# instead of treating an include fragment as an independent executable.
+INCLUDED_SOURCE_OWNERS = {
+    "examples/GUI/GTK+/FB_Calc/tobac/FB_Calc_tobac.bas": "examples/GUI/GTK+/FB_Calc/FB_Calc.bas",
+    "examples/GUI/GTK+/FB_Calc/tobac/on_number_clicked.bas": "examples/GUI/GTK+/FB_Calc/FB_Calc.bas",
+    "examples/GUI/GTK+/FB_Calc/tobac/on_operation_clicked.bas": "examples/GUI/GTK+/FB_Calc/FB_Calc.bas",
+}
+
+# Local libraries belong to the example, not to the installed SDK. Build them
+# from the copied sources so a stale archive or another target's binary cannot
+# accidentally satisfy the linker. Each entry is (mode, name, sources, flags).
+LOCAL_LIBRARIES = {
+    "examples/dll/test.bas": ("-dll", "mydll", ("mydll.bas",), ()),
+    "examples/manual/procs/lib.bas": ("-dll", "mydll", ("mydll.bas",), ()),
+    "examples/manual/proguide/shared-lib/mainShareData.bas": ("-dll", "dllShareData", ("dllShareData.bas",), ()),
+    "examples/manual/proguide/shared-lib/mainShareData2.bas": ("-dll", "dllShareData2", ("dllShareData2.bas",), ()),
+    "examples/manual/proguide/shared-lib/mytest.bas": ("-dll", "mylib", ("mylib.bas",), ()),
+    "examples/manual/proguide/static-lib/mytest.bas": ("-lib", "mylib", ("mylib.bas",), ()),
+    "examples/manual/proguide/static-lib/varZstringTest.bas": ("-lib", "varZstring", ("varZstring.bas",), ()),
+    "examples/network/curl/CHttp/test.bas": ("-lib", "CHttp", ("CHttp.bas", "CHttpStream.bas", "CHttpForm.bas"), ()),
+    "examples/regex/PCRE/CRegex/test.bas": ("-lib", "CRegex", ("CRegex.bas",), ()),
+    "examples/threads/timer-lib/test.bas": ("-lib", "timer", ("timer.bas",), ("-mt",)),
+    "examples/graphics/OpenGL/fbgl/line.bas": ("-lib", "fbgl", ("fbgl.bas",), ()),
+}
+
+# These inputs produce libraries, not executable entry points. Building an
+# archive does not require the library being built to exist at link time,
+# even when its own public header contains a matching #inclib directive.
+LIBRARY_MODULES = {
+    "examples/network/curl/CHttp/CHttp.bas": ("-lib", ()),
+    "examples/network/curl/CHttp/CHttpForm.bas": ("-lib", ()),
+    "examples/network/curl/CHttp/CHttpStream.bas": ("-lib", ()),
+    "examples/regex/PCRE/CRegex/CRegex.bas": ("-lib", ()),
+    "examples/threads/timer-lib/timer.bas": ("-lib", ("-mt",)),
+    "examples/graphics/OpenGL/fbgl/fbgl.bas": ("-lib", ()),
+    "examples/other-languages/Java/JNI/mylib.bas": ("-dll", ()),
+    "examples/manual/libraries/jni/mylib.bas": ("-dll", ()),
+}
+
+LOCAL_CPP_LIBRARIES = {
+    "examples/other-languages/C++/alias.bas": "alias",
+    "examples/other-languages/C++/complex.bas": "complex",
+    "examples/other-languages/C++/simple.bas": "simple",
+}
+
 MULTIFILE_PROGRAMS = {
     "examples/graphics/SDL3/ttf/showfont.bas": (
         "examples/graphics/SDL3/ttf/editbox.bas",
@@ -210,6 +259,7 @@ MULTIFILE_PROGRAMS = {
 # example itself. Keep those switches local to the affected source so the
 # general sweep continues to exercise ordinary command-line behavior.
 EXAMPLE_FBC_ARGUMENTS = {
+    "examples/threads/timer-lib/test.bas": ("-mt",),
     "examples/manual/module/option_entry.bas": (
         "-entry",
         "custom_main",
@@ -230,9 +280,12 @@ GAS64_VARIADIC_SOURCES = {
     "examples/manual/proguide/variadic_arguments/va_.bas",
     "examples/manual/proguide/variadic_arguments/va_2.bas",
     "examples/manual/proguide/variadic_arguments/va_3.bas",
-    "examples/graphics/OpenGL/NeHe/lesson21.bas",
-    "examples/graphics/OpenGL/NeHe/lesson24.bas",
-    "examples/graphics/OpenGL/NeHe/lesson32.bas",
+}
+
+# These arguments describe the example's documented command line. File paths
+# stay relative to its isolated run directory so the sweep owns their outputs.
+EXAMPLE_RUN_ARGUMENTS = {
+    "examples/manual/fileio/serialization.bas": ("saved-state.bin",),
 }
 
 INTENTIONAL_FAILURES = {
@@ -494,8 +547,30 @@ def classify(path: Path, root: Path, target_os: str, supports_gas64: bool) -> Cl
             False,
         )
 
-    if rel in HELPER_MODULES:
+    if rel in HELPER_MODULES or rel in INCLUDED_SOURCE_OWNERS or rel in LIBRARY_MODULES:
         return Classification("helper-module", "source is built through a multi-file or library rule", False)
+
+    # A .bas suffix is also used by Visual Basic. This source is the VB6
+    # consumer of the Win32 DLL example, not an executable FreeBASIC module.
+    if rel == "examples/other-languages/VB/vbside.bas":
+        return Classification("platform-specific", "source requires the Visual Basic 6 compiler and host", False)
+
+    # The adjacent instructions select fbc-js and Emscripten's websocket
+    # library. Native desktop socket libraries cannot supply that browser API.
+    if rel == "examples/network/emscripten-websocket.bas" and target_os not in ("js", "emscripten"):
+        return Classification("platform-specific", "example requires fbc-js and an Emscripten browser runtime", False)
+
+    if target_os != "windows" and (
+        rel.startswith("examples/OptimizePureAbstractTypes/")
+        or rel in {
+            "examples/manual/libraries/disphelper1.bas",
+            "examples/manual/libraries/disphelper2.bas",
+            "examples/manual/libraries/disphelper3.bas",
+            "examples/other-languages/VB/fbside.bas",
+            "examples/manual/extras/gfx-null.bas",
+        }
+    ):
+        return Classification("platform-specific", "example requires Windows COM or Win32 window APIs", False)
 
     if rel.startswith("examples/aros/") and target_os != "aros":
         # These fixtures depend on native AROS devices and, in the graphics
@@ -577,6 +652,10 @@ def prepare_run_directory(source_dir: Path, run_dir: Path, copy_directories: boo
                     "*.obj",
                     "*.asm",
                     "*.exe",
+                    "*.a",
+                    "*.lib",
+                    "*.dll",
+                    "*.so*",
                     "gmon.out",
                     "prof-*.txt",
                 ),
@@ -584,7 +663,8 @@ def prepare_run_directory(source_dir: Path, run_dir: Path, copy_directories: boo
             continue
 
         if source.is_file():
-            if source.suffix.lower() in (".o", ".obj", ".asm", ".exe"):
+            if source.suffix.lower() in (".o", ".obj", ".asm", ".exe", ".a", ".lib", ".dll") or \
+                    ".so" in source.suffixes:
                 continue
             if source.name == "gmon.out" or source.name.startswith("prof-"):
                 continue
@@ -701,13 +781,23 @@ def run_remote_script(
     return 255, "".join(combined_output)
 
 
-def sync_remote_directory(cwd: Path, args: argparse.Namespace) -> tuple[bool, str]:
+def sync_remote_directory(
+    cwd: Path,
+    args: argparse.Namespace,
+    preserve_existing: bool = False,
+) -> tuple[bool, str]:
     remote_cwd = map_remote_path(str(cwd), args)
     quoted_cwd = shlex.quote(remote_cwd)
 
+    # One example may need several ordered compiler/linker commands. Keep
+    # their private outputs after the first command resets this work directory.
+    if preserve_existing:
+        reset_script = f"mkdir -p {quoted_cwd}"
+    else:
+        reset_script = f"rm -rf {quoted_cwd} && mkdir -p {quoted_cwd}"
     reset_status, reset_output = run_remote_script(
         args,
-        f"rm -rf {quoted_cwd} && mkdir -p {quoted_cwd}",
+        reset_script,
     )
     if reset_status != 0:
         return False, reset_output
@@ -729,6 +819,10 @@ def sync_remote_directory(cwd: Path, args: argparse.Namespace) -> tuple[bool, st
         )
         if tar.stdout is not None:
             tar.stdout.close()
+            # The extract process owns the other reader for this stream.
+            # communicate() must only drain tar's stderr after we close our
+            # copy, or Windows starts a reader thread on the closed stdout.
+            tar.stdout = None
         _, tar_stderr = tar.communicate()
 
         if tar.returncode != 0:
@@ -794,6 +888,7 @@ def run_command(
     log_path: Path,
     args: argparse.Namespace,
     env: dict[str, str] | None = None,
+    preserve_remote_files: bool = False,
 ) -> tuple[str, float]:
     started = time.monotonic()
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -805,7 +900,9 @@ def run_command(
 
         try:
             if args.remote_shell:
-                synced, remote_cwd = sync_remote_directory(cwd, args)
+                synced, remote_cwd = sync_remote_directory(
+                    cwd, args, preserve_existing=preserve_remote_files
+                )
                 if not synced:
                     log.write(remote_cwd)
                     return "fail(255)", time.monotonic() - started
@@ -862,17 +959,52 @@ def run_command(
 def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     rel = relpath(path, root)
     classification = classify(path, root, args.target_os, compiler_supports_gas64(args))
+    if rel in INCLUDED_SOURCE_OWNERS:
+        path = root / INCLUDED_SOURCE_OWNERS[rel]
     stem = safe_name(rel[:-4])
     binary = args.outdir / "bin" / executable_name(stem)
+    if rel in LIBRARY_MODULES:
+        mode, _ = LIBRARY_MODULES[rel]
+        if mode == "-lib":
+            binary = binary.with_name("lib" + stem + ".a")
+        elif args.target_os == "windows":
+            binary = binary.with_suffix(".dll")
+        else:
+            binary = binary.with_name("lib" + stem + ".so")
+    if not args.remote_shell:
+        # A failed linker can leave an older successful output in place. This
+        # directory holds only this sweep's products, so require a fresh one.
+        binary.unlink(missing_ok=True)
     compile_log = args.outdir / "logs" / (stem + ".compile.log")
     run_log = args.outdir / "logs" / (stem + ".run.log")
-    compile_cwd = args.outdir / "work" / stem / "compile"
-    run_cwd = args.outdir / "work" / stem / "run"
+    # GCC adds process-specific suffixes to intermediate filenames. Keep the
+    # isolated directories short enough for Windows tools which still enforce
+    # MAX_PATH; the readable example path remains in logs and reports.
+    work_name = hashlib.sha256(rel.encode("utf-8")).hexdigest()[:12]
+    work_root = args.outdir / "work" / work_name
+    if work_root.resolve().parent != (args.outdir / "work").resolve():
+        raise ValueError(f"isolated example directory escapes work root: {work_root}")
+    compile_cwd = work_root / "c"
+    run_cwd = work_root / "r"
     sdl_generation = Path(rel).parts[:3] in (
         ("examples", "graphics", "SDL1"),
         ("examples", "graphics", "SDL2"),
         ("examples", "graphics", "SDL3"),
     )
+    fmod_manual = rel == "examples/manual/libraries/fmod2.bas"
+    pcre_cregex = rel.startswith("examples/regex/PCRE/CRegex/")
+    if pcre_cregex:
+        # CRegex shares global-match progress with preg_class in its parent.
+        # Keep that include inside this example's private build tree.
+        compile_tree = compile_cwd
+        compile_cwd /= "CRegex"
+        run_cwd /= "CRegex"
+    if fmod_manual:
+        # The manual player shares its metadata helper with the sound example.
+        # Preserve that relative include inside this worker's private tree.
+        compile_tree = compile_cwd
+        compile_cwd /= "manual/libraries"
+        run_cwd /= "manual/libraries"
     if sdl_generation:
         # Preserve the generation/sublibrary depth so relative references to
         # SDL_common resolve inside this example's isolated source tree.
@@ -884,6 +1016,13 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     copy_directories = path.parent != root / "examples"
 
     prepare_run_directory(path.parent, compile_cwd, copy_directories)
+    if pcre_cregex:
+        shutil.copy2(root / "examples/regex/PCRE/match-progress.bi",
+                     compile_tree / "match-progress.bi")
+    if fmod_manual:
+        helper = compile_tree / "sound/FMOD/fmod_tags.bi"
+        helper.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(root / "examples/sound/FMOD/fmod_tags.bi", helper)
     if sdl_generation:
         shutil.copytree(root / "examples/graphics/SDL_common", compile_tree / "SDL_common",
                         dirs_exist_ok=True)
@@ -897,7 +1036,32 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     cmd = list(args.fbc)
     if args.prefix is not None:
         cmd.extend(["-prefix", str(args.prefix)])
-    cmd.extend(args.fbc_arg)
+    # Some supported legacy SDKs are i386-only even on a 64-bit PC. Keep
+    # their compiler target and tool overrides local to the named examples;
+    # changing the global profile would also rebuild unrelated native APIs.
+    profile = args.example_profiles.get(rel, {})
+    # A cross-target SDK must not inherit native library search directories.
+    # FBC resolves import archives before ld can reject a mismatched machine,
+    # so appending a target override alone cannot isolate the SDK's ABI.
+    if profile.get("inherit_fbc_args", True):
+        cmd.extend(args.fbc_arg)
+    cmd.extend(profile.get("fbc_args", []))
+    compile_env = None
+    if profile.get("compiler_env"):
+        compile_env = os.environ.copy()
+        compile_env.update(profile["compiler_env"])
+    if args.iup_gtk3 and rel.startswith("examples/GUI/IUP/"):
+        # The IUP C ABI is stable across GTK backends, but the link libraries
+        # must match the installed IUP build. Keep this choice local to IUP.
+        cmd.extend(["-d", "__USE_GTK3__"])
+    if args.glfw2_libdir is not None and rel == "examples/graphics/OpenGL/NeHe/lesson22.bas":
+        # GLFW2 and GLFW3 both use libglfw on Unix, with incompatible APIs.
+        # Keep the legacy SDK out of the general search path so GLFW3 examples
+        # can still use the system library; only this example needs GLFW2.
+        cmd.extend(["-p", str(args.glfw2_libdir)])
+    if rel in LIBRARY_MODULES:
+        mode, flags = LIBRARY_MODULES[rel]
+        cmd.extend([mode, *flags])
     cmd.extend(EXAMPLE_FBC_ARGUMENTS.get(rel, ()))
     if rel == "examples/graphics/SDL3/ttf/showfont.bas":
         cmd.extend(["-m", "showfont"])
@@ -924,16 +1088,88 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     ])
     if args.main_module_from_source:
         cmd.extend(["-m", path.stem])
+    dependency_status = "pass"
+    dependency_elapsed = 0.0
+    preserve_remote_files = False
+    if rel in LOCAL_LIBRARIES:
+        mode, name, sources, flags = LOCAL_LIBRARIES[rel]
+        if mode == "-dll":
+            library_name = name + ".dll" if args.target_os == "windows" else "lib" + name + ".so"
+        else:
+            library_name = "lib" + name + ".a"
+        dependency_command = cmd + [mode, *flags, *sources, "-x", str(compile_cwd / library_name)]
+        dependency_log = compile_log.with_suffix(".dependency.log")
+        dependency_status, dependency_elapsed = run_command(
+            dependency_command, cwd=compile_cwd, timeout=args.compile_timeout,
+            log_path=dependency_log, args=args,
+            env=compile_env,
+        )
+        if dependency_status != "pass":
+            shutil.copy2(dependency_log, compile_log)
+        elif not args.remote_shell and not (compile_cwd / library_name).is_file():
+            dependency_status = "fail(missing-output)"
+            shutil.copy2(dependency_log, compile_log)
+        if dependency_status == "pass":
+            preserve_remote_files = bool(args.remote_shell)
+
+    if rel in LOCAL_CPP_LIBRARIES:
+        name = LOCAL_CPP_LIBRARIES[rel]
+        environment = command_environment(args, compile_env)
+        for index, dependency_command in enumerate((
+            [environment.get("CXX", "g++"), "-c", name + ".cxx", "-o", name + ".o"],
+            [environment.get("AR", "ar"), "rcs", "lib" + name + ".a", name + ".o"],
+        )):
+            dependency_log = compile_log.with_suffix(f".dependency{index}.log")
+            dependency_status, elapsed = run_command(
+                dependency_command, cwd=compile_cwd, timeout=args.compile_timeout,
+                log_path=dependency_log, args=args,
+                env=compile_env,
+                preserve_remote_files=(index > 0 and args.remote_shell),
+            )
+            dependency_elapsed += elapsed
+            if dependency_status != "pass":
+                shutil.copy2(dependency_log, compile_log)
+                break
+        if dependency_status == "pass":
+            preserve_remote_files = bool(args.remote_shell)
+        cmd.extend(["-l", "stdc++"])
+
+    if rel == "examples/manual/proguide/embed-access-data-in-executable.bas":
+        # This is the same binary-object rule documented in examples/GNUmakefile.
+        # The input is fixture data in this example's isolated build directory.
+        (compile_cwd / "hello.txt").write_text("Hello from embedded data.\n", encoding="ascii")
+        dependency_log = compile_log.with_suffix(".dependency.log")
+        dependency_status, dependency_elapsed = run_command(
+            [command_environment(args, compile_env).get("LD", "ld"), "-r", "-b", "binary", "-o", "hello_txt.o", "hello.txt"],
+            cwd=compile_cwd, timeout=args.compile_timeout, log_path=dependency_log, args=args,
+            env=compile_env,
+        )
+        if dependency_status != "pass":
+            shutil.copy2(dependency_log, compile_log)
+        else:
+            preserve_remote_files = bool(args.remote_shell)
+        cmd.append(str(compile_cwd / "hello_txt.o"))
+
     cmd.extend(str(source) for source in compile_inputs(path, root, compile_cwd))
     cmd.extend(["-x", str(binary)])
 
-    compile_status, compile_elapsed = run_command(
-        cmd,
-        cwd=compile_cwd,
-        timeout=args.compile_timeout,
-        log_path=compile_log,
-        args=args,
-    )
+    if dependency_status == "pass":
+        compile_status, compile_elapsed = run_command(
+            cmd,
+            cwd=compile_cwd,
+            timeout=args.compile_timeout,
+            log_path=compile_log,
+            args=args,
+            env=compile_env,
+            preserve_remote_files=preserve_remote_files,
+        )
+        compile_elapsed += dependency_elapsed
+        if compile_status == "pass" and not args.remote_shell and not binary.is_file():
+            # Some external-tool launch failures have returned zero through
+            # the driver. An exit code alone cannot prove a linked product.
+            compile_status = "fail(missing-output)"
+    else:
+        compile_status, compile_elapsed = dependency_status, dependency_elapsed
 
     run_status = "skipped"
     run_elapsed = 0.0
@@ -953,7 +1189,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
             env.setdefault("SFXLIB_DRIVER", "null")
             env.setdefault("FB_GFX_DRIVER", "none")
             run_status, run_elapsed = run_command(
-                [str(binary)],
+                [str(binary), *EXAMPLE_RUN_ARGUMENTS.get(rel, ())],
                 cwd=run_cwd,
                 timeout=args.run_timeout,
                 log_path=run_log,
@@ -977,7 +1213,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         # The copied sources are only needed while compiling or running. Logs
         # and binaries live outside this tree, so retaining it for every
         # example needlessly consumes several gigabytes in a full sweep.
-        shutil.rmtree(compile_cwd.parent, ignore_errors=True)
+        shutil.rmtree(work_root, ignore_errors=True)
 
     return Result(
         path=rel,
@@ -1133,6 +1369,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--include-dir", type=Path, default=None)
     parser.add_argument("--fbc", default=str(root / "bin" / "fbc"))
     parser.add_argument("--fbc-arg", action="append", default=[], help="Pass an additional argument to every compiler invocation")
+    parser.add_argument("--example-profile", type=Path,
+                        help="JSON compiler arguments and tool overrides for exact example paths; inherit_fbc_args defaults to true")
+    parser.add_argument("--glfw2-libdir", type=Path, help="Use this isolated GLFW2 library directory for the legacy NeHe example")
+    parser.add_argument("--iup-gtk3", action="store_true", help="Link IUP examples against a GTK 3 build of IUP")
     parser.add_argument("--target-os", default=platform.system().lower(), help="Classify target-specific examples for this OS")
     parser.add_argument("--jobs", type=int, default=cpu_count)
     parser.add_argument("--compile-timeout", type=int, default=60)
@@ -1151,7 +1391,42 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     args = parser.parse_args(argv)
     args.root = args.root.resolve()
+    args.example_profiles = {}
+    if args.example_profile is not None:
+        try:
+            profiles = json.loads(args.example_profile.read_text(encoding="utf-8"))
+            if not isinstance(profiles, dict):
+                raise ValueError("the profile must be an object keyed by example path")
+            valid_sources = {source.relative_to(args.root).as_posix()
+                             for source in (args.root / "examples").rglob("*.bas") if source.is_file()}
+            for name, profile in profiles.items():
+                source = args.root / name
+                if (name not in valid_sources or not name.startswith("examples/") or ".." in Path(name).parts
+                        or source.suffix != ".bas" or not source.is_file()
+                        or not source.resolve().is_relative_to(args.root / "examples")):
+                    raise ValueError("invalid example path: " + name)
+                if not isinstance(profile, dict) or set(profile) - {"fbc_args", "compiler_env", "inherit_fbc_args"}:
+                    raise ValueError("unknown profile fields for " + name)
+                if not isinstance(profile.get("inherit_fbc_args", True), bool):
+                    raise ValueError("inherit_fbc_args must be a boolean for " + name)
+                flags = profile.get("fbc_args", [])
+                if not isinstance(flags, list) or any(not isinstance(flag, str) or "\0" in flag for flag in flags):
+                    raise ValueError("fbc_args must be a string array for " + name)
+                tools = profile.get("compiler_env", {})
+                if not isinstance(tools, dict) or set(tools) - {"GCC", "AS", "LD", "AR", "CXX", "PATH"}:
+                    raise ValueError("compiler_env contains an unsupported tool variable for " + name)
+                if any(not isinstance(value, str) or "\0" in value for value in tools.values()):
+                    raise ValueError("compiler_env values must be strings for " + name)
+                if args.remote_shell and tools:
+                    raise ValueError("compiler_env overrides require running the controller on its native host")
+            args.example_profiles = profiles
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
     args.outdir = args.outdir.resolve()
+    if args.glfw2_libdir is not None:
+        args.glfw2_libdir = args.glfw2_libdir.resolve()
+        if not args.glfw2_libdir.is_dir():
+            parser.error("--glfw2-libdir must name an existing directory")
     if args.no_prefix:
         args.prefix = None
     else:

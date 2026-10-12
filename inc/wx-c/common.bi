@@ -1,7 +1,13 @@
+'' FreeBASIC wx-c binding
+'' File: common.bi
+'' Purpose: Share opaque wxWidgets handles and native C scalar types.
+'' Responsibilities: Export convention, primitive widths and callback types.
+'' This file contains no widget implementation or resource ownership logic.
 #Ifndef __common_bi__
 #Define __common_bi__
 
 #Include Once "crt/stddef.bi"
+#Include Once "crt/long.bi"
 #Include Once "defs.bi"
 
 
@@ -373,11 +379,13 @@ Type _wxZipFSHandler As Any : Type wxZipFSHandler As _wxZipFSHandler
 
 ' wx simple data types
 Type wxChar      As UByte
-Type wxInt       As Integer
-Type wxUInt      As UInteger
+'' C int remains 32 bits on the Windows and Linux SDKs. C long follows
+'' the platform ABI, including LP64 Linux and LLP64 Windows.
+Type wxInt       As Long
+Type wxUInt      As ULong
 Type wxFloat     As Single
 Type wxDouble    As Double
-Type wxLong      As Long
+Type wxLong      As clong
 Type wxCoord     As wxInt
 Type wxBool      As wxChar
 Type wxWindowID  As wxInt
@@ -396,3 +404,5 @@ Type _wxWidget As Any  : Type wxWidget As _wxWidget
 Type Virtual_Dispose   As Sub      WXCALL
 
 #EndIf ' __common_bi__
+
+'' end of common.bi

@@ -1,10 +1,26 @@
 {{fbdoc item="title" value="wx-c, C Interface for WxWidgets"}}----
 Cross-platform Graphical User Interface library
 
-Website: http://wxnet.sourceforge.net/
+Website: https://wxnet.sourceforge.net/
 Platforms supported: ""Win32"", Linux
 Headers to include: wx-c/wx.bi
 Header version: 0.9.0.2
 Example Usage: yes, in examples/GUI/wx-c/
+
+{{fbdoc item="section" value="Matching the native SDK"}}
+	The FreeBASIC examples use the native wx-c interface. The publisher's [[https://sourceforge.net/projects/wxnet/files/wxnet/0.9.2/|WX.Net 0.9.2 archive]] contains the matching ##wx-c-0-9-0-2.dll## and C++ wrapper source. The archive is ##wx.NET-0.9.2.zip##, with SHA-256 ##33f36659bf459d5fee9ac6d6a774db600d426036a4bf54859a0c766d88a57ba0##.
+
+	The supplied Windows DLL is i386 and uses ##StdCall## exports. Build a 32-bit FreeBASIC executable with a matching runtime and import library, including when running on a 64-bit Windows PC. Its runtime dependencies include the x86 Visual C++ 2008 CRT. FreeBASIC calls the native DLL directly.
+
+	A newly built wrapper must match the header's calling convention as well as its architecture. The publisher's source selects different export conventions for MSVC and GNU builds; an arbitrary recompiled DLL is not interchangeable with its original Windows binary. Current native Windows qualification covers the publisher DLL, both FreeBASIC backends and all four examples. Linux runtime qualification is separate.
+
+{{fbdoc item="section" value="Callbacks and resource ownership"}}
+	Use ##WXCALL## on application, event, MDI and sizer callbacks. C ##int## arguments and results use ##wxInt##/##wxUInt##, which are 32-bit ##Long##/##ULong##. ##wxLong## follows C ##long## through ##clong##; it is 32 bits on Windows and 64 bits on LP64 Linux.
+
+	The GUI event loop runs on its application thread. Windows own their child controls and attached sizers. Callback code must keep borrowed handles valid until their owning widget is destroyed. Sizer disposal callbacks must not continue using the released sizer.
+
+	Label and title APIs copy their string arguments. Release temporary ##wxString## wrappers with ##wxString_dtor## after those calls. Controls also copy fonts and colours; release application-created wrappers after their last use. The stock pointer returned by ##wxFont_SMALL_FONT## belongs to the library and must not be destroyed.
+
+	The examples demonstrate font and colour inheritance, four MDI child frames, resizeable box-sizer layout, and a modal dialog with native button callbacks. Close the windows normally. The dialog example displays its final confirmation during the application's exit callback.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

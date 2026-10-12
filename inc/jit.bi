@@ -1,4 +1,8 @@
 '' FreeBASIC binding for libjit-0.1.4
+'' File: jit.bi
+'' Purpose: Declare the native libjit API and its C data layouts.
+'' Responsibilities: Scalar widths, callbacks and compiler-neutral JIT handles.
+'' This file contains no runtime compiler implementation or library loader.
 ''
 '' based on the C header files:
 ''   Copyright (C) 2004  Southern Storm Software, Pty Ltd.
@@ -59,7 +63,13 @@ type jit_long as longint
 type jit_ulong as ulongint
 type jit_float32 as single
 type jit_float64 as double
-#ifdef __FB_WIN32__
+'' Match the native library's configuration. Windows defaults to double.
+'' On other targets, define JIT_NFLOAT_IS_DOUBLE only when libjit was built
+'' with --disable-long-double. FreeBASIC's clongdouble is opaque storage;
+'' it cannot supply the C long-double calling convention or 16-byte UDT
+'' alignment. Use the double configuration for native-float calls and
+'' jit_constant_t on targets where C long double requires that alignment.
+#if defined(__FB_WIN32__) or defined(JIT_NFLOAT_IS_DOUBLE)
 	type jit_nfloat as double
 #else
 	type jit_nfloat as clongdouble
@@ -96,7 +106,8 @@ const JIT_MEMORY_RESTART = 1
 const JIT_MEMORY_TOO_BIG = 2
 const JIT_MEMORY_ERROR = 3
 
-type jit_size_t as ulong
+'' Upstream defines this as jit_nuint, including on 64-bit Windows.
+type jit_size_t as jit_nuint
 type jit_memory_context_t as any ptr
 type jit_function_info_t as any ptr
 type jit_memory_manager_t as const jit_memory_manager ptr
@@ -1729,3 +1740,5 @@ declare function jit_mangle_global_function(byval name as const zstring ptr, byv
 declare function jit_mangle_member_function(byval class_name as const zstring ptr, byval name as const zstring ptr, byval signature as jit_type_t, byval form as long, byval flags as long) as zstring ptr
 
 end extern
+
+'' end of jit.bi

@@ -1,0 +1,95 @@
+{{fbdoc item="title" value="DESERIALIZE"}}----
+Reconstructs a supported value or whole array from a complete binary payload
+
+{{fbdoc item="syntax"}}##
+	#include once "fbserialize.bi"
+	//success// = **Deserialize**( //payload//, //destination// )
+	//success// = **Deserialize**( //payload//, //array//() )
+##
+{{fbdoc item="param"}}
+	##//payload//##
+		A binary ##[[KeyPgString|String]]## produced by ##[[KeyPgSerialize|Serialize]]##, containing exactly one complete payload.
+	##//destination//##
+		A writable supported variable or member. Its structure must match the payload schema. Destinations with ##Const## fields are rejected at compilation.
+	##//array//()##
+		A writable whole array with a compatible element type, array kind and declared rank. Fixed arrays also require matching bounds.
+
+{{fbdoc item="ret"}}
+	##True## (-1) on success, or zero on failure. Success sets ##[[KeyPgErr|Err]]## to zero. Failure sets ##Err## to ##FB_SERIALIZE_INVALID## (1) for malformed, incompatible or over-budget input, or ##FB_SERIALIZE_OUT_OF_MEMORY## (4) for allocation or temporary-descriptor exhaustion. These constants are declared by ##fbserialize.bi##.
+
+{{fbdoc item="desc"}}
+	Reconstruction allocates independent strings and dynamic arrays, including owned members nested inside UDTs and array elements. It never borrows storage from the input payload or the serialized source. Dynamic arrays recover their stored lower and upper bounds; an unallocated array remains unallocated and can subsequently be resized with ##[[KeyPgRedim|Redim]]##.
+	
+	The decoder validates the format version, full schema, lengths, bounds, ranks, value ranges, resource limits and end of payload before replacing the destination. On any failure the original destination remains unchanged and temporary allocations are freed. On success its old owned data is released and the reconstructed data replaces it.
+	
+	A known-rank array must preserve its declared rank. Unknown-rank arrays and array parameters are supported, subject to the actual descriptor capacity supplied by the caller. Unknown and explicitly declared ranks have distinct schemas. An array parameter cannot enlarge a borrowed descriptor beyond that capacity.
+	
+	Truncated input, trailing bytes, unsupported versions, schema differences and values outside a narrower native integer range are rejected. Added or renamed fields are not silently ignored. Use an application version envelope and explicit migration for evolving records, as shown in ##[[ProPgSerialization|Compiler-assisted serialization]]##.
+	
+	The destination must already be a valid ordinary FreeBASIC value. The caller must synchronize concurrent access to it. This function does not receive bytes from a file or socket and does not frame stream messages.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/manual/array/deserialize.bas"}}%%(freebasic)
+'' examples/manual/array/deserialize.bas
+''
+'' FreeBASIC Manual: DESERIALIZE
+'' Purpose: Restore a whole array and handle incomplete input.
+'' Responsibilities: Bounds, embedded nulls and unchanged data on failure.
+'' This example intentionally contains no transport framing.
+'' --------
+
+#include once "fbserialize.bi"
+
+Dim source(Any) As String
+Dim destination(Any) As String
+ReDim source(-1 To 1)
+source(-1) = "first"
+source(0) = "A" & Chr(0) & "B"
+source(1) = "last"
+
+'' Empty parentheses select the whole array rather than one element.
+Dim As String payload = Serialize(source())
+If Err <> 0 Then
+    Print "Serialize failed: "; Err
+    End 1
+End If
+
+'' Start with one existing element at index 7 to make retained bounds visible.
+ReDim destination(7 To 7)
+destination(7) = "keep this value"
+
+'' Missing the last byte must fail before replacing any existing data.
+Dim As String incomplete = Left(payload, Len(payload) - 1)
+If Deserialize(incomplete, destination()) Then End 1
+If Err <> FB_SERIALIZE_INVALID Then End 1
+If LBound(destination) <> 7 OrElse UBound(destination) <> 7 Then End 1
+If destination(7) <> "keep this value" Then End 1
+Print "Incomplete input left the destination unchanged."
+
+If Deserialize(payload, destination()) = 0 Then
+    Print "Deserialize failed: "; Err
+    End 1
+End If
+
+Print "Restored bounds: "; LBound(destination); " to "; UBound(destination)
+Print destination(-1); " / "; destination(1)
+Print "Middle string length: "; Len(destination(0))
+Print "Middle byte: "; Asc(destination(0), 2)
+
+'' end of deserialize.bas
+%%
+	The first decode fails without changing the existing array. The complete payload then restores bounds -1 through 1 and a three-byte middle string containing a null byte.
+
+{{fbdoc item="lang"}}
+	- Available in the ##[[CompilerOptlang|-lang fb]]## and ##[[CompilerOptlang|-lang fblite]]## dialects; unavailable in ##[[CompilerOptlang|-lang qb]]##.
+
+{{fbdoc item="diff"}}
+	- New to ##""FreeBASIC""##. The public name is an opt-in macro from ##fbserialize.bi##. Without this include, an application may still use ##Deserialize## as its own identifier.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgSerialize|Serialize]]##
+	- ##[[ProPgSerialization|Compiler-assisted serialization]]##
+	- ##[[KeyPgGetfileio|Get (File I/O)]]##
+	- ##[[KeyPgErr|Err]]##
+
+{{fbdoc item="back" value="ProPgSerialization|Compiler-assisted serialization"}}{{fbdoc item="back" value="CatPgArray|Array Functions"}}

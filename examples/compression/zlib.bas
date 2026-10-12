@@ -63,7 +63,7 @@ declare function mymain() as integer
 dim shared stderr_ as integer
 stderr_ = freefile()
 
-mymain()
+end mymain()
 
 /' ===========================================================================
  * Test compress() and uncompress()

@@ -665,6 +665,11 @@ List of ""FreeBASIC"" keywords sorted by the function they perform.
 	- {{fbdoc item="keyword" value="KeyPgWhile|WHILE"}}
 	- {{fbdoc item="keyword" value="KeyPgWhilewend|WHILE...WEND"}}
 
+{{fbdoc item="section" value="Serialization"}}
+	- {{fbdoc item="keyword" value="KeyPgSerialize|SERIALIZE"}}
+	- {{fbdoc item="keyword" value="KeyPgDeserialize|DESERIALIZE"}}
+	- {{fbdoc item="keyword" value="ProPgSerialization|Compiler-assisted serialization"}}
+
 {{fbdoc item="section" value="String functions"}}
 	- {{fbdoc item="keyword" value="KeyPgInstr|INSTR"}}
 	- {{fbdoc item="keyword" value="KeyPgInstrrev|INSTRREV"}}

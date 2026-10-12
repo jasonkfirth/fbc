@@ -7,4 +7,6 @@ Headers to include: quicklz.bi
 Header version: 1.5.0
 Example: ""examples/compression/QuickLZ.bas""
 
+The file example reads one independent QuickLZ 1.5.0 packet. It accepts nonempty input up to 16 MiB uncompressed and requires a new or empty output file. Before decompression it validates the header, byte counts, compression level and allocation limit. The decoder must have been compiled with ##QLZ_MEMORY_SAFE##; defining the macro only in FreeBASIC does not change checks in an existing C library. A corrupt packet can still decode to incorrect data, so applications needing integrity must supply their own checksum or authenticated transport.
+
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

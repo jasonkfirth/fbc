@@ -4,7 +4,7 @@
 # Unit / log / warning test harness
 ##############################################################################
 
-.PHONY: unit-tests log-tests warning-tests clean-tests ustring-test
+.PHONY: unit-tests log-tests warning-tests clean-tests ustring-test serialization-test jni-test big-int-test quicklz-test
 
 TESTS_FBC := $(if $(LOCAL_FBC),$(abspath $(LOCAL_FBC)),$(AVAILABLE_FBC))
 TESTS_TOOLCHAIN_BINDIR := $(call tool_bindir,$(CC))
@@ -78,6 +78,28 @@ warning-tests: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
 
 ustring-test: compiler rtlib gfxlib2 gfxlib3 sfxlib
 	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-ustring.py" --root "$(rootdir)" --fbc "$(abspath $(FBC_EXE))"
+
+# Logical serialization owns no transport and needs only compiler and rtlib.
+serialization-test: compiler rtlib
+	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-serialization.py" --root "$(rootdir)" --fbc "$(abspath $(FBC_EXE))"
+
+# JNI is an optional native SDK check. The JDK owns its platform headers and
+# VM library; this target does not fetch or install one on the test machine.
+jni-test: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
+	@test -n "$(JAVA_HOME)" || { echo "ERROR: set JAVA_HOME to a native JDK"; exit 1; }
+	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-jni.py" --java-home "$(JAVA_HOME)" --fbc "$(TESTS_FBC)" --cc "$(CC)"
+
+# big_int is an optional release-matched C ABI check. Keep the historical
+# SDK outside the installed compiler and supply its headers explicitly.
+big-int-test: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
+	@test -n "$(BIG_INT_HEADERS)" -a -n "$(BIG_INT_LIBDIR)" || { echo "ERROR: set BIG_INT_HEADERS and BIG_INT_LIBDIR"; exit 1; }
+	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-big-int.py" --headers "$(BIG_INT_HEADERS)" --libdir "$(BIG_INT_LIBDIR)" --fbc "$(TESTS_FBC)" --cc "$(CC)"
+
+# QuickLZ state sizes depend on the source release and build settings. The
+# native test checks the library's settings before lending it typed buffers.
+quicklz-test: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
+	@test -n "$(QUICKLZ_HEADERS)" -a -n "$(QUICKLZ_LIBDIR)" || { echo "ERROR: set QUICKLZ_HEADERS and QUICKLZ_LIBDIR"; exit 1; }
+	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-quicklz.py" --headers "$(QUICKLZ_HEADERS)" --libdir "$(QUICKLZ_LIBDIR)" --fbc "$(TESTS_FBC)" --cc "$(CC)"
 
 ##############################################################################
 # END tests.mk

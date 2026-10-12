@@ -1,3 +1,9 @@
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson22.bas
+'' Purpose: Demonstrate bump mapping with optional ARB multitexturing.
+'' Responsibilities: Load extension handles, textures and draw the scene.
+'' This file contains no OpenGL or GLFW implementation.
+''
 '' This Code Was Created by Jens Schneider (WizardSoft) 2000
 '' Lesson22 to the series of OpenGL tutorials by NeHe-Production
 ''
@@ -87,13 +93,14 @@ dim shared multitextureSupported as integer                '' Flag Indicating Wh
 dim shared useMultitexture as integer = true               '' Use It If It Is Supported?
 dim shared maxTexelUnits as GLint = 1                      '' Number Of Texel-Pipelines. This Is At Least 1.
 
-'' These are the types of the C++ functions we will link with at runtime if supported
-dim shared glMultiTexCoord1fARB as PFNGLMULTITEXCOORD1FARBPROC
-dim shared glMultiTexCoord2fARB as PFNGLMULTITEXCOORD2FARBPROC
-dim shared glMultiTexCoord3fARB as PFNGLMULTITEXCOORD3FARBPROC
-dim shared glMultiTexCoord4fARB as PFNGLMULTITEXCOORD4FARBPROC
-dim shared glActiveTextureARB as PFNGLACTIVETEXTUREARBPROC
-dim shared glClientActiveTextureARB as PFNGLCLIENTACTIVETEXTUREARBPROC
+'' Mesa declares the OpenGL functions directly. Give the loaded handles their
+'' own names so they remain usable with both Mesa and the Windows bindings.
+dim shared pglMultiTexCoord1fARB as PFNGLMULTITEXCOORD1FARBPROC
+dim shared pglMultiTexCoord2fARB as PFNGLMULTITEXCOORD2FARBPROC
+dim shared pglMultiTexCoord3fARB as PFNGLMULTITEXCOORD3FARBPROC
+dim shared pglMultiTexCoord4fARB as PFNGLMULTITEXCOORD4FARBPROC
+dim shared pglActiveTextureARB as PFNGLACTIVETEXTUREARBPROC
+dim shared pglClientActiveTextureARB as PFNGLCLIENTACTIVETEXTUREARBPROC
 
 
 '' CubeData Contains The Faces For The Cube In Format 2xTexCoord, 3xVertex;
@@ -263,12 +270,18 @@ function initMultitexture() as integer
 		glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, @maxTexelUnits)
 
 		'' Set addresses of functions we will use
-		glMultiTexCoord1fARB = cast( PFNGLMULTITEXCOORD1FARBPROC, glfwGetProcAddress( "glMultiTexCoord1fARB" ) )
-		glMultiTexCoord2fARB = cast( PFNGLMULTITEXCOORD2FARBPROC, glfwGetProcAddress( "glMultiTexCoord2fARB" ) )
-		glMultiTexCoord3fARB = cast( PFNGLMULTITEXCOORD3FARBPROC, glfwGetProcAddress( "glMultiTexCoord3fARB" ) )
-		glMultiTexCoord4fARB = cast( PFNGLMULTITEXCOORD4FARBPROC, glfwGetProcAddress( "glMultiTexCoord4fARB" ) )
-		glActiveTextureARB   = cast( PFNGLACTIVETEXTUREARBPROC, glfwGetProcAddress( "glActiveTextureARB" ) )
-		glClientActiveTextureARB = cast( PFNGLCLIENTACTIVETEXTUREARBPROC, glfwGetProcAddress( "glClientActiveTextureARB" ) )
+		pglMultiTexCoord1fARB = cast( PFNGLMULTITEXCOORD1FARBPROC, glfwGetProcAddress( "glMultiTexCoord1fARB" ) )
+		pglMultiTexCoord2fARB = cast( PFNGLMULTITEXCOORD2FARBPROC, glfwGetProcAddress( "glMultiTexCoord2fARB" ) )
+		pglMultiTexCoord3fARB = cast( PFNGLMULTITEXCOORD3FARBPROC, glfwGetProcAddress( "glMultiTexCoord3fARB" ) )
+		pglMultiTexCoord4fARB = cast( PFNGLMULTITEXCOORD4FARBPROC, glfwGetProcAddress( "glMultiTexCoord4fARB" ) )
+		pglActiveTextureARB   = cast( PFNGLACTIVETEXTUREARBPROC, glfwGetProcAddress( "glActiveTextureARB" ) )
+		pglClientActiveTextureARB = cast( PFNGLCLIENTACTIVETEXTUREARBPROC, glfwGetProcAddress( "glClientActiveTextureARB" ) )
+		if pglMultiTexCoord1fARB = 0 orelse pglMultiTexCoord2fARB = 0 orelse _
+		   pglMultiTexCoord3fARB = 0 orelse pglMultiTexCoord4fARB = 0 orelse _
+		   pglActiveTextureARB = 0 orelse pglClientActiveTextureARB = 0 then
+			useMultitexture = false
+			return false
+		end if
 
 		#if EXT_INFO
 		'' This diagnostic path is compiled only when the Windows-only extension dialog is enabled.
@@ -835,13 +848,13 @@ function doMesh2TexelUnits() as integer
 	''                            Texture-Operation "Replace"
 
 	'' TEXTURE-UNIT #0
-	glActiveTextureARB(GL_TEXTURE0_ARB)
+	pglActiveTextureARB(GL_TEXTURE0_ARB)
 	glEnable(GL_TEXTURE_2D)
 	glBindTexture(GL_TEXTURE_2D, bump(filter))
 	glTexEnvf (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_EXT)
 	glTexEnvf (GL_TEXTURE_ENV, GL_COMBINE_RGB_EXT, GL_REPLACE)
 	'' TEXTURE-UNIT #1:
-	glActiveTextureARB(GL_TEXTURE1_ARB)
+	pglActiveTextureARB(GL_TEXTURE1_ARB)
 	glEnable(GL_TEXTURE_2D)
 	glBindTexture(GL_TEXTURE_2D, invbump(filter))
 	glTexEnvf (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_EXT)
@@ -859,8 +872,8 @@ function doMesh2TexelUnits() as integer
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
 			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			pglMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			pglMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Back Face
@@ -872,8 +885,8 @@ function doMesh2TexelUnits() as integer
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
 			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			pglMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			pglMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Top Face
@@ -885,8 +898,8 @@ function doMesh2TexelUnits() as integer
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
 			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			pglMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			pglMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Bottom Face
@@ -898,8 +911,8 @@ function doMesh2TexelUnits() as integer
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
 			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			pglMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			pglMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Right Face
@@ -911,8 +924,8 @@ function doMesh2TexelUnits() as integer
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
 			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			pglMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			pglMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 		'' Left Face
@@ -924,8 +937,8 @@ function doMesh2TexelUnits() as integer
 			c(1)=CubeData(5*i+3)
 			c(2)=CubeData(5*i+4)
 			SetUpBumps(@n(0), @c(0), @l(0), @s(0), @t(0))
-			glMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
-			glMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
+			pglMultiTexCoord2fARB(GL_TEXTURE0_ARB, CubeData(5*i), CubeData(5*i+1))
+			pglMultiTexCoord2fARB(GL_TEXTURE1_ARB, CubeData(5*i)+c(0), CubeData(5*i+1)+c(1))
 			glVertex3f(CubeData(5*i+2), CubeData(5*i+3), CubeData(5*i+4))
 		next
 	glEnd()
@@ -935,9 +948,9 @@ function doMesh2TexelUnits() as integer
 	''            Lighting Enabled
 	''            No Offset Texture-Coordinates
 
-	glActiveTextureARB(GL_TEXTURE1_ARB)
+	pglActiveTextureARB(GL_TEXTURE1_ARB)
 	glDisable(GL_TEXTURE_2D)
-	glActiveTextureARB(GL_TEXTURE0_ARB)
+	pglActiveTextureARB(GL_TEXTURE0_ARB)
 	if not emboss then
 		glTexEnvf (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE)
 		glBindTexture(GL_TEXTURE_2D, texture(filter))
@@ -970,9 +983,9 @@ function doMeshNoBumps() as integer
 	glRotatef(xrot, 1.0, 0.0, 0.0)
 	glRotatef(yrot, 0.0, 1.0, 0.0)
 	if (useMultitexture) then
-		glActiveTextureARB(GL_TEXTURE1_ARB)
+		pglActiveTextureARB(GL_TEXTURE1_ARB)
 		glDisable(GL_TEXTURE_2D)
-		glActiveTextureARB(GL_TEXTURE0_ARB)
+		pglActiveTextureARB(GL_TEXTURE0_ARB)
 	end if
 	glDisable(GL_BLEND)
 	glBindTexture(GL_TEXTURE_2D, texture(filter))

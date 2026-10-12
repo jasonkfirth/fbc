@@ -5,6 +5,10 @@
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibfreeimage
 '' --------
+''
+'' Purpose: Load common image formats into an owned 32-bit FB image.
+'' Responsibilities: Check copy bounds and release decoder/image resources.
+'' This file contains no image writer or FreeImage implementation.
 
 '' Code example for loading all common image types using FreeImage.
 '' The example loads an image passed as a command line argument.
@@ -33,9 +37,20 @@ Function FI_Load(filename As String) As Any Ptr
 	End If
 
 	'' Always load jpegs accurately
-	Dim As UInteger flags = 0
+	Dim As Long flags = 0
 	If form = FIF_JPEG Then
 		flags = JPEG_ACCURATE
+	End If
+	Const MAX_IMAGE_PIXELS = 16 * 1024 * 1024
+	'' Inspect supported formats without acquiring their pixel buffer.
+	If FreeImage_FIFSupportsNoPixels(form) Then
+		Dim metadata As FIBITMAP Ptr = FreeImage_Load(form, filename, flags Or FIF_LOAD_NOPIXELS)
+		If metadata = NULL Then Return NULL
+		Dim metadata_width As ULong = FreeImage_GetWidth(metadata)
+		Dim metadata_height As ULong = FreeImage_GetHeight(metadata)
+		FreeImage_Unload(metadata)
+		If metadata_width = 0 Or metadata_height = 0 Or _
+			CULngInt(metadata_width) * metadata_height > MAX_IMAGE_PIXELS Then Return NULL
 	End If
 
 	'' Load the image into memory
@@ -61,14 +76,15 @@ Function FI_Load(filename As String) As Any Ptr
 	'' Get the image's size
 	Dim As UInteger w = FreeImage_GetWidth(image)
 	Dim As UInteger h = FreeImage_GetHeight(image)
-	If w = 0 Or h = 0 Then
+	'' Limit display output to 16 million pixels (64 MiB at 32 bpp).
+	If w = 0 Or h = 0 OrElse CULngInt(w) * h > MAX_IMAGE_PIXELS Then
 		FreeImage_Unload image32
 		FreeImage_Unload image
 		Return NULL
 	End If
 
 	'' Create an FB image of the same size
-	Dim As fb.Image Ptr sprite = ImageCreate(w, h)
+	Dim As fb.Image Ptr sprite = ImageCreate(w, h, 0, 32)
 	If sprite = NULL Then
 		FreeImage_Unload image32
 		FreeImage_Unload image
@@ -87,6 +103,12 @@ Function FI_Load(filename As String) As Any Ptr
 	End If
 
 	Dim As Integer source_pitch = FreeImage_GetPitch(image32)
+	If source_pitch < CULngInt(w) * 4 Or target_pitch < CULngInt(w) * 4 Then
+		ImageDestroy sprite
+		FreeImage_Unload image32
+		FreeImage_Unload image
+		Return NULL
+	End If
 
 	'' And copy over the pixels, row by row
 	For y As Integer = 0 To (h - 1)
@@ -101,13 +123,14 @@ Function FI_Load(filename As String) As Any Ptr
 	Return sprite
 End Function
 
+#ifndef IMAGE_EXAMPLE_NO_MAIN
 If ScreenRes(640, 480, 32) <> 0 Then
 	Print "Could not set the requested graphics mode"
-	Sleep
 	End 1
 End If
 
 Dim As String filename = Command(1)
+FreeImage_Initialise()
 
 Dim As Any Ptr image = FI_Load(filename)
 If image <> 0 Then
@@ -115,6 +138,12 @@ If image <> 0 Then
 	ImageDestroy(image)
 Else
 	Print "Problem while loading file : " & filename
+	FreeImage_DeInitialise()
+	End 1
 End If
 
 Sleep
+FreeImage_DeInitialise()
+#endif
+
+'' end of freeimage.bas

@@ -1,0 +1,43 @@
+--- a/src/win/wgdi.c
++++ b/src/win/wgdi.c
+@@ -524,7 +524,14 @@
+ 
+    /* create the screen surface */
+    screen_surf = _AL_MALLOC_ATOMIC(w * h * BYTES_PER_PIXEL(color_depth));
+-   gdi_screen = _make_bitmap(w, h, (unsigned long)screen_surf, &gfx_gdi, color_depth, w * BYTES_PER_PIXEL(color_depth));
++   if (!screen_surf) {
++      _TRACE(PREFIX_E "Could not allocate the screen surface.\n");
++      goto Error;
++   }
++   /* Windows unsigned long remains 32 bits on Win64. Keep the complete
++    * allocation address when constructing the bitmap's scanline pointers.
++    */
++   gdi_screen = _make_bitmap(w, h, (uintptr_t)screen_surf, &gfx_gdi, color_depth, w * BYTES_PER_PIXEL(color_depth));
+    if (!gdi_screen) {
+       _TRACE(PREFIX_E "Could not make a bitmap out of the screen surface.\n");	   
+       goto Error;
+--- a/src/glyph.c
++++ b/src/glyph.c
+@@ -25,7 +25,7 @@
+ #define DRAW_GLYPH(bits, size)                                               \
+ {                                                                            \
+    AL_CONST unsigned char *data = glyph->dat;                                \
+-   unsigned long addr;                                                       \
++   uintptr_t addr;                                                           \
+    int w = glyph->w;                                                         \
+    int h = glyph->h;                                                         \
+    int stride = (w+7)/8;                                                     \
+--- a/include/allegro/platform/almngw32.h
++++ b/include/allegro/platform/almngw32.h
+@@ -40,7 +40,11 @@
+ #endif
+ 
+ #define ALLEGRO_WINDOWS
++#ifdef _WIN64
++   #define ALLEGRO_AMD64
++#else
+ #define ALLEGRO_I386
++#endif
+ #define ALLEGRO_LITTLE_ENDIAN
+ #define ALLEGRO_USE_CONSTRUCTOR
+ #define ALLEGRO_MULTITHREADED

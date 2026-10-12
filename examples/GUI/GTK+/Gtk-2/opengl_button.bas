@@ -1,3 +1,8 @@
+'' FreeBASIC GTK 2 examples
+'' File: Gtk-2/opengl_button.bas
+'' Purpose: Animate an OpenGL scene using the GTK 2 API.
+'' Responsibilities: GTK callbacks, GL context use and animation lifetime.
+'' This file intentionally contains no GTK 3 or standalone GL backend.
 ''
 '' button.c:
 '' Simple toggle button example with 3D OpenGl rendering.
@@ -255,7 +260,9 @@ function create_gl_toggle_button (byval glconfig as GdkGLConfig ptr) as GtkWidge
   gtk_widget_set_size_request(drawing_area, 200, 200)
 
   '' Set OpenGL-capability to the widget.
-  gtk_widget_set_gl_capability(drawing_area, glconfig, NULL, TRUE, GDK_GL_RGBA_TYPE)
+  '' GtkGLExt compares direct with GLib's TRUE (1), not merely nonzero.
+  '' FreeBASIC's TRUE is -1, so use the binding's CTRUE for this argument.
+  gtk_widget_set_gl_capability(drawing_area, glconfig, NULL, CTRUE, GDK_GL_RGBA_TYPE)
 
   g_signal_connect_after(GTK_OBJECT(drawing_area), "realize", GTK_SIGNAL_FUNC(@realize), NULL)
   g_signal_connect(GTK_OBJECT(drawing_area), "configure_event", GTK_SIGNAL_FUNC(@configure_event), NULL)
@@ -365,3 +372,5 @@ end function
   gtk_main ()
 
   end 0
+
+'' end of Gtk-2/opengl_button.bas

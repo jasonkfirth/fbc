@@ -86,6 +86,8 @@ Statements and procedures for working with files and devices.
 		Accepts a TCP client from a server file number.
 	=={{fbdoc item="keyword" value="ProPgFbnetwire|fbnetwire.bi portable wire helpers"}}==
 		Provides fixed-size little-endian value helpers for files and TCP handles.
+	=={{fbdoc item="keyword" value="ProPgSerialization|Compiler-assisted serialization"}}==
+		Encodes and reconstructs owned strings, arrays and records for binary files or application transports.
 		
 {{anchor name="FILEPOS"}}{{fbdoc item="section" value="File Position and other Info"}}
 	=={{fbdoc item="keyword" value="KeyPgLof|LOF"}}==

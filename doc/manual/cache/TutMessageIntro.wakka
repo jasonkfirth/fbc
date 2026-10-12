@@ -17,7 +17,7 @@ While RAD languages enable the programmer to quickly build GUI-based programs, i
 
 ""FreeBASIC"" doesn't have a RAD system for Windows programming. To create a Windows program in ""FreeBASIC"", you will have to use the SDK, as this is the only option. While the SDK is massive, and would probably take a lifetime to fully understand, for 99% of all Windows programs, only a small subset of the SDK needs to be used. The reality is that Windows SDK programming is no harder than any other type of programming, and for GUI-based programs, is actually easier than a language where you would have to create all the GUI elements yourself.
 
-Putting aside all the gritty details of the Windows API for the moment, it is important to understand the mechanism of messages in an SDK program. This is best accomplished by looking at our old friend, the Hello World program. In the examples\Windows\gui folder of the ""FreeBASIC"" .15b distribution (which is required for the code in this article), there is a nice Hello World program that I am going to steal--I mean borrow, as the base for this example.
+Putting aside all the gritty details of the Windows API for the moment, it is important to understand the mechanism of messages in an SDK program. This is best accomplished by looking at the Hello World program in ##examples/GUI/win32/hello.bas##. The example below adds a message box when the window is clicked.
 
 ##%%(freebasic)
 #include once "windows.bi"
@@ -31,7 +31,7 @@ declare function        WinMain     ( byval hInstance as HINSTANCE, _
 	''
 	'' Entry point    
 	''
-	end WinMain( GetModuleHandle( null ), null, Command$, SW_NORMAL )
+	end WinMain( GetModuleHandle( null ), null, Command, SW_NORMAL )
 
 '' ::::::::
 '' name: WndProc
@@ -57,7 +57,7 @@ function WndProc ( byval hWnd as HWND, _
 		
 		'' User clicked the form
 		case WM_LBUTTONUP
-			MessageBox NULL, "Hello world from FreeBasic", "FB Win", MB_OK
+			MessageBox hWnd, "Hello world from FreeBasic", "FB Win", MB_OK
 		''
 		'' Windows is being repainted
 		''
@@ -119,7 +119,7 @@ function WinMain ( byval hInstance as HINSTANCE, _
 	dim szAppName as string
 	dim hWnd as HWND
 	 
-	function = 0
+	function = 1
 	 
 	''
 	'' Setup window class
@@ -164,16 +164,23 @@ function WinMain ( byval hInstance as HINSTANCE, _
 						   NULL )
 						  
 
+	if( hWnd = NULL ) then exit function
 	ShowWindow( hWnd, iCmdShow )
 	UpdateWindow( hWnd )
 	 
 	''
 	'' Process windows messages
 	''
-	while( GetMessage( @wMsg, NULL, 0, 0 ) <> FALSE )    
+	do
+		dim received as BOOL = GetMessage( @wMsg, NULL, 0, 0 )
+		if( received = -1 ) then
+			DestroyWindow( hWnd )
+			return 1
+		end if
+		if( received = 0 ) then exit do
 		TranslateMessage( @wMsg )
 		DispatchMessage( @wMsg )
-	wend
+	loop
 	
 	
 	''
@@ -190,7 +197,7 @@ Take a moment to examine the window. You will see that the form has the max, min
 
 The first thing you should notice about the code listed above is the format. This is the basic format of any ""FreeBASIC"" Windows program. Every Windows program, no matter how simple or complex, will follow this same basic format. The two key ingredients of this program are the **""WinMain""** and **""WinProc""** procedures.
 
-The ""WinMain"" procedure is the procedure Windows calls when a program is started. It is the entry point of a Windows program. In ""WinMain"", you build and register the main program window and then enter into the message loop to process messages. Once the program enters the message loop, it will start processing messages with the ""WinProc"" procedure. Since this article is about the message model in a Windows program, we will only discuss the message loop in ""WinMain"" and the ""WinProc"" procedure.
+In this FreeBASIC example, module-level code calls the local ""WinMain"" helper with ##End WinMain(...)##. The procedure name has no special entry-point behavior in FreeBASIC. In ""WinMain"", you build and register the main program window and then enter into the message loop to process messages. Once the program enters the message loop, it will start processing messages with the ""WinProc"" procedure. Since this article is about the message model in a Windows program, we will only discuss the message loop in ""WinMain"" and the ""WinProc"" procedure.
 
 When the Windows operating system is running, there are messages being generated all the time. When a Windows program is running, the OS will send messages to the program, when something happens that the OS thinks the program should know about. Some of these program specific messages are sent directly to the ""WinProc"" (or similar) procedure, and others, primarily user-generated messages, are placed into a message queue. Since most of a program is concerned with user interaction, it is important to understand the message queue.
 
@@ -202,11 +209,25 @@ For a program, the message queue will hold one or more messages, lined up like t
 	''
 	'' Process windows messages
 	''
-	while( GetMessage( @wMsg, NULL, 0, 0 ) <> FALSE )    
+	do
+		dim received as BOOL = GetMessage( @wMsg, NULL, 0, 0 )
+		if( received = -1 ) then
+			DestroyWindow( hWnd )
+			return 1
+		end if
+		if( received = 0 ) then exit do
 		TranslateMessage( @wMsg )
 		DispatchMessage( @wMsg )
-	wend
+	loop
 %%##
+
+##GetMessage## has three outcomes: a positive result supplies a message, zero reports ##WM_QUIT##, and -1 reports an error. Test the error before translating or dispatching the message. A loop which tests only for nonzero treats -1 as a valid message.
+
+The current native examples are in ##examples/GUI/win32##. In ##menu.bas##, ##WM_COMMAND## is checked for a menu notification and an assigned command ID before the selection table is indexed. Control notifications and accelerator commands have different parameters and need their own handlers.
+
+In ##bitmap.bas##, the embedded BMP bytes remain owned by the program. ##CreateDIBitmap## creates a separate GDI bitmap: release the temporary ##GetDC## context with ##ReleaseDC##, restore the original object after selecting the bitmap into a memory DC, delete that DC after painting, and delete the owned bitmap when the window is destroyed. Stock brushes belong to Windows and must not be deleted. These examples handle their window messages on one GUI thread.
+
+See Microsoft's [[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessage|GetMessage]], [[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdc|GetDC]], and [[https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createdibitmap|CreateDIBitmap]] references for the underlying API contracts.
 
 The **""GetMessage""** procedure retrieves a message from the queue via the **wMsg** parameter. The wMsg parameter is a MSG type-def that contains the necessary information related to a particular message. Here is the definition of the MSG type-def.
 

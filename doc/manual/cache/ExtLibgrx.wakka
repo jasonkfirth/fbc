@@ -1,10 +1,20 @@
 {{fbdoc item="title" value="GRX"}}----
 2D graphics library
 
-Website: http://grx.gnu.de/
+Website: https://grx.gnu.de/
 Platforms supported: ""Win32"", Linux, DOS
 Headers to include: grx/grx20.bi
-Header version: 2.4.6
+Header version: 2.4.9
 Examples: in examples/graphics/grx/
+
+{{fbdoc item="section" value="Matching the native SDK"}}
+	Use a GRX 2.4.9 library matching ##grx/grx20.bi## and the executable architecture. The publisher's Windows driver is an i386 driver. On a 64-bit Windows PC, compile this example as a 32-bit executable and use the matching FreeBASIC runtime and GRX archive. The example and binding retain their shared Windows, Linux and DOS source.
+
+	The original source archive is ##grx249.tar.gz##. Its SHA-256 checksum is ##a899956b3ee46492696114d220431405320c64c1f6f058fdfc2b4d6a2beae786##, recorded in the maintained FreeBSD port at https://github.com/freebsd/freebsd-ports/blob/main/graphics/grx/distinfo. Preserved copies must match the original archive before building.
+
+	The Windows archive links with ##gdi32## and ##user32##, already selected by the binding. Linux console and X11 builds are separate SDK configurations; select the backend appropriate to the application rather than mixing their libraries.
+
+{{fbdoc item="section" value="Color grid example"}}
+	The example checks mode selection and cell dimensions before drawing its 256-color grid. It restores text mode before exit. Set ##FB_EXAMPLE_AUTOPLAY=1## for a bounded run that checks all 256 cell centers without requiring keyboard input; otherwise it waits for a key in the GRX window.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

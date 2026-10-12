@@ -1,45 +1,83 @@
 {{fbdoc item="title" value="BASS"}}----
-Audio library for use in Windows with a Beta Version for Linux.
+Audio library for sample, stream and tracker-module playback and recording.
 
-Website: http://www.un4seen.com/bass.html
-Platforms supported: ""Win32"", Linux (beta)
+Website: https://www.un4seen.com/bass.html
+Platforms supported: Windows, Linux
 Headers to include: bass.bi
 Header version: 2.4.14
 Examples: in examples/sound/BASS/
 
+The binding's sample and stream API has been checked with native BASS 2.4.18.3 on 32-bit and 64-bit Windows and 64-bit Linux. Use a library matching the executable's architecture. Windows needs the BASS DLL and an import library compatible with the compiler's declarations; the FreeBASIC binding uses ##Extern "Windows-MS"##. The supplied C import archive and a FreeBASIC import archive may therefore use different linker names for the same DLL functions.
+
+Compare ##HiWord(BASS_GetVersion())## with ##BASSVERSION## before using the 2.4 API. Handles and ##DWORD## fields are 32-bit values even in a 64-bit application; ##QWORD## byte positions are 64-bit. Check each load or playback result and release the process's handles with ##BASS_Free()##. Newer SDKs reserve the older ##BASS_INFO## hardware-capability fields; their names remain in this binding for source compatibility.
+
+The example accepts an optional module filename, using the package's ##dne_trtn.mod## relative to the executable when none is supplied. The sound-folder examples accept a data directory containing their media files. Setting ##FB_EXAMPLE_AUTOPLAY## enables bounded playback checks; otherwise the programs retain their interactive controls. The demonstration exercises stream/sample playback, pause/resume, restart and volume controls in that mode. BASSMOD is a separate library with its own binding.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/bass.bas"}}%%(freebasic)
-#include once "bass.bi"
+'' examples/manual/libraries/bass.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'BASS'
+'' Purpose: Play a tracker module through the native BASS output device.
+'' Responsibilities: Asset paths, playback errors and owned resource cleanup.
+'' This example contains no network streaming or recording.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibbass
+'' --------
 
-'' this mod file should be available in the fbc package:
-const SOUND_FILE = "..\..\sound\data\dne_trtn.mod"
+#include Once "bass.bi"
 
-if (BASS_GetVersion() < MAKELONG(2,2)) then
-	print "BASS version 2.2 or above required!"
-	end 1
-end if
+'' An optional filename also allows running the executable outside this tree.
+Dim As String sound_file = Command(1)
+If sound_file = "" Then sound_file = ExePath() & "/../../sound/data/dne_trtn.mod"
 
-if (BASS_Init(-1, 44100, 0, 0, 0) = 0) then
-	print "Could not initialize BASS"
-	end 1
-end if
+If (HiWord(BASS_GetVersion()) <> BASSVERSION) Then
+	Print "BASS 2.4 required!"
+	End 1
+End If
 
-dim as HMUSIC test = BASS_MusicLoad(FALSE, @SOUND_FILE, 0, 0, BASS_MUSIC_LOOP, 0)
-if (test = 0) then
-	print "BASS could not load '" & SOUND_FILE & "'"
+If (BASS_Init(-1, 44100, 0, 0, 0) = 0) Then
+	Print "Could not initialize BASS"
+	End 1
+End If
+
+Dim As HMUSIC test = BASS_MusicLoad(False, StrPtr(sound_file), 0, 0, BASS_MUSIC_LOOP, 0)
+If (test = 0) Then
+	Print "BASS could not load '" & sound_file & "'"
 	BASS_Free()
-	end 1
-end if
+	End 1
+End If
 
-BASS_ChannelPlay(test, FALSE)
+If BASS_ChannelPlay(test, False) = 0 Then
+	Print "BASS could not start playback: "; BASS_ErrorGetCode()
+	BASS_Free()
+	End 1
+End If
 
-print "Sound playing; waiting to keypress to stop and exit..."
-sleep
+If( Environ( "FB_EXAMPLE_AUTOPLAY" ) <> "" ) Then
+	Sleep 1500, 1
+	Dim As QWORD position = BASS_ChannelGetPosition(test, BASS_POS_BYTE)
+	If position = Cast(QWORD, -1) OrElse position = 0 Then
+		BASS_Free()
+		End 1
+	End If
+	Print "BASS position seconds:"; BASS_ChannelBytes2Seconds(test, position)
+Else
+	Print "Sound playing; waiting to keypress to stop and exit..."
+	Sleep
+End If
 
-BASS_ChannelStop(test)
-BASS_MusicFree(test)
-BASS_Stop()
-BASS_Free()
+If BASS_ChannelStop(test) = 0 Then
+	BASS_Free()
+	End 1
+End If
+If BASS_MusicFree(test) = 0 Then
+	BASS_Free()
+	End 1
+End If
+If BASS_Free() = 0 Then End 1
+'' end of bass.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

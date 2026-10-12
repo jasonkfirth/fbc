@@ -9,6 +9,8 @@ Statements and procedures for working with arrays.
 	Procedures that return the array's length/size and bounds for any array's dimension.
 **{{anchor name="DESCRIPTOR|Retrieving Array Descriptor"}}**
 	Procedures that return a pointers to an array's descriptor.
+**{{anchor name="SERIALIZATION|Serializing Arrays"}}**
+	Procedures that preserve logical array contents and bounds in a binary string.
 
 <<{{anchor name="DEFINE"}}{{fbdoc item="section" value="Defining Arrays"}}
 	=={{fbdoc item="keyword" value="KeyPgOptiondynamic|OPTION DYNAMIC"}}==
@@ -42,6 +44,14 @@ Statements and procedures for working with arrays.
 {{anchor name="DESCRIPTOR"}}{{fbdoc item="section" value="Retrieving Array Descriptor"}}
 	=={{fbdoc item="keyword" value="KeyPgFBArray|Array[Const]DescriptorPtr"}}==
 		Returns a [constant] pointer to array's descriptor (FBARRAY).
+
+{{anchor name="SERIALIZATION"}}{{fbdoc item="section" value="Serializing Arrays"}}
+	=={{fbdoc item="keyword" value="KeyPgSerialize|SERIALIZE"}}==
+		Encodes a whole fixed or dynamic array, including owned element data.
+	=={{fbdoc item="keyword" value="KeyPgDeserialize|DESERIALIZE"}}==
+		Restores an array with independent ownership, leaving it unchanged on failure.
+	=={{fbdoc item="keyword" value="ProPgSerialization|Compiler-assisted serialization"}}==
+		Explains supported types, portable schemas, resource limits and record versions.
 >>::c::
 
 {{fbdoc item="back" value="DocToc|Table of Contents"}}

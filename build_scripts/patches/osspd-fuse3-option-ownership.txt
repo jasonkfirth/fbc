@@ -1,0 +1,23 @@
+FreeBASIC exampleageddon dependency qualification
+File: osspd-fuse3-option-ownership.txt
+Purpose: Explain the private OSS proxy startup repair.
+This note contains no BASSMOD implementation or system service configuration.
+
+Upstream: https://github.com/OpenMandrivaSoftware/ossp
+Revision: 72f82cc7b98f026c6827743d8f48bd43f6b49b32
+Archive SHA-256: 27ba8be7f43583e80a96571514f93f106d0bb0b29d160a0fc5b32fa1509fe78d
+
+Ubuntu osspd 1.3.3-6 aborts in fuse_opt_parse when --adsp= or --mixer=
+overrides an option field initialized with a string literal. FUSE 3 frees
+the field's previous value before storing the parsed string. The same
+initialization is present in the pinned upstream revision.
+
+The patch leaves the three device-name fields NULL during parsing and
+supplies omitted defaults afterwards. Explicit empty strings retain their
+documented meaning. It changes neither the OSS protocol nor the ALSA backend.
+
+Apply with patch -p1 from the extracted upstream directory. Qualification
+uses a private binary and a task-owned CUSE device. No packaged binary or
+system service is replaced.
+
+end of osspd-fuse3-option-ownership.txt

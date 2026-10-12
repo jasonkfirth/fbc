@@ -4,7 +4,9 @@ Portable toolkit for building graphical user interfaces.
 Website: http://www.tecgraf.puc-rio.br/iup/
 Platforms supported: ""Win32"", Linux
 Headers to include: IUP/iup.bi
-Header version: 3.13
+Header version: 3.15
 Example Usage: yes, in examples/GUI/IUP/
+
+On Linux, the link dependencies must match the GTK backend used to build IUP. Define ##__USE_GTK3__## before including ##IUP/iup.bi##, or pass ##-d __USE_GTK3__##, when using a GTK 3 build. The default remains the older GTK 2 backend. This selection affects link libraries; it does not change the IUP C declarations.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

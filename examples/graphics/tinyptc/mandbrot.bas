@@ -1,3 +1,10 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: mandbrot.bas
+'' Purpose: Render a Mandelbrot zoom through the TinyPTC display.
+'' Responsibilities: Framebuffer rendering and Windows throughput reporting.
+'' This file contains no reusable window or timing abstraction.
+'' The one display loop owns the framebuffer and closes the display on exit.
+
 #ifdef __FB_WIN32__
 #include once "windows.bi"
 #endif
@@ -21,7 +28,7 @@ declare function HSBtoRGB( byval hue as double, byval saturation as double, byva
 '' globals
 dim shared as double xstart, ystart
 dim shared as double xzoom, yzoom
-dim shared as integer buffer( 0 to SCR_SIZE-1 )
+dim shared as ulong buffer( 0 to SCR_SIZE-1 )
 
 if( ptc_open( "mandelbrot test", SCR_WIDTH, SCR_HEIGHT ) = 0 ) then
     end -1
@@ -32,23 +39,24 @@ ystart = SY
 dim as double xend = EX
 dim as double yend = EY
 
-dim as uinteger starttime, tottime
 #ifdef __FB_WIN32__
+'' GetTickCount and the throughput caption belong to the Windows display.
+dim as ulong starttime, tottime, sectimer
+dim as integer frames
 dim as HWND hwnd
 hwnd = GetActiveWindow( )
+frames = 0
+tottime = 0
+sectimer = GetTickCount()
 #endif
-
-dim as uinteger sectimer
-dim as integer frames
 
 dim as double fac = 0.99
 dim as double finc = .01
 
-frames = 0
-tottime = 0
-sectimer = GetTickCount
 do
-    starttime = GetTickCount
+#ifdef __FB_WIN32__
+    starttime = GetTickCount()
+#endif
 
     xend = xend * fac
     yend = yend * fac
@@ -59,8 +67,10 @@ do
 
     mandelbrot( )
 
-    tottime = tottime + (GetTickCount - starttime)
+#ifdef __FB_WIN32__
+    tottime = tottime + (GetTickCount() - starttime)
     frames = frames + 1
+#endif
 
     fac = fac - finc
     if( fac <= 0.91 ) then
@@ -80,7 +90,9 @@ do
 #ifdef __FB_WIN32__
     if( GetTickCount( ) - sectimer >= 1000 ) then
 
-        SetWindowText( hwnd, (SCR_WIDTH * SCR_HEIGHT * frames) \ tottime & " kpixels p/ sec " )
+        if tottime > 0 then
+            SetWindowText( hwnd, (SCR_WIDTH * SCR_HEIGHT * frames) \ tottime & " kpixels p/ sec " )
+        end if
 
         sectimer = GetTickCount( )
         frames = 0
@@ -91,6 +103,8 @@ do
 
 loop until( inkey = chr( 27 ) )
 
+ptc_close()
+
 'END
 
 ' -------------------------------------------------------------------------
@@ -99,7 +113,7 @@ loop until( inkey = chr( 27 ) )
 ' calculate all points
 private sub mandelbrot static
     dim as integer x, y, col
-    dim as integer ptr p
+    dim as ulong ptr p
     dim as double old, h
 
     p = @buffer(0)
@@ -145,6 +159,7 @@ private function DotsColor( byval xval as double, byval yval as double ) as doub
     function = j / _MAX
 
 end function
+
 
 
 
@@ -210,3 +225,5 @@ private function HSBtoRGB( byval hue as double, byval saturation as double, byva
     function = rgb( red*255.0, green*255.0, blue*255.0 )
 
 end function
+
+'' end of mandbrot.bas

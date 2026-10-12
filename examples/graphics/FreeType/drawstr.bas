@@ -1,6 +1,12 @@
+'' FreeBASIC FreeType examples
+'' File: drawstr.bas
+'' Purpose: Blend rendered text into the FB graphics window.
+'' Responsibilities: Check glyph state, clip pixels and release font resources.
+'' This file contains no font engine or application-owned glyph buffer.
 '' Drawing text onto an FB screen using FreeType2, by jofers
 
 #include "freetype2/freetype.bi"
+#include once "bitmap.bi"
 
 #ifdef __FB_LINUX__
 Const TTF_FONT = "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf"
@@ -27,46 +33,11 @@ Sub draw_glyph _
 
     If font = 0 Then Exit Sub
 
-    Dim As FT_Bitmap Ptr bitmap = @font->glyph->bitmap
-
-    Dim As UByte Ptr source = bitmap->buffer
-    Dim As Integer h = bitmap->rows
-    Dim As Integer pitch = SCREEN_W - bitmap->width
-
-    Dim As UInteger Ptr p = CPtr(UInteger Ptr, ScreenPtr()) + (y * SCREEN_W) + x
-
-    If source = 0 OrElse p = 0 Then Exit Sub
-
-    While (h > 0)
-        Dim As Integer w = bitmap->width
-        While (w > 0)
-            '' Doing alpha blending here
-            #define MASK_RB_32 &h00FF00FF
-            #define MASK_G_32  &h0000FF00
-
-            Dim As UInteger srb = col And MASK_RB_32
-            Dim As UInteger sg  = col And MASK_G_32
-
-            Dim As UInteger dcol = p[0]
-            Dim As UInteger drb = dcol And MASK_RB_32
-            Dim As UInteger dg  = dcol And MASK_G_32
-
-            Dim As Integer Alpha = source[0]
-            srb = ((srb - drb) * Alpha) Shr 8
-            sg  = ((sg - dg) * Alpha) Shr 8
-
-            '' source and p were checked before this glyph-row loop.
-            '' FB-LINTER: DISABLE-NEXT-LINE FBL-PTR-001
-            *p = ((drb + srb) And MASK_RB_32) Or ((dg + sg) And MASK_G_32)
-
-            p += 1
-            source += 1
-            w -= 1
-        Wend
-
-        h -= 1
-        p += pitch
-    Wend
+    Dim image_width As Long, image_height As Long, image_bpp As Long, image_pitch As Long
+    ScreenInfo image_width, image_height, , image_bpp, image_pitch
+    If image_bpp <> 4 Or ScreenPtr() = NULL Then Exit Sub
+    '' The caller holds ScreenLock throughout glyph blending.
+    blend_bitmap(@font->glyph->bitmap, ScreenPtr(), image_width, image_height, image_pitch, x, y, col)
 End Sub
 
 Function print_text _
@@ -80,7 +51,8 @@ Function print_text _
     ) As Integer
 
     '' Get rid of any alpha channel
-    col = (col Shl 8) Shr 8
+    col = col And &h00ffffff
+    If font = NULL Or size < 1 Or size > 256 Then Return 0
 
     '' Set font size
     If (FT_Set_Pixel_Sizes(font, size, size) <> 0) Then
@@ -107,12 +79,8 @@ Function print_text _
             Return 0
         End If
 
-        '' Do clipping
-        If ((penx + font->glyph->bitmap_left + font->glyph->bitmap.width) > SCREEN_W) Then Exit For
-        If ((peny - font->glyph->bitmap_top + font->glyph->bitmap.rows) > SCREEN_H) Then Exit For
-        If ((penx + font->glyph->bitmap_left) < 0) Then Exit For
-        If ((peny - font->glyph->bitmap_top) < 0) Then Exit For
-
+        '' Clip each bitmap independently; an off-screen glyph must not discard
+        '' later characters that can still fall inside the destination.
         '' Draw the glyph bitmap to the screen
         draw_glyph(font, penx + font->glyph->bitmap_left, peny - font->glyph->bitmap_top, col)
 
@@ -122,15 +90,23 @@ Function print_text _
     Return -1
 End Function
 
+#ifndef FREETYPE_EXAMPLE_NO_MAIN
+    Dim font_file As String = Command(1)
+    If font_file = "" Then font_file = TTF_FONT
     If (FT_Init_FreeType(@library) <> 0) Then
-        Print "FT_Init_FreeType() failed" : Sleep : End 1
+        Print "FT_Init_FreeType() failed" : End 1
     End If
 
-    If (FT_New_Face(library, TTF_FONT, 0, @font1) <> 0) Then
-        Print "FT_New_Face() failed (font file '" & TTF_FONT & "' not found?)" : Sleep : End 1
+    If (FT_New_Face(library, font_file, 0, @font1) <> 0) Then
+        FT_Done_FreeType(library)
+        Print "FT_New_Face() failed (font file '" & font_file & "' not found?)" : End 1
     End If
 
-    ScreenRes SCREEN_W, SCREEN_H, 32
+    If ScreenRes(SCREEN_W, SCREEN_H, 32) <> 0 Then
+        FT_Done_Face(font1)
+        FT_Done_FreeType(library)
+        End 1
+    End If
 
     ScreenLock()
     For x As Integer = 0 To (SCREEN_W - 1)
@@ -152,3 +128,8 @@ End Function
     Next
 
     Sleep
+    FT_Done_Face(font1)
+    FT_Done_FreeType(library)
+#endif
+
+'' end of drawstr.bas

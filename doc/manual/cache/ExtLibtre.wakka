@@ -3,9 +3,17 @@ Lightweight, robust, and efficient POSIX compliant regexp matching library
 
 Website: https://laurikari.net/tre/
 Github: https://github.com/laurikari/tre/
-Platforms supported: ""Win32"", Linux
+Platforms supported: Windows, Linux
 Headers to include: tre/tre.bi, tre/regex.bi
 Header version: 0.8.0
 Examples: in examples/regex/TRE/
+
+The Windows examples and their native data layouts were checked with the real TRE 0.9.0 SDK on Win32 and Win64. The binding's version remains 0.8.0. Use a library built for the executable's bitness.
+
+A successful ##regcomp## acquires resources in ##regex_t##. Call ##regfree## after matching, including when no match is found. ##regmatch_t## offsets are zero-based byte offsets; an unmatched optional capture has negative offsets and must be checked before extracting a substring.
+
+##match.bas## prints successive identifiers and waits for a key. ##replace.bas## accepts numbered replacement captures such as ##\1##, with ##\0## selecting the whole match. A doubled backslash inserts one literal backslash. Its demonstration prints ##Hi *you* strange *user* :D##. ##subexpr.bas## extracts filename components as a text example and does not access the filesystem.
+
+The match and replacement examples use ##regnexec## with explicit byte lengths. Empty matches advance by one byte and stop after a match at the end, which keeps iteration finite and preserves intervening subject bytes. These examples are intended for byte-oriented input; their global iteration has not been qualified for a multibyte locale. Empty results also represent compile or execution failures in the replacement helper.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

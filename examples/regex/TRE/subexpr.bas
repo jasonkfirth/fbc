@@ -1,3 +1,9 @@
+'' FreeBASIC TRE examples
+'' File: subexpr.bas
+'' Purpose: Split filename text using numbered captures.
+'' Responsibilities: Check optional capture_offsets offsets and release the compiled pattern.
+'' This file contains no filesystem access or TRE implementation.
+
 ''
 '' regular expression example
 ''
@@ -11,6 +17,11 @@ enum eFilePartKind
 	eFPK_Basename
 	eFPK_Extension
 end enum
+
+private function captured_text( byref text as string, byref capture_offsets as regmatch_t ) as string
+	if capture_offsets.rm_so < 0 or capture_offsets.rm_eo < capture_offsets.rm_so or capture_offsets.rm_eo > len(text) then return ""
+	return mid(text, capture_offsets.rm_so+1, capture_offsets.rm_eo-capture_offsets.rm_so)
+end function
 
 function get_filepart( byref buffer as string, byval kind as eFilePartKind ) as string
 	dim re as regex_t
@@ -39,17 +50,18 @@ function get_filepart( byref buffer as string, byval kind as eFilePartKind ) as 
 		case eFPK_Full
 			function = buffer
 		case eFPK_Path
-			function = mid( *pbuff, 1 + match(2).rm_so, match(2).rm_eo - match(2).rm_so )
+			function = captured_text(buffer, match(2))
 		case eFPK_File
-			function = mid( *pbuff, 1 + match(3).rm_so, match(3).rm_eo - match(3).rm_so ) + _
-			           mid( *pbuff, 1 + match(4).rm_so, match(4).rm_eo - match(4).rm_so )
+			function = captured_text(buffer, match(3)) + _
+			           captured_text(buffer, match(4))
 		case eFPK_Basename
-			function = mid( *pbuff, 1 + match(3).rm_so, match(3).rm_eo - match(3).rm_so ) + _
-			           mid( *pbuff, 1 + match(5).rm_so, match(5).rm_eo - match(5).rm_so )
+			function = captured_text(buffer, match(3)) + _
+			           captured_text(buffer, match(5))
 		case eFPK_Extension
-			function = mid( *pbuff, 1 + match(7).rm_so, match(7).rm_eo - match(7).rm_so )
+			function = captured_text(buffer, match(7))
 		end select
 	end if
+	regfree(@re)
 end function
 
 private sub ShowAll( byref s as string )
@@ -61,6 +73,7 @@ private sub ShowAll( byref s as string )
 	print
 end sub
 
+#ifndef REGEX_EXAMPLE_NO_MAIN
 ShowAll "path/name.ext"
 ShowAll "path/name.ext1.ext2"
 ShowAll "path/name.ext1.ext2.ext3"
@@ -74,3 +87,6 @@ ShowAll ".ext"
 ShowAll ".ext1.ext2"
 ShowAll ".ext1.ext2.ext3"
 ShowAll ""
+#endif
+
+'' end of subexpr.bas

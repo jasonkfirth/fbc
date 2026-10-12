@@ -1,6 +1,11 @@
+'' FreeBASIC Win32 examples
+'' File: toolbar.bas
+'' Purpose: Display the standard Windows toolbar images.
+'' Responsibilities: Keep the separator separate from the six button images.
+'' This file contains no application commands or private image-list ownership.
 ''
-'' toolbar demo, code by zydon (...@...)
-''
+
+'' Original demo by zydon (...@...).
 
 #include once "windows.bi"
 #include once "win/commctrl.bi"
@@ -39,10 +44,10 @@ function WndProc ( byval hWnd as HWND, _
         iccx.dwICC  = ICC_BAR_CLASSES
 
         '' bitmap for each button
-        static tbBmp(0 to 6) as BYTE = {STD_FILENEW, STD_FILEOPEN, STD_FILESAVE, STD_CUT, STD_COPY, STD_PASTE }
+        static tbBmp(0 to 6) as BYTE = {STD_FILENEW, STD_FILEOPEN, STD_FILESAVE, 0, STD_CUT, STD_COPY, STD_PASTE }
 
         '' initialize common controls 32
-        InitCommonControlsEx( @iccx )
+        if( InitCommonControlsEx( @iccx ) = FALSE ) then return -1
 
         '' Lets build a new toolbar
         hTools = CreateWindowEx( WS_EX_DLGMODALFRAME, _
@@ -52,24 +57,28 @@ function WndProc ( byval hWnd as HWND, _
 								 hWnd, NULL, _
 								 hInstance, NULL )
 
+		'' The parent window owns the child control. The standard images come
+		'' from comctl32; this example does not own a separate image list.
+		if( hTools = NULL ) then return -1
 		'' paint toolbar buttons now
 		if ( hTools <> NULL ) then
 			'' draw toolbar panel
             SendMessage( hTools, TB_BUTTONSTRUCTSIZE, len( tbb ), NULL )
             tbAddBmp.hInst = HINST_COMMCTRL
             tbAddBmp.nID   = IDB_STD_SMALL_COLOR
-            SendMessage( hTools, TB_ADDBITMAP, 0, cint( @tbAddBmp ) )
+            if( SendMessage( hTools, TB_ADDBITMAP, 0, cint( @tbAddBmp ) ) = -1 ) then return -1
 
             '' apply bitmap to toolbar buttons
             with tbb
 				dim i as LONG
 				for i = 0 to 6
-					.iBitmap   = tbBmp(i)
+					'' A separator uses a pixel width, not an image index.
+					.iBitmap   = iif( i = 3, 8, tbBmp(i) )
 					.fsState   = TBSTATE_ENABLED
 					.fsStyle   = iif( i = 3, TBSTYLE_SEP, TBSTYLE_BUTTON )
 					.idCommand = -1
 					.dwData    = 0
-					SendMessage( hTools, TB_ADDBUTTONS, 1, cint( @tbb ) )
+					if( SendMessage( hTools, TB_ADDBUTTONS, 1, cint( @tbb ) ) = FALSE ) then return -1
 				next
 			end with
 		end if
@@ -107,7 +116,7 @@ end function
 		.hInstance     = hInstance
 		.hIcon         = LoadIcon( null, IDI_APPLICATION )
 		.hCursor       = LoadCursor( null, IDC_ARROW )
-		.hbrBackground = cast( HGDIOBJ, 16 )  ' btnface color
+        .hbrBackground = cast( HGDIOBJ, COLOR_BTNFACE + 1 )
 		.lpszMenuName  = null
 		'' appName remains alive through this synchronous RegisterClass call.
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL427
@@ -126,11 +135,20 @@ end function
 						   null, null, hInstance, null )
 
 	''
-	'' messages loop
+	'' messages loop, on the single GUI thread
 	''
-	do until( GetMessage( @wMsg, null, 0, 0 ) = FALSE )
+	if( hWnd = NULL ) then end 1
+	do
+		dim received as BOOL = GetMessage( @wMsg, null, 0, 0 )
+		if( received = -1 ) then
+			DestroyWindow( hWnd )
+			end 1
+		end if
+		if( received = 0 ) then exit do
 		TranslateMessage( @wMsg )
 		DispatchMessage( @wMsg )
 	loop
 
 	end 0
+
+'' end of toolbar.bas

@@ -1,0 +1,32 @@
+--- a/osspd.c
++++ b/osspd.c
+@@ -2277,11 +2277,8 @@
+ int main(int argc, char **argv)
+ {
+ 	static struct ossp_param param = {
+-		.dsp_name = DFL_DSP_NAME,
+ 		.dsp_major = DFL_DSP_MAJOR, .dsp_minor = DFL_DSP_MINOR,
+-		.adsp_name = DFL_ADSP_NAME,
+ 		.adsp_major = DFL_ADSP_MAJOR, .adsp_minor = DFL_ADSP_MINOR,
+-		.mixer_name = DFL_MIXER_NAME,
+ 		.mixer_major = DFL_MIXER_MAJOR, .mixer_minor = DFL_MIXER_MINOR,
+ 		.max_streams = DFL_MAX_STREAMS,
+ 	};
+@@ -2302,6 +2299,17 @@
+ 	if (param.help)
+ 		return 0;
+ 
++	/* FUSE frees a previous string value when parsing a %s option. Keep
++	 * those fields NULL until parsing finishes, then supply defaults for
++	 * options the caller omitted. An explicit empty string still disables
++	 * the optional device, as documented by --adsp and --mixer. */
++	if (!param.dsp_name)
++		param.dsp_name = DFL_DSP_NAME;
++	if (!param.adsp_name)
++		param.adsp_name = DFL_ADSP_NAME;
++	if (!param.mixer_name)
++		param.mixer_name = DFL_MIXER_NAME;
++
+ 	max_streams = param.max_streams;
+ 	hashtbl_size = max_streams / 2 + 13;
+ 

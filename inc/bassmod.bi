@@ -1,4 +1,10 @@
 '' FreeBASIC binding for bassmod20
+'' File: bassmod.bi
+'' Purpose: Declare the BASSMOD 2.0 module playback API.
+'' Responsibilities: Fixed-width vendor types and native calling conventions.
+'' This header contains no module decoder or output driver implementation.
+'' Define BASSMOD_21 before including this header for the Linux 2.1 hotfix
+'' attribute API. The default declarations retain the original 2.0 API.
 ''
 '' based on the C header files:
 ''   BASSMOD 2.0 C/C++ header file, copyright (c) 1999-2004 Ian Luck.
@@ -50,7 +56,9 @@
 
 #if defined(__FB_DOS__) or defined(__FB_UNIX__)
 	type WORD as ushort
-	type DWORD as culong
+	'' DWORD is a 32-bit unsigned int in the vendor Unix header. It does not
+	'' follow C unsigned long, which is 64-bit on many Unix targets.
+	type DWORD as ulong
 	type BOOL as long
 
 	#ifndef CTRUE
@@ -111,6 +119,17 @@ const BASS_ACTIVE_STOPPED = 0
 const BASS_ACTIVE_PLAYING = 1
 const BASS_ACTIVE_PAUSED = 3
 
+#ifdef BASSMOD_21
+	const BASS_MUSIC_ATTRIB_AMPLIFY = 0
+	const BASS_MUSIC_ATTRIB_PANSEP = 1
+	const BASS_MUSIC_ATTRIB_PSCALER = 2
+	const BASS_MUSIC_ATTRIB_BPM = 3
+	const BASS_MUSIC_ATTRIB_SPEED = 4
+	const BASS_MUSIC_ATTRIB_VOL_GLOBAL = 5
+	const BASS_MUSIC_ATTRIB_VOL_CHAN = &h100
+	const BASS_MUSIC_ATTRIB_VOL_INST = &h200
+#endif
+
 declare function BASSMOD_GetVersion() as DWORD
 declare function BASSMOD_ErrorGetCode() as DWORD
 declare function BASSMOD_GetDeviceDescription(byval devnum as long) as zstring ptr
@@ -126,11 +145,16 @@ declare function BASSMOD_MusicGetLength(byval playlen as BOOL) as DWORD
 declare function BASSMOD_MusicPlay() as BOOL
 declare function BASSMOD_MusicPlayEx(byval pos as DWORD, byval flags as long, byval reset as BOOL) as BOOL
 declare function BASSMOD_MusicDecode(byval buffer as any ptr, byval length as DWORD) as DWORD
+#ifdef BASSMOD_21
+	declare function BASSMOD_MusicSetAttribute(byval attrib as DWORD, byval value as DWORD) as DWORD
+	declare function BASSMOD_MusicGetAttribute(byval attrib as DWORD) as DWORD
+#else
 declare function BASSMOD_MusicSetAmplify(byval amp as DWORD) as BOOL
 declare function BASSMOD_MusicSetPanSep(byval pan as DWORD) as BOOL
 declare function BASSMOD_MusicSetPositionScaler(byval scale as DWORD) as BOOL
 declare function BASSMOD_MusicSetVolume(byval chanins as DWORD, byval volume as DWORD) as BOOL
 declare function BASSMOD_MusicGetVolume(byval chanins as DWORD) as DWORD
+#endif
 declare function BASSMOD_MusicIsActive() as DWORD
 declare function BASSMOD_MusicStop() as BOOL
 declare function BASSMOD_MusicPause() as BOOL
@@ -140,3 +164,5 @@ declare function BASSMOD_MusicSetSync(byval type as DWORD, byval param as DWORD,
 declare function BASSMOD_MusicRemoveSync(byval sync as HSYNC) as BOOL
 
 end extern
+
+'' end of bassmod.bi

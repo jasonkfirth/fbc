@@ -1,3 +1,8 @@
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson21.bas
+'' Purpose: Demonstrate the NeHe grid game and bitmap font rendering.
+'' Responsibilities: Own game state, draw frames and format bounded font text.
+'' This file contains no OpenGL or C runtime implementation.
 ''
 '' This Code Was Created By Jeff Molofee 2000
 '' A HUGE Thanks To Fredric Echols For Cleaning Up
@@ -485,15 +490,18 @@ end sub
 '------------------------------------------------------------------------
 '' Where The Printing Happens
 sub glPrint cdecl (byval x as integer, byval y as integer, byval gset as integer, byref fmt as string, ...)
-	dim text as string * 256                '' Holds Our String
-	dim ap as any ptr                       '' Pointer To List Of Arguments
+	dim text as zstring * 256               '' Holds Our String
+	dim ap as cva_list
 
 	if len(fmt) = 0 then                   '' If There's No Text
 		exit sub                            '' Do Nothing
 	end if
 
-	ap = va_first()                         '' get pointer to first arg
-	vsprintf(text, fmt, ap)                 '' And Converts Symbols To Actual Numbers
+	'' The C runtime needs its native va_list, including register arguments
+	'' on System V targets. Bound the output including its null terminator.
+	cva_start(ap, fmt)
+	if vsnprintf(@text, sizeof(text), fmt, ap) < 0 then text = ""
+	cva_end(ap)
 
 	if gset>1 then                          '' Did User Choose An Invalid Character Set?
 		gset=1                              '' If So, Select Set 1 (Italic)

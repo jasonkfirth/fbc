@@ -4,7 +4,15 @@ Open source code library for the dynamic creation of images by programmers.
 Website: http://www.libgd.org
 Platforms supported: ""Win32"", Linux
 Headers to include: gd.bi
-Header version: 2.1.0 development version
+Header version: 2.1.1
 Examples: yes, in examples/files/GD/
+
+The original Windows example and its used data layouts were checked with GD 2.3.3 on Win64. This check does not qualify the older Win32 archive supplied with some FreeBASIC SDKs.
+
+##gdImageCreateTrueColor## returns an owned image or a null pointer. Release a successful image with ##gdImageDestroy## after drawing and saving it.
+
+The example uses ##gdImageGifPtr##, ##gdImagePngPtr## and ##gdImageJpegPtr##. Each returns a GD-owned encoded buffer and a C ##int## byte count, represented by FreeBASIC ##Long##. Release the buffer with ##gdFree##, including when opening or writing the output file fails.
+
+These buffer APIs avoid passing a caller's ##FILE## record into a DLL built with a different C runtime. The example writes the encoded bytes through its own runtime, truncates previous output, checks the byte count and close status, and returns a nonzero process status if any of the three saves fails.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

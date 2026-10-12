@@ -24,7 +24,7 @@
 
 /* mydll.c :
 	compile with
-	  gcc -shared -Wl,--strip-all -o mydll.dll mydll.c
+	  gcc -shared -Wl,--strip-all -Wl,--out-implib,libmydll.dll.a -o mydll.dll mydll.c
 */
 __declspec( dllexport ) int MyDll_Data = 0x1234;
 

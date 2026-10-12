@@ -874,6 +874,7 @@ declare function cColorStmt(byval isfunc as integer) as ASTNODE ptr
 declare function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 declare function cCVXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 declare function cMKXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
+declare function cSerializationFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 declare function cMathFunct _
 	( _
 		byval tk as FB_TOKEN, _

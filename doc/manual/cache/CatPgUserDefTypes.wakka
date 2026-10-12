@@ -42,6 +42,8 @@
 		Declares a user defined type from other user defined or standard data types
 	=={{fbdoc item="keyword" value="KeyPgWith|WITH"}}==
 		Compound statement to access the data and members of a user defined type
+	=={{fbdoc item="keyword" value="ProPgSerialization|Compiler-assisted serialization"}}==
+		Creates portable snapshots of ordinary public records with independent string and array ownership
 		
 <<>>{{anchor name="MEMBERPROC"}}{{fbdoc item="section" value="Member Procedures"}}
 	=={{fbdoc item="keyword" value="KeyPgBaseInit|BASE (initialization)"}}==

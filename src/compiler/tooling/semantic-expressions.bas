@@ -380,6 +380,9 @@ dim shared as integer size_query_count, size_query_capacity
 dim shared as longint size_query_work_left
 const SEMANTIC_SIZE_QUERY_WORK_LIMIT = 8000000
 dim shared as longint pointer_observation_work_left
+'' Bound aggregate merge work across one module, independently of AST ownership.
+const SEMANTIC_EXPRESSION_TRANSFER_WORK = 8000000
+dim shared as longint expression_transfer_work_left
 
 '' The index owns no ASTs and uses at most one byte per expression. A cloned
 '' TYPEINI can select more than one copy contract; keep that ambiguity instead
@@ -388,6 +391,7 @@ dim shared as ubyte ptr string_initializer_copies
 dim shared as integer string_initializer_copy_capacity
 
 sub fbSemanticModelResetExpressions( )
+	expression_transfer_work_left = SEMANTIC_EXPRESSION_TRANSFER_WORK
 
 	deallocate(literal_links)
 	literal_links = NULL
@@ -534,6 +538,59 @@ sub fbSemanticModelAttachExpression(byval node as ASTNODE ptr, byval identity as
 	node->semantic_expressions = expression_link_count
 end sub
 
+'' The optimizer calls this before deleting an equivalent scalar wrapper.
+'' Association identities and predecessor links do not own AST nodes. Sharing
+'' an empty destination's chain allocates nothing; otherwise merge identities
+'' and their storage annotations without losing either node's provenance.
+sub fbSemanticModelTransferExpressionLinks(byval source_node as ASTNODE ptr, byval result_node as ASTNODE ptr)
+	if( (source_node = NULL) or (result_node = NULL) or (source_node = result_node) ) then exit sub
+	if( fbSemanticModelFullEnabled( ) ) then
+		if( result_node->semantic_expressions = 0 ) then
+			result_node->semantic_expressions = source_node->semantic_expressions
+		else
+			dim as longint link = source_node->semantic_expressions
+			while( link <> 0 )
+				expression_transfer_work_left -= 1
+				if( (link < 1) or (link > expression_link_count) or (expression_transfer_work_left < 0) ) then
+					fbSemanticModelFailAt("expression association transfer exceeds its bounds")
+					exit sub
+				end if
+				dim as SEMANTIC_EXPRESSION_LINK observation = expression_links[link - 1]
+				if( observation.previous >= link ) then
+					fbSemanticModelFailAt("expression association transfer has a cyclic predecessor")
+					exit sub
+				end if
+				fbSemanticModelAttachExpression(result_node, observation.expression)
+				dim as longint target_link = result_node->semantic_expressions
+				while( target_link <> 0 )
+					expression_transfer_work_left -= 1
+					if( (target_link < 1) or (target_link > expression_link_count) or (expression_transfer_work_left < 0) ) then
+						fbSemanticModelFailAt("expression association merge exceeds its bounds")
+						exit sub
+					end if
+					with expression_links[target_link - 1]
+						if( .expression = observation.expression ) then
+							if( observation.array_symbol <> 0 ) then
+								if( (.array_symbol <> 0) and ((.array_symbol <> observation.array_symbol) or _
+								    (.array_receiver <> observation.array_receiver)) ) then
+									fbSemanticModelFailAt("expression association merge changes array storage")
+									exit sub
+								end if
+								.array_symbol = observation.array_symbol
+								.array_receiver = observation.array_receiver
+							end if
+							exit while
+						end if
+						target_link = .previous
+					end with
+				wend
+				link = observation.previous
+			wend
+		end if
+	end if
+	if( source_node->semantic_expression > 0 ) then result_node->semantic_expression = source_node->semantic_expression
+end sub
+
 sub fbSemanticModelExportExpressionLinks(byval node as ASTNODE ptr, byval identity as longint)
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	dim as longint link = node->semantic_expressions
@@ -567,6 +624,21 @@ function fbSemanticModelCaptureOperands _
 	dim as longint left_id = 0, right_id = 0
 	if( left_expr <> NULL ) then left_id = left_expr->semantic_expression
 	if( right_expr <> NULL ) then right_id = right_expr->semantic_expression
+	if( fbSemanticModelFullEnabled( ) and (kind = "binary") ) then
+		'' The parser owns these typed children before astNewBOP can fold or
+		'' promote them. Export missing identities at the operator anchor so
+		'' the EX receipt remains complete without claiming their exact spans.
+		dim as LEX_LOCATION anchor = source
+		anchor.is_physical = FALSE
+		if( (left_expr <> NULL) and (left_id = 0) ) then
+			fbSemanticModelExportSelectedExpression(left_expr, anchor)
+			left_id = left_expr->semantic_expression
+		end if
+		if( (right_expr <> NULL) and (right_id = 0) ) then
+			fbSemanticModelExportSelectedExpression(right_expr, anchor)
+			right_id = right_expr->semantic_expression
+		end if
+	end if
 	fbSemanticModelStatementOperandCapture((left_id > 0) and _
 		((right_expr = NULL) or (right_id > 0)))
 	'' Bindings-only exports never assign expression IDs. Missing observations
@@ -1052,9 +1124,11 @@ function fbSemanticModelCaptureAssignmentInputs _
 	dim as LEX_LOCATION anchor = source
 	anchor.is_physical = FALSE
 	anchor.raw_valid = FALSE
-	if( left_expr->semantic_expression = 0 ) then
-		fbSemanticModelExportExpression(left_expr, anchor, anchor, 0, 0)
-	end if
+	'' Member lvalues can keep the identity of a parsed base expression after
+	'' the AST has grown to the final field. Snapshot the actual destination root
+	'' with its own typed identity; the nonphysical anchor leaves source reporting
+	'' to the separate assignment-operator and destination origins.
+	fbSemanticModelExportExpressionDistinct(left_expr, anchor, anchor, 0, 0)
 	if( right_expr->semantic_expression = 0 ) then
 		fbSemanticModelExportExpression(right_expr, anchor, anchor, 0, 0)
 	end if

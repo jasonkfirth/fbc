@@ -1,0 +1,11 @@
+--- a/coreLibrary_300/source/core/dgTypes.cpp
++++ b/coreLibrary_300/source/core/dgTypes.cpp
+@@ -39,7 +39,7 @@
+ dgUnsigned64 dgGetTimeInMicrosenconds()
+ {
+ 
+-#ifdef _MSC_VER
++#if defined (_MSC_VER) || defined (_MINGW_32_VER) || defined (_MINGW_64_VER)
+ 	static LARGE_INTEGER frequency;
+ 	static LARGE_INTEGER baseCount;
+ 	if (!frequency.QuadPart) {

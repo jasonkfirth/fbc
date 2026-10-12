@@ -1,0 +1,21 @@
+FreeBASIC Newton 3.13 private SDK build
+File: newton313-mingw-timer.txt
+Purpose: Explain the native MinGW timer patch.
+Responsibilities: Record the source revision and the missing platform branch.
+This file does not describe an SDK installation or a physics algorithm change.
+
+Upstream source:
+https://github.com/MADEAPPS/newton-dynamics/tree/newton-3.13
+Revision: 20e799131197faf835c3dda0a36822d7038fb101
+File: coreLibrary_300/source/core/dgTypes.cpp
+
+dgGetTimeInMicrosenconds selects Windows QueryPerformanceCounter only for
+_MSC_VER. The engine also supports _MINGW_32_VER and _MINGW_64_VER, but these
+builds reach the end of this non-void function without returning a value.
+The patch selects the existing Windows timer for these Windows targets.
+
+Apply only to an exact private copy of the 3.13 source. Keep the original
+license notices. Compile with -Werror=return-type and qualify the actual
+resulting library before selecting it for an example.
+
+end of newton313-mingw-timer.txt

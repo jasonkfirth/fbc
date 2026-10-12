@@ -1,3 +1,9 @@
+'' FreeBASIC PCRE examples
+'' File: preg_class.bas
+'' Purpose: Demonstrate an owning match and replacement class.
+'' Responsibilities: Bound result access, release captures, and advance empty matches.
+'' This file contains no PCRE engine or concurrent object ownership.
+
 /'
 '' PCRE example?
 '' Copyright (C) 2007  MindlessXD
@@ -26,6 +32,7 @@
 '/
 
 #include "pcre.bi"
+#include once "match-progress.bi"
 
 type preg_t
 	as integer             substrings_limit '' the maximum number of substrings that may be matched, -1 is infinite
@@ -57,12 +64,17 @@ type preg_t
 
 	declare constructor (byval substrings_limit_ as integer = -1)
 	declare destructor ()
+private:
+	'' Match arrays have one owner; copying their pointers would double-free them.
+	declare constructor(byref other as const preg_t)
+	declare operator let(byref other as const preg_t)
 end type
 
 function preg_t.append_match() as integer
 	dim as zstring ptr ptr ptr resized_strings
 	dim as zstring ptr ptr new_match
 
+	if this.matches < 0 or this.matches >= (cast(uinteger, -1) shr 1) \ sizeof(zstring ptr ptr) then return -1
 	resized_strings = reallocate(this.strings, (this.matches + 1) * sizeof(zstring ptr ptr))
 	if resized_strings = 0 then return -1
 
@@ -80,11 +92,29 @@ function preg_t.match(pattern as zstring ptr, subject as zstring ptr, byval offs
 	this.clean_up()
 
 	this.errorcode = 0
+	if pattern = NULL or subject = NULL then
+		this.errorcode = PCRE_ERROR_NULL
+		return this.errorcode
+	end if
+	if len(*subject) > &h7fffffff then
+		this.errorcode = PCRE_ERROR_BADLENGTH
+		return this.errorcode
+	end if
+	if offset < 0 or offset > len(*subject) then
+		this.errorcode = PCRE_ERROR_BADOFFSET
+		return this.errorcode
+	end if
 
 	dim as pcre ptr temp_c = pcre_compile2(pattern, flags, @this.errorcode, @this.err_, @this.erroffset, 0)
 	if temp_c = 0 then return this.errorcode
 
-	pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @this.substrings)
+	dim capture_count as long
+	this.errorcode = pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @capture_count)
+	if this.errorcode <> 0 then
+		pcre_free(temp_c)
+		return this.errorcode
+	end if
+	this.substrings = capture_count
 	if (this.substrings_limit >= 0 and this.substrings_limit < this.substrings) then this.substrings = this.substrings_limit
 
 	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
@@ -131,11 +161,29 @@ function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval 
 	this.clean_up()
 
 	this.errorcode = 0
+	if pattern = NULL or subject = NULL then
+		this.errorcode = PCRE_ERROR_NULL
+		return this.errorcode
+	end if
+	if len(*subject) > &h7fffffff then
+		this.errorcode = PCRE_ERROR_BADLENGTH
+		return this.errorcode
+	end if
+	if offset < 0 or offset > len(*subject) then
+		this.errorcode = PCRE_ERROR_BADOFFSET
+		return this.errorcode
+	end if
 
 	dim as pcre ptr temp_c = pcre_compile2(pattern, flags, @this.errorcode, @this.err_, @this.erroffset, 0)
 	if temp_c = 0 then return this.errorcode
 
-	pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @this.substrings)
+	dim capture_count as long
+	this.errorcode = pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @capture_count)
+	if this.errorcode <> 0 then
+		pcre_free(temp_c)
+		return this.errorcode
+	end if
+	this.substrings = capture_count
 	if (this.substrings_limit >= 0 and this.substrings_limit < this.substrings) then this.substrings = this.substrings_limit
 
 	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
@@ -148,7 +196,12 @@ function preg_t.match_all(pattern as zstring ptr, subject as zstring ptr, byval 
 	dim as long temp_l = len(*subject)
 	dim as long temp_o = offset
 	do
-		dim as long temp_e = pcre_exec(temp_c, 0, subject, temp_l, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
+		dim as long temp_e
+		if this.matches = 0 then
+			temp_e = pcre_exec(temp_c, 0, subject, temp_l, temp_o, 0, vector, (this.substrings + 1) * 3)
+		else
+			temp_e = pcre_next_match(temp_c, 0, subject, temp_l, vector[0], vector[1], 0, vector, (this.substrings + 1) * 3)
+		end if
 		if temp_e = 0 then temp_e = this.substrings + 1
 		if temp_e < 0 then
 			this.errorcode = temp_e
@@ -191,14 +244,37 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 	this.clean_up()
 
 	this.errorcode = 0
+	if pattern = NULL or subject = NULL then
+		this.errorcode = PCRE_ERROR_NULL
+		return this.errorcode
+	end if
+	if len(*subject) > &h7fffffff then
+		this.errorcode = PCRE_ERROR_BADLENGTH
+		return this.errorcode
+	end if
+	if offset < 0 or offset > len(*subject) then
+		this.errorcode = PCRE_ERROR_BADOFFSET
+		return this.errorcode
+	end if
+
+	if replacement = NULL then
+		this.errorcode = PCRE_ERROR_NULL
+		return this.errorcode
+	end if
 
 	dim as pcre ptr temp_c = pcre_compile2(pattern, flags, @this.errorcode, @this.err_, @this.erroffset, 0)
 	if temp_c = 0 then return this.errorcode
 
-	pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @this.substrings)
+	dim capture_count as long
+	this.errorcode = pcre_fullinfo(temp_c, 0, PCRE_INFO_CAPTURECOUNT, @capture_count)
+	if this.errorcode <> 0 then
+		pcre_free(temp_c)
+		return this.errorcode
+	end if
+	this.substrings = capture_count
 	if (this.substrings_limit >= 0 and this.substrings_limit < this.substrings) then this.substrings = this.substrings_limit
 
-	dim as string result_
+	dim as string result_ = left(*subject, offset)
 
 	dim as long ptr vector = allocate((this.substrings + 1) * 3 * sizeof(long))
 	if vector = 0 then
@@ -209,8 +285,15 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 
 	dim as long temp_s = len(*subject)
 	dim as long temp_o = offset
+	dim first_match as boolean = true
 	do
-		dim as long temp_e = pcre_exec(temp_c, 0, subject, temp_s, temp_o, 0 /'flags'/, vector, (this.substrings + 1) * 3)
+		dim as long temp_e
+		if first_match then
+			temp_e = pcre_exec(temp_c, 0, subject, temp_s, temp_o, 0, vector, (this.substrings + 1) * 3)
+			first_match = false
+		else
+			temp_e = pcre_next_match(temp_c, 0, subject, temp_s, vector[0], vector[1], 0, vector, (this.substrings + 1) * 3)
+		end if
 		if temp_e = 0 then temp_e = this.substrings + 1
 		if temp_e < 0 then
 			this.errorcode = temp_e
@@ -218,33 +301,43 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 			'' PCRE replacement output has variable-length matches. FB-LINTER: DISABLE-NEXT-LINE FBL503
 			result_ &= left(subject[temp_o], vector[0] - temp_o)
 
-			dim as integer temp_s1, temp_s2
-			do
-				temp_s2 = instr(replacement[temp_s1], "$")
-				if temp_s2 = 0 then exit do
-
-				result_ &= left(replacement[temp_s1], temp_s2 - 1)
-
-				dim as integer temp_n = -1
-				do while left(replacement[temp_s1 + temp_s2], 1) >= "0" and left(replacement[temp_s1 + temp_s2], 1) <= "9"
-					temp_n = iif(temp_n = -1, 0, temp_n * 10)
-					temp_n += val(left(replacement[temp_s1 + temp_s2], 1))
-					temp_s1 += 1
-				loop
-				if left(replacement[temp_s1 + temp_s2], 1) = "$" then
-					'' Literal-dollar replacement is one token per replacement field. FB-LINTER: DISABLE-NEXT-LINE FBL503
-					if temp_n = -1 then result_ &= "$"
-					temp_s1 += 1
-				end if
-				if temp_n > -1 and temp_n <= temp_e then
-					if vector[2 * temp_n] > -1 then
-						result_ &= left(subject[vector[2 * temp_n]], vector[2 * temp_n + 1] - vector[2 * temp_n])
+			dim replacement_text as string = *replacement
+			dim token as integer = 0
+			do while token < len(replacement_text)
+				if replacement_text[token] <> asc("$") then
+					result_ &= chr(replacement_text[token])
+					token += 1
+				elseif token+1 < len(replacement_text) andalso replacement_text[token+1] = asc("$") then
+					result_ &= "$"
+					token += 2
+				else
+					dim digit_position as integer = token+1
+					dim capture_index as long = 0
+					dim overflowed as boolean = false
+					do while digit_position < len(replacement_text)
+						dim digit as long = replacement_text[digit_position]-asc("0")
+						if digit < 0 or digit > 9 then exit do
+						if capture_index > (&h7fffffff-digit) \ 10 then
+							overflowed = true
+						elseif not overflowed then
+							capture_index = capture_index*10+digit
+						end if
+						digit_position += 1
+					loop
+					if digit_position = token+1 then
+						result_ &= "$"
+						token += 1
+					else
+						if not overflowed andalso capture_index < temp_e then
+							if vector[2*capture_index] >= 0 then
+								result_ &= mid(*subject, vector[2*capture_index]+1, vector[2*capture_index+1]-vector[2*capture_index])
+							end if
+						end if
+						if digit_position < len(replacement_text) andalso replacement_text[digit_position] = asc("$") then digit_position += 1
+						token = digit_position
 					end if
 				end if
-
-				temp_s1 += temp_s2
 			loop
-			result_ &= replacement[temp_s1]
 
 			'' PCRE writes the next subject offset into vector slot 1. FB-LINTER: DISABLE-NEXT-LINE FBL525
 			temp_o = vector[1]
@@ -281,7 +374,7 @@ function preg_t.replace(pattern as zstring ptr, replacement as zstring ptr, subj
 end function
 
 function preg_t.result(byval substring as integer = 0) as string
-	if (0 < matches and substring <= this.substrings) then
+	if (0 < matches and substring >= 0 and substring <= this.substrings) then
 		if (this.strings[0][substring]) then
 			return *this.strings[0][substring]
 		end if
@@ -290,7 +383,7 @@ function preg_t.result(byval substring as integer = 0) as string
 end function
 
 function preg_t.result_all(byval match_ as integer, byval substring as integer = 0) as string
-	if (match_ < matches and substring <= this.substrings) then
+	if (match_ >= 0 and match_ < matches and substring >= 0 and substring <= this.substrings) then
 		if (this.strings[match_][substring]) then
 			return *this.strings[match_][substring]
 		end if
@@ -348,6 +441,7 @@ function preg_replace_simple(pattern as zstring ptr, replacement as zstring ptr,
 	return preg.result()
 end function
 
+#ifndef REGEX_EXAMPLE_NO_MAIN
 '' a few tests
 scope
 	dim as preg_t foo
@@ -385,3 +479,6 @@ end scope
 ? preg_replace_simple("(foo)?ba(r|z)", "//$-//$0//", "foo--bar--foo")
 ? preg_replace_simple("(foo)?ba(r|z)", "//$999//$0//", "foo--bar--foo")
 ?
+#endif
+
+'' end of preg_class.bas

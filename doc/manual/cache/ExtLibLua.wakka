@@ -2,9 +2,18 @@
 Lightweight, embeddable scripting engine using the Lua language.
 
 Website: https://www.lua.org
-Platforms supported: ""Win32"", Linux, DOS
+Platforms supported: ""Win32"", ""Win64"", Linux, DOS
 Headers to include: Lua/lua.bi
-Header version: 5.2.3
+Header version: 5.3.1
 Examples: in examples/other-languages/Lua/
+
+{{fbdoc item="section" value="Callback types and errors"}}
+	Use a native Lua 5.3 SDK with these headers. The example's ##lua_Alloc## callback uses native-sized allocation counts, while a ##lua_CFunction## returns a C 32-bit ##Long## result count. Check ##lua_newstate## and the script result, and release the state with ##lua_close## after script execution.
+
+	The min/max callback starts with the first converted number. Zero is a valid input, and an all-negative list must keep a negative maximum. Invalid or missing numeric arguments raise ordinary Lua argument errors which the script can catch with ##pcall##.
+
+	On Win64, compile GAS64 callbacks with ##-eunwind## when a Lua error may leave the callback through native ##longjmp##. Windows needs unwind information for those frames. This does not run FreeBASIC destructors: the callback deliberately owns no local strings or objects requiring cleanup across an error.
+
+	The native Win64 Lua 5.3.6 SDK has been checked against independent C layouts and both FreeBASIC backends. The original callback is exercised with positive, negative, zero and single-number lists, protected errors and missing-script cleanup, including its real final console keypress.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

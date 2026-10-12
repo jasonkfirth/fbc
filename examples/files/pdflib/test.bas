@@ -1,15 +1,35 @@
+'' FreeBASIC external library examples
+'' File: test.bas
+'' Purpose: Generate a PDF with text, an image and drawing commands.
+'' Responsibilities: PDFlib handles, file errors and optional logo placement.
+'' This file contains no PDF encoder or viewer implementation.
+'' PDFlib owns p and its image/font handles until they are closed or deleted.
 #include once "pdflib.bi"
 
 dim as PDF ptr p
-dim as integer font, textx, texty, x, y, w, h, fontsize, c, image
+dim as long font, image
+dim as integer textx, texty, x, y, w, h, fontsize, c
 dim as string text
+dim as string filename = command(1)
+dim as string logofilename = command(2)
+if filename = "" then filename = "pdflib_test.pdf"
+if logofilename = "" then logofilename = exepath() & "/../../fblogo.gif"
+'' Version 4 stores resource filenames in 1024-byte buffers.
+if len(filename) > 1023 or len(logofilename) > 1023 then
+	print "Filename too long for PDFlib 4."
+	end 1
+end if
 
 p = PDF_new()
+if p = 0 then end 1
 '' open new PDF file
-if (PDF_open_file(p, "pdflib_test.pdf") = -1) then
+if (PDF_open_file(p, filename) = -1) then
 	print "Error: could not open PDF file. Check to see if it is open by another application"
-	print "Press any key to end..."  '' pause to allow error message to be read
-	sleep
+	PDF_delete(p)
+	if environ("FB_EXAMPLE_AUTOPLAY") <> "1" then
+		print "Press any key to end..."
+		sleep
+	end if
 	end 1
 end if
 
@@ -21,17 +41,26 @@ PDF_set_info(p, "Title", "FreeBASIC")
 '' start a new page, set font and size
 PDF_begin_page(p, a4_width, a4_height)
 font = PDF_findfont(p, "Helvetica-Bold", "host", 0)
+if font < 0 then
+	PDF_end_page(p)
+	PDF_close(p)
+	PDF_delete(p)
+	end 1
+end if
 PDF_setfont(p, font, 12)
 
 '' Insert the logo
-dim as string logofilename = exepath() & "/../../fblogo.gif"
 image = PDF_open_image_file(p, "gif", logofilename, "", 0)
 if image = -1  then
 	print "Error: Couldn't read image file """ & logofilename & """"
 else
 	w = PDF_get_value(p, "imagewidth", image)
 	h = PDF_get_value(p, "imageheight", image)
-	PDF_place_image(p, image, (a4_width - w)/2, a4_height-h-50, 1)
+	if w > 0 and h > 0 then
+		PDF_place_image(p, image, (a4_width - w)/2, a4_height-h-50, 1)
+	else
+		h = 0
+	end if
 	'' Note: only close the image when you are finished with it. Keep it in
 	'' memory if you plan on reusing it.
 	PDF_close_image(p, image)
@@ -78,6 +107,12 @@ text = "PDF Viewers support a set of 14 core fonts which need not be embedded in
 
 fontsize = 10
 font = PDF_findfont(p, "Courier", "host", 0)
+if font < 0 then
+	PDF_end_page(p)
+	PDF_close(p)
+	PDF_delete(p)
+	end 1
+end if
 PDF_setfont(p, font, fontsize)
 x = 50
 y = 350
@@ -98,5 +133,10 @@ PDF_end_page(p)                                           '' close page
 PDF_close(p)                                              '' close PDF document
 PDF_delete(p)                                             '' delete the PDF "object"
 
-print "Press any key to continue..."                      '' pause to allow error message to be read
-sleep
+print "PDF document completed: "; filename
+if environ("FB_EXAMPLE_AUTOPLAY") <> "1" then
+	print "Press any key to continue..."
+	sleep
+end if
+
+'' end of test.bas

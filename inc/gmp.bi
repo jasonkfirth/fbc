@@ -1,4 +1,8 @@
 '' FreeBASIC binding for gmp-6.0.0
+'' File: gmp.bi
+'' Purpose: Declare GMP scalar types, structures and native arithmetic calls.
+'' Responsibilities: Match the C integer model and GMP's limb representation.
+'' This file contains no big-number implementation or memory allocator.
 ''
 '' based on the C header files:
 ''    Definitions for GNU multiple precision functions.   -*- mode: c -*-
@@ -63,8 +67,14 @@ const __GNU_MP__ = 5
 	const __GMP_LIBGMP_DLL = 0
 #endif
 
-type mp_limb_t as culong
-type mp_limb_signed_t as clong
+' Win64 uses LLP64: C long stays 32-bit, while GMP's native limbs are 64-bit.
+#if defined(__FB_WIN32__) and defined(__FB_64BIT__)
+	type mp_limb_t as ulongint
+	type mp_limb_signed_t as longint
+#else
+	type mp_limb_t as culong
+	type mp_limb_signed_t as clong
+#endif
 type mp_bitcnt_t as culong
 
 type __mpz_struct
@@ -922,3 +932,4 @@ const __GNU_MP_RELEASE = ((__GNU_MP_VERSION * 10000) + (__GNU_MP_VERSION_MINOR *
 #define __GMP_H__
 
 end extern
+'' end of gmp.bi

@@ -2,9 +2,23 @@
 Consists of a set of functions that implement regular expression pattern matching using the same syntax and semantics as Perl 5.
 
 Website: https://www.pcre.org
-Platforms supported: ""Win32"", Linux
-Headers to include: pcre.bi, pcre16.bi, prceposix.bi
-Version: 8.31
+Platforms supported: Windows, Linux
+Headers to include: pcre.bi, pcre16.bi, pcre32.bi, pcreposix.bi
+Header version: 8.37 (PCRE 1)
 Examples: in examples/regex/PCRE/
+
+These bindings use the original PCRE API. PCRE 2 has different entry points and cannot replace a PCRE 1 library when linking these examples. Match offsets and capture counts use C ##int##, represented by FreeBASIC ##Long## even on Win64.
+
+On Windows, allocator and callout exports are DLL data containing function pointers. The bindings import that data with ##Extern Import##. Define ##PCRE_STATIC## when linking static PCRE archives so the declarations refer directly to the archive's variables. Use libraries built for the executable's bitness and the required character width.
+
+The Windows examples were checked with PCRE 8.45 DLLs and static archives on Win64, and genuine PCRE 8.32 static archives on Win32. Native C checks used matching SDK headers and compared the layouts used by these examples; this does not qualify every entry point in the 8.37 binding against the older 8.32 engine.
+
+##pcredemo.bas## compiles one pattern, checks capture offsets and releases the pattern with ##pcre_free##. Its optional command-line arguments select the pattern and subject. A malformed pattern returns a nonzero exit status; no match is a normal result.
+
+##CRegex## and ##preg_t## own their compiled patterns or result arrays. Their copy constructors and assignment operators are private to prevent shallow copies of native allocations. Use one thread owner per object. ##CRegex.search## copies the subject, including embedded zero bytes when an explicit byte length is supplied. Capture pointers returned by ##getStr## remain valid until the next search; failed searches and unmatched optional captures return no capture.
+
+Global searches need special handling after an empty match. ##match-progress.bi## first retries a nonempty, anchored match at the same position, then advances if none exists. It advances across a complete UTF-8 character or configured CRLF newline and stops at the end of the subject. Both wrappers use this helper to avoid infinite loops while preserving nonempty alternatives at the same position.
+
+##preg_t.replace## accepts ##$n## or ##$n$## for numbered captures, ##$0## for the whole match and ##$$## for a literal dollar sign. An unset or out-of-range capture contributes an empty string. The replacement parser bounds numeric indices before using them.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

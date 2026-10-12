@@ -1,10 +1,16 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: rel-flower.bas
+'' Purpose: Render this demonstration through the TinyPTC display.
+'' Responsibilities: Own the display loop and packed 32-bit pixel storage.
+'' This file contains no reusable display implementation.
+
 'Flower tunnel
 'relsoft 2006
 'http://rel.betterwebber.com
 
 #include "tinyptc.bi"
 
-declare sub DrawTunnel( target_buffer() as integer, texture_data() as integer, _
+declare sub DrawTunnel( target_buffer() as ulong, texture_data() as ulong, _
                        angle_table() as integer, depth_table() as integer, _
                        byval addx as integer, byval addy as integer)
 declare FUNCTION dist (byval x as single, byval y as single, xc() as single, yc() as single) as single
@@ -33,10 +39,10 @@ const TWOPI = (2 * PI)
 /' The tunnel uses these shared tables only from the main display thread.
  * DrawTunnel accepts arrays so its drawing algorithm remains reusable. '/
 '' FB-LINTER: DISABLE-NEXT-LINE FBL301
-    dim shared Buffer( 0 to SCR_SIZE-1 ) as integer
+    dim shared Buffer( 0 to SCR_SIZE-1 ) as ulong
     dim shared Tangle( 0 to TWID, 0 to THEI) as integer
     dim shared Tdepth( 0 to TWID, 0 to THEI) as integer
-    dim shared Texture( 0 to 255, 0 to 255) as integer
+    dim shared Texture( 0 to 255, 0 to 255) as ulong
     dim shared Distbuffer( 0 to 255, 0 to 255) as single
     dim shared xcoords(0 to maxpoints) as single
     dim shared ycoords(0 to maxpoints) as single
@@ -102,11 +108,11 @@ const TWOPI = (2 * PI)
 end
 
 
-private sub DrawTunnel(target_buffer() as integer, texture_data() as integer, _
+private sub DrawTunnel(target_buffer() as ulong, texture_data() as ulong, _
                        angle_table() as integer, depth_table() as integer, _
                        byval addx as integer, byval addy as integer)
 
-    dim as integer ptr pbuff, ptext
+    dim as ulong ptr pbuff, ptext
     dim as integer x, y, tx, ty
 
     static as integer cx= 160, cy =120
@@ -127,7 +133,7 @@ private sub DrawTunnel(target_buffer() as integer, texture_data() as integer, _
     fold_off += 0.2
     fold_scale = 0.3 * sin(frame / 40)
 
-    dim as integer ptr b = @target_buffer(0)
+    dim as ulong ptr b = @target_buffer(0)
     for y = 0 to THEIM1
         cymy = cy - y
         for x = 0 to TWIDM1
@@ -169,3 +175,5 @@ private FUNCTION dist (byval x as single, byval y as single, xc() as single, yc(
     NEXT i
     return mindist
 END FUNCTION
+
+'' end of rel-flower.bas

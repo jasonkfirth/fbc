@@ -1,11 +1,23 @@
 {{fbdoc item="title" value="Newton"}}----
 The Newton Physics Engine is an integrated solution for real time simulation of physics environments. 
 
-Website: http://newtondynamics.com/
-Github: https://github.com/MADEAPPS/newton-dynamics/
-Platforms supported: ""Win32"", Linux
+Website: [[https://github.com/JulioJerez/newton-dynamics]]
+Newton 3.13 source: [[https://github.com/MADEAPPS/newton-dynamics/tree/newton-3.13]]
+Platforms supported: ""Win32"", ""Win64"", Linux
 Headers to include: Newton.bi
-Header version: from 2005
+Header version: Newton 3.13
 Examples: in examples/math/Newton/
+
+{{fbdoc item="section" value="SDK version and precision"}}
+	Use the native Newton 3.13 library with this header. Check ##NewtonWorldGetVersion()## against ##NEWTON_MAJOR_VERSION * 100 + NEWTON_MINOR_VERSION## before creating a world. A DLL bundled with an unrelated tool may have an older version even when it appears in the 3.13 source tree.
+
+	The default ##dFloat## is ##Single##. Define ##__USE_DOUBLE_PRECISION__## before including ##Newton.bi## only when the native library was compiled with ##_NEWTON_USE_DOUBLE##. Check ##NewtonWorldFloatSize()## against ##SizeOf(dFloat)##. The wrong precision changes both by-value calls and structure layouts.
+
+	Native Win64 MinGW and Linux amd64 builds of revision ##20e799131197faf835c3dda0a36822d7038fb101## have been checked with independent C layouts, both FreeBASIC backends, force callbacks, body motion and world cleanup. The private Windows build uses the engine's MinGW platform branch and fixes its missing Windows timer return; see ##build_scripts/patches/newton313-mingw-timer.patch##. The Linux build uses the original ##_POSIX_VER_64## branch and needs no Windows timer patch. C callers should include ##stdbool.h## before ##Newton.h## because this older header declares a ##bool## callback without supplying that C type itself. This qualification does not establish compatibility with Newton 4.
+
+{{fbdoc item="section" value="Ownership and updates"}}
+	Check ##NewtonCreate()## for a null result. Destroy the world once with ##NewtonDestroy()## after finishing all updates. The world owns its bodies. A body keeps its own reference to the collision used to create it, so release the caller's collision reference with ##NewtonDestroyCollision()## after body creation.
+
+	##NewtonUpdate()## completes synchronously. ##NewtonUpdateAsync()## requires ##NewtonWaitForUpdateToFinish()## before reading simulation results or destroying resources. Force callbacks run in the engine's solver threads; use the callback's thread index and synchronize shared application data when more than one solver thread is enabled.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

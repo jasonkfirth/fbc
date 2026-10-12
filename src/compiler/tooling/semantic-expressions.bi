@@ -21,6 +21,7 @@ declare sub fbSemanticModelEndLiteralInitializer(byval scope_id as integer, byva
 declare sub fbSemanticModelExplicitConstruction _
 	( byval owner_type as FBSYMBOL ptr, byval selected as ASTNODE ptr, byref source as LEX_LOCATION )
 declare sub fbSemanticModelAttachExpression(byval node as ASTNODE ptr, byval identity as longint)
+declare sub fbSemanticModelTransferExpressionLinks(byval source_node as ASTNODE ptr, byval result_node as ASTNODE ptr)
 declare sub fbSemanticModelExportExpressionLinks(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportExpressionSource(byval node as ASTNODE ptr, byval identity as longint)
 declare sub fbSemanticModelExportBoundExpression(byval node as ASTNODE ptr, byval identity as longint)

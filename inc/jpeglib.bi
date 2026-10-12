@@ -1,3 +1,9 @@
+'' FreeBASIC image bindings
+'' File: jpeglib.bi
+'' Purpose: Declare the selectable IJG JPEG ABI.
+'' Responsibilities: Version-specific layouts and native function declarations.
+'' This file contains no JPEG decoder or image-resource ownership.
+''
 '' FreeBASIC binding for jpeglib 6b, 7, 8, 9a
 ''
 '' based on the C header files:
@@ -85,10 +91,16 @@ type JCOEF as short
 type JOCTET as ubyte
 #define GETJOCTET(value) (value)
 
-type UINT8 as ubyte
-type UINT16 as ushort
-type INT16 as short
-type INT32 as clong
+#ifdef __FB_WIN32__
+	'' These fixed-width aliases are also used by FreeImage and Windows headers.
+	'' Include their owner first so either include order has one definition.
+	#include once "win/basetsd.bi"
+#else
+	type UINT8 as ubyte
+	type UINT16 as ushort
+	type INT16 as short
+	type INT32 as clong
+#endif
 type JDIMENSION as ulong
 const JPEG_MAX_DIMENSION = cast(clong, 65500)
 
@@ -664,3 +676,5 @@ const JPEG_APP0 = &hE0
 const JPEG_COM = &hFE
 
 end extern
+
+'' end of jpeglib.bi

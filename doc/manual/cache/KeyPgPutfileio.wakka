@@ -163,5 +163,7 @@ Print u2.d
 	- ##[[KeyPgRandom|Random]]##
 	- ##[[KeyPgBinary|Binary]]##
 	- ##[[KeyPgFreefile|Freefile]]##
+	- ##[[KeyPgSerialize|Serialize]]##
+	- ##[[ProPgSerialization|Compiler-assisted serialization]]##
 
 {{fbdoc item="back" value="CatPgFile|File I/O Functions"}}

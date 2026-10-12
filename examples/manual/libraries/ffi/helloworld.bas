@@ -2,6 +2,9 @@
 ''
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'libffi'
+'' Purpose: Call a typed C function through a libffi call interface.
+'' Responsibilities: Match its C return type and provide ffi_arg result storage.
+'' This example contains no closure allocation or persistent argument storage.
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibFfi
 '' --------
@@ -9,7 +12,8 @@
 #include "ffi.bi"
 
 ' Simple "puts" equivalent function
-Function printer cdecl (ByVal s As ZString Ptr) As Integer
+Function printer cdecl (ByVal s As ZString Ptr) As ULong
+	If s = 0 Then Return 0
 	Print *s
 	Return 42
 End Function
@@ -31,7 +35,8 @@ result = ffi_prep_cif( _
 )
 
 ' Call function
-Dim return_value As Integer
+' libffi widens small integer results to ffi_arg when storing them.
+Dim return_value As ffi_arg
 If result = FFI_OK Then
 	s = @"Hello world"
 	ffi_call(@cif, FFI_FN(@printer), @return_value, @values(0))
@@ -42,4 +47,8 @@ If result = FFI_OK Then
 	s = @"This is cool!"
 	ffi_call(@cif, FFI_FN(@printer), @return_value, @values(0))
 	Print Using "Function returned &"; return_value
+Else
+	Print "Could not prepare the libffi call interface"
+	End 1
 End If
+'' end of helloworld.bas

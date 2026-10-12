@@ -1,3 +1,9 @@
+'' FreeBASIC PCRE examples
+'' File: test.bas
+'' Purpose: Tokenize the bundled text using CRegex.
+'' Responsibilities: Handle nullable results and release the owning object.
+'' This file contains no PCRE engine or general BASIC parser.
+
 ''
 '' CRegex test
 ''
@@ -32,7 +38,7 @@ function load_textfile( filename as string ) as string
 end function
 
 	'' create a regex object
-	var reg = new CRegex( TEST_PATTERN, CRegex.MULTILINE or CRegex.DOTALL )
+	var reg = new CRegex( TEST_PATTERN, cast(CRegex.options, CRegex.MULTILINE or CRegex.DOTALL) )
 	if( reg = NULL ) then
 		print "Error: CRegex_New failed"
 		end 1
@@ -42,6 +48,7 @@ end function
 	dim as string text = load_textfile( "test.txt" )
 	if( len( text ) = 0 ) then
 		print "Error: load_textfile failed"
+		delete reg
 		end 1
 	end if
 
@@ -50,9 +57,15 @@ end function
 		'' match found..
 		dim as string match
 		do
-			match = *reg->getStr( 0 )
+			dim token_text as zstring ptr = reg->getStr( 0 )
+			if token_text = NULL then
+				delete reg
+				end 1
+			end if
+			match = *token_text
 
 			'' naive check..
+			if len(match) = 0 then continue do
 			select case match[0]
 			case asc( "0" ) to asc( "9" )
 				print "Number";
@@ -72,3 +85,5 @@ end function
 
 	'' free the object
 	delete reg
+
+'' end of test.bas

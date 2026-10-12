@@ -1,3 +1,8 @@
+'' FreeBASIC FreeType examples
+'' File: char.bas
+'' Purpose: Render one grayscale glyph into the FB graphics window.
+'' Responsibilities: Check bitmap layout and release font resources.
+'' This file contains no font engine or borrowed-buffer deallocation.
 '' Example of rendering a char using freetype
 
 #include "freetype2/freetype.bi"
@@ -21,35 +26,38 @@ Sub releaseFreeType(ByRef library As FT_Library, ByRef face As FT_Face)
 
 End Sub
 
+Dim font_file As String = Command(1)
+If font_file = "" Then font_file = TTF_FONT
+
 Dim As FT_Library library = 0
 Dim As FT_Face face = 0
 
 If (FT_Init_FreeType(@library) <> 0) Then
-	Print "FT_Init_FreeType() failed" : Sleep : End 1
+	Print "FT_Init_FreeType() failed" : End 1
 End If
 
 ''
 '' Load a font and render an '@' character on to a bitmap
 ''
 
-If (FT_New_Face(library, TTF_FONT, 0, @face) <> 0) Then
+If (FT_New_Face(library, font_file, 0, @face) <> 0) Then
 	releaseFreeType library, face
-	Print "FT_New_Face() failed (font file '" & TTF_FONT & "' not found?)" : Sleep : End 1
+	Print "FT_New_Face() failed (font file '" & font_file & "' not found?)" : End 1
 End If
 
 If (FT_Set_Pixel_Sizes(face, 0, 200) <> 0) Then
 	releaseFreeType library, face
-	Print "FT_Set_Pixel_Sizes() failed" : Sleep : End 1
+	Print "FT_Set_Pixel_Sizes() failed" : End 1
 End If
 
 If (FT_Load_Char(face, Asc("@"), FT_LOAD_DEFAULT) <> 0) Then
 	releaseFreeType library, face
-	Print "FT_Load_Char() failed" : Sleep : End 1
+	Print "FT_Load_Char() failed" : End 1
 End If
 
 If (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) <> 0) Then
 	releaseFreeType library, face
-	Print "FT_Render_Glyph() failed" : Sleep : End 1
+	Print "FT_Render_Glyph() failed" : End 1
 End If
 
 ''
@@ -59,15 +67,26 @@ End If
 If ScreenRes(320, 200, 32) <> 0 Then
 	releaseFreeType library, face
 	Print "Could not set the requested graphics mode"
-	Sleep
 	End 1
 End If
 
 Dim As FT_Bitmap Ptr bitmap = @face->glyph->bitmap
+If bitmap->pixel_mode <> FT_PIXEL_MODE_GRAY Or bitmap->num_grays <> 256 Or bitmap->buffer = NULL Then
+    releaseFreeType library, face
+    End 1
+End If
+Dim row_size As LongInt = Abs(CLngInt(bitmap->pitch))
+If row_size < bitmap->width Or bitmap->width > 8192 Or bitmap->rows > 8192 Then
+    releaseFreeType library, face
+    End 1
+End If
+Dim source_top As UByte Ptr = bitmap->buffer
+If bitmap->pitch < 0 Then source_top += row_size*(bitmap->rows-1)
+
 
 For y As Integer = 0 To (bitmap->rows - 1)
     For x As Integer = 0 To (bitmap->width - 1)
-        Dim As Integer col = bitmap->buffer[y * bitmap->pitch + x]
+        Dim As Integer col = source_top[y * CLngInt(bitmap->pitch) + x]
         PSet(x, y), RGB(col, col, col)
     Next
 next
@@ -75,3 +94,5 @@ next
 Sleep
 
 releaseFreeType library, face
+
+'' end of char.bas

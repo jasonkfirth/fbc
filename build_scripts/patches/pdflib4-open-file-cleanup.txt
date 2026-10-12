@@ -1,0 +1,31 @@
+FreeBASIC external library qualification
+File: pdflib4-open-file-cleanup.txt
+Purpose: Describe a private PDFlib 4.0.2 failed-open ownership repair.
+This file contains no installed-library replacement instructions.
+
+Source: GnuWin32's PDFlib 4.0.2 source archive, pdflib-4.0.2-src.zip.
+SHA-256: f1fb0952dcd7387fed48607a83da89bf8e854bf39ff6299b801a33367d08fc27
+https://sourceforge.net/projects/gnuwin32/files/pdflib-lite/4.0.2/
+
+PDF_open_file initializes the document before trying fopen. The failure
+branch restores object scope, but PDF_delete only cleans document tables
+outside object scope. A native C custom-allocator probe reproduced retained
+allocations after a failed open followed by PDF_delete.
+
+The patch releases those tables before returning -1. It retains the object
+and its output stream so a caller can either retry the open or delete it.
+The same upstream cleanup function handles successful document closure.
+PDF_delete still owns the final stream and object release.
+
+Apply from the extracted archive root:
+    git apply /path/to/pdflib4-open-file-cleanup.patch
+
+Qualification uses tests/bindings/pdflib-native.c and pdflib-native.bas with
+custom allocation callbacks, failed opens, normal file output, streamed
+output and in-memory output. build_scripts/test-pdflib.py independently
+parses the generated files and compares C and FreeBASIC content.
+
+The original publisher license remains in the source archive and header.
+This patch does not change the SDK feature configuration or ABI.
+
+end of pdflib4-open-file-cleanup.txt

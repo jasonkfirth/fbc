@@ -1181,8 +1181,13 @@ can also carry the independent `assignment-target-dtype` pair described above.
 
 Full models advertise `CAP module source-assignment-inputs available`.
 Compact modes advertise it as unavailable. Successful ordinary and compound
-assignments retain both original typed `E` identities before the assignment
-builder consumes, clones or converts their ASTs:
+assignments retain typed `E` identities for both operands before the assignment
+builder consumes, clones or converts their ASTs. The destination AST receives a
+distinct typed identity at a nonphysical assignment-operator anchor. A member
+lvalue can otherwise retain the identity of its parsed base expression, whose
+type and symbol no longer describe the complete destination tree. Its earlier
+parser expression remains available through the expression-source relationship;
+the separate operator and destination origins remain authoritative for reporting:
 
     K symbol procedure-ID assignment-input:statement-ID:ordinal left-E<TAB>right-E<TAB>kind<TAB>code<TAB>selection<TAB>target-S
     H symbol procedure-ID symbol procedure-ID assignment-input:ordinal statement-ID

@@ -6,135 +6,243 @@ Platforms supported: Windows, Linux, DOS
 Headers to include: jit.bi
 Header version: git a8293e141b79c28734a3633a81a43f92f29fc2d7
 
+{{fbdoc item="section" value="Native ABI configuration"}}
+	Use ##jit_int## and ##jit_uint## for C-style 32-bit integer arguments and return storage. ##jit_nint##, ##jit_nuint## and ##jit_size_t## follow the native pointer width. FreeBASIC ##Integer## is not a substitute for ##jit_int## on a 64-bit target.
+
+	The native library and binding must agree on ##jit_nfloat##. Windows builds normally use ##Double##. For a library configured with ##--disable-long-double## on another target, define ##JIT_NFLOAT_IS_DOUBLE## before including ##jit.bi##, or compile with ##-d JIT_NFLOAT_IS_DOUBLE##. Match this choice to the installed library's generated C headers, not just its filename.
+
+	FreeBASIC's ##CLongDouble## is opaque byte storage. It does not implement C long-double arithmetic or by-value calls, and cannot reproduce a 16-byte-aligned C union in ##jit_constant_t##. Use libjit's double configuration for native-float calls and constant structures on such targets. Changing this configuration requires rebuilding the native library as well as the application.
+
+	The upstream x86-64 apply implementation in revision ##942c988db170d98061a9e934fb3d7b618b7d5137## uses the System V calling convention. Its Windows 64-bit build fails in the native apply-rules generator. A Win32 library belongs to a Win32 application; it cannot be linked into a Win64 executable.
+
+	The same revision has been built and checked natively on Linux amd64 with ##--disable-long-double## and ##JIT_NFLOAT_IS_DOUBLE##. Independent C layouts agree with both FreeBASIC backends; native checks cover signed results, a callback, native-float calls, constant structures and the original multiplication/addition and GCD examples. This is an actual System V build of the upstream JIT.
+
+	These examples check context creation, instruction building, compilation and application. A created function keeps its own signature reference, so the caller releases its reference with ##jit_type_free##. Every build-start call is paired with build-end before destroying the context. The GCD example's subtraction algorithm requires positive inputs.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/jit/mul_add.bas"}}%%(freebasic)
+'' examples/manual/libraries/jit/mul_add.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'libjit'
+'' Purpose: Compile and call a C-style integer multiply/add function.
+'' Responsibilities: Typed arguments, build locking and owned context cleanup.
+'' This example contains no persistent machine code or native-float ABI calls.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibJit
+'' --------
+
 '' Simple mul/add example
 
 #include "jit.bi"
 
+' The caller owns the build lock and releases the context on failure.
+Function emit_mul_add(ByVal mul_add As jit_function_t) As Integer
+	' build function (result = (x*y)+z)
+	Dim As jit_value_t x, y, z, temp1, temp2
+	x = jit_value_get_param(mul_add, 0)
+	y = jit_value_get_param(mul_add, 1)
+	z = jit_value_get_param(mul_add, 2)
+	If x = 0 OrElse y = 0 OrElse z = 0 Then Return 0
+	temp1 = jit_insn_mul(mul_add, x, y)
+	If temp1 = 0 Then Return 0
+	temp2 = jit_insn_add(mul_add, temp1, z)
+	If temp2 = 0 Then Return 0
+	If jit_insn_return(mul_add, temp2) = 0 Then Return 0
+
+	' compile function
+	Return jit_function_compile(mul_add)
+End Function
+
 ' initialize libjit
-dim context as jit_context_t = jit_context_create()
+Dim context As jit_context_t = jit_context_create()
+If context = 0 Then End 1
 jit_context_build_start(context)
 
 ' define function mul_add(x, y, z)
-dim params(0 to 2) as jit_type_t = {jit_type_int, jit_type_int, jit_type_int}
-dim signature as jit_type_t = jit_type_create_signature( _  
+Dim params(0 To 2) As jit_type_t = {jit_type_int, jit_type_int, jit_type_int}
+Dim signature As jit_type_t = jit_type_create_signature( _
 	jit_abi_cdecl,  _ ' C-style function
 	jit_type_int,   _ ' Return type
 	@params(0),     _ ' Parameter array
 	3,              _ ' Number of components
 	1               _ ' Count references?
 )
-dim mul_add as jit_function_t = jit_function_create(context, signature)
+If signature = 0 Then
+	jit_context_build_end(context)
+	jit_context_destroy(context)
+	End 1
+End If
+Dim mul_add As jit_function_t = jit_function_create(context, signature)
+'' The function retains its own signature reference.
+jit_type_free(signature)
+If mul_add = 0 Then
+	jit_context_build_end(context)
+	jit_context_destroy(context)
+	End 1
+End If
 
-' build function (result = (x*y)+z)
-dim as jit_value_t x, y, z, temp1, temp2
-x = jit_value_get_param(mul_add, 0)
-y = jit_value_get_param(mul_add, 1)
-temp1 = jit_insn_mul(mul_add, x, y)
-z = jit_value_get_param(mul_add, 2)
-temp2 = jit_insn_add(mul_add, temp1, z)
-jit_insn_return(mul_add, temp2)
-
-' compile function function
-jit_function_compile(mul_add)
+Dim As Integer build_ok = emit_mul_add(mul_add)
 jit_context_build_end(context)
+If build_ok = 0 Then
+	jit_context_destroy(context)
+	End 1
+End If
 
 ' call function
-dim as integer a=3, b=5, c=2, result
-dim args(0 to 2) as integer ptr = {@a, @b, @c}
-jit_function_apply(mul_add, @args(0), @result)
-print using "mul__add(&, &, &) = &"; a; b; c; result
+'' jit_type_int is a C int, even when FreeBASIC Integer is 64 bits.
+Dim As jit_int a = 3
+Dim As jit_int b = 5
+Dim As jit_int c = 2
+Dim As jit_int result
+Dim args(0 To 2) As jit_int Ptr = {@a, @b, @c}
+If jit_function_apply(mul_add, @args(0), @result) = 0 Then
+	jit_context_destroy(context)
+	End 1
+End If
+Print Using "mul__add(&, &, &) = &"; a; b; c; result
 
 ' clean up libjit
 jit_context_destroy(context)
+'' end of mul_add.bas
 %%
 
 {{fbdoc item="filename" value="examples/manual/libraries/jit/gcd.bas"}}%%(freebasic)
+'' examples/manual/libraries/jit/gcd.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'libjit'
+'' Purpose: Compile a recursive greatest-common-divisor function.
+'' Responsibilities: Positive unsigned inputs, build locking and context cleanup.
+'' This example contains no arbitrary-input parser or native-float ABI calls.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibJit
+'' --------
+
 '' GCD calculation example
 
 #include "jit.bi"
 
+' The caller owns the build lock and releases the context on failure.
+Function emit_gcd(ByVal gcd As jit_function_t) As Integer
+	' build function
+	' check x = y
+	Dim As jit_value_t x, y, x_eq_y
+	x = jit_value_get_param(gcd, 0)
+	y = jit_value_get_param(gcd, 1)
+	If x = 0 OrElse y = 0 Then Return 0
+	x_eq_y = jit_insn_eq(gcd, x, y)
+	If x_eq_y = 0 Then Return 0
+
+	' if x = y, return x
+	Dim label_x_ne_y As jit_label_t = jit_label_undefined
+	If jit_insn_branch_if_not(gcd, x_eq_y, @label_x_ne_y) = 0 Then Return 0
+	If jit_insn_return(gcd, x) = 0 Then Return 0
+
+	' else if...
+	If jit_insn_label(gcd, @label_x_ne_y) = 0 Then Return 0
+
+	' check x < y
+	Dim As jit_value_t x_lt_y
+	Dim label_x_gte_y As jit_label_t = jit_label_undefined
+	x_lt_y = jit_insn_lt(gcd, x, y)
+	If x_lt_y = 0 Then Return 0
+	If jit_insn_branch_if_not(gcd, x_lt_y, @label_x_gte_y) = 0 Then Return 0
+
+	' if x < y, return gcd(x, y-x)
+	Dim As jit_value_t gcd_args(0 To 1), gcd_result
+	gcd_args(0) = x
+	gcd_args(1) = jit_insn_sub(gcd, y, x)
+	If gcd_args(1) = 0 Then Return 0
+	gcd_result = jit_insn_call( _
+		gcd,          _ ' where we are calling from
+		"gcd",        _ ' function name
+		gcd,          _ ' function reference
+		0,            _ ' signature = auto
+		@gcd_args(0), _ ' arguments
+		2,            _ ' argument count
+		0             _ ' flags = nothing special
+	)
+	If gcd_result = 0 Then Return 0
+	If jit_insn_return(gcd, gcd_result) = 0 Then Return 0
+
+	' else...
+	If jit_insn_label(gcd, @label_x_gte_y) = 0 Then Return 0
+
+	' return gcd(x-y, y)
+	gcd_args(0) = jit_insn_sub(gcd, x, y)
+	If gcd_args(0) = 0 Then Return 0
+	gcd_args(1) = y
+	gcd_result = jit_insn_call( _
+		gcd,          _ ' where we are calling from
+		"gcd",        _ ' function name
+		gcd,          _ ' function reference
+		0,            _ ' signature = auto
+		@gcd_args(0), _ ' arguments
+		2,            _ ' argument count
+		0             _ ' flags = nothing special
+	)
+	If gcd_result = 0 Then Return 0
+	If jit_insn_return(gcd, gcd_result) = 0 Then Return 0
+
+	' compile function
+	Return jit_function_compile(gcd)
+End Function
+
 ' initialize libjit
-dim context as jit_context_t = jit_context_create()
+Dim context As jit_context_t = jit_context_create()
+If context = 0 Then End 1
 jit_context_build_start(context)
 
-' define function gcd(x as uinteger, y as uinteger) as uinteger
-dim params(0 to 1) as jit_type_t = {jit_type_uint, jit_type_uint}
-dim signature as jit_type_t = jit_type_create_signature( _  
+' define function gcd(x as jit_uint, y as jit_uint) as jit_uint
+Dim params(0 To 1) As jit_type_t = {jit_type_uint, jit_type_uint}
+Dim signature As jit_type_t = jit_type_create_signature( _
 	jit_abi_cdecl,  _ ' C-style function
 	jit_type_uint,  _ ' Return type
 	@params(0),     _ ' Parameter array
 	2,              _ ' Number of components
 	1               _ ' Count references?
 )
-dim gcd as jit_function_t = jit_function_create(context, signature)
+If signature = 0 Then
+	jit_context_build_end(context)
+	jit_context_destroy(context)
+	End 1
+End If
+Dim gcd As jit_function_t = jit_function_create(context, signature)
+'' The function retains its own signature reference.
+jit_type_free(signature)
+If gcd = 0 Then
+	jit_context_build_end(context)
+	jit_context_destroy(context)
+	End 1
+End If
 
-' build function
-' check x = y
-dim as jit_value_t x, y, x_eq_y
-x = jit_value_get_param(gcd, 0)
-y = jit_value_get_param(gcd, 1)
-x_eq_y = jit_insn_eq(gcd, x, y)
-
-' if x = y, return x
-dim label_x_ne_y as jit_label_t = jit_label_undefined
-jit_insn_branch_if_not(gcd, x_eq_y, @label_x_ne_y)
-jit_insn_return(gcd, x)
-
-' else if...
-jit_insn_label(gcd, @label_x_ne_y)
-
-' check x < y
-dim as jit_value_t x_lt_y
-dim label_x_gte_y as jit_label_t = jit_label_undefined
-x_lt_y = jit_insn_lt(gcd, x, y)
-jit_insn_branch_if_not(gcd, x_lt_y, @label_x_gte_y)
-
-' if x < y, return gcd(x, y-x)
-dim as jit_value_t gcd_args(0 to 2), gcd_result
-gcd_args(0) = x
-gcd_args(1) = jit_insn_sub(gcd, y, x)
-gcd_result = jit_insn_call( _
-	gcd,          _ ' where we are calling from
-	"gcd",        _ ' function name
-	gcd,          _ ' function reference
-	0,            _ ' signature = auto
-	@gcd_args(0), _ ' arguments
-	2,            _ ' argument count
-	0             _ ' flags = nothing special
-)
-jit_insn_return(gcd, gcd_result)
-
-' else...
-jit_insn_label(gcd, @label_x_gte_y)
-
-' return gcd(x-y, y)
-gcd_args(0) = jit_insn_sub(gcd, x, y)
-gcd_args(1) = y
-gcd_result = jit_insn_call( _
-	gcd,          _ ' where we are calling from
-	"gcd",        _ ' function name
-	gcd,          _ ' function reference
-	0,            _ ' signature = auto
-	@gcd_args(0), _ ' arguments
-	2,            _ ' argument count
-	0             _ ' flags = nothing special
-)
-jit_insn_return(gcd, gcd_result)
-
-' compile function
-jit_function_compile(gcd)
+Dim As Integer build_ok = emit_gcd(gcd)
 jit_context_build_end(context)
+If build_ok = 0 Then
+	jit_context_destroy(context)
+	End 1
+End If
 
 ' call function
-dim as jit_uint a=21, b=14, result
-dim as jit_uint ptr args(0 to 1) = {@a, @b}
-jit_function_apply(gcd, @args(0), @result)
-print using "gcd(&, &) = &"; a; b; result
+Dim As jit_uint a = 21
+Dim As jit_uint b = 14
+Dim As jit_uint result
+Dim As jit_uint Ptr args(0 To 1) = {@a, @b}
+'' The subtraction algorithm needs positive inputs to make progress.
+If a = 0 OrElse b = 0 Then
+	jit_context_destroy(context)
+	End 1
+End If
+If jit_function_apply(gcd, @args(0), @result) = 0 Then
+	jit_context_destroy(context)
+	End 1
+End If
+Print Using "gcd(&, &) = &"; a; b; result
 
 ' clean up libjit
 jit_context_destroy(context)
+'' end of gcd.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

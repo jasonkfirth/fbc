@@ -773,12 +773,12 @@ private function hImplicitCtor _
 	dim as integer is_ctorcall = any
 
 	if( symbHasCtor( param ) = FALSE ) then
-		exit function
+		return FALSE
 	end if
 
 	'' recursion? (astBuildImplicitCtorCallEx() will call astNewARG() with the same expr)
 	if( rec_cnt <> 0 ) then
-		exit function
+		return FALSE
 	end if
 
 	'' try calling any ctor with the expression
@@ -788,7 +788,7 @@ private function hImplicitCtor _
 
 	if( is_ctorcall = FALSE ) then
 		'' No implicit construction possible, n->l is not changed
-		exit function
+		return FALSE
 	end if
 
 	tmp = symbAddTempVar( symbGetFullType( param ), symbGetSubtype( param ) )
@@ -805,7 +805,7 @@ private function hImplicitCtor _
 		hBuildByrefArg( param, n )
 	end if
 
-	function = TRUE
+	return TRUE
 end function
 
 '':::::

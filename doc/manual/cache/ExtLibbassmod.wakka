@@ -1,42 +1,88 @@
 {{fbdoc item="title" value="BASSMOD"}}----
 BASSMOD is a MOD only (XM, IT, S3M, MOD, MTM, UMX) version of BASS - useful for demos, or anything else where you want to play some MOD music.
 
-Website: http://www.un4seen.com/bassmod.html
-Platforms supported: ""Win32"", Linux
+Website: https://www.un4seen.com/bassmod.html
+Platforms supported: ""Win32"", Linux i386
 Headers to include: bassmod.bi
-Header version: 2.0
+Header version: 2.0, with opt-in 2.1 attribute declarations
 Examples: in examples/sound/BASS/
+
+{{fbdoc item="section" value="SDK and target selection"}}
+	BASSMOD is a separate legacy library, not the current BASS 2.4 SDK. The Windows 2.0 DLL and the author's Linux 2.1 hotfix are 32-bit i386 libraries. On a 64-bit PC, build a 32-bit executable and provide the matching FreeBASIC runtime and library. A 64-bit executable cannot link or load these binaries.
+
+	The Windows SDK is available at https://www.un4seen.com/files/bassmod20.zip. The Linux hotfix is available at https://www.un4seen.com/stuff/bassmod-linux.zip, as linked by the author at https://www.un4seen.com/forum/?topic=12858.0. Keep each SDK's headers and binary together.
+
+	The header defaults to the original 2.0 API. When using the Linux 2.1 hotfix's attribute API, define ##BASSMOD_21## before including ##bassmod.bi##. That selects ##BASSMOD_MusicSetAttribute## and ##BASSMOD_MusicGetAttribute## in place of the old amplify, pan separation, position scaler and channel/instrument volume functions removed in 2.1. Common playback and decoding calls used below work with both versions.
+
+	##DWORD## and ##HSYNC## are always 32-bit vendor values, including on Unix. ##BASSMOD_GetVersion## places the major version in the low 16 bits and the minor version in the high 16 bits: 2.0 returns 2 and 2.1 returns 65538.
+
+{{fbdoc item="section" value="Playback and errors"}}
+	The Linux library uses the legacy OSS device interface. It requires a working ##/dev/dsp## character device, supplied by an OSS driver or a compatible driver such as osspd with an ALSA backend. The library checks device existence before opening it, so an ALSA preload wrapper alone cannot initialize playback when that device is absent.
+
+	Device -1 requests default output. Device -2 disables sound output, and device -3 selects decoding only. Successful initialization with either negative special device does not demonstrate output-device support.
+
+	The example accepts a module filename as its first command-line argument. With no argument it uses the bundled module relative to the executable's normal example directory. Set ##FB_EXAMPLE_AUTOPLAY=1## for a bounded playback check without keyboard input. Initialization, loading, starting and stopping failures return a nonzero exit status; the library's void cleanup procedures are called before exit.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/bassmod.bas"}}%%(freebasic)
-#include once "bassmod.bi"
+'' examples/manual/libraries/bassmod.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'BASSMOD'
+'' Purpose: Play a module with the native BASSMOD 2.x library.
+'' Responsibilities: File selection, playback errors and library cleanup.
+'' This example contains no module decoder or output driver implementation.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibbassmod
+'' --------
 
-const SOUND_FILE = "test.mod"
+#include Once "bassmod.bi"
 
-if (BASSMOD_GetVersion() < 2) then
-	print "BASSMOD version 2 or above required!"
-	end 1
-end if
+Dim As String sound_file = Command(1)
+If sound_file = "" Then sound_file = ExePath() & "/../../sound/data/dne_trtn.mod"
 
-if (BASSMOD_Init(-1, 44100, 0) = 0) then
-	print "Could not initialize BASSMOD"
-	end 1
-end if
+If ((BASSMOD_GetVersion() And &hffff) <> 2) Then
+	Print "BASSMOD version 2 required!"
+	End 1
+End If
 
-if (BASSMOD_MusicLoad(FALSE, SOUND_FILE, 0, 0, BASS_MUSIC_LOOP) = 0) then
-	print "BASSMOD could not load '" & SOUND_FILE & "'"
+If (BASSMOD_Init(-1, 44100, 0) = 0) Then
+	Print "Could not initialize BASSMOD: "; BASSMOD_ErrorGetCode()
+	End 1
+End If
+
+If (BASSMOD_MusicLoad(False, StrPtr(sound_file), 0, 0, BASS_MUSIC_LOOP) = 0) Then
+	Print "BASSMOD could not load '" & sound_file & "'"
 	BASSMOD_Free()
-	end 1
-end if
+	End 1
+End If
 
-BASSMOD_MusicPlay()
+If BASSMOD_MusicPlay() = 0 Then
+	Print "Could not start playback: "; BASSMOD_ErrorGetCode()
+	BASSMOD_MusicFree()
+	BASSMOD_Free()
+	End 1
+End If
 
-print "Sound playing; waiting for keypress to stop and exit..."
-sleep
+Dim As Integer playback_error = 0
+If Environ("FB_EXAMPLE_AUTOPLAY") = "1" Then
+	'' Wait for actual module progress without requiring keyboard input.
+	Sleep 1200, 1
+	Dim As DWORD position = BASSMOD_MusicGetPosition()
+	If BASSMOD_MusicIsActive() <> BASS_ACTIVE_PLAYING OrElse _
+		position = 0 OrElse position = Cast(DWORD, -1) Then playback_error = 1
+Else
+	Print "Sound playing; waiting for keypress to stop and exit..."
+	Sleep
+End If
 
-BASSMOD_MusicStop()
+If BASSMOD_MusicStop() = 0 Then playback_error = 1
 BASSMOD_MusicFree()
 BASSMOD_Free()
+If playback_error Then End 1
+Print "BASSMOD playback completed."
+
+'' end of bassmod.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

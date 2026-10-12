@@ -1,8 +1,9 @@
+'' FreeBASIC Win32 examples
+'' File: bitmap.bas
+'' Purpose: Draw and move an embedded bitmap with GDI.
+'' Responsibilities: Own the bitmap, pair DC acquisition and release, bound zoom.
+'' This file contains no file loading or background rendering threads.
 ''
-'' bitmap drawing test
-''
-
-
 
 #include once "windows.bi"
 
@@ -17,6 +18,9 @@ extern fblogo_data(0 to 3126-1) as ubyte
 	end WinMain( GetModuleHandle( NULL ), NULL, command, SW_NORMAL )
 
 #define SCALE_MULT 256
+'' The 32-pixel logo may be zoomed from 1/32 to 16 times its size.
+const MIN_SCALE = 8
+const MAX_SCALE = 16 * SCALE_MULT
 #define SCALE_CALC(x,s) (((x) * (s)) \ SCALE_MULT)
 
 ''::::
@@ -31,6 +35,8 @@ function WndProc ( byval hWnd as HWND, _
     dim as HDC hDC
     dim as RECT rct
 
+    '' One window and one GUI thread own these resources. logoinfo borrows
+    '' the embedded array; logodib owns a separate GDI bitmap until WM_DESTROY.
     static logoinfo as BITMAPINFO ptr
     static logodib as HBITMAP
     static as integer x = 0, y = 0, scale = SCALE_MULT
@@ -47,12 +53,16 @@ function WndProc ( byval hWnd as HWND, _
         logoinfo = cast(BITMAPINFO ptr, logo + 1)
 
         '' create a DIB
-        logodib = CreateDIBitmap( GetDC( hWnd ), _
+        hDC = GetDC( hWnd )
+        if( hDC = NULL ) then return -1
+        logodib = CreateDIBitmap( hDC, _
   								  @logoinfo->bmiHeader, _
   								  CBM_INIT, _
   								  cast(byte ptr, logo) + logo->bfOffBits, _
   								  logoinfo, _
 								  DIB_RGB_COLORS )
+        ReleaseDC( hWnd, hDC )
+        if( logodib = NULL ) then return -1
 
         return 0
 
@@ -60,13 +70,26 @@ function WndProc ( byval hWnd as HWND, _
 	case WM_PAINT
 
         hDC = BeginPaint( hWnd, @pnt )
+        if( hDC = NULL ) then
+            EndPaint( hWnd, @pnt )
+            return 0
+        end if
 
         '' load DIB into a compatible DC
         dim memDC as HDC
         memDC = CreateCompatibleDC( hDC )
+        if( memDC = NULL ) then
+            EndPaint( hWnd, @pnt )
+            return 0
+        end if
 
         dim oldobj as HGDIOBJ
         oldobj = SelectObject( memDC, logodib )
+        if( oldobj = NULL or oldobj = HGDI_ERROR ) then
+            DeleteDC( memDC )
+            EndPaint( hWnd, @pnt )
+            return 0
+        end if
 
         '' blit the compatible DC to this window
         if( scale = SCALE_MULT ) then
@@ -95,46 +118,45 @@ function WndProc ( byval hWnd as HWND, _
 
 		dim doupdate as integer = FALSE
 
+		GetClientRect( hWnd, @rct )
 		select case lobyte( wParam )
 		case VK_ESCAPE
 			PostMessage( hWnd, WM_CLOSE, 0, 0 )
 			return 0
 
 		case VK_UP
-			y -= 8
+			if( y > -SCALE_CALC( logoinfo->bmiHeader.biHeight, scale ) ) then y -= 8
 			doupdate = TRUE
 		case VK_DOWN
-			y += 8
+			if( y < rct.bottom ) then y += 8
 			doupdate = TRUE
 		case VK_LEFT
-			x -= 8
+			if( x > -SCALE_CALC( logoinfo->bmiHeader.biWidth, scale ) ) then x -= 8
 			doupdate = TRUE
 		case VK_RIGHT
-			x += 8
+			if( x < rct.right ) then x += 8
 			doupdate = TRUE
 		case VK_ADD
-			scale += 8
+			if( scale < MAX_SCALE ) then scale += 8
 			doupdate = TRUE
 		case VK_SUBTRACT
-			scale -= 8
+			if( scale > MIN_SCALE ) then scale -= 8
 			doupdate = TRUE
 		end select
 
 		if( doupdate ) then
-			with rct
-				.left 	= x - 8
-				.top 	= y - 8
-				.right  = .left + SCALE_CALC( logoinfo->bmiHeader.biWidth, scale ) + 8 + 8
-				.bottom = .top + SCALE_CALC( logoinfo->bmiHeader.biHeight, scale ) + 8 + 8
-			end with
-
-			InvalidateRect( hwnd, @rct, TRUE )
+			'' Clear the old position and size too, especially when shrinking.
+			InvalidateRect( hWnd, NULL, TRUE )
 			return 0
 		end if
 
 	''
 	case WM_DESTROY
 
+        if( logodib <> NULL ) then
+            DeleteObject( logodib )
+            logodib = NULL
+        end if
         PostQuitMessage( 0 )
         return 0
 
@@ -158,7 +180,7 @@ function WinMain ( byval hInstance as HINSTANCE, _
     dim szAppName as string
     dim hWnd as HWND
 
-    function = 0
+    function = 1
 
     szAppName = "BitmapTest"
 
@@ -186,13 +208,21 @@ function WinMain ( byval hInstance as HINSTANCE, _
                            null, null, hInstance, null )
 
 
+    if( hWnd = NULL ) then exit function
     ShowWindow( hWnd, iCmdShow )
     UpdateWindow( hWnd )
 
-    while ( GetMessage( @wMsg, null, 0, 0 ) <> false )
+    '' GetMessage returns -1 for an error, zero for WM_QUIT, or a message.
+    do
+        dim received as BOOL = GetMessage( @wMsg, null, 0, 0 )
+        if( received = -1 ) then
+            DestroyWindow( hWnd )
+            return 1
+        end if
+        if( received = 0 ) then exit do
         TranslateMessage( @wMsg )
         DispatchMessage( @wMsg )
-    wend
+    loop
 
     function = wMsg.wParam
 
@@ -305,3 +335,5 @@ dim shared fblogo_data(0 to 3126-1) as ubyte = { _
 &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, _
 &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, _
 &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff, &hff }
+
+'' end of bitmap.bas

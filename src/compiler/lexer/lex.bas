@@ -56,6 +56,8 @@ dim shared as LEX_CTX lex
 
 '' Module state: buffer holding the current line when emitting in -pp only mode.
 dim shared as string pponly_ln
+dim shared as LEX_LOCATION pponly_location
+dim shared as integer pponly_lastline
 
 '':::::
 '' only update the line count if not inside a multi-line macro
@@ -218,6 +220,9 @@ sub lexInit _
 	'' first time? make sure lex.ctx points to something
 	if( ctx_kind = LEX_TKCTX_CONTEXT_INIT ) then
 		assert( env.includerec = 0 )
+		pponly_ln = ""
+		pponly_location.source_file = ""
+		pponly_location.start_line = 0
 		lex.ctx = @lex.ctxTB(0)
 	end if
 
@@ -346,6 +351,8 @@ end sub
 sub lexEnd( )
 
 	pponly_ln = ""
+	pponly_location.source_file = ""
+	pponly_location.start_line = 0
 
 	ppEnd( )
 
@@ -482,6 +489,7 @@ sub lexAdvanceByteColumn(byval source_byte as uinteger, byref column as integer,
 	'' Unmarked source accepts legacy bytes as well as UTF-8. Count a valid
 	'' sequence as UTF-16 units, but count every byte of a malformed prefix.
 	'' Remember its leading byte to reject overlong and surrogate encodings.
+	assert( source_byte <= &hFF )
 	if( continuations_left > 0 ) then
 		dim as integer sequence_length = iif(sequence_first < &hE0, 2, iif(sequence_first < &hF0, 3, 4))
 		dim as integer valid = (source_byte >= &h80) and (source_byte <= &hBF)
@@ -505,7 +513,7 @@ sub lexAdvanceByteColumn(byval source_byte as uinteger, byref column as integer,
 	end if
 
 	column += 1
-	sequence_first = source_byte
+	sequence_first = cint( source_byte )
 	select case source_byte
 	case &hC2 to &hDF: continuations_left = 1
 	case &hE0 to &hEF: continuations_left = 2
@@ -2684,8 +2692,10 @@ function lexGetLookAhead _
 		byval flags as LEXCHECK _
 	) as integer static
 
-	if( k > FB_LEX_MAXK ) then
-		exit function
+	'' Reject invalid lookahead requests instead of returning a token-shaped
+	'' default result. The ring contains offsets zero through FB_LEX_MAXK.
+	if( (k < 0) orelse (k > FB_LEX_MAXK) ) then
+		return INVALID
 	end if
 
 	if( k > lex.ctx->k ) then
@@ -2708,8 +2718,8 @@ function lexGetLookAheadClass _
 		byval flags as LEXCHECK _
 	) as integer static
 
-	if( k > FB_LEX_MAXK ) then
-		exit function
+	if( (k < 0) orelse (k > FB_LEX_MAXK) ) then
+		return FB_TKCLASS_UNKNOWN
 	end if
 
 	if( k > lex.ctx->k ) then
@@ -2808,6 +2818,13 @@ sub lexPPOnlyEmitToken( )
 
 		'' Don't write out empty lines (e.g. from PP directives)...
 		if( len( pponly_ln ) > 0 ) then
+			if( env.clopt.pponly = FB_PPONLY_LINES ) then
+				'' #line sets the directive's line; the following line is one
+				'' greater. Use the first token's logical location, including
+				'' include and macro origins, rather than the flush location.
+				dim as string filename = hReplace( pponly_location.source_file, QUOTE, QUOTE + QUOTE )
+				print #env.ppfile_num, "#line " + str( pponly_location.start_line - 1 ) + " " + QUOTE + filename + QUOTE
+			end if
 			print #env.ppfile_num, pponly_ln
 			pponly_ln = ""
 		elseif( lexGetToken( ) = FB_TK_EOL ) then
@@ -2821,6 +2838,20 @@ sub lexPPOnlyEmitToken( )
 	end select
 
 	'' Everything else...
+	if( len( pponly_ln ) = 0 ) then
+		pponly_location = lexGetCurrentLocation( )
+		pponly_lastline = pponly_location.start_line
+	elseif( env.clopt.pponly = FB_PPONLY_LINES ) then
+		'' Flattened continuation lines would change -e's statement-end line.
+		'' Retain those line advances without introducing statement boundaries.
+		dim as LEX_LOCATION location = lexGetCurrentLocation( )
+		if( location.source_file = pponly_location.source_file ) then
+			while( pponly_lastline < location.start_line )
+				pponly_ln += " _" + chr( 10 )
+				pponly_lastline += 1
+			wend
+		end if
+	end if
 	if( lex.ctx->head->after_space ) then
 		pponly_ln += " "
 	end if
@@ -2838,6 +2869,10 @@ sub lexPPOnlyEmitToken( )
 end sub
 
 sub lexPPOnlyEmitText( byref s as string )
+	if( len( pponly_ln ) = 0 ) then
+		pponly_location = lexGetCurrentLocation( )
+		pponly_lastline = pponly_location.start_line
+	end if
 	pponly_ln += s
 end sub
 

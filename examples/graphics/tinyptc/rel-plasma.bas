@@ -1,3 +1,9 @@
+'' Project: FreeBASIC TinyPTC examples
+'' File: rel-plasma.bas
+'' Purpose: Render this demonstration through the TinyPTC display.
+'' Responsibilities: Own the display loop and packed 32-bit pixel storage.
+'' This file contains no reusable display implementation.
+
 '//Plasma using y*xwidth +x addresing
 '//Relsoft 2004
 '//Uses the superhot FB compiler
@@ -19,7 +25,7 @@ end type
 
 	' The plasma loop retains these lookup tables and framebuffer for PTC updates.
 	' FB-LINTER: DISABLE-NEXT-LINE FBL301
-	dim shared buffer( 0 to SCR_SIZE-1 ) as integer
+	dim shared buffer( 0 to SCR_SIZE-1 ) as ulong
 	dim shared Lsin1( -1024 to 1024) as integer
 	dim shared Lsin2( -1024 to 1024) as integer
 	dim shared Lsin3( -1024 to 1024) as integer
@@ -53,7 +59,7 @@ next i
 counter = 0
 cdir = 1
 
-dim p as integer ptr
+dim p as ulong ptr
 do
     counter = counter + cdir
     if( (counter < 1) or (counter > 4096) ) then
@@ -77,3 +83,5 @@ do
 loop until( inkey = chr( 27 ) )
 
 ptc_close
+
+'' end of rel-plasma.bas

@@ -42,6 +42,7 @@
 	{{fbdoc item="keyword" value="CatPgFile|File IO Functions"}}
 	{{fbdoc item="keyword" value="CatPgMath|Mathematical Functions"}}
 	{{fbdoc item="keyword" value="CatPgMemory|Memory Functions"}}
+	{{fbdoc item="keyword" value="ProPgSerialization|Compiler-assisted Serialization"}}
 	{{fbdoc item="keyword" value="CatPgOpsys|Operating System Functions"}}
 	{{fbdoc item="keyword" value="CatPgSfx|Sound Library Reference"}}
 	{{fbdoc item="keyword" value="CatPgString|String Functions"}}

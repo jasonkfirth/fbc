@@ -2,9 +2,16 @@
 Small C library that implements a self-contained, embeddable, zero-configuration SQL database engine.
 
 Website: https://sqlite.org
-Platforms supported: ""Win32"", Linux, DOS
+Platforms supported: ""Win32"", ""Win64"", Linux, DOS
 Headers to include: sqlite2.bi or sqlite3.bi
 Header versions: 2.8.17, 3.30.0
 Examples: in examples/database/
+
+{{fbdoc item="section" value="Query callbacks and ownership"}}
+	The SQLite 3 example accepts a database name and an optional SQL query. Supplying both arguments must still select that database. The callback's column count is a C 32-bit ##Long##; its value and column-name arrays are borrowed only for the duration of the callback.
+
+	A null value pointer represents SQL ##NULL##. A nonnull pointer to an empty string represents empty text and must remain distinct. Error strings returned by ##sqlite3_exec## belong to SQLite and must be released with ##sqlite3_free##. Close a connection returned by ##sqlite3_open## even when opening reports an error, and report failed SQL with a nonzero program exit status.
+
+	The Win64 example has been checked with both compiler backends against the native library: database selection, null and empty values, valid queries, SQL failure, open failure and usage errors. An independent native C check also verifies error-string cleanup and connection memory returning to its initial count.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

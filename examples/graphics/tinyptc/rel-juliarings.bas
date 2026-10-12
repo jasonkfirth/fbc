@@ -40,7 +40,7 @@ const MAXITER = 20
 const MAXSIZE = 4
 
 
-dim Buffer(0 to SCR_SIZE - 1) as integer
+dim Buffer(0 to SCR_SIZE - 1) as ulong
 dim Lx(0 to SCR_WIDTH-1) as single
 dim Ly(0 to SCR_HEIGHT-1) as single
 dim sqrt(0 to SCR_SIZE - 1) as single
@@ -60,7 +60,7 @@ dim xsquare as single, ysquare as single
 dim ytemp as single
 dim temp1 as single, temp2 as single
 dim i as integer, pixel as integer
-dim p_buffer as integer ptr, p_bufferl as integer ptr
+dim p_buffer as ulong ptr, p_bufferl as ulong ptr
 dim t as uinteger, frame as uinteger
 dim ty as single
 dim r as integer, g as integer, b as integer

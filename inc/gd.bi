@@ -1,3 +1,9 @@
+'' FreeBASIC image bindings
+'' File: gd.bi
+'' Purpose: Declare the GD image API.
+'' Responsibilities: Native records, encoder declarations and buffer release APIs.
+'' This file contains no encoder implementation or caller resource ownership.
+''
 '' FreeBASIC binding for gd-2.1.1
 ''
 '' based on the C header files:
@@ -146,7 +152,10 @@ const gdEffectMultiply = 4
 const GD_TRUE = 1
 const GD_FALSE = 0
 const GD_EPSILON = 1e-6
+'' CRT math headers may already provide this constant.
+#ifndef M_PI
 const M_PI = 3.14159265358979323846
+#endif
 
 declare function gdAlphaBlend(byval dest as long, byval src as long) as long
 declare function gdLayerOverlay(byval dest as long, byval src as long) as long
@@ -755,3 +764,5 @@ declare sub gd_error_ cdecl alias "gd_error"(byval format as const zstring ptr, 
 declare sub gd_error_ex cdecl(byval priority as long, byval format as const zstring ptr, ...)
 
 end extern
+
+'' end of gd.bi

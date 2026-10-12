@@ -1,124 +1,135 @@
-'' XML file parser command line tool based on libexpat
-
-'' Can use zstring or wstring (libexpat or libexpatw):
-'#define XML_UNICODE
+'' FreeBASIC XML examples
+'' File: expat.bas
+'' Purpose: Display an XML file using Expat's streaming callbacks.
+'' Responsibilities: Preserve text chunks, match C callback types, and release parser/file state.
+'' This file contains no tree construction, external entity loading or background parsing.
 
 #include once "expat.bi"
+#include once "crt/string.bi"
 
-
+'' Narrow mode uses libexpat. Define XML_UNICODE to use the compatible
+'' wide-character libexpatw SDK instead; its XML_Char layout must match.
 Const BUFFER_SIZE = 1024
+Const MAX_INDENT = 64  '' Bound display indentation for deeply nested input.
 
 Type Context
-    As Integer nesting
-    As XML_char * (BUFFER_SIZE+1) text
-    As Integer textlength
+	parser As XML_Parser
+	nesting As Integer
+	line_open As Boolean
 End Type
 
-'' libexpat callbacks collect text in this parser-owned module context.
-'' FB-LINTER: DISABLE-NEXT-LINE FBL301
-Dim Shared As Context ctx
-
-'' Callback called by libexpat when begin of XML tag is found
-Sub elementBegin cdecl _
-    ( _
-        ByVal userdata As Any Ptr, _
-        ByVal element As XML_char Ptr, _
-        ByVal attributes As XML_char Ptr ptr _
-    )
-
-    '' Show its name
-    Print Space(ctx.nesting);*element;
-
-    '' and its attributes (attributes are given as an array of XML_char pointers
-    '' much like argv, for each attribute there will apparently be the one
-    '' element representing the name and a second element representing the
-    '' specified value)
-    While (*attributes)
-        Print " ";**attributes;
-        attributes += 1
-        Print "='";**attributes;"'";
-        attributes += 1
-    Wend
-    Print
-
-    ctx.nesting += 1
-    ctx.text[0] = 0
-    ctx.textlength = 0
+Private Sub finish_text(ByRef ctx As Context)
+	If ctx.line_open Then Print
+	ctx.line_open = False
 End Sub
 
-'' Callback called by libexpat when end of XML tag is found
-Sub elementEnd cdecl(ByVal userdata As Any Ptr, ByVal element As XML_char Ptr)
-    '' Show text collected in charData() callback below
-    Print Space(ctx.nesting);ctx.text
-    ctx.text[0] = 0
-    ctx.textlength = 0
-    ctx.nesting -= 1
+Private Function indentation(ByRef ctx As Context) As Integer
+	If ctx.nesting > MAX_INDENT Then Return MAX_INDENT
+	Return ctx.nesting
+End Function
+
+Sub elementBegin cdecl(ByVal userdata As Any Ptr, ByVal element As Const XML_Char Ptr, _
+                       ByVal attributes As Const XML_Char Ptr Ptr)
+	Dim ctx As Context Ptr = userdata
+	If ctx = NULL Or element = NULL Then Exit Sub
+	finish_text(*ctx)
+	Print Space(indentation(*ctx)); *element;
+	If Cast(Any Ptr, attributes) <> NULL Then
+		While attributes[0] <> NULL
+			If attributes[1] = NULL Then Exit While
+			Print " "; *attributes[0]; "='"; *attributes[1]; "'";
+			attributes += 2
+		Wend
+	End If
+	Print
+	ctx->nesting += 1
 End Sub
 
-Sub charData cdecl _
-    ( _
-        ByVal userdata As Any Ptr, _
-        ByVal chars As XML_char Ptr, _  '' Note: not null-terminated
-        ByVal length As Integer _
-    )
-
-    '' This callback will apparently recieve every data between xml tags
-    '' (really?), including newlines and space.
-
-    '' Append to our buffer, if there still is free room, so we can print it out later
-    If (length <= (BUFFER_SIZE - ctx.textlength)) Then
-        fb_MemCopy(ctx.text[ctx.textlength], chars[0], length * SizeOf(XML_char))
-        ctx.textlength += length
-        ctx.text[ctx.textlength] = 0
-    End If
+Sub elementEnd cdecl(ByVal userdata As Any Ptr, ByVal element As Const XML_Char Ptr)
+	Dim ctx As Context Ptr = userdata
+	If ctx = NULL Then Exit Sub
+	finish_text(*ctx)
+	If ctx->nesting > 0 Then ctx->nesting -= 1
 End Sub
 
-''
-'' Main
-''
+Sub charData cdecl(ByVal userdata As Any Ptr, ByVal chars As Const XML_Char Ptr, ByVal length As Long)
+	Dim ctx As Context Ptr = userdata
+	If ctx = NULL Or chars = NULL Or length <= 0 Then Exit Sub
+	If Not ctx->line_open Then Print Space(indentation(*ctx));
+	ctx->line_open = True
 
-    Dim As String filename = Command(1)
-    Dim As Integer file_number = FreeFile
-    If (Len(filename) = 0) Then
-        Print "Usage: expat <xmlfilename>"
-        End 1
-    End If
+	'' Callback data is not terminated. Print bounded copies continuously,
+	'' retaining all character data rather than silently dropping long text.
+	'' XML forbids embedded zero characters in successfully parsed text.
+	Dim text As XML_Char * (BUFFER_SIZE+1)
+	Dim position As Long = 0
+	Do While position < length
+		Dim count As Long = length-position
+		If count > BUFFER_SIZE Then count = BUFFER_SIZE
+		#ifdef XML_UNICODE
+			'' Keep a UTF-16 surrogate pair in the same output conversion.
+			If SizeOf(XML_Char) = 2 And count < length-position Then
+				Dim last_unit As UInteger = chars[position+count-1]
+				If last_unit >= &hd800 And last_unit <= &hdbff Then count -= 1
+			End If
+		#endif
+		memcpy(@text[0], @chars[position], count * SizeOf(XML_Char))
+		text[count] = 0
+		Print text;
+		position += count
+	Loop
+End Sub
 
-    Dim As XML_Parser parser = XML_ParserCreate(NULL)
-    If (parser = NULL) Then
-        Print "XML_ParserCreate failed"
-        End 1
-    End If
+Function main() As Integer
+	Dim filename As String = Command(1)
+	If Len(filename) = 0 Then
+		Print "Usage: expat <xmlfilename>"
+		Return 1
+	End If
+	Dim file_number As Integer = FreeFile()
+	If Open(filename, For Binary, Access Read, As #file_number) <> 0 Then
+		Print "Could not open file: '"; filename; "'"
+		Return 1
+	End If
+	Dim ctx As Context
+	ctx.parser = XML_ParserCreate(NULL)
+	If ctx.parser = NULL Then
+		Close #file_number
+		Print "XML_ParserCreate failed"
+		Return 1
+	End If
+	'' The local context outlives every synchronous XML_Parse callback.
+	XML_SetUserData(ctx.parser, @ctx)
+	XML_SetElementHandler(ctx.parser, @elementBegin, @elementEnd)
+	XML_SetCharacterDataHandler(ctx.parser, @charData)
 
-    ''XML_SetUserData(parser, userdata_pointer)
-    XML_SetElementHandler(parser, Cast(XML_StartElementHandler, @elementBegin), Cast(XML_EndElementHandler, @elementEnd))
-    XML_SetCharacterDataHandler(parser, Cast(XML_CharacterDataHandler, @charData))
+	Dim buffer(0 To BUFFER_SIZE-1) As UByte
+	Dim exit_status As Integer = 0
+	Do
+		Dim count As Integer
+		Dim input_status As Integer = Get(#file_number, , buffer(0), BUFFER_SIZE, count)
+		If input_status <> 0 Then
+			Print "File input error"
+			exit_status = 1
+			Exit Do
+		End If
+		Dim finished As Boolean = EOF(file_number) <> 0
+		'' Finalize even an empty input, so Expat reports its syntax error.
+		If XML_Parse(ctx.parser, @buffer(0), count, finished) = XML_STATUS_ERROR Then
+			finish_text(ctx)
+			Print filename & "(" & XML_GetCurrentLineNumber(ctx.parser) & "): Error from XML parser: "
+			Print *XML_ErrorString(XML_GetErrorCode(ctx.parser))
+			exit_status = 1
+			Exit Do
+		End If
+		If finished Then Exit Do
+	Loop
+	finish_text(ctx)
+	If Close(#file_number) <> 0 Then exit_status = 1
+	XML_ParserFree(ctx.parser)
+	Return exit_status
+End Function
 
+End main()
 
-    If (Open(filename, For Input, As #file_number)) Then
-        Print "Could not open file: '";filename;"'"
-        End 1
-    End If
-
-    Static As UByte buffer(0 To (BUFFER_SIZE-1))
-
-    Dim As Integer reached_eof = FALSE
-    Do
-        Dim As Integer size = BUFFER_SIZE
-        Dim As Integer result = Get(#file_number, , buffer(0), size, size)
-        If (result Or (size <= 0)) Then
-            Print "File input error"
-            End 1
-        End If
-
-        reached_eof = (EOF(file_number) <> FALSE)
-
-        If (XML_Parse(parser, @buffer(0), size, reached_eof) = FALSE) Then
-            Print filename & "(" & XML_GetCurrentLineNumber(parser) & "): Error from XML parser: "
-            Print *XML_ErrorString(XML_GetErrorCode(parser))
-            End 1
-        End If
-    Loop While (reached_eof = FALSE)
-
-    Close #file_number
-    XML_ParserFree(parser)
+'' end of expat.bas

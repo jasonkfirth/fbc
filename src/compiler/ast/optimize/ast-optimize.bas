@@ -28,6 +28,7 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "support/hlp.bi"
+#include once "tooling/semantic-expressions.bi"
 
 
 '':::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1269,6 +1270,10 @@ private function hOptNullOp _
 
 				case AST_OP_INTDIV
 					if( v = 1 ) then
+						'' Pointer distance lowers to integer division by the
+						'' element size. Removing a one-byte divisor must retain
+						'' the parsed subtraction's link to its surviving SUB.
+						fbSemanticModelTransferExpressionLinks( n, l )
 						astDelNode( r )
 						astDelNode( n )
 						return l

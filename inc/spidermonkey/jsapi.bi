@@ -1,6 +1,10 @@
 ''
 ''
 '' jsapi -- header translated with help of SWIG FB wrapper
+'' File: jsapi.bi
+'' Purpose: Declare the SpiderMonkey 1.6 embedding API and tagged jsval helpers.
+'' Responsibilities: Native callbacks, C exports and GC value classification.
+'' This file contains no JavaScript engine implementation or ownership policy.
 ''
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
 ''         be included in other distributions without authorization.
@@ -36,7 +40,7 @@
 #define JSVAL_IS_NULL(v) ((v) = JSVAL_NULL)
 #define JSVAL_IS_VOID(v) ((v) = JSVAL_VOID)
 #define JSVAL_IS_PRIMITIVE(v) ((JSVAL_IS_OBJECT(v) = 0) or JSVAL_IS_NULL(v))
-#define JSVAL_IS_GCTHING(v)((((v) and JSVAL_INT) and (JSVAL_IS_BOOLEAN(v) = 0)) = 0)
+#define JSVAL_IS_GCTHING(v) ((((v) and JSVAL_INT) = 0) and (JSVAL_IS_BOOLEAN(v) = 0))
 #define JSVAL_TO_GCTHING(v) (cast(any ptr, JSVAL_CLRTAG(v)))
 #define JSVAL_TO_OBJECT(v) (cast(JSObject ptr, JSVAL_TO_GCTHING(v)))
 #define JSVAL_TO_DOUBLE(v) (cast(jsdouble ptr, JSVAL_TO_GCTHING(v)))
@@ -50,12 +54,12 @@
 
 #define JSVAL_INT_BITS 31
 #define JSVAL_INT_POW2(n) (cast(jsval,1) shl (n))
-#define JSVAL_INT_MIN (cast(jsval,1 - JSVAL_INT_POW2(30))
+#define JSVAL_INT_MIN (cast(jsval,1) - JSVAL_INT_POW2(30))
 #define JSVAL_INT_MAX (JSVAL_INT_POW2(30) - 1)
 #define INT_FITS_IN_JSVAL(i) (cast(jsuint,(i)+JSVAL_INT_MAX) <= 2*JSVAL_INT_MAX)
 #define JSVAL_TO_INT(v) (cast(jsint,v) shr 1)
 #define INT_TO_JSVAL(i) ((cast(jsval,i) shl 1) or JSVAL_INT)
-#define JSVAL_TO_BOOLEAN(v) (cast(JSBool, (v) >> JSVAL_TAGBITS))
+#define JSVAL_TO_BOOLEAN(v) (cast(JSBool, (v) shr JSVAL_TAGBITS))
 #define BOOLEAN_TO_JSVAL(b) JSVAL_SETTAG(cast(jsval,b) shl JSVAL_TAGBITS, JSVAL_BOOLEAN)
 #define JSVAL_TO_PRIVATE(v) (cast(any ptr,(v) and not JSVAL_INT))
 #define PRIVATE_TO_JSVAL(p) (cast(jsval,p) or JSVAL_INT)
@@ -328,7 +332,7 @@ declare function JS_strdup (byval cx as JSContext ptr, byval s as zstring ptr) a
 declare function JS_NewDouble (byval cx as JSContext ptr, byval d as jsdouble) as jsdouble ptr
 declare function JS_NewDoubleValue (byval cx as JSContext ptr, byval d as jsdouble, byval rval as jsval ptr) as JSBool
 declare function JS_NewNumberValue (byval cx as JSContext ptr, byval d as jsdouble, byval rval as jsval ptr) as JSBool
-declare function JS_AddRoot_ (byval cx as JSContext ptr, byval rp as any ptr) as JSBool
+declare function JS_AddRoot_ alias "JS_AddRoot" (byval cx as JSContext ptr, byval rp as any ptr) as JSBool
 declare function JS_AddNamedRoot (byval cx as JSContext ptr, byval rp as any ptr, byval name as zstring ptr) as JSBool
 declare function JS_AddNamedRootRT (byval rt as JSRuntime ptr, byval rp as any ptr, byval name as zstring ptr) as JSBool
 declare function JS_RemoveRoot (byval cx as JSContext ptr, byval rp as any ptr) as JSBool
@@ -452,7 +456,7 @@ declare function JS_DecompileFunction (byval cx as JSContext ptr, byval fun as J
 declare function JS_DecompileFunctionBody (byval cx as JSContext ptr, byval fun as JSFunction ptr, byval indent as uintN) as JSString ptr
 declare function JS_ExecuteScript (byval cx as JSContext ptr, byval obj as JSObject ptr, byval script as JSScript ptr, byval rval as jsval ptr) as JSBool
 declare function JS_ExecuteScriptPart (byval cx as JSContext ptr, byval obj as JSObject ptr, byval script as JSScript ptr, byval part as JSExecPart, byval rval as jsval ptr) as JSBool
-declare function JS_EvaluateScript (byval cx as JSContext ptr, byval obj as JSObject ptr, byval bytes as zstring ptr, byval length as uintN, byval filename as zstring ptr, byval lineno as uintN, byval rval as jsval ptr) as JSBool
+declare function JS_EvaluateScript (byval cx as JSContext ptr, byval obj as JSObject ptr, byval bytes as const zstring ptr, byval length as uintN, byval filename as const zstring ptr, byval lineno as uintN, byval rval as jsval ptr) as JSBool
 declare function JS_EvaluateScriptForPrincipals (byval cx as JSContext ptr, byval obj as JSObject ptr, byval principals as JSPrincipals ptr, byval bytes as zstring ptr, byval length as uintN, byval filename as zstring ptr, byval lineno as uintN, byval rval as jsval ptr) as JSBool
 declare function JS_EvaluateUCScript (byval cx as JSContext ptr, byval obj as JSObject ptr, byval chars as jschar ptr, byval length as uintN, byval filename as zstring ptr, byval lineno as uintN, byval rval as jsval ptr) as JSBool
 declare function JS_EvaluateUCScriptForPrincipals (byval cx as JSContext ptr, byval obj as JSObject ptr, byval principals as JSPrincipals ptr, byval chars as jschar ptr, byval length as uintN, byval filename as zstring ptr, byval lineno as uintN, byval rval as jsval ptr) as JSBool
@@ -465,8 +469,8 @@ declare function JS_IsConstructing (byval cx as JSContext ptr) as JSBool
 declare function JS_IsAssigning (byval cx as JSContext ptr) as JSBool
 declare sub JS_SetCallReturnValue2 (byval cx as JSContext ptr, byval v as jsval)
 declare function JS_NewString (byval cx as JSContext ptr, byval bytes as zstring ptr, byval length as size_t) as JSString ptr
-declare function JS_NewStringCopyN (byval cx as JSContext ptr, byval s as zstring ptr, byval n as size_t) as JSString ptr
-declare function JS_NewStringCopyZ (byval cx as JSContext ptr, byval s as zstring ptr) as JSString ptr
+declare function JS_NewStringCopyN (byval cx as JSContext ptr, byval s as const zstring ptr, byval n as size_t) as JSString ptr
+declare function JS_NewStringCopyZ (byval cx as JSContext ptr, byval s as const zstring ptr) as JSString ptr
 declare function JS_InternString (byval cx as JSContext ptr, byval s as zstring ptr) as JSString ptr
 declare function JS_NewUCString (byval cx as JSContext ptr, byval chars as jschar ptr, byval length as size_t) as JSString ptr
 declare function JS_NewUCStringCopyN (byval cx as JSContext ptr, byval s as jschar ptr, byval n as size_t) as JSString ptr
@@ -509,3 +513,4 @@ declare function JS_ErrorFromException (byval cx as JSContext ptr, byval v as js
 end extern
 
 #endif
+'' end of jsapi.bi

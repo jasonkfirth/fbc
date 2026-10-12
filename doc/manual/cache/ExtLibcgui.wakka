@@ -1,12 +1,71 @@
 {{fbdoc item="title" value="CGUI"}}----
 Library for making GUIs in a simple way.
 
-Website: http://cgui.sourceforge.net/index.html, http://www.allegro.cc/resource/Libraries/GUI/CGUI
-Platforms supported: ""Win32"", Linux
+Website: https://cgui.sourceforge.net/
+Platforms supported: Windows, Linux
 Headers to include: cgui.bi
 Header version: 2.0.4
 Example Usage: yes, in examples/GUI/CGUI/
 
+CGUI uses classic Allegro 4. Include ##cgui.bi## and link against a native CGUI library and its matching Allegro library. Allegro 5 uses a different API and cannot replace this dependency. Windows DLLs and import libraries must match the executable's architecture.
+
+The example's API has been checked with CGUI 2.1.0 on 64-bit Windows and Linux. The binding's version constants describe its original 2.0.4 header; the ##cgui_ver##, ##cgui_rev## and ##cgui_minor_rev## variables report the linked library's version. CGUI uses C ##int## for dialogue identifiers and geometry, represented by FreeBASIC ##Long## even in a 64-bit application. Declare callbacks ##Cdecl## and keep their user data alive until event processing completes.
+
+Use ##InitCguiWindowedMode()## to request a desktop window explicitly. CGUI otherwise defaults to fullscreen on Windows. ##InitCguiWindowedMode()## returns nonzero on success. ##StopProcessEvents()## ends the current event-processing level, allowing a nested dialogue to return to its caller. ##DeInitCgui()## releases CGUI resources when the outer dialogue has closed.
+
+Allegro 4.4.4's unpatched MinGW source has Win64 rendering defects. A native Win64 build must preserve pointer-sized framebuffer and glyph addresses and select the 64-bit triangle implementation before using it with CGUI.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/GUI/CGUI/hello.bas"}}%%(freebasic)
+'' CGUI Example: hello.bas
+'' Purpose: Open a dialogue and create further dialogues from its buttons.
+'' Responsibilities: Native CGUI event processing and close callbacks.
+'' This example contains no custom renderer or application data persistence.
+
+#include once "allegro.bi"
+#include once "cgui.bi"
+
+declare sub make_a_window ()
+
+sub new_window cdecl (byval userdata as any ptr)
+   make_a_window()
+end sub
+
+sub stop_program cdecl (byval userdata as any ptr)
+   end 0
+end sub
+
+sub close_window cdecl (byval userdata as any ptr)
+   '' This terminates the top level of event processing.
+   StopProcessEvents()
+   CloseWin(NULL)
+end sub
+
+sub make_a_window( )
+
+   MkDialogue(CGUI_ADAPTIVE, "Hello world", 0)
+
+   AddButton(CGUI_TOPLEFT, "A new_window", @new_window, NULL)
+
+   AddTextBox(CGUI_RIGHT, "A simple window showing some buttons. Press the button to the left and you will get a new identical window.", 200, 0, 0)
+
+   AddButton(CGUI_DOWNLEFT, "E~xit", @stop_program, NULL)
+
+   AddButton(CGUI_RIGHT, "Close", @close_window, NULL)
+   DisplayWin()
+
+   '' Check for events - like mouse clicks and key-presses
+   ProcessEvents()
+end sub
+
+   '' CGUI defaults to fullscreen on Windows. Request a window explicitly
+   '' so this introductory example can run beside other desktop programs.
+   If InitCguiWindowedMode() = 0 Then End 1
+   make_a_window()
+   DeInitCgui()
+   END_OF_MAIN()
+'' end of hello.bas
+%%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}
    

@@ -6,6 +6,10 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibzlib
 '' --------
 
+'' Purpose: Demonstrate a checked in-memory zlib round trip.
+'' Responsibilities: Bound output buffers, check the restored checksum, and release memory.
+'' This file contains no file I/O or application compression format.
+
 '' Ownership:
 '' The example owns src and dest after allocation. Every codec or allocation
 '' failure releases acquired buffers before terminating the demonstration.
@@ -93,7 +97,8 @@ End If
 Print "Uncompressed to     : " & src_len & " bytes."
 
 '' Make sure the checksum of the uncompressed data matches our original data.
-If crc <> crc32(0, src, src_len) Then
+Dim checksum_valid As Boolean = (src_len = 100000 AndAlso crc = crc32(0, src, src_len))
+If Not checksum_valid Then
 	Print "crc32 checksum      : FAILED"
 Else
 	Print "crc32 checksum      : PASSED"
@@ -106,6 +111,7 @@ Deallocate(dest)
 dest = 0
 
 Print
+If Not checksum_valid Then End 1
 Print "Press any key to end . . . "
 Sleep
 

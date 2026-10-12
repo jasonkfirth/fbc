@@ -1,0 +1,12 @@
+--- a/src/pdflib/p_basic.c
++++ b/src/pdflib/p_basic.c
+@@ -836,4 +836,9 @@
+ 	if ((p->fp = fopen(filename, WRITEMODE)) == NULL) {
++	    /* Initialization precedes fopen. Release these document tables
++	     * before returning to object scope, where PDF_delete skips them.
++	     * Keep the stream alive for deletion or a later open attempt.
++	     */
++	    pdf_cleanup_document(p);
+ 	    PDF_SET_STATE(p, "PDF_open_file", pdf_state_object);
+ 	    PDF_TRACE((" [%d]\n", -1));
+ 	    return -1;

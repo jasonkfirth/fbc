@@ -1,4 +1,9 @@
 ''------------------------------------------------------------------------------
+'' Project: FreeBASIC OpenGL examples
+'' File: lesson32.bas
+'' Purpose: Demonstrate the NeHe picking game and bitmap font rendering.
+'' Responsibilities: Own game state, draw frames and format bounded font text.
+'' This file contains no OpenGL or C runtime implementation.
 ''
 ''    Jeff Molofee's Picking Tutorial
 ''           nehe.gamedev.net
@@ -283,16 +288,19 @@ end sub
 
 '------------------------------------------------------------------------
 sub glPrint cdecl(byval x as integer, byval y as integer, byref fmt as string, ...)    '' Where The Printing Happens
-	dim text as string * 256                           '' Holds Our String
-	dim ap as any ptr                                  '' Pointer To List Of Arguments
+	dim text as zstring * 256                          '' Holds Our String
+	dim ap as cva_list
 
 	'' If There's No Text
 	if len(fmt)= 0 then                                '' Do Nothing
 		exit sub
 	end if
 
-	ap = va_first()                                   '' get pointer to first arg
-	vsprintf (text, fmt, ap)                          '' And Converts Symbols To Actual Numbers
+	'' The C runtime needs its native va_list, including register arguments
+	'' on System V targets. Bound the output including its null terminator.
+	cva_start(ap, fmt)
+	if vsnprintf(@text, sizeof(text), fmt, ap) < 0 then text = ""
+	cva_end(ap)
 
 
 	glBindTexture (GL_TEXTURE_2D, textures(9).texID)  '' Select Our Font Texture

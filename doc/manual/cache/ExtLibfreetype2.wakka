@@ -2,10 +2,18 @@
 A Free, High-Quality, and Portable Font Engine
 
 Website: http://www.freetype.org
-Platforms supported: ""Win32"", Linux
+Platforms supported: Windows, Linux
 Headers to include: freetype2/freetype.bi
 Header version: 2.5.5
 Examples: yes, in ""examples/graphics/FreeType/""
+
+The Windows examples were checked with the genuine FreeType 2.14.3 SDK on Win32 and Win64. Their optional first command-line argument selects a font file; the fallback remains the platform-specific example font. A missing font returns a nonzero status.
+
+A glyph bitmap belongs to its face and remains valid until another glyph is loaded or the face is released. Destroy the face before the library. The examples render eight-bit grayscale coverage; other pixel modes need their own interpretation or an explicit conversion.
+
+The text renderer uses ##ULong## for each 32-bit destination pixel. ##UInteger## is pointer-sized and occupies eight bytes on Win64. ##ScreenInfo## supplies the actual destination pitch. The caller holds ##ScreenLock## while the renderer writes into the framebuffer.
+
+##bitmap.bi## clips each glyph independently and honors padding and signed source pitch. A negative-pitch bitmap stores its bottom row at the buffer base, so its top row begins at a higher address. Coverage is blended with division by 255, which makes full coverage replace the destination pixel exactly. The example's text loop handles individual bytes; it is not a Unicode shaping engine.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/freetype2.bas"}}%%(freebasic)
@@ -19,48 +27,90 @@ Const TTF_FONT = "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf"
 Const TTF_FONT = "Vera.ttf"
 #endif
 
-Dim As FT_Library library
+Sub releaseFreeType(ByRef library As FT_Library, ByRef face As FT_Face)
+
+	If face <> 0 Then
+		FT_Done_Face face
+		face = 0
+	End If
+
+	If library <> 0 Then
+		FT_Done_FreeType library
+		library = 0
+	End If
+
+End Sub
+
+Dim font_file As String = Command(1)
+If font_file = "" Then font_file = TTF_FONT
+
+Dim As FT_Library library = 0
+Dim As FT_Face face = 0
+
 If (FT_Init_FreeType(@library) <> 0) Then
-	Print "FT_Init_FreeType() failed" : Sleep : End 1
+	Print "FT_Init_FreeType() failed" : End 1
 End If
 
 ''
 '' Load a font and render an '@' character on to a bitmap
 ''
 
-Dim As FT_Face face
-If (FT_New_Face(library, TTF_FONT, 0, @face) <> 0) Then
-	Print "FT_New_Face() failed (font file '" & TTF_FONT & "' not found?)" : Sleep : End 1
+If (FT_New_Face(library, font_file, 0, @face) <> 0) Then
+	releaseFreeType library, face
+	Print "FT_New_Face() failed (font file '" & font_file & "' not found?)" : End 1
 End If
 
 If (FT_Set_Pixel_Sizes(face, 0, 200) <> 0) Then
-	Print "FT_Set_Pixel_Sizes() failed" : Sleep : End 1
+	releaseFreeType library, face
+	Print "FT_Set_Pixel_Sizes() failed" : End 1
 End If
 
 If (FT_Load_Char(face, Asc("@"), FT_LOAD_DEFAULT) <> 0) Then
-	Print "FT_Load_Char() failed" : Sleep : End 1
+	releaseFreeType library, face
+	Print "FT_Load_Char() failed" : End 1
 End If
 
 If (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) <> 0) Then
-	Print "FT_Render_Glyph() failed" : Sleep : End 1
+	releaseFreeType library, face
+	Print "FT_Render_Glyph() failed" : End 1
 End If
 
 ''
 '' Draw the rendered bitmap
 ''
 
-ScreenRes 320, 200, 32
+If ScreenRes(320, 200, 32) <> 0 Then
+	releaseFreeType library, face
+	Print "Could not set the requested graphics mode"
+	End 1
+End If
 
 Dim As FT_Bitmap Ptr bitmap = @face->glyph->bitmap
+If bitmap->pixel_mode <> FT_PIXEL_MODE_GRAY Or bitmap->num_grays <> 256 Or bitmap->buffer = NULL Then
+    releaseFreeType library, face
+    End 1
+End If
+Dim row_size As LongInt = Abs(CLngInt(bitmap->pitch))
+If row_size < bitmap->width Or bitmap->width > 8192 Or bitmap->rows > 8192 Then
+    releaseFreeType library, face
+    End 1
+End If
+Dim source_top As UByte Ptr = bitmap->buffer
+If bitmap->pitch < 0 Then source_top += row_size*(bitmap->rows-1)
+
 
 For y As Integer = 0 To (bitmap->rows - 1)
-	For x As Integer = 0 To (bitmap->width - 1)
-		Dim As Integer col = bitmap->buffer[y * bitmap->pitch + x]
+	For x As Integer = 0 To (bitmap->Width - 1)
+		Dim As Integer col = source_top[y * CLngInt(bitmap->pitch) + x]
 		PSet(x, y), RGB(col, col, col)
 	Next
-next
+Next
 
 Sleep
+
+releaseFreeType library, face
+
+'' end of freetype2.bas
 %%
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

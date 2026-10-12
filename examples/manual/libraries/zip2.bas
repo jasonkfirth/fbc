@@ -1,39 +1,46 @@
-'' examples/manual/libraries/zip2.bas
-''
-'' Example extracted from the FreeBASIC Manual
-'' from topic 'libzip'
-''
-'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ExtLibZip
-'' --------
+'' FreeBASIC libzip examples
+'' File: zip2.bas
+'' Purpose: Add text strings to a ZIP archive.
+'' Responsibilities: Check commit errors and transfer ownership of each zip source.
+'' This file contains no binary-buffer input or archive extraction.
 
-'' .zip packing using libzip
-#include "zip.bi"
+#include once "zip.bi"
 
-Sub zipAddFileFromString(ByVal fname As ZString Ptr, ByVal id_d As ZString Ptr, ByVal myData As ZString Ptr)
-	Dim As Any Ptr pzo
-	Dim As Any Ptr pzsb
-
-	pzo = zip_open(fname, ZIP_CREATE, 0)
-	If pzo = 0 Then End
-
-	pzsb = zip_source_buffer(pzo, myData, Len(*myData), 0)
-	If pzsb = 0 Then End
-
-	zip_file_add(pzo, id_d, pzsb, ZIP_FL_OVERWRITE)
-	zip_close(pzo)
-
+Function zipAddFileFromString(ByVal filename As ZString Ptr, ByVal entry As ZString Ptr, _
+                              ByVal text As ZString Ptr) As Boolean
+	If filename = NULL Or entry = NULL Or text = NULL Then Return False
+	Dim archive As zip_t Ptr = zip_open(filename, ZIP_CREATE, NULL)
+	If archive = NULL Then
+		Print "could not open output archive"
+		Return False
+	End If
+	'' freep=0 borrows this FreeBASIC-owned text until zip_close completes.
+	'' libzip must not release it with its own allocator.
+	Dim source As zip_source_t Ptr = zip_source_buffer(archive, text, Len(*text), 0)
+	If source = NULL Then
+		zip_discard(archive)
+		Return False
+	End If
+	If zip_file_add(archive, entry, source, ZIP_FL_OVERWRITE) < 0 Then
+		'' Failed insertion retains caller ownership; successful insertion transfers it.
+		zip_source_free(source)
+		zip_discard(archive)
+		Return False
+	End If
+	If zip_close(archive) <> 0 Then
+		Print "could not commit output archive"
+		zip_discard(archive)
+		Return False
+	End If
 	Print "OK"
-End Sub
+	Return True
+End Function
 
-Dim As String mytext, myzipfile, myfile
-
-myText    = "<My text           >......6...3..2"
-myZipFile = "26.zip"
-myFile    = "file3.txt"
-
-zipAddFileFromString(myZipFile, myFile, myText)
-
-myFile    = "BIMBO/file3.txt"
-zipAddFileFromString(myZipFile, myFile, myText)
-
+Dim text As String = "<My text           >......6...3..2"
+Dim archive_name As String = Command(1)
+If archive_name = "" Then archive_name = "26.zip"
+If Not zipAddFileFromString(archive_name, "file3.txt", text) Then End 1
+If Not zipAddFileFromString(archive_name, "BIMBO/file3.txt", text) Then End 1
 Sleep
+
+'' end of zip2.bas

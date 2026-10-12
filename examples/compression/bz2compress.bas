@@ -49,12 +49,16 @@ private function hLoadFile _
 		return -1
 	end if
 
-	size = lof( f )
-	if( size < 0 ) then
+	dim file_size as longint = lof( f )
+	' The streaming avail_in field and this demo's output growth use 32-bit
+	' counts. Reject files above the signed 32-bit bound before allocation.
+	if( file_size < 0 or file_size > &h7fffffff ) then
 		close #f
 		print "error: invalid file size"
 		return -1
 	end if
+
+	size = file_size
 
 	if( size > 0 ) then
 		buffer = callocate( size )
@@ -64,7 +68,15 @@ private function hLoadFile _
 			return -1
 		end if
 
-		get #f, , *buffer, size
+		dim bytes_read as integer
+		if( get( #f, , *buffer, size, bytes_read ) <> 0 or bytes_read <> size ) then
+			close #f
+			deallocate( buffer )
+			buffer = 0
+			size = 0
+			print "error: could not read input file"
+			return -1
+		end if
 	end if
 
 	close #f
@@ -103,7 +115,11 @@ private function hWriteFile _
 	end if
 
 	if( size > 0 ) then
-		put #f, , *p, size
+		if( put( #f, , *p, size ) <> 0 ) then
+			close #f
+			print "error: could not write output file"
+			return -1
+		end if
 	end if
 
 	close #f
@@ -210,7 +226,8 @@ end function
 
 	'' File to compress
 	'filename = __FILE__
-	filename = "zlib.bas"
+	filename = command(1)
+	if( filename = "" ) then filename = "zlib.bas"
 
 	dim as byte ptr buffer_in, buffer_out
 	dim as integer size_in, size_out

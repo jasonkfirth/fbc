@@ -5,31 +5,73 @@ External linkage attribute for public data located in DLL's
 	[[KeyPgExtern|Extern]] **Import** //symbolname//[( //subscripts//)] [ [[KeyPgAlias|alias]] "//aliasname//"] [ [[KeyPgAs|as]] [[DataType|DataType]]] [, ...]
 ##
 {{fbdoc item="desc"}}
-	Is used only (with the ##[[KeyPgExtern|Extern]]## keyword) in external modules to access global variables from Win32 DLLs: the variable names will be added to the dynamic library import list so that their addresses can be fixed at run-time.
+	Is used only (with the ##[[KeyPgExtern|Extern]]## keyword) in external modules to access global variables from 32-bit and 64-bit Windows DLLs: the variable names will be added to the dynamic library import list so that their addresses can be fixed at run-time.
 	This is due to the level of indirection on any such access: an implicit pointer dereference.
+	The declaration must match the DLL's C data type. A C ##int## is 32 bits on both Windows targets, so use FreeBASIC ##Long##. FreeBASIC ##Integer## is native-sized and is 64 bits on Win64.
+	The import library and DLL must match the application's target architecture. Win32 and Win64 use different import-address symbol prefixes, which the compiler supplies automatically.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/module/mydll.c"}}%%(c)
+/*
+    Project: FreeBASIC manual examples
+    ----------------------------------
+
+    File: examples/manual/module/mydll.c
+
+    Purpose:
+
+        Provide the C DLL used by the manual's IMPORT example.
+
+    Responsibilities:
+
+        - export one integer data symbol from a Windows DLL
+
+    This file intentionally does NOT contain:
+
+        - executable startup code
+        - FreeBASIC declarations for importing the symbol
+
+    See also:
+
+        https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgImport
+*/
+
 /* mydll.c :
 	compile with
-	  gcc -shared -Wl,--strip-all -o mydll.dll mydll.c
+	  gcc -shared -Wl,--strip-all -Wl,--out-implib,libmydll.dll.a -o mydll.dll mydll.c
 */
 __declspec( dllexport ) int MyDll_Data = 0x1234;
+
+/* end of examples/manual/module/mydll.c */
 %%
 
 {{fbdoc item="filename" value="examples/manual/module/import.bas"}}%%(freebasic)
+'' examples/manual/module/import.bas
+''
+'' Example extracted from the FreeBASIC Manual
+'' from topic 'IMPORT'
+'' Purpose: Read a C DLL's exported 32-bit integer.
+'' Responsibilities: DLL import linkage and matching the C data width.
+'' This example contains no DLL implementation or runtime loading code.
+''
+'' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgImport
+'' --------
+
 /'  import.bas :
 	Compile with
 	  fbc import.bas
 '/
 #inclib "mydll"
 
-Extern Import MyDll_Data Alias "MyDll_Data" As Integer
+'' C int remains 32 bits on both Win32 and Win64.
+Extern Import MyDll_Data Alias "MyDll_Data" As Long
 
 Print "&h" + Hex( MyDll_Data )
 
 ' Output:
 ' &h1234
+
+'' end of import.bas
 %%
 
 

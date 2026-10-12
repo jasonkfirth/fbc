@@ -1,4 +1,8 @@
-''
+'' FreeBASIC Java Native Interface binding
+'' File: jni.bi
+'' Purpose: Declare JNI values, function tables and VM startup records.
+'' Responsibilities: Preserve the JDK C ABI and its pointer ownership rules.
+'' This file intentionally contains no Java VM or object lifetime management.
 ''
 '' jni -- Java(tm) Native Interface
 ''		  header translated with help of SWIG FB wrapper
@@ -18,7 +22,9 @@
 #include once "crt/stdarg.bi"
 
 '' begin include "jni_md.bi"
-type jint as integer
+'' JNI uses a C int even on 64-bit hosts. A native-width Integer changes
+'' both array element strides and the JavaVMInitArgs field offsets.
+type jint as long
 type jlong as longint
 type jbyte as byte
 '' end include "jni_md.bi"
@@ -304,7 +310,7 @@ type JNINativeInterface_
 	GetJavaVM as function (byval as JNIEnv ptr, byval as JavaVM ptr ptr) as jint
 	GetStringRegion as sub (byval as JNIEnv ptr, byval as jstring, byval as jsize, byval as jsize, byval as jchar ptr)
 	GetStringUTFRegion as sub (byval as JNIEnv ptr, byval as jstring, byval as jsize, byval as jsize, byval as zstring ptr)
-	GetPrimitiveArrayCritical as sub (byval as JNIEnv ptr, byval as jarray, byval as jboolean ptr)
+	GetPrimitiveArrayCritical as function (byval as JNIEnv ptr, byval as jarray, byval as jboolean ptr) as any ptr
 	ReleasePrimitiveArrayCritical as sub (byval as JNIEnv ptr, byval as jarray, byval as any ptr, byval as jint)
 	GetStringCritical as function (byval as JNIEnv ptr, byval as jstring, byval as jboolean ptr) as jchar ptr
 	ReleaseStringCritical as sub (byval as JNIEnv ptr, byval as jstring, byval as jchar ptr)
@@ -312,7 +318,7 @@ type JNINativeInterface_
 	DeleteWeakGlobalRef as sub (byval as JNIEnv ptr, byval as jweak)
 	ExceptionCheck as function (byval as JNIEnv ptr) as jboolean
 	NewDirectByteBuffer as function (byval as JNIEnv ptr, byval as any ptr, byval as jlong) as jobject
-	GetDirectBufferAddress as sub (byval as JNIEnv ptr, byval as jobject)
+	GetDirectBufferAddress as function (byval as JNIEnv ptr, byval as jobject) as any ptr
 	GetDirectBufferCapacity as function (byval as JNIEnv ptr, byval as jobject) as jlong
 end type
 
@@ -392,3 +398,5 @@ declare sub JNI_OnUnload  alias "JNI_OnUnload" (byval vm as JavaVM ptr, byval re
 #define JNI_VERSION_1_4 &h00010004
 
 #endif
+
+'' end of jni.bi
