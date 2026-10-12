@@ -106,6 +106,7 @@ private sub hUdtFor _
 	                      step_expr )
 
 	if( proc <> NULL ) then
+		fbSemanticModelExportOperation(proc, AST_OP_FOR, stk->for.semantic_for_site)
 		astAdd( proc )
 	end if
 
@@ -130,6 +131,9 @@ private sub hUdtStep _
 	                      step_expr )
 
 	if( proc <> NULL ) then
+		if( stk->for.explicit_step ) then
+			fbSemanticModelExportOperation(proc, AST_OP_STEP, stk->for.semantic_step_site)
+		end if
 		astAdd( proc )
 	end if
 
@@ -155,6 +159,7 @@ private sub hUdtNext _
 	                      step_expr )
 
 	if( proc <> NULL ) then
+		fbSemanticModelExportOperation(proc, AST_OP_NEXT, stk->for.semantic_next_site)
 		'' if proc(...) <> 0 then goto init
 		astAdd( astNewBOP( AST_OP_NE, _
 		                   proc, _
@@ -596,6 +601,7 @@ private sub hForStep _
 	stk->for.explicit_step = FALSE
 	if( lexGetToken( ) = FB_TK_STEP ) then
 		dim as LEX_LOCATION semantic_step_site = lexGetCurrentLocation( )
+		stk->for.semantic_step_site = semantic_step_site
 		fbSemanticModelForStepSource( semantic_step_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		stk->for.explicit_step = TRUE
@@ -738,6 +744,7 @@ sub cForStmtBegin( )
 	dim as FBSYMBOL ptr sym = any
 
 	'' FOR
+	dim as LEX_LOCATION semantic_for_site = lexGetCurrentLocation( )
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 	dim as LEX_LOCATION counter_site = lexGetCurrentLocation( )
 
@@ -842,6 +849,7 @@ sub cForStmtBegin( )
 
 	'' push a FOR context
 	dim as FB_CMPSTMTSTK ptr stk = cCompStmtPush( FB_TK_FOR )
+	if( stk <> NULL ) then stk->for.semantic_for_site = semantic_for_site
 
 	'' extract counter variable from the expression
 	stk->for.cnt.sym = astGetSymbol( idexpr )
@@ -1093,6 +1101,7 @@ end sub
 '' ForStmtEnd  =  NEXT (ID (',' ID?))? .
 sub cForStmtEnd( )
 	dim as FB_CMPSTMTSTK ptr stk = any
+	dim as LEX_LOCATION semantic_next_site = lexGetCurrentLocation( )
 
 	'' NEXT
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -1104,6 +1113,7 @@ sub cForStmtEnd( )
 			hSkipStmt( )
 			exit sub
 		end if
+		stk->for.semantic_next_site = semantic_next_site
 
 		hForStmtClose( stk )
 

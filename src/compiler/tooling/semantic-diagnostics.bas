@@ -232,6 +232,12 @@ sub fbSemanticDiagnosticsAt( byref context_text as const string, byref source as
 	diagnostic_has_point = TRUE
 end sub
 
+sub fbSemanticDiagnosticsPoint( byref source as LEX_LOCATION )
+	if( diagnostic_output = NULL ) then exit sub
+	diagnostic_point = source
+	diagnostic_has_point = TRUE
+end sub
+
 sub fbSemanticDiagnosticsProcedure( byval proc as FBSYMBOL ptr, byval header_valid as integer )
 	if( (diagnostic_output = NULL) or diagnostic_failed or (proc = NULL) ) then exit sub
 	for index as integer = 0 to diagnostic_invalid_count - 1

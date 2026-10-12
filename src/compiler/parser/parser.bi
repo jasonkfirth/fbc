@@ -73,6 +73,9 @@ type FB_CMPSTMT_FOR
 	endlabel        as FBSYMBOL ptr
 	last            as FB_CMPSTMTSTK_ ptr
 	explicit_step   as integer
+	semantic_for_site as LEX_LOCATION
+	semantic_step_site as LEX_LOCATION
+	semantic_next_site as LEX_LOCATION
 end type
 
 type FB_CMPSTMT_IF

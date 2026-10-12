@@ -1496,7 +1496,7 @@ function cVariableEx _
 				dim as LEX_LOCATION preceding_site = lexGetLastLocation( )
 				if( preceding_site.is_physical ) then diagnostic_site = preceding_site
 			end if
-			fbSemanticDiagnosticsAt("", diagnostic_site)
+			fbSemanticDiagnosticsPoint(diagnostic_site)
 			errReportUndef( FB_ERRMSG_VARIABLENOTDECLARED, id )
 			fbSemanticDiagnosticsContext("")
 			'' Error recovery in -lang fb: don't declare the variable implicitly;

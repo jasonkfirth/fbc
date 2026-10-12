@@ -959,13 +959,15 @@ declare function astBuildNewOp _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval do_clear as integer, _
-		byval newexpr as ASTNODE ptr _
+		byval newexpr as ASTNODE ptr, _
+		byref semantic_operator as ASTNODE ptr _
 	) as ASTNODE ptr
 
 declare function astBuildDeleteOp _
 	( _
 		byval op as AST_OP, _
-		byval ptrexpr as ASTNODE ptr _
+		byval ptrexpr as ASTNODE ptr, _
+		byref semantic_operator as ASTNODE ptr _
 	) as ASTNODE ptr
 
 declare function astNewBOUNDCHK _

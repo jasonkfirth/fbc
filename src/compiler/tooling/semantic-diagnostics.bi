@@ -21,6 +21,9 @@ declare sub fbSemanticDiagnosticsContext( byref context_text as const string )
 '' editable range, and clearing the context also clears this temporary point.
 declare sub fbSemanticDiagnosticsAt( byref context_text as const string, byref source as LEX_LOCATION )
 
+'' Set a point without replacing a diagnostic context selected by an enclosing parser.
+declare sub fbSemanticDiagnosticsPoint( byref source as LEX_LOCATION )
+
 '' Invalid headers can leave recovery symbols in the native table. They cannot
 '' prove a later declaration conflict, even though ordinary errors still emit.
 declare sub fbSemanticDiagnosticsProcedure( byval proc as FBSYMBOL ptr, byval header_valid as integer )

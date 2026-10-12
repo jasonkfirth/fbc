@@ -1351,7 +1351,7 @@ private sub hCallDeleteDtor _
 	end if
 	this_ = symbGetParamVar( symbGetProcHeadParam( proc ) )
 	thisptr = astNewADDROF( astBuildVarField( this_ ) )
-	tree = astBuildDeleteOp( AST_OP_DEL, thisptr )
+	tree = astBuildDeleteOp( AST_OP_DEL, thisptr, NULL )
 	astAdd( tree )
 
 end sub

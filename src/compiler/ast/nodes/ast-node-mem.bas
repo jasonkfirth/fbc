@@ -143,7 +143,8 @@ function astBuildNewOp _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval do_clear as integer, _
-		byval newexpr as ASTNODE ptr _
+		byval newexpr as ASTNODE ptr, _
+		byref semantic_operator as ASTNODE ptr _
 	) as ASTNODE ptr
 
 	enum
@@ -161,6 +162,7 @@ function astBuildNewOp _
 
 	init = INIT_NONE
 	tree = NULL
+	semantic_operator = NULL
 	save_elmts = FALSE
 	elementstreecount = 0
 
@@ -237,6 +239,12 @@ function astBuildNewOp _
 		newexpr = rtlMemNewOp( op, lenexpr, dtype, subtype, do_clear )
 		if( newexpr = NULL ) then
 			return NULL
+		end if
+		if( (newexpr->class = AST_NODECLASS_CALL) andalso _
+			(newexpr->sym <> NULL) andalso symbIsOperator(newexpr->sym) ) then
+			'' Keep the resolved allocator call borrowed so the parser can export its
+			'' physical NEW token without retaining AST ownership.
+			semantic_operator = newexpr
 		end if
 	end if
 
@@ -360,14 +368,16 @@ end function
 function astBuildDeleteOp _
 	( _
 		byval op as AST_OP, _
-		byval ptrexpr as ASTNODE ptr _
+		byval ptrexpr as ASTNODE ptr, _
+		byref semantic_operator as ASTNODE ptr _
 	) as ASTNODE ptr
 
-	dim as ASTNODE ptr tree = any
+	dim as ASTNODE ptr tree = any, operator_call = any
 	dim as FBSYMBOL ptr label = any, subtype = any
 	dim as integer dtype = any
 
 	tree = NULL
+	semantic_operator = NULL
 	dtype = astGetFullType( ptrexpr )
 	subtype = astGetSubType( ptrexpr )
 	assert( typeIsPtr( dtype ) )
@@ -398,7 +408,13 @@ function astBuildDeleteOp _
 	end if
 
 	'' delete( ptr )
-	tree = astNewLINK( tree, rtlMemDeleteOp( op, ptrexpr, dtype, subtype ), AST_LINK_RETURN_NONE )
+	operator_call = rtlMemDeleteOp( op, ptrexpr, dtype, subtype )
+	if( (operator_call <> NULL) andalso (operator_call->class = AST_NODECLASS_CALL) andalso _
+		(operator_call->sym <> NULL) andalso symbIsOperator(operator_call->sym) ) then
+		'' Keep only the selected custom deallocator call for parser-side observation.
+		semantic_operator = operator_call
+	end if
+	tree = astNewLINK( tree, operator_call, AST_LINK_RETURN_NONE )
 
 	'' end if
 	tree = astNewLINK( tree, astNewLABEL( label ), AST_LINK_RETURN_NONE )

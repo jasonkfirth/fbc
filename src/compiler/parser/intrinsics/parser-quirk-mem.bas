@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
 
 declare sub fbSemanticModelExportImplicitCall _
@@ -48,6 +49,8 @@ function cOperatorNew( ) as ASTNODE ptr
 	dim as ASTNODE ptr expr = any
 	dim as AST_OP op = any
 	dim as LEX_LOCATION semantic_site
+	dim as LEX_LOCATION semantic_operation_site
+	dim as ASTNODE ptr semantic_operator = NULL
 
 	do_clear = TRUE
 	op = AST_OP_NEW
@@ -56,6 +59,7 @@ function cOperatorNew( ) as ASTNODE ptr
 	placementexpr = NULL
 
 	'' NEW
+	semantic_operation_site = lexGetCurrentLocation( )
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	'' '('?
@@ -243,10 +247,12 @@ function cOperatorNew( ) as ASTNODE ptr
 	fbSemanticModelNewStorage(tmp, dtype, subtype, elementsexpr, do_clear, _
 		op = AST_OP_NEW_VEC, placementexpr)
 	expr = astBuildNewOp( op, tmp, elementsexpr, initexpr, _
-	                      dtype, subtype, do_clear, placementexpr )
+	                      dtype, subtype, do_clear, placementexpr, semantic_operator )
 
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
+	elseif( semantic_operator <> NULL ) then
+		fbSemanticModelExportOperation(semantic_operator, op, semantic_operation_site)
 	end if
 
 	'' return the pointer
@@ -255,7 +261,7 @@ end function
 
 '' DELETE ['[]'] expr
 sub cOperatorDelete( )
-	dim as ASTNODE ptr ptrexpr = any
+	dim as ASTNODE ptr ptrexpr = any, semantic_operator = NULL, delete_expr = any
 	dim as integer dtype = any, op = any
 	dim as FBSYMBOL ptr subtype = any, dtor = any
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
@@ -315,7 +321,11 @@ sub cOperatorDelete( )
 	end if
 
 	fbSemanticModelDeleteStorage(ptrexpr, op = AST_OP_DEL_VEC)
-	astAdd( astBuildDeleteOp( op, ptrexpr ) )
+	delete_expr = astBuildDeleteOp( op, ptrexpr, semantic_operator )
+	if( semantic_operator <> NULL ) then
+		fbSemanticModelExportOperation(semantic_operator, op, semantic_site)
+	end if
+	astAdd( delete_expr )
 end sub
 
 '' end of parser/intrinsics/parser-quirk-mem.bas

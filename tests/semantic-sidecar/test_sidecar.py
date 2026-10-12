@@ -1435,6 +1435,107 @@ print value
                 self.assertFalse([binding for binding in model.records["B"]
                                   if source_range(binding, 4) == source_range(row, 5)])
 
+    def test_overloaded_allocation_operators_have_physical_receipts(self) -> None:
+        source = self.source(
+            "type AllocatedValue\n"
+            " value as long\n"
+            " declare operator New(byval size as uinteger) as any ptr\n"
+            " declare operator New[](byval size as uinteger) as any ptr\n"
+            " declare operator Delete(byval buffer as any ptr)\n"
+            " declare operator Delete[](byval buffer as any ptr)\n"
+            "end type\n"
+            "operator AllocatedValue.New(byval size as uinteger) as any ptr\n"
+            " return Allocate(size)\n"
+            "end operator\n"
+            "operator AllocatedValue.New[](byval size as uinteger) as any ptr\n"
+            " return Allocate(size)\n"
+            "end operator\n"
+            "operator AllocatedValue.Delete(byval buffer as any ptr)\n"
+            " Deallocate(buffer)\n"
+            "end operator\n"
+            "operator AllocatedValue.Delete[](byval buffer as any ptr)\n"
+            " Deallocate(buffer)\n"
+            "end operator\n"
+            "type PlacementAddress\n"
+            " value as long\n"
+            "end type\n"
+            "operator +(byref address as PlacementAddress, byval offset as long) as any ptr\n"
+            " return 0\n"
+            "end operator\n"
+            "dim placement_address as PlacementAddress\n"
+            "dim placed_value as AllocatedValue ptr = New(placement_address + 1) AllocatedValue\n"
+            "dim single_value as AllocatedValue ptr = New AllocatedValue\n"
+            "Delete single_value\n"
+            "dim array_value as AllocatedValue ptr = New AllocatedValue[2]\n"
+            "Delete[] array_value\n"
+        )
+        self.invoke([source], mode="off")
+        emission = self.emission_path(source.stem, "gcc").read_bytes()
+        model = self.compile(source)
+        self.assertEqual(self.emission_path(source.stem, "gcc").read_bytes(), emission)
+        operations = [row for row in model.records["O"]
+                      if row[1] in ("allocate", "allocate-array", "deallocate", "deallocate-array")
+                      and row[2] == "overloaded"]
+        self.assertEqual(len(operations), 4, "Placement expressions must not be mislabeled as allocator calls.")
+        self.assertEqual({row[1] for row in operations},
+                         {"allocate", "allocate-array", "deallocate", "deallocate-array"})
+        for row in operations:
+            self.assertEqual(model.signatures[int(row[3])][2], "operator")
+        expected = {
+            "allocate": [("New AllocatedValue", "New")],
+            "allocate-array": [("New AllocatedValue[2]", "New")],
+            "deallocate": [("Delete single_value", "Delete")],
+            "deallocate-array": [("Delete[] array_value", "Delete")],
+        }
+        for operator_code, expressions in expected.items():
+            observed_ranges = {source_range(row, 5) for row in operations if row[1] == operator_code}
+            for expression, token in expressions:
+                self.assertIn(self.span(source, expression, token), observed_ranges)
+        self.assert_physical_ranges(model, {str(source): source.read_text()})
+
+    def test_udt_iteration_operators_have_physical_receipts(self) -> None:
+        source = self.source(
+            "type IteratorValue\n"
+            " value as long\n"
+            " declare constructor(byval initial as long = 0)\n"
+            " declare operator For(byref stepValue as IteratorValue)\n"
+            " declare operator Step(byref stepValue as IteratorValue)\n"
+            " declare operator Next(byref finish as IteratorValue, byref stepValue as IteratorValue) as integer\n"
+            "end type\n"
+            "constructor IteratorValue(byval initial as long)\n"
+            " value = initial\n"
+            "end constructor\n"
+            "operator IteratorValue.For(byref stepValue as IteratorValue)\n"
+            "end operator\n"
+            "operator IteratorValue.Step(byref stepValue as IteratorValue)\n"
+            " value += stepValue.value\n"
+            "end operator\n"
+            "operator IteratorValue.Next(byref finish as IteratorValue, byref stepValue as IteratorValue) as integer\n"
+            " operator = value <= finish.value\n"
+            "end operator\n"
+            "dim current as IteratorValue\n"
+            "for current = IteratorValue(0) to IteratorValue(2) step IteratorValue(1)\n"
+            "next\n"
+        )
+        self.invoke([source], mode="off")
+        emission = self.emission_path(source.stem, "gcc").read_bytes()
+        model = self.compile(source)
+        self.assertEqual(self.emission_path(source.stem, "gcc").read_bytes(), emission)
+
+        expected = {
+            "iterator-initialize": ("for current = IteratorValue(0)", "for"),
+            "iterator-step": ("step IteratorValue(1)", "step"),
+            "iterator-next": ("next", "next"),
+        }
+        for operator_code, (expression, token) in expected.items():
+            operations = [row for row in model.records["O"]
+                          if row[1:3] == [operator_code, "overloaded"]]
+            self.assertEqual(len(operations), 1, operator_code)
+            operation = operations[0]
+            self.assertEqual(model.signatures[int(operation[3])][2], "operator")
+            self.assertEqual(source_range(operation, 5), self.span(source, expression, token))
+        self.assert_physical_ranges(model, {str(source): source.read_text()})
+
     def test_erased_operations_do_not_create_guessed_ast_operators(self) -> None:
         source = self.source("dim value as long = 1\nprint 1 + 2\nprint value\nprint 3\n")
         model = self.compile(source)
