@@ -483,6 +483,7 @@ write_boot_task() {
     local source_path
     local binary
     local compile_directory
+    local run_arguments
 
     mkdir -p "$(dirname "$BOOT_TASK")" "$RUNTIME_LOGS" "$EXAMPLE_WORK"
     cat > "$run_task" <<EOF
@@ -512,10 +513,16 @@ EOF
 
     for row in "${BATCH_ROWS[@]}"; do
         IFS=$'\t' read -r case_index source_path binary compile_directory <<<"$row"
+        run_arguments=""
+        if [ "$source_path" = "examples/manual/fileio/serialization.bas" ]; then
+            # This example requires a new file. An extensionless name avoids
+            # RISC OS path separators and UnixLib suffix-directory mapping.
+            run_arguments="saved-state"
+        fi
         cat >> "$run_task" <<EOF
 Dir HostFS:\$.FreeBASIC.exampleageddon.work.case$case_index
 Echo EXAMPLE_BEGIN_$case_index $source_path
-Run runner
+Run runner $run_arguments
 Set FreeBASIC\$ExampleStatus <Sys\$ReturnCode>
 Echo EXAMPLE_RESULT_$case_index <FreeBASIC\$ExampleStatus>
 EOF

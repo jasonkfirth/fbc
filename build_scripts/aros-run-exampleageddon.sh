@@ -499,6 +499,7 @@ write_startup() {
     local compile_directory
     local guest_root="SYS:Tests/Examples"
     local row
+    local run_arguments
 
     if [ "$CURRENT_TARGET" = m68k ]; then
         guest_root="ExampleDrive:"
@@ -515,11 +516,16 @@ EOF
     for row in "${BATCH_ROWS[@]}"; do
         IFS=$'\t' read -r \
             case_index source_path binary compile_directory <<< "$row"
+        run_arguments=""
+        if [ "$source_path" = "examples/manual/fileio/serialization.bas" ]; then
+            # The file example owns a new output inside this staged case.
+            run_arguments="saved-state"
+        fi
         if [ "$CURRENT_TARGET" = m68k ]; then
             cat >> "$destination" <<EOF
 CD ${guest_root}case$case_index
 Stack 1048576
-runner >NIL:
+runner $run_arguments >NIL:
 Set ExampleRC \$RC
 Echo "EXAMPLE_RESULT_$case_index \$ExampleRC" >ExampleDrive:results/case$case_index.log
 EOF
@@ -527,7 +533,7 @@ EOF
             cat >> "$destination" <<EOF
 CD ${guest_root}case$case_index
 Stack 1048576
-runner >NIL:
+runner $run_arguments >NIL:
 Set ExampleRC \$RC
 SYS:Tests/Examples/KEcho "EXAMPLE_RESULT_$case_index \$ExampleRC"
 EOF

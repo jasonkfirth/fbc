@@ -110,7 +110,9 @@ compiler-semantic-model-smoke: compiler
 		'    return 1' \
 		'end function' \
 		> "$(TEST_TMP)/semantic-model-helper.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-model.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-model.fbcsem" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-model.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
+	$(PYTHON) "$(rootdir)/build_scripts/check-semantic-smoke-transport.py" --root "$(rootdir)" "$(TEST_TMP)/semantic-model.fbcsem" "$(TEST_TMP)/semantic-model.tsv"
 	@awk -F '\t' -v minimum_schema="$(SEMANTIC_MODEL_SMOKE_MIN_SCHEMA)" '\
 		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 !~ /^[1-9][0-9]*$$/ || ($$2 + 0) < minimum_schema) exit 1; schema = $$2; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
@@ -174,6 +176,7 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "CB" || $$1 == "CN" || $$1 == "CL" { if (schema < 26 || NF != 4) exit 1; details++; next } \
 		$$1 == "CE" { if (schema < 26 || NF != 6) exit 1; details++; next } \
 		$$1 == "DI" { if (schema < 27 || NF != 12) exit 1; details++; next } \
+		$$1 == "COM" { if (schema < 27 || NF != 4) exit 1; details++; next } \
 		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != implicit_calls || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
 		footer { exit 1 } \
 		{ exit 1 } \
@@ -187,7 +190,7 @@ compiler-semantic-model-smoke: compiler
 		'dim as function(byval as integer) as integer semantic_integer_pointer = @semantic_overload' \
 		'dim as function(byval as double) as double semantic_double_pointer = procptr(semantic_overload, function(byval as double) as double)' \
 		> "$(TEST_TMP)/semantic-procedure-bindings.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-procedure-bindings.tsv" -c "$(TEST_TMP)/semantic-procedure-bindings.bas" -o "$(TEST_TMP)/semantic-procedure-bindings.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-procedure-bindings.tsv" -c "$(TEST_TMP)/semantic-procedure-bindings.bas" -o "$(TEST_TMP)/semantic-procedure-bindings.o")
 	@awk -F '\t' '\
 		$$1 == "B" && $$3 == "declaration" && $$6 == 1 { integer_declaration = $$2; next } \
 		$$1 == "B" && $$3 == "declaration" && $$6 == 2 { double_declaration = $$2; next } \
@@ -211,7 +214,7 @@ compiler-semantic-model-smoke: compiler
 		'dim as integer result = BindingConstant' \
 		'result += BindingEnumValue' \
 		> "$(TEST_TMP)/semantic-type-constant-bindings.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-type-constant-bindings.tsv" -c "$(TEST_TMP)/semantic-type-constant-bindings.bas" -o "$(TEST_TMP)/semantic-type-constant-bindings.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-type-constant-bindings.tsv" -c "$(TEST_TMP)/semantic-type-constant-bindings.bas" -o "$(TEST_TMP)/semantic-type-constant-bindings.o")
 	@awk -F '\t' '\
 		$$1 == "B" && $$3 == "declaration" && $$6 == 1 { type_id = $$2 } \
 		$$1 == "B" && $$3 == "declaration" && $$6 == 4 { enum_id = $$2 } \
@@ -241,7 +244,7 @@ compiler-semantic-model-smoke: compiler
 		'data 1' \
 		'restore dataMarker' \
 		> "$(TEST_TMP)/semantic-label-bindings.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -lang qb -semantic-model "$(TEST_TMP)/semantic-label-bindings.tsv" -c "$(TEST_TMP)/semantic-label-bindings.bas" -o "$(TEST_TMP)/semantic-label-bindings.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -lang qb -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-label-bindings.tsv" -c "$(TEST_TMP)/semantic-label-bindings.bas" -o "$(TEST_TMP)/semantic-label-bindings.o")
 	@awk -F '\t' '\
 		$$1 == "B" && $$3 == "declaration" && $$6 == 2 { label10 = $$2; declarations++; next } \
 		$$1 == "B" && $$3 == "declaration" && $$6 == 3 { label20 = $$2; declarations++; next } \
@@ -281,7 +284,7 @@ compiler-semantic-model-smoke: compiler
 		'dim second as Beta.Inner.Node' \
 		'print Alpha.number' \
 		> "$(TEST_TMP)/semantic-namespace-bindings.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-namespace-bindings.tsv" -c "$(TEST_TMP)/semantic-namespace-bindings.bas" -o "$(TEST_TMP)/semantic-namespace-bindings.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-namespace-bindings.tsv" -c "$(TEST_TMP)/semantic-namespace-bindings.bas" -o "$(TEST_TMP)/semantic-namespace-bindings.o")
 	@awk -F '\t' '\
 		$$1 == "B" && $$3 == "reference" && $$6 == 2 && $$7 == 7 { parameter = $$2; next } \
 		$$1 == "B" && $$3 == "declaration" && $$6 == 4 && $$7 == 10 { alpha = $$2; declarations++; next } \
@@ -304,7 +307,7 @@ compiler-semantic-model-smoke: compiler
 		'    print .value' \
 		'end with' \
 		> "$(TEST_TMP)/semantic-with-bindings.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-with-bindings.tsv" -c "$(TEST_TMP)/semantic-with-bindings.bas" -o "$(TEST_TMP)/semantic-with-bindings.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-with-bindings.tsv" -c "$(TEST_TMP)/semantic-with-bindings.bas" -o "$(TEST_TMP)/semantic-with-bindings.o")
 	@awk -F '\t' '\
 		$$1 == "B" && $$3 == "declaration" && $$6 == 2 && $$7 == 4 { field = $$2; next } \
 		$$1 == "B" && $$3 == "reference" && $$6 == 6 && $$7 == 5 && $$2 == field { first_member = 1; next } \
@@ -327,7 +330,7 @@ compiler-semantic-model-smoke: compiler
 		'    value = 0' \
 		'end sub' \
 		> "$(TEST_TMP)/semantic-this-bindings.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-this-bindings.tsv" -c "$(TEST_TMP)/semantic-this-bindings.bas" -o "$(TEST_TMP)/semantic-this-bindings.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-this-bindings.tsv" -c "$(TEST_TMP)/semantic-this-bindings.bas" -o "$(TEST_TMP)/semantic-this-bindings.o")
 	@awk -F '\t' '\
 		$$1 == "B" && $$3 == "declaration" && $$6 == 2 && $$7 == 4 { field = $$2; next } \
 		$$1 == "B" && $$3 == "declaration" && $$6 == 3 && $$7 == 16 { clear_proc = $$2; next } \
@@ -339,7 +342,7 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "B" && $$3 == "reference" && $$6 == 13 && $$7 == 4 && $$2 == field { implicit_clear_lvalue = 1; next } \
 		END { if (!field || !clear_proc || !implicit_method || !implicit_lvalue || !implicit_read || !explicit_this || !implicit_rhs || !implicit_clear_lvalue) exit 1 }' \
 		"$(TEST_TMP)/semantic-this-bindings.tsv" || { echo "ERROR: member binding inventory omitted a compiler-resolved This reference or implicit method call"; exit 1; }
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-expressions.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model-expressions "$(TEST_TMP)/semantic-expressions.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
 	@awk -F '\t' -v minimum_schema="$(SEMANTIC_MODEL_SMOKE_MIN_SCHEMA)" '\
 		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 !~ /^[1-9][0-9]*$$/ || ($$2 + 0) < minimum_schema) exit 1; schema = $$2; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
@@ -396,7 +399,7 @@ compiler-semantic-model-smoke: compiler
 	'semantic_result = iif(semantic_factor > 0, semantic_factor + 1, semantic_factor + 2)' \
 	'semantic_result = 1 + 2 + semantic_factor + 4' \
 	> "$(TEST_TMP)/semantic-intermediate.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-intermediate.tsv" -c "$(TEST_TMP)/semantic-intermediate.bas" -o "$(TEST_TMP)/semantic-intermediate.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model-expressions "$(TEST_TMP)/semantic-intermediate.tsv" -c "$(TEST_TMP)/semantic-intermediate.bas" -o "$(TEST_TMP)/semantic-intermediate.o")
 	@awk -F '\t' '$$1 == "E" && $$3 == "1" && $$5 == 3 && $$6 == 22 && $$7 == 3 && $$8 == 41 && tolower($$16) == "double" { inner = 1 } $$1 == "E" && $$3 == "1" && $$5 == 3 && $$6 == 18 && $$7 == 3 && $$8 == 41 && tolower($$16) == "double" { outer = 1 } $$1 == "E" && $$3 == "1" && $$5 == 8 && $$6 == 18 && $$7 == 8 && $$8 == 34 && tolower($$16) == "double" { unary = 1 } $$1 == "E" && $$3 == "1" && $$5 == 9 && $$6 == 18 && $$7 == 9 && $$8 == 41 && tolower($$16) == "double" { member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 10 && $$6 == 18 && $$7 == 10 && $$8 == 28 && tolower($$16) == "integer" { call = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 18 && $$7 == 11 && $$8 == 45 && tolower($$16) == "integer" { sizeof_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 25 && $$7 == 11 && $$8 == 44 && tolower($$16) == "double" { sizeof_operand = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 18 && $$7 == 12 && $$8 == 84 && tolower($$16) == "double" { iif_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 22 && $$7 == 12 && $$8 == 41 && tolower($$16) == "integer" { iif_condition = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 43 && $$7 == 12 && $$8 == 62 && tolower($$16) == "double" { iif_true = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 64 && $$7 == 12 && $$8 == 83 && tolower($$16) == "double" { iif_false = 1 } $$1 == "E" && $$3 == "1" && $$5 == 13 && $$6 == 18 && $$7 == 13 && $$8 == 23 && tolower($$16) == "integer" { folded_prefix = 1 } $$1 == "E" && $$3 == "1" && $$5 == 13 && $$6 == 18 && $$7 == 13 && $$8 == 41 && tolower($$16) == "double" { chained_prefix = 1 } END { if (!inner || !outer || !unary || !member || !call || !sizeof_result || !sizeof_operand || !iif_result || !iif_condition || !iif_true || !iif_false || !folded_prefix || !chained_prefix) exit 1 }' \
 		"$(TEST_TMP)/semantic-intermediate.tsv" || { echo "ERROR: expression-only model omitted a typed intermediate expression range"; exit 1; }
 	@printf "%s\n" \
@@ -413,7 +416,7 @@ compiler-semantic-model-smoke: compiler
 		'print semantic_branch.leaves(1).amount' \
 		'print semantic_range_factory().leaf.amount' \
 		> "$(TEST_TMP)/semantic-prefix.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-prefix.tsv" -c "$(TEST_TMP)/semantic-prefix.bas" -o "$(TEST_TMP)/semantic-prefix.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model-expressions "$(TEST_TMP)/semantic-prefix.tsv" -c "$(TEST_TMP)/semantic-prefix.bas" -o "$(TEST_TMP)/semantic-prefix.o")
 	@awk -F '\t' '$$1 == "E" && $$3 == "1" && $$5 == 10 && $$6 == 6 && $$7 == 10 && $$8 == 26 && tolower($$16) == "semanticrangeleaf" { direct_member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 10 && $$6 == 6 && $$7 == 10 && $$8 == 33 && tolower($$16) == "double" { direct_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 6 && $$7 == 11 && $$8 == 31 && tolower($$16) == "semanticrangeleaf" { indexed_member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 11 && $$6 == 6 && $$7 == 11 && $$8 == 38 && tolower($$16) == "double" { indexed_result = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 6 && $$7 == 12 && $$8 == 30 && tolower($$16) == "semanticrangebranch" { call = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 6 && $$7 == 12 && $$8 == 35 && tolower($$16) == "semanticrangeleaf" { call_member = 1 } $$1 == "E" && $$3 == "1" && $$5 == 12 && $$6 == 6 && $$7 == 12 && $$8 == 42 && tolower($$16) == "double" { call_result = 1 } END { if (!direct_member || !direct_result || !indexed_member || !indexed_result || !call || !call_member || !call_result) exit 1 }' \
 		"$(TEST_TMP)/semantic-prefix.tsv" || { echo "ERROR: expression-only model omitted a member, index, or call prefix"; exit 1; }
 	@printf "%s\n" \
@@ -423,11 +426,11 @@ compiler-semantic-model-smoke: compiler
 		'#define D .' \
 		'dim array(0 to D D D) as integer => { 1 }' \
 		> "$(TEST_TMP)/semantic-remapped-range.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-remapped-range.tsv" -c "$(TEST_TMP)/semantic-remapped-range.bas" -o "$(TEST_TMP)/semantic-remapped-range.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-remapped-range.tsv" -c "$(TEST_TMP)/semantic-remapped-range.bas" -o "$(TEST_TMP)/semantic-remapped-range.o")
 	@awk -F '\t' '$$1 == "E" && $$4 == "semantic-remapped.bas" && $$5 == 24 && $$6 == 41 && $$7 == 24 && $$8 == 42 { if ($$3 != "0") exit 1; found = 1 } END { if (!found) exit 1 }' \
 		"$(TEST_TMP)/semantic-remapped-range.tsv" || { echo "ERROR: repeated #line location reused a stale physical-line bound"; exit 1; }
 	@{ printf 'Print '; printf '%1500s' ''; printf 'Len("😀") + 1 + 2\n'; } > "$(TEST_TMP)/semantic-long-line.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model "$(TEST_TMP)/semantic-long-line.tsv" -c "$(TEST_TMP)/semantic-long-line.bas" -o "$(TEST_TMP)/semantic-long-line.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-long-line.tsv" -c "$(TEST_TMP)/semantic-long-line.bas" -o "$(TEST_TMP)/semantic-long-line.o")
 	@awk -F '\t' '$$1 == "E" && $$4 ~ /semantic-long-line\.bas$$/ && $$5 == 1 && $$6 == 1506 && $$7 == 1 && $$8 == 1523 { if ($$3 != "1") exit 1; found = 1 } END { if (!found) exit 1 }' \
 		"$(TEST_TMP)/semantic-long-line.tsv" || { echo "ERROR: diagnostic excerpt truncated the semantic physical-line bound"; exit 1; }
 	@printf "%s\n" \
@@ -435,7 +438,7 @@ compiler-semantic-model-smoke: compiler
 		'print recovery_factor * 2 +' \
 		'print recovery_factor * 3' \
 		> "$(TEST_TMP)/semantic-recovery.bas"
-	@set +e; $(TEST_FBC_CMD) -semantic-model-expressions "$(TEST_TMP)/semantic-recovery.tsv" -c "$(TEST_TMP)/semantic-recovery.bas" -o "$(TEST_TMP)/semantic-recovery.o" >/dev/null 2>&1; status=$$?; set -e; \
+	@set +e; $(TEST_FBC_CMD) -semantic-model-text -semantic-model-expressions "$(TEST_TMP)/semantic-recovery.tsv" -c "$(TEST_TMP)/semantic-recovery.bas" -o "$(TEST_TMP)/semantic-recovery.o" >/dev/null 2>&1; status=$$?; set -e; \
 		test $$status -eq 1 || { echo "ERROR: malformed semantic-recovery fixture did not fail compilation"; exit 1; }
 	@awk -F '\t' -v minimum_schema="$(SEMANTIC_MODEL_SMOKE_MIN_SCHEMA)" '\
 		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 !~ /^[1-9][0-9]*$$/ || ($$2 + 0) < minimum_schema) exit 1; schema = $$2; header = 1; next } \

@@ -8,6 +8,8 @@ This file does not claim target compilation or emulator runtime qualification.
 import csv
 import importlib.util
 from pathlib import Path
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -94,6 +96,40 @@ class ResultContracts(unittest.TestCase):
                     row = next(csv.DictReader(stream, delimiter="\t"))
                 self.assertEqual(Path(row["compile_directory"]), directory)
                 self.assertTrue(Path(row["compile_directory"]).is_dir())
+
+    def test_guest_tasks_pass_the_serialization_filename(self):
+        bash = shutil.which("bash")
+        if bash is None:
+            self.skipTest("Bash is required to generate the guest startup scripts")
+        rows = ["0001\texamples/manual/fileio/serialization.bas\tbinary\tcompile",
+                "0002\texamples/arrays.bas\tbinary\tcompile"]
+        definitions = "BATCH_ROWS=(" + " ".join(shlex.quote(row) for row in rows) + ")\n"
+        work = self.root / "guest"
+        startup = self.root / "startup"
+        definitions += ("EXAMPLE_WORK=" + shlex.quote(work.as_posix()) + "\n"
+                        "RUNTIME_LOGS=" + shlex.quote((self.root / "logs").as_posix()) + "\n"
+                        "BOOT_TASK=" + shlex.quote((self.root / "boot").as_posix()) + "\n"
+                        "TASKWINDOW_MIB=192\nTASKWINDOW_KIB=196608\n")
+        for filename, function, invocation, output in (
+            ("build_scripts/riscos-run-exampleageddon.sh", "write_boot_task",
+             "write_boot_task batch01 key bas", work / "RunBatch,feb"),
+            ("build_scripts/aros-run-exampleageddon.sh", "write_startup",
+             "write_startup batch01 " + shlex.quote(startup.as_posix()), startup),
+        ):
+            text = (ROOT / filename).read_text(encoding="utf-8")
+            start = text.index(function + "() {")
+            body = text[start:text.index("\n}", start) + 2]
+            for target in (("riscos",) if "riscos" in filename else ("x86_64", "m68k")):
+                with self.subTest(wrapper=filename, target=target):
+                    script = definitions + "CURRENT_TARGET=" + target + "\n" + body + "\n" + invocation + "\n"
+                    result = subprocess.run([bash, "-s"], input=script, capture_output=True,
+                                            text=True, timeout=10)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    lines = output.read_text().splitlines()
+                    calls = [line.split(" >", 1)[0].strip() for line in lines
+                             if line.startswith(("Run runner", "runner "))]
+                    prefix = "Run runner" if target == "riscos" else "runner"
+                    self.assertEqual(calls, [prefix + " saved-state", prefix])
 
 
 if __name__ == "__main__":

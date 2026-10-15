@@ -11,6 +11,7 @@ usr/include/freebasic/MediaInfo.bi
 usr/include/freebasic/Newton.bi
 usr/include/freebasic/SDL
 usr/include/freebasic/SDL2
+usr/include/freebasic/SDL3
 usr/include/freebasic/X11
 usr/include/freebasic/allegro
 usr/include/freebasic/allegro.bi

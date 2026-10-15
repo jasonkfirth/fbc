@@ -1687,7 +1687,10 @@ end sub
 private sub dbg_emitstab()
 	dim as ustab stab
 	if ctx.systemv then
-		asm_section(".dbgdat,""a""")
+		'' These records contain native code addresses. The ELF loader must
+		'' relocate them when a debug executable is linked as PIE, including
+		'' OpenBSD's default links; the string-only section stays read-only.
+		asm_section(".dbgdat,""aw""")
 	else
 		asm_section(".dbgdat,""dr""")
 	end if
