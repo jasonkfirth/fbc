@@ -391,6 +391,7 @@ EOF
             -e FBC_PACKAGE_HOST_ARCH="$arch" \
             -e FBC_PACKAGE_DISTRO_ID="$distro" \
             -e FBC_PACKAGE_CODENAME="$release" \
+            -e FBC_PACKAGE_IPV4_ONLY=1 \
             -e BUILDROOT="/work/.build-slackware/${distro}/${release}/${arch}" \
             -e JOBS="$MAKE_JOBS" \
             -v "$ROOT:/work" \

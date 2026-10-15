@@ -87,6 +87,7 @@ Environment:
   WORKDIR         Workspace for source/package preparation
   OUTBASE         Output root (default: <repo>/out)
   JOBS            Parallel make job count
+  FBC_PACKAGE_IPV4_ONLY  Use IPv4 for slackpkg downloads (default: 0)
 
 Artifacts are written under:
   out/linux/slackware/<release>/<arch>/
@@ -251,6 +252,21 @@ configure_slackpkg_priority() {
     fi
 }
 
+configure_slackpkg_network() {
+    [ "${FBC_PACKAGE_IPV4_ONLY:-0}" = "1" ] || return 0
+
+    # The package factory's Docker network has no IPv6 route. Request IPv4
+    # records explicitly, preserving the downloader's other options and all
+    # package checksum/signature checks. Native builds keep their own policy.
+    local config=/etc/slackpkg/slackpkg.conf
+    [ -f "$config" ] || die "missing slackpkg configuration: $config"
+    cat >> "$config" <<'EOF'
+
+WGETFLAGS="${WGETFLAGS:-} --inet4-only"
+CURLFLAGS="${CURLFLAGS:-} --ipv4"
+EOF
+}
+
 run_slackpkg_changes() {
     local status=0
     local attempt
@@ -282,6 +298,7 @@ install_deps() {
     configure_slackpkg_mirror "$CODENAME"
     configure_slackpkg_architecture
     configure_slackpkg_priority
+    configure_slackpkg_network
 
     msg "installing Slackware build dependencies via slackpkg"
     local packages=(
