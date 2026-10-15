@@ -64,6 +64,49 @@ SUITE( fbc_tests.expressions.selfbops )
 		END_TEST
 	END_TEST_GROUP
 
+#if __FB_FPMODE__ <> "fast"
+	TEST_GROUP( floatingPointAssociation )
+		TEST( preciseModePreservesRightHandGrouping )
+			dim as double largeA = 10000000000000000.0
+			dim as double largeB = 10000000000000000.0
+			dim as double small = 3.0
+			dim as double hugeA = 1.0e308
+			dim as double hugeB = 1.0e308
+			dim as double tiny = 1.0e-308
+			dim as double constantBase = 10000000000000000.0
+			dim as double constantScale = 9007199254740992.0
+			dim as double constantHuge = 1.0e308
+			dim as double compound = -1.0
+			dim as double assignment = -1.0
+			dim as double constantAdd = any
+			dim as double constantDistribution = any
+			dim as double constantMultiply = any
+
+			compound += (largeA - largeB) + small
+			assignment = assignment + ((largeA - largeB) + small)
+
+			CU_ASSERT( compound = 2.0 )
+			CU_ASSERT( assignment = 2.0 )
+
+			compound = -1.0
+			assignment = -1.0
+			compound += hugeA * (hugeB * tiny)
+			assignment = assignment + (hugeA * (hugeB * tiny))
+			CU_ASSERT( compound > 5.0e307 )
+			CU_ASSERT( compound < 1.5e308 )
+			CU_ASSERT( assignment > 5.0e307 )
+			CU_ASSERT( assignment < 1.5e308 )
+
+			constantAdd = (constantBase - 10000000000000000.0) + 1.0
+			constantDistribution = (constantScale + 1.0) * 3.0
+			constantMultiply = (constantHuge * 10.0) * 0.1
+			CU_ASSERT( constantAdd = 1.0 )
+			CU_ASSERT( constantDistribution = 27021597764222976.0 )
+			CU_ASSERT( constantMultiply > 1.5e308 )
+		END_TEST
+	END_TEST_GROUP
+#endif
+
 	TEST_GROUP( sidefxRemoval )
 		dim shared as integer f1calls, f2calls
 		dim shared as integer i

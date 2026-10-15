@@ -205,7 +205,10 @@ private function hOptConstAccum1( byval n as ASTNODE ptr ) as ASTNODE ptr
 	'' (this will handle for ex. a+1+b+2-3, that will become a+b
 	if( n->class = AST_NODECLASS_BOP ) then
 		r = n->r
-		if( astIsCONST( r ) ) then
+		'' Combining floating-point constants changes rounding in precise mode.
+		if( astIsCONST( r ) and _
+		    ((env.clopt.fpmode <> FB_FPMODE_PRECISE) or _
+		     (astGetDataClass( n ) <> FB_DATACLASS_FPOINT)) ) then
 			accumval = NULL
 			o = n->op.op
 
@@ -253,27 +256,31 @@ private function hOptConstAccum2( byval n as ASTNODE ptr ) as ASTNODE ptr
 	if( n->class = AST_NODECLASS_BOP ) then
 		accumval = NULL
 
-		select case n->op.op
-		case AST_OP_ADD
-			'' don't mess with strings..
-			select case as const astGetDataType( n )
-			case FB_DATATYPE_STRING, FB_DATATYPE_USTRING, FB_DATATYPE_FIXSTR, _
-				 FB_DATATYPE_WCHAR
+		'' Constant accumulation changes floating-point grouping in precise mode.
+		if( (env.clopt.fpmode <> FB_FPMODE_PRECISE) or _
+		    (astGetDataClass( n ) <> FB_DATACLASS_FPOINT) ) then
+			select case n->op.op
+			case AST_OP_ADD
+				'' don't mess with strings..
+				select case as const astGetDataType( n )
+				case FB_DATATYPE_STRING, FB_DATATYPE_USTRING, FB_DATATYPE_FIXSTR, _
+					 FB_DATATYPE_WCHAR
 
-			case else
-				n = hConstAccumADDSUB( n, accumval, 1 )
+				case else
+					n = hConstAccumADDSUB( n, accumval, 1 )
+					if( accumval ) then
+						n = astNewBOP( AST_OP_ADD, n, accumval )
+					end if
+				end select
+
+			case AST_OP_MUL
+				n = hConstAccumMUL( n, accumval )
 				if( accumval ) then
-					n = astNewBOP( AST_OP_ADD, n, accumval )
+					n = astNewBOP( AST_OP_MUL, n, accumval )
 				end if
+
 			end select
-
-		case AST_OP_MUL
-			n = hConstAccumMUL( n, accumval )
-			if( accumval ) then
-				n = astNewBOP( AST_OP_MUL, n, accumval )
-			end if
-
-		end select
+		end if
 	end if
 
 	function = n
@@ -388,7 +395,10 @@ private function hOptConstDistMUL( byval n as ASTNODE ptr ) as ASTNODE ptr
 	''    to be checked here)
 	if( n->class = AST_NODECLASS_BOP ) then
 		if( astIsCONST( n->r ) ) then
-			if( n->op.op = AST_OP_MUL ) then
+			'' Distributing across floating-point addition changes rounding.
+			if( (n->op.op = AST_OP_MUL) and _
+			    ((env.clopt.fpmode <> FB_FPMODE_PRECISE) or _
+			     (astGetDataClass( n ) <> FB_DATACLASS_FPOINT)) ) then
 				'' 2. Scan the lhs for ADD BOPs with CONST rhs (hConstDistMUL())
 				''  - Sums up the CONST summands of all such ADDs
 				''  - Removes these ADDs (possibly leaving in other non-const summands)
@@ -664,34 +674,39 @@ private function hOptAssocADD _
 				 FB_DATATYPE_WCHAR
 
 			case else
-				r = n->r
-				if( r->class = AST_NODECLASS_BOP ) then
-					rop = r->op.op
-					select case rop
-					case AST_OP_ADD, AST_OP_SUB
-						if( op = AST_OP_SUB ) then
-							if( rop = AST_OP_SUB ) then
-								op = AST_OP_ADD
+				'' In precise mode, retain the parsed grouping of floating-point
+				'' additions and subtractions. Reassociation can change rounding.
+				if( (env.clopt.fpmode <> FB_FPMODE_PRECISE) or _
+				    (astGetDataClass( n ) <> FB_DATACLASS_FPOINT) ) then
+					r = n->r
+					if( r->class = AST_NODECLASS_BOP ) then
+						rop = r->op.op
+						select case rop
+						case AST_OP_ADD, AST_OP_SUB
+							if( op = AST_OP_SUB ) then
+								if( rop = AST_OP_SUB ) then
+									op = AST_OP_ADD
+								else
+									rop = AST_OP_SUB
+								end if
 							else
-								rop = AST_OP_SUB
+								if( rop = AST_OP_SUB ) then
+									op = AST_OP_SUB
+									rop = AST_OP_ADD
+								end if
 							end if
-						else
-							if( rop = AST_OP_SUB ) then
-								op = AST_OP_SUB
-								rop = AST_OP_ADD
-							end if
-						end if
 
-						n_old = n
+							n_old = n
 
-						'' n = (( n->l, r->l ), r->r)
-						n = astNewBOP( op, _
+							'' n = (( n->l, r->l ), r->r)
+							n = astNewBOP( op, _
 									   astNewBOP( rop, n->l, r->l ), _
-									   r->r )
+								   r->r )
 
-						astDelNode( r )
-						astDelNode( n_old )
-					end select
+							astDelNode( r )
+							astDelNode( n_old )
+						end select
+					end if
 				end if
 			end select
 
@@ -727,17 +742,21 @@ private function hOptAssocMUL _
 
 	'' convert a*(b*c) to a*b*c
 	if( astIsBOP( n, AST_OP_MUL ) ) then
-		r = n->r
-		if( astIsBOP( r, AST_OP_MUL ) ) then
-			n_old = n
+		'' Keep source grouping for floating point arithmetic in precise mode.
+		if( (env.clopt.fpmode <> FB_FPMODE_PRECISE) or _
+		    (astGetDataClass( n ) <> FB_DATACLASS_FPOINT) ) then
+			r = n->r
+			if( astIsBOP( r, AST_OP_MUL ) ) then
+				n_old = n
 
-			'' n = (( n->l, r->l ), r->r)
-			n = astNewBOP( AST_OP_MUL, _
-			               astNewBOP( AST_OP_MUL, n->l, r->l ), _
-			               r->r )
+				'' n = (( n->l, r->l ), r->r)
+				n = astNewBOP( AST_OP_MUL, _
+				               astNewBOP( AST_OP_MUL, n->l, r->l ), _
+				               r->r )
 
-			astDelNode( r )
-			astDelNode( n_old )
+				astDelNode( r )
+				astDelNode( n_old )
+			end if
 		end if
 	end if
 

@@ -15,7 +15,9 @@ Selects faster, less accurate or slower, more precise floating-point math.
 	
 	##-fpmode PRECISE## will generate standard floating point instructions that operate at the default speed and accuracy of the selected floating point unit.
 	
-	Currently, the only floating point operations that behave differently when using ##-fpmode FAST## are: ##[[KeyPgSin|sin]]()##, ##[[KeyPgCos|cos]]()##, reciprocal, and reciprocal [[KeyPgSqr|square root]], all of which must operate on ##[[KeyPgSingle|Single]]## precision values.
+	In ##-fpmode PRECISE##, floating-point addition, subtraction, and multiplication retain their parsed grouping. In ##-fpmode FAST##, the compiler may reassociate these operations, which can change rounding.
+	
+	The operations that use faster, less accurate instructions in ##-fpmode FAST## are: ##[[KeyPgSin|sin]]()##, ##[[KeyPgCos|cos]]()##, reciprocal, and reciprocal [[KeyPgSqr|square root]], all of which must operate on ##[[KeyPgSingle|Single]]## precision values.
 	
 	A number of changes were made to normalize handling of ""NaN's"" (Not a Number) to get consistent results across toolchains and platforms, but that costs extra code, so intention was that ##-fpmode FAST## could allow user to skip that extra code generation if they wanted (and they assume responsibility how things work or do not work across platforms).
 	

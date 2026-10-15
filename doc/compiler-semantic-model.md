@@ -451,6 +451,37 @@ uses the verified GOTO/RETURN/EXIT/CONTINUE keyword and exact departing local.
 Macro/remapped or unverified temporary/scope-exit ranges are omitted. Non-UDT
 cleanup and operations without a concrete UDT procedure are omitted.
 
+### Constructor-selection observations
+
+Full models also emit counted `K` properties for constructor choices that must
+survive lowering even when the choice has no safe `I` source range. An
+`implicit-construction-inputs` `CAP` record reports whether this property
+family is available for each module.
+
+For an implicit constructor, the property is named
+`construction-observation:<ordinal>` and is attached to the compiler-selected
+owner symbol. Its tab-delimited value contains the selected procedure symbol
+ID, owning UDT symbol ID, constructor kind, statement ID, source-context ID, and
+macro identity (zero when none is recorded). The module closure is a
+`construction-observation-count:<module>` property whose value is the number
+of observations. Ordinals start at one and must form a complete sequence up to
+that count.
+
+For a written `TYPE(...)`-style temporary construction, the property is named
+`temporary-construction:<ordinal>` and is attached to the result UDT. Its value
+contains the selected procedure symbol ID, statement ID, source-context ID,
+and macro identity. The matching `temporary-construction-count:<module>` and
+`temporary-construction-inputs` capability provide the same closure check. A
+`LOC` attachment with role `temporary-construction:<ordinal>` may identify the
+physical expression context, but the property itself does not name an editable
+callee token.
+
+These properties complement, rather than replace, `I`: use a physical `I`
+range for source navigation or edit locations, and use the counted properties
+to compare compiler-selected construction behavior across validation passes.
+Consumers must reject duplicate, provisional, malformed, or incomplete
+observation sets and must not infer source locations from statement IDs.
+
 All source ranges use one-based lines and zero-based UTF-16 columns, with an
 exclusive end. A physical flag of 1 is required before editor projection.
 Macro expansion, logical #line remapping, cross-file expressions, or failed
