@@ -80,6 +80,25 @@ run_smoke()
     SMOKE_RESULT="passed"
 }
 
+check_ffi_layout()
+{
+    local -a native_abi binding_abi
+
+    # Compare the SDK's C declarations before either fixture invokes a closure.
+    # Matching only binding-owned constants would miss an incorrect SDK layout.
+    "$FFI_NATIVE_C" abi > "$OUT_DIR/ffi-native-c.abi"
+    "$FFI_NATIVE_FB" abi > "$OUT_DIR/ffi-native-fb.abi"
+    read -r -a native_abi < "$OUT_DIR/ffi-native-c.abi"
+    read -r -a binding_abi < "$OUT_DIR/ffi-native-fb.abi"
+    if [[ "${#native_abi[@]}" -ne 13 || "${native_abi[0]}" != "ABI" ||
+          "${native_abi[*]}" != "${binding_abi[*]}" ]]; then
+        echo "macos-smoke: libffi C and FreeBASIC layouts differ" >&2
+        cat "$OUT_DIR/ffi-native-c.abi" "$OUT_DIR/ffi-native-fb.abi" >&2
+        return 1
+    fi
+    echo "macos-smoke: libffi SDK and FreeBASIC layouts match"
+}
+
 check_ppm_region_color()
 {
     local file="$1"
@@ -186,6 +205,8 @@ UUID_BINDING="$OUT_DIR/uuid-smoke"
 CURSES_BINDING="$OUT_DIR/curses-smoke"
 FFI_LAYOUT="$OUT_DIR/ffi-darwin-layout-check"
 FFI_CALL="$OUT_DIR/ffi-darwin-call-smoke"
+FFI_NATIVE_C="$OUT_DIR/ffi-native-c"
+FFI_NATIVE_FB="$OUT_DIR/ffi-native-fb"
 FRAMEWORK_LINK="$OUT_DIR/framework-link-smoke"
 ZLIB_EXAMPLE="$OUT_DIR/zlib-example"
 GFX_PALETTED="$OUT_DIR/gfx-darwin-paletted-smoke"
@@ -215,6 +236,10 @@ compile_smoke "$ROOT_DIR/tests/macos/iconv-smoke.bas" "$ICONV_BINDING"
 compile_smoke "$ROOT_DIR/tests/macos/regex-smoke.bas" "$REGEX_BINDING"
 compile_smoke "$ROOT_DIR/tests/macos/uuid-smoke.bas" "$UUID_BINDING"
 compile_smoke "$ROOT_DIR/tests/macos/curses-smoke.bas" "$CURSES_BINDING"
+"$CLANG" -isysroot "$SDKROOT" -I "$SDKROOT/usr/include/ffi" \
+    "$ROOT_DIR/tests/bindings/ffi-native.c" -lffi -o "$FFI_NATIVE_C"
+compile_smoke "$ROOT_DIR/tests/bindings/ffi-native.bas" "$FFI_NATIVE_FB"
+check_ffi_layout
 compile_smoke "$ROOT_DIR/tests/macos/ffi-darwin-layout-check.bas" "$FFI_LAYOUT"
 compile_smoke "$ROOT_DIR/tests/macos/ffi-darwin-call-smoke.bas" "$FFI_CALL"
 compile_smoke "$ROOT_DIR/tests/macos/framework-link-smoke.bas" "$FRAMEWORK_LINK"
@@ -258,6 +283,8 @@ run_smoke "system POSIX regex" "$REGEX_BINDING"
 run_smoke "system UUID" "$UUID_BINDING"
 run_smoke "system ncurses" "$CURSES_BINDING"
 run_smoke "libffi native layout" "$FFI_LAYOUT"
+run_smoke "C libffi guarded call and closure" "$FFI_NATIVE_C"
+run_smoke "FreeBASIC libffi guarded call and closure" "$FFI_NATIVE_FB"
 run_smoke "libffi call and closure" "$FFI_CALL"
 run_smoke "system frameworks" "$FRAMEWORK_LINK"
 run_smoke "system zlib example" "$ZLIB_EXAMPLE" "$OUT_DIR/zlib-smoke.gz"

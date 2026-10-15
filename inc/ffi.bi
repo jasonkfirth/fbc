@@ -3,7 +3,8 @@
 '' Purpose: Declare the native libffi call and closure interfaces.
 '' Responsibilities: Target ABI types and modern x86 closure layouts.
 '' This file contains no call engine or executable memory allocator.
-'' The x86 trampoline layout below matches libffi 3.4 and newer.
+'' Non-Darwin x86 trampolines match libffi 3.4 and newer. Darwin retains
+'' the system SDK's legacy x86 trampoline sizes.
 ''
 '' based on the C header files:
 ''   -----------------------------------------------------------------*-C-*-
@@ -231,7 +232,7 @@ end enum
 #endif
 
 #ifndef __FB_64BIT__
-	#ifdef X86_ANY
+	#if defined(X86_ANY) and not defined(__FB_DARWIN__)
 		const FFI_TRAMPOLINE_SIZE = 16
 	#else
 		const FFI_TRAMPOLINE_SIZE = 12
@@ -241,7 +242,12 @@ end enum
 #if (not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
 	const FFI_NATIVE_RAW_API = 1
 #elseif defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
-	const FFI_TRAMPOLINE_SIZE = 32
+	'' Apple's system libffi does not use the larger CET trampoline layout.
+	#ifdef __FB_DARWIN__
+		const FFI_TRAMPOLINE_SIZE = 24
+	#else
+		const FFI_TRAMPOLINE_SIZE = 32
+	#endif
 	const FFI_NATIVE_RAW_API = 0
 #elseif (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	const FFI_TRAMPOLINE_CLOSURE_OFFSET = FFI_TRAMPOLINE_SIZE
@@ -384,8 +390,8 @@ type ffi_closure
 		trampoline_table_entry as any ptr
 	#else
 		#ifdef X86_ANY
-			' Modern x86 trampolines include CET entry instructions. The C
-			' closure is aligned to 8 bytes; this member adds no storage.
+			' The C closure is aligned to 8 bytes. This member adds no storage
+			' to the trampoline selected for the target.
 			union
 				tramp as zstring * FFI_TRAMPOLINE_SIZE
 				ftramp as any ptr
