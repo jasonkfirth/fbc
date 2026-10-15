@@ -236,7 +236,9 @@ jobs:
     name: Windows ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: windows-latest
-    timeout-minutes: 90
+    # The x86 semantic suite can take 75 minutes on hosted Windows runners.
+    # Leave time for bootstrap, the remaining smoke tests, fbctests and examples.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:

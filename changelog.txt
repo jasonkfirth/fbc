@@ -167,6 +167,7 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- build/CI Windows: give x86 and x86_64 native qualification the existing 120-minute ARM64 budget so the full semantic suite leaves time for language and example checks.
 - build/RISC OS: retry bounded archive downloads after connection resets, identify the requested archive in CI logs, and retain pinned SHA-256 checks and temporary-file cleanup before caching emulator and system inputs.
 - build/Slackware packages: select IPv4 explicitly for package-manager downloads in the IPv4-only Docker matrix, preserving native download policy and package checksum/signature validation.
 - packaging/Debian: assign the shared semantic codec, generated element table and serialization header to the core package, and SDL3 headers to the bindings package; retain exact single-package ownership for every installed include.
