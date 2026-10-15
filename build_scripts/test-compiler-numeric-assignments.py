@@ -7,6 +7,7 @@ This file intentionally does NOT parse BASIC or execute unsafe test arithmetic.
 
 import argparse
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,10 @@ def main() -> int:
     args = parser.parse_args()
     sys.path.insert(0, str(args.root / "tests" / "semantic-sidecar"))
     from sidecar import Model
+
+    version = re.search(r"^FBVERSION\s*:=\s*(\d+\.\d+\.\d+)\s*$",
+                        (args.root / "mk/version.mk").read_text(), re.M)
+    assert version is not None, "Missing compiler release version"
 
     source = (args.root / "tests" / "semantic-sidecar" / "numeric-assignment-targets.bas").read_text()
     count = 0
@@ -40,7 +45,7 @@ def main() -> int:
                 if result.returncode:
                     raise AssertionError(f"{target}/{encoding}: {result.stdout}{result.stderr}")
                 model = Model.read(model_path)
-                assert model.rows[0] == ["FBCSEM", "27", "1.20.4"]
+                assert model.rows[0] == ["FBCSEM", "27", version.group(1)]
                 expressions = {int(row[1]): row for row in model.records["E"]}
                 receipts = [(identity, props) for (domain, identity), props in model.properties.items()
                             if domain == "expression" and "assignment-kind" in props]

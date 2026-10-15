@@ -137,7 +137,10 @@ endif
 
 BUILD_FBCFLAGS ?=
 
-$(fbcobjdir)/%.o: %.bas $(FBC_BI) | $(fbcobjdir)
+# Version defines come from version.mk. Rebuild existing compiler objects when
+# they change so an incremental build cannot retain the previous release banner.
+
+$(fbcobjdir)/%.o: %.bas $(FBC_BI) $(mkpath)/version.mk | $(fbcobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) -i $(srcdir)/compiler $(FBC_INCLUDE_FLAGS) -c $< -o $@
 
@@ -146,7 +149,7 @@ FBC_JS_DEFINES := \
 	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_ASMJS \
 	-d ENABLE_SUFFIX=\"-js\"
 
-$(fbcjsobjdir)/%.o: %.bas $(FBC_BI) | $(fbcjsobjdir)
+$(fbcjsobjdir)/%.o: %.bas $(FBC_BI) $(mkpath)/version.mk | $(fbcjsobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_JS_DEFINES) -i $(srcdir)/compiler -i $(rootdir)/inc -c $< -o $@
 
@@ -155,7 +158,7 @@ FBC_ANDROID_DEFINES := \
 	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_AARCH64 \
 	-d ENABLE_SUFFIX=\"-android\"
 
-$(fbcandroidobjdir)/%.o: %.bas $(FBC_BI) | $(fbcandroidobjdir)
+$(fbcandroidobjdir)/%.o: %.bas $(FBC_BI) $(mkpath)/version.mk | $(fbcandroidobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_ANDROID_DEFINES) -i $(srcdir)/compiler -i $(rootdir)/inc -c $< -o $@
 
@@ -164,7 +167,7 @@ FBC_WII_DEFINES := \
 	-d BUILD_FB_DEFAULT_CPUTYPE=FB_CPUTYPE_PPC \
 	-d ENABLE_SUFFIX=\"-wii\"
 
-$(fbcwiiobjdir)/%.o: %.bas $(FBC_BI) | $(fbcwiiobjdir)
+$(fbcwiiobjdir)/%.o: %.bas $(FBC_BI) $(mkpath)/version.mk | $(fbcwiiobjdir)
 	@mkdir -p "$(dir $@)"
 	$(FBC_TOOL_ENV) $(BUILD_FBC) $(BUILD_FBC_TARGET_OPT) $(BUILD_FBC_BUILDPREFIX_OPT) $(BUILD_FBC_COMPAT_DEFINES) $(BUILD_FBCFLAGS) $(FBC_PREFIX_OPT) $(ALLFBCFLAGS) $(FBC_WII_DEFINES) -i $(srcdir)/compiler -i $(rootdir)/inc -c $< -o $@
 

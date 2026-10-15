@@ -1,13 +1,14 @@
-# FreeBASIC 1.20.4 documentation
+# FreeBASIC 1.20.5 documentation
 
 This directory collects the documentation added or substantially revised from
-the 1.10.0 release through the current 1.20.4 tree. The generated language
+the 1.10.0 release through the current 1.20.5 tree. The generated language
 manual remains under `doc/manual`; these guides cover release, package, port,
 and experimental runtime subjects that do not fit naturally in the language
 reference.
 
 ## Start here
 
+- [Current changelog](../changelog.txt) records the 1.20.5 changes.
 - [1.20.4 release notes](release-1.20.4.md) summarize the user-visible work
   completed since the 1.20.2 development baseline.
 - [1.10 to 1.20 development history](release-history-1.10-to-1.20.md) records

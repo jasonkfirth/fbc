@@ -6,6 +6,7 @@ This file intentionally does NOT execute its unevaluated pointer expressions.
 """
 import argparse
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,10 @@ def main() -> int:
     args.root = args.root.resolve()
     sys.path.insert(0, str(args.root / "tests" / "semantic-sidecar"))
     from sidecar import Model
+
+    version = re.search(r"^FBVERSION\s*:=\s*(\d+\.\d+\.\d+)\s*$",
+                        (args.root / "mk/version.mk").read_text(), re.M)
+    assert version is not None, "Missing compiler release version"
 
     source = (args.root / "tests" / "semantic-sidecar" / "size-query-inputs.bas").read_text()
     count = 0
@@ -41,7 +46,7 @@ def main() -> int:
                                         capture_output=True, text=True, timeout=60)
                 assert result.returncode == 0, result.stdout + result.stderr
                 model = Model.read(model_path)
-                assert model.rows[0] == ["FBCSEM", "27", "1.20.4"]
+                assert model.rows[0] == ["FBCSEM", "27", version.group(1)]
                 queries = [(identity, props) for (domain, identity), props in model.properties.items()
                            if domain == "expression" and "size-query-kind" in props]
                 assert len(queries) == 11, queries

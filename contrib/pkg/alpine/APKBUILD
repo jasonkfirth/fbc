@@ -1,6 +1,6 @@
 # Maintainer: FreeBASIC packagers <packagers@example.invalid>
 pkgname=freebasic
-pkgver=1.20.1
+pkgver=1.20.5
 pkgrel=0
 pkgdesc="FreeBASIC compiler"
 url="https://www.freebasic.net/"

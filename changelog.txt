@@ -1,6 +1,7 @@
-Version 1.20.4
+Version 1.20.5
 
 [changed]
+- build/versioning: identify compiler and package outputs as 1.20.5 with package revision 1, refresh compiler objects when version metadata changes, and retain diagnostic compatibility with 1.20.4 and 1.20.5 producers.
 - compiler floating-point optimization: preserve parsed addition, subtraction and multiplication grouping in precise mode, including compound assignments and constant accumulation; retain reassociation in fast mode and add rounding and overflow regressions.
 - compiler semantic transport: retain the self-describing FBCSEMB1 binary format and shared bounded codec when integrating constructor-selection documentation; qualify implicit, temporary and REDIM construction properties against identical binary/text facts and compact-mode exclusions.
 - compiler build verification: select the graph-reporting target explicitly so semantic transport dependency rules cannot become the graph probe's default target.

@@ -1,6 +1,6 @@
 # Template file for 'freebasic'
 pkgname=freebasic
-version=1.20.1
+version=1.20.5
 revision=1
 build_style=gnu-makefile
 short_desc="FreeBASIC compiler"

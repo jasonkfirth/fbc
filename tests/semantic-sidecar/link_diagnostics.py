@@ -70,7 +70,7 @@ class LinkDiagnostics:
             row = [unescape(field) for field in fields]
             tag = row[0]
             if ordinal == 0:
-                if row[0] != 'FBCLNK' or row[1] not in ('1', '2') or row[2] != '1.20.4':
+                if row[0] != 'FBCLNK' or row[1] not in ('1', '2') or row[2] not in ('1.20.4', '1.20.5'):
                     raise ValueError('Unsupported link diagnostics header')
                 result.version = row[1]
                 continue

@@ -53,7 +53,7 @@ class Diagnostics:
                 raise ValueError("Unknown diagnostic record or invalid shape")
             row = [unescape(field) for field in fields]
             if index == 0:
-                if row[:2] != ["FBCDIA", "1"] or row[2] != "1.20.4":
+                if row[:2] != ["FBCDIA", "1"] or row[2] not in ("1.20.4", "1.20.5"):
                     raise ValueError("Unsupported diagnostic artifact or producer")
                 result.producer = row[2]
                 continue

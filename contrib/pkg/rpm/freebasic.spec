@@ -1,5 +1,5 @@
 Name:           freebasic
-Version:        1.20.1
+Version:        1.20.5
 Release:        1%{?dist}
 Summary:        FreeBASIC compiler
 
@@ -67,5 +67,8 @@ headers, examples, and documentation needed to build FreeBASIC programs.
 %{_mandir}/man1/fbc.1*
 
 %changelog
+* Thu Oct 15 2026 FreeBASIC packagers <packagers@example.invalid> - 1.20.5-1
+- Bump the compiler and package version to 1.20.5.
+
 * Fri Apr 24 2026 FreeBASIC packagers <packagers@example.invalid> - 1.20.1-1
 - Initial source package metadata.

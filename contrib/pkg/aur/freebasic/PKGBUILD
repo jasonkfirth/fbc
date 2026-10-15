@@ -25,7 +25,7 @@
 #
 
 pkgname=freebasic
-pkgver=1.20.1
+pkgver=1.20.5
 pkgrel=1
 pkgdesc="FreeBASIC compiler and runtime libraries"
 arch=('x86_64' 'aarch64' 'armv7h' 'riscv64')
