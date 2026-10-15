@@ -233,6 +233,8 @@ dim shared as longint semantic_model_module_detail_count
 '' Count selected FIELD references independently of their surviving AST shape.
 '' Reset for each serial module; no AST or lexer pointer is retained here.
 dim shared as longint semantic_model_module_member_selection_count
+'' Non-field members have their own closure; keep capability 115 field-only.
+dim shared as longint semantic_model_module_nonfield_member_selection_count
 
 declare function hSemanticModelRangeFitsCurrentSourceLine _
 	( _
@@ -1471,7 +1473,23 @@ function fbSemanticModelParameterVariable(byval param as FBSYMBOL ptr, _
 	return semantic_model_symbols[index].paramvarid
 end function
 
-'' The parser knows whether a selected field belongs to an object expression
+'' A member can be declared in an enum nested in its aggregate. Stop at any
+'' other owner: procedure locals are not members of the enclosing type.
+private function hSemanticModelIsNonfieldMember(byval sym as FBSYMBOL ptr) as integer
+	if( symbIsField(sym) ) then return FALSE
+	dim as FBSYMBOL ptr owner = symbGetParent(sym)
+	'' Bound a malformed owner chain; ordinary declarations need one step.
+	for depth as integer = 0 to 63
+		if( owner = NULL ) then return FALSE
+		if( symbIsStruct(owner) ) then return TRUE
+		if( symbIsEnum(owner) = FALSE ) then return FALSE
+		owner = symbGetParent(owner)
+	next
+	fbSemanticModelFailAt("nonfield member owner depth")
+	return FALSE
+end function
+
+'' The parser knows whether a selected member belongs to an object expression
 '' or to a type-member query. Keep that decision on the binding/reference
 '' occurrence: two uses of the same field in one macro are not interchangeable.
 private sub hSemanticModelMemberSelection _
@@ -1480,8 +1498,15 @@ private sub hSemanticModelMemberSelection _
 	  byval reference as longint, byval expansion as longint )
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or _
 		(fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
-	if( symbIsField(sym) = FALSE ) then exit sub
-	if( semantic_model_module_member_selection_count >= SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL ) then
+	dim as integer is_field = symbIsField(sym)
+	dim as string family = "selected-member-"
+	dim as longint count = semantic_model_module_member_selection_count
+	if( is_field = FALSE ) then
+		if( hSemanticModelIsNonfieldMember(sym) = FALSE ) then exit sub
+		family = "selected-nonfield-"
+		count = semantic_model_module_nonfield_member_selection_count
+	end if
+	if( count >= SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL ) then
 		fbSemanticModelFailAt("selected member count limit")
 		exit sub
 	end if
@@ -1503,32 +1528,38 @@ private sub hSemanticModelMemberSelection _
 	end if
 	dim as string prefix = "K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + TABCHAR
 	if( binding > 0 ) then
-		fbSemanticModelAppendDetail(prefix + "selected-member-binding-" + fbSemanticModelNumber(binding) + _
+		fbSemanticModelAppendDetail(prefix + family + "binding-" + fbSemanticModelNumber(binding) + _
 			TABCHAR + fbSemanticModelEscape(role + TABCHAR + fbSemanticModelNumber(receiver_id)))
 	else
-		fbSemanticModelAppendDetail(prefix + "selected-member-reference-" + fbSemanticModelNumber(reference) + _
+		fbSemanticModelAppendDetail(prefix + family + "reference-" + fbSemanticModelNumber(reference) + _
 			TABCHAR + fbSemanticModelEscape(role + TABCHAR + fbSemanticModelNumber(receiver_id) + TABCHAR + fbSemanticModelNumber(expansion)))
 	end if
-	semantic_model_module_member_selection_count += 1
+	if( is_field ) then
+		semantic_model_module_member_selection_count += 1
+	else
+		semantic_model_module_nonfield_member_selection_count += 1
+	end if
 end sub
 
 '' Export one compiler-resolved identifier occurrence with its exact lexer span.
 '' Physical-origin status lets editor consumers refuse macro-expanded ranges.
-private sub hSemanticModelExportBinding _
+private function hSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
 		byref source as LEX_LOCATION, _
 		byval is_declaration as integer, _
 		byval member_receiver as FBSYMBOL ptr, _
 		byref member_role as const string _
-	)
+	) as longint
+
+	function = 0
 
 	if( (semantic_model_file_open = FALSE) or _
 		(semantic_model_module_open = FALSE) or _
 		(semantic_model_expressions_only) or _
 		(semantic_model_module_failed) or _
 		(hSemanticModelHasSymbol(sym) = FALSE) ) then
-		exit sub
+		exit function
 	end if
 
 	if( (source.start_line < 1) or (source.start_column < 0) or _
@@ -1553,20 +1584,21 @@ private sub hSemanticModelExportBinding _
 			fbSemanticModelMacroOrigin("symbol", fbSemanticModelSymbolId(sym), source.macro_identity, _
 				"reference-" + fbSemanticModelNumber(reference))
 			hSemanticModelMemberSelection(sym, member_receiver, member_role, 0, reference, source.macro_identity)
+			if( fbSemanticModelMacroProvenanceEnabled( ) ) then return -reference
 		end if
-		exit sub
+		exit function
 	end if
 
 	if( semantic_model_binding_count + _
 		semantic_model_module_binding_count >= _
 		SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL ) then
 		fbSemanticModelFailAt("binding count limit")
-		exit sub
+		exit function
 	end if
 
 	dim as integer physical_range = hSemanticModelLocationIsPhysical(source)
 	dim as longint symbolid = hSemanticModelSymbolId(sym)
-	if( (symbolid = 0) or (semantic_model_module_failed) ) then exit sub
+	if( (symbolid = 0) or (semantic_model_module_failed) ) then exit function
 	if( is_declaration ) then
 		dim as integer index = hSemanticModelFindSymbol(sym)
 		if( index >= 0 ) then semantic_model_symbols[index].declared = TRUE
@@ -1592,6 +1624,7 @@ private sub hSemanticModelExportBinding _
 		fbSemanticModelAssociateStatement("binding", semantic_model_binding_count + semantic_model_module_binding_count)
 		fbSemanticModelExportCoordinates("binding", semantic_model_binding_count + semantic_model_module_binding_count, "range", source, source)
 		fbSemanticModelMacroOrigin("binding", semantic_model_binding_count + semantic_model_module_binding_count, source.macro_identity, "name")
+		function = semantic_model_binding_count + semantic_model_module_binding_count
 		dim as longint sourceid = fbSemanticModelCurrentSource( )
 		if( sourceid > 0 ) then
 			fbSemanticModelAppendProvenance("ORIG" + TABCHAR + "binding" + TABCHAR + _
@@ -1599,7 +1632,7 @@ private sub hSemanticModelExportBinding _
 				TABCHAR + fbSemanticModelNumber(sourceid))
 		end if
 	end if
-end sub
+end function
 
 sub fbSemanticModelExportBinding _
 	( byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION, byval is_declaration as integer )
@@ -1615,6 +1648,27 @@ sub fbSemanticModelExportMemberBinding _
 	hSemanticModelExportBinding(sym, source, FALSE, receiver, iif(is_type, "type", "expression"))
 end sub
 
+'' Positive identities are B ordinals; a negative CALL-only tag identifies MR.
+'' Neither tag changes code generation or claims an editable macro spelling.
+function fbSemanticModelExportCallBinding _
+	( byval sym as FBSYMBOL ptr, byval receiver as FBSYMBOL ptr, _
+	  byref source as LEX_LOCATION, byval is_type as integer ) as longint
+	if( receiver = NULL ) then
+		return hSemanticModelExportBinding(sym, source, FALSE, NULL, "symbol")
+	end if
+	return hSemanticModelExportBinding(sym, source, FALSE, receiver, iif(is_type, "type", "expression"))
+end function
+
+sub fbSemanticModelExportMacroCallCount(byval count as longint)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or _
+		(fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+		TABCHAR + "source-call-macro-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + fbSemanticModelNumber(count))
+end sub
+
+'' Count only B records; macro reference tags have their own identity domain.
 function fbSemanticModelBindingCount( ) as longint
 	return semantic_model_binding_count + semantic_model_module_binding_count
 end function
@@ -3662,13 +3716,14 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_memory_context_depth = 0
 	semantic_model_module_detail_count = 0
 	semantic_model_module_member_selection_count = 0
+	semantic_model_module_nonfield_member_selection_count = 0
 	semantic_model_module_open = TRUE
 	semantic_model_module_source = filename
 	fbSemanticModelBeginSource(filename, 0)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 116
+	for capability as integer = 0 to 118
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -3786,6 +3841,8 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 114: feature = "redim-constructor-selections": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 115: feature = "selected-member-roles": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
 		case 116: feature = "source-memory-applications": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 117: feature = "selected-nonfield-member-roles": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 118: feature = "source-call-macro-references": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _
@@ -3827,6 +3884,10 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 				fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
 				TABCHAR + "selected-member-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
 				TABCHAR + fbSemanticModelNumber(semantic_model_module_member_selection_count))
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+				fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+				TABCHAR + "selected-nonfield-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+				TABCHAR + fbSemanticModelNumber(semantic_model_module_nonfield_member_selection_count))
 		end if
 		fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
 			TABCHAR + "cache-stable-inputs" + TABCHAR + iif(semantic_binary_volatile_input, "unavailable", "available"))

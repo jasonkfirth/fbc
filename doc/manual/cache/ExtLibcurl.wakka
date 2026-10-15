@@ -2,10 +2,14 @@
 Free and easy-to-use client-side URL transfer library supporting almost every protocol.
 
 Website: https://curl.se/libcurl/
-Platforms supported: Windows (32-bit and 64-bit), Linux, DOS, macOS
+Platforms supported: Windows (32-bit and 64-bit), Linux, macOS, FreeBSD, Haiku
 Headers to include: curl.bi
 Header version: 7.85.0
 Examples: in examples/network/curl/
+
+Haiku R1 beta 6 amd64: `examples/manual/libraries/curl.bas` compiled and ran
+with FreeBASIC 1.20.4-3 against HaikuPorts libcurl 8.22.0, fetching and
+checking the exact response from a local loopback HTTP fixture.
 
 The declarations describe libcurl 7.85.0. The Windows qualification uses the installed 32-bit and 64-bit libcurl 8.21.0 SDKs and compares stable C types and form-list layouts with the native C headers. This does not add newer APIs to ##curl.bi##. The HTTP fixtures test loopback transfers; they do not establish HTTPS certificate or public-server interoperability.
 

@@ -133,4 +133,3 @@ For i As fraction = fraction(4, 4) To fraction(1, 4)
 	Print i; " ";
 Next
 Print "done"
-

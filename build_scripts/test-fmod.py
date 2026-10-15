@@ -187,10 +187,22 @@ def main():
             if log is not None:
                 log.close()
             assert not node.exists(), "task-owned OSS device survived driver shutdown"
+    # Metadata-only checks do not initialize an output device. Keep that
+    # distinction in the receipt even when an OSS driver happens to exist.
+    driver_cleanup = ("not used: metadata-only" if args.metadata_only else
+                      "pass" if proxy is not None else
+                      "native Windows driver" if windows else "existing OSS driver")
+    library = prefix / ("bin/fmod64.dll" if windows else "lib/libfmod-3.75.so")
+    sources = [Path(__file__).resolve(), root / "tests/bindings/fmod-tags.c",
+               root / "tests/bindings/fmod-tags.bas", root / "examples/sound/FMOD/fmod_tags.bi",
+               root / "inc/fmod.bi", root / "examples/manual/libraries/fmod1.bas",
+               root / "examples/manual/libraries/fmod2.bas", root / "examples/sound/FMOD/mp3-player.bas"]
     receipt = {"status": "pass", "platform": "Win64" if windows else "Linux i386",
                "records": records, "metadata_C_comparisons": len(expected) * len(backends),
                "compiler_sha256": hashlib.sha256(fbc.read_bytes()).hexdigest(),
-               "driver_cleanup": "pass" if proxy is not None else "native Windows driver" if windows else "existing OSS driver"}
+               "library_sha256": hashlib.sha256(library.read_bytes()).hexdigest(),
+               "source_sha256": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
+               "driver_cleanup": driver_cleanup}
     receipt["scope"] = "metadata and example compilation only" if args.metadata_only else "metadata and playback"
     (output / "results.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print("FMOD_METADATA_QUALIFICATION=PASS" if args.metadata_only else "FMOD_QUALIFICATION=PASS", flush=True)

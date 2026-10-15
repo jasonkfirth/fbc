@@ -16,4 +16,3 @@ Type bar
   st  As sometype
   a   As Integer
 End Type
-

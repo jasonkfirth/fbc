@@ -15,6 +15,9 @@
 #define CIRCLE_DRAW_SIDES 32
 #define CIRCLE_DRAW_SIDES_LEN (CIRCLE_DRAW_SIDES + 1)
 
+'' -------------------------------------------------------------------------
+'' Player state and map data
+'' -------------------------------------------------------------------------
 type Player
 	mouse as SDL_MouseID
 	keyboard as SDL_KeyboardID
@@ -41,7 +44,10 @@ type ExtendedMetadataRecord
 	value as const zstring ptr
 end type
 
-dim shared extended_metadata(0 to 3) as ExtendedMetadataRecord = {type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_URL_STRING), strptr("https://examples.libsdl.org/SDL3/demo/02-woodeneye-008/")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_CREATOR_STRING), strptr("SDL team")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_COPYRIGHT_STRING), strptr("Placed in the public domain")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_TYPE_STRING), strptr("game"))}
+dim shared extended_metadata(0 to 3) as ExtendedMetadataRecord = {type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_URL_STRING), _
+strptr("https://examples.libsdl.org/SDL3/demo/02-woodeneye-008/")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_CREATOR_STRING), strptr("SDL team")), _
+type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_COPYRIGHT_STRING), strptr("Placed in the public domain")), _
+type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_TYPE_STRING), strptr("game"))}
 dim shared debug_string(0 to 31) as byte
 
 declare function whoseMouse cdecl(byval mouse as SDL_MouseID, byval players as const Player ptr, byval players_len as long) as long
@@ -58,6 +64,9 @@ declare function SDL_AppEvent cdecl(byval appstate as any ptr, byval event as SD
 declare function SDL_AppIterate cdecl(byval appstate as any ptr) as SDL_AppResult
 declare sub SDL_AppQuit cdecl(byval appstate as any ptr, byval result as SDL_AppResult)
 
+'' -------------------------------------------------------------------------
+'' Rendering and application callbacks
+'' -------------------------------------------------------------------------
 function whoseMouse cdecl(byval mouse as SDL_MouseID, byval players as const Player ptr, byval players_len as long) as long
 	scope
 		dim i as long
@@ -595,7 +604,9 @@ function SDL_AppEvent cdecl(byval appstate as any ptr, byval event as SDL_Event 
 				if (index >= 0) then
 					scope
 						players[index].yaw -= ((cast(long, event->motion.xrel)) * 524288)
-						players[index].pitch = (iif(((((-1073741824)) > ((iif((((1073741824) < ((players[index].pitch - ((cast(long, event->motion.yrel)) * 524288))))), (1073741824), ((players[index].pitch - ((cast(long, event->motion.yrel)) * 524288)))))))), ((-1073741824)), ((iif((((1073741824) < ((players[index].pitch - ((cast(long, event->motion.yrel)) * 524288))))), (1073741824), ((players[index].pitch - ((cast(long, event->motion.yrel)) * 524288))))))))
+						players[index].pitch = (iif(((((-1073741824)) > ((iif((((1073741824) < ((players[index].pitch - ((cast(long, event->motion.yrel)) * 524288))))), (1073741824), _
+						((players[index].pitch - ((cast(long, event->motion.yrel)) * 524288)))))))), ((-1073741824)), ((iif((((1073741824) < ((players[index].pitch - ((cast(long, _
+						event->motion.yrel)) * 524288))))), (1073741824), ((players[index].pitch - ((cast(long, event->motion.yrel)) * 524288))))))))
 					end scope
 				else
 					if id then

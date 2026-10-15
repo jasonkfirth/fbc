@@ -3,6 +3,10 @@
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'Critical Sections FAQ'
 ''
+'' Purpose: Demonstrate independent worker output without a console mutex.
+'' Responsibilities: The documented example flow and its owned resources.
+'' This file contains no compiler implementation or replacement system API.
+''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
@@ -12,7 +16,7 @@
 '' demonstration converts it through a pointer-sized integer before using it.
 
 Sub Thread (ByVal p As Any Ptr)
-	Dim As Integer threadNumber = CInt(CLngInt(p))
+	Dim As Integer threadNumber = CInt(p)
 	Color threadNumber + 8, threadNumber
 	For I As Integer = 1 To 50 - 2 * threadNumber
 		Print " " & threadNumber & " ";
@@ -42,3 +46,5 @@ Screen 12
 test()
 Print "Any key to quit"
 Sleep
+
+'' end of criticalsectionfaq9-2.bas

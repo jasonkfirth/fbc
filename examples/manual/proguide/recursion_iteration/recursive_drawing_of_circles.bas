@@ -49,4 +49,3 @@ Print "iteration with own storage stack:"
 recursiveToIterativeCircleStack(480, 320, 150)
 
 Sleep
-

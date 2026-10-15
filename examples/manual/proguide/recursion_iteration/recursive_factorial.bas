@@ -13,4 +13,3 @@ Function recursiveFactorial (ByVal n As Integer) As Integer
 		Return n * recursiveFactorial(n - 1)  '' recursive call
 	End If
 End Function
-

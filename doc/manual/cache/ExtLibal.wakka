@@ -2,9 +2,15 @@
 ""OpenAL"" is a cross-platform 3D audio API appropriate for use with gaming applications and many other types of audio applications. ALUT is the ""OpenAL"" utility toolkit, a library providing additional functions to work with ""OpenAL"".
 
 Website: http://www.openal.org
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux
 Headers to include: AL/al.bi, AL/alut.bi
 Header version: openal-soft-1.16.0, freealut 1.1.0
 Examples: in examples/sound/OpenAL/
+
+The WAV player accepts an optional filename as its first command-line argument. Without one, it uses ../data/prodigy.wav relative to the executable. Any key pauses or resumes playback; ESC exits. Initialization, loading, playback and cleanup failures return a nonzero exit status. The input loop sleeps between polls.
+
+Delete sources before deleting their attached buffers. ""OpenAL"" rejects deletion of a buffer still attached to a source with AL_INVALID_OPERATION. The example stops and deletes its source, releases the buffer, then closes ALUT. Its listener faces negative Z with positive Y as the up vector; forward and up must not be parallel. See the [[https://www.openal.org/documentation/OpenAL_Programmers_Guide.pdf OpenAL Programmer's Guide]].
+
+FB_EXAMPLE_AUTOPLAY=1 runs the looping source for one second and exits without keyboard input. This checks lifecycle behavior; software audio startup buffering may delay observable PCM beyond that interval. Native Linux checks also exercise pause, resume and ESC in an owned terminal and capture nonzero PCM from a private PulseAudio sink. These checks do not establish physical speaker output.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

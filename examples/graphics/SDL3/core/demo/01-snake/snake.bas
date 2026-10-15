@@ -25,6 +25,9 @@
 
 '' use the callbacks instead of main()
 '' floor(log2(SNAKE_CELL_FOOD)) + 1
+'' -------------------------------------------------------------------------
+'' Game state and metadata
+'' -------------------------------------------------------------------------
 dim shared joystick as SDL_Joystick ptr = cptr(SDL_Joystick ptr, 0)
 enum SnakeCell
 	SNAKE_CELL_NOTHING = (0u)
@@ -65,7 +68,10 @@ type ExtendedMetadataRecord
 	value as const zstring ptr
 end type
 
-dim shared extended_metadata(0 to 3) as ExtendedMetadataRecord = {type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_URL_STRING), strptr("https://examples.libsdl.org/SDL3/demo/01-snake/")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_CREATOR_STRING), strptr("SDL team")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_COPYRIGHT_STRING), strptr("Placed in the public domain")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_TYPE_STRING), strptr("game"))}
+dim shared extended_metadata(0 to 3) as ExtendedMetadataRecord = {type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_URL_STRING), _
+strptr("https://examples.libsdl.org/SDL3/demo/01-snake/")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_CREATOR_STRING), strptr("SDL team")), _
+type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_COPYRIGHT_STRING), strptr("Placed in the public domain")), _
+type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_TYPE_STRING), strptr("game"))}
 
 declare function snake_cell_at cdecl(byval ctx as const SnakeContext ptr, byval x as byte, byval y as byte) as SnakeCell
 declare sub set_rect_xy_ cdecl(byval r as SDL_FRect ptr, byval x as short, byval y as short)
@@ -83,6 +89,9 @@ declare function SDL_AppInit cdecl(byval appstate as any ptr ptr, byval argc as 
 declare function SDL_AppEvent cdecl(byval appstate as any ptr, byval event as SDL_Event ptr) as SDL_AppResult
 declare sub SDL_AppQuit cdecl(byval appstate as any ptr, byval result as SDL_AppResult)
 
+'' -------------------------------------------------------------------------
+'' Input and game loop
+'' -------------------------------------------------------------------------
 function snake_cell_at cdecl(byval ctx as const SnakeContext ptr, byval x as byte, byval y as byte) as SnakeCell
 	scope
 		dim shift_bits as long = (((((x) + (((y) * 24u)))) * 3u))

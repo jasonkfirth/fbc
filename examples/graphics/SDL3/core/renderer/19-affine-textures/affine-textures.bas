@@ -102,7 +102,9 @@ function SDL_AppIterate cdecl(byval appstate as any ptr) as SDL_AppResult
 		dim cos_ as single = SDL_cosf(rad)
 		dim sin_ as single = SDL_sinf(rad)
 		dim k(0 to 2) as single = {(3.0f / SDL_sqrtf(50.0f)), (4.0f / SDL_sqrtf(50.0f)), (5.0f / SDL_sqrtf(50.0f))}
-		dim mat(0 to 8) as single = {(cos_ + ((((1.0f - cos_)) * k(0)) * k(0))), (((-sin_) * k(2)) + ((((1.0f - cos_)) * k(0)) * k(1))), ((sin_ * k(1)) + ((((1.0f - cos_)) * k(0)) * k(2))), ((sin_ * k(2)) + ((((1.0f - cos_)) * k(0)) * k(1))), (cos_ + ((((1.0f - cos_)) * k(1)) * k(1))), (((-sin_) * k(0)) + ((((1.0f - cos_)) * k(1)) * k(2))), (((-sin_) * k(1)) + ((((1.0f - cos_)) * k(0)) * k(2))), ((sin_ * k(0)) + ((((1.0f - cos_)) * k(1)) * k(2))), (cos_ + ((((1.0f - cos_)) * k(2)) * k(2)))}
+		dim mat(0 to 8) as single = {(cos_ + ((((1.0f - cos_)) * k(0)) * k(0))), (((-sin_) * k(2)) + ((((1.0f - cos_)) * k(0)) * k(1))), _
+		((sin_ * k(1)) + ((((1.0f - cos_)) * k(0)) * k(2))), ((sin_ * k(2)) + ((((1.0f - cos_)) * k(0)) * k(1))), (cos_ + ((((1.0f - cos_)) * k(1)) * k(1))), _
+		(((-sin_) * k(0)) + ((((1.0f - cos_)) * k(1)) * k(2))), (((-sin_) * k(1)) + ((((1.0f - cos_)) * k(0)) * k(2))), ((sin_ * k(0)) + ((((1.0f - cos_)) * k(1)) * k(2))), (cos_ + ((((1.0f - cos_)) * k(2)) * k(2)))}
 		dim corners(0 to 15) as single
 		dim i as long
 		scope

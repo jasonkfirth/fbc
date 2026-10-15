@@ -5,3 +5,5 @@ out/*
 .build-*/*
 generated/fbctests-*/
 generated/fbctests-*/*
+.semantic-cache/
+.semantic-cache/*

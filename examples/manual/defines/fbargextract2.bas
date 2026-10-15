@@ -20,4 +20,3 @@ print_last( 7, 89.78, "Postman" )
 /' Compiler output:
 Postman
 '/
-

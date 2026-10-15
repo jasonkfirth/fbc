@@ -16,7 +16,7 @@
 
 #define SCREEN_W 256
 #define SCREEN_H 256
-#define RAM_SIZE &h1000000
+#define RAM_SIZE (&h1000000)
 #define FRAMES_PER_SECOND 60
 #define SAMPLES_PER_FRAME 256
 #define NS_PER_SECOND (Uint64)SDL_NS_PER_SECOND
@@ -26,6 +26,9 @@
 #define IO_SCREEN_PAGE 5
 #define IO_AUDIO_BANK 6
 
+'' -------------------------------------------------------------------------
+'' Virtual machine state
+'' -------------------------------------------------------------------------
 type BytePusher
 	ram(0 to 16777223) as Uint8
 	last_tick as Uint64
@@ -47,7 +50,10 @@ type ExtendedMetadataRecord
 	value as const zstring ptr
 end type
 
-dim shared extended_metadata(0 to 3) as ExtendedMetadataRecord = {type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_URL_STRING), strptr("https://examples.libsdl.org/SDL3/demo/04-bytepusher/")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_CREATOR_STRING), strptr("SDL team")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_COPYRIGHT_STRING), strptr("Placed in the public domain")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_TYPE_STRING), strptr("game"))}
+dim shared extended_metadata(0 to 3) as ExtendedMetadataRecord = {type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_URL_STRING), _
+strptr("https://examples.libsdl.org/SDL3/demo/04-bytepusher/")), type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_CREATOR_STRING), strptr("SDL team")), _
+type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_COPYRIGHT_STRING), strptr("Placed in the public domain")), _
+type<ExtendedMetadataRecord>(strptr(SDL_PROP_APP_METADATA_TYPE_STRING), strptr("game"))}
 
 declare function read_u16 cdecl(byval vm as const BytePusher ptr, byval addr as Uint32) as Uint16
 declare function read_u24 cdecl(byval vm as const BytePusher ptr, byval addr as Uint32) as Uint32
@@ -63,6 +69,9 @@ declare function scancode_mask cdecl(byval scancode as SDL_Scancode) as Uint16
 declare function SDL_AppEvent cdecl(byval appstate as any ptr, byval event as SDL_Event ptr) as SDL_AppResult
 declare sub SDL_AppQuit cdecl(byval appstate as any ptr, byval result as SDL_AppResult)
 
+'' -------------------------------------------------------------------------
+'' Execution and SDL callbacks
+'' -------------------------------------------------------------------------
 function read_u16 cdecl(byval vm as const BytePusher ptr, byval addr as Uint32) as Uint16
 	scope
 		dim ptr_ as const Uint8 ptr = @(vm->ram(addr))

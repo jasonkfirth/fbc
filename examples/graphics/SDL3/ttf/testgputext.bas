@@ -34,6 +34,9 @@
 
 #include once "testgputext/shader-data.bi"
 
+'' -------------------------------------------------------------------------
+'' GPU text data and state
+'' -------------------------------------------------------------------------
 type SDL_Vec2
 	x as single
 	y as single
@@ -148,6 +151,9 @@ declare sub draw_ cdecl(byval context as Context ptr, byval matrices as SDL_Mat4
 declare sub free_context cdecl(byval context as Context ptr)
 declare function example_main cdecl(byval argc as long, byval argv as zstring ptr ptr) as long
 
+'' -------------------------------------------------------------------------
+'' Rendering and application callbacks
+'' -------------------------------------------------------------------------
 function SDL_Vector3 cdecl(byval x as single, byval y as single, byval z as single) as SDL_Vec3
 	return type<SDL_Vec3>(x, y, z)
 end function

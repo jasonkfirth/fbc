@@ -6,7 +6,7 @@
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgConstantExpressions
 '' --------
 
-#define pi 4 * Atn(1)
+#define pi (4 * Atn(1))
 #define pi_over_six (pi / 6)
 
 Dim As Double d = Sqr(2)

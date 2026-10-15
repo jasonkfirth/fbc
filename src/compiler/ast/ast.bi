@@ -328,7 +328,9 @@ type ASTNODE
 	semantic_expressions as longint                '' immutable source-expression association chain
 	semantic_expression as longint                 '' most recent typed parser result, including compact mode
 	semantic_operands as longint                   '' operands captured before destructive source lowering
-	semantic_binding as longint                    '' actual written variable/member occurrence
+	'' Positive B occurrence; negative MR identity is reserved for source CALLs.
+	'' The tag is observation-only and does not change AST layout or codegen.
+	semantic_binding as longint
 
 	dtype           as integer
 	subtype         as FBSYMBOL ptr

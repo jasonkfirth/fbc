@@ -3,6 +3,10 @@
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'Critical Sections FAQ'
 ''
+'' Purpose: Demonstrate synchronized worker output with a shared mutex.
+'' Responsibilities: The documented example flow and its owned resources.
+'' This file contains no compiler implementation or replacement system API.
+''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
@@ -15,7 +19,7 @@
 Dim Shared As Any Ptr mutex
 
 Sub Thread (ByVal p As Any Ptr)
-	Dim As Integer threadNumber = CInt(CLngInt(p))
+	Dim As Integer threadNumber = CInt(p)
 	MutexLock(mutex)
 	Dim As ULong c0 = Color(threadNumber + 8, threadNumber)
 	Dim As ULong c = Color()
@@ -57,3 +61,5 @@ Print "Any key to quit"
 Sleep
 
 MutexDestroy(mutex)
+
+'' end of criticalsectionfaq9-3.bas

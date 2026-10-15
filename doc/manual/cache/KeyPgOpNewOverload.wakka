@@ -360,4 +360,7 @@ end program forced
 	- ##[[KeyPgOpDeleteOverload|Delete Overload]]##
 	- ##[[KeyPgAllocate|Allocate]]##
 
+{{fbdoc item="section" value="Pointer width in the example"}}
+	The allocation-header example retrieves the original pointer before freeing it. When saving that address for display, use ##UInteger## and ##CUInt(pOrig)## so that both 32-bit and 64-bit targets retain the complete address.
+
 {{fbdoc item="back" value="CatPgOpMemory|Memory Operators"}}{{fbdoc item="back" value="CatPgOperators|Operators"}}

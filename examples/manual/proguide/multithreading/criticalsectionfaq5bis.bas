@@ -79,4 +79,3 @@ Locate UDT.numberMax + 4, 1
 Print CULngInt(c / t) & " increments per second"
 
 Sleep
-

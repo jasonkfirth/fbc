@@ -18,4 +18,3 @@ Sleep
 Sub passbyref (ByRef ref As Double, ByVal value As Double)  '' declaration for passing by reference
 	ref = value
 End Sub
-

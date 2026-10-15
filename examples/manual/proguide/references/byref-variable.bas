@@ -14,4 +14,3 @@ refX = 7.89
 Print X
 
 Sleep
-

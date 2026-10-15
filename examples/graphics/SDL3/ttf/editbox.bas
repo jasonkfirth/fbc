@@ -20,6 +20,9 @@
 
 #define CURSOR_BLINK_INTERVAL_MS 500
 
+'' -------------------------------------------------------------------------
+'' Edit box state
+'' -------------------------------------------------------------------------
 type EditBox
 	window_ as SDL_Window ptr
 	renderer as SDL_Renderer ptr
@@ -88,6 +91,9 @@ declare function HandleMouseDown cdecl(byval edit as EditBox ptr, byval x as sin
 declare function HandleMouseMotion cdecl(byval edit as EditBox ptr, byval x as single, byval y as single) as boolean
 declare function HandleMouseUp cdecl(byval edit as EditBox ptr, byval x as single, byval y as single) as boolean
 
+'' -------------------------------------------------------------------------
+'' Text input and rendering
+'' -------------------------------------------------------------------------
 sub DrawText cdecl(byval edit as EditBox ptr, byval text as TTF_Text ptr, byval x as single, byval y as single)
 	scope
 		if edit->window_surface then
@@ -466,7 +472,9 @@ sub UpdateTextInputArea cdecl(byval edit as EditBox ptr)
 		dim window_edit_rect_min as SDL_FPoint
 		dim window_edit_rect_max as SDL_FPoint
 		dim window_cursor as SDL_FPoint
-		if (((SDL_RenderCoordinatesToWindow(renderer, edit->rect.x, edit->rect.y, @(window_edit_rect_min.x), @(window_edit_rect_min.y)) = 0) orelse (SDL_RenderCoordinatesToWindow(renderer, (edit->rect.x + edit->rect.w), (edit->rect.y + edit->rect.h), @(window_edit_rect_max.x), @(window_edit_rect_max.y)) = 0)) orelse (SDL_RenderCoordinatesToWindow(renderer, edit->cursor_rect.x, edit->cursor_rect.y, @(window_cursor.x), @(window_cursor.y)) = 0)) then
+		if (((SDL_RenderCoordinatesToWindow(renderer, edit->rect.x, edit->rect.y, @(window_edit_rect_min.x), @(window_edit_rect_min.y)) = 0) orelse (SDL_RenderCoordinatesToWindow(renderer, _
+		(edit->rect.x + edit->rect.w), (edit->rect.y + edit->rect.h), @(window_edit_rect_max.x), @(window_edit_rect_max.y)) = 0)) orelse (SDL_RenderCoordinatesToWindow(renderer, _
+		edit->cursor_rect.x, edit->cursor_rect.y, @(window_cursor.x), @(window_cursor.y)) = 0)) then
 			scope
 				exit sub
 			end scope

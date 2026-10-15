@@ -639,7 +639,7 @@ Do
 		Do
 		#if Not defined(__FB_WIN32__) And Not defined(__FB_LINUX__)
 			t2 = Timer
-			If t2 < t Then t -= 24 * 60 * 60
+			If t2 < t1 Then t1 -= 24 * 60 * 60
 		Loop Until t2 >= t1 + tt / 1000
 		#else
 		Loop Until Timer >= t1 + tt / 1000
@@ -685,7 +685,7 @@ Do
 	Do
 	#if Not defined(__FB_WIN32__) And Not defined(__FB_LINUX__)
 		t2 = Timer
-		If t2 < t Then t -= 24 * 60 * 60
+		If t2 < t1 Then t1 -= 24 * 60 * 60
 	Loop Until t2 >= t1 + tc / 1000
 	#else
 	Loop Until Timer >= t1 + tc / 1000
@@ -1035,6 +1035,9 @@ Loop
 %%
 
 	One can notice that for these 2 graphic animations, the mode of operation with 'image skipping' activated plus 'skipped image' removed by the user makes it possible to reach higher FPS, because in these two cases the user code has well separated the drawing part of the new image (the only part that should not be executed when the 'skipped image' tag is true) from the calculation part of the parameters for the new image (which must always be executed).
+
+{{fbdoc item="section" value="Windows timer declarations"}}
+	The WinMM ##timeBeginPeriod## and ##timeEndPeriod## functions use ##StdCall## on Win32. Their ##UINT## arguments and ##MMRESULT## return values remain 32-bit on Win32 and Win64, so the explicit declarations use ##ULong##. Each successful timer-resolution request must be paired with a matching reset.
 
 {{fbdoc item="section" value="See also"}}
 	- ##[[KeyPgSleep|Sleep]]##

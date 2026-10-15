@@ -2,10 +2,14 @@
 Small C library that implements a self-contained, embeddable, zero-configuration SQL database engine.
 
 Website: https://sqlite.org
-Platforms supported: ""Win32"", ""Win64"", Linux, DOS
+Platforms supported: ""Win32"", ""Win64"", Linux, FreeBSD, Haiku (SQLite 3)
 Headers to include: sqlite2.bi or sqlite3.bi
 Header versions: 2.8.17, 3.30.0
 Examples: in examples/database/
+
+Haiku R1 beta 6 amd64: `examples/database/sqlite3_test.bas` compiled and ran
+with FreeBASIC 1.20.4-3, using an in-memory database and the query `select 2+2`.
+SQLite 2 was not available for this check.
 
 {{fbdoc item="section" value="Query callbacks and ownership"}}
 	The SQLite 3 example accepts a database name and an optional SQL query. Supplying both arguments must still select that database. The callback's column count is a C 32-bit ##Long##; its value and column-name arrays are borrowed only for the duration of the callback.

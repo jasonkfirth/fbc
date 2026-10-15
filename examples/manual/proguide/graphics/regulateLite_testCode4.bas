@@ -1,4 +1,15 @@
-'' examples/manual/proguide/graphics/regulateLite_testCode4.bas
+'' Project: FreeBASIC manual examples
+'' File: examples/manual/proguide/graphics/regulateLite_testCode4.bas
+''
+'' Purpose:
+''	Demonstrate frame-rate regulation inside a graphics loop.
+''
+'' Responsibilities:
+''	- exercise the regulateLite routine
+''	- account for DOS Timer rollover when measuring loop intervals
+''
+'' This file intentionally does NOT contain:
+''	- the regulateLite implementation, which is in regulateLite.bi
 ''
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'Lite regulation function to be integrated into user loop for FPS control'
@@ -94,7 +105,7 @@ Do
 		Do
 		#if Not defined(__FB_WIN32__) And Not defined(__FB_LINUX__)
 			t2 = Timer
-			If t2 < t Then t -= 24 * 60 * 60
+			If t2 < t1 Then t1 -= 24 * 60 * 60
 		Loop Until t2 >= t1 + tt / 1000
 		#else
 		Loop Until Timer >= t1 + tt / 1000
@@ -140,10 +151,12 @@ Do
 	Do
 	#if Not defined(__FB_WIN32__) And Not defined(__FB_LINUX__)
 		t2 = Timer
-		If t2 < t Then t -= 24 * 60 * 60
+		If t2 < t1 Then t1 -= 24 * 60 * 60
 	Loop Until t2 >= t1 + tc / 1000
 	#else
 	Loop Until Timer >= t1 + tc / 1000
 	#endif
 	fps = regulateLite(MyFPS, SkipImage, , ImageSkipped)
 Loop
+
+'' end of regulateLite_testCode4.bas

@@ -1,3 +1,9 @@
+'' Project: FreeBASIC CRT headers
+'' File: crt/linux/fcntl.bi
+'' Purpose: Declare Linux-family file-control interfaces.
+'' Responsibilities: Open flags, lock layouts and public mode_t API operands.
+'' This file intentionally does NOT implement filesystem operations.
+
 ''
 ''
 '' fcntl -- header translated with help of SWIG FB wrapper
@@ -171,8 +177,8 @@ declare function open_ alias "open" (byval __file as const zstring ptr, byval __
 declare function open64 (byval __file as const zstring ptr, byval __oflag as long, ...) as long
 declare function openat   (byval __fd as long, byval __file as const zstring ptr, byval __oflag as long, ...) as long
 declare function openat64 (byval __fd as long, byval __file as const zstring ptr, byval __oflag as long, ...) as long
-declare function creat   (byval __file as const zstring ptr, byval __mode as __mode_t) as long
-declare function creat64 (byval __file as const zstring ptr, byval __mode as __mode_t) as long
+declare function creat   (byval __file as const zstring ptr, byval __mode as mode_t) as long
+declare function creat64 (byval __file as const zstring ptr, byval __mode as mode_t) as long
 
 #ifndef F_LOCK
 #define F_ULOCK 0
@@ -191,3 +197,5 @@ declare function posix_fallocate64 (byval __fd as long, byval __offset as __off6
 end extern
 
 #endif
+
+'' end of crt/linux/fcntl.bi

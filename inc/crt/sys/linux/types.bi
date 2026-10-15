@@ -1,3 +1,9 @@
+'' Project: FreeBASIC CRT headers
+'' File: crt/sys/linux/types.bi
+'' Purpose: Define Linux-family C types and target-specific public aliases.
+'' Responsibilities: Scalar aliases, POSIX names and Android mode_t width.
+'' This file intentionally does NOT contain filesystem operation declarations.
+
 ''
 ''
 '' sys\types -- header translated with help of SWIG FB wrapper
@@ -76,7 +82,15 @@ type loff_t as __loff_t
 type ino_t as __ino_t
 type dev_t as __dev_t
 type gid_t as __gid_t
+'' Bionic ARM/x86 LP32 exposes a 16-bit public mode_t. Keep the internal
+'' Linux __mode_t at 32 bits for existing data layouts; the public alias
+'' selects API argument and return widths independently of those layouts.
+#if defined(__FB_ANDROID__) and not defined(__FB_64BIT__) and _
+    (defined(__FB_X86__) or defined(__FB_ARM__))
+type mode_t as ushort
+#else
 type mode_t as __mode_t
+#endif
 type nlink_t as __nlink_t
 type uid_t as __uid_t
 type off_t as __off_t
@@ -103,3 +117,5 @@ type fsblkcnt_t as __fsblkcnt_t
 type fsfilcnt_t as __fsfilcnt_t
 
 #endif
+
+'' end of crt/sys/linux/types.bi

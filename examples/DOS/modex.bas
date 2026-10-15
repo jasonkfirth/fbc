@@ -9,9 +9,9 @@
 #include "dos/pc.bi"
 #include "dos/sys/farptr.bi"
 
-#define SC_INDEX	&H3C4
-#define CRTC_INDEX	&H3D4
-#define MISC_OUTPUT	&H3C2
+#define SC_INDEX	(&H3C4)
+#define CRTC_INDEX	(&H3D4)
+#define MISC_OUTPUT	(&H3C2)
 
 modex:
 data &H0D06 '/* vertical total */

@@ -20,8 +20,8 @@ end type
 
 #define SPEED_LIMIT        20
 
-#define SCR_WIDTH			320*1
-#define SCR_HEIGHT			240*1
+#define SCR_WIDTH			(320 * 1)
+#define SCR_HEIGHT			(240 * 1)
 
 '' Module state shared by this single-threaded renderer's update and draw code.
 dim shared stars(0 to NUM_STARS-1) as VECTOR

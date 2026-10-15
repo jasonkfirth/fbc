@@ -30,6 +30,22 @@ producer/consumer transport and incremental-cache checks with:
 python3 tests/semantic-sidecar/test_binary_transport.py --fbc ./bin/fbc --linter /path/to/fb_linter
 ```
 
+`macro_call_inputs.py` checks `source-call-macro-references` (capability 118).
+Full models with macro provenance retain the exact original `MR` reference
+identity on surviving direct and virtual CALL nodes. The immutable node
+property `source-call-macro-reference` selects that reference; the selected
+procedure must agree with the call target and its original macro invocation.
+Physical calls continue to use their `H` source-binding relation. These are
+distinct identity domains and never share a binding ordinal.
+
+Each available module has one namespace-owned
+`source-call-macro-count:<module-id>` closure, including zero. Counts describe
+surviving CALL associations, so cloned nodes can refer to the same original
+reference. This family does not assert complete implicit-call coverage.
+Reduced models and compact macro provenance mark the capability unavailable
+and omit its observations. The focused tests compare unchanged GCC, Clang and
+LLVM output, exact text/binary rows and malformed-reference refusal.
+
 This gate compares exact decoded facts, checks native codec rollback and bounds,
 rejects malformed headers, and exercises source/include invalidation and concurrent
 cache reuse, private C-stream ownership and cache lease release after a crash.

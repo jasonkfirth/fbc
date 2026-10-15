@@ -1,9 +1,26 @@
+'' Project: FreeBASIC network examples
+'' -----------------------------------
 ''
-'' simple http-get example using OPEN TCP
+'' File: examples/network/opentcp/http-get.bas
+''
+'' Purpose:
+''
+''     Fetch and print an HTTP response using the OPEN TCP file device.
+''
+'' Responsibilities:
+''
+''     - parse host, port, and path arguments
+''     - bound response-header and body waits
+''     - close the acquired TCP file unit on every exit path
+''
+'' This file intentionally does NOT contain:
+''
+''     - TLS or general HTTP transfer decoding
+''     - packet-driver installation or Watt-32 configuration
+''
 '' Ownership: the module closes its acquired TCP file unit on every exit path.
-''
 
-#if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)
+#if defined(__FB_JS__) or defined(__FB_XBOX__)
 	print "TCP is not supported on this target"
 	end 1
 #endif
@@ -139,3 +156,5 @@ function hGetArg( byval index as integer, byref default_value as string ) as str
 		function = default_value
 	end if
 end function
+
+'' end of examples/network/opentcp/http-get.bas

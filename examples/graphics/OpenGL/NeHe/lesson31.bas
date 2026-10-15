@@ -83,4 +83,3 @@ function InitGL() as integer
 	glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST     '' Really Nice Perspective Calculations
 	InitGL = true
 end function
-

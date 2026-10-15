@@ -7,4 +7,3 @@
 '' --------
 
 Print SizeOf(Byte) ' returns 1
-

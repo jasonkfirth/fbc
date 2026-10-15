@@ -2,10 +2,15 @@
 Provides a wide range of mathematical routines such as random number generators, special functions and least-squares fitting.
 
 Website: https://www.gnu.org/software/gsl/, Windows port: http://gnuwin32.sourceforge.net/packages/gsl.htm 
-Platforms supported: ""Win32"", ""Win64"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux, FreeBSD, Haiku
 Headers to include: gsl/*.bi
 Header version: 1.16
 Examples: in examples/math/GSL/
+
+Haiku R1 beta 6 amd64: `gsl1.bas` and `gsl2.bas` compiled and ran with
+FreeBASIC 1.20.4-3 against HaikuPorts GSL 2.6. The Haiku binding links both
+`gsl` and `gslcblas`, because the package leaves CBLAS references for the
+application link step.
 
 {{fbdoc item="section" value="Matrices and precision"}}
 	##gsl_matrix_alloc## creates an owning allocation. Check its result, check operations which return a status, and release it with ##gsl_matrix_free## before leaving the example. Matrix views borrow their backing storage and must not be freed as independent owning allocations. GSL uses row-major indexing.

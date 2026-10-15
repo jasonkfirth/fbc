@@ -299,6 +299,9 @@ User Call of Destructor
 	Destructor
 		erase: @1375344 (descriptors) -> {"u","v","w","x"} => {"","","",""}
 %%
+{{fbdoc item="section" value="Pointer width in allocation examples"}}
+	An address saved for display after deallocation uses ##UInteger## and ##CUInt(pointer)##. This preserves the target pointer width without dereferencing released memory. A direct pointer-to-##ULongInt## cast is not portable to 32-bit targets.
+
 {{fbdoc item="section" value="See also"}}
 	- [[KeyPgOperator|Operator]]
 	- [[KeyPgConstructor|Constructor]]

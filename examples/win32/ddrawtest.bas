@@ -17,12 +17,12 @@ const SCR_HEIGHT        = 240
 const SCR_SIZE          = (SCR_WIDTH * SCR_HEIGHT)
 
 #ifdef __FB_64BIT__
-	const SCR_BPP           = 32                    '' \
-	#define SCR_TYPE        ulong                   '' /
+	const SCR_BPP           = 32 ' 32-bit color depth
+	#define SCR_TYPE        ulong
 	#define VAL2RGB(v) (((v) shl 16) or ((v) shl 8) or (v))
 #else
-	const SCR_BPP           = 16                    '' \
-	#define SCR_TYPE        ushort                  '' /
+	const SCR_BPP           = 16 ' 16-bit color depth
+	#define SCR_TYPE        ushort
 	#define VAL2RGB(v) (((v) shl 11) or ((v) shl 5) or (v))
 #endif
 

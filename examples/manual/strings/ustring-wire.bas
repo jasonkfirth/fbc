@@ -16,7 +16,7 @@ dim as integer handle = freefile()
 if open(filename for binary as #handle) <> 0 then end 1
 if FbNetPutStringLE(handle, bytes, 7) = 0 then end 1
 if FbNetPutStringLE(handle, wide, 7) = 0 then end 1
-'' The five-byte limit retains é and excludes the incomplete emoji.
+'' The five-byte limit retains U+00E9 and excludes the incomplete emoji.
 if FbNetPutStringLE(handle, text, 5) = 0 then end 1
 seek #handle, 1
 if FbNetGetStringLE(handle, received, 7) = 0 then end 1

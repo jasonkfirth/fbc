@@ -15,6 +15,9 @@ const SEMANTIC_ACCESS_MAX_BINDINGS = 1000000
 dim shared as ubyte ptr access_roles
 dim shared as integer access_capacity
 dim shared as longint access_base, access_last
+'' Counts surviving CALL-to-MR associations, including cloned call nodes.
+'' Reset with the module; MR identities themselves belong to the exporter.
+dim shared as longint macro_call_count
 '' Direct writes are separate from final ACC roles. Runtime lowering may use
 '' BYREF and generated tokens may have no binding, but neither is a negative
 '' observation about a parser-selected assignment to a parameter variable.
@@ -22,6 +25,7 @@ dim shared as ubyte ptr direct_writes
 dim shared as integer direct_capacity
 
 sub fbSemanticModelResetAccess( )
+	macro_call_count = 0
 	deallocate(access_roles)
 	deallocate(direct_writes)
 	direct_writes = NULL
@@ -115,6 +119,7 @@ end function
 
 sub fbSemanticModelSetAccess(byval node as ASTNODE ptr, byref role as const string)
 	if( (fbSemanticModelEnabled( ) = FALSE) or (node = NULL) ) then exit sub
+	if( node->semantic_binding < 0 ) then exit sub
 	hDirectSourceWrite(node, role)
 	'' Transparent address/type wrappers can surround a written lvalue.
 	'' Stop at its actual occurrence, so assigning a field does not mark
@@ -144,6 +149,7 @@ sub fbSemanticModelSetAccess(byval node as ASTNODE ptr, byref role as const stri
 end sub
 
 sub fbSemanticModelExportAccess( )
+	fbSemanticModelExportMacroCallCount(macro_call_count)
 	for binding as longint = access_base + 1 to access_last
 		dim as string role
 		select case access_roles[binding - access_base - 1]
@@ -161,6 +167,21 @@ end sub
 
 sub fbSemanticModelExportBindingLink(byval node as ASTNODE ptr, byval identity as longint)
 	if( node->semantic_binding = 0 ) then exit sub
+	if( node->semantic_binding < 0 ) then
+		'' Negative tags are exact macro references captured after overload
+		'' selection. Never export them as B ordinals or editable locations.
+		if( (node->class <> AST_NODECLASS_CALL) or _
+			(fbSemanticModelFullEnabled( ) = FALSE) or _
+			(fbSemanticModelMacroProvenanceEnabled( ) = FALSE) or _
+			(macro_call_count >= SEMANTIC_ACCESS_MAX_BINDINGS) ) then
+			fbSemanticModelFailAt("invalid macro source-call association")
+			exit sub
+		end if
+		fbSemanticModelAppendDetail("K" + TABCHAR + "node" + TABCHAR + fbSemanticModelNumber(identity) + _
+			TABCHAR + "source-call-macro-reference" + TABCHAR + fbSemanticModelNumber(-node->semantic_binding))
+		macro_call_count += 1
+		exit sub
+	end if
 	fbSemanticModelAppendDetail("H" + TABCHAR + "node" + TABCHAR + fbSemanticModelNumber(identity) + _
 		TABCHAR + "binding" + TABCHAR + fbSemanticModelNumber(node->semantic_binding) + TABCHAR + "source-binding" + TABCHAR + "0")
 end sub

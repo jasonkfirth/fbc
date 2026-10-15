@@ -33,7 +33,7 @@ RTL_LIBS := \
 	$(libdir)/$(FBEXTRA_SCRIPT)
 
 ifeq ($(THREAD_MODEL),pdmlwp)
-RTL_LIBS += $(libdir)/libfbpdmlwp.a
+RTL_LIBS += $(libdir)/libfblwp.a
 endif
 
 ifeq ($(TARGET_OS),amiga)

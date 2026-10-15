@@ -88,6 +88,31 @@ qualification. The PCRE row includes the later focused rerun noted above.
 | GUI, utility and math | `gtk3_devel`, `glib2_devel`, `gsl_devel`, `ode_devel`, `lua5.3_devel`, `portaudio_devel`, `libcaca_devel`, `ncurses6_devel`, `bcunit_devel` | GLib 7/7, GSL 1/1, ODE 1/1, Lua 1/1, PortAudio 1/1, libcaca 2/2, curses 1/1 and CUnit 2/2 compiled and linked. Only 4 GTK-family sources compiled; many examples target GTK 2 APIs. |
 | PCRE | `libpcre_devel` | The focused rerun compiled and linked `CRegex.bas` and `test.bas` after the runner began syncing their shared parent helper. |
 
+## Libraries compiled and run on Haiku
+
+Each row records a focused example run on the Haiku VM, in addition to a
+successful native compile and link. These runs qualify the named interfaces
+and input paths only; they do not establish full binding coverage.
+
+| Library and HaikuPorts package | Example programs | Runtime result |
+| --- | --- | --- |
+| SQLite 3 (`sqlite_devel` 3.53.4.0-1) | `examples/database/sqlite3_test.bas` | Opened an in-memory database and returned `4` for `select 2+2`. SQLite 2 was unavailable. |
+| Lua 5.3 (`lua5.3_devel` 5.3.6-5) | `examples/other-languages/Lua/minmax.bas` with `minmax.lua` | Loaded the script and reported the expected minimum and maximum. |
+| GSL (`gsl_devel` 2.6-2) | `examples/manual/libraries/gsl1.bas`, `gsl2.bas` | Both numerical and matrix examples ran. The header now links `gslcblas` on Haiku because the package leaves CBLAS references for the application link step. |
+| GMP (`gmp_devel` 6.3.0-1) | `examples/manual/libraries/gmp.bas` | Computed `2^65536`. |
+| LZO (`lzo_devel` 2.10-3) | `examples/manual/libraries/lzo.bas` | Safe decompression restored the original bytes after compression. |
+| Expat (`expat_devel` 2.9.0-1) | `examples/xml/expat.bas` | Parsed a controlled XML fixture through the streaming callbacks. |
+| libxml2 (`libxml2_devel` 2.15.3-1) | `examples/xml/libxml.bas` | Parsed a controlled XML fixture through the text-reader API. |
+| zlib (`zlib_devel` 1.3.2-1) | `examples/compression/zlib.bas` | Compression, inflate, dictionary and gzip checks passed; the example reported the expected runtime/header version difference. |
+| bzip2 (`bzip2_devel` 1.0.8-3) | `examples/compression/bz2compress.bas` | Compressed the repository's `examples/fblogo.bmp` fixture. |
+| libzip (`libzip_devel` 1.11.4-1) | `examples/manual/libraries/zip2.bas`, `examples/compression/libzip.bas` | Created and extracted both entries; extracted bytes matched their source text. |
+| BCUnit (`bcunit_devel` 3.0.2-1) | `examples/misc/CUnit/simple.bas` | Two tests and five assertions passed. HaikuPorts supplies this CUnit-compatible API as `libbcunit`. |
+| GD (`gd_devel` 2.3.3-8) | `examples/files/GD/gd.bas` | Generated non-empty GIF, PNG and JPEG files. |
+| PCRE 1 (`libpcre_devel` 8.45-3) | `examples/regex/PCRE/pcredemo.bas`, `preg_class.bas` | Both regex examples ran; `preg_class.bas` used its sibling `match-progress.bi` helper. |
+| GLib (`glib2_devel` 2.88.1-8) | `g_Actions.bas`, `g_Arguments.bas`, `g_Assert.bas`, `g_Filenames.bas`, `g_SplitArguments.bas` in `examples/misc/glib/` | The five named utility examples ran. Other GLib examples are not included in this runtime claim. |
+| SDL 1.2 (`libsdl_devel` 1.2.15-19) | `examples/graphics/SDL1/core/video_info.bas` | SDL initialization and video-info queries completed in the headless VM. No window or rendering behavior was tested. SDL 2 and SDL 3 remain unqualified on Haiku. |
+| cURL (`curl_devel` 8.22.0-3) | `examples/manual/libraries/curl.bas` | Fetched and checked the exact response from a local loopback HTTP fixture. |
+
 Useful package versions in this snapshot include HaikuPorts `curl_devel`
 8.22.0-3, `expat_devel` 2.9.0-1, `libxml2_devel` 2.15.3-1,
 `libiconv_devel` 1.18-1, `libpcre_devel` 8.45-3, `freetype_devel`
@@ -125,6 +150,10 @@ Useful package versions in this snapshot include HaikuPorts `curl_devel`
   the four successful compiles do not qualify that family as a whole.
 - OpenAL examples need `-lalut`, which was not present. The installed OpenAL
   package alone is insufficient for those examples.
+- Aspell compiled but did not run because no `en_US` word list was installed.
+  Installing HaikuPorts `aspell_en` failed when package refresh/download was
+  denied, so Aspell is not runtime-qualified and is not listed as Haiku
+  supported in its library page.
 - BASS and FMOD are proprietary SDKs and were not available. The focused FMOD
   probe reached the expected missing `-lfmod` link failure.
 - The libffi example did not compile because the current binding refers to

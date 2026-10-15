@@ -2822,6 +2822,9 @@ Each thread using fix-len zstrings, with user code working on zstring indexes:
 
 @@{{anchor name="ProPgMtCriticalSectionsFAQtop|Back to top"}}@@
 
+{{fbdoc item="section" value="Thread argument width"}}
+	The thread-number examples carry only values 1 through 9 in an ##Any Ptr## argument. Convert that argument with ##CInt(p)##, which has the native pointer width. Casting the pointer directly to ##LongInt## is not portable to 32-bit targets.
+
 {{fbdoc item="section" value="See also"}}
 	- [[ProPgMultiThreading|Multi-Threading Overview]]
 	- [[ProPgMtThreads|Threads]]

@@ -18,4 +18,3 @@ Function returnbyref () ByRef As Double  '' declaration for returning by referen
 	Static As Double X = 0
 	Return X
 End Function
-

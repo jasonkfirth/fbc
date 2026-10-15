@@ -64,4 +64,3 @@ Singleton.suppress()
 'Dim As Singleton Ptr ps5 = New Singleton(*ps3)  '' forbidden
 
 Sleep
-

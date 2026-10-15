@@ -1,0 +1,132 @@
+<!--
+    Project: FreeBASIC compiler manual
+    File: doc/manual/cache/DOSLibrarySupport.wakka
+
+    Purpose:
+
+        Record third-party library evidence for the DOS target.
+
+    Responsibilities:
+
+        - identify the DOSBox-X and DJGPP qualification environment
+        - distinguish runtime checks from compile and link checks
+        - record the full Exampleageddon outcome and tested library versions
+        - identify optional DOS networking requirements
+
+    This file intentionally does NOT claim physical-PC qualification or
+    support for library versions that were not tested.
+-->
+{{fbdoc item="title" value="DOS third-party library support"}}----
+
+This page records which external libraries have a matching DOS library and
+what level of evidence was collected. A FreeBASIC binding file only declares
+the API. The DOS target also needs a compatible DJGPP library, headers,
+runtime files, and any data assets required by the program.
+
+{{fbdoc item="section" value="Test environment"}}
+
+- DOSBox-X 2026.10.01, DOS 7.1 with long filename support enabled
+- Emulated Pentium II, dynamic x86 core, maximum cycles
+- DJGPP 3.4 toolchain, FreeBASIC 1.20.4 DOS candidate
+- Compiler options: `-target dos -arch 686 -fpu x87 -w all -exx -mt -dos-threads pdmlwp`
+- Full corpus receipts: `out/exampleageddon-dos-20261012/evidence/sweep/`
+
+The full sweep covered 1,767 examples in 45 completed batches: 1,347
+compiled and linked, while 420 did not. The raw categories include unavailable third-party packages, platform-specific
+examples, helper modules, and intentional failures. Of the 313 external-library
+rows, 22 linked against staged packages. All 652 DOS-applicable self-contained
+examples compiled, linked, and returned status 0 at runtime. DOS `THREADCALL`
+is excluded because the runtime omits its libffi implementation. The full
+Exampleageddon runner does not launch interactive or external-library examples
+at runtime.
+
+Focused DOSBox-X retries fixed two actionable compile failures from the raw
+sweep. Example 1025 now compiles and links after its DOS extern aliases were
+adjusted for FreeBASIC's leading C symbol prefix; its embedded-data object
+exports `_binary_hello_txt_start/end`. Example 1043 now compiles and links
+after correcting its timer rollover checks. Neither interactive example was
+launched. Example 1667 includes an explicit `#error "Unsupported platform"`
+in its timer library on DOS and is now classified as platform-specific. R006
+rebuilt the two corrected examples from the current worktree source; both
+artifacts were present and neither interactive program was launched. The raw
+receipts are preserved as run.
+
+The full sweep used the listed options with Watt-32, PDMLWP, DPMI yield, and
+low-power graphics enabled in the private compiler candidate. These results
+are DOSBox-X evidence only. It compiled and linked all three network examples,
+but did not run them or any external-library examples.
+
+{{fbdoc item="section" value="Runtime checks"}}
+
+|| **Library** || **DOS version** || **Evidence and limits** ||
+|| bzip2 || 1.0.8 || The DOS example compressed a fixture to 710 bytes. Host-side decompression recovered the original bytes; DOS-side decompression was not exercised. ||
+|| QuickLZ || 1.5.0 || Level 1 compressed an 8 KiB input and decoded it byte-for-byte. The DJGPP build used `QLZ_MEMORY_SAFE`. ||
+|| zlib || 1.3 || Runtime self-tests, stream operations, and gzip file checks passed. The binding declares 1.2.8, so its version warning is expected. ||
+
+{{fbdoc item="section" value="Compile and link checks"}}
+
+These examples linked against the listed DOS packages. Their external-library
+APIs were not exercised at runtime by the corpus runner.
+
+|| **Library** || **DOS library version** || **Evidence** ||
+|| Allegro 4 || 4.2.2 || Five Allegro 4 examples linked. The binding page lists headers for 4.4.2 and 5.0.11; this result does not qualify those versions. ||
+|| Curses || PDCurses 3.9 || Curses examples linked; interactive runtime behavior was not checked. ||
+|| Expat || 2.0.0 || Manual library example linked. ||
+|| JPEG || 9e || JPEG example linked. ||
+|| GRX || 2.4.9 || GRX graphics example linked. ||
+|| libpng || 1.6.40 || PNG example linked. ||
+|| Lua || 5.2.2 || Lua example linked. ||
+|| PCRE1 || 8.42 || PCRE examples linked. ||
+
+{{fbdoc item="section" value="DXE and threaded runtime limits"}}
+
+The DOS DXE compiler path created `mydll.dxe` and `libmydll_il.a`. The
+import-library basename fix and the DOS COFF profiling-boundary linker-script
+fix were checked in a private candidate package. With the multithreaded DOS
+runtime, `dylib.bas` loaded the DXE and called its exact DOS export name
+`_AddNumbers` successfully. The import-library consumer also compiled and
+linked, but its runtime stopped with error 14 because the DXE referenced
+`_fb_ErrorSetModName`, which the multithreaded runtime does not export.
+
+The existing [[ProPgSharedLibrariesDOS|DOS shared library limitations]] page
+describes this multithreaded DXE limit. A successful consumer link alone does
+not qualify import-library loading at runtime.
+
+Watt-32 is present in the staged DJGPP library set, but is an opt-in compiler
+feature. Build FreeBASIC with `DOS_TCP_PROVIDER=watt32` so the DOS driver adds
+`-lwatt` automatically. On a real DOS PC, Watt-32 also needs a compatible
+packet-driver and `WATTCP.CFG`. Packet-driver networking and socket runtime
+behavior were not tested here, so the library is available for opt-in builds
+but is not runtime-qualified.
+
+The provider-enabled full sweep compiled and linked all three DOS network
+examples, including their active `OPEN TCP` code. The DOS branch of
+`examples/network/http-get.bas` uses the FreeBASIC TCP file device rather than
+Unix socket bindings. The verbose link commands confirmed automatic `-lwatt`
+selection. The examples were not run because this setup did not configure or
+qualify a packet driver and `WATTCP.CFG`.
+
+{{fbdoc item="section" value="Not qualified in this setup"}}
+
+The `ExtLib*.wakka` platform lists include DOS for the three third-party
+libraries with targeted runtime checks, plus the DOS API and DJGPP C runtime.
+Compile/link-only results, missing packages, and other DOS limits are recorded
+here. "Not qualified" means that this run did not establish a usable matching
+DOS library. It does not prove that no third-party DOS port exists.
+
+The corpus examples for libzip, caca, SQLite, MySQL, PostgreSQL, FreeImage,
+GD, PDFLib, Allegro 5, Cairo, FreeType, OpenGL, SDL, and several other
+bindings did not link in the staged DJGPP setup. Review the per-library page
+for the specific dependency or platform limitation. SQLite 3.54 was also
+tried from source; the POSIX-oriented build path failed on missing or
+incompatible `osFstat`, `ETIMEDOUT`, `timespec`, and `nanosleep` APIs.
+
+The DJGPP toolchain supplies the C runtime. FreeBASIC's DOS API bindings
+target DOS BIOS and DOS calls. Their presence does not imply that optional
+third-party libraries are available. Likewise, a package archive or `.bi`
+binding is not a successful link or runtime result. A successful link also
+does not show that the library's devices, configuration files, or runtime
+assets work on a physical DOS PC.
+
+{{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}
+<!-- end of DOSLibrarySupport.wakka -->

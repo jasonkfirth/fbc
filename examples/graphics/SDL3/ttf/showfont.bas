@@ -34,8 +34,11 @@
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
 #define MAX_FALLBACKS 4
-#define TTF_SHOWFONT_USAGE !"Usage: %s [--textengine surface|renderer] [--solid] [--shaded] [--blended] [-b] [-i] [-u] [-s] [--outline size] [--hintlight|--hintmono|--hintnone] [--nokerning] [--wrap] [--align left|center|right] [--fgcol r,g,b,a] [--bgcol r,g,b,a] [--disable-editbox] [--fallback <font>.ttf>] <font>.ttf [ptsize] [text]\n"
+#define TTF_SHOWFONT_USAGE (!"Usage: %s [--textengine surface|renderer] [--solid] [--shaded] [--blended] [-b] [-i] [-u] [-s] [--outline size] [--hintlight|--hintmono|--hintnone] [--nokerning] [--wrap] [--align left|center|right] [--fgcol r,g,b,a] [--bgcol r,g,b,a] [--disable-editbox] [--fallback <font>.ttf>] <font>.ttf [ptsize] [text]\n")
 
+'' -------------------------------------------------------------------------
+'' Font display state
+'' -------------------------------------------------------------------------
 type EditBox
 	window_ as SDL_Window ptr
 	renderer as SDL_Renderer ptr
@@ -116,6 +119,9 @@ declare sub AdjustTextOffset cdecl(byval text as TTF_Text ptr, byval xoffset as 
 declare sub HandleKeyDown cdecl(byval scene as Scene ptr, byval event as SDL_Event ptr)
 declare function example_main cdecl(byval argc as long, byval argv as zstring ptr ptr) as long
 
+'' -------------------------------------------------------------------------
+'' Text rendering and event handling
+'' -------------------------------------------------------------------------
 sub DrawScene cdecl(byval scene as Scene ptr)
 	dim renderer as SDL_Renderer ptr = scene->renderer
 	'' Clear the background to background color

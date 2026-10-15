@@ -2,11 +2,17 @@
 Portable toolkit for building graphical user interfaces.
 
 Website: http://www.tecgraf.puc-rio.br/iup/
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux
 Headers to include: IUP/iup.bi
 Header version: 3.15
 Example Usage: yes, in examples/GUI/IUP/
 
 On Linux, the link dependencies must match the GTK backend used to build IUP. Define ##__USE_GTK3__## before including ##IUP/iup.bi##, or pass ##-d __USE_GTK3__##, when using a GTK 3 build. The default remains the older GTK 2 backend. This selection affects link libraries; it does not change the IUP C declarations.
+
+Check ##IupOpen## for ##IUP_ERROR## before creating or showing controls. A missing X display can cause initialization to fail on Linux. The examples return status 1 in that case rather than entering the main loop or reporting successful message display. See [[https://web.tecgraf.puc-rio.br/iup/en/func/iupopen.html IupOpen]].
+
+Call ##IupClose## after the final IUP operation. It releases toolkit memory and automatically destroys dialogs and named elements, so the examples keep their dialog hierarchy alive through the callbacks and close the toolkit after the loop or message returns. See [[https://web.tecgraf.puc-rio.br/iup/en/func/iupclose.html IupClose]].
+
+The native Linux runner is build_scripts/test-iup-examples.py. It uses the genuine GTK 3 IUP library and isolated Xvfb displays to check initialization failures, modal button callbacks, text edits and RGB bounds. Windows checks use the installed native Win32/Win64 IUP libraries. Headless rendering does not establish physical display operation.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

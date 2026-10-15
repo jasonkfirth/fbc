@@ -65,4 +65,3 @@ Next iterator
 Print "End of supported screen resolutions"
 
 Sleep
-

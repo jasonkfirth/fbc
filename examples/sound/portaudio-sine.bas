@@ -1,5 +1,9 @@
 ''
 '' PortAudio Sine wave example
+'' File: portaudio-sine.bas
+'' Purpose: Play three sine tones through the native PortAudio API.
+'' Responsibilities: Callback buffers, stream lifetime and checked device data.
+'' This file contains no audio driver or device installation.
 ''
 '' Requires libportaudio2
 
@@ -34,6 +38,15 @@ Function PlayCallback cdecl (InputBuff as Const Any Ptr, OutputBuff as Any Ptr, 
     Function = paContinue
 End Function
 
+Sub PortAudioFailure(ByVal pe As PaError, ByVal pa_stream As PaStream Ptr = 0)
+    Print "Error: "; *Pa_GetErrorText(pe)
+    '' CloseStream also aborts an active stream and joins its callback.
+    '' Keep the caller's stack payload alive until this cleanup has finished.
+    If pa_stream <> 0 Then Pa_CloseStream(pa_stream)
+    Pa_Terminate()
+    End 1
+End Sub
+
 Sub Play(Frequency as Single, Duration as Single)
     Dim as PaError pe
     Dim as PaStream Ptr pa_stream
@@ -43,15 +56,13 @@ Sub Play(Frequency as Single, Duration as Single)
 
     pe = Pa_OpenDefaultStream(@pa_stream, 0, 1, paInt32, SampleRate, SineSamples, @PlayCallback, @payload)
     If pe <> paNoError Then
-        Print "Error: "; *Pa_GetErrorText(pe)
-        End 1
+        PortAudioFailure(pe)
     End If
 
     Print "Playing "; Frequency; "Hz for "; Duration; "ms"
     pe = Pa_StartStream(pa_stream)
     If pe <> paNoError Then
-        Print "Error: "; *Pa_GetErrorText(pe)
-        End 1
+        PortAudioFailure(pe, pa_stream)
     End If
 
     'Sleep 2
@@ -59,14 +70,12 @@ Sub Play(Frequency as Single, Duration as Single)
 
     pe = Pa_StopStream(pa_stream)
     If pe <> paNoError Then
-        Print "Error: "; *Pa_GetErrorText(pe)
-        End 1
+        PortAudioFailure(pe, pa_stream)
     End If
 
     pe = Pa_CloseStream(pa_stream)
     If pe <> paNoError Then
-        Print "Error: "; *Pa_GetErrorText(pe)
-        End 1
+        PortAudioFailure(pe)
     End If
 End Sub
 
@@ -82,11 +91,23 @@ End If
 Dim defdevice as Integer = Pa_GetDefaultOutputDevice()
 If defdevice = paNoDevice Then
     Print "Error: no default output device"
+    Pa_Terminate()
     End 1
 End If
 
 Dim devinfo as const PaDeviceInfo Ptr = Pa_GetDeviceInfo(defdevice)
-Dim apiinfo as const PaHostApiInfo Ptr = Pa_GetHostApiInfo(Pa_GetDefaultHostApi())
+If devinfo = 0 Then
+    Print "Error: default output device information unavailable"
+    Pa_Terminate()
+    End 1
+End If
+'' Use the API that owns this device; the process default API can differ.
+Dim apiinfo as const PaHostApiInfo Ptr = Pa_GetHostApiInfo(devinfo->hostApi)
+If apiinfo = 0 Then
+    Print "Error: output host API information unavailable"
+    Pa_Terminate()
+    End 1
+End If
 Print "Using "; *apiinfo->name; " api on default output device: "; *devinfo->name
 
 '' Play from A4 (440Hz) for 440ms until A3 (220Hz) for 220ms
@@ -95,6 +116,11 @@ For i as Integer = 440 to 220 Step -110
 Next
 
 Print "Shutdown PortAudio"
-Pa_Terminate()
+pe = Pa_Terminate()
+If pe <> paNoError Then
+    Print "Error: "; *Pa_GetErrorText(pe)
+    End 1
+End If
 
 End 0
+'' end of portaudio-sine.bas

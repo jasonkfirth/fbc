@@ -1,4 +1,9 @@
-﻿#include once "IUP/iup.bi"
+﻿'' FreeBASIC IUP examples
+'' File: textbox.bas
+'' Purpose: Display text and its numeric conversions after a button click.
+'' Responsibilities: Native dialog behavior, callbacks and checked toolkit lifetime.
+'' This file contains no widget implementation or secondary event dispatcher.
+#include once "IUP/iup.bi"
 const NULL = 0
 const NEWLINE = !"\n"
 
@@ -30,7 +35,10 @@ function on_click_ok cdecl(byval handler as Ihandle ptr) as long
 	function = IUP_DEFAULT
 end function
 
-IupOpen(NULL, NULL)
+if IupOpen( NULL, NULL ) = IUP_ERROR then
+  print "Error: Could not initialize IUP."
+  end 1
+end if
 
 '' Create a window with a text box, ok button, and a label
 var textbox = IupText(NULL)
@@ -68,3 +76,5 @@ IupSetHandle("label", label)
 IupShow(dialog)
 IupMainLoop()
 IupClose()
+
+'' end of textbox.bas

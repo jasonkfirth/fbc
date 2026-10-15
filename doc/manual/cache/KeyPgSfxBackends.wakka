@@ -26,6 +26,10 @@ Output and capture backends used by FreeBASIC's built-in sound library.
 
 	For native Linux example checks, ##build_scripts/test-sfx-examples.py## runs both compiler backends with the genuine null driver. It limits diagnostic dumps to 8192 frames, checks finite submitted samples, independently reads the MIDI/stress WAV captures, and opens the composer on its own authenticated X display. These checks cover software execution and file output; they do not establish speaker, microphone or external MIDI-device operation.
 
+	Use ##--driver pulse --private-pulse## with that runner to check the genuine PulseAudio backend against a separate clocked null sink. The helper creates its own authenticated Unix socket and D-Bus session, then stops the service when the run ends. It does not change an existing desktop sound service. ##--driver alsa## checks the ALSA backend using the caller's selected ALSA configuration; a process-local ALSA null PCM can be used on a headless test host.
+
+	ALSA and PulseAudio diagnostic dumps contain only samples accepted by the native API. ALSA short writes advance the buffer offset, and zero-frame writes use the same bounded retry budget as interrupted or temporarily unavailable writes. Diagnostic dumps remain optional and capped; successful software-sink checks do not establish physical speaker operation.
+
 {{fbdoc item="see"}}
 	- ##[[KeyPgDevice|DEVICE]]##
 	- ##[[KeyPgCapture|CAPTURE]]##

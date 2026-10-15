@@ -1,9 +1,18 @@
 '/*
- '* GooCanvas Demo. Copyright (C) 2006 Damon Chaplin.
- '* Released under the GNU LGPL license. See COPYING for details.
- '*
- '* demo-arrowhead.c
- '*/
+'* Project: FreeBASIC graphics examples
+'* File: demo-arrowhead.bas
+'* Purpose: Display GooCanvas arrowhead editing in a GTK window.
+'* Responsibilities:
+'*     create the GTK window and canvas
+'*     draw and update arrow dimensions
+'* This file intentionally does NOT contain general GooCanvas bindings or
+'* renderer code.
+'*
+'* GooCanvas Demo. Copyright (C) 2006 Damon Chaplin.
+'* Released under the GNU LGPL license. See COPYING for details.
+'*
+'* demo-arrowhead.c
+'*/
 '
 ' FB translation by TJF, 2011
 ' Details: http://library.gnome.org/devel/goocanvas/unstable/
@@ -44,7 +53,8 @@ SUB set_dimension(BYVAL canvas AS GooCanvas PTR, _
           "points", points, _
           NULL)
 
-  sprintf (@buf, !"%d", dim_)
+  ' The C %d conversion expects a 32-bit int; FreeBASIC Integer is native-width.
+  sprintf (@buf, !"%d", CLng(dim_))
   g_object_set (g_object_get_data (G_OBJECT (canvas), text_name), _
           "text", @buf, _
           "x", tx, _
@@ -199,10 +209,11 @@ SUB create_dimension(BYVAL canvas AS GtkWidget PTR, _
                      BYVAL arrow_name AS ZSTRING PTR, _
                      BYVAL text_name AS ZSTRING PTR, _
                      BYVAL anchor AS GooCanvasAnchorType)
+  ' These gboolean properties go through GObject varargs; pass 1 for true.
   VAR item = goo_canvas_polyline_new (root, FALSE, 0, _
               "fill_color", "black", _
-              "start-arrow", TRUE, _
-              "end-arrow", TRUE, _
+              "start-arrow", 1, _
+              "end-arrow", 1, _
               NULL)
   g_object_set_data (G_OBJECT (canvas), arrow_name, item)
 
@@ -234,8 +245,8 @@ SUB create_sample_arrow(BYVAL canvas AS GtkWidget PTR, _
                         BYVAL x2 AS DOUBLE, _
                         BYVAL y2 AS DOUBLE)
   VAR item = goo_canvas_polyline_new_line (root, x1, y1, x2, y2, _
-               "start-arrow", TRUE, _
-               "end-arrow", TRUE, _
+               "start-arrow", CTRUE, _
+               "end-arrow", CTRUE, _
                NULL)
   g_object_set_data (G_OBJECT (canvas), sample_name, item)
 END SUB
@@ -407,10 +418,12 @@ FUNCTION create_canvas_arrowhead() AS GtkWidget PTR
 
   '/* Big arrow */
 
+  ' GObject's variadic property setter expects canonical C gboolean values.
+  ' FreeBASIC TRUE is -1, so pass 1 for this boolean property.
   VAR item = goo_canvas_polyline_new_line (root, _
                LEFT_, MIDDLE, RIGHT_, MIDDLE, _
                "stroke_color", "mediumseagreen", _
-               "end-arrow", TRUE, _
+               "end-arrow", 1, _
                NULL)
   g_object_set_data (G_OBJECT (canvas), "big_arrow", item)
 
@@ -483,3 +496,5 @@ gtk_container_add (GTK_CONTAINER (win), page)
 gtk_main ()
 
 END 0
+
+' end of demo-arrowhead.bas

@@ -58,4 +58,3 @@ Print " iteration with own storage stack:";
 Display(@translationToIterativeCombinationStack, 12)
 
 Sleep
-

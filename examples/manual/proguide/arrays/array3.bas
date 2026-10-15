@@ -15,4 +15,3 @@ Dim vlarray() As Integer
 
 ' Resizes the array to 10 elements.
 ReDim vlarray(1 To 10)
-

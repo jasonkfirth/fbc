@@ -168,4 +168,3 @@ Dim As UDT5 u57 = u54                      '' default copy-construction
 Print
 
 Sleep
-

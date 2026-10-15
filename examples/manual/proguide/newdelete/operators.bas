@@ -3,6 +3,10 @@
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'New and Delete'
 ''
+'' Purpose: Trace allocation and cleanup through overloaded New and Delete operators.
+'' Responsibilities: The documented example flow and its owned resources.
+'' This file contains no compiler implementation or replacement system API.
+''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgNewDelete
 '' --------
 ''
@@ -72,8 +76,9 @@ Operator UDT.New[] (ByVal size As UInteger) As Any Ptr
 	Return p                                            ' Returning memory pointer
 End Operator
 
+'' Preserve the pointer's native width before releasing the allocation.
 Operator UDT.Delete (ByVal buf As Any Ptr)
-	Dim As ULongInt bufAddress = CULngInt(buf)
+	Dim As UInteger bufAddress = CUInt(buf)
 	Print "    Operator Delete Overload"
 	If buf <> 0 Then
 		Deallocate(buf)                                 ' Memory deallocation (with passed pointer)
@@ -84,7 +89,7 @@ Operator UDT.Delete (ByVal buf As Any Ptr)
 End Operator
 
 Operator UDT.Delete[] (ByVal buf As Any Ptr)
-	Dim As ULongInt bufAddress = CULngInt(buf)
+	Dim As UInteger bufAddress = CUInt(buf)
 	Print "    Operator Delete[] Overload"
 	If buf <> 0 Then
 		Deallocate(buf)                                 ' Memory deallocation (with passed pointer)
@@ -164,3 +169,5 @@ Sub printArray (ByRef label As String = "", array() As String)
 	End If
 	Print "}";
 End Sub
+
+'' end of operators.bas

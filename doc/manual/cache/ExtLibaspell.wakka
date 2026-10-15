@@ -2,7 +2,7 @@
 Free and Open Source spell checker.
 
 Website: http://aspell.net/
-Platforms supported: ""Win32"", ""Win64"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux, FreeBSD
 Headers to include: aspell.bi
 Header version: 0.60.6.1
 

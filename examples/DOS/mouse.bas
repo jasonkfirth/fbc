@@ -6,7 +6,7 @@
 
 #include "dos/dpmi.bi"
 
-#define MOUSE &H33
+#define MOUSE (&H33)
 
 dim regs as __dpmi_regs
 dim x as integer, y as integer, b as integer

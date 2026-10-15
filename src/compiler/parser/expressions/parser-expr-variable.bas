@@ -321,7 +321,7 @@ private function hMemberId( byval parent as FBSYMBOL ptr, byval allow_inner as i
 	end select
 
 	if( res ) then
-		fbSemanticModelExportBinding(res, semantic_site, FALSE)
+		if( allow_inner ) then fbSemanticModelExportMemberBinding(res, parent, semantic_site, TRUE)
 		return res
 	end if
 
@@ -369,8 +369,8 @@ private function hMemberId( byval parent as FBSYMBOL ptr, byval allow_inner as i
 		return NULL
 	end select
 
-	if( (symbGetClass(sym) <> FB_SYMBCLASS_VAR) and _
-	    (symbGetClass(sym) <> FB_SYMBCLASS_PROC) ) then
+	if( allow_inner or ((symbGetClass(sym) <> FB_SYMBCLASS_VAR) and _
+	    (symbGetClass(sym) <> FB_SYMBCLASS_PROC)) ) then
 		'' ALLOW_INNER identifies the type-member grammar, independently of
 		'' whether the same field also appears in an enclosing expression.
 		fbSemanticModelExportMemberBinding(sym, parent, semantic_site, allow_inner)
@@ -463,7 +463,7 @@ function cUdtMember _
 		'' static var?
 		case FB_SYMBCLASS_VAR
 			astDelTree( varexpr )
-			varexpr = cVariableEx( fld, check_array )
+			varexpr = cVariableEx( fld, check_array, subtype )
 			if( export_semantics ) then
 				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
 			end if
@@ -1238,7 +1238,8 @@ end function
 function cVariableEx overload _
 	( _
 		byval sym as FBSYMBOL ptr, _
-		byval check_array as integer _
+		byval check_array as integer, _
+		byval semantic_receiver as FBSYMBOL ptr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr varexpr = any, idxexpr = any, descexpr = any
@@ -1253,7 +1254,11 @@ function cVariableEx overload _
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 	dim as longint semantic_array_nonphysical = lexGetNonphysicalTokenCount( )
 	dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
-	fbSemanticModelExportBinding(sym, semantic_site, FALSE)
+	if( semantic_receiver <> NULL ) then
+		fbSemanticModelExportMemberBinding(sym, semantic_receiver, semantic_site, FALSE)
+	else
+		fbSemanticModelExportBinding(sym, semantic_site, FALSE)
+	end if
 	dim as longint semantic_binding = fbSemanticModelBindingCount( )
 	if( semantic_binding = semantic_binding_before ) then semantic_binding = 0
 

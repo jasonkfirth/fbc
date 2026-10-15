@@ -56,6 +56,7 @@
 # build; Watt-32 is enabled only by an explicit command-line assignment.
 DOS_TCP_PROVIDER  ?=
 DOS_WATT32_CFLAGS ?=
+DOS_WATT32_LIBS   ?= -lwatt
 DOS_THREAD_PROVIDER ?=
 
 # Optional DOS host yield.  The empty default preserves the normal DOS

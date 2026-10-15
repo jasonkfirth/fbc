@@ -317,6 +317,15 @@ BOOTSTRAP_PLATFORM_LIBS := -lamiga -lffi
 BOOTSTRAP_PLATFORM_ARCHIVES := $(libdir)/libfbsoftfloat.a $(libdir)/libpthread.a $(libdir)/libffi.a
 endif
 
+# The DOS bootstrap pulls in runtime objects that reference the optional
+# Watt-32 adapter. Keep the same provider archive and duplicate strerror
+# policy used by the DOS compiler driver.
+ifeq ($(TARGET_OS),dos)
+ifdef ENABLE_DOS_WATT32
+BOOTSTRAP_PLATFORM_LIBS += $(DOS_WATT32_LIBS) -Wl,--allow-multiple-definition -lm
+endif
+endif
+
 $(BOOTSTRAP_FBC): $(BOOTSTRAP_RT0) $(BOOTSTRAP_RTL) $(BOOTSTRAP_OBJ) $(BOOTSTRAP_PLATFORM_ARCHIVES) | $(BOOTSTRAP_PATH)
 
 	$(RUN_CC) $(ALLLDFLAGS) -o $@ \

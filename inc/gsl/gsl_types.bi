@@ -26,8 +26,8 @@
 
 #inclib "gsl"
 
-#ifdef __FB_FREEBSD__
-	'' FreeBSD's GSL shared library leaves its CBLAS symbols for the link step.
+#if defined(__FB_FREEBSD__) or defined(__FB_HAIKU__)
+	'' These GSL packages leave CBLAS symbols for the application link step.
 	#inclib "gslcblas"
 #endif
 

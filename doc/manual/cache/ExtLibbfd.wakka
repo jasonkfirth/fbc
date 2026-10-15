@@ -2,7 +2,7 @@
 Provides an API to read and write object files in many different object file formats. libbfd is the core of the GNU binutils.
 
 Website: http://sourceware.org/binutils/
-Platforms supported: ""Win32"", Linux, DOS
+Platforms supported: ""Win32"", Linux
 Headers to include: bfd.bi
 Header version: binutils versions from 2.16 to 2.25
 

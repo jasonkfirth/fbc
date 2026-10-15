@@ -143,7 +143,7 @@ install-runtime:
 		find "$(INSTALL_LIBDIR)/include" -type f | sed "s|^$(DESTDIR)||" >> "$(INSTALL_MANIFEST)"; \
 	fi
 	@set -e; \
-	if [ -f "$(libdir)/libfbpdmlwp.a" ]; then \
+	if [ -f "$(libdir)/libfblwp.a" ]; then \
 		dst="$(INSTALL_LIBDIR)/pdmlwp-source"; \
 		mkdir -p "$$dst/contrib/dos/pdmlwp" "$$dst/build_scripts" "$$dst/docs"; \
 		cp -a "$(rootdir)/contrib/dos/pdmlwp/." "$$dst/contrib/dos/pdmlwp/"; \

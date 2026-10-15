@@ -41,4 +41,3 @@ Dim d As Date = Date.Today
 Print "Year  = "; d.Year
 Print "Month = "; d.Month
 Print "Day   = "; d.Day
-

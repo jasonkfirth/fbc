@@ -3,7 +3,7 @@ Lightweight, robust, and efficient POSIX compliant regexp matching library
 
 Website: https://laurikari.net/tre/
 Github: https://github.com/laurikari/tre/
-Platforms supported: Windows, Linux
+Platforms supported: Windows, Linux, FreeBSD
 Headers to include: tre/tre.bi, tre/regex.bi
 Header version: 0.8.0
 Examples: in examples/regex/TRE/

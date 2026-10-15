@@ -102,6 +102,13 @@ test-fmod.py --metadata-only for scoped decoder/metadata checks without
 /dev/dsp. Those modes compile original clients and never claim OSS playback.
 Do not install or load host kernel audio drivers from the container.
 
+Opening an output device is insufficient for playback acceptance. The archived
+FMOD 3.75 binary opened ALSA through the genuine Pulse PCM plugin in CT133,
+but its tracker timing failed the native C check. Supported buffer settings
+of 50, 100 and 200 ms did not produce an accepted tracker result. Retain that
+failure separately from the passing metadata checks; it does not establish
+working playback for the original examples.
+
 ## Native checks
 
 The following commands assume `bin/fbc` is the private native Linux compiler,
@@ -173,6 +180,9 @@ python3 build_scripts/test-sdl-addons.py --fbc bin/fbc \
 
 python3 build_scripts/test-sfx-examples.py --fbc bin/fbc \
     --output out/linux-sfx-examples --jobs 2
+
+python3 build_scripts/test-sfx-examples.py --fbc bin/fbc \
+    --output out/linux-sfx-pulse --jobs 2 --driver pulse --private-pulse
 ```
 
 The SDL runners inspect rendered windows, use input only on their own X
@@ -182,11 +192,122 @@ the genuine sfxlib null backend, checks bounded driver samples and verifies
 original output WAV files independently. Input capture and external MIDI
 hardware may be unavailable; that is distinct from software mixing/output.
 
+The PulseAudio profile creates a separate authenticated service and clocked
+null sink, with a private Unix socket and D-Bus session. It exercises the real
+PulseAudio API and verifies accepted samples without changing desktop audio.
+An independent monitor capture can confirm PCM beyond the library's own
+diagnostic hook. Native ALSA checks can select a process-local null PCM using
+ALSA_CONFIG_PATH; those accepted samples are also diagnostic evidence, not
+physical speaker proof. The private service requires pulseaudio,
+pulseaudio-utils and dbus-run-session.
+
+The native write-loop regression is separate from playback acceptance:
+
+```sh
+python3 build_scripts/test-sfx-linux-write.py --cc /usr/bin/gcc \
+    --bits 64 --output out/sfx-write64
+python3 build_scripts/test-sfx-linux-write.py --cc /usr/bin/clang \
+    --bits 32 --output out/sfx-write32
+python3 build_scripts/test-sfx-linux-write.py --cc /usr/bin/clang \
+    --bits 64 --ubsan --output out/sfx-write-ubsan
+```
+
+It uses genuine SDK declarations with unit-only controlled write responses to
+check partial acceptance, zero-frame retry bounds, error prefixes and invalid
+input sizes. These fault cases do not emulate playback or replace the SDK.
+
+PortAudio example cleanup and callback bounds have a separate controlled
+regression:
+
+```sh
+python3 build_scripts/test-portaudio-failures.py --fbc bin/fbc \
+    --output out/portaudio-failures
+```
+
+Native PortAudio monitor checks must wait for the recording client and allow
+for software-sink startup buffering. An independent C reference helps separate
+fixture behavior from FreeBASIC callback behavior. The checked fixture uses
+a private clocked Pulse sink, the genuine ALSA Pulse PCM plugin, bounded raw
+PCM capture and independent tone analysis; it does not prove exact audible
+durations. The archived FMOD 3.75 ALSA/Pulse route remains unqualified: its
+tracker timing is inconsistent, including with tested buffer sizes.
+
 The private Xvfb helper uses -noreset to keep the server from resetting after
 the readiness client disconnects, before the example connects. Authentication
 and cleanup remain active. Native gfxlib2 windows have no _NET_WM_PID property;
 the composer check therefore requires its unique exact title on a private
 server containing only the launched child, rather than searching the desktop.
+
+OpenAL source and buffer cleanup has a controlled amd64 regression using the
+installed OpenAL/ALUT declarations and both compiler backends:
+
+```sh
+python3 build_scripts/test-openal-failures.py --fbc bin/fbc \
+    --output out/openal-failures
+```
+
+The WAV player accepts an explicit filename, checks API failures, and deletes
+its source before its attached buffer. Native Linux checks use a private
+PulseAudio service and an owned terminal to pause, resume and exit the exact
+example while recording bounded nonzero monitor PCM. FB_EXAMPLE_AUTOPLAY=1
+checks a one-second lifecycle; cold software-sink startup can delay observable
+PCM beyond that interval. A native C reference exhibits the same delay.
+Allow startup time before testing interactive controls or accepting PCM.
+These software-sink results do not qualify physical speaker output.
+
+## GTK windows and C argument checks
+
+The GTK examples have a separate native window runner:
+
+```sh
+python3 build_scripts/test-gtk-examples.py --fbc bin/fbc \
+    --sdk-prefix out/gtk2-sdk/prefix --output out/linux-gtk
+```
+
+The optional SDK prefix supplies archived GTK2 add-ons such as libglade and
+gtkglext; installed GTK2, GTK3 and GooCanvas libraries remain genuine. The
+runner stages assets, tests all three packing layouts, opens a text fixture
+in the application example, and checks normal closure of each visible window.
+Arrow dragging must change the rendered image and canvas items must receive
+keyboard focus. Only the base and colour-selection examples intentionally
+start with uniform windows. Authentication and process ownership remain
+required. Accessibility bridging is disabled for this private fixture, which
+has no accessibility service; software OpenGL is selected explicitly.
+
+GObject variadic property values must use their declared C types. Boolean
+properties use CTRUE (1), and double properties require Double expressions.
+Native C va_arg checks cover the Windows GAS64 immediate-float register-copy
+regression separately:
+
+```sh
+python3 build_scripts/test-vararg-float.py --fbc bin/fbc \
+    --cc /usr/bin/gcc --output out/vararg-float
+```
+
+This native amd64 runner checks register positions, stack arguments, zero and
+negative values, stored values, named float parameters and indirect calls.
+On Windows, select the native GCC executable and compiler paths explicitly.
+The Windows compiler fix is qualified in a private candidate; a Linux native
+run does not by itself establish the Microsoft x64 ABI.
+
+## IUP dialogs
+
+The IUP examples have native dialog and callback checks:
+
+```sh
+python3 build_scripts/test-iup-examples.py --fbc bin/fbc \
+    --sdk-prefix out/native-small-sdk/prefix --output out/linux-iup
+```
+
+Use the genuine GTK3-backed IUP library in that prefix. The runner tests all
+five examples on both amd64 backends. With DISPLAY removed, each must report
+initialization failure and exit with status 1. With a private authenticated
+Xvfb display, the button example must open and dismiss its modal message, then
+exit through its Close callback. Text edits include a decimal value, empty
+input and words with spaces. RGB cases check orange, cyan and out-of-range
+components clamped to black by inspecting actual rendered pixels. Input stays
+on the launched process's own display and the server is reaped afterward.
+These checks do not qualify physical displays or all IUP controls.
 
 ## Whole example sweep
 
@@ -202,6 +323,43 @@ the machine. Debian's libjpeg-turbo uses JPEG ABI 6, so the JPEG example needs
 `-d __JPEGLIB_VER__=6`; the checked Windows SDK uses ABI 8. Keep that choice
 local to the example. Use `--glfw2-libdir` for the legacy GLFW example and
 `--iup-gtk3` when linking against the GTK3 IUP build.
+
+Use absolute library paths: each example compiles in its own working directory.
+For private shared-library SDKs, the compiler/linker process also needs their
+transitive dependencies on LD_LIBRARY_PATH or an appropriate linker search
+path. The wx-c 2.8 checks require their matching private wxWidgets libraries.
+Keep the GLFW2 archive in its own directory and pass that directory through
+--glfw2-libdir; adding the generic SDK prefix can instead select system GLFW3.
+
+A global backend override needs per-example profiles for backend-specific
+sources. The builtin-memory and builtin-numeric examples explicitly require
+the GCC/Clang/LLVM builtin interface; a GAS64 qualification must compile those
+with a compatible C backend and record the exceptions. Likewise, archived
+i386-only libraries need their original target and toolchain profiles rather
+than inheriting native amd64 library paths.
+
+Set CXX to the complete C++ compiler used for local .cxx helpers, and keep its
+matching runtime libraries available when executing those clients. A different
+g++ earlier on PATH can be incomplete even when the selected GCC works.
+
+Native GAS64 value regressions can be run separately from the corpus sweep:
+
+```sh
+python3 build_scripts/test-gas64-values.py --fbc bin/fbc \
+    --cc /usr/bin/gcc --output out/gas64-values
+```
+
+This checks integer FRAC results returned as Single and Double, including an
+overloaded UDT operator. Independent C aggregate factories exercise floating,
+integer and mixed return classes through array, member and pointer stores,
+with exact field values and neighboring canaries. These are native amd64 ABI
+checks. They do not establish physical graphics or another architecture's ABI.
+
+Packed C structures from 9 through 16 bytes also check every returned tail
+byte and adjacent array elements. On SysV amd64 these tails occupy the second
+integer return register. Partial stores must shift by bits, so consuming two
+or four bytes requires a shift of 16 or 32. The regression catches incorrect
+tail extraction even when the structure's first eight bytes are correct.
 
 The runner reports every compile failure and the original classification.
 `--fail-on-self-contained` gates its unattended self-contained subset; a zero

@@ -67,4 +67,3 @@ operator VARIANT.let _
 	V_BSTR(@this.var_) = SysAllocStringLen( rhs, len( *rhs ) )
 
 end operator
-

@@ -51,7 +51,7 @@ library source, modification notices and materials needed to relink with a
 modified library. The standalone builder retains library objects; application
 distributions must retain their relinkable objects and complete link command.
 Runtime installation carries this source tree, notices and standalone builder
-beside libfbpdmlwp.a in pdmlwp-source, preserving the builder's relative paths.
+beside libfblwp.a in pdmlwp-source, preserving the builder's relative paths.
 
 Credit to Paolo De Marino and everyone listed in THANKS: Josh Turpen,
 Sengan Short, Malcolm Taylor, Charles Sandmann, DJ Delorie, Chih-Hao Tsai,

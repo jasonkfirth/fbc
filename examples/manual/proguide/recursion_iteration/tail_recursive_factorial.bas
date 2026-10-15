@@ -13,4 +13,3 @@ Function tailRecursiveFactorial (ByVal n As Integer, ByVal result As Integer = 1
 		Return tailRecursiveFactorial(n - 1, result * n)  '' tail recursive call
 	End If
 End Function
-

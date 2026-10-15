@@ -37,6 +37,9 @@ declare function load_image cdecl(byval renderer as SDL_Renderer ptr, byval file
 declare function example_main cdecl(byval argc as long, byval argv as zstring ptr ptr) as long
 
 '' Draw a Gimpish background pattern to show transparency in the image
+'' -------------------------------------------------------------------------
+'' Image display helpers
+'' -------------------------------------------------------------------------
 sub draw_background cdecl(byval renderer as SDL_Renderer ptr)
 	scope
 		dim col(0 to 1) as SDL_Color = {type<SDL_Color>(102, 102, 102, 255), type<SDL_Color>(153, 153, 153, 255)}
@@ -76,6 +79,9 @@ sub draw_background cdecl(byval renderer as SDL_Renderer ptr)
 	end scope
 end sub
 
+'' -------------------------------------------------------------------------
+'' Application entry and event handling
+'' -------------------------------------------------------------------------
 function get_file_path cdecl(byval file_ as const zstring ptr) as const zstring ptr
 	scope
 		static path(0 to 4095) as byte

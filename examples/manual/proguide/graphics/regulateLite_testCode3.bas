@@ -3,15 +3,19 @@
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'Lite regulation function to be integrated into user loop for FPS control'
 ''
+'' Purpose: Compare frame pacing and the Windows timer resolution API.
+'' Responsibilities: The documented example flow and its owned resources.
+'' This file contains no compiler implementation or replacement system API.
+''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgLiteRegulate
 '' --------
 
 #include "regulateLite.bi"
 
 #if defined(__FB_WIN32__)
-' WinMM uses 32-bit UINT and MMRESULT values on both Win32 and Win64.
-Declare Function _setTimer CDecl Lib "winmm" Alias "timeBeginPeriod"(ByVal period As ULong = 1) As ULong
-Declare Function _resetTimer CDecl Lib "winmm" Alias "timeEndPeriod"(ByVal period As ULong = 1) As ULong
+' WinMM uses StdCall on x86 and 32-bit UINT and MMRESULT values on both Win32 and Win64.
+Declare Function _setTimer StdCall Lib "winmm" Alias "timeBeginPeriod"(ByVal period As ULong = 1) As ULong
+Declare Function _resetTimer StdCall Lib "winmm" Alias "timeEndPeriod"(ByVal period As ULong = 1) As ULong
 #endif
 
 Screen 12, , 2
@@ -189,3 +193,5 @@ Do
 		ist = 0
 	End If
 Loop
+
+'' end of regulateLite_testCode3.bas

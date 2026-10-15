@@ -6,7 +6,8 @@
 
 #define NULL 0
 
-#define EVENT_METHOD( i, x) GTK_WIDGET_GET_CLASS(i)->x
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-PP-001 REASON: The x parameter is a field selector and must remain an identifier after the pointer operator.
+#define EVENT_METHOD( i, x) (GTK_WIDGET_GET_CLASS((i))->x)
 
 #define XSIZE  600
 #define YSIZE  400

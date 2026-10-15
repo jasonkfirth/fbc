@@ -9,4 +9,3 @@
 '' This Dim statement is spread across multiple lines, using the '_' character
 Dim myvariable _
 As Integer
-

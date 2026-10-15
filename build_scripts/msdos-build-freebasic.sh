@@ -91,6 +91,7 @@ Environment:
   TARGET_TRIPLET         DJGPP target triplet (default: i586-pc-msdosdjgpp)
   DOS_TCP_PROVIDER        Set to watt32 to enable the optional Watt-32 TCP path
   DOS_WATT32_CFLAGS       Include path for the Watt-32 headers
+  DOS_WATT32_LIBS         Link flags for the Watt-32 archive (default: DJGPP payload lib)
   DOS_DPMI_YIELD          Set to YesPlease for a tested DPMI host time-slice path
   DJGPP_CROSS_VERSION    MSYS2 prebuilt toolchain release tag (default: v3.4)
   DJGPP_CROSS_ASSET      MSYS2 prebuilt toolchain asset name
@@ -601,6 +602,7 @@ prepare_dos_runtime_layout() {
 	local legacy_libdir="$root/lib/freebas/dos"
 	local host_libdir="$root/lib/freebasic/dos"
 	local djgpp_ldscript="$djgpp_root/lib/ldscripts/i386go32.x"
+	local linker_script
 
 	[ -d "$compat_libdir" ] || return 0
 
@@ -615,7 +617,47 @@ prepare_dos_runtime_layout() {
 		cp -f "$djgpp_ldscript" "$legacy_libdir/i386go32.x"
 		cp -f "$djgpp_ldscript" "$compat_libdir/i386go32.x"
 		cp -f "$djgpp_ldscript" "$host_libdir/i386go32.x"
+		for linker_script in \
+			"$legacy_libdir/i386go32.x" \
+			"$compat_libdir/i386go32.x" \
+			"$host_libdir/i386go32.x"; do
+			patch_dos_profile_cycle_bounds "$linker_script"
+		done
 	fi
+}
+
+patch_dos_profile_cycle_bounds() {
+	local linker_script="$1"
+	local patched_script="${linker_script}.fb-profile.$$"
+
+	[ -f "$linker_script" ] || return 0
+	if grep -Fq '___start_fb_profilecycledata = .' "$linker_script"; then
+		grep -Fq '___stop_fb_profilecycledata = .' "$linker_script" || \
+			die "incomplete DOS profiling bounds in $linker_script"
+		return 0
+	fi
+
+	if ! awk '
+		BEGIN { inserted = 0 }
+		index($0, "*(.data.*)") > 0 {
+			print
+			print "    /* DOS COFF uses underscore-prefixed C symbols. */"
+			print "    . = ALIGN(4);"
+			print "    ___start_fb_profilecycledata = .;"
+			print "    KEEP(*(fb_profilecycledata))"
+			print "    ___stop_fb_profilecycledata = .;"
+			inserted++
+			next
+		}
+		{ print }
+		END { if (inserted != 1) exit 1 }
+	' "$linker_script" > "$patched_script"; then
+		rm -f "$patched_script"
+		die "cannot find the DOS .data.* section in $linker_script"
+	fi
+
+	chmod --reference="$linker_script" "$patched_script"
+	mv -f "$patched_script" "$linker_script"
 }
 
 stage_dos_compiler_tools() {
@@ -937,6 +979,15 @@ else
 	[ -d "$DJGPP_DOS_CACHE/bin" ] || die "missing DOS-side DJGPP payload cache: $DJGPP_DOS_CACHE"
 fi
 
+if [ "$DO_DOS_BUILD" = "1" ] && [ "${DOS_TCP_PROVIDER:-}" = "watt32" ]; then
+	watt_archive="$DJGPP_DOS_CACHE/lib/libwatt.a"
+	[ -f "$watt_archive" ] || die "Watt-32 selected but its DJGPP archive is missing: $watt_archive"
+	if [ -z "${DOS_WATT32_LIBS:-}" ]; then
+		DOS_WATT32_LIBS="-L$DJGPP_DOS_CACHE/lib -lwatt"
+	fi
+	export DOS_WATT32_LIBS
+fi
+
 ##############################################################################
 # Host bootstrap compiler
 ##############################################################################
@@ -1168,7 +1219,11 @@ run_dosbox_test() {
 	prepare_dos_runtime_layout "$test_root/fb" "$test_root/djgpp"
 	[ -f "$test_root/fb/bin/dos/as.exe" ] || die "DOS smoke-test assembler is missing"
 
-	if [ "$dosbox_kind" = "dosbox-x" ] && have mcopy && have sfdisk; then
+	# On MSYS2, DOSBox-X's imgmake drive path is not a host path.  It can report
+	# successful image creation without leaving a file where sfdisk can read it.
+	# The mounted-directory smoke below still exercises the DOS compiler and keeps
+	# the test independent of that host/guest path translation.
+	if [ "$dosbox_kind" = "dosbox-x" ] && [ "$HOST_KIND" != "msys2" ] && have mcopy && have sfdisk; then
 		local dosbox_image_file
 		local mtools_image_file
 

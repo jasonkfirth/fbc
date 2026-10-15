@@ -23,6 +23,8 @@ from semantic_array_storage import validate_array_storage_inputs
 from semantic_literals import validate_wide_literals
 from semantic_queries import validate_query_inputs
 from semantic_member_selections import validate_member_selections
+from semantic_nonfield_members import validate_nonfield_members
+from semantic_macro_calls import validate_macro_calls
 from semantic_source_memory import validate_source_memory
 from semantic_selects import validate_select_inputs
 from semantic_declarations import validate_declaration_types
@@ -664,7 +666,10 @@ class Model:
                         raise ValueError("Unknown constant value kind")
                     self.constants[key] = row[3], row[4]
                 elif tag == "K":
-                    if row[3].startswith("selected-member-"):
+                    if row[3].startswith("source-call-macro-"):
+                        if row[3] in self.properties[key]:
+                            raise ValueError("Duplicate immutable macro call observation")
+                    if row[3].startswith(("selected-member-", "selected-nonfield-")):
                         if row[1] != "symbol" or row[3] in self.properties[key]:
                             raise ValueError("Duplicate or foreign selected member observation")
                         storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
@@ -1507,6 +1512,8 @@ class Model:
             self.validate_storage_receipts(subject_modules)
             validate_query_inputs(self, number, subject_modules)
             validate_member_selections(self, number, subject_modules)
+            validate_nonfield_members(self, number, subject_modules)
+            validate_macro_calls(self, number, subject_modules)
             validate_source_memory(self, number, subject_modules)
             validate_select_inputs(self, number, subject_modules)
             procedure_headers = validate_procedure_types(self, number, subject_modules)

@@ -622,7 +622,8 @@ declare function cVariable _
 declare function cVariableEx overload _
 	( _
 		byval sym as FBSYMBOL ptr, _
-		byval check_array as integer _
+		byval check_array as integer, _
+		byval semantic_receiver as FBSYMBOL ptr = NULL _
 	) as ASTNODE ptr
 
 declare function cVariableEx _

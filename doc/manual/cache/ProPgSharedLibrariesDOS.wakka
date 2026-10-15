@@ -19,7 +19,7 @@ DOS supports shared libraries (dynamic link libraries) with some limitations com
 	- no complex ##[[KeyPgType|type]]##'s or types with ##[[KeyPgExtends|Extends]]##.  Types having member procedures can not be exported
 	- ##[[KeyPgExport|Export]]## is allowed but also ignored; all public procedures are exported
 	- Exported symbols on DOS have the underscore ( ##'_'## ) and is required with ##[[KeyPgDylibsymbol|Dylibsymbol]]##.
-	- Mutli-threaded build of the fb runtime not exported and is likely not to work (more testing needed at the time of this writing).
+	- The multi-threaded build of the fb runtime is not exported to DXE files. In DOSBox-X, an import-library consumer compiled and linked with ##-mt##, but loading its DXE failed with error 14 because ##_fb_ErrorSetModName## was unresolved. The dynamic-loading example passed after using the exact DOS export name. Import-library loading with the multi-threaded runtime is not qualified.
 
 {{fbdoc item="section" value="DXE3GEN"}}
 	##dxe3gen## is a utility which allows you to create files which contain dynamically loadable code (DXE). DXE is used as a synonym for `dynamically loadable executable module'.  See [[http://www.delorie.com/djgpp/doc/utils/utils_19.html|dxe3gen]].

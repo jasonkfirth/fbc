@@ -56,7 +56,7 @@ $(libfbmtobjdir)/pdmlwp/lwpasm.o: $(DOS_PDMLWP_DIR)/src/lwpasm.s
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) -x assembler-with-cpp -c $< -o $@
 
-$(libdir)/libfbpdmlwp.a: $(DOS_PDMLWP_OBJ) | $(libdir)
+$(libdir)/libfblwp.a: $(DOS_PDMLWP_OBJ) | $(libdir)
 	$(call DO_AR)
 endif
 

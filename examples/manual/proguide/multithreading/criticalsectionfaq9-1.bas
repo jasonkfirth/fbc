@@ -3,6 +3,10 @@
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'Critical Sections FAQ'
 ''
+'' Purpose: Demonstrate mutex ownership while workers update console positions.
+'' Responsibilities: The documented example flow and its owned resources.
+'' This file contains no compiler implementation or replacement system API.
+''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgMtCriticalSectionsFAQ
 '' --------
 
@@ -15,7 +19,7 @@
 Dim Shared As Any Ptr mutex
 
 Sub Thread (ByVal p As Any Ptr)
-	Dim As Integer threadNumber = CInt(CLngInt(p))
+	Dim As Integer threadNumber = CInt(p)
 	MutexLock(mutex)
 	Dim As Long l0 = Locate()
 	Locate threadNumber, threadNumber
@@ -60,3 +64,5 @@ Print "Any key to quit"
 Sleep
 
 MutexDestroy(mutex)
+
+'' end of criticalsectionfaq9-1.bas

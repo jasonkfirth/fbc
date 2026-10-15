@@ -316,6 +316,27 @@ end function
 '':::::
 ''ProcArgList     =    ProcArg (DECL_SEPARATOR ProcArg)* .
 ''
+declare sub fbSemanticModelExportMemberBinding _
+	( byval sym as FBSYMBOL ptr, byval receiver as FBSYMBOL ptr, _
+	  byref source as LEX_LOCATION, byval is_type as integer )
+
+'' Overload selection and implicit THIS construction precede this observation.
+'' Each call has its own list even when nested macro tokens share an anchor.
+'' Reuse the selected callee binding rather than emitting the overload head.
+private function hExportCalleeBinding _
+	( byval proc as FBSYMBOL ptr, byval base_parent as FBSYMBOL ptr, _
+	  byval arg_list as FB_CALL_ARG_LIST ptr, byval source as LEX_LOCATION ptr ) as longint
+	if( source = NULL ) then return 0
+	if( arg_list->semantic_receiver <> NULL ) then
+		return fbSemanticModelExportCallBinding(proc, arg_list->semantic_receiver, *source, FALSE)
+	elseif( base_parent <> NULL ) then
+		if( symbIsStruct(base_parent) ) then
+			return fbSemanticModelExportCallBinding(proc, base_parent, *source, TRUE)
+		end if
+	end if
+	return fbSemanticModelExportCallBinding(proc, NULL, *source, FALSE)
+end function
+
 private function hOvlProcArgList _
 	( _
 		byval base_parent as FBSYMBOL ptr, _
@@ -424,16 +445,7 @@ private function hOvlProcArgList _
 		return astBuildFakeCall( proc )
 	end if
 
-	'' Save this selected callee occurrence before argument parsing emits
-	'' more bindings. Overload selection has already chosen the procedure.
 	dim as longint semantic_binding = 0
-	if( semantic_site <> NULL ) then
-		dim as longint previous_binding = fbSemanticModelBindingCount( )
-		fbSemanticModelExportBinding(proc, *semantic_site, FALSE)
-		if( fbSemanticModelBindingCount( ) > previous_binding ) then
-			semantic_binding = fbSemanticModelBindingCount( )
-		end if
-	end if
 
 	'' method?
 	if( symbIsMethod( proc ) ) then
@@ -451,6 +463,7 @@ private function hOvlProcArgList _
 			arg = symbAllocOvlCallArg( @parser.ovlarglist, arg_list, TRUE )
 			arg->expr = astBuildVarField( symbGetParamVar( symbGetProcHeadParam( parser.currproc ) ) )
 			arg->mode = INVALID
+			arg_list->semantic_receiver = astGetSubtype( arg->expr )
 		end if
 
 		'' re-add the instance ptr
@@ -468,6 +481,7 @@ private function hOvlProcArgList _
 		procexpr = NULL
 	end if
 
+	semantic_binding = hExportCalleeBinding(proc, base_parent, arg_list, semantic_site)
 	procexpr = astNewCALL( proc, procexpr )
 	if( procexpr <> NULL ) then
 		procexpr->semantic_binding = semantic_binding
@@ -558,16 +572,7 @@ function cProcArgList _
 		return astBuildFakeCall( proc )
 	end if
 
-	'' Save this selected callee occurrence before argument parsing emits
-	'' more bindings. Overload selection has already chosen the procedure.
 	dim as longint semantic_binding = 0
-	if( semantic_site <> NULL ) then
-		dim as longint previous_binding = fbSemanticModelBindingCount( )
-		fbSemanticModelExportBinding(proc, *semantic_site, FALSE)
-		if( fbSemanticModelBindingCount( ) > previous_binding ) then
-			semantic_binding = fbSemanticModelBindingCount( )
-		end if
-	end if
 
 	'' method?
 	if( symbIsMethod( proc ) ) then
@@ -585,6 +590,7 @@ function cProcArgList _
 			arg = symbAllocOvlCallArg( @parser.ovlarglist, arg_list, TRUE )
 			arg->expr = astBuildVarField( symbGetParamVar( symbGetProcHeadParam( parser.currproc ) ) )
 			arg->mode = INVALID
+			arg_list->semantic_receiver = astGetSubtype( arg->expr )
 		end if
 
 		'' Assuming there is no existing function pointer access,
@@ -603,6 +609,7 @@ function cProcArgList _
 		end if
 	end if
 
+	semantic_binding = hExportCalleeBinding(proc, base_parent, arg_list, semantic_site)
 	procexpr = astNewCALL( proc, ptrexpr )
 	if( procexpr <> NULL ) then
 		procexpr->semantic_binding = semantic_binding

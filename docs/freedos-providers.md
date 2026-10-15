@@ -29,8 +29,10 @@ fbc -target dos -dos-threads pdmlwp program.bas
 
 In PowerShell, quote make assignments, for example
 `'TARGET_TRIPLET=i586-pc-msdosdjgpp' 'DOS_THREAD_PROVIDER=pdmlwp'`.
-The build produces `libfbmt.a`, `libsfxmt.a`, and `libfbpdmlwp.a` in the
-DOS runtime directory; ordinary `libfb.a`/`libsfx.a` remain separate.
+The build produces `libfbmt.a`, `libsfxmt.a`, and `libfblwp.a` in the
+DOS runtime directory; ordinary `libfb.a`/`libsfx.a` remain separate. The
+thread-provider archive uses the 8.3-safe name `libfblwp.a` so DJGPP's DOS
+linker can open it without relying on long-filename support.
 Provider objects use a separate `dos/pdmlwp` build directory. Link threaded
 programs with the provider option even when using separately compiled objects.
 
@@ -44,7 +46,7 @@ To build just the scheduler archive without installing anything:
 
 ```sh
 python build_scripts/build-dos-pdmlwp.py --cc i586-pc-msdosdjgpp-gcc \
-  --ar i586-pc-msdosdjgpp-ar --output build/dos-provider/libfbpdmlwp.a
+  --ar i586-pc-msdosdjgpp-ar --output build/dos-provider/libfblwp.a
 ```
 
 See [the library's provenance and credit file](../contrib/dos/pdmlwp/README.fbxl.md)

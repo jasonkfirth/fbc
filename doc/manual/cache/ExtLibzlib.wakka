@@ -2,10 +2,15 @@
 Loss-less data compression library using the Deflate algorithm unencumbered by patents.
 
 Website: http://www.zlib.net
-Platforms supported: Windows (32-bit and 64-bit), Linux, DOS
+Platforms supported: Windows (32-bit and 64-bit), Linux, DOS, FreeBSD, Haiku
 Headers to include: zlib.bi
 Header version: 1.2.8
 Examples: in examples/compression/
+
+Haiku R1 beta 6 amd64: `examples/compression/zlib.bas` compiled and ran with
+FreeBASIC 1.20.4-3 against HaikuPorts zlib 1.3.2. Its compression, inflate,
+dictionary and gzip checks passed; the example reported the expected runtime
+version difference from the 1.2.8 declarations.
 
 Windows qualification compares the stable stream layout with the installed zlib 1.3.2 SDK on both architectures, then exercises compression, small-buffer streams, synchronization, dictionaries and gzip file I/O. A newer compatible runtime may report a version warning against the 1.2.8 declarations.
 

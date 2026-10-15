@@ -1,4 +1,8 @@
-﻿
+﻿'' FreeBASIC IUP examples
+'' File: color.bas
+'' Purpose: Apply entered RGB components to a read-only text control.
+'' Responsibilities: Native dialog behavior, callbacks and checked toolkit lifetime.
+'' This file contains no widget implementation or secondary event dispatcher.
 #include once "IUP/iup.bi"
 
 #define NULL 0
@@ -49,7 +53,10 @@ end function
   dim as Ihandle ptr ok_button
   dim as Ihandle ptr main_dlg
 
-  IupOpen( NULL, NULL )
+  if IupOpen( NULL, NULL ) = IUP_ERROR then
+    print "Error: Could not initialize IUP."
+    end 1
+  end if
 
   label = IupLabel("Enter RGB values")
   red_label = IupLabel("Red")
@@ -109,3 +116,5 @@ end function
 
   IupMainLoop()
   IupClose()
+
+'' end of color.bas

@@ -27,6 +27,3 @@
 'g_assert_no_error(err)
 
 'g_assert_error(err, dom, c)
-
-
-

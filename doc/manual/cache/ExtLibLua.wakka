@@ -2,10 +2,13 @@
 Lightweight, embeddable scripting engine using the Lua language.
 
 Website: https://www.lua.org
-Platforms supported: ""Win32"", ""Win64"", Linux, DOS
+Platforms supported: ""Win32"", ""Win64"", Linux, FreeBSD, Haiku
 Headers to include: Lua/lua.bi
 Header version: 5.3.1
 Examples: in examples/other-languages/Lua/
+
+Haiku R1 beta 6 amd64: `examples/other-languages/Lua/minmax.bas` compiled and
+ran with FreeBASIC 1.20.4-3 against HaikuPorts Lua 5.3, loading `minmax.lua`.
 
 {{fbdoc item="section" value="Callback types and errors"}}
 	Use a native Lua 5.3 SDK with these headers. The example's ##lua_Alloc## callback uses native-sized allocation counts, while a ##lua_CFunction## returns a C 32-bit ##Long## result count. Check ##lua_newstate## and the script result, and release the state with ##lua_close## after script execution.

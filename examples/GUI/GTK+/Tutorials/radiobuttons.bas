@@ -73,4 +73,3 @@
   gtk_widget_show (win)
 
   gtk_main ()
-

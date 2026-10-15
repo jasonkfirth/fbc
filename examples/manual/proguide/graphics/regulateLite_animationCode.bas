@@ -14,10 +14,11 @@ Type vector3d
 	As Single x, y, z
 End Type
 'assignment macro
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-PP-001 REASON: Type syntax needs this unparenthesized token sequence.
 #define vct Type<vector3d>
 
  'macros
-	#define map(a,b,x,c,d) ((d)-(c))*((x)-(a))/((b)-(a))+(c)
+	#define map(a,b,x,c,d) (((d) - (c)) * ((x) - (a)) / ((b) - (a)) + (c))
 	#macro combsort(array,begin,finish,dot)
 	Scope
 		Var size=(finish),switch=0,j=0

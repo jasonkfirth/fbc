@@ -2,13 +2,21 @@
 Cross-platform Graphical User Interface library
 
 Website: http://www.gtk.org
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", Linux, FreeBSD
 Headers to include: gtk/gtk.bi
 Example Usage: yes, in examples/GUI/GTK+/
 Header version: 2.24.27, 3.14.10
 
 By default, gtk/gtk.bi will use the GTK+ 2 API.
 Define ""__USE_GTK3__"" before including gtk/gtk.bi to use GTK+ 3.
+
+GObject property setters are variadic C calls: pass the type declared for each property. A double property needs a Double expression, not an Integer. Use CTRUE (1) for boolean properties; FreeBASIC TRUE (-1) can be rejected by property validation. In the GooCanvas table example, the width_TJF parameter must supply the width property, rather than BASIC's WIDTH function.
+
+The Linux GTK example runner checks the original GTK 2, GTK 3 and GooCanvas windows on isolated, authenticated Xvfb displays, including normal window closure. It stages each example's assets, tests all three packing layouts and opens a text fixture in the application example. GooCanvas checks also drag the arrow-width handle and verify keyboard focus events. Software OpenGL and these headless windows do not establish accelerated GPU or physical display operation. See build_scripts/test-gtk-examples.py and doc/linux-example-qualification.md.
+
+On FreeBSD, the manual GTK 2 window example exited under Xvfb and linked GTK 2.
+The synthetic close emitted a Gdk-WARNING when the headless server destroyed
+the window. GTK 3 and GooCanvas runtime behavior remains unqualified.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/libraries/gtk.bas"}}%%(freebasic)

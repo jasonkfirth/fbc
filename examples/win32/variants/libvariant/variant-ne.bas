@@ -69,4 +69,3 @@ operator <> _
 	VariantClear( @tmp )
 
 end operator
-

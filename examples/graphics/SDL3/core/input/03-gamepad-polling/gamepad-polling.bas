@@ -162,7 +162,10 @@ function SDL_AppIterate cdecl(byval appstate as any ptr) as SDL_AppResult
 			scope
 				'' we have a stick opened?
 				'' where to draw the buttons
-				dim buttons(0 to 15) as SDL_FRect = {type<SDL_FRect>(497, 266, 38, 38), type<SDL_FRect>(550, 217, 38, 38), type<SDL_FRect>(445, 221, 38, 38), type<SDL_FRect>(499, 173, 38, 38), type<SDL_FRect>(235, 228, 32, 29), type<SDL_FRect>(287, 195, 69, 69), type<SDL_FRect>(377, 228, 32, 29), type<SDL_FRect>(91, 234, 63, 63), type<SDL_FRect>(381, 354, 63, 63), type<SDL_FRect>(74, 73, 102, 29), type<SDL_FRect>(468, 73, 102, 29), type<SDL_FRect>(207, 316, 32, 32), type<SDL_FRect>(207, 384, 32, 32), type<SDL_FRect>(173, 351, 32, 32), type<SDL_FRect>(242, 351, 32, 32), type<SDL_FRect>(310, 286, 23, 27)}
+				dim buttons(0 to 15) as SDL_FRect = {type<SDL_FRect>(497, 266, 38, 38), type<SDL_FRect>(550, 217, 38, 38), type<SDL_FRect>(445, 221, 38, 38), type<SDL_FRect>(499, 173, 38, 38), _
+				type<SDL_FRect>(235, 228, 32, 29), type<SDL_FRect>(287, 195, 69, 69), type<SDL_FRect>(377, 228, 32, 29), type<SDL_FRect>(91, 234, 63, 63), type<SDL_FRect>(381, 354, 63, 63), _
+				type<SDL_FRect>(74, 73, 102, 29), type<SDL_FRect>(468, 73, 102, 29), type<SDL_FRect>(207, 316, 32, 32), type<SDL_FRect>(207, 384, 32, 32), type<SDL_FRect>(173, 351, 32, 32), _
+				type<SDL_FRect>(242, 351, 32, 32), type<SDL_FRect>(310, 286, 23, 27)}
 				SDL_RenderTexture(renderer, texture, cptr(const SDL_FRect ptr, 0), cptr(const SDL_FRect ptr, 0))
 				'' draw the gamepad picture to the whole window.
 				'' draw green boxes over buttons that are currently pressed.

@@ -13,4 +13,3 @@ Dim s As String = "text"
 Write 123, "text", -.45600
 Write
 Write i, d, s
-

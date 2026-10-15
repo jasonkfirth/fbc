@@ -63,4 +63,3 @@ ThreadWait(pt)
 Print "main and other thread completed"
 
 Sleep
-

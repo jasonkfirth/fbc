@@ -15,4 +15,3 @@ fb_memmove(z[20], z[15], 11)
 Print z
 
 Sleep
-

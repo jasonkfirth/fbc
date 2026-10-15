@@ -15,4 +15,3 @@ Type xyz
 End Type
 
 Print Len(xyz) ' returns 8
-

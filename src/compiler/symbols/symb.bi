@@ -594,6 +594,9 @@ type FB_CALL_ARG_LIST
 	args            as integer
 	head            as FB_CALL_ARG ptr
 	tail            as FB_CALL_ARG ptr
+	'' Borrowed receiver identity before overload conversion or static-call
+	'' lowering discards the instance. Its lifetime is this serial call parse.
+	semantic_receiver as FBSYMBOL_ ptr
 end type
 
 '' function param

@@ -2,9 +2,14 @@
 Universal utility library most commonly used with [[ExtLibgtk|GTK+]] and GNOME. Provides a main loop implementation for event-based programming, portable multi-threading, portable file/pipe I/O, many utilities such as command line parsing, timers, XML parsing, regular expressions, Unicode manipulation, and also general-purpose data structures.
 
 Website: http://developer.gnome.org/glib/
-Platforms supported: Linux, ""Win32""
+Platforms supported: Linux, ""Win32"", FreeBSD, Haiku
 Headers to include: glib.bi
 Version: 2.42.2
 Examples: in examples/misc/glib/
+
+Haiku R1 beta 6 amd64: `g_Actions.bas`, `g_Arguments.bas`, `g_Assert.bas`,
+`g_Filenames.bas` and `g_SplitArguments.bas` compiled and ran with FreeBASIC
+1.20.4-3 against HaikuPorts GLib 2.88.1. These checks cover the named utility
+examples only.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

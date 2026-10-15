@@ -30,7 +30,7 @@ def main():
         destination = stage / layout
         destination.mkdir(parents=True, exist_ok=True)
         for name in ['i386go32.x', 'fbrt0.o', 'fbrt1.o', 'fbrt2.o',
-                     'libfb.a', 'libfbmt.a', 'libfbpdmlwp.a', 'libsfx.a', 'libsfxmt.a']:
+                     'libfb.a', 'libfbmt.a', 'libfblwp.a', 'libsfx.a', 'libsfxmt.a']:
             shutil.copyfile(args.libdir / name, destination / name)
         if args.graphics:
             shutil.copyfile(args.libdir / 'libfbgfxmt.a', destination / 'libfbgfxmt.a')

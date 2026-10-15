@@ -111,6 +111,16 @@ else
   COMPILER_RTL := $(libdir)/libfb.a
 endif
 
+# A Watt-32 DOS runtime also needs its provider archive in the compiler
+# executable. The compiler's own driver adds Watt-32 when it links user
+# programs, but that does not resolve references in this embedded runtime.
+COMPILER_PLATFORM_LIBS :=
+ifeq ($(TARGET_OS),dos)
+ifdef ENABLE_DOS_WATT32
+COMPILER_PLATFORM_LIBS += $(DOS_WATT32_LIBS) -Wl,--allow-multiple-definition
+endif
+endif
+
 # The compiler only links against rtlib.  Keeping optional graphics and sound
 # libraries out of this order-only prerequisite lets a compiler be rebuilt on
 # a small bootstrap host before those platform backends are available.
@@ -123,7 +133,8 @@ $(FBC_EXE): $(FBC_OBJS) | rtlib
 		$(COMPILER_RTL) \
 		-lm \
 		$(THREAD_FLAGS) \
-		$(TERM_LIB)
+		$(TERM_LIB) \
+		$(COMPILER_PLATFORM_LIBS)
 
 $(FBC_JS_EXE): $(FBC_JS_OBJS) | rtlib
 	@mkdir -p "$(dir $@)"

@@ -45,4 +45,3 @@ Color std_foreground, std_background
 Print "end"
 
 Sleep
-

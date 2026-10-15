@@ -10,4 +10,3 @@
 #include Once "pfunc.bi"
 
 Print "3 + 4 = " & pFunc(3, 4)
-

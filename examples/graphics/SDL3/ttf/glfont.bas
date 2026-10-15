@@ -35,7 +35,7 @@
 #define DEFAULT_TEXT "The quick brown fox jumped over the lazy dog"
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
-#define TTF_GLFONT_USAGE !"Usage: %s [-b] [-i] [-u] [--fgcol r,g,b] [--bgcol r,g,b] <font>.ttf [ptsize] [text]\n"
+#define TTF_GLFONT_USAGE (!"Usage: %s [-b] [-i] [-u] [--fgcol r,g,b] [--bgcol r,g,b] <font>.ttf [ptsize] [text]\n")
 
 declare sub SDL_GL_Enter2DMode cdecl(byval width_ as long, byval height as long)
 declare sub SDL_GL_Leave2DMode cdecl()
@@ -46,6 +46,9 @@ declare function example_main cdecl(byval argc as long, byval argv as zstring pt
 
 '' A simple program to test the text rendering feature of the TTF library
 '' quiet windows compiler warnings
+'' -------------------------------------------------------------------------
+'' Font and OpenGL state
+'' -------------------------------------------------------------------------
 sub SDL_GL_Enter2DMode cdecl(byval width_ as long, byval height as long)
 	scope
 		'' Note, there may be other things you need to change,
@@ -69,6 +72,9 @@ sub SDL_GL_Enter2DMode cdecl(byval width_ as long, byval height as long)
 	end scope
 end sub
 
+'' -------------------------------------------------------------------------
+'' Text rendering and application callbacks
+'' -------------------------------------------------------------------------
 sub SDL_GL_Leave2DMode cdecl()
 	scope
 		glMatrixMode(5888)
@@ -178,8 +184,12 @@ function example_main cdecl(byval argc as long, byval argv as zstring ptr ptr) a
 		dim texMinY as GLfloat
 		dim texMaxX as GLfloat
 		dim texMaxY as GLfloat
-		dim color_(0 to 7, 0 to 2) as single = {{cast(single, 1.0), cast(single, 1.0), cast(single, 0.0)}, {cast(single, 1.0), cast(single, 0.0), cast(single, 0.0)}, {cast(single, 0.0), cast(single, 0.0), cast(single, 0.0)}, {cast(single, 0.0), cast(single, 1.0), cast(single, 0.0)}, {cast(single, 0.0), cast(single, 1.0), cast(single, 1.0)}, {cast(single, 1.0), cast(single, 1.0), cast(single, 1.0)}, {cast(single, 1.0), cast(single, 0.0), cast(single, 1.0)}, {cast(single, 0.0), cast(single, 0.0), cast(single, 1.0)}}
-		dim cube(0 to 7, 0 to 2) as single = {{cast(single, 0.5), cast(single, 0.5), cast(single, (-0.5))}, {cast(single, 0.5), cast(single, (-0.5)), cast(single, (-0.5))}, {cast(single, (-0.5)), cast(single, (-0.5)), cast(single, (-0.5))}, {cast(single, (-0.5)), cast(single, 0.5), cast(single, (-0.5))}, {cast(single, (-0.5)), cast(single, 0.5), cast(single, 0.5)}, {cast(single, 0.5), cast(single, 0.5), cast(single, 0.5)}, {cast(single, 0.5), cast(single, (-0.5)), cast(single, 0.5)}, {cast(single, (-0.5)), cast(single, (-0.5)), cast(single, 0.5)}}
+		dim color_(0 to 7, 0 to 2) as single = {{cast(single, 1.0), cast(single, 1.0), cast(single, 0.0)}, {cast(single, 1.0), cast(single, 0.0), cast(single, 0.0)}, {cast(single, 0.0), _
+		cast(single, 0.0), cast(single, 0.0)}, {cast(single, 0.0), cast(single, 1.0), cast(single, 0.0)}, {cast(single, 0.0), cast(single, 1.0), cast(single, 1.0)}, {cast(single, 1.0), _
+		cast(single, 1.0), cast(single, 1.0)}, {cast(single, 1.0), cast(single, 0.0), cast(single, 1.0)}, {cast(single, 0.0), cast(single, 0.0), cast(single, 1.0)}}
+		dim cube(0 to 7, 0 to 2) as single = {{cast(single, 0.5), cast(single, 0.5), cast(single, (-0.5))}, {cast(single, 0.5), cast(single, (-0.5)), cast(single, (-0.5))}, {cast(single, _
+		(-0.5)), cast(single, (-0.5)), cast(single, (-0.5))}, {cast(single, (-0.5)), cast(single, 0.5), cast(single, (-0.5))}, {cast(single, (-0.5)), cast(single, 0.5), cast(single, 0.5)}, _
+		{cast(single, 0.5), cast(single, 0.5), cast(single, 0.5)}, {cast(single, 0.5), cast(single, (-0.5)), cast(single, 0.5)}, {cast(single, (-0.5)), cast(single, (-0.5)), cast(single, 0.5)}}
 		dim event as SDL_Event
 		dim renderstyle as long
 		dim dump as long

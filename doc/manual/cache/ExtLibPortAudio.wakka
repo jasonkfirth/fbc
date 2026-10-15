@@ -2,8 +2,18 @@
 ""PortAudio"" is a cross-platform audio I/O library that allows programs to access the system's audio devices to record or play sounds.
 
 Website: http://www.portaudio.com/
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", ""Win64"", Linux
 Headers to include: portaudio.bi
-Header version: from 2010, machine-translated only
+Header version: pa_stable_v190700_20210406 (PortAudio 19.7.0 declarations)
+
+{{fbdoc item="section" value="Callbacks and stream ownership"}}
+	Include ##portaudio.bi## and use a native PortAudio library matching the executable architecture. Callback frame counts and stream flags use C ##unsigned long##, represented by ##CULong##; ##PaError## and callback results use 32-bit ##Long##. The supplied sine example requests mono ##paInt32## samples, so its output buffer is a ##Long Ptr##.
+
+	The callback runs on the SDK's audio thread. Keep its payload valid until the stream has been stopped and closed, and avoid printing, allocation or blocking work in the callback. Check default-device and host-API information pointers before reading them. Use the selected device's ##hostApi## to find its owning API; the process default API can differ.
+
+	The example closes an opened stream and terminates the initialized library on start/stop failures. It also handles unavailable device information and checks the final termination result. Controlled failure and guarded-callback checks are available through ##build_scripts/test-portaudio-failures.py##.
+
+{{fbdoc item="section" value="Native checks"}}
+	The original three-tone playback path passes on Win32/Win64 with both compiler backends and the native MME output device. Linux GCC/GAS64 checks use the genuine ALSA Pulse PCM plugin and a separate clocked PulseAudio null sink. Independent monitor analysis observes the 440, 330 and 220 Hz components. The capture fixture waits for its monitor and primes the software sink; its startup buffering is distinct from example or compiler behavior. These checks do not establish exact audible durations or physical speaker quality.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

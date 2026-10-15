@@ -16,7 +16,8 @@
 #define	SIGFPE		8	'' Floating point error
 #define	SIGSEGV		11	'' Segmentation violation
 #define	SIGTERM		15	'' Termination request
-#define SIGBREAK	21	'' Control-break
+'' Control-break signal value.
+#define SIGBREAK (21)
 #define	SIGABRT		22	'' Abnormal termination (abort)
 
 extern "C"

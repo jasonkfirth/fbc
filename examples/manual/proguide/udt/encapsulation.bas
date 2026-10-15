@@ -71,4 +71,3 @@ Do
 	Sleep 100, 1
 Loop Until Inkey <> ""
 Print
-

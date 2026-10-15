@@ -47,6 +47,10 @@ declare sub fbSemanticModelPPIdentifier _
 declare sub fbSemanticModelNumericLiteral( byval token as FBTOKEN ptr )
 declare sub fbSemanticModelNumericLiteralExpression(byval expr as ASTNODE ptr, byval token as FBTOKEN ptr)
 declare function fbSemanticModelBindingCount( ) as longint
+declare function fbSemanticModelExportCallBinding _
+	( byval sym as FBSYMBOL ptr, byval receiver as FBSYMBOL ptr, _
+	  byref source as LEX_LOCATION, byval is_type as integer ) as longint
+declare sub fbSemanticModelExportMacroCallCount(byval count as longint)
 declare sub fbSemanticModelSetAccess(byval node as ASTNODE ptr, byref role as const string)
 declare sub fbSemanticModelForCounter _
 	( byval counter as FBSYMBOL ptr, byref source as LEX_LOCATION, byval declared_here as integer )

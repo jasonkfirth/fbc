@@ -2,9 +2,13 @@
 libbzip2 is the library implementing .bz2 file or in-memory compression and extraction, with interfaces similar to zlib.
 
 Website: http://bzip.org/
-Platforms supported: ""Win32"", Linux, DOS
+Platforms supported: ""Win32"", Linux, DOS, FreeBSD, Haiku
 Headers to include: bzlib.bi
 Header version: 1.0.6
 Examples: in examples/compression/
+
+Haiku R1 beta 6 amd64: `examples/compression/bz2compress.bas` compiled and
+ran with FreeBASIC 1.20.4-3 against HaikuPorts bzip2 1.0.8, compressing the
+repository's `fblogo.bmp` fixture.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

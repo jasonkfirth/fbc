@@ -2,10 +2,14 @@
 Open source code library for the dynamic creation of images by programmers.
 
 Website: http://www.libgd.org
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", Linux, FreeBSD, Haiku
 Headers to include: gd.bi
 Header version: 2.1.1
 Examples: yes, in examples/files/GD/
+
+Haiku R1 beta 6 amd64: `examples/files/GD/gd.bas` compiled and ran with
+FreeBASIC 1.20.4-3 against HaikuPorts GD 2.3.3. It generated non-empty GIF,
+PNG and JPEG output files.
 
 The original Windows example and its used data layouts were checked with GD 2.3.3 on Win64. This check does not qualify the older Win32 archive supplied with some FreeBASIC SDKs.
 

@@ -92,7 +92,7 @@ Dim As Long pitch8, pitch32
 
 #ifndef ImageInfo '' older versions of FB don't have the ImageInfo feature
 #define GETPITCH(img_) IIf(img_->Type=PUT_HEADER_NEW,img_->pitch,img_->old.width*img_->old.bpp)
-#define GETP(img_) CPtr(Byte Ptr,img_)+IIf(img_->Type=PUT_HEADER_NEW,SizeOf(PUT_HEADER),SizeOf(_OLD_HEADER))
+#define GETP(img_) (CPtr(Byte Ptr, (img_)) + IIf((img_)->Type = PUT_HEADER_NEW, SizeOf(PUT_HEADER), SizeOf(_OLD_HEADER)))
 pitch8 = GETPITCH(img8): p8 = GETP(img8)
 pitch32 = GETPITCH(img32): p32 = GETP(img32)
 #else

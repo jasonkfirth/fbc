@@ -3,10 +3,19 @@ Easy-to-use library for creating, reading out or modifying .zip archives.
 
 Website: https://libzip.org
 Github: https://github.com/nih-at/libzip
-Platforms supported: Windows (32-bit and 64-bit), Linux, DOS
+Platforms supported: Windows (32-bit and 64-bit), Linux, FreeBSD, Haiku
 Headers to include: zip.bi
 Header version: 1.0.1
-Examples: in examples/compression/
+Examples: examples/manual/libraries/zip2.bas and examples/compression/libzip.bas
+
+The packing and extraction examples were run on FreeBSD with libzip 1.11.4.
+Both archive entries were written, extracted into a new directory and
+byte-compared with the source text.
+
+Haiku R1 beta 6 amd64: `examples/manual/libraries/zip2.bas` and
+`examples/compression/libzip.bas` compiled and ran with FreeBASIC 1.20.4-3
+against HaikuPorts libzip 1.11.4. Both archive entries were extracted and
+byte-compared with their source text.
 
 The extraction examples accept an archive filename and a new destination directory (defaults: ##test.zip## and ##test-unpacked##). They validate relative path components, reject parent/root/drive/device paths and duplicate files, and refuse an existing destination. Directory entries are created as directories. The demonstration limits extraction to 10,000 entries and one GiB of decoded bytes before writing data. It assumes that the fresh destination is not concurrently modified; it does not create archive symlinks, restore attributes or provide a transactional rollback of all prior entries.
 

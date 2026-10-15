@@ -2,9 +2,18 @@
 Cross-platform mulitmedia library
 
 Website: http://www.libsdl.org
-Platforms supported: ""Win32"", Linux
+Platforms supported: ""Win32"", Linux, FreeBSD, Haiku (SDL 1.2)
 Headers to include: SDL/SDL.bi or SDL2/SDL.bi
 Header version: SDL 1.2.15, SDL2 2.0.3
 Examples: yes, in examples/graphics/SDL1/, examples/graphics/SDL2/, and examples/graphics/SDL3/
+
+FreeBSD runtime checks passed for SDL 3 core, image, TrueType and network
+examples, plus the SDL 1.2 video-info example under Xvfb. SDL 2 runtime, audio
+devices and physical display behavior remain unqualified.
+
+Haiku R1 beta 6 amd64: `examples/graphics/SDL1/core/video_info.bas` compiled and
+ran with FreeBASIC 1.20.4-3 against HaikuPorts SDL 1.2.15. This headless check
+covered SDL initialization and video-info queries; it did not open a window or
+test rendering. SDL 2 and SDL 3 remain unqualified on Haiku.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

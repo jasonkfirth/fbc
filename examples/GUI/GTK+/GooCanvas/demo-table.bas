@@ -1,4 +1,9 @@
 '/*
+ '* Project: FreeBASIC graphics examples
+ '* File: demo-table.bas
+ '* Purpose: Demonstrate nested GooCanvas tables and child layout properties.
+ '* Responsibilities: Create table items and apply sizing and packing options.
+ '* This file contains no canvas binding or general layout engine.
  '* GooCanvas Demo. Copyright (C) 2006 Damon Chaplin.
  '* Released under the GNU LGPL license. See COPYING for details.
  '*
@@ -70,11 +75,12 @@ SUB create_demo_item (BYVAL table AS GooCanvasItem PTR, _
     g_warning ("Got bad row setting: %i should be: %i\n", new_row, row)
 
 #IF 1
+  ' GObject boolean properties require CTRUE (1), not FreeBASIC TRUE (-1).
   goo_canvas_item_set_child_properties (table, item, _
-          "x-expand", TRUE, _
-          "x-fill", TRUE, _
-          "y-expand", TRUE, _
-          "y-fill", TRUE, _
+          "x-expand", CTRUE, _
+          "x-fill", CTRUE, _
+          "y-expand", CTRUE, _
+          "y-fill", CTRUE, _
           NULL)
 #ENDIF
 
@@ -110,16 +116,16 @@ FUNCTION create_table (BYVAL parent AS GooCanvasItem PTR, _
     goo_canvas_item_set_child_properties (parent, table, _
             "row", row, _
             "column", column, _
-            "x-expand", TRUE, _
-            "x-fill", TRUE, _
+            "x-expand", CTRUE, _
+            "x-fill", CTRUE, _
             NULL)
 #ELSE
   IF row <> -1 THEN _
     goo_canvas_item_set_child_properties (parent, table, _
             "row", row, _
             "column", column, _
-            "y-expand", TRUE, _
-            "y-fill", TRUE, _
+            "y-expand", CTRUE, _
+            "y-fill", CTRUE, _
             NULL)
 #ENDIF
 
@@ -154,10 +160,12 @@ SUB create_demo_table (BYVAL root AS GooCanvasItem PTR, _
                        BYVAL y AS gdouble, _
                        BYVAL width_TJF AS gdouble, _
                        BYVAL height AS gdouble)
+  ' Use the Double parameter here. WIDTH is a BASIC function returning Integer;
+  ' passing it through varargs corrupts the property list expecting a Double.
   VAR table = goo_canvas_table_new (root, _
                                 "row-spacing", 4.0, _
                                 "column-spacing", 4.0, _
-        "width", WIDTH, _
+        "width", width_TJF, _
         "height", height, _
                                 NULL)
   goo_canvas_item_translate (table, x, y)
@@ -168,7 +176,7 @@ SUB create_demo_table (BYVAL root AS GooCanvasItem PTR, _
   goo_canvas_item_set_child_properties (table, square, _
           "row", 0, _
           "column", 0, _
-          "x-shrink", TRUE, _
+          "x-shrink", CTRUE, _
           NULL)
   g_object_set_data (G_OBJECT (square), "id", @"Red square")
   g_signal_connect (square, "button_press_event", _
@@ -180,7 +188,7 @@ SUB create_demo_table (BYVAL root AS GooCanvasItem PTR, _
   goo_canvas_item_set_child_properties (table, circl, _
           "row", 0, _
           "column", 1, _
-          "x-shrink", TRUE, _
+          "x-shrink", CTRUE, _
           NULL)
   g_object_set_data (G_OBJECT (circl), "id", @"Blue circle")
   g_signal_connect (circl, "button_press_event", _
@@ -193,7 +201,7 @@ SUB create_demo_table (BYVAL root AS GooCanvasItem PTR, _
   goo_canvas_item_set_child_properties (table, triangle, _
           "row", 0, _
           "column", 2, _
-          "x-shrink", TRUE, _
+          "x-shrink", CTRUE, _
           NULL)
   g_object_set_data (G_OBJECT (triangle), "id", @"Yellow triangle")
   g_signal_connect (triangle, "button_press_event", _
@@ -209,19 +217,19 @@ SUB create_width_for_height_table (BYVAL root AS GooCanvasItem PTR, _
   DIM AS gchar PTR text = @!"This is a long paragraph that will have to be split over a few lines so we can see if its allocated height changes when its allocated width is changed."
 
   VAR table = goo_canvas_table_new (root, _
-        "width", WIDTH, _
+        "width", width_TJF, _
         "height", height, _
          NULL)
   goo_canvas_item_translate (table, x, y)
   goo_canvas_item_rotate (table, rotation, 0, 0)
 
-  VAR item = goo_canvas_rect_new (table, 0.0, 0.0, WIDTH - 2, 10.0, _
+  VAR item = goo_canvas_rect_new (table, 0.0, 0.0, width_TJF - 2, 10.0, _
             "fill-color", "red", _
             NULL)
   goo_canvas_item_set_child_properties (table, item, _
           "row", 0, _
           "column", 0, _
-          "x-shrink", TRUE, _
+          "x-shrink", CTRUE, _
           NULL)
 
 #IF 1
@@ -229,24 +237,24 @@ SUB create_width_for_height_table (BYVAL root AS GooCanvasItem PTR, _
   goo_canvas_item_set_child_properties (table, item, _
           "row", 1, _
           "column", 0, _
-          "x-expand", TRUE, _
-          "x-fill", TRUE, _
-          "x-shrink", TRUE, _
-          "y-expand", TRUE, _
-          "y-fill", TRUE, _
+          "x-expand", CTRUE, _
+          "x-fill", CTRUE, _
+          "x-shrink", CTRUE, _
+          "y-expand", CTRUE, _
+          "y-fill", CTRUE, _
           NULL)
   g_object_set_data (G_OBJECT (item), "id", @"Text Item")
   g_signal_connect (item, "button_press_event", _
         G_CALLBACK (@on_button_press), NULL)
 #ENDIF
 
-  item = goo_canvas_rect_new (table, 0.0, 0.0, WIDTH - 2, 10.0, _
+  item = goo_canvas_rect_new (table, 0.0, 0.0, width_TJF - 2, 10.0, _
             "fill-color", "red", _
             NULL)
   goo_canvas_item_set_child_properties (table, item, _
           "row", 2, _
           "column", 0, _
-          "x-shrink", TRUE, _
+          "x-shrink", CTRUE, _
           NULL)
 END SUB
 
@@ -328,3 +336,5 @@ gtk_container_add (GTK_CONTAINER (win), page)
 gtk_main ()
 
 END 0
+
+' end of demo-table.bas

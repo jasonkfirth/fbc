@@ -20,7 +20,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     sources = Path(__file__).resolve().parent
     libraries = ['-Wl,--start-group', *[str(args.libdir / name) for name in
-                 ['libsfxmt.a', 'libfbmt.a', 'libfbpdmlwp.a']], '-lm', '-Wl,--end-group']
+                 ['libsfxmt.a', 'libfbmt.a', 'libfblwp.a']], '-lm', '-Wl,--end-group']
     wrappers = ('-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free,'
                 '--wrap=delay,--wrap=__dpmi_int,--wrap=uclock')
     names = ['ac97-playback'] if args.ac97_only else [

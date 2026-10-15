@@ -2,10 +2,15 @@
 Consists of a set of functions that implement regular expression pattern matching using the same syntax and semantics as Perl 5.
 
 Website: https://www.pcre.org
-Platforms supported: Windows, Linux
+Platforms supported: Windows, Linux, FreeBSD, Haiku
 Headers to include: pcre.bi, pcre16.bi, pcre32.bi, pcreposix.bi
 Header version: 8.37 (PCRE 1)
 Examples: in examples/regex/PCRE/
+
+Haiku R1 beta 6 amd64: `examples/regex/PCRE/pcredemo.bas` and
+`examples/regex/PCRE/preg_class.bas` compiled and ran with FreeBASIC 1.20.4-3
+against HaikuPorts PCRE 8.45. The latter uses the sibling
+`match-progress.bi` helper.
 
 These bindings use the original PCRE API. PCRE 2 has different entry points and cannot replace a PCRE 1 library when linking these examples. Match offsets and capture counts use C ##int##, represented by FreeBASIC ##Long## even on Win64.
 

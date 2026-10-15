@@ -26,4 +26,3 @@ Dim b As /' can comment in here also '/    Integer
 	This way of commenting Out code was
 	required before version 0.16
 #endif
-

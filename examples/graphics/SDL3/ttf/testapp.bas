@@ -41,7 +41,11 @@
 ''
 dim shared g_force_no_SDF as long = 0
 dim shared test_fonts(0 to 23) as const zstring ptr = { _
-	strptr("fonts/NotoColorEmoji.ttf"), strptr("fonts/FletcherGothicFLF.ttf"), strptr("fonts/ITCAvantGardeStd-Demi.ttf"), strptr("fonts/DroidSansFallback.ttf"), strptr(!"fonts/\&o320\&o237\&o320\&o260\&o320\&o277\&o320\&o272\&o320\&o260/Lazy.ttf"), strptr("fonts/DroidSans.ttf"), strptr("fonts/DejaVuSans.ttf"), strptr("fonts/digital-7.ttf"), strptr("fonts/HelveticaNeue-Regular.ttf"), strptr("fonts/ttf_amiga/amiga4ever pro2.ttf"), strptr("fonts/ttf-bitstream-vera-1.10/VeraMoBI.ttf"), strptr("fonts/ttf-bitstream-vera-1.10/VeraBd.ttf"), strptr("fonts/ttf-bitstream-vera-1.10/Vera.ttf"), strptr("fonts/nonscalable/sazanami-gothic.ttf"), strptr("fonts/drakono.ttf"), strptr("fonts/Lazy.ttf"), _
+	strptr("fonts/NotoColorEmoji.ttf"), strptr("fonts/FletcherGothicFLF.ttf"), strptr("fonts/ITCAvantGardeStd-Demi.ttf"), strptr("fonts/DroidSansFallback.ttf"), _
+	strptr(!"fonts/\&o320\&o237\&o320\&o260\&o320\&o277\&o320\&o272\&o320\&o260/Lazy.ttf"), strptr("fonts/DroidSans.ttf"), strptr("fonts/DejaVuSans.ttf"), _
+	strptr("fonts/digital-7.ttf"), strptr("fonts/HelveticaNeue-Regular.ttf"), strptr("fonts/ttf_amiga/amiga4ever pro2.ttf"), strptr("fonts/ttf-bitstream-vera-1.10/VeraMoBI.ttf"), _
+	strptr("fonts/ttf-bitstream-vera-1.10/VeraBd.ttf"), strptr("fonts/ttf-bitstream-vera-1.10/Vera.ttf"), strptr("fonts/nonscalable/sazanami-gothic.ttf"), strptr("fonts/drakono.ttf"), _
+	strptr("fonts/Lazy.ttf"), _
 	strptr("fonts/font_bug254.ttf"), strptr("fonts/OpenSansEmoji.ttf"), strptr("fonts/nonscalable/pvfixed_20b.pcf.gz"), strptr("fonts/nonscalable/pvfixed_20r.pcf.gz"), strptr("fonts/nonscalable/7x13B-ISO8859-15.pcf.gz"), strptr("fonts/nonscalable/vgasys.fon"), strptr("fonts/nonscalable/fixed8.fon"), strptr("fonts/Kaumudi.ttf") _
 }
 dim shared test_fonts_count as long = (((sizeof(const zstring ptr) * 24) \ sizeof((test_fonts(0)))))
@@ -97,7 +101,9 @@ dim shared test_strings(0 to 75) as const zstring ptr = { _
 		!"pqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abc" & _
 		!"defghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqr" & _
 		!"stuvwxyz abcdefghijklmnopqrstuvwxyz ")), strptr("abcdefghijklmnopqrstuvwxyz"), strptr("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), strptr("0123456789"), strptr("="), strptr("~"), _
-	strptr(!"`~!@#$%^&*()_-+={}|[]\\;:'\",<.>/?"), strptr(!"\&o303\&o205"), strptr(!"A\n\b\nB"), strptr(!"Tap \&o303\&o205"), strptr("Jap"), strptr(!"A\&o315\&o241B"), strptr(!"\&o315\&o241BC"), strptr(!".\&o315\&o241BC"), strptr(!".\&o315\&o241BC\naaaaa"), strptr(!".aaaaa\n.\&o315\&o241BC"), strptr(!"aaa\n.\&o315\&o241BCaa\n.aaa\n.\&o315\&o241BCaaaaa"), strptr((!"Tap \&o303\&o205  \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205  \&o303\&o205 " & _
+	strptr(!"`~!@#$%^&*()_-+={}|[]\\;:'\",<.>/?"), strptr(!"\&o303\&o205"), strptr(!"A\n\b\nB"), strptr(!"Tap \&o303\&o205"), strptr("Jap"), strptr(!"A\&o315\&o241B"), _
+	strptr(!"\&o315\&o241BC"), strptr(!".\&o315\&o241BC"), strptr(!".\&o315\&o241BC\naaaaa"), strptr(!".aaaaa\n.\&o315\&o241BC"), _
+	strptr(!"aaa\n.\&o315\&o241BCaa\n.aaa\n.\&o315\&o241BCaaaaa"), strptr((!"Tap \&o303\&o205  \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205  \&o303\&o205 " & _
 		!"\&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303" & _
 		!"\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 " & _
 		!"\&o303\&o205 \&o303\&o205Tap \&o303\&o205  \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 " & _
@@ -107,9 +113,20 @@ dim shared test_strings(0 to 75) as const zstring ptr = { _
 		!"\&o303\&o205 \&o303\&o205 \&o303\&o205  \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303" & _
 		!"\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 " & _
 		!"\&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205 \&o303\&o205")), strptr("+"), strptr("2"), strptr(")"), strptr("|"), _
-	strptr(!"a\tsdfsad.f..| I V I A AV A V D \n F G H "), strptr(!"\&o303\&o251 \&o303\&o252 \&o303\&o250 \&o303\&o240 \&o303\&o242 \&o303\&o264 \&o303\&o256 \&o303\&o257 fi if \&o303\&o261 \&o303\&o247 \&o303\&o203 \&o303\&o202"), strptr("Kl1AqvJAUOOKzdjpGTteM775hTYEuqvV b3EU0RZ88JIAMRVS7rMbyKsF1xMg9RTe"), strptr("CGOXraiYCL44XSlvqx825GvZT3HQYXNQcVNjgzrccX1eUar8nG0FZ3MsYdB5caGqiG7l7RJCyNZFRUVQ8rEVnc0TJVrY3ef4v8miQpVvYswTjjZKTZLwwFxLbsHhaDQ3"), strptr("7I8DRXPfbKUIl6SH5V6Twqw6mzEzTlDf"), strptr("JJsSGv1EA MpN9FIctQxi9D iHgEQZe2Wg"), strptr("xqKyuaT8H2xmySzWdbo wgMZ4Sp2BLUGj"), strptr("hUEKUunoouIjw6Cu jdXnPkQzMNGG7U8u"), strptr("4GDEgeCgEXwxoszBpriddAibgbhh36Vz"), strptr("FdkAi hx8B3QvmjFXovy64TzYwaZ0uoW8"), strptr("zAcp1V4PmI5dBv wtnbHqN1ISyrXB7P32"), strptr("lJq5w9GNhpqveQ67kxyQlgAwgQz1AAj3"), strptr("yi0jssXmCMjnFjl2rWs0rNIx51iVNLoI"), strptr("HT1BYxlX3z39XBFEw8JMNwYdWeQrO8h2"), strptr("aQmJI2hUruwhqvJeWL3 gZCGAZ09q67nR"), strptr("rxGWF OPfQdxUR0cYRenCccz5XgSpTDqf"), _
-	strptr("4NI1L2KbwybObecSDAAgb0K00oCEkf3E"), strptr("heBlACb AfcK9G85Gl6mBpBUiblc81FSe"), strptr("GwWx6pHvWyvxSu82PbJbZI UNwx9JSATu"), strptr("AFCQd25jnbBJ7LBbaXI3I5IeSwDXqME6"), strptr("lzSqw9t7hJ03AkTjWWUyd3KqrnGAvPJg"), strptr("pxwCKuWxUOrIMvqXGL 5fbibttAPNIJFC"), strptr("Fs6sFtGnRezLttwm8AbSKsuvLGbcqFbZ"), strptr("hEdVvdwWDwsDA23dX0NjDqzYEaURRC7a"), strptr("IBrdiqo3g0tj LkXz1a45DJD52tO8FJSw"), strptr("h5QYsL9S1cfsWzTyyFJ6Npq7vLi1tjEX"), strptr("zhUkVyCPdhWspT9kBQpOmmREmSU6GPW3"), strptr("Ud1ih3stL5nq00PJMRoA1Zd1QJi0mOzj"), strptr("iVppAFr5pGYa4oT8OozDi0oqGvqJg3Eg"), strptr("YC9YUpKq95nIe7D3ckdc6Yy1cEmmuqf1"), strptr("pzmZvs5j77aVaXXnPqzcuU9fW4Kfmiv5"), strptr("04ifd9OyA5XGsLTovRo04MnIKToW9Qu3"), _
-	strptr("iDJcbD5si6xPRcPRBEVeEhcJSs7n65SD"), strptr("a4oZMmgJQAa72o6sllH4n0zfJE5H0HlA"), strptr("5eSVmFkJMmPCRKdTZRJeuW71uhprmYHp"), strptr("LcnSHbxguPfqPNhdDR4XDc2qv01Q4Y1Y"), strptr("H3wT59MiQmEBZ7tYGMt1xMUu7wajECo6"), strptr("JNGUtcQz660ApgN54rk2UzpqWimO25Cy"), strptr("ss887dpFwjPaqAg53K6qZnc1NFiXc9WX"), strptr("y9Th4vRk1jSpKlzB5soK66ckzl3USZq6"), strptr("WGWY5YmWhaA5oKCoDmRA3n82XwclqvSP"), strptr("hvlSZ6jE2BU9ImjUjQiY255GA5ASfUUx"), strptr("e9o4tBCA9TCpilOI05UyHzes6s8lP9lQ"), strptr("gJyC26gZsCKR8wSp9kNMYKJRRgA3u45U1DWdzPCWv1SUEKi3Wdo3zNFTWiMcCfcl5A0MzOhbqRee7OP13NruY WP0ufGiB4W9RBWqgSy7umnE6puTyCc9WhPOzdLz168BhQwYetZkADWibObi8jcYajuUv54zxXkXQwC1B8lAi8rIH9lmIy0G10fQ832HKiLx") _
+	strptr(!"a\tsdfsad.f..| I V I A AV A V D \n F G H "), _
+	strptr(!"\&o303\&o251 \&o303\&o252 \&o303\&o250 \&o303\&o240 \&o303\&o242 \&o303\&o264 \&o303\&o256 \&o303\&o257 fi if \&o303\&o261 \&o303\&o247 \&o303\&o203 \&o303\&o202"), _
+	strptr("Kl1AqvJAUOOKzdjpGTteM775hTYEuqvV b3EU0RZ88JIAMRVS7rMbyKsF1xMg9RTe"), _
+	strptr("CGOXraiYCL44XSlvqx825GvZT3HQYXNQcVNjgzrccX1eUar8nG0FZ3MsYdB5caGqiG7l7RJCyNZFRUVQ8rEVnc0TJVrY3ef4v8miQpVvYswTjjZKTZLwwFxLbsHhaDQ3"), _
+	strptr("7I8DRXPfbKUIl6SH5V6Twqw6mzEzTlDf"), strptr("JJsSGv1EA MpN9FIctQxi9D iHgEQZe2Wg"), strptr("xqKyuaT8H2xmySzWdbo wgMZ4Sp2BLUGj"), strptr("hUEKUunoouIjw6Cu jdXnPkQzMNGG7U8u"), _
+	strptr("4GDEgeCgEXwxoszBpriddAibgbhh36Vz"), strptr("FdkAi hx8B3QvmjFXovy64TzYwaZ0uoW8"), strptr("zAcp1V4PmI5dBv wtnbHqN1ISyrXB7P32"), strptr("lJq5w9GNhpqveQ67kxyQlgAwgQz1AAj3"), _
+	strptr("yi0jssXmCMjnFjl2rWs0rNIx51iVNLoI"), strptr("HT1BYxlX3z39XBFEw8JMNwYdWeQrO8h2"), strptr("aQmJI2hUruwhqvJeWL3 gZCGAZ09q67nR"), strptr("rxGWF OPfQdxUR0cYRenCccz5XgSpTDqf"), _
+	strptr("4NI1L2KbwybObecSDAAgb0K00oCEkf3E"), strptr("heBlACb AfcK9G85Gl6mBpBUiblc81FSe"), strptr("GwWx6pHvWyvxSu82PbJbZI UNwx9JSATu"), strptr("AFCQd25jnbBJ7LBbaXI3I5IeSwDXqME6"), _
+	strptr("lzSqw9t7hJ03AkTjWWUyd3KqrnGAvPJg"), strptr("pxwCKuWxUOrIMvqXGL 5fbibttAPNIJFC"), strptr("Fs6sFtGnRezLttwm8AbSKsuvLGbcqFbZ"), strptr("hEdVvdwWDwsDA23dX0NjDqzYEaURRC7a"), _
+	strptr("IBrdiqo3g0tj LkXz1a45DJD52tO8FJSw"), strptr("h5QYsL9S1cfsWzTyyFJ6Npq7vLi1tjEX"), strptr("zhUkVyCPdhWspT9kBQpOmmREmSU6GPW3"), strptr("Ud1ih3stL5nq00PJMRoA1Zd1QJi0mOzj"), _
+	strptr("iVppAFr5pGYa4oT8OozDi0oqGvqJg3Eg"), strptr("YC9YUpKq95nIe7D3ckdc6Yy1cEmmuqf1"), strptr("pzmZvs5j77aVaXXnPqzcuU9fW4Kfmiv5"), strptr("04ifd9OyA5XGsLTovRo04MnIKToW9Qu3"), _
+	strptr("iDJcbD5si6xPRcPRBEVeEhcJSs7n65SD"), strptr("a4oZMmgJQAa72o6sllH4n0zfJE5H0HlA"), strptr("5eSVmFkJMmPCRKdTZRJeuW71uhprmYHp"), strptr("LcnSHbxguPfqPNhdDR4XDc2qv01Q4Y1Y"), _
+	strptr("H3wT59MiQmEBZ7tYGMt1xMUu7wajECo6"), strptr("JNGUtcQz660ApgN54rk2UzpqWimO25Cy"), strptr("ss887dpFwjPaqAg53K6qZnc1NFiXc9WX"), strptr("y9Th4vRk1jSpKlzB5soK66ckzl3USZq6"), _
+	strptr("WGWY5YmWhaA5oKCoDmRA3n82XwclqvSP"), strptr("hvlSZ6jE2BU9ImjUjQiY255GA5ASfUUx"), strptr("e9o4tBCA9TCpilOI05UyHzes6s8lP9lQ"), strptr("gJyC26gZsCKR8wSp9kNMYKJRRgA3u45U1DWdzPCWv1SUEKi3Wdo3zNFTWiMcCfcl5A0MzOhbqRee7OP13NruY WP0ufGiB4W9RBWqgSy7umnE6puTyCc9WhPOzdLz168BhQwYetZkADWibObi8jcYajuUv54zxXkXQwC1B8lAi8rIH9lmIy0G10fQ832HKiLx") _
 }
 dim shared test_strings_count as long = (((sizeof(const zstring ptr) * 76) \ sizeof((test_strings(0)))))
 dim shared font_path as const zstring ptr = cptr(const zstring ptr, 0)
@@ -821,10 +838,18 @@ function example_main cdecl(byval argc as long, byval argv as zstring ptr ptr) a
 						SDL_snprintf(@title(0), ((sizeof(byte) * 1024) - 1), strptr("%s Sz=%d outline=%d Hinting=%s %s"), render_mode_desc(render_mode), cast(long, curr_size), cast(long, outline), hinting_desc(hinting), testapp_basename(font_path))
 						if save_to_bmp then
 							scope
-								SDL_snprintf(@filename(0), ((sizeof(byte) * 256) - 1), strptr("Render=%s_size=%d_outline=%d_wrap=%d_wrap_size=%d_kerning=%d_sdf=%d_italic=%d_bold=%d_underline=%d_strikethrough=%d_hinting=%s_%s__%" SDL_PRIs64 ".bmp"), render_mode_desc(render_mode), cast(long, curr_size), cast(long, outline), cast(long, wrap), cast(long, wrap_size), cast(long, kerning), cast(long, sdf), cast(long, ((((font_style and TTF_STYLE_ITALIC)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_BOLD)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_UNDERLINE)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_STRIKETHROUGH)) = 0) = 0)), hinting_desc(hinting), testapp_basename(font_path), cast(Sint64, cast(Sint64, time_(cptr(time_t ptr, 0)))))
+								SDL_snprintf(@filename(0), ((sizeof(byte) * 256) - 1), _
+								strptr("Render=%s_size=%d_outline=%d_wrap=%d_wrap_size=%d_kerning=%d_sdf=%d_italic=%d_bold=%d_underline=%d_strikethrough=%d_hinting=%s_%s__%" SDL_PRIs64 ".bmp"), _
+								render_mode_desc(render_mode), cast(long, curr_size), cast(long, outline), cast(long, wrap), cast(long, wrap_size), cast(long, kerning), cast(long, sdf), cast(long, _
+								((((font_style and TTF_STYLE_ITALIC)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_BOLD)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_UNDERLINE)) = 0) = 0)), _
+								cast(long, ((((font_style and TTF_STYLE_STRIKETHROUGH)) = 0) = 0)), hinting_desc(hinting), testapp_basename(font_path), cast(Sint64, cast(Sint64, time_(cptr(time_t ptr, 0)))))
 							end scope
 						end if
-						SDL_snprintf(@infos(0), ((sizeof(byte) * 256) - 1), strptr("Render=%s size=%d outline=%d wrap=%d wrap_size=%d kerning=%d sdf=%d italic=%d bold=%d underline=%d strikethrough=%d hinting=%s %s"), render_mode_desc(render_mode), cast(long, curr_size), cast(long, outline), cast(long, wrap), cast(long, wrap_size), cast(long, kerning), cast(long, sdf), cast(long, ((((font_style and TTF_STYLE_ITALIC)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_BOLD)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_UNDERLINE)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_STRIKETHROUGH)) = 0) = 0)), hinting_desc(hinting), font_path)
+						SDL_snprintf(@infos(0), ((sizeof(byte) * 256) - 1), _
+						strptr("Render=%s size=%d outline=%d wrap=%d wrap_size=%d kerning=%d sdf=%d italic=%d bold=%d underline=%d strikethrough=%d hinting=%s %s"), render_mode_desc(render_mode), _
+						cast(long, curr_size), cast(long, outline), cast(long, wrap), cast(long, wrap_size), cast(long, kerning), cast(long, sdf), cast(long, _
+						((((font_style and TTF_STYLE_ITALIC)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_BOLD)) = 0) = 0)), cast(long, ((((font_style and TTF_STYLE_UNDERLINE)) = 0) = 0)), _
+						cast(long, ((((font_style and TTF_STYLE_STRIKETHROUGH)) = 0) = 0)), hinting_desc(hinting), font_path)
 						SDL_SetWindowTitle(window_, @title(0))
 						SDL_Log_(strptr("%s"), @infos(0))
 					end scope
@@ -1520,7 +1545,9 @@ sub random_input cdecl()
 		hinting = rand_n(hinting_count)
 		curr_str = rand_n(test_strings_count)
 		fg_alpha = rand_n(256)
-		SDL_Log_(strptr("%6d] seed=%d; replay=1; font_style=%d; kerning=%d; sdf=%d; wrap=%d; wrap_size=%d; w_align=%d; outline=%d; curr_size=%d; render_mode=%d; curr_str=%d; curr_font=%d; hinting=%d; fg_alpha=%d; // %s %s"), cast(long, random_cnt), cast(long, seed), cast(long, font_style), cast(long, kerning), cast(long, sdf), cast(long, wrap), cast(long, wrap_size), cast(long, w_align), cast(long, outline), cast(long, curr_size), cast(long, render_mode), cast(long, curr_str), cast(long, curr_font), cast(long, hinting), cast(long, fg_alpha), hinting_desc(hinting), render_mode_desc(render_mode))
+		SDL_Log_(strptr("%6d] seed=%d; replay=1; font_style=%d; kerning=%d; sdf=%d; wrap=%d; wrap_size=%d; w_align=%d; outline=%d; curr_size=%d; render_mode=%d; curr_str=%d; curr_font=%d; hinting=%d; fg_alpha=%d; // %s %s"), _
+		cast(long, random_cnt), cast(long, seed), cast(long, font_style), cast(long, kerning), cast(long, sdf), cast(long, wrap), cast(long, wrap_size), cast(long, w_align), cast(long, _
+		outline), cast(long, curr_size), cast(long, render_mode), cast(long, curr_str), cast(long, curr_font), cast(long, hinting), cast(long, fg_alpha), hinting_desc(hinting), render_mode_desc(render_mode))
 		exit sub
 	end scope
 end sub

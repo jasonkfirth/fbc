@@ -17,4 +17,3 @@ Type list_
   first As listnode Ptr
   count As Integer
 End Type
-

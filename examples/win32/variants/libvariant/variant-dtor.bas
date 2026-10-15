@@ -12,4 +12,3 @@ destructor VARIANT _
 	VariantClear( @this.var_ )
 
 end destructor
-

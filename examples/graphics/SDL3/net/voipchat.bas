@@ -10,6 +10,9 @@
 #include once "smoke.bi"
 #include once "SDL3/SDL_net.bi"
 
+'' -------------------------------------------------------------------------
+'' Voice and device state
+'' -------------------------------------------------------------------------
 type Voice
 	stream as SDL_AudioStream ptr
 	addr as NET_Address ptr
@@ -47,6 +50,9 @@ declare sub print_usage cdecl(byval prog as const zstring ptr)
 declare sub run_voipchat cdecl(byval argc as long, byval argv as zstring ptr ptr)
 declare function example_main cdecl(byval argc as long, byval argv as zstring ptr ptr) as long
 
+'' -------------------------------------------------------------------------
+'' Network and audio processing
+'' -------------------------------------------------------------------------
 function FindVoiceByAddr cdecl(byval addr as const NET_Address ptr, byval port as Uint16) as Voice ptr
 	scope
 		dim i as Voice ptr

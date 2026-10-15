@@ -23,4 +23,3 @@ For I As Integer = 0 To 1
 Next I
 
 Sleep
-

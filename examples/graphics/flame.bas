@@ -21,7 +21,7 @@
 #define FIRE_SEED_COUNT     6
 #define EXPLOSION_CHANCE    50
 #define EXPLOSION_LIFETIME  192
-#define VGA_COMPONENT_MAX   &h3F
+#define VGA_COMPONENT_MAX   (&h3F)
 
 #include "fbgfx.bi"
 

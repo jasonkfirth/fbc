@@ -25,4 +25,3 @@ fb_memcopy(person2, person1, SizeOf(Person))
 Print person2.name, person2.age
 
 Sleep
-

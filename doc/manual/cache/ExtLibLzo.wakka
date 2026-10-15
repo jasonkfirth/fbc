@@ -2,9 +2,13 @@
 LZO is a compression library offering fast compression and very fast decompression.
 
 Website: [[https://www.oberhumer.com/opensource/lzo/]]
-Platforms supported: Windows (32-bit and 64-bit), Linux, DOS
+Platforms supported: Windows (32-bit and 64-bit), Linux, FreeBSD, Haiku
 Headers to include: lzo/lzo.bi
 Header version: 2.09
+
+Haiku R1 beta 6 amd64: `examples/manual/libraries/lzo.bas` compiled and ran
+with FreeBASIC 1.20.4-3 against HaikuPorts LZO 2.10; its compression and safe
+decompression round trip matched the original bytes.
 
 The example uses the upstream LZO1X worst-case compression capacity ##input + input \ 16 + 64 + 3##, allocates the exact expected decoded capacity, and calls ##lzo1x_decompress_safe##. It validates the decoded length and every input byte, including the terminator, before displaying the text. The source, output and compression workspace use separate ownership paths.
 

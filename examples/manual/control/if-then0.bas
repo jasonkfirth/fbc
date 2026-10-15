@@ -18,4 +18,3 @@ If d > 0 Then r = Sqr(d) : Print "square root computed:" Else r = 0 : Print "squ
 Print r
 
 Sleep
-

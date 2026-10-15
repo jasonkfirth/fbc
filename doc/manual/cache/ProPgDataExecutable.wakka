@@ -38,6 +38,10 @@ Extern "C"
 	#if defined(__FB_WIN32__) and not defined(__FB_64BIT__)
 		Extern hello_txt_start Alias "binary_hello_txt_start" As Const Byte
 		Extern hello_txt_end Alias "binary_hello_txt_end" As Const Byte
+	#elseif defined(__FB_DOS__)
+		'' FreeBASIC adds the DOS C symbol prefix, so the alias omits the leading underscore.
+		Extern hello_txt_start Alias "binary_hello_txt_start" As Const Byte
+		Extern hello_txt_end Alias "binary_hello_txt_end" As Const Byte
 	#else
 		Extern hello_txt_start Alias "_binary_hello_txt_start" As Const Byte
 		Extern hello_txt_end Alias "_binary_hello_txt_end" As Const Byte

@@ -1,4 +1,8 @@
-
+'' FreeBASIC IUP examples
+'' File: frame.bas
+'' Purpose: Display a frame with a label describing its attributes.
+'' Responsibilities: Native dialog behavior, callbacks and checked toolkit lifetime.
+'' This file contains no widget implementation or secondary event dispatcher.
 #include once "IUP/iup.bi"
 
 #define NULL 0
@@ -7,7 +11,10 @@
   dim as Ihandle ptr frame, dialog
 
   '' Initializes IUP
-  IupOpen( NULL, NULL )
+  if IupOpen( NULL, NULL ) = IUP_ERROR then
+    print "Error: Could not initialize IUP."
+    end 1
+  end if
 
   '' Creates frame with a label
   frame = IupFrame _
@@ -38,3 +45,5 @@
 
   '' Finishes IUP
   IupClose()
+
+'' end of frame.bas

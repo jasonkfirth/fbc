@@ -1,9 +1,26 @@
+'' Project: FreeBASIC network examples
+'' -----------------------------------
 ''
-'' minimal http server example using OPEN TCP SERVER
+'' File: examples/network/opentcp/http-server.bas
+''
+'' Purpose:
+''
+''     Serve one small HTTP response through OPEN TCP SERVER.
+''
+'' Responsibilities:
+''
+''     - accept one client and parse its request line
+''     - return a bounded in-memory page or a 404 response
+''     - close the client and listening file units
+''
+'' This file intentionally does NOT contain:
+''
+''     - a persistent multi-client service or TLS
+''     - packet-driver installation or Watt-32 configuration
+''
 '' Ownership: the server closes each accepted TCP file unit before the next request.
-''
 
-#if defined(__FB_DOS__) or defined(__FB_JS__) or defined(__FB_XBOX__)
+#if defined(__FB_JS__) or defined(__FB_XBOX__)
 	print "TCP is not supported on this target"
 	end 1
 #endif
@@ -74,3 +91,5 @@ function hGetArg( byval index as integer, byref default_value as string ) as str
 		function = default_value
 	end if
 end function
+
+'' end of examples/network/opentcp/http-server.bas

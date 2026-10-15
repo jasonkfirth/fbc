@@ -16,4 +16,3 @@ hour_date = Format(Now, TEMPLATE)
 Print hour_date, "(" & TEMPLATE & ")"
 
 Sleep
-

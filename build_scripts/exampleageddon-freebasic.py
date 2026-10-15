@@ -53,8 +53,10 @@ EXTERNAL_PATH_MARKERS = (
     "/console/caca/",
     "/console/curses/",
     "/database/",
+    "/files/devil/",
     "/files/freeimage/",
     "/files/gd/",
+    "/files/giflib/",
     "/files/jpeglib/",
     "/files/libpng/",
     "/graphics/allegro/",
@@ -68,11 +70,13 @@ EXTERNAL_PATH_MARKERS = (
     "/graphics/tinyptc/",
     "/graphics/grx/",
     "/gui/",
+    "/math/big_int/",
     "/math/cryptlib/",
     "/math/gsl/",
     "/math/ode/",
     "/manual/libraries/",
     "/network/curl/",
+    "/misc/gdsl/",
     "/other-languages/",
     "/regex/pcre/",
     "/regex/tre/",
@@ -587,6 +591,12 @@ def classify(path: Path, root: Path, target_os: str, supports_gas64: bool) -> Cl
 
     if target_os == "wii" and THREADCALL_RE.search(text):
         return Classification("platform-specific", "Wii intentionally builds without libffi THREADCALL support", False)
+
+    if target_os == "dos" and THREADCALL_RE.search(text):
+        return Classification("platform-specific", "DOS builds omit libffi-backed THREADCALL support", False)
+
+    if target_os == "dos" and rel == "examples/threads/timer-lib/test.bas":
+        return Classification("platform-specific", "timer library explicitly rejects DOS", False)
 
     if rel in PLATFORM_SOURCES:
         return Classification("platform-specific", "example contains platform-specific ABI or OS assumptions", False)

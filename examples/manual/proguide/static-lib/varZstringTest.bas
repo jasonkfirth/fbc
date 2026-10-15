@@ -35,4 +35,3 @@ v.Constructor(v)  '' readjusts memory allocation to minimum
 Print "varZstring v:", "'" & v & "'", "|"; Using "########|"; Len(v); v.allocated
 
 Sleep
-

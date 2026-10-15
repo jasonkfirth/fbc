@@ -3190,4 +3190,45 @@ owned by a `CALL` or preceding `ARG` through a right edge and that the count
 matches the complete chain. This check uses the compiler's AST relationships,
 does not infer formal arity or source order, and needs no new capability.
 
+## Selected non-field member reference roles
+
+Capability 117, `selected-nonfield-member-roles`, is available in full models
+with macro provenance. Binding-only, expression-only and macro-compact modes
+advertise unavailable and omit the family. Capability 115 remains field-only.
+The selected non-FIELD member owns these immutable properties:
+
+| Property | Payload |
+| --- | --- |
+| `selected-nonfield-binding-<B ordinal>` | role, receiver aggregate S identity |
+| `selected-nonfield-reference-<reference identity>` | role, receiver aggregate S identity, MI identity |
+| `selected-nonfield-count:<module identity>` on the global namespace | complete occurrence count, including zero |
+
+Payloads use escaped tabs within one K value. These annotate existing B/MR
+observations rather than duplicate them. `expression` preserves object-member
+grammar even when constants fold or static calls discard their instance.
+`type` identifies type-member queries and calls resolved through a type qualifier.
+`symbol` is other identifier resolution without an object receiver and uses zero.
+Direct type-qualified static data/constants can follow that symbol-only parser
+path. These roles do not assert runtime evaluation or an active union field.
+
+The receiver is an aggregate type identity. It need not be the declaring owner:
+the call parser retains it before an inherited-owner conversion and when it
+constructs implicit THIS. Nested calls have separate receiver state even when
+macro replacement tokens share an invocation anchor. Only a selected overload
+gets the call binding; explicit CONSTRUCTOR/DESTRUCTOR selections no longer
+export a second unselected overload-head binding.
+
+Members include static data, constants, methods, enums and other declarations
+owned by an aggregate. Enum owner chains are bounded at 64 levels; procedure
+locals are excluded. Readers validate exact existing B/MR associations,
+same-module aggregate receivers, immutable uniqueness and complete counts.
+Original LOC/MR records retain physical and macro origins. An older producer
+without capability 117 makes no occurrence-coverage claim.
+
+The independent reader and native reader validate this optional family. Tests
+cover GCC/Clang/LLVM emission parity, binary/text parity, queries, inherited and
+implicit receivers, mixed-role macros, enum scopes, keyword overload selection,
+reduced modes, empty families and 42 independently damaged controls. The private
+producer is retained separately from the installed compiler.
+
 <!-- end of compiler-semantic-model.md -->

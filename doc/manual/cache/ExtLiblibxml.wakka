@@ -2,10 +2,14 @@
 De-facto standard library for accessing xml files.
 
 Website: http://xmlsoft.org/
-Platforms supported: Windows (32-bit and 64-bit), Linux
+Platforms supported: Windows (32-bit and 64-bit), Linux, FreeBSD, Haiku
 Headers to include: libxml/*.bi
 Header version: 2.9.2
 Examples: in examples/xml/
+
+Haiku R1 beta 6 amd64: `examples/xml/libxml.bas` compiled and ran with
+FreeBASIC 1.20.4-3 against HaikuPorts libxml2 2.15.3, reading a controlled XML
+fixture with the text-reader API.
 
 The reader example checks nullable ##xmlTextReaderConstName## and ##xmlTextReaderConstValue## results before using the borrowed strings. It prints node information until ##xmlTextReaderRead## reports end of input or an error, frees the reader, and returns a failing process status for malformed, empty, missing or unfinished XML. Process-wide cleanup runs after the last reader. It does not substitute entities and requests ##XML_PARSE_NONET##.
 

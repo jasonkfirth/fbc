@@ -107,4 +107,3 @@ For i As CharIterator = "z" To "a" Step "up"
 	Print i; " ";
 Next
 Print "done"
-

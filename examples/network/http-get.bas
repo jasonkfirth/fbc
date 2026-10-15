@@ -1,6 +1,124 @@
+'' Project: FreeBASIC network examples
+'' -----------------------------------
 ''
-'' simple http-get example for Windows and Unix-like systems
+'' File: examples/network/http-get.bas
 ''
+'' Purpose:
+''
+''     Send a simple HTTP GET request and print the response.
+''
+'' Responsibilities:
+''
+''     - use the DOS TCP file device or native Windows/Unix sockets
+''     - parse the host and optional path from the command line
+''     - bound response reads and waiting on DOS
+''
+'' This file intentionally does NOT contain:
+''
+''     - HTTPS, redirects, or general HTTP response parsing
+''     - DOS packet-driver installation or Watt-32 configuration
+''
+'' DOS uses FreeBASIC's TCP file device and needs a Watt-32-enabled runtime.
+
+#ifdef __FB_DOS__
+
+'' -------------------------------------------------------------------------
+'' DOS TCP file-device implementation
+'' -------------------------------------------------------------------------
+
+const DEFAULT_HOST = "www.freebasic.net"
+'' HTTP's standard TCP service port.
+const HTTP_PORT = "80"
+'' Keep reads under 4 KiB and cap idle polling. Each poll requests a 10 ms sleep.
+const RECVBUFFLEN = 4096
+const WAIT_SLICE_MS = 10
+const MAX_IDLE_TICKS = 1000
+
+declare sub getHostAndPath _
+	( _
+		byref src as string, _
+		byref hostname as string, _
+		byref path as string _
+	)
+
+dim hostname as string
+dim path as string
+dim chunk as string
+dim source as string = command( )
+dim f as integer
+dim idle_ticks as integer = 0
+dim saw_data as integer = FALSE
+
+getHostAndPath( source, hostname, path )
+if( len( hostname ) = 0 ) then
+	hostname = DEFAULT_HOST
+end if
+
+f = freefile( )
+if( OPEN TCP( "host=" & hostname & ",port=" & HTTP_PORT AS #f ) <> 0 ) then
+	print "OPEN TCP failed, ERR="; err
+	end 1
+end if
+
+print #f, "GET /" & path & " HTTP/1.0"
+print #f, "Host: " & hostname
+print #f, "Connection: close"
+print #f, "User-Agent: FreeBASIC DOS HTTP example"
+print #f,
+
+do
+	if( eof( f ) = 0 ) then
+		chunk = input( RECVBUFFLEN, #f )
+		if( len( chunk ) <> 0 ) then
+			print chunk;
+			saw_data = TRUE
+			idle_ticks = 0
+		else
+			sleep WAIT_SLICE_MS, 1
+			idle_ticks += 1
+		end if
+	elseif( eoc( f ) <> 0 ) then
+		exit do
+	else
+		sleep WAIT_SLICE_MS, 1
+		idle_ticks += 1
+	end if
+	if( idle_ticks >= MAX_IDLE_TICKS ) then
+		print "Timed out waiting for HTTP response"
+		close #f
+		end 1
+	end if
+loop
+
+close #f
+if( saw_data = FALSE ) then
+	print "No HTTP response received"
+	end 1
+end if
+
+sub getHostAndPath _
+	( _
+		byref src as string, _
+		byref hostname as string, _
+		byref path as string _
+	)
+
+	dim p as integer = instr( src, " " )
+	if( p = 0 or p = len( src ) ) then
+		hostname = trim( src )
+		path = ""
+	else
+		hostname = trim( left( src, p-1 ) )
+		path = trim( mid( src, p+1 ) )
+	end if
+
+end sub
+
+#else
+
+'' -------------------------------------------------------------------------
+'' Native Windows and Unix socket implementation
+'' -------------------------------------------------------------------------
 
 #ifdef __FB_WIN32__
 #include once "win/winsock2.bi"
@@ -182,5 +300,7 @@ sub doShutdown( )
 	WSACleanup( )
 #endif
 end sub
+
+#endif
 
 '' end of http-get.bas

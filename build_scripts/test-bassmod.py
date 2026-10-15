@@ -150,7 +150,8 @@ def main():
                "malformed_and_missing_module_checks": 6, "native_output_checks": 0 if args.decode_only else 3,
                "examples": records, "compiler_sha256": hashlib.sha256(fbc.read_bytes()).hexdigest(),
                "library_sha256": hashlib.sha256(library.read_bytes()).hexdigest(),
-               "driver_cleanup": "pass" if proxy is not None else "existing driver retained"}
+               "driver_cleanup": "not used: decode-only" if args.decode_only else
+                                 "pass" if proxy is not None else "existing driver retained"}
     receipt["scope"] = "vendor decoding only" if args.decode_only else "native OSS playback and decoding"
     (output / "results.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print("BASSMOD_DECODER_QUALIFICATION=PASS" if args.decode_only else "BASSMOD_QUALIFICATION=PASS", flush=True)

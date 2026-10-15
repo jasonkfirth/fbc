@@ -3,6 +3,10 @@
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'Operator New Overload'
 ''
+'' Purpose: Reserve and recover an allocation header in overloaded New and Delete.
+'' Responsibilities: The documented example flow and its owned resources.
+'' This file contains no compiler implementation or replacement system API.
+''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgOpNewOverload
 '' --------
 
@@ -42,7 +46,8 @@ Operator UDT.Delete (ByVal buffer As Any Ptr)
   '' This retrieves the header reserved by UDT.New immediately before buffer.
   '' FB-LINTER: DISABLE-NEXT-LINE FBL525 FBL-PTR-019
   Dim pOrig As Any Ptr = Cast(Any Ptr Ptr, buffer)[-1]
-  Dim pOrigAddress As ULongInt = CULngInt(pOrig)
+  '' An unsigned pointer-sized value retains the complete address on both targets.
+  Dim pOrigAddress As UInteger = CUInt(pOrig)
 
   If pOrig <> 0 Then
     Deallocate(pOrig)
@@ -74,3 +79,5 @@ Else
 End If
 
 Sleep
+
+'' end of newoverload1.bas

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """FreeBASIC Linux sfxlib example qualification
 File: test-sfx-examples.py
-Purpose: Run the original sound examples against the genuine null backend.
+Purpose: Run the original sound examples against a selected genuine backend.
 Responsibilities: Private media, bounded diagnostics, GUI closure and receipts.
 This file contains no sound driver replacement or physical audio acceptance.
 """
 import argparse
+from contextlib import nullcontext
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import importlib.util
@@ -19,6 +20,7 @@ import time
 import wave
 
 from sdl3_xvfb import private_display
+from sfx_pulse import private_pulse
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,11 +37,15 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument("--select")
+    parser.add_argument("--driver", choices=("null", "alsa", "pulse"), default="null")
+    parser.add_argument("--private-pulse", action="store_true")
     args = parser.parse_args()
     if os.name != "posix":
         parser.error("this runner qualifies native Linux and its owned X display")
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+    if args.private_pulse and args.driver != "pulse":
+        parser.error("--private-pulse requires --driver pulse")
     args.fbc = args.fbc.resolve()
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -56,6 +62,7 @@ def main():
     source_hashes = {source.relative_to(ROOT).as_posix(): fingerprint(source) for source in sources}
     source_hashes["examples/sfxlib/example_common.bi"] = fingerprint(ROOT / "examples/sfxlib/example_common.bi")
     source_hashes["build_scripts/test-sfx-examples.py"] = fingerprint(Path(__file__).resolve())
+    source_hashes["build_scripts/sfx_pulse.py"] = fingerprint(ROOT / "build_scripts/sfx_pulse.py")
     (args.output / "results.json").write_text(json.dumps({"status": "pending", "source_sha256": source_hashes}, indent=2) + "\n")
     spec = importlib.util.spec_from_file_location("sdl12_checks", ROOT / "build_scripts/test-sdl12-examples.py")
     gui = importlib.util.module_from_spec(spec)
@@ -71,8 +78,10 @@ def main():
         assert media.resolve() == args.output / "media"
         binary = directory / "example"
         record = {"source": source.relative_to(ROOT).as_posix(), "backend": backend}
-        environment = os.environ.copy()
-        environment["SFXLIB_DRIVER"] = "null"
+        environment = base_environment.copy()
+        environment["SFXLIB_DRIVER"] = "PulseAudio" if args.driver == "pulse" else args.driver
+        if args.driver != "null":
+            environment["SFXLIB_DEBUG"] = "1"
         environment["SFXLIB_DRIVER_DUMP"] = str(directory / "driver.txt")
         environment["SFXLIB_DRIVER_DUMP_FRAMES"] = str(DUMP_FRAMES)
         environment.pop("FB_GFX_DRIVER", None)
@@ -138,6 +147,11 @@ def main():
                 assert all(math.isfinite(value) and abs(value) <= 1.00001 for value in samples)
                 record["driver_samples"] = len(samples)
                 record["nonzero_driver_samples"] = sum(abs(value) > 0.000001 for value in samples)
+                if args.driver != "null":
+                    name = "ALSA" if args.driver == "alsa" else "PulseAudio"
+                    assert "requested driver '" + name + "' initialized" in (directory / "run.log").read_text()
+            if args.driver != "null" and source.stem.startswith(("basics-01-", "basics-03-", "basics-04-")):
+                assert record.get("nonzero_driver_samples", 0) > 0, "no generated samples reached the selected driver"
             if source.stem in ("midi-synth-player", "voice-effects-stress"):
                 text = (directory / "run.log").read_text()
                 if source.stem == "midi-synth-player":
@@ -157,12 +171,15 @@ def main():
             record.update(status="run-failed", error=str(error))
         return record
 
-    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        records = list(pool.map(check, [(backend, source) for backend in ("gcc", "gas64") for source in sources]))
+    context = private_pulse(args.output, os.environ.copy()) if args.private_pulse else nullcontext((os.environ.copy(), None))
+    with context as (base_environment, pulse_server):
+        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            records = list(pool.map(check, [(backend, source) for backend in ("gcc", "gas64") for source in sources]))
     failures = [record for record in records if record["status"] != "passed"]
-    receipt = {"status": "fail" if failures else "pass", "scope": "original Linux examples with genuine null audio backend",
+    receipt = {"status": "fail" if failures else "pass", "scope": "original Linux examples with genuine " + args.driver + " audio backend",
                "compiler_sha256": fingerprint(args.fbc), "source_sha256": source_hashes,
                "driver_dump_limit": DUMP_FRAMES, "records": records}
+    receipt["private_pulse"] = pulse_server
     (args.output / "results.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps({"examples": len(sources), "checks": len(records), "passed": len(records) - len(failures),
                       "failures": failures}, indent=2), flush=True)

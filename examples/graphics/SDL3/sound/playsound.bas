@@ -27,8 +27,13 @@
 '' This is a quick and dirty test of SDL_sound.
 '' this is a console-only app
 dim shared option_list(0 to 29) as const zstring ptr = { _
-	strptr("--rate"), strptr("n       Playback at sample rate of n HZ."), strptr("--format"), strptr("fmt   Playback in fmt format (see below)."), strptr("--channels"), strptr("n   Playback on n channels (1 or 2)."), strptr("--decodebuf"), strptr("n  Buffer n decoded bytes at a time (default 16384)."), strptr("--audiobuf"), strptr("n   Buffer n samples to audio device (default 4096)."), strptr("--volume_level"), strptr("n     Playback volume_level multiplier (default 1.0)."), strptr("--window"), strptr("      Open a window for playback."), strptr("--version"), strptr("     Display version information and exit."), _
-	strptr("--decoders"), strptr("    List supported data formats and exit."), strptr("--predecode"), strptr("   Decode entire sample before playback."), strptr("--loop"), strptr("n       Loop playback n times."), strptr("--seek"), strptr("list    List of seek points and playback durations."), strptr("--credits"), strptr("     Shameless promotion."), strptr("--help"), strptr("        Display this information and exit."), cptr(const zstring ptr, 0), cptr(const zstring ptr, 0) _
+	strptr("--rate"), strptr("n       Playback at sample rate of n HZ."), strptr("--format"), strptr("fmt   Playback in fmt format (see below)."), strptr("--channels"), _
+	strptr("n   Playback on n channels (1 or 2)."), strptr("--decodebuf"), strptr("n  Buffer n decoded bytes at a time (default 16384)."), strptr("--audiobuf"), _
+	strptr("n   Buffer n samples to audio device (default 4096)."), strptr("--volume_level"), strptr("n     Playback volume_level multiplier (default 1.0)."), strptr("--window"), _
+	strptr("      Open a window for playback."), strptr("--version"), strptr("     Display version information and exit."), _
+	strptr("--decoders"), strptr("    List supported data formats and exit."), strptr("--predecode"), strptr("   Decode entire sample before playback."), strptr("--loop"), _
+	strptr("n       Loop playback n times."), strptr("--seek"), strptr("list    List of seek points and playback durations."), strptr("--credits"), strptr("     Shameless promotion."), _
+	strptr("--help"), strptr("        Display this information and exit."), cptr(const zstring ptr, 0), cptr(const zstring ptr, 0) _
 }
 '' output_credits
 dim shared done_flag as long = 0
@@ -253,7 +258,8 @@ sub memcpy_with_volume cdecl(byval sample as Sound_Sample ptr, byval dst as Uint
 		exit sub
 	end if
 	'' if
-	'' !!! FIXME: This would be more efficient with a lookup table.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: Each format has a dedicated conversion case; the lookup-table change is a separate optimization.
+'' !!! FIXME: This would be more efficient with a lookup table.
 	select case sample->desired.format
 		case (SDL_AUDIO_U8)
 			goto switch_case_6

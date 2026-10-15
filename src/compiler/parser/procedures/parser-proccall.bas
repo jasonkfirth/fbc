@@ -254,6 +254,9 @@ sub hMethodCallAddInstPtrOvlArg _
 
 	dim as FB_CALL_ARG ptr arg = symbAllocOvlCallArg( @parser.ovlarglist, arg_list, FALSE )
 
+	'' Keep the written type before conversion to an inherited owner. A static
+	'' overload can discard the argument while still having an object selection.
+	arg_list->semantic_receiver = astGetSubtype( thisexpr )
 	dim as FBSYMBOL ptr parent = symbGetParent( proc )
 	if( astGetSubtype( thisexpr ) <> parent ) then
 		thisexpr = astNewCONV( symbGetType( parent ), parent, thisexpr )

@@ -8,6 +8,7 @@
 #endif
 
 const LANG = "Chinese"
+'' FB-LINTER: DISABLE-NEXT-LINE FBL-SEC-014 REASON: The fullwidth comma is the intended Chinese punctuation in this Unicode example.
 	dim helloworld as wstring * 20 => "你好，世界!"
 
 	print """Hello World!"" in "; LANG; ": "; helloworld

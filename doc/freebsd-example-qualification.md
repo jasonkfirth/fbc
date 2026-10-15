@@ -69,11 +69,11 @@ The profile adds `/usr/local/lib/mariadb` for
 `examples/database/mysql_test.bas`. FreeBSD's MariaDB Connector/C package
 places `libmariadb.so` in that directory.
 
-## Libraries exercised by examples
+## Libraries compiled and linked by Exampleageddon
 
-These rows mean at least one matching Exampleageddon example compiled and
-linked on this VM. They do not imply that every API in a binding works or that
-the example was run.
+These rows summarize third-party package families represented in the
+compile/link sweep. They do not show runtime proof. The manual pages list
+FreeBSD only for libraries with a successful example run described below.
 
 | Area | FreeBSD packages | Example coverage |
 | --- | --- | --- |
@@ -111,22 +111,67 @@ The FreeBASIC bindings need a few FreeBSD-specific details:
 
 ## Runtime checks
 
-Four headless third-party examples were compiled and run separately:
+These repository examples were compiled with the staged native compiler and
+run on the FreeBSD guest. Their per-example logs are under
+`out/freebsd-third-party-runtime-20261012/logs/`; the libzip smoke artifacts
+are under `out/freebsd-third-party-runtime-20261012/zip-smoke/`.
 
-- SQLite opened an in-memory database and returned its SQLite version.
-- Lua 5.3 loaded `minmax.lua` and returned the expected minimum and maximum.
-- GSL computed a fourth power and a 3-4-5 hypotenuse.
-- libffi called the example callback and returned its integer result.
+- SQLite: `examples/database/sqlite3_test.bas` opened `:memory:`, reported
+  SQLite 3.53.4 and returned `4` for `2+2`.
+- Lua 5.3: `examples/other-languages/Lua/minmax.bas` loaded `minmax.lua` and
+  returned the expected minimum and maximum.
+- GSL: `examples/manual/libraries/gsl1.bas` and `gsl2.bas` produced the
+  expected power, hypotenuse and matrix results.
+- libffi: `examples/manual/libraries/ffi/helloworld.bas` and `closures.bas`
+  called the example callback and returned `42`.
+- GMP: `examples/manual/libraries/gmp.bas` computed and printed `2^65536`.
+- LZO: `examples/manual/libraries/lzo.bas` completed its compression and
+  decompression round trip.
+- Expat and libxml2: `examples/xml/expat.bas` and `libxml.bas` parsed a
+  controlled XML fixture.
+- zlib: `examples/compression/zlib.bas` passed its checks. It reported the
+  expected header/runtime version difference because FreeBSD's runtime is
+  newer than the bundled binding's header version.
+- bzip2: `examples/compression/bz2compress.bas` wrote a compressed fixture.
+- libzip: `examples/manual/libraries/zip2.bas` created an archive and
+  `examples/compression/libzip.bas` extracted both entries; both outputs were
+  byte-compared with the expected text. `ldd` showed `libzip.so.5` from
+  `/usr/local/lib`.
+- GD: `examples/files/GD/gd.bas` wrote its GIF, PNG and JPEG outputs.
+- CUnit: `examples/misc/CUnit/simple.bas` passed both tests.
+- PCRE: `pcredemo.bas` and `preg_class.bas` produced their expected matches.
+- TRE: `match.bas`, `replace.bas` and `subexpr.bas` produced their expected
+  match and replacement results.
+- GLib: `g_Actions.bas`, `g_Arguments.bas`, `g_Assert.bas`, `g_Filenames.bas`,
+  `g_HashTable.bas` and `g_SplitArguments.bas` exited successfully.
+  `g_VarArgMacros.bas` intentionally calls `g_error` and aborts; it is not
+  counted as a passing example.
+- cURL: `examples/manual/libraries/curl.bas` fetched a response from a
+  temporary loopback HTTP server.
+- Aspell: `examples/manual/libraries/aspell.bas` returned suggestions with
+  the `en_US` dictionary installed.
+- DevIL: `examples/manual/libraries/il.bas` read `fblogo.bmp` and wrote a
+  copy in the test directory.
+- SDL 1.2: `examples/graphics/SDL1/core/video_info.bas` exited under Xvfb; its
+  driver-name field was blank in this headless setup.
+- SDL 3: the core template, image, TrueType and network examples exited under
+  Xvfb or the local resolver. The tests used bounded frame counts for GUI
+  examples.
+- GTK 2: the manual `examples/manual/libraries/gtk.bas` example linked GTK 2,
+  opened and exited under Xvfb. The synthetic window close emitted a GDK
+  warning while destroying the window, so interactive desktop behavior is
+  not established.
 
-`ldd` confirmed that each executable loaded the corresponding FreeBSD shared
-library from `/usr/local/lib`. The SQLite check used `:memory:` and left no
-database file. MariaDB and PostgreSQL examples only received compile/link
-qualification; this VM did not have their database servers configured.
-
-The VM was headless and had no physical audio device. GTK, GooCanvas, SDL,
-OpenGL, and audio examples were not interactively exercised. The native
-Exampleageddon run covers the self-contained execution gate, not GUI or
-hardware behavior.
+GTK 3's custom-widget example stayed in its event loop after a synthetic close.
+The GooCanvas arrowhead example opened without the earlier invalid boolean
+property warning after its FreeBASIC varargs were corrected, but the headless
+close test did not finish cleanly. SDL 2 and Allegro 4 event-loop tests did not
+complete, Allegro 5 segfaulted under Xvfb, and Cairo and FreeImage screen
+examples segfaulted in the same FreeBASIC graphics path. These libraries are
+not listed as runtime-proven here. The VM had no physical audio device, so no
+audio-device behavior was tested. MariaDB and PostgreSQL examples only
+received compile/link qualification because no database servers were
+configured.
 
 ## Packages or bindings still needing separate work
 

@@ -34,6 +34,18 @@ class SidecarTests(unittest.TestCase):
     backends: list[str]
     native_windows: bool
 
+    def test_macro_call_inputs(self) -> None:
+        from macro_call_inputs import check_inputs
+        check_inputs(self)
+
+    def test_macro_call_rejects_incomplete_observations(self) -> None:
+        from macro_call_inputs import check_rejection
+        check_rejection(self)
+
+    def test_macro_call_module_closures(self) -> None:
+        from macro_call_inputs import check_modules
+        check_modules(self)
+
     def test_source_memory_application_inputs(self) -> None:
         from source_memory_inputs import check_inputs
         check_inputs(self)
@@ -41,6 +53,22 @@ class SidecarTests(unittest.TestCase):
     def test_source_memory_application_rejects_invalid_observations(self) -> None:
         from source_memory_inputs import check_rejection
         check_rejection(self)
+
+    def test_nonfield_member_inputs(self) -> None:
+        from nonfield_member_inputs import check_inputs
+        check_inputs(self)
+
+    def test_nonfield_member_rejects_incomplete_observations(self) -> None:
+        from nonfield_member_inputs import check_rejection
+        check_rejection(self)
+
+    def test_nonfield_keyword_calls_keep_only_the_selected_overload(self) -> None:
+        from nonfield_member_inputs import check_keyword_calls
+        check_keyword_calls(self)
+
+    def test_nonfield_enum_member_owners(self) -> None:
+        from nonfield_member_inputs import check_enum_owners
+        check_enum_owners(self)
 
     def test_selected_member_reference_roles(self) -> None:
         from member_selection_inputs import check_inputs

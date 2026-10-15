@@ -1,4 +1,9 @@
 '/*
+ '* Project: FreeBASIC graphics examples
+ '* File: demo-focus.bas
+ '* Purpose: Demonstrate keyboard focus on GooCanvas items.
+ '* Responsibilities: Create focusable items and report their input events.
+ '* This file contains no canvas binding or general input dispatcher.
  '* GooCanvas Demo. Copyright (C) 2006 Damon Chaplin.
  '* Released under the GNU LGPL license. See COPYING for details.
  '*
@@ -79,7 +84,7 @@ SUB create_focus_box(BYVAL canvas AS GtkWidget PTR, _
             "stroke-pattern", NULL, _
             "fill-color", color_, _
             "line-width", 5.0, _
-            "can-focus", TRUE, _
+            "can-focus", CTRUE, _
             NULL)
   g_object_set_data (G_OBJECT (item), "id", color_)
 
@@ -159,3 +164,5 @@ gtk_container_add (GTK_CONTAINER (win), page)
 gtk_main ()
 
 END 0
+
+' end of demo-focus.bas

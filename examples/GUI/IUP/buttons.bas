@@ -1,4 +1,8 @@
-﻿
+﻿'' FreeBASIC IUP examples
+'' File: buttons.bas
+'' Purpose: Open a message from a button and close the main dialog.
+'' Responsibilities: Native dialog behavior, callbacks and checked toolkit lifetime.
+'' This file contains no widget implementation or secondary event dispatcher.
 #include once "IUP/iup.bi"
 
 #define NULL 0
@@ -7,6 +11,7 @@ declare function ok_onclick cdecl (byval handler as Ihandle ptr) as long
 declare function close_onclick cdecl (byval handler as Ihandle ptr) as long
 
 	if( IupOpen( NULL, NULL ) = IUP_ERROR ) then
+		print "Error: Could not initialize IUP."
 		end 1
 	end if
 
@@ -54,3 +59,5 @@ function close_onclick cdecl (byval handler as Ihandle ptr) as long
   function = IUP_CLOSE
 
 end function
+
+'' end of buttons.bas

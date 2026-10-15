@@ -56,4 +56,3 @@ type TryCatch
 	ex			as Exception ptr
 	prev		as TryCatch ptr
 end type
-
