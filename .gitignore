@@ -13,6 +13,11 @@
 # Those outputs must not become example source files in version control.
 /examples/**/*.asm
 /examples/**/*.fbc-*.c
+# Direct -r output from the corresponding maintained BASIC examples.
+/examples/graphics/SDL3/core/demo/01-snake/snake.c
+/examples/manual/gfx/imageconvertrow.c
+/examples/manual/proguide/constant_expressions.c
+/examples/manual/proguide/macro.c
 
 # Legacy Windows import libraries and runtime DLLs intentionally bundled for
 # examples that still depend on libraries not provided by current MSYS2.

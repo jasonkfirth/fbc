@@ -1998,8 +1998,13 @@ WithDefault()
                 base = self.one(model, "BaseType", "type")
                 for relation in ("virtual-table", "runtime-type-info"):
                     edges = [row for row in model.relations(relation) if row[2] == str(base)]
-                    self.assertEqual(len(edges), 1)
-                    self.assertEqual(model.types[int(edges[0][4])][3], "variable")
+                    # Symbol snapshots may repeat an unchanged relationship.
+                    # Every snapshot must still select the same native object.
+                    self.assertTrue(edges)
+                    self.assertTrue(all(row[1] == "symbol" and row[3] == "symbol" for row in edges))
+                    targets = {int(row[4]) for row in edges}
+                    self.assertEqual(len(targets), 1)
+                    self.assertEqual(model.types[targets.pop()][3], "variable")
                 source = self.source("declare sub ArrayAPI(values(any, any) as long)\n"
                                      "sub InitializeEarly() constructor 201\nend sub\n"
                                      "function Calculate(byval value as long) as long\n"

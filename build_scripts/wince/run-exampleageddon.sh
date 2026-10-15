@@ -349,7 +349,8 @@ with manifest.open("w", newline="", encoding="utf-8") as stream:
         program = output_root / "bin" / stem
         if not program.is_file():
             program = program.with_name(program.name + ".exe")
-        compile_directory = output_root / "work" / stem / "compile"
+        # Use the producer's retained resource path, independent of its private layout.
+        compile_directory = output_root / row.get("compile_directory", f"work/{stem}/compile")
         if not program.is_file():
             raise SystemExit(f"compiled WinCE executable is missing: {program}")
         if not compile_directory.is_dir():

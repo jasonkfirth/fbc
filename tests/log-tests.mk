@@ -496,6 +496,11 @@ $(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' $(LOG_TESTS_RESULTS_LO
 	; fi  >> $(FAILED_LOG)
 endif
 	@$(CAT) $(FAILED_LOG)
+	@while IFS= read -r result; do \
+		logfile=$${result%%:*}; \
+		$(PRINTF) "\nFailed test details: %s\n" "$$logfile"; \
+		$(TAIL) -n 100 "$$logfile"; \
+	done < $(LOG_TESTS_RESULTS_LOG)
 	@test ! -s $(LOG_TESTS_RESULTS_LOG)
 
 # ------------------------------------------------------------------------

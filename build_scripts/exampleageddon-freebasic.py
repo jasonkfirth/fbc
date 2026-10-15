@@ -396,6 +396,7 @@ class Result:
     output: str
     compile_log: str
     run_log: str
+    compile_directory: str
 
 
 def relpath(path: Path, root: Path) -> str:
@@ -459,8 +460,11 @@ def compiler_supports_gas64(args: argparse.Namespace) -> bool:
     return True
 
 
-def executable_name(stem: str) -> str:
-    if not host_uses_windows_executables():
+def executable_name(stem: str, target_os: str | None = None) -> str:
+    # Cross compilers name the target product, regardless of the runner host.
+    windows_target = (target_os in ("windows", "wince", "dos") or target_os.startswith(("msys", "mingw", "cygwin"))
+                      if target_os is not None else host_uses_windows_executables())
+    if not windows_target:
         return stem
 
     name = stem
@@ -975,12 +979,12 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     if rel in INCLUDED_SOURCE_OWNERS:
         path = root / INCLUDED_SOURCE_OWNERS[rel]
     stem = safe_name(rel[:-4])
-    binary = args.outdir / "bin" / executable_name(stem)
+    binary = args.outdir / "bin" / executable_name(stem, args.target_os)
     if rel in LIBRARY_MODULES:
         mode, _ = LIBRARY_MODULES[rel]
         if mode == "-lib":
             binary = binary.with_name("lib" + stem + ".a")
-        elif args.target_os == "windows":
+        elif args.target_os in ("windows", "wince"):
             binary = binary.with_suffix(".dll")
         else:
             binary = binary.with_name("lib" + stem + ".so")
@@ -1249,6 +1253,9 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         output=output if compile_status == "pass" else "",
         compile_log=str(compile_log.relative_to(args.outdir)),
         run_log=str(run_log.relative_to(args.outdir)),
+        # Consumers stage retained resources after compilation, including
+        # nested SDK layouts. A relative path also survives container mounts.
+        compile_directory=compile_cwd.relative_to(args.outdir).as_posix(),
     )
 
 

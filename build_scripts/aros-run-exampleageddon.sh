@@ -436,7 +436,8 @@ with manifest_path.open("w", newline="", encoding="utf-8") as stream:
     writer.writerow(("index", "path", "output", "compile_directory"))
     for index, row in enumerate(selected, start=1):
         output = Path(row["output"])
-        compile_directory = target_output / "work" / output.name / "compile"
+        # Use the producer's retained resource path, independent of its private layout.
+        compile_directory = target_output / row.get("compile_directory", f"work/{output.name}/compile")
         writer.writerow((f"{index:04d}", row["path"], output, compile_directory))
 PY
 }

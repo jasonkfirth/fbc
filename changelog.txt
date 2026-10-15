@@ -167,6 +167,10 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- compiler/GAS64 BSD: select the SysV argument, stack and call-preservation ABI on NetBSD, OpenBSD and DragonFly instead of the Windows register convention; retain each target's existing aggregate-return policy and exercise the division and ninth-SINGLE-argument regressions.
+- compiler semantic tests: freeze the complete non-field-member and macro-call reader dependencies, and require one consistent virtual-table/RTTI target across repeated symbol snapshots rather than one serialized relationship row.
+- build/exampleageddon CI: name cross-built Windows CE products with their target suffix, publish relative retained-resource directories for RISC OS/AROS/Windows CE staging, and add quick-test coverage for guest manifests and zero-exit missing products.
+- build/CI diagnostics: remove accidental generated example C output from version control and ignore its exact paths while retaining whole-tree C lint; print bounded failed log-test details before preserving the failing result.
 - compiler semantic output: handle temporary-directory name collisions through the runtime's file query instead of assuming host errno values, preserving atomic reservations when DOS or concurrent exports choose the same clock-based name.
 - sfxlib/Linux: reject overflowing frame/channel products, report only samples accepted by ALSA or PulseAudio, advance diagnostic offsets after short ALSA writes, and bound zero-progress retry handling; keep failed submissions out of the diagnostic stream.
 - compiler/build/DOS: use the 8.3-safe libfblwp.a provider name consistently in driver links, runtime archives, installation and probes; derive DXE import-library names from the module basename rather than its output directory.

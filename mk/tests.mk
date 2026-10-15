@@ -101,6 +101,13 @@ quicklz-test: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
 	@test -n "$(QUICKLZ_HEADERS)" -a -n "$(QUICKLZ_LIBDIR)" || { echo "ERROR: set QUICKLZ_HEADERS and QUICKLZ_LIBDIR"; exit 1; }
 	$(TESTS_FBC_ENV) python3 "$(rootdir)/build_scripts/test-quicklz.py" --headers "$(QUICKLZ_HEADERS)" --libdir "$(QUICKLZ_LIBDIR)" --fbc "$(TESTS_FBC)" --cc "$(CC)"
 
+# Guest runners consume the output names and retained resource paths from the
+# host inventory. Check that contract without requiring an SDK or emulator.
+.PHONY: exampleageddon-contract-test
+quick-test: exampleageddon-contract-test
+exampleageddon-contract-test:
+	$(PYTHON) "$(rootdir)/build_scripts/test-exampleageddon-contracts.py"
+
 ##############################################################################
 # END tests.mk
 ##############################################################################

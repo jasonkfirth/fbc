@@ -23,6 +23,8 @@ SEMANTIC_READER_FILES = (
     "sidecar.py",
     "semantic_binary.py",
     "semantic_member_selections.py",
+    "semantic_nonfield_members.py",
+    "semantic_macro_calls.py",
     "semantic_source_memory.py",
     "semantic_flow.py",
     "semantic_literals.py",
