@@ -1,3 +1,9 @@
+'' FreeBASIC expression regression tests
+'' File: selfbops.bas
+'' Purpose: Check compound assignment, floating grouping and retained side effects.
+'' Responsibilities: Bitfield updates, precise grouping and single evaluation.
+'' This file contains no optimizer or floating-point backend implementation.
+
 # include once "fbcunit.bi"
 
 SUITE( fbc_tests.expressions.selfbops )
@@ -75,12 +81,20 @@ SUITE( fbc_tests.expressions.selfbops )
 			dim as double tiny = 1.0e-308
 			dim as double constantBase = 10000000000000000.0
 			dim as double constantScale = 9007199254740992.0
+			dim as double extendedScale = 18446744073709551616.0
 			dim as double constantHuge = 1.0e308
+			dim as double one = 1.0, three = 3.0, ten = 10.0, tenth = 0.1
+			dim as double scaledBase = constantScale * three
+			dim as double extendedBase = extendedScale * three
 			dim as double compound = -1.0
 			dim as double assignment = -1.0
 			dim as double constantAdd = any
 			dim as double constantDistribution = any
+			dim as double referenceDistribution = any
+			dim as double extendedDistribution = any
+			dim as double referenceExtendedDistribution = any
 			dim as double constantMultiply = any
+			dim as double referenceMultiply = any
 
 			compound += (largeA - largeB) + small
 			assignment = assignment + ((largeA - largeB) + small)
@@ -98,11 +112,23 @@ SUITE( fbc_tests.expressions.selfbops )
 			CU_ASSERT( assignment < 1.5e308 )
 
 			constantAdd = (constantBase - 10000000000000000.0) + 1.0
-			constantDistribution = (constantScale + 1.0) * 3.0
-			constantMultiply = (constantHuge * 10.0) * 0.1
+			'' Precise mode preserves grouping without requiring x87 to narrow
+			'' every intermediate to Double. Variable operands provide a reference
+			'' that cannot use the constant-only reassociation optimizations.
+			'' Test the 53-bit and 64-bit significand boundaries, subtracting the
+			'' exact scaled base before storage so either FPU exposes regrouping.
+			constantDistribution = ((constantScale + 1.0) * 3.0) - scaledBase
+			referenceDistribution = ((constantScale + one) * three) - scaledBase
+			extendedDistribution = ((extendedScale + 1.0) * 3.0) - extendedBase
+			referenceExtendedDistribution = ((extendedScale + one) * three) - extendedBase
+			constantMultiply = ((constantHuge * 10.0) * 0.1) - constantHuge
+			referenceMultiply = ((constantHuge * ten) * tenth) - constantHuge
 			CU_ASSERT( constantAdd = 1.0 )
-			CU_ASSERT( constantDistribution = 27021597764222976.0 )
-			CU_ASSERT( constantMultiply > 1.5e308 )
+			CU_ASSERT( constantDistribution = referenceDistribution )
+			CU_ASSERT( extendedDistribution = referenceExtendedDistribution )
+			CU_ASSERT( ((constantScale + 1.0) * 3.0) = ((constantScale + one) * three) )
+			CU_ASSERT( ((extendedScale + 1.0) * 3.0) = ((extendedScale + one) * three) )
+			CU_ASSERT( constantMultiply = referenceMultiply )
 		END_TEST
 	END_TEST_GROUP
 #endif
@@ -197,3 +223,5 @@ SUITE( fbc_tests.expressions.selfbops )
 	END_TEST_GROUP
 
 END_SUITE
+
+'' end of selfbops.bas

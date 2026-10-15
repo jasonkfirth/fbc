@@ -167,6 +167,7 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- tests/floating-point grouping: compare literal and variable operand paths using each backend's native intermediate precision, and exercise both SSE and x87 significand boundaries with cancellation so precise-mode regrouping regressions remain observable without requiring binary64 rounding after every operation.
 - bindings/libffi Darwin: retain Apple's 24-byte x86_64 and 12-byte i386 trampolines while preserving newer x86 layouts elsewhere; compare the binding's native ABI against the selected SDK's C headers before running guarded call and closure checks in macOS CI.
 - build/CI Windows: give x86 and x86_64 native qualification the existing 120-minute ARM64 budget so the full semantic suite leaves time for language and example checks.
 - build/RISC OS: retry bounded archive downloads after connection resets, identify the requested archive in CI logs, and retain pinned SHA-256 checks and temporary-file cleanup before caching emulator and system inputs.
