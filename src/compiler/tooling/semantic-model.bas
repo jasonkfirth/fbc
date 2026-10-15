@@ -29,7 +29,7 @@
 ''
 '' Responsibilities:
 ''
-''     - write a transactional, tab-separated semantic sidecar
+''     - write a transactional binary semantic sidecar with a descriptive header
 ''     - retain bounded expression facts under an explicit recovery footer
 ''     - preserve symbol identity, type, scope, and parent relationships
 ''     - serialize procedure AST nodes with source locations
@@ -71,6 +71,7 @@
 #include once "tooling/semantic-comments.bi"
 #include once "tooling/semantic-variable-names.bi"
 #include once "tooling/semantic-member-names.bi"
+#include once "fbc-semantic-binary.bi"
 
 '' -------------------------------------------------------------------------
 '' Export limits and process-local module state
@@ -82,20 +83,43 @@ private const SEMANTIC_MODEL_MAX_DEPENDENCIES = 5000
 private const SEMANTIC_MODEL_INITIAL_SYMBOL_INDEX_CAPACITY = 256
 private const SEMANTIC_MODEL_MAX_SYMBOL_INDEX_CAPACITY = 2097152
 private const SEMANTIC_MODEL_INITIAL_MODULE_BUFFER_CAPACITY = 8192
-'' Large GUI roots can include many source and SDK modules. Keep one complete
-'' semantic export available without allowing an unbounded staging allocation.
-private const SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES = 536870912
-private const SEMANTIC_MODEL_MAX_NODES_PER_MODEL = 1000000
+'' Large source roots can exceed 1 GiB of compact semantic records per module.
+'' Keep staging finite and below signed 32-bit offsets.
+private const SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES = 1792 * 1024 * 1024
+'' The FBLint root exceeded 3 Mi AST nodes. Keep a finite 4.5 Mi-node cap
+'' aligned with the reader's identity-indexed analysis bound.
+private const SEMANTIC_MODEL_MAX_NODES_PER_MODEL = 4718592
+'' Symbol IDs span committed modules, so bound their model-wide identity space.
+private const SEMANTIC_MODEL_MAX_SYMBOL_IDENTITIES = 4718592
 private const SEMANTIC_MODEL_MAX_EXPRESSIONS_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL = 1000000
 private const SEMANTIC_MODEL_MAX_IMPLICIT_CALLS_PER_MODEL = 1000000
-'' Details share the bounded transaction buffer and invalidate the model on
-'' overflow. Several details per symbol or node are normal.
-private const SEMANTIC_MODEL_MAX_DETAILS_PER_MODEL = 16000000
+'' Detail rows share the bounded transaction buffer. This 80 Mi-row cap matches
+'' the reader's row ceiling while the finite byte cap remains the final bound.
+private const SEMANTIC_MODEL_MAX_DETAILS_PER_MODEL = 83886080
 private const SEMANTIC_MODEL_MAX_OPERATION_WRAPPER_DEPTH = 64
 '' Keep one malformed or pathological procedure from expanding a sidecar without bound.
 private const SEMANTIC_MODEL_MAX_CALL_SIGNATURE_BYTES = 1048576
 private const SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS = FB_MAXINCRECLEVEL + 1
+private const SEMANTIC_MODEL_MAX_MEMORY_CONTEXT_DEPTH = 64
+
+'' Compact bytes enter the existing module transaction immediately. Dictionary
+'' checkpoints follow the same rollback boundaries as parser restarts and the
+'' replacement of an adjacent expression observation.
+private dim shared as FbcSemDictionary semantic_binary_dictionary
+private dim shared as integer semantic_binary_text
+private dim shared as long semantic_binary_module_checkpoint
+private dim shared as long semantic_binary_expression_checkpoint
+private dim shared as integer semantic_binary_volatile_input
+
+sub fbSemanticModelTextFormat( )
+	semantic_binary_text = TRUE
+end sub
+
+sub fbSemanticModelVolatileInput( )
+	'' This flag is reset before every module; disabled exports need no work.
+	semantic_binary_volatile_input = TRUE
+end sub
 
 private type SEMANTIC_MODEL_SYMBOL
 	sym         as FBSYMBOL ptr
@@ -120,6 +144,11 @@ private type SEMANTIC_MODEL_NODEFRAME
 	edge        as integer
 	ordinal     as longint
 	temporary   as FBSYMBOL ptr
+end type
+
+private type SEMANTIC_MODEL_MEMORY_CONTEXT
+	owner       as FBSYMBOL ptr
+	kind        as integer
 end type
 
 dim shared as any ptr semantic_model_output
@@ -175,6 +204,10 @@ dim shared as longint semantic_model_module_implicit_call_count
 '' cannot produce a legacy I row. This counter belongs to one serial module.
 private dim shared as longint semantic_model_module_construction_count
 private dim shared as longint semantic_model_module_temporary_construction_count
+private dim shared as longint semantic_model_module_memory_application_count
+private dim shared as integer semantic_model_memory_context_depth
+private dim shared as SEMANTIC_MODEL_MEMORY_CONTEXT _
+	semantic_model_memory_contexts(0 to SEMANTIC_MODEL_MAX_MEMORY_CONTEXT_DEPTH - 1)
 dim shared as longint semantic_model_module_node_count
 dim shared as integer semantic_model_proc_count
 dim shared as integer semantic_model_total_symbol_count
@@ -197,6 +230,9 @@ dim shared as ulongint semantic_model_next_symbol_identity
 dim shared as ulongint semantic_model_visit
 dim shared as longint semantic_model_detail_count
 dim shared as longint semantic_model_module_detail_count
+'' Count selected FIELD references independently of their surviving AST shape.
+'' Reset for each serial module; no AST or lexer pointer is retained here.
+dim shared as longint semantic_model_module_member_selection_count
 
 declare function hSemanticModelRangeFitsCurrentSourceLine _
 	( _
@@ -217,6 +253,8 @@ private function hSemanticModelNumber(byval value as longint) as string
 	'' Semantic rows contain tens of millions of integer fields in a large
 	'' translation unit. STR adds a leading sign column and LTRIM then allocates
 	'' a second string. Format the bounded decimal value once instead.
+	'' Datatype fields convert through CULNG before reaching this formatter:
+	'' their 32-bit invalid-type bit must not sign-extend on a 32-bit host.
 	dim as zstring * 22 text
 	dim as integer position = 21
 	dim as integer negative = value < 0
@@ -369,6 +407,14 @@ private sub hSemanticModelAppendLine(byref value as string)
 	dim as string line_text = value + NEWLINE
 	if( (len(value) >= 2) and (left(value, 2) = "E" + TABCHAR) ) then
 		semantic_model_last_expression_buffer_start = semantic_model_module_buffer_len
+		semantic_binary_expression_checkpoint = semantic_binary_dictionary.count
+	end if
+	if( semantic_binary_text = FALSE ) then
+		line_text = FbcSemEncodeRecord(semantic_binary_dictionary, value)
+		if( len(line_text) = 0 ) then
+			fbSemanticModelFailAt("binary semantic record encoding failed")
+			exit sub
+		end if
 	end if
 
 	hSemanticModelAppendBytes(strptr(line_text), len(line_text))
@@ -494,6 +540,7 @@ private function hSemanticModelReplaceLastExpressionFact(byref expression_fact a
 	'' Keep the existing expression identity and replace only the staged E record.
 	semantic_model_module_buffer_len = semantic_model_last_expression_buffer_start
 	semantic_model_module_buffer[semantic_model_module_buffer_len] = 0
+	FbcSemRollback(semantic_binary_dictionary, semantic_binary_expression_checkpoint)
 	hSemanticModelAppendLine("E" + TABCHAR + _
 		hSemanticModelNumber(semantic_model_expression_count + _
 			semantic_model_module_expression_count) + TABCHAR + expression_fact)
@@ -505,7 +552,12 @@ end function
 private sub hSemanticModelWriteDependencies( )
 	for index as integer = 0 to semantic_model_dependency_count - 1
 		dim as string line_text = "D" + TABCHAR + _
-			hSemanticModelEscape(semantic_model_dependencies(index)) + NEWLINE
+			hSemanticModelEscape(semantic_model_dependencies(index))
+		if( semantic_binary_text ) then
+			line_text += NEWLINE
+		else
+			line_text = FbcSemEncodeRecord(semantic_binary_dictionary, line_text)
+		end if
 		if( fbSemanticOutputWrite(semantic_model_output, strptr(line_text), len(line_text)) = 0 ) then
 			fbSemanticModelFailAt("semantic-model.bas:441")
 			exit sub
@@ -687,6 +739,11 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 			return semantic_model_total_symbol_count + index + 1
 		end if
 	else
+		if( semantic_model_total_symbol_count + semantic_model_symbol_count >= _
+			SEMANTIC_MODEL_MAX_SYMBOL_IDENTITIES ) then
+			fbSemanticModelFailAt("symbol identity limit")
+			return 0
+		end if
 		if( semantic_model_symbol_count >= SEMANTIC_MODEL_MAX_SYMBOLS ) then
 			fbSemanticModelFailAt("symbol count limit")
 			return 0
@@ -761,7 +818,7 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 
 	hSemanticModelAppendLine("S" + TABCHAR + hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelEscape(symbolname) + TABCHAR + hSemanticModelNumber(sym->class) + TABCHAR + _
-		hSemanticModelNumber(sym->typ) + TABCHAR + hSemanticModelNumber(subtypeid) + TABCHAR + _
+		hSemanticModelNumber(culng(sym->typ)) + TABCHAR + hSemanticModelNumber(subtypeid) + TABCHAR + _
 		hSemanticModelNumber(sym->scope) + TABCHAR + hSemanticModelNumber(sym->attrib) + TABCHAR + _
 		hSemanticModelNumber(sym->pattrib) + TABCHAR + hSemanticModelNumber(sym->lgt) + TABCHAR + _
 		hSemanticModelNumber(sym->ofs) + TABCHAR + hSemanticModelNumber(parentid))
@@ -1414,13 +1471,56 @@ function fbSemanticModelParameterVariable(byval param as FBSYMBOL ptr, _
 	return semantic_model_symbols[index].paramvarid
 end function
 
+'' The parser knows whether a selected field belongs to an object expression
+'' or to a type-member query. Keep that decision on the binding/reference
+'' occurrence: two uses of the same field in one macro are not interchangeable.
+private sub hSemanticModelMemberSelection _
+	( byval sym as FBSYMBOL ptr, byval receiver as FBSYMBOL ptr, _
+	  byref role as const string, byval binding as longint, _
+	  byval reference as longint, byval expansion as longint )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or _
+		(fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
+	if( symbIsField(sym) = FALSE ) then exit sub
+	if( semantic_model_module_member_selection_count >= SEMANTIC_MODEL_MAX_BINDINGS_PER_MODEL ) then
+		fbSemanticModelFailAt("selected member count limit")
+		exit sub
+	end if
+	if( ((role <> "expression") and (role <> "type") and (role <> "symbol")) or _
+		((role = "symbol") <> (receiver = NULL)) ) then
+		fbSemanticModelFailAt("invalid selected member role or receiver")
+		exit sub
+	end if
+	if( receiver <> NULL ) then
+		if( symbIsStruct(receiver) = FALSE ) then
+			fbSemanticModelFailAt("selected member receiver is not an aggregate")
+			exit sub
+		end if
+	end if
+	dim as longint receiver_id = 0
+	if( receiver <> NULL ) then
+		receiver_id = fbSemanticModelSymbolId(receiver)
+		fbSemanticModelExportSymbolDetails(receiver)
+	end if
+	dim as string prefix = "K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + TABCHAR
+	if( binding > 0 ) then
+		fbSemanticModelAppendDetail(prefix + "selected-member-binding-" + fbSemanticModelNumber(binding) + _
+			TABCHAR + fbSemanticModelEscape(role + TABCHAR + fbSemanticModelNumber(receiver_id)))
+	else
+		fbSemanticModelAppendDetail(prefix + "selected-member-reference-" + fbSemanticModelNumber(reference) + _
+			TABCHAR + fbSemanticModelEscape(role + TABCHAR + fbSemanticModelNumber(receiver_id) + TABCHAR + fbSemanticModelNumber(expansion)))
+	end if
+	semantic_model_module_member_selection_count += 1
+end sub
+
 '' Export one compiler-resolved identifier occurrence with its exact lexer span.
 '' Physical-origin status lets editor consumers refuse macro-expanded ranges.
-sub fbSemanticModelExportBinding _
+private sub hSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
 		byref source as LEX_LOCATION, _
-		byval is_declaration as integer _
+		byval is_declaration as integer, _
+		byval member_receiver as FBSYMBOL ptr, _
+		byref member_role as const string _
 	)
 
 	if( (semantic_model_file_open = FALSE) or _
@@ -1449,8 +1549,10 @@ sub fbSemanticModelExportBinding _
 			'' symbol is still useful to semantic clients, but the invocation
 			'' name is an anchor, not an editable spelling of this reference.
 			'' A distinct role retains separate uses within one expansion.
+			dim as longint reference = fbSemanticModelNextDetailIdentity( )
 			fbSemanticModelMacroOrigin("symbol", fbSemanticModelSymbolId(sym), source.macro_identity, _
-				"reference-" + fbSemanticModelNumber(fbSemanticModelNextDetailIdentity( )))
+				"reference-" + fbSemanticModelNumber(reference))
+			hSemanticModelMemberSelection(sym, member_receiver, member_role, 0, reference, source.macro_identity)
 		end if
 		exit sub
 	end if
@@ -1480,6 +1582,10 @@ sub fbSemanticModelExportBinding _
 		TABCHAR + hSemanticModelNumber(source.end_column))
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_binding_count += 1
+		if( is_declaration = FALSE ) then
+			hSemanticModelMemberSelection(sym, member_receiver, member_role, _
+				semantic_model_binding_count + semantic_model_module_binding_count, 0, source.macro_identity)
+		end if
 		if( (is_declaration = FALSE) and ((sym->class = FB_SYMBCLASS_VAR) or (sym->class = FB_SYMBCLASS_FIELD)) ) then
 			fbSemanticModelCaptureAccess(semantic_model_binding_count + semantic_model_module_binding_count)
 		end if
@@ -1493,6 +1599,20 @@ sub fbSemanticModelExportBinding _
 				TABCHAR + fbSemanticModelNumber(sourceid))
 		end if
 	end if
+end sub
+
+sub fbSemanticModelExportBinding _
+	( byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION, byval is_declaration as integer )
+	'' A symbol-only reference, for example an assembler field offset, does
+	'' not imply an object member expression. Expression/type parsers below
+	'' supply their selected receiver explicitly through the dedicated hook.
+	hSemanticModelExportBinding(sym, source, is_declaration, NULL, "symbol")
+end sub
+
+sub fbSemanticModelExportMemberBinding _
+	( byval sym as FBSYMBOL ptr, byval receiver as FBSYMBOL ptr, _
+	  byref source as LEX_LOCATION, byval is_type as integer )
+	hSemanticModelExportBinding(sym, source, FALSE, receiver, iif(is_type, "type", "expression"))
 end sub
 
 function fbSemanticModelBindingCount( ) as longint
@@ -1560,7 +1680,7 @@ private function hSemanticModelCallSignature _
 			signature_part = "|" + mode_name + "|" + _
 				hSemanticModelNumber(param_optional) + "|" + _
 				hSemanticModelNumber(param_dimensions) + "|" + _
-				hSemanticModelNumber(symbGetFullType(param)) + "|" + _
+				hSemanticModelNumber(culng(symbGetFullType(param))) + "|" + _
 				hSemanticModelNumber(param_subtype_id)
 			if( len(signature) > _
 				SEMANTIC_MODEL_MAX_CALL_SIGNATURE_BYTES - len(signature_part) ) then
@@ -1579,7 +1699,7 @@ private function hSemanticModelImplicitCallKindSupported(byref call_kind as cons
 	select case call_kind
 	case "default-constructor", "initializer-constructor", "new-constructor", _
 		"destructor-call", "argument-constructor", "temporary-destructor", _
-		"scope-exit-destructor", "delete-destructor", "return-constructor"
+		"scope-exit-destructor", "delete-destructor", "return-constructor", "redim-constructor"
 		return TRUE
 	case else
 		return FALSE
@@ -2086,9 +2206,14 @@ function fbSemanticModelSelectedOperationTarget _
 		if( node = NULL ) then exit do
 		select case node->class
 		case AST_NODECLASS_CALL
-			if( hSemanticModelHasSymbol(node->sym) andalso symbIsOperator(node->sym) ) then
+			'' A virtual call's symbol names the generated dispatch variable.
+			'' Keep the selected source operator, as the lowered call exporter
+			'' does for its static-target relation, without changing dispatch.
+			dim as FBSYMBOL ptr selected = node->call.semantic_target
+			if( selected = NULL ) then selected = node->sym
+			if( hSemanticModelHasSymbol(selected) andalso symbIsProc(selected) andalso symbIsOperator(selected) ) then
 				kind = "overloaded"
-				targetid = hSemanticModelSymbolId(node->sym)
+				targetid = hSemanticModelSymbolId(selected)
 			end if
 			exit do
 		case AST_NODECLASS_CALLCTOR
@@ -2151,6 +2276,150 @@ sub fbSemanticModelExportOperation(byval expression as ASTNODE ptr, _
 		hSemanticModelEscape(source.source_file) + TABCHAR + hSemanticModelNumber(source.start_line) + _
 		TABCHAR + hSemanticModelNumber(source.start_column) + TABCHAR + _
 		hSemanticModelNumber(source.end_line) + TABCHAR + hSemanticModelNumber(source.end_column))
+end sub
+
+'' Source memory applications survive even when constant folding or an
+'' unevaluated query removes the lowered CALL. A bounded parser context records
+'' declaration-time expressions which must later be replayed by consumers.
+function fbSemanticModelBeginSourceMemoryContext _
+	( byval owner as FBSYMBOL ptr, byref context_kind as const string ) as integer
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or _
+		(fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then return 0
+	dim as integer kind
+	select case context_kind
+	case "formal-default"
+		if( (owner = NULL) or (owner->class <> FB_SYMBCLASS_PARAM) ) then
+			fbSemanticModelFailAt("source memory default context lacks its formal")
+			return 0
+		end if
+		kind = 1
+	case "field-initializer"
+		if( (owner = NULL) or (owner->class <> FB_SYMBCLASS_FIELD) ) then
+			fbSemanticModelFailAt("source memory field context lacks its field")
+			return 0
+		end if
+		kind = 2
+	case else
+		fbSemanticModelFailAt("source memory context kind is invalid")
+		return 0
+	end select
+	if( semantic_model_memory_context_depth >= SEMANTIC_MODEL_MAX_MEMORY_CONTEXT_DEPTH ) then
+		fbSemanticModelFailAt("source memory context nesting limit")
+		return 0
+	end if
+	semantic_model_memory_contexts(semantic_model_memory_context_depth).owner = owner
+	semantic_model_memory_contexts(semantic_model_memory_context_depth).kind = kind
+	semantic_model_memory_context_depth += 1
+	return semantic_model_memory_context_depth
+end function
+
+sub fbSemanticModelEndSourceMemoryContext(byval token as integer)
+	if( token = 0 ) then exit sub
+	if( (token <> semantic_model_memory_context_depth) or _
+		(semantic_model_memory_context_depth < 1) ) then
+		fbSemanticModelFailAt("source memory context nesting is unbalanced")
+		semantic_model_memory_context_depth = 0
+		exit sub
+	end if
+	semantic_model_memory_context_depth -= 1
+	semantic_model_memory_contexts(semantic_model_memory_context_depth).owner = NULL
+	semantic_model_memory_contexts(semantic_model_memory_context_depth).kind = 0
+end sub
+
+sub fbSemanticModelSourceMemoryApplication(byval expression as ASTNODE ptr, _
+	byval op as integer, byref source as LEX_LOCATION)
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expression = NULL) ) then exit sub
+	if( fbSemanticModelMacroProvenanceEnabled( ) = FALSE ) then
+		'' Preserve the older operation observation in macro-compact mode,
+		'' without claiming the complete source-application contract.
+		fbSemanticModelExportOperation(expression, op, source)
+		exit sub
+	end if
+	dim as string role = hSemanticModelConceptOperatorCode(op), operation_kind
+	select case role
+	case "allocate", "allocate-array", "deallocate", "deallocate-array"
+	case else
+		fbSemanticModelFailAt("source memory application role is invalid")
+		exit sub
+	end select
+	dim as longint targetid = fbSemanticModelSelectedOperationTarget(expression, operation_kind)
+	dim as longint ownerid = fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))
+	dim as longint statementid = fbSemanticModelCurrentStatement( )
+	dim as longint sourceid = fbSemanticModelCurrentSource( )
+	if( (operation_kind <> "overloaded") or (targetid <= 0) or (ownerid <= 0) or _
+		(statementid <= 0) or (sourceid <= 0) ) then
+		fbSemanticModelFailAt("source memory application lacks selected ownership")
+		exit sub
+	end if
+	'' A replacement NEW/DELETE token can be only a logical point. The
+	'' existing macro observer retains its real invocation and raw coordinates.
+	'' That is a reporting anchor, never an editable spelling of the operator.
+	dim as LEX_LOCATION observed_source = source
+	if( (source.macro_identity > 0) and (source.raw_valid = FALSE) ) then
+		if( fbSemanticModelMacroExpressionLocation(source, source, 0, 0, observed_source) = FALSE ) then
+			fbSemanticModelFailAt("source memory macro invocation is unavailable")
+			exit sub
+		end if
+	end if
+	if( (observed_source.raw_valid = FALSE) or (observed_source.source_context <> sourceid) ) then
+		fbSemanticModelFailAt("source memory application lacks its original source context")
+		exit sub
+	end if
+	if( semantic_model_module_memory_application_count >= _
+		SEMANTIC_MODEL_MAX_IMPLICIT_CALLS_PER_MODEL ) then
+		fbSemanticModelFailAt("source memory application count limit")
+		exit sub
+	end if
+	dim as string context_kind = "direct", relation_kind
+	dim as FBSYMBOL ptr context_owner = NULL
+	if( semantic_model_memory_context_depth > 0 ) then
+		with semantic_model_memory_contexts(semantic_model_memory_context_depth - 1)
+			context_owner = .owner
+			select case .kind
+			case 1: context_kind = "formal-default": relation_kind = "source-memory-default-formal"
+			case 2: context_kind = "field-initializer": relation_kind = "source-memory-field"
+			case else
+				fbSemanticModelFailAt("source memory context state is invalid")
+				exit sub
+			end select
+		end with
+	end if
+	semantic_model_module_memory_application_count += 1
+	dim as longint ordinal = semantic_model_module_memory_application_count
+	dim as string key = "source-memory-application:" + hSemanticModelNumber(ordinal)
+	dim as string payload = role + TABCHAR + hSemanticModelNumber(statementid) + TABCHAR + _
+		hSemanticModelNumber(sourceid) + TABCHAR + hSemanticModelNumber(source.macro_identity) + _
+		TABCHAR + context_kind
+	dim as LEX_LOCATION operation_source = observed_source
+	if( observed_source.is_physical = FALSE ) then
+		'' #LINE names are logical aliases, including env.inf.incfile. The
+		'' opened source revision retains the actual path. Pair the operation with
+		'' that observed raw anchor, rather than mixing logical and raw paths.
+		dim as string opened_path = fbSemanticModelSourcePath(sourceid)
+		if( len(opened_path) = 0 ) then
+			fbSemanticModelFailAt("source memory application lacks its opened file")
+			exit sub
+		end if
+		operation_source.source_file = opened_path
+		operation_source.start_line = observed_source.raw_start_line
+		operation_source.start_column = observed_source.raw_start_column
+		operation_source.end_line = observed_source.raw_end_line
+		operation_source.end_column = observed_source.raw_end_column
+	end if
+	'' Exactly one operation precedes each application, including macro-only
+	'' selections which had no surviving legacy operator range.
+	fbSemanticModelExportOperation(expression, op, operation_source)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		hSemanticModelNumber(ownerid) + TABCHAR + key + TABCHAR + hSemanticModelEscape(payload))
+	fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + _
+		hSemanticModelNumber(ownerid) + TABCHAR + "symbol" + TABCHAR + _
+		hSemanticModelNumber(targetid) + TABCHAR + "source-memory-target" + TABCHAR + _
+		hSemanticModelNumber(ordinal))
+	if( context_owner <> NULL ) then
+		fbSemanticModelExportRelation("symbol", ownerid, context_owner, relation_kind, ordinal)
+	end if
+	fbSemanticModelExportCoordinates("source-context", sourceid, key, observed_source, observed_source)
+	fbSemanticModelMacroOrigin("symbol", ownerid, source.macro_identity, key)
 end sub
 
 private function hSemanticModelConceptOperator(byval node as ASTNODE ptr, _
@@ -2890,7 +3159,7 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
 		hSemanticModelEscape(operator_code) + _
 		TABCHAR + hSemanticModelEscape(operator_kind) + TABCHAR + _
-		hSemanticModelNumber(astGetFullType(expr)) + TABCHAR + _
+		hSemanticModelNumber(culng(astGetFullType(expr))) + TABCHAR + _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelNumber(subtypeid) + TABCHAR + _
 		hSemanticModelEscape(type_name)
@@ -2903,7 +3172,7 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(observed_end.end_column) + TABCHAR + _
 		hSemanticModelNumber(expr->class) + TABCHAR + _
 		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
-		hSemanticModelNumber(astGetFullType(expr)) + TABCHAR + _
+		hSemanticModelNumber(culng(astGetFullType(expr))) + TABCHAR + _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelNumber(subtypeid) + TABCHAR + _
 		hSemanticModelEscape(type_name)
@@ -3131,7 +3400,7 @@ function fbSemanticModelExportTree _
 			hSemanticModelNumber(hSemanticModelNodeOperator(current.node)) + TABCHAR + _
 			hSemanticModelEscape(operator_code) + TABCHAR + _
 			hSemanticModelEscape(operator_kind) + TABCHAR + _
-			hSemanticModelNumber(current.node->dtype) + TABCHAR + hSemanticModelNumber(symbolid) + _
+			hSemanticModelNumber(culng(current.node->dtype)) + TABCHAR + hSemanticModelNumber(symbolid) + _
 			TABCHAR + hSemanticModelNumber(subtypeid) + TABCHAR + _
 			hSemanticModelNumber(source_line) + _
 			TABCHAR + hSemanticModelEscape(sourcefile))
@@ -3247,8 +3516,15 @@ function fbSemanticModelBegin(byref filename as string, byval expressions_only a
 	semantic_model_node_count = 0
 	semantic_model_detail_count = 0
 	semantic_model_visit = 0
+	FbcSemRollback(semantic_binary_dictionary, 0)
 	dim as string header = "FBCSEM" + TABCHAR + SEMANTIC_MODEL_SCHEMA + _
 		TABCHAR + FB_VERSION + NEWLINE
+	if( semantic_binary_text = FALSE ) then
+		dim as string mode = "full"
+		if( semantic_model_expressions_only ) then mode = "expressions"
+		if( semantic_model_bindings_only ) then mode = "bindings"
+		header = FbcSemHeader(FB_VERSION, mode, macros_enabled)
+	end if
 	if( fbSemanticOutputWrite(semantic_model_output, strptr(header), len(header)) = 0 ) then
 		fbSemanticOutputFinish(semantic_model_output, FALSE)
 		semantic_model_output = NULL
@@ -3363,6 +3639,8 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_last_expression_had_operator_override = FALSE
 	semantic_model_last_expression_buffer_start = 0
 	semantic_model_module_buffer_len = 0
+	semantic_binary_module_checkpoint = semantic_binary_dictionary.count
+	semantic_binary_volatile_input = FALSE
 	hSemanticModelReleaseDeclarationNames( )
 	fbSemanticModelResetPreprocessor( )
 	fbSemanticModelResetMacros( )
@@ -3380,14 +3658,17 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_node_count = 0
 	semantic_model_module_construction_count = 0
 	semantic_model_module_temporary_construction_count = 0
+	semantic_model_module_memory_application_count = 0
+	semantic_model_memory_context_depth = 0
 	semantic_model_module_detail_count = 0
+	semantic_model_module_member_selection_count = 0
 	semantic_model_module_open = TRUE
 	semantic_model_module_source = filename
 	fbSemanticModelBeginSource(filename, 0)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 113
+	for capability as integer = 0 to 116
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -3500,6 +3781,11 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 111: feature = "parsed-expression-input-coverage": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 112: feature = "parsed-iif-input-counts": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 113: feature = "macro-numeric-payloads": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		'' Older construction exporters do not include REDIM callbacks. Consumers
+		'' need a separate coverage claim before treating their absence as proof.
+		case 114: feature = "redim-constructor-selections": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 115: feature = "selected-member-roles": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 116: feature = "source-memory-applications": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _
@@ -3532,7 +3818,18 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	end if
 	semantic_model_pending_expression_value = ""
 
+	if( commit and fbSemanticModelFullEnabled( ) and (semantic_model_memory_context_depth <> 0) ) then
+		fbSemanticModelFailAt("source memory context remains open at module finish")
+	end if
 	if( commit and fbSemanticModelFullEnabled( ) ) then
+		if( fbSemanticModelMacroProvenanceEnabled( ) ) then
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+				fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+				TABCHAR + "selected-member-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+				TABCHAR + fbSemanticModelNumber(semantic_model_module_member_selection_count))
+		end if
+		fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+			TABCHAR + "cache-stable-inputs" + TABCHAR + iif(semantic_binary_volatile_input, "unavailable", "available"))
 		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
 			hSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
 			TABCHAR + "construction-observation-count:" + hSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
@@ -3541,6 +3838,12 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 			hSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
 			TABCHAR + "temporary-construction-count:" + hSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
 			TABCHAR + hSemanticModelNumber(semantic_model_module_temporary_construction_count))
+		if( fbSemanticModelMacroProvenanceEnabled( ) ) then
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+				hSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+				TABCHAR + "source-memory-application-count" + TABCHAR + _
+				hSemanticModelNumber(semantic_model_module_memory_application_count))
+		end if
 	end if
 
 	if( (commit <> FALSE) and (semantic_model_module_failed = FALSE) ) then
@@ -3563,12 +3866,17 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 
 	semantic_model_module_buffer_len = 0
 	semantic_model_module_open = FALSE
+	if( (commit = FALSE) or semantic_model_module_failed ) then
+		FbcSemRollback(semantic_binary_dictionary, semantic_binary_module_checkpoint)
+	end if
 	fbSemanticModelEndSource(0)
 	hSemanticModelReleaseDeclarationNames( )
 	semantic_model_symbol_count = 0
 	semantic_model_module_expression_count = 0
 	semantic_model_module_binding_count = 0
 	semantic_model_module_implicit_call_count = 0
+	semantic_model_module_memory_application_count = 0
+	semantic_model_memory_context_depth = 0
 end sub
 
 '' Commit expression-only facts from a module whose parser recovered with
@@ -3638,7 +3946,7 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 
 	hSemanticModelAppendLine("P" + TABCHAR + hSemanticModelNumber(procid) + TABCHAR + _
 		hSemanticModelEscape(procname) + TABCHAR + hSemanticModelNumber(proc->class) + TABCHAR + _
-		hSemanticModelNumber(proc->typ) + TABCHAR + _
+		hSemanticModelNumber(culng(proc->typ)) + TABCHAR + _
 		hSemanticModelNumber(hSemanticModelSymbolId(proc->subtype)) + _
 		TABCHAR + hSemanticModelNumber(proc_start_line) + TABCHAR + _
 		hSemanticModelNumber(proc_end_line) + TABCHAR + hSemanticModelEscape(filename))
@@ -3711,7 +4019,11 @@ function fbSemanticModelEnd(byval succeeded as integer) as integer
 	end if
 
 	if( len(footer) > 0 ) then
-		footer += NEWLINE
+		if( semantic_binary_text ) then
+			footer += NEWLINE
+		else
+			footer = FbcSemEncodeRecord(semantic_binary_dictionary, footer)
+		end if
 		if( fbSemanticOutputWrite(semantic_model_output, strptr(footer), len(footer)) = 0 ) then fbSemanticModelFailAt("semantic-model.bas:2958")
 	end if
 	'' Publication follows all writes and the checked close. Parser errors can

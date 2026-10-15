@@ -2752,8 +2752,6 @@ private sub _emitAddr _
 		byval vr as IRVREG ptr _
 	)
 
-	dim as string ln
-
 	select case( op )
 	case AST_OP_ADDROF
 		hAstCommand( "addrof " + vregPretty( v1 ) )
@@ -3174,7 +3172,7 @@ private sub hVarIniFieldPadding( byval fld as FBSYMBOL ptr )
 	'' String initializer callbacks do not receive their field symbol. Find it
 	'' using the number of fields already emitted in this struct scope.
 	if( fld = NULL ) then
-		if( iniscope->sym = NULL or iniscope->sym->subtype = NULL ) then exit sub
+		if( iniscope->sym = NULL orelse iniscope->sym->subtype = NULL ) then exit sub
 		fld = symbUdtGetFirstField( iniscope->sym->subtype )
 		for i as longint = 1 to iniscope->emitted_elements
 			if( fld = NULL ) then exit sub

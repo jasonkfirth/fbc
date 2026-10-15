@@ -138,7 +138,7 @@ sub fbSemanticModelExportContext(byref filename as string)
 		TABCHAR + language + TABCHAR + backend + TABCHAR + _
 		fbSemanticModelNumber(env.pointersize) + TABCHAR + byte_order + TABCHAR + _
 		fbSemanticModelNumber(fbGetTargetWcharSize( )) + TABCHAR + _
-		fbSemanticModelNumber(env.lang.integerkeyworddtype))
+		fbSemanticModelNumber(culng(env.lang.integerkeyworddtype)))
 	for dtype as integer = 0 to FB_DATATYPES - 1
 		dim as string type_name = *symb_dtypeTB(dtype).name
 		if( dtype = FB_DATATYPE_FIXSTR ) then type_name = "fixed-string"
@@ -161,7 +161,7 @@ sub fbSemanticModelExportContext(byref filename as string)
 			'' accepts source types aligned to at most eight bytes, not XMMWORD.
 			alignment_text = fbSemanticModelNumber(typeCalcNaturalAlign(dtype, NULL))
 		end if
-		fbSemanticModelAppendDetail("Y" + TABCHAR + fbSemanticModelNumber(dtype) + _
+		fbSemanticModelAppendDetail("Y" + TABCHAR + fbSemanticModelNumber(culng(dtype)) + _
 			TABCHAR + fbSemanticModelEscape(type_name) + TABCHAR + type_class + _
 			TABCHAR + size_text + TABCHAR + alignment_text + TABCHAR + _
 			fbSemanticModelNumber(abs(symb_dtypeTB(dtype).signed <> FALSE)))
@@ -501,7 +501,7 @@ private sub hExportProcedure(byval sym as FBSYMBOL ptr, byval symbolid as longin
 		proc_kind + TABCHAR + hCallingConvention(sym->proc.mode) + TABCHAR + _
 		fbSemanticModelNumber(param_count) + TABCHAR + fbSemanticModelNumber(sym->proc.optparams) + _
 		TABCHAR + fbSemanticModelNumber(abs(symbIsReturnByRef(sym))) + TABCHAR + _
-		fbSemanticModelNumber(sym->proc.realdtype) + TABCHAR + _
+		fbSemanticModelNumber(culng(sym->proc.realdtype)) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelSymbolId(sym->proc.realsubtype)) + TABCHAR + _
 		fbSemanticModelNumber(sym->proc.returnMethod) + TABCHAR + operator_code + TABCHAR + _
 		fbSemanticModelNumber(overriddenid) + TABCHAR + fbSemanticModelNumber(vtableindex))
@@ -640,7 +640,7 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 	if( sym->id.alias <> NULL ) then alias_name = *sym->id.alias
 	fbSemanticModelAppendDetail("T" + TABCHAR + fbSemanticModelNumber(symbolid) + TABCHAR + _
 		fbSemanticModelEscape(symbol_name) + TABCHAR + hSymbolClass(sym) + TABCHAR + fbSemanticModelTypeKind(sym) + TABCHAR + _
-		fbSemanticModelEscape(type_name) + TABCHAR + fbSemanticModelNumber(sym->typ) + TABCHAR + _
+		fbSemanticModelEscape(type_name) + TABCHAR + fbSemanticModelNumber(culng(sym->typ)) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelSymbolId(sym->subtype)) + TABCHAR + _
 		fbSemanticModelNumber(ownerid) + TABCHAR + fbSemanticModelNumber(namespaceid) + TABCHAR + _
 		fbSemanticModelNumber(sym->attrib) + TABCHAR + fbSemanticModelNumber(sym->pattrib) + TABCHAR + _
@@ -747,7 +747,7 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 		fbSemanticModelAppendDetail("U" + TABCHAR + fbSemanticModelNumber(symbolid) + _
 			TABCHAR + hSymbolClass(sym) + TABCHAR + fbSemanticModelNumber(baseid) + _
 			TABCHAR + fbSemanticModelNumber(alignment) + TABCHAR + fbSemanticModelNumber(unpadded) + _
-			TABCHAR + fbSemanticModelNumber(options) + TABCHAR + fbSemanticModelNumber(retdtype) + _
+			TABCHAR + fbSemanticModelNumber(options) + TABCHAR + fbSemanticModelNumber(culng(retdtype)) + _
 			TABCHAR + fbSemanticModelNumber(abstract_count) + TABCHAR + fbSemanticModelNumber(elements) + _
 			TABCHAR + fbSemanticModelNumber(start_line) + TABCHAR + fbSemanticModelNumber(end_line))
 		if( symbIsStruct(sym) andalso symbGetUDTIsAnon(sym) ) then

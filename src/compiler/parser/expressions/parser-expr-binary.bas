@@ -117,7 +117,7 @@ private function hSemanticModelLoweredBinaryOperator _
 		byval expr as ASTNODE ptr, _
 		byval source_operator as integer _
 	) as integer
-	if( (expr = NULL) or (expr->class = AST_NODECLASS_CONST) ) then return -1
+	if( (expr = NULL) orelse (expr->class = AST_NODECLASS_CONST) ) then return -1
 	if( expr->class = AST_NODECLASS_BOP ) then
 		if( expr->op.op = source_operator ) then return -1
 	elseif( expr->class = AST_NODECLASS_CALL ) then

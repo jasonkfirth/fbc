@@ -186,7 +186,6 @@ private function hOptionalExpr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr expr = any
-	dim as integer inioptions = any
 
 	function = NULL
 
@@ -597,7 +596,10 @@ private function hParamDecl _
 			end if
 		else
 			dim as longint semantic_default = 0
+			dim as integer semantic_memory_context = _
+				fbSemanticModelBeginSourceMemoryContext(param, "formal-default")
 			var optexpr = hOptionalExpr( proc, id, param, semantic_site, semantic_default )
+			fbSemanticModelEndSourceMemoryContext(semantic_memory_context)
 			if( optexpr ) then
 				symbMakeParamOptional( proc, param, optexpr )
 				fbSemanticModelParameterDefault(param, semantic_default)

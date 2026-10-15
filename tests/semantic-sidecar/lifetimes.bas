@@ -74,6 +74,8 @@ done:
 		exit for
 	next
 	dim plain_value as Plain
+	dim redim_values() as Tracked
+	redim redim_values(0 to 1)
 	dim plain_heap as Plain ptr = new Plain
 	delete plain_heap
 end sub

@@ -116,6 +116,16 @@ function astLoadMACRO _
 		v1 = astLoad( n->l )
 		v2 = astLoad( n->r )
 		vr = NULL
+
+	case else
+		'' No IR operation is defined for other operators in this node family.
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		astDelTree( n->l )
+		astDelTree( n->r )
+		n->l = NULL
+		n->r = NULL
+		function = NULL
+		exit function
 	end select
 
 	if( ast.doemit ) then

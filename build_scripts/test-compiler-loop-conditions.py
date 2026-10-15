@@ -48,7 +48,7 @@ def main() -> int:
                 assert result.returncode == 0, result.stdout + result.stderr
                 assert output.read_bytes() == emitted, "Loop observations changed generated C"
                 if count == 0:
-                    rows = [row.split("\t") for row in model_path.read_text(encoding="ascii").splitlines()]
+                    rows = [row[:] for row in model.rows]
                     predicate = next(i for i, row in enumerate(rows) if row[0] == "K" and row[3].startswith("loop-condition-expression:") and row[4] != "0")
                     bare = next(i for i, row in enumerate(rows) if row[0] == "K" and row[3].startswith("loop-condition-expression:") and row[4] == "0")
                     kind = next(i for i, row in enumerate(rows) if row[0] == "K" and row[3].startswith("loop-condition-kind:"))

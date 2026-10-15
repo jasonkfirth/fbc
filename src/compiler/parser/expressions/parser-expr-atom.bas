@@ -476,7 +476,7 @@ private function hCheckId _
 		end if
 	end if
 
-	if( fbLangOptIsSet( FB_LANG_OPT_IMPLICIT = FALSE ) ) then
+	if( fbLangOptIsSet( FB_LANG_OPT_IMPLICIT ) = FALSE ) then
 		errReportNotAllowed( FB_LANG_OPT_IMPLICIT, _
 							 FB_ERRMSG_IMPLICITVARSONLYVALIDINLANG )
 		return NULL

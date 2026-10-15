@@ -69,8 +69,6 @@ private function hCheckUDTOps _
 		byval no_upcast as integer _
 	) as integer
 
-	dim as FBSYMBOL ptr proc = any
-
 	function = FALSE
 
 	'' l node must be an UDT's,
@@ -274,7 +272,6 @@ function astCheckASSIGN _
 		byval no_upcast as integer _
 	) as integer
 
-	dim as ASTNODE ptr n = any
 	dim as FB_DATATYPE ldtype = any, rdtype = any, ldfull = any, rdfull = any
 	dim as FB_DATACLASS ldclass = any, rdclass = any
 
@@ -429,7 +426,7 @@ private function hShallowCopy _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr t = any
-	dim as longint offset = any, bytestocopy = any
+	dim as longint bytestocopy = any
 	dim as integer has_vptr = any
 
 	assert( astGetDataType( l ) = FB_DATATYPE_STRUCT )
@@ -628,7 +625,6 @@ function astNewASSIGN _
 	dim as FB_DATATYPE ldtype = any, rdtype = any, ldfull = any, rdfull = any
 	dim as FB_DATACLASS ldclass = any, rdclass = any
 	dim as FBSYMBOL ptr lsubtype = any
-	dim as integer do_move = any
 
 	function = NULL
 

@@ -244,7 +244,8 @@ end function
 function hFindFreeReg( byval dclass as integer ) as integer
 	function = INVALID
 
-	for r as integer = emit.regTB(dclass)->getMaxRegs( emit.regTB(dclass) )-1 to 0 step -1
+	var maxregs = emit.regTB(dclass)->getMaxRegs( emit.regTB(dclass) )
+	for r as integer = maxregs - 1 to 0 step -1
 		if( hIsRegFree( dclass, r ) ) then
 			return r
 		end if
@@ -713,7 +714,7 @@ end sub
 
 '':::::
 private sub hInitRegTB
-	dim as integer lastclass, regs, i
+	dim as integer i
 
 	'' ebp and esp are reserved
 	const int_regs = 6
@@ -8086,7 +8087,7 @@ private sub _procFooter _
 		byval exitlabel as FBSYMBOL ptr _
 	)
 
-	dim as integer oldpos = any, ispublic = any
+	dim as integer ispublic = any
 	dim as zstring ptr mangledname = symbGetMangledName( proc )
 	dim as FB_PROCEXT ptr procext = proc->proc.ext
 	dim as integer islinux = any

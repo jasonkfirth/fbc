@@ -41,7 +41,7 @@ def main() -> int:
                                         capture_output=True, text=True, timeout=60)
                 assert result.returncode == 0, result.stdout + result.stderr
                 model = Model.read(model_path)
-                assert model_path.read_text().splitlines()[0] == "FBCSEM\t27\t1.20.4"
+                assert model.rows[0] == ["FBCSEM", "27", "1.20.4"]
                 queries = [(identity, props) for (domain, identity), props in model.properties.items()
                            if domain == "expression" and "size-query-kind" in props]
                 assert len(queries) == 11, queries
@@ -58,7 +58,7 @@ def main() -> int:
                 assert result.returncode == 0, result.stdout + result.stderr
                 assert output.read_bytes() == observed_code, "Size observations changed generated code"
                 count += 1
-                rows = model_path.read_text().splitlines()
+                rows = ["\t".join(row) for row in model.rows]
                 identity = str(queries[0][0])
                 for key in ("size-query-kind", "size-query-dtype", "size-query-subtype",
                             "size-query-operand", "size-query-input"):

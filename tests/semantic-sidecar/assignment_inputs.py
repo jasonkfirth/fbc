@@ -155,6 +155,105 @@ counterValue += otherCounter
             test.assertNotEqual(compound[-1][5], copy[0][5])
 
 
+def check_virtual_selected_operations(test):
+    body = '''Type DirectBox
+    value As Integer
+    Declare Operator Let(ByRef other As DirectBox)
+End Type
+Operator DirectBox.Let(ByRef other As DirectBox)
+    value = other.value
+End Operator
+Type VirtualBox Extends Object
+    value As Integer
+    Declare Virtual Operator Let(ByRef other As VirtualBox)
+    Declare Virtual Operator +=(ByRef other As VirtualBox)
+End Type
+Operator VirtualBox.Let(ByRef other As VirtualBox)
+    value = other.value
+End Operator
+Operator VirtualBox.+=(ByRef other As VirtualBox)
+    value += other.value
+End Operator
+Sub ApplyDirect(ByRef destination As DirectBox, ByRef sourceValue As DirectBox)
+    destination = sourceValue
+End Sub
+#Macro COPY_VIRTUAL(destination, sourceValue)
+    destination = sourceValue
+#EndMacro
+#Macro ADD_VIRTUAL(destination, sourceValue)
+    destination += sourceValue
+#EndMacro
+Sub ApplyVirtual(ByRef destination As VirtualBox, ByRef sourceValue As VirtualBox)
+    destination = sourceValue
+    destination += sourceValue
+    COPY_VIRTUAL(destination, sourceValue)
+    ADD_VIRTUAL(destination, sourceValue)
+#Line 700 "virtual-assignment-remap.bas"
+    destination = sourceValue: destination += sourceValue
+End Sub
+'''
+    for backend in test.backends:
+        with test.subTest(backend=backend):
+            source = test.source(source_text(body, 'virtual-assignments.bas'), 'virtual-assignments.bas')
+            output = test.emission_path('virtual-assignments', backend)
+            extra = ('-o', str(output))
+            test.invoke([source], mode='off', backend=backend, extra=extra)
+            plain = output.read_bytes()
+            model = test.compile(source, backend=backend, extra=extra)
+            test.assertEqual(output.read_bytes(), plain)
+            model.validate_physical_locations()
+            virtual_owner = test.one(model, 'ApplyVirtual', 'procedure')
+            direct_owner = test.one(model, 'ApplyDirect', 'procedure')
+            entries = [row for row in model.records['K']
+                       if row[3].startswith('assignment-input:') and int(row[2]) == virtual_owner]
+            test.assertEqual(len(entries), 6)
+            selected = {}
+            for entry in entries:
+                fields = entry[4].split('\t')
+                test.assertEqual(fields[4], 'overloaded')
+                target = int(fields[5])
+                test.assertEqual(model.signatures[target][2], 'operator')
+                previous = selected.setdefault(fields[3], target)
+                test.assertEqual(previous, target)
+                statement = int(entry[3].split(':')[1])
+                # The generated dispatch variable is not the source operator.
+                # Bind through the independent native static-target relation.
+                calls = [row for identity, row in model.nodes.items()
+                         if row[4] == '9' and model.statement_owners.get(('node', identity)) == statement
+                         and model.properties.get(('node', identity), {}).get('call-kind') == 'virtual']
+                test.assertEqual(len(calls), 1)
+                call = calls[0]
+                targets = [int(row[4]) for row in model.records['H']
+                           if row[1:4] == ['node', call[1], 'symbol'] and row[5] == 'static-target']
+                test.assertEqual(targets, [target])
+                test.assertNotEqual(int(call[9]), target)
+            test.assertEqual(set(selected), {'assign', 'add'})
+            test.assertNotEqual(selected['assign'], selected['add'])
+            observations = [row for row in model.records['O'] if int(row[3]) in selected.values()]
+            # O uses the native compound spelling, unlike assignment inputs.
+            # These macro expansions lack a separate O range; their complete
+            # tickets and static-target relations above still cover all six.
+            test.assertEqual(sorted((row[1], row[2], int(row[3])) for row in observations),
+                             sorted((code, 'overloaded', target) for code, target in
+                                    [('assign', selected['assign']), ('add-assign', selected['add'])]
+                                    for _ in range(2)))
+            direct = [row[4].split('\t') for row in model.records['K']
+                      if row[3].startswith('assignment-input:') and int(row[2]) == direct_owner]
+            test.assertEqual(len(direct), 1)
+            test.assertEqual(direct[0][2:5], ['copy', 'assign', 'overloaded'])
+            test.assertNotIn(int(direct[0][5]), selected.values())
+            binary_path = test.working / ('virtual-assignments-' + backend + '.fbcsem')
+            test.invoke([source], mode='off', backend=backend,
+                        extra=extra + ('-semantic-model', str(binary_path)))
+            test.assertEqual(Model.read(binary_path).rows, model.rows)
+            test.assertEqual(output.read_bytes(), plain)
+            for mode in ('bindings', 'expressions'):
+                compact = test.compile(source, mode=mode, backend=backend, extra=extra)
+                test.assertEqual(output.read_bytes(), plain)
+                test.assertEqual(compact.capabilities[1][FEATURE], 'unavailable')
+                test.assertFalse(any(row[3].startswith(PREFIXES) for row in compact.records['K']))
+
+
 MUTATIONS = ('missing-input', 'missing-count', 'missing-zero-count', 'missing-marker',
              'missing-input-pair', 'wrong-count', 'negative-count', 'huge-count',
              'wrong-owner', 'wrong-statement', 'wrong-ordinal', 'noncanonical-key',

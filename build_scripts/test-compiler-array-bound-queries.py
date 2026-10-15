@@ -47,7 +47,8 @@ def main() -> int:
                 assert len(model.relations("array-bound-query")) == len(groups)
                 expressions = {int(row[1]): row for row in model.records["E"]}
                 floating = next(identity for identity, props in groups.items()
-                                if expressions[int(props["array-bound-dimension"])][12] == "16")
+                                if int(props["array-bound-dimension"]) in expressions
+                                and expressions[int(props["array-bound-dimension"])][12] == "16")
                 assert int(expressions[int(groups[floating]["array-bound-selected-dimension"])][12]) & 511 == 8
                 # A folded constant and a runtime call both retain query membership.
                 assert {expressions[identity][8] for identity in groups} >= {"16", "9"}
@@ -56,7 +57,7 @@ def main() -> int:
                 assert result.returncode == 0, result.stdout + result.stderr
                 assert output.read_bytes() == emitted, "Array bound observations changed generated C"
                 if count == 0:
-                    rows = [row.split("\t") for row in model_path.read_text(encoding="ascii").splitlines()]
+                    rows = [row[:] for row in model.rows]
                     positions = {key: next(i for i, row in enumerate(rows) if row[0] == "K" and row[3] == key)
                                  for key in ("array-bound-kind", "array-bound-symbol", "array-bound-dimension", "array-bound-selected-dimension")}
                     owner = rows[positions["array-bound-kind"]][2]
@@ -64,7 +65,8 @@ def main() -> int:
                     capability = next(i for i, row in enumerate(rows) if row[0] == "CAP" and row[2] == "array-bound-query-inputs")
                     selected_float = next(i for i, row in enumerate(rows) if row[0] == "K" and row[2] == str(floating) and row[3] == "array-bound-selected-dimension")
                     foreign = next(props["array-bound-dimension"] for identity, props in groups.items()
-                                   if model.statement_owners["expression", identity] != model.statement_owners["expression", int(owner)])
+                                   if int(props["array-bound-dimension"]) > 0
+                                   and model.statement_owners["expression", identity] != model.statement_owners["expression", int(owner)])
                     scalar = next(row[1] for row in model.records["S"] if row[2].upper() == "DIMENSIONINDEX")
                     def changed(index: int, column: int, value: str) -> list[list[str]]:
                         altered = [row.copy() for row in rows]

@@ -1762,7 +1762,7 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 		'' be solved by using a forward reference.
 		if( is_ptr ) then
 			'' Emit a forward reference for this struct (if not yet done).
-			'' HACK: reusing the accessed flag (that's used by variables only)
+			'' The symbol's accessed bit prevents emitting this struct reference twice.
 			if( symbGetIsAccessed( s ) = FALSE ) then
 				symbSetIsAccessed( s )
 				hWriteLine( hGetUdtName( s ) + ";" )
@@ -3249,8 +3249,6 @@ end sub
 
 '' Builds up final expression text, walking the EXPRNODE tree
 private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
-	dim as EXPRNODE ptr l = any
-	dim as FBSYMBOL ptr sym = any
 	dim as integer is_builtin = any
 
 	select case as const( n->class )
@@ -4455,7 +4453,7 @@ private sub _emitJmpTb _
 		byval span as ulongint _
 	)
 
-	dim as string tb, temp, ln
+	dim as string tb, temp
 	dim as EXPRNODE ptr l = any
 
 	var dtype = v1->dtype

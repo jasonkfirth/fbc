@@ -47,7 +47,7 @@
 '' Keeping this selection here also respects -z gosub-setjmp, which
 '' must not acquire the assembly backend's extra stack frame at its labels.
 sub astGosubMarkTarget( byval label as FBSYMBOL ptr )
-	if( (label <> NULL) and AsmBackend() ) then label->lbl.gosub = TRUE
+	if( (label <> NULL) andalso AsmBackend() ) then label->lbl.gosub = TRUE
 end sub
 
 sub astGosubAddInit( byval proc as FBSYMBOL ptr )

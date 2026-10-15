@@ -907,7 +907,7 @@ private sub hLoadProcResult( byval proc as FBSYMBOL ptr )
 end sub
 
 private function hModLevelIsEmpty( byval p as ASTNODE ptr ) as integer
-	dim as ASTNODE ptr n = any, nxt = any
+	dim as ASTNODE ptr n = any
 
 	'' an empty module-level proc will have just the
 	'' initial and final labels as nodes and nothing else
@@ -1135,8 +1135,7 @@ private function hCallFieldCtors _
 	) as ASTNODE ptr
 
 	dim as FBSYMBOL ptr fld = any, this_ = any
-	dim as ASTNODE ptr tree = any, boundstypeini = any
-	dim as integer skip = any
+	dim as ASTNODE ptr tree = any
 
 	tree = NULL
 	this_ = symbGetParamVar( symbGetProcHeadParam( proc ) )
@@ -1570,7 +1569,6 @@ end sub
 
 private sub hGenGlobalInstancesCtor( )
 	dim as FB_GLOBINSTANCE ptr inst = any
-	dim as FBSYMBOL ptr sym = any
 
 	'' any global instance with ctors?
 	if( ast.globinst.ctorcnt > 0 ) then

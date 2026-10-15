@@ -91,6 +91,7 @@ function symbProcReturnsOnStack( byval proc as FBSYMBOL ptr ) as integer
 
 		'' GAS64 stores its aggregate-return decision in retin2regs.
 		'' A non-zero value means no hidden stack-result pointer is needed.
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: non-GAS64 aggregate-return rules need ABI review before refactoring
 		'' TODO: Audit the remaining target ABIs and expose their aggregate
 		'' return decisions through target data instead of a GAS64-only field.
 		if( (proc->subtype <> NULL) andalso (proc->subtype->udt.retin2regs <> FB_STRUCT_NONE) ) then

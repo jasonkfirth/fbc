@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-hooks.bi"
 #include once "ast/ast.bi"
 
 declare sub fbSemanticModelExportBinding _
@@ -300,8 +301,11 @@ private sub hFieldInit _
 	end if
 
 	hBeginNesting( parent )
+	dim as integer semantic_memory_context = _
+		fbSemanticModelBeginSourceMemoryContext(sym, "field-initializer")
 	dim as ASTNODE ptr initree = cInitializer( sym, FB_INIOPT_ISINI, _
 		FB_DATATYPE_INVALID, NULL, @semantic_site )
+	fbSemanticModelEndSourceMemoryContext(semantic_memory_context)
 	fbSemanticModelScalarStringDeclaration(sym, initree, 0, semantic_site)
 	hSetFieldInitree( sym, initree )
 end sub

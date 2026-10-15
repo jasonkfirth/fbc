@@ -1069,6 +1069,7 @@ end sub
 private function hExprIsConst( byval n as ASTNODE ptr ) as integer
 	var lsym = n->sym
 	if( lsym ) then
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: global bitfields remain rejected until a valid initialization path exists
 		'' TODO: Implement constant initialization of global bitfields.
 		'' Until then, reject it instead of emitting an invalid initializer.
 		if( symbIsBitfield( lsym ) ) then

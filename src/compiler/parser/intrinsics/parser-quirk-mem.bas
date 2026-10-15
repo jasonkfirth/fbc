@@ -252,7 +252,7 @@ function cOperatorNew( ) as ASTNODE ptr
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 	elseif( semantic_operator <> NULL ) then
-		fbSemanticModelExportOperation(semantic_operator, op, semantic_operation_site)
+		fbSemanticModelSourceMemoryApplication(semantic_operator, op, semantic_operation_site)
 	end if
 
 	'' return the pointer
@@ -323,7 +323,7 @@ sub cOperatorDelete( )
 	fbSemanticModelDeleteStorage(ptrexpr, op = AST_OP_DEL_VEC)
 	delete_expr = astBuildDeleteOp( op, ptrexpr, semantic_operator )
 	if( semantic_operator <> NULL ) then
-		fbSemanticModelExportOperation(semantic_operator, op, semantic_site)
+		fbSemanticModelSourceMemoryApplication(semantic_operator, op, semantic_site)
 	end if
 	astAdd( delete_expr )
 end sub

@@ -81,6 +81,7 @@ function hIsConstInRange _
 	'' they decide whether an explicit enum or alias constant fits its requested
 	'' storage type. astCheckConst() has different conversion-warning semantics,
 	'' so sharing this table there would couple two separate diagnostics.
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: the two conversion policies need a shared constant owner
 	'' TODO: Centralize the integer limit constants used here and by
 	'' astCheckConst() so the two diagnostic policies share one source of
 	'' numeric bounds without sharing their decision logic.

@@ -145,6 +145,7 @@ const GAS64_DWORD_BYTES = 4
 const GAS64_QWORD_BYTES = 8
 const GAS64_BYTE_BITS = 8
 const GAS64_WORD_BITS = 16
+const GAS64_DWORD_BITS = 32
 const GAS64_INLINE_QWORD_LIMIT = 7
 const GAS64_SYSTEMV_INTEGER_ARG_REGISTERS = 6
 const GAS64_SYSTEMV_FLOAT_ARG_REGISTERS = 8
@@ -1984,8 +1985,8 @@ private function hgetdatatype_asm64 _
 	end if
 
 	''
-	'' HACK: When emitting array descriptor types, we don't always emit the
-	'' whole FBARRAYdim dimTB, but only the actually used dimensions.
+	'' Array descriptors include only the dimensions they use from FBARRAYDIM.
+	'' The descriptor can hold more slots than the array needs.
 	''
 	'' This makes a difference (only) for arrays declared with unknown
 	'' dimension count (array()), where the descriptor will have room for
@@ -2039,7 +2040,7 @@ private function hgetdatatype_asm64 _
 				'' Normally we want to emit all fixed-size arrays with
 				'' their proper dimensions & bounds - the only exception
 				'' is the one-dimensional dimTB in array descriptor
-				'' types (also see the above HACK).
+				'' types (see the array descriptor dimension rule above).
 				if( requesteddimtbelements > 0 ) then
 					assert( symbGetArrayDimensions( sym ) = 1 )
 					desc += "ar1;"
@@ -6047,6 +6048,26 @@ private sub hConvertToFloat _
 	else
 		''int to float
 		asm_info("int to float")
+		if( v2->typ = IR_VREGTYPE_IMM ) then
+			'' CVTSI2S[DS] and the narrow integer extension instructions accept
+			'' registers or memory, never immediate operands. FRAC(integer)
+			'' can leave an integer zero here even after normal constant folding.
+			select case typeGetSize( v2dtype )
+			case 1
+				asm_code( "mov al, " + op2 )
+				op2 = "al"
+			case 2
+				asm_code( "mov ax, " + op2 )
+				op2 = "ax"
+			case 4
+				asm_code( "mov eax, " + op2 )
+				op2 = "eax"
+			case else
+				asm_code( "mov rax, " + op2 )
+				op2 = "rax"
+			end select
+			prefix2 = ""
+		end if
 		asm_code("pxor xmm0, xmm0",KNOFREE)
 		select case v2dtype
 			case FB_DATATYPE_ULONGINT
@@ -6431,7 +6452,9 @@ private sub _emitconvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 end sub
 private sub emitStoreStruct(byval v1 as IRVREG ptr, byval v2 as IRVREG ptr,byref op1 as string,byref op3 as string)
 	dim as string dest
-	dim as integer lgtv1=v1->sym->lgt
+	'' A dereferenced pointer or array element need not carry a variable symbol.
+	'' Copy the returned UDT's size, not the size of an enclosing array variable.
+	dim as integer lgtv1=symbGetSizeOf( v2->subtype )
 	dim as FB_STRUCT_INREG retin2regs=v2->subtype->udt.retin2regs
 
 	if op3<>"" then emitop3_op4(op3)
@@ -6483,6 +6506,7 @@ private sub emitStoreStruct(byval v1 as IRVREG ptr, byval v2 as IRVREG ptr,byref
 	asm_code("lea rax, "+op1)
 	asm_code("add rax, 8")
 
+	'' Shift counts are bits, while these stores consume bytes of the tail.
 	select case as const lgtv1
 		case 9
 			asm_code("mov [rax], dl")
@@ -6490,23 +6514,23 @@ private sub emitStoreStruct(byval v1 as IRVREG ptr, byval v2 as IRVREG ptr,byref
 			asm_code("mov [rax], dx")
 		case 11
 			asm_code("mov [rax], dx")
-			asm_code("shr rdx, 2")
+			asm_code("shr rdx, " + str(GAS64_WORD_BITS))
 			asm_code("mov [rax+2], dl")
 		case 12
 			asm_code("mov [rax], edx")
 		case 13
 			asm_code("mov [rax], edx")
-			asm_code("shr rdx, 4")
+			asm_code("shr rdx, " + str(GAS64_DWORD_BITS))
 			asm_code("mov [rax+4], dl")
 		case 14
 			asm_code("mov [rax], edx")
-			asm_code("shr rdx, 4")
+			asm_code("shr rdx, " + str(GAS64_DWORD_BITS))
 			asm_code("mov [rax+4], dx")
 		case 15
 			asm_code("mov [rax], edx")
-			asm_code("shr rdx, 4")
+			asm_code("shr rdx, " + str(GAS64_DWORD_BITS))
 			asm_code("mov [rax+4], dx")
-			asm_code("shr rdx, 2")
+			asm_code("shr rdx, " + str(GAS64_WORD_BITS))
 			asm_code("mov [rax+6], dl")
 		case 16
 			asm_code("mov [rax], rdx")
@@ -6907,7 +6931,8 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 
 	if( hIsStructIn2Regs( v2 ) ) then
 		'' for Linux structures can be returned in 2 registers so needs a special handling
-		if ( v1->sym->stats and FB_SYMBSTATS_IMPLICIT ) then
+		if( (v1->sym <> NULL) andalso _
+		    (v1->sym->stats and FB_SYMBSTATS_IMPLICIT) ) then
 			asm_info("Replacing  "+str(v1->sym->ofs)+" by "+str(v2->ofs))
 			v1->sym->ofs=v2->ofs
 			asm_info("v1="+vregdumpfull(v1))
@@ -7578,6 +7603,12 @@ private sub hCallEmitImmediateRegisterArgument _
 			asm_code( "mov eax, " + op1 )
 		end if
 		asm_code( "movd xmm" + str( cptfloat - 1 ) + ", eax" )
+		if( variadic andalso (ctx.target = FB_COMPTARGET_WIN32) ) then
+			'' Windows variadic calls duplicate register floats in the matching
+			'' integer register. A shadow-space store alone is overwritten when
+			'' the C callee homes its incoming integer registers for va_arg.
+			asm_code( "mov " + *regstrd( listreg( cptint ) ) + ", eax" )
+		end if
 	elseif( dtype = FB_DATATYPE_DOUBLE ) then
 		if( v2->value.f = 0 ) then
 			asm_code( "xor eax, eax" )
@@ -7586,6 +7617,7 @@ private sub hCallEmitImmediateRegisterArgument _
 		end if
 		asm_code( "movq xmm" + str( cptfloat - 1 ) + ", rax" )
 		if( variadic andalso (ctx.target = FB_COMPTARGET_WIN32) ) then
+			asm_code( "mov " + *regstrq( listreg( cptint ) ) + ", rax" )
 			asm_code( "mov QWORD PTR " + str( (cptarg - 1) * 8 ) + _
 			          "[rsp], rax", KNOOPTIM )
 		end if

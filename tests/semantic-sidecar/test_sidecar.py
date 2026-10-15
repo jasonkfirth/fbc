@@ -34,6 +34,22 @@ class SidecarTests(unittest.TestCase):
     backends: list[str]
     native_windows: bool
 
+    def test_source_memory_application_inputs(self) -> None:
+        from source_memory_inputs import check_inputs
+        check_inputs(self)
+
+    def test_source_memory_application_rejects_invalid_observations(self) -> None:
+        from source_memory_inputs import check_rejection
+        check_rejection(self)
+
+    def test_selected_member_reference_roles(self) -> None:
+        from member_selection_inputs import check_inputs
+        check_inputs(self)
+
+    def test_selected_member_roles_reject_incomplete_observations(self) -> None:
+        from member_selection_inputs import check_rejection
+        check_rejection(self)
+
     def test_original_numeric_macro_payloads(self) -> None:
         from numeric_macro_payloads import check_payloads
         check_payloads(self)
@@ -104,6 +120,10 @@ class SidecarTests(unittest.TestCase):
     def test_original_assignment_inputs_keep_selected_operations(self) -> None:
         from assignment_inputs import check_selected_operations
         check_selected_operations(self)
+
+    def test_original_assignment_inputs_keep_virtual_selected_operations(self) -> None:
+        from assignment_inputs import check_virtual_selected_operations
+        check_virtual_selected_operations(self)
 
     def test_original_assignment_inputs_reject_foreign_modules(self) -> None:
         from assignment_inputs import check_module_ownership
@@ -389,6 +409,10 @@ class SidecarTests(unittest.TestCase):
         if emit:
             command.append("-r")
         if mode != "off":
+            # The mutation fixtures below edit logical rows. Select the text
+            # transport explicitly; test_binary_transport checks the binary
+            # producer, exact decoded parity and the native linter together.
+            command.append("-semantic-model-text")
             option = {
                 "full": "-semantic-model",
                 "bindings": "-semantic-model-bindings",
@@ -1774,6 +1798,10 @@ print value
             self.assertTrue(any(int(edge[4]) == target and int(model.types[int(edge[2])][8]) == derived
                                 for edge in model.relations("overrides")))
 
+    def test_virtual_dispatch_rejects_missing_unbound_targets(self) -> None:
+        from virtual_call_inputs import check_rejection
+        check_rejection(self)
+
     def test_preprocessor_parameters_replacements_and_undefined_history(self) -> None:
         source = self.source('#define REMOVED_VALUE 7\nprint REMOVED_VALUE\n#undef REMOVED_VALUE\n'
                              '#define COMBINE(left_arg, right_arg) left_arg + right_arg\nprint COMBINE(1, 2)\n'
@@ -3018,6 +3046,14 @@ print SEM_EMPTY joined3
                     self.assertTrue(any(row[2] == "reference" and row[3] == "1" and row[1] in field_ids
                                         for row in model.records["B"]))
                 self.assertTrue(all(emission == emissions[0] for emission in emissions[1:]))
+
+    def test_redim_construction_inputs(self) -> None:
+        from redim_construction_inputs import check_inputs
+        check_inputs(self)
+
+    def test_redim_construction_inputs_reject_invalid_receipts(self) -> None:
+        from redim_construction_inputs import check_rejection
+        check_rejection(self)
 
     def test_implicit_calls_keep_optional_physical_coordinate_receipts(self) -> None:
         text = (self.root / "tests/semantic-sidecar/implicit-call-coordinates.bas").read_text(encoding="utf-8")

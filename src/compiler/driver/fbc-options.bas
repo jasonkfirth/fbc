@@ -20,6 +20,8 @@
 
 #include once "driver/fbc-private.bi"
 
+declare sub fbSemanticModelTextFormat( )
+
 '' -------------------------------------------------------------------------
 '' Input files and pending option arguments
 '' -------------------------------------------------------------------------
@@ -452,6 +454,7 @@ enum
 	OPT_SEMANTIC_MODEL
 	OPT_SEMANTIC_BINDINGS
 	OPT_SEMANTIC_COMPACT
+	OPT_SEMANTIC_TEXT
 	OPT_SEMANTIC_EXPRESSIONS
 	OPT_SEMANTIC_DIAGNOSTICS
 	OPT_SEMANTIC_LINK_DIAGNOSTICS
@@ -548,6 +551,7 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_MODEL compiler-owned semantic model output
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_BINDINGS compiler-owned bindings and implicit calls
 	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_COMPACT omit verbose macro-expansion provenance
+	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_TEXT diagnostic text transport
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_EXPRESSIONS expression-only semantic output
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_DIAGNOSTICS independent compiler diagnostics
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_LINK_DIAGNOSTICS independent native link observations
@@ -697,6 +701,9 @@ private sub hHandleOptCompileSetup _
 
 	case OPT_SEMANTIC_COMPACT
 		fbc.semanticmodel_compact = TRUE
+
+	case OPT_SEMANTIC_TEXT
+		fbSemanticModelTextFormat( )
 
 	case OPT_SEMANTIC_EXPRESSIONS
 		fbc.semanticmodel = arg
@@ -1161,7 +1168,7 @@ private sub handleOpt _
 	)
 
 	select case as const optid
-	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_BUNDLE, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_EXPRESSIONS, OPT_SEMANTIC_DIAGNOSTICS, OPT_SEMANTIC_LINK_DIAGNOSTICS
+	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_BUNDLE, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_TEXT, OPT_SEMANTIC_EXPRESSIONS, OPT_SEMANTIC_DIAGNOSTICS, OPT_SEMANTIC_LINK_DIAGNOSTICS
 		hHandleOptCompileSetup( optid, arg, is_source )
 
 	case OPT_G, OPT_GEN to OPT_O
@@ -1296,6 +1303,7 @@ private function parseOption(byval opt as zstring ptr) as integer
 		CHECK("semantic-model", OPT_SEMANTIC_MODEL)
 		CHECK("semantic-model-bindings", OPT_SEMANTIC_BINDINGS)
 		CHECK("semantic-model-compact", OPT_SEMANTIC_COMPACT)
+		CHECK("semantic-model-text", OPT_SEMANTIC_TEXT)
 		CHECK("semantic-model-expressions", OPT_SEMANTIC_EXPRESSIONS)
 		CHECK("semantic-diagnostics", OPT_SEMANTIC_DIAGNOSTICS)
 		CHECK("semantic-link-diagnostics", OPT_SEMANTIC_LINK_DIAGNOSTICS)

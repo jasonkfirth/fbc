@@ -105,7 +105,8 @@ private sub fbcDosPlatformAddDefaultLibs( )
 	fbcAddDefLib( "c" )
 	fbcAddDefLib( "m" )
 	if( fbc.dos_threads ) then
-		fbcAddDefLib( "fbpdmlwp" )
+		'' Keep the provider archive name within DOS's 8.3 file-name limit.
+		fbcAddDefLib( "fblwp" )
 	end if
 #ifdef FB_DOS_WATT32
 	fbcAddDefLib( "watt" )

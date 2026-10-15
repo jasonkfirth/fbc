@@ -1298,7 +1298,6 @@ private sub hRename _
 	)
 
 	dim as IRTACVREG ptr t = any
-	dim as IRVREG ptr v = any
 
 	'' reassign tac table vregs
 	'' (assuming res, v1 and v2 will never point to the same vreg!)
@@ -2630,7 +2629,6 @@ private function _GetDistance _
 		byval vreg as IRVREG ptr _
 	) as uinteger
 
-	dim as IRVREG ptr v
 	dim as IRTAC ptr t
 	dim as integer dist
 

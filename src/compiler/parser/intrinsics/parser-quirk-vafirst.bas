@@ -237,6 +237,7 @@ private sub hSolveValistType _
 			end if
 
 			'' for anything else, replace the dtype here and let backend
+			'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: the casts remain until exprNewVREG stops producing them
 			'' TODO: Remove the redundant casts which exprNewVREG() can still
 			'' produce after this va_list dtype replacement.
 			'' handle it (though there are some casts in exprNewVREG that

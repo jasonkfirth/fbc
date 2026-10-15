@@ -307,6 +307,12 @@ function astNewLINK _
 		n = astNewNode( AST_NODECLASS_LINK, astGetFullType( l ), l->subtype )
 	case AST_LINK_RETURN_RIGHT
 		n = astNewNode( AST_NODECLASS_LINK, astGetFullType( r ), r->subtype )
+	case else
+		'' No result type can be selected for an unsupported LINK selector.
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		astDelTree( l )
+		astDelTree( r )
+		return NULL
 	end select
 
 	n->link.ret = ret

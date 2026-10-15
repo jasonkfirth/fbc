@@ -496,7 +496,6 @@ private sub hDelLocals _
 		byval check_backward as integer _
 	)
 
-	dim as FBSYMBOL ptr s = any
 	dim as integer label_stmt = any, branch_stmt = any
 	dim as ASTNODE ptr blk = any
 

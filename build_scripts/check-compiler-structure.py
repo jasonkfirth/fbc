@@ -26,12 +26,14 @@ def source_graph(root: Path, host: str) -> dict[str, list[str]]:
             "include " + str(root / "mk/compiler-sources.mk") + "\n"
             "all:\n"
             "\t$(info SOURCES=$(FBC_SRC))\n"
-            "\t$(info HEADERS=$(FBC_BI))\n"
+            "\t$(info HEADERS=$(sort $(FBC_BI) $(FBC_SEMANTIC_WIRE_BI)))\n"
             "\t$(info GROUPS=$(FBC_SOURCE_GROUPS))\n"
             "\t@:\n",
             encoding="utf-8",
         )
-        command = ["make", "--no-print-directory", "-s", "-f", str(makefile)]
+        # Included dependency rules can become make's default target. Always
+        # select our reporting recipe instead of building a compiler object.
+        command = ["make", "--no-print-directory", "-s", "-f", str(makefile), "all"]
         result = subprocess.run(command, text=True, capture_output=True, check=False)
         if result.returncode:
             raise ValueError(result.stderr.strip())

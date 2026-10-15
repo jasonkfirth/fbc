@@ -26,6 +26,10 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+
+'' These inputs cannot be replayed from a source-content hash. Report actual
+'' expansion, including expansion through another macro, to the model owner.
+declare sub fbSemanticModelVolatileInput( )
 #include once "parser/parser.bi"
 #include once "support/containers/hash.bi"
 #include once "support/containers/list.bi"
@@ -146,14 +150,17 @@ private function hGetCompileTime() as double
 end function
 
 private function hDefDate_cb() as string static
+	fbSemanticModelVolatileInput( )
 	function = format( hGetCompileTime(), "mm-dd-yyyy" )
 end function
 
 private function hDefDateISO_cb() as string static
+	fbSemanticModelVolatileInput( )
 	function = format( hGetCompileTime(), "yyyy-mm-dd" )
 end function
 
 private function hDefTime_cb() as string static
+	fbSemanticModelVolatileInput( )
 	function = format( hGetCompileTime(), "hh:nn:ss" )
 end function
 
@@ -162,6 +169,7 @@ private function hDefMultithread_cb() as string static
 end function
 
 private function hDefCmdline_cb() as string
+	fbSemanticModelVolatileInput( )
 	dim as string cmdline = fbcGetSourceCmdline()
 	'' String defines are literals, so quotes in the source text must be doubled.
 	function = hReplace( cmdline, QUOTE, QUOTE + QUOTE )

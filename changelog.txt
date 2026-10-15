@@ -1,6 +1,13 @@
 Version 1.20.4
 
 [changed]
+- compiler floating-point optimization: preserve parsed addition, subtraction and multiplication grouping in precise mode, including compound assignments and constant accumulation; retain reassociation in fast mode and add rounding and overflow regressions.
+- compiler semantic transport: retain the self-describing FBCSEMB1 binary format and shared bounded codec when integrating constructor-selection documentation; qualify implicit, temporary and REDIM construction properties against identical binary/text facts and compact-mode exclusions.
+- compiler build verification: select the graph-reporting target explicitly so semantic transport dependency rules cannot become the graph probe's default target.
+- compiler semantic selections: retain source allocation/deallocation applications, selected member roles and virtual source callees; validate constructor coverage after REDIM lowering and include the complete reader dependency set in frozen audits.
+- compiler semantic limits: bound model-wide symbol identities to the consumer's identity capacity and verify that the producer, native reader and contract document use the same limit.
+- compiler/GAS64: materialize integer immediates before floating conversion, preserve variadic floating argument delivery and use returned UDT sizes and bit-correct tail shifts for aggregate stores; add native C ABI and integer FRAC regressions.
+- compiler graphics and literals: retain the LOAD wrapper for descriptor-based image destinations and initialize nondecimal literal recovery state; cover nonzero array bounds and wide radix boundaries with focused regressions.
 - compiler AST: initialize failed helper results explicitly, guard null relational-node probes, keep local tree-count helpers available for -eassert builds, and preserve Unicode scalar values and effectful indices through SWAP compatibility checks.
 - platform/library examples: refine POSIX time, select and iconv declarations for the selected host ABI; retain additional CUnit, image, Lua, spell-checking, GSL and GRX binding repairs, GooCanvas and sound examples, and Windows/Linux/FreeBSD/Haiku qualification instructions.
 - example runners: add bounded audio and image checks, deterministic display handling and native wx-c value comparisons; retain repeatable source dependency patches and update the SDL and legacy-library workflows.

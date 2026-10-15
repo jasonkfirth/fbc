@@ -1119,7 +1119,7 @@ sub fbSemanticModelScalarForStepSelection _
 	end if
 	dim as string prefix = "K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(counter)) + TABCHAR
 	dim as string statement_text = fbSemanticModelNumber(statement)
-	fbSemanticModelAppendProvenance(prefix + "for-step-selected-dtype:" + statement_text + TABCHAR + fbSemanticModelNumber(dtype))
+	fbSemanticModelAppendProvenance(prefix + "for-step-selected-dtype:" + statement_text + TABCHAR + fbSemanticModelNumber(culng(dtype)))
 	fbSemanticModelAppendProvenance(prefix + "for-step-selected-expression:" + statement_text + TABCHAR + fbSemanticModelNumber(expression_id))
 end sub
 
@@ -1198,7 +1198,7 @@ sub fbSemanticModelSelectConstant _
 		fbSemanticModelFailAt("invalid selected case constant")
 		exit sub
 	end if
-	dim as string value = fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelNumber(dtype) + _
+	dim as string value = fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelNumber(culng(dtype)) + _
 		TABCHAR + ltrim(str(first_value)) + TABCHAR + ltrim(str(last_value)) + TABCHAR + ltrim(str(bias))
 	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->select_owner) + _
 		TABCHAR + "select-case-constant:" + fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + ":" + _
@@ -1217,7 +1217,7 @@ sub fbSemanticModelSelectTable _
 		fbSemanticModelFailAt("invalid selected case table")
 		exit sub
 	end if
-	dim as string value = fbSemanticModelNumber(dtype) + TABCHAR + fbSemanticModelNumber(symbGetFullType(storage)) + _
+	dim as string value = fbSemanticModelNumber(culng(dtype)) + TABCHAR + fbSemanticModelNumber(culng(symbGetFullType(storage))) + _
 		TABCHAR + ltrim(str(bias)) + TABCHAR + ltrim(str(span)) + TABCHAR + fbSemanticModelNumber(count)
 	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->select_owner) + _
 		TABCHAR + "select-case-table:" + fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelEscape(value))

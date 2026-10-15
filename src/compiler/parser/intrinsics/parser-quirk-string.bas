@@ -755,7 +755,7 @@ end function
 ''
 function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 	dim as ASTNODE ptr expr1 = any, expr2 = any, expr3 = any
-	dim as integer dclass = any, dtype = any, is_any = any, is_wstr = any
+	dim as integer is_any = any, is_wstr = any
 	dim as LEX_LOCATION intrinsic_start = lexGetCurrentLocation( )
 	dim as longint intrinsic_nonphysical_start = lexGetNonphysicalTokenCount( )
 	dim as longint trim_arguments(0 to 1)

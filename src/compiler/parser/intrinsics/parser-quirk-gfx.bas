@@ -106,7 +106,7 @@ private function hNidxArray2ArrayAccess( byval nidxarray as ASTNODE ptr ) as AST
 		idxexpr = astNewBOP( AST_OP_ADD, idxexpr, dataOffset )
 
 		'' ...
-		astNewLOAD( idxexpr, FB_DATATYPE_INTEGER )
+		idxexpr = astNewLOAD( idxexpr, FB_DATATYPE_INTEGER )
 
 		'' can't reuse varexpr
 		astDelTree( varexpr )
@@ -1003,8 +1003,6 @@ function cGfxPut as integer
 	dim as integer coordtype, mode, expectmode
 	dim as ASTNODE ptr xexpr, yexpr, arrayexpr, texpr, alphaexpr, _
 		funcexpr, paramexpr, x1expr, y1expr, x2expr, y2expr
-	dim as FBSYMBOL ptr arg1, arg2
-
 	function = FALSE
 
 	alphaexpr = NULL

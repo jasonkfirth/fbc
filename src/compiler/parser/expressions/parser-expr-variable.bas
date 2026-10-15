@@ -33,6 +33,9 @@
 #include once "tooling/semantic-variable-names.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
+declare sub fbSemanticModelExportMemberBinding _
+	( byval sym as FBSYMBOL ptr, byval receiver as FBSYMBOL ptr, _
+	  byref source as LEX_LOCATION, byval is_type as integer )
 declare sub fbSemanticModelExportBinding _
 	( _
 		byval sym as FBSYMBOL ptr, _
@@ -368,7 +371,9 @@ private function hMemberId( byval parent as FBSYMBOL ptr, byval allow_inner as i
 
 	if( (symbGetClass(sym) <> FB_SYMBCLASS_VAR) and _
 	    (symbGetClass(sym) <> FB_SYMBCLASS_PROC) ) then
-		fbSemanticModelExportBinding(sym, semantic_site, FALSE)
+		'' ALLOW_INNER identifies the type-member grammar, independently of
+		'' whether the same field also appears in an enclosing expression.
+		fbSemanticModelExportMemberBinding(sym, parent, semantic_site, allow_inner)
 	end if
 	return sym
 

@@ -704,6 +704,8 @@ private function hDeclPointer _
 
 	if( desc.data <> NULL ) then
 		function = *desc.data
+	else
+		function = ""
 	end if
 	DZstrAllocate( desc, 0 )
 
@@ -724,8 +726,8 @@ private function hGetDataType _
 	end if
 
 	''
-	'' HACK: When emitting array descriptor types, we don't always emit the
-	'' whole FBARRAYDIM dimTB, but only the actually used dimensions.
+	'' Array descriptors include only the dimensions they use from FBARRAYDIM.
+	'' The descriptor can hold more slots than the array needs.
 	''
 	'' This makes a difference (only) for arrays declared with unknown
 	'' dimension count (array()), where the descriptor will have room for
@@ -779,7 +781,7 @@ private function hGetDataType _
 				'' Normally we want to emit all fixed-size arrays with
 				'' their proper dimensions & bounds - the only exception
 				'' is the one-dimensional dimTB in array descriptor
-				'' types (also see the above HACK).
+				'' types (see the array descriptor dimension rule above).
 				if( requesteddimtbelements > 0 ) then
 					assert( symbGetArrayDimensions( sym ) = 1 )
 					desc += "ar1;"
@@ -957,7 +959,7 @@ sub edbgEmitGlobalVar _
 		byval section as integer _
 	)
 
-	dim as integer t = any, attrib = any
+	dim as integer t = any
 	dim as string desc
 
 	if( env.clopt.debuginfo = FALSE ) then

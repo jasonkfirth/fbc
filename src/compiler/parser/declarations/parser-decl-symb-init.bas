@@ -513,7 +513,6 @@ end function
 
 private function hUDTInit( byref ctx as FB_INITCTX ) as integer
 
-	dim as integer elm_cnt = any
 	dim as longint lgt = any, baseofs = any, pad_lgt = any
 	dim as FBSYMBOL ptr fld = any, first = any
 	dim as FB_INITCTX old_ctx = any

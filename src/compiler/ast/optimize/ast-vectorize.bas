@@ -411,7 +411,8 @@ private function hMergeNode _
 		byval doMerge as integer _
 	) as integer
 
-	dim as integer offset = any, needOffset = 0
+	'' Arithmetic nodes do not use a memory distance, but still pass it by value.
+	dim as integer offset = 0, needOffset = 0
 	dim as integer vn_ofs = any, n_ofs = any
 	dim as integer dtype = any
 
@@ -744,6 +745,7 @@ sub astProcVectorize _
 
 			intraTree = FALSE
 			parallelB = FALSE
+			nodeB = NULL
 
 			if( ( treeB = NULL ) or ( parallelA = FALSE ) )then
 				intraTree = TRUE

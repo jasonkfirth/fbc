@@ -85,7 +85,7 @@ private function hConstAccumADDSUB _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr l = any, r = any
-	dim as integer dtype = any, o = any, rsign = any
+	dim as integer o = any, rsign = any
 
 	if( n = NULL ) then
 		return NULL
@@ -153,7 +153,6 @@ private function hConstAccumMUL _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr l = any, r = any
-	dim as integer dtype = any
 
 	if( n = NULL ) then
 		return NULL
@@ -187,7 +186,7 @@ private function hConstAccumMUL _
 end function
 
 private function hOptConstAccum1( byval n as ASTNODE ptr ) as ASTNODE ptr
-	dim as ASTNODE ptr l = any, r = any, accumval = any
+	dim as ASTNODE ptr r = any, accumval = any
 	dim as integer o = any
 
 	'' walk
@@ -238,7 +237,7 @@ private function hOptConstAccum1( byval n as ASTNODE ptr ) as ASTNODE ptr
 end function
 
 private function hOptConstAccum2( byval n as ASTNODE ptr ) as ASTNODE ptr
-	dim as ASTNODE ptr l = any, r = any, accumval = any
+	dim as ASTNODE ptr accumval = any
 
 	'' walk
 	if( n->l ) then
@@ -293,7 +292,6 @@ private function hConstDistMUL _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr l = any, r = any
-	dim as integer dtype = any
 
 	if( n = NULL ) then
 		return NULL
@@ -511,6 +509,9 @@ function astIncOffset( byval n as ASTNODE ptr, byval ofs as longint ) as integer
 			function = astIncOffset( n->l, ofs )
 		case AST_LINK_RETURN_RIGHT
 			function = astIncOffset( n->r, ofs )
+		case else
+			'' A LINK without a result child has no address to adjust.
+			function = FALSE
 		end select
 
 	case AST_NODECLASS_FIELD, AST_NODECLASS_IIF
@@ -941,7 +942,6 @@ end function
 
 private function hTryRemoveCAST( byval n as ASTNODE ptr, byval dtype as FB_DATATYPE ) as ASTNODE ptr
 	dim as ASTNODE ptr l = any
-	dim as integer op = any
 
 	assert( n <> NULL )
 
@@ -2018,7 +2018,6 @@ function hOptSelfAssign _
 	'' d  d
 
 	dim as ASTNODE ptr l = any, r = any
-	dim as integer dtype = any, dclass = any
 
 	function = n
 
@@ -2051,7 +2050,6 @@ function hOptSelfCompare _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr l = any, r = any
-	dim as integer dtype = any, dclass = any
 
 	function = n
 
@@ -2114,7 +2112,6 @@ private function hOptReciprocal _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr l = any, r = any
-	dim as single v = Any
 
 	if( n = NULL ) then
 		return NULL

@@ -10,7 +10,8 @@ FEATURE = 'implicit-construction-inputs'
 PREFIX = 'construction-observation:'
 CLOSURE = 'construction-observation-count:'
 KINDS = frozenset(('default-constructor', 'initializer-constructor',
-                  'new-constructor', 'argument-constructor', 'return-constructor'))
+                  'new-constructor', 'argument-constructor', 'return-constructor',
+                  'redim-constructor'))
 LIMIT = 1000000
 
 
@@ -84,6 +85,8 @@ def validate_construction_inputs(model, number, subject_modules):
             native = model.statements.get(statement)
             if native is None or int(native[7]) != module or native[5] != str(source):
                 raise ValueError('Construction statement or source belongs to another owner')
+        if kind == 'redim-constructor' and (not statement or not source):
+            raise ValueError('REDIM construction lacks its source statement')
         owner_snapshot = model.types.get(canonical(owner))
         if (owner_snapshot is not None and owner_snapshot[3] == 'variable'
                 and owner_snapshot[17] in ('static', 'shared', 'global') and owner_snapshot[18] == 'source'

@@ -212,7 +212,12 @@ function fbSemanticOutputOpen( byval filename as const zstring ptr ) as any ptr
 			writer->directory = candidate
 			exit for
 		end if
-		if( errno <> EEXIST ) then exit for
+		'' DOS MKDIR reports runtime errors, and CRT errno values differ across
+		'' hosts. Retry only an existing name; do not assume one errno mapping
+		'' while two sidecars reserve directories within the same clock tick.
+		dim as FB_FILE_INFO existing
+		if( fb_FileQueryInfo(strptr(candidate), FALSE, @existing) = 0 ) then exit for
+		if( (existing.flags and FB_FILE_INFO_EXISTS) = 0 ) then exit for
 	next
 	if( len(writer->directory) = 0 ) then
 		hReleaseOutput(writer)

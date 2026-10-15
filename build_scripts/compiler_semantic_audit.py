@@ -21,6 +21,9 @@ import subprocess
 EMISSION_SUFFIX = {"gcc": ".c", "clang": ".c", "llvm": ".ll", "gas64": ".asm", "gas": ".asm"}
 SEMANTIC_READER_FILES = (
     "sidecar.py",
+    "semantic_binary.py",
+    "semantic_member_selections.py",
+    "semantic_source_memory.py",
     "semantic_flow.py",
     "semantic_literals.py",
     "semantic_queries.py",

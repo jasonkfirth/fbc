@@ -670,8 +670,8 @@ private sub hForStep _
 			iscomplex = TRUE
 			fbSemanticModelScalarForStepSelection( stk->for.cnt.sym, NULL, dtype )
 
-			'' make a copy of type info, so we can hack
-			'' the pointer stuff if necessary
+			'' Keep a local copy so pointer counters can use an integer step type.
+			'' Non-pointer counters retain their original expression type.
 			dim as integer tmp_dtype = dtype
 			dim as FBSYMBOL ptr tmp_subtype = subtype
 

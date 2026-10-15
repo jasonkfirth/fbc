@@ -189,7 +189,7 @@ function astBuildJMPTB _
 		byval span as ulongint _
 	) as ASTNODE ptr
 
-	dim as ASTNODE ptr tree = any, l = any
+	dim as ASTNODE ptr tree = any
 	static as FBARRAYDIM dTB(0)
 	dim as FBSYMBOL ptr tbsym = any
 

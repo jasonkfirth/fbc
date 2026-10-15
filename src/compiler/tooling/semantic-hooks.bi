@@ -111,6 +111,15 @@ declare sub fbSemanticModelExportOperation _
 	( byval expression as ASTNODE ptr, byval op as integer, _
 	  byref source as LEX_LOCATION )
 
+declare function fbSemanticModelBeginSourceMemoryContext _
+	( byval owner as FBSYMBOL ptr, byref context_kind as const string ) as integer
+
+declare sub fbSemanticModelEndSourceMemoryContext( byval token as integer )
+
+declare sub fbSemanticModelSourceMemoryApplication _
+	( byval expression as ASTNODE ptr, byval op as integer, _
+	  byref source as LEX_LOCATION )
+
 #endif
 
 '' end of tooling/semantic-hooks.bi

@@ -21,6 +21,9 @@
 '' position and never owns or closes the compiler's stream.
 
 dim shared as longint semantic_source_ids(0 to FB_MAXINCRECLEVEL)
+'' #LINE changes both env.inf.name and its cached include name. Retain the
+'' actual opened revision's path separately for observers with raw coordinates.
+dim shared as string semantic_source_paths(0 to FB_MAXINCRECLEVEL)
 dim shared as any ptr semantic_source_revisions(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_handles(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_formats(0 to FB_MAXINCRECLEVEL)
@@ -60,12 +63,21 @@ sub fbSemanticModelResetSources( )
 	for depth as integer = 0 to FB_MAXINCRECLEVEL
 		if( semantic_source_revisions(depth) <> NULL ) then fbSemanticModelFailAt("semantic-source.bas:49")
 		semantic_source_ids(depth) = 0
+		semantic_source_paths(depth) = ""
 	next
 end sub
 
 function fbSemanticModelCurrentSource( ) as longint
 	if( (env.includerec < 0) or (env.includerec > FB_MAXINCRECLEVEL) ) then return 0
 	return semantic_source_ids(env.includerec)
+end function
+
+function fbSemanticModelSourcePath( byval identity as longint ) as string
+	if( identity <= 0 ) then return ""
+	for depth as integer = 0 to FB_MAXINCRECLEVEL
+		if( semantic_source_ids(depth) = identity ) then return semantic_source_paths(depth)
+	next
+	return ""
 end function
 
 function fbSemanticModelSourceHandle( byval identity as longint, byref format as integer ) as integer
@@ -103,6 +115,7 @@ sub fbSemanticModelOpenSource(byref filename as const string, byval depth as int
 	dim as longint parentid = 0
 	if( depth > 0 ) then parentid = semantic_source_ids(depth - 1)
 	semantic_source_ids(depth) = fbSemanticModelNextDetailIdentity( )
+	semantic_source_paths(depth) = filename
 	semantic_source_handles(depth) = env.inf.num
 	semantic_source_formats(depth) = env.inf.format
 	semantic_source_regular(depth) = status = 1
@@ -136,6 +149,7 @@ sub fbSemanticModelCloseSource(byval depth as integer)
 	fbSemanticModelAppendProvenance("SRE" + TABCHAR + fbSemanticModelNumber(semantic_source_ids(depth)) + _
 		TABCHAR + iif(status = 1, "verified", iif(status = 2, "unverified-stream", "changed-or-unreadable")))
 	semantic_source_ids(depth) = 0
+	semantic_source_paths(depth) = ""
 	semantic_source_handles(depth) = 0
 	if( status = 0 ) then fbSemanticModelFailAt("semantic-source.bas:115")
 end sub

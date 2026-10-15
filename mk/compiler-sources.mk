@@ -97,6 +97,14 @@ FBC_JS_OBJS := $(addprefix $(fbcjsobjdir)/,$(FBC_OBJNAMES))
 FBC_ANDROID_OBJS := $(addprefix $(fbcandroidobjdir)/,$(FBC_OBJNAMES))
 FBC_WII_OBJS := $(addprefix $(fbcwiiobjdir)/,$(FBC_OBJNAMES))
 
+# These public tooling headers are embedded only by the semantic writer.
+# Keep that dependency explicit without rebuilding unrelated compiler modules
+# whenever the transport implementation or generated element table changes.
+FBC_SEMANTIC_WIRE_BI := $(addprefix $(abspath $(srcdir)/../inc)/,\
+fbc-semantic-binary.bi fbc-semantic-elements.bi)
+$(filter %/semantic-model.o,$(FBC_OBJS) $(FBC_JS_OBJS) \
+$(FBC_ANDROID_OBJS) $(FBC_WII_OBJS)): $(FBC_SEMANTIC_WIRE_BI)
+
 ##############################################################################
 # end of compiler-sources.mk
 ##############################################################################

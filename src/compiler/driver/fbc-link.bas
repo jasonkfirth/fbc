@@ -288,7 +288,8 @@ private function hLinkDosDxe _
 
 	'' DXE modules use an import archive for libfb and leave the remaining
 	'' references for the loader to resolve when the module is loaded.
-	ldcline += " -I ""lib" + hStripExt( fbc.outname ) + "_il.a"""
+	'' The import archive is named from the module, not its output directory.
+	ldcline += " -I ""lib" + hStripPath( hStripExt( fbc.outname ) ) + "_il.a"""
 	ldcline += " -U"
 
 	scope

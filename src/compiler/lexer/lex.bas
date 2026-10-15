@@ -967,6 +967,10 @@ private function hReadNonDecNumber _
 	assert( dtype = FB_DATATYPE_SHORT )
 
 	value = 0
+	'' Recovery can finish before the scanner promotes a literal to 64 bits.
+	'' Keep its wide result and leading octal digit defined across radix dispatch.
+	value64 = 0
+	first_c = CHAR_0
 	lgt = 0
 	skipchar = FALSE
 	havedigits = FALSE
@@ -2296,7 +2300,7 @@ sub lexNextToken _
 	)
 
 	dim as uinteger char = any
-	dim as integer lgt = any, reread = any, readchar = any
+	dim as integer reread = any, readchar = any
 
 	t->after_space = lex.ctx->after_space
 	lex.ctx->after_space = FALSE

@@ -15,7 +15,12 @@ from pathlib import Path
 import shlex
 import shutil
 import subprocess
+import sys
 import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tests/semantic-sidecar'))
+from semantic_binary import read_rows
+from sidecar import unescape
 
 
 def digest(path: Path) -> str:
@@ -38,14 +43,21 @@ def save(path: Path, value: dict) -> None:
 
 def model_sources(model: Path) -> dict[str, str]:
     sources = {}
-    with model.open(encoding='utf-8') as stream:
-        for line in stream:
-            fields = line.rstrip('\n').split('\t')
-            if fields[0] == 'FILE':
-                if len(fields) != 7 or fields[6] != 'regular':
-                    raise ValueError('Compiler model contains an unsupported source revision')
-                path = native_path(fields[2])
-                sources[str(path)] = fields[4]
+    complete = False
+    for line in read_rows(model):
+        if complete:
+            raise ValueError('Compiler model has records after its footer')
+        fields = line.decode('ascii').split('\t')
+        if fields[0] == 'FILE':
+            if len(fields) != 7 or fields[6] != 'regular':
+                raise ValueError('Compiler model contains an unsupported source revision')
+            # Compiler paths use byte-safe percent escapes in both transports.
+            path = native_path(unescape(fields[2]))
+            sources[str(path)] = fields[4]
+        elif fields[0] == 'END':
+            complete = True
+    if not complete:
+        raise ValueError('Compiler model has no completion footer')
     if not sources:
         raise ValueError('Compiler model has no physical source revisions')
     return sources

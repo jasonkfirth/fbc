@@ -43,7 +43,7 @@ def main() -> int:
                                             capture_output=True, text=True, timeout=60)
                     assert result.returncode == 0, result.stdout + result.stderr
                     if count == 0:
-                        rows = [row.split("\t") for row in model_path.read_text(encoding="ascii").splitlines()]
+                        rows = [row[:] for row in model.rows]
                         type_index = next(index for index, row in enumerate(rows)
                                           if row[0] == "K" and row[3] == "string-initializer-dtype")
                         mutation_path = directory / "qualification.semantic"

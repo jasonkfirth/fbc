@@ -157,6 +157,7 @@ private sub hInitInlineAsmKeywords( )
 	if( inlineAsmKeywords.inited = FALSE ) then
 		listInit( @inlineAsmKeywords.list, 8, sizeof( zstring ptr ) )
 		hashInit( @inlineAsmKeywords.hash, INLINE_ASM_KEYWORD_HASH_BUCKETS )
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: these targets need their own inline-assembly keyword tables
 		'' TODO: Add target keyword tables for ARM and AArch64 inline
 		'' assembly instead of leaving their tables empty.
 		select case( fbGetCpuFamily( ) )
@@ -173,6 +174,7 @@ private sub hInitGlobalAsmKeywords( )
 	if( globalAsmKeywords.inited = FALSE ) then
 		listInit( @globalAsmKeywords.list, 8, sizeof( zstring ptr ) )
 		hashInit( @globalAsmKeywords.hash, GLOBAL_ASM_KEYWORD_HASH_BUCKETS )
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: these targets need their own global-assembly keyword tables
 		'' TODO: Add target keyword tables for ARM and AArch64 global
 		'' assembly instead of leaving their tables empty.
 		select case( fbGetCpuFamily( ) )

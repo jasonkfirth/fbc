@@ -286,6 +286,7 @@ enum FB_VECTORIZELEVEL
 	FB_VECTORIZE_NONE               '' no vectorization
 	FB_VECTORIZE_NORMAL             '' complete expression merging
 	FB_VECTORIZE_INTRATREE          '' intra-expression merging
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: sub-expression merging needs a separate optimizer implementation
 	FB_VECTORIZE_SUBEXPRESSION      '' TODO: Implement sub-expression merging.
 end enum
 

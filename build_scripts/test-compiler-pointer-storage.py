@@ -56,7 +56,7 @@ def main() -> int:
                 assert result.returncode == 0, result.stdout + result.stderr
                 assert output.read_bytes() == observed_code, "Storage observations changed generated code"
                 count += 1
-                rows = model_path.read_text().splitlines()
+                rows = ["\t".join(row) for row in model.rows]
                 for domain, prefix in (("expression", "pointer-address-"), ("symbol", "memory-new-")):
                     receipt = next(row.split("\t") for row in rows if row.startswith(f"K\t{domain}\t")
                                    and row.split("\t")[3] == prefix + "kind")

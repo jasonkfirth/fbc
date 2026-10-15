@@ -577,6 +577,8 @@ private function hLookupVar _
 
 	dim as FBSYMBOL ptr sym = any
 
+	function = NULL
+
 	if( chain_ = NULL ) then
 		exit function
 	end if
@@ -746,6 +748,7 @@ private sub hValidateGlobalVarInit( byval sym as FBSYMBOL ptr, byref initree as 
 	end if
 
 	'' Disallow initialization of global dynamic strings
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: global dynamic strings need generated startup initialization
 	'' TODO: Support global dynamic-string initialization through generated
 	'' startup code. It cannot be represented by the static initializer alone.
 	if( (typeIsDynamicString( symbGetType( sym ) )) and (not symbIsRef( sym )) ) then
@@ -1188,6 +1191,8 @@ private function hRedimExpressionHasFieldSuffix( ) as integer
 	dim as LEX_PROBE_CTX probe
 	dim as integer depth = 0
 
+	function = FALSE
+
 	lexProbeBegin( probe )
 
 	'' The first identifier is the ambiguous part of REDIM.  Walk the tokens
@@ -1263,6 +1268,8 @@ private function hMaybeBuildFieldAccess _
 	) as ASTNODE ptr
 
 	dim as FBSYMBOL ptr thisparam = any
+
+	function = NULL
 
 	if( is_redim = FALSE ) then
 		exit function
@@ -1467,8 +1474,9 @@ private function hEmitVarDecl _
 			varexpr = astNewNIDXARRAY( astNewVAR( sym ) )
 		end if
 
+		dim as FBSYMBOL ptr selected_ctor = NULL
 		redimcall = rtlArrayRedim( varexpr, dimensions, exprTB(), _
-		                           dopreserve, (not symbGetDontInit( sym )) )
+		                           dopreserve, (not symbGetDontInit( sym )), @selected_ctor )
 
 		''
 		'' A local STATIC array declaration allocates once. Typeless REDIMs
@@ -1480,6 +1488,12 @@ private function hEmitVarDecl _
 		    (FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_COMMON)) = 0) and _
 		    (not is_declared) ) then
 			redimcall = hWrapInStaticFlag( redimcall )
+		end if
+
+		'' The runtime receives this exact callback even when bounds are empty
+		'' or allocation is conditional. Record selection, not execution count.
+		if( (redimcall <> NULL) and (selected_ctor <> NULL) ) then
+			fbSemanticModelExportImplicitCall(sym, selected_ctor, "redim-constructor", semantic_site)
 		end if
 
 		tree = astNewLINK( tree, redimcall, AST_LINK_RETURN_NONE )
@@ -1617,7 +1631,6 @@ function cVarDecl _
 	dim as longint lgt = any
 	dim as integer dimensions = any, suffix = any
 	dim as zstring ptr palias = any
-	dim as FB_IDOPT options = any
 	dim as LEX_LOCATION semantic_site, diagnostic_site
 
 	dim as longint semantic_group, semantic_owner

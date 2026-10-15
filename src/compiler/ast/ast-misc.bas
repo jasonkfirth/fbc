@@ -197,6 +197,10 @@ function astIsTreeEqual _
 		'' unpredictable nodes
 		exit function
 
+	case else
+		'' Unhandled node classes are not safe to compare by their children alone.
+		exit function
+
 	end select
 
 	'' check childs
@@ -593,6 +597,7 @@ sub astCheckConst _
 	''    dim a as uinteger = -1
 	''    dim b as uinteger = 1 shl 31
 	''
+	'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: bitfield width validation needs metadata to reach conversion checking
 	'' TODO: Extend this check so bitfield assignments can be validated
 	'' against the declared field width instead of only the container type.
 	'' That requires passing bitfield metadata through the conversion path.

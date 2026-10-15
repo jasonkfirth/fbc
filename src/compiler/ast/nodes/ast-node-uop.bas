@@ -46,7 +46,7 @@ private sub hApplyFloatConstResultType( byval dtype as integer, byref f as doubl
 	if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_SINGLE ) then
 		'' Float constants are stored as DOUBLE, but a folded SINGLE
 		'' operation must still match the runtime SINGLE helper.
-		dim as single s = f
+		dim as single s = csng( f )
 		f = s
 	end if
 end sub
@@ -347,7 +347,8 @@ function astNewUOP _
 	case AST_OP_FIX, AST_OP_FLOOR
 		'' integer?
 		if( typeGetClass( o->dtype ) = FB_DATACLASS_INTEGER ) then
-			'' return value unchanged (hack: add 0 to prevent passing byref)
+			'' Force a value expression so BYREF argument lowering cannot expose
+			'' the original variable. The addition does not change its value.
 			return astNewBOP( AST_OP_ADD, o, astNewCONSTi( 0, dtype ) )
 		end if
 

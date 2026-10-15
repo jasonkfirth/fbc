@@ -300,12 +300,11 @@ def run_case(case: Case, common: list[str], output: Path, reader) -> list[dict]:
 
 def reader_mutations(output: Path, reader) -> list[dict]:
     """Keep record totals correct while changing a class-specific payload."""
-    text = (output / "copyback/full.tsv").read_text()
-    model = reader(text)
+    model = reader.read(output / "copyback/full.tsv")
     results = []
     for name, key, replacement in (("unknown_node_kind", "kind", "pretend-kind"),
                                     ("invalid_argument_bytes", "bytes", "nonnumeric")):
-        rows = [line.split("\t") for line in text.splitlines()]
+        rows = [row[:] for row in model.rows]
         row = next(row for row in rows if row[0] == "K" and row[1] == "node" and row[3] == key
                    and (key != "bytes" or model.properties["node", int(row[2])]["kind"] == "argument"))
         entry = {"case": name, "mode": "reader-mutation", "original_property": row.copy(),

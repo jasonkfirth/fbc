@@ -22,6 +22,22 @@ normal C toolchain. `--backend gas64` selects native assembly emission on a
 supported host. Repeat `--backend` to select several backends. `--test` selects
 an individual `test_...` method.
 
+The compiler defaults to the self-describing binary transport. Existing row
+mutation fixtures select `-semantic-model-text` explicitly. Run the matching
+producer/consumer transport and incremental-cache checks with:
+
+```sh
+python3 tests/semantic-sidecar/test_binary_transport.py --fbc ./bin/fbc --linter /path/to/fb_linter
+```
+
+This gate compares exact decoded facts, checks native codec rollback and bounds,
+rejects malformed headers, and exercises source/include invalidation and concurrent
+cache reuse, private C-stream ownership and cache lease release after a crash.
+`C:/fblint/test_semantic_io.bas` is also a standalone native storage regression
+for Windows, POSIX and DOS builds. `semantic_binary.read_rows()` streams either transport for dependency
+receipts without retaining a second expanded model. Frozen graph readers must
+include `semantic_binary.py` with their other imported modules.
+
 Use `--toolchain-prefix <SDK>` when the source checkout has no native tools or
 libraries. Source-tree declarations still take precedence through `-i inc`;
 the SDK supplies executable tools and link libraries without another copy.
@@ -58,6 +74,15 @@ and target relationships. The BASIC fixtures own separate responsibilities:
 direct and virtual source call bindings, compact exclusions and unchanged
 emission. Its malformed groups include missing pairs, wrong symbol classes,
 unavailable capabilities, virtual signature mismatches and foreign modules.
+
+`assignment_inputs.py` also checks virtual LET and compound operator selection.
+Assignment tickets and written-operation observations name the statically
+selected source operator, matching the lowered CALL's `static-target` relation.
+The generated dispatch variable is not an operator identity, and this does not
+predict which runtime override executes. Macro tickets retain their selected
+targets even when the older O stream lacks a separate physical operator range.
+The virtual regression covers remapping, same-line assignments, direct-call
+fallback and identical binary/text facts across GCC, Clang and LLVM emission.
 
 `function_result_inputs.py` checks original RETURN and function-name assignment
 inputs and accepted numeric destination types. Enum inputs retain their own
@@ -348,5 +373,21 @@ infer source order, formal arity or external-call behavior. Existing producers
 already export these counts and relationships; no new capability is needed.
 `test_native_call_argument_counts_and_chains` covers zero/fixed/variadic calls,
 defaults, nested calls, 201 arguments and damaged counts or chain ownership.
+
+`redim_construction_inputs.py` checks the exact array-runtime constructor
+selection for source REDIM, runtime declarations, STATIC storage, PRESERVE,
+empty bounds, fields, BYDESC parameters, macros and remapped same-line sites.
+Scalar, destructor-only and generated-field operations are negative controls.
+GCC, Clang and LLVM preserve full/off/compact emission and exact binary/text
+facts. Recounted damage controls check ownership, selection, statement/source,
+macro origins, ordinals and closure, including loss hidden by a reduced count.
+The tests compile these sources without executing their constructors.
+
+`virtual_call_inputs.py` checks virtual selections independently of written
+source bindings. A generated LET CALL still requires its static source target.
+Recounted models damage unbound/bound targets, duplicates, procedure identity,
+node ownership and dispatch kind. The direct CALL control keeps the original
+virtual selection, so an extra static-target relation cannot hide behind an
+unrelated missing relation. No method or override is executed by these tests.
 
 <!-- end of README.md -->

@@ -40,7 +40,7 @@ def main() -> int:
                 if result.returncode:
                     raise AssertionError(f"{target}/{encoding}: {result.stdout}{result.stderr}")
                 model = Model.read(model_path)
-                assert model_path.read_text().splitlines()[0] == "FBCSEM\t27\t1.20.4"
+                assert model.rows[0] == ["FBCSEM", "27", "1.20.4"]
                 expressions = {int(row[1]): row for row in model.records["E"]}
                 receipts = [(identity, props) for (domain, identity), props in model.properties.items()
                             if domain == "expression" and "assignment-kind" in props]

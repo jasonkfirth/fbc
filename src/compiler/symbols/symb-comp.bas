@@ -875,8 +875,8 @@ private function hHasByrefSelfParam _
 		exit function
 	end if
 
-	'' HACK: Allow forward references with the same name
-	'' (but CONSTs must still match)
+	'' Accept compatible forward references when both parameters use the same name.
+	'' CONST parameters still have to match.
 	if( param->typ = typeJoin( dtype, FB_DATATYPE_FWDREF ) ) then
 		assert( param->subtype->class = FB_SYMBCLASS_FWDREF )
 		if( param->subtype->hash.index = subtype->hash.index ) then

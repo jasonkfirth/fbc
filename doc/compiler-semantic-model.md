@@ -8,7 +8,7 @@ This file intentionally does NOT contain independent parsing or linter rules.
 
 # FreeBASIC compiler semantic model
 
-`-semantic-model <file>` writes an opt-in, tab-separated semantic sidecar from
+`-semantic-model <file>` writes an opt-in, self-describing binary sidecar from
 compiler-selected symbols, typed expressions, and procedure ASTs. It enables
 source observation without enabling language debug options or changing
 predefined configuration values such as `__FB_ERR__`. Consumers can compile to
@@ -49,8 +49,9 @@ not serialized and does not make macro-expansion or macro-reference capabilities
 available.
 
 The exporter observes the compiler; it does not resolve names independently.
-This is an invocation artifact, not an incremental workspace index or language
-server. Tooling remains responsible for arguments, project state, and process
+Each artifact describes one compilation context. Tooling can retain that
+context incrementally when the compiler, arguments, source hashes and include
+resolution still match. It remains responsible for project state and process
 lifetime.
 
 ## Completion and transactions
@@ -71,9 +72,150 @@ or recovered regions, withhold overlapping facts, and mark retained facts
 provisional. A full-model reader must reject recovery output. Interrupted
 processes do not write a recovery footer.
 
+## Binary transport version 1
+
+The default transport begins with `FBCSEMB1` and an LF. A bounded ASCII header
+describes the schema, compiler producer, export mode, available capabilities,
+integer encoding and dictionary. Each `record` definition assigns a byte ID to
+a semantic record name and describes its ordered fields and arity. `DATA` and
+an LF terminate the header. The remainder is binary, including the ordinary
+`END` or `RECOVERY` completion record.
+
+`inc/fbc-semantic-elements.bi` is generated from the record table below.
+`inc/fbc-semantic-binary.bi` owns the portable codec. Fblint vendors identical
+copies. Check both copies and the documented definitions with:
+
+```text
+python build_scripts/update-semantic-binary-contract.py --linter-root C:/fblint
+```
+
+Use `--write` when intentionally updating the contract. The integration gate
+rejects a producer/consumer copy mismatch. Transport version and semantic
+schema are separate: this changes how schema-27 facts are represented, while
+preserving their identities, ranges, values, capabilities and completion rules.
+
+Each frame is a four-byte little-endian payload length, followed by a one-byte
+record ID, a one-byte count of fields after the tag, and encoded values. The
+logical `FBCSEM` record is supplied by the header's schema and producer fields.
+No host pointer, native integer layout or structure padding appears on disk.
+Values use canonical unsigned LEB128 tokens. Their low three bits identify the
+encoding; the remaining bits hold the value, length or dictionary ID:
+
+| Low bits | Meaning |
+| --- | --- |
+| 0 | Empty field; the remaining bits must be zero |
+| 1 | Unsigned decimal integer |
+| 2 | Negative decimal integer, stored as its nonzero magnitude |
+| 3 | Previously defined string ID |
+| 4 | Byte length followed by a new string; assigns the next dictionary ID |
+| 5 | Byte length followed by literal bytes without interning |
+| 6 | String token for a prefix ending in `:`, followed by a numeric suffix varint |
+| 7 | Count followed by 2 through 256 encoded components, joined as escaped tabs |
+
+Canonical integers of at most 61 bits use numeric tokens; other spellings
+remain exact strings. Strings retain the schema's byte-safe escapes. Prefix
+tokens keep observation keys such as `type-declaration-spelling:1234` from
+creating a unique dictionary entry for every identity. Dictionary IDs begin
+at one and follow encounter order. Forward references, malformed varints,
+truncated frames and bytes following the completion record are invalid.
+Structured values preserve nested observation receipts without repeating long
+textual tuples for each source identity. They cannot nest and require the
+`structured-values` version-one capability.
+
+The writer stages compact bytes directly. Its dictionary rolls back with
+discarded modules and replaced adjacent expression facts. It interns at most
+262,144 strings and 64 MiB of string bytes, then uses literal tokens. Native
+readers retain the compact record pool and dictionary and index field offsets;
+they do not expand an entire model into a second TSV allocation. The native
+wire limit remains 1.75 GiB, with a 64 KiB header and 64 MiB per-frame ceiling.
+
+Header `cap` entries name a capability, version and required flag. Unsupported
+required capabilities fail explicitly; unknown optional ones can be ignored.
+All six metadata fields are required and nonempty. The export mode is `full`,
+`bindings` or `expressions`; a reduced mode cannot satisfy a full-model request.
+Header bytes are ASCII, and capability versions are positive canonical decimals.
+Full fblint analysis requires `core`, `source-revisions`, `native-types` and
+`control-flow`, all at version one. Module `CAP` records continue to describe
+the individual semantic observations available to rules. Recovery and reduced
+models cannot satisfy the complete-model gate.
+
+`-semantic-model-text` selects the diagnostic TSV transport. It can accompany
+any export mode and preserves the same logical records. It is useful for
+inspection, mutation fixtures and exact binary/text comparisons.
+
+## Incremental fblint use
+
+Fblint keeps compiler artifacts under the semantic compiler's adjacent
+`.semantic-cache/fblint-v2` directory. `--semantic-cache <directory>` selects
+another parent directory when needed. An ownership marker and process lock
+protect the cache; publication commits its manifest after checked artifact
+writes. Cache failures fall back to ordinary compilation.
+Compiler workers own private C stdio streams for cache I/O and streaming SHA-256,
+so they do not compete with the main thread for FreeBASIC file-number slots.
+Cache publication takes a nonblocking CRT/POSIX byte-range lock. A process-local
+gate prevents competing threads from closing a POSIX process-scoped lock; the
+host releases the lease if its owner exits. Unavailable locks cause cache misses.
+Eviction removes each enumeration anchor last, preserving bounded cleanup after
+an interrupted deletion.
+
+The storage and semantic-launch paths support native Windows, Linux, Haiku and
+DOS builds. POSIX arguments use shell quoting; DOS uses FBC response files rather
+than a long command tail. Private output directories are reserved with atomic
+`MKDIR` and retained through cleanup. Native POSIX and DOS requests retain the
+compiler's architecture unless `--compiler-target` overrides it. DOS uses 8.3 temporary and
+cache names under `semcache/fblint2`; manifests retain the complete request hash,
+so a shortened filename collision cannot authorize a different cached request.
+
+Compiler artifacts are keyed by compiler SHA-256, the complete normalized
+request, working directory and environment. Reuse verifies every compiler
+`FILE` SHA-256 and rechecks `INC` search outcomes. A changed root rebuilds that
+root; a changed include rebuilds its dependent roots. Preserved timestamps do
+not hide changes, and a newly introduced include that shadows an earlier
+resolution invalidates reuse. Header facts belong to the compilation context
+that produced them, since defines, target and earlier declarations can change
+their meaning.
+
+Accepted independent roots also retain final lint findings. Their keys include
+the linter's own SHA-256, configuration, all command arguments, the complete
+project-index metadata used by cross-file rules and the preceding publication
+state. Unchanged roots replay their findings after source and include checks.
+Source hashing and include-search probes are deduplicated across roots: each
+distinct reused revision is hashed once on first use and once at completion.
+Their bounded audit tables retain unique inputs rather than copying the SDK
+dependency manifest for every root. `semantic_cache_source_hashes` counts this
+source-audit work separately from compiler and artifact hashes.
+
+A final audit verifies reused inputs again. Shared-root/bundle analysis keeps
+its validated in-process replay path. Source repair, linking, stdin, failed
+analysis and incomplete fact retention do not reuse persisted lint findings.
+
+Models that expand date, time or command-line predefined macros report the
+`cache-stable-inputs` capability as unavailable and bypass persistent reuse.
+Generated module basenames remain stable inside private temporary directories,
+so compiler-generated aliases do not acquire an identity from a random filename.
+
+Compiler artifacts retain at most 512 MiB in total and 256 MiB per entry.
+Finding entries retain at most 64 MiB in total, with 4 MiB limits on each data
+file and dependency manifest. Both caches cap entry counts and evict only their
+owned files. Interrupted or corrupt entries are cache misses. `--no-semantic-cache`
+disables both persistent caches; `--no-semantic-result-cache` retains compiler
+artifact reuse while rerunning analysis. `--timings` reports cache hits, stores
+and actual compiler launches separately.
+
+Run the producer/consumer gate with:
+
+```text
+python tests/semantic-sidecar/test_binary_transport.py --fbc bin/fbc.exe --linter C:/fblint/fb_linter.exe --receipt build/semantic-binary-results.json
+```
+
+It checks all export modes, identical logical facts, native malformed-input
+rejection, content-hash invalidation, include shadowing, cache corruption,
+project-index changes and ordered finding replay.
+
 ## Schema version 27
 
-Fields are separated by tabs. The wire representation is ASCII. A percent sign,
+The table describes the logical fields. In diagnostic text output, fields are
+separated by tabs and the wire representation is ASCII. A percent sign,
 every byte below 32, and every byte at or above 127 is encoded as `%HH`, using
 two uppercase hexadecimal digits. Printable ASCII otherwise remains literal.
 This preserves compiler strings, accepted legacy source bytes, and filesystem
@@ -434,10 +576,19 @@ pointer binds its written variable, not an invented concrete callee.
 
 `I` kinds are `default-constructor`, `initializer-constructor`, `new-constructor`,
 `destructor-call`, `argument-constructor`, `temporary-destructor`,
-`scope-exit-destructor`, `delete-destructor`, and `return-constructor`.
+`scope-exit-destructor`, `delete-destructor`, `return-constructor`, and
+`redim-constructor` (schema 27).
 They identify exact compiler-selected UDT procedures, not written callee tokens.
 Their opaque `sig2` signature uses explicit formal mode, optional flag, array
 rank, data type, and subtype identity, excluding the implicit instance parameter.
+
+A CALL with `call-kind=virtual` always has one `static-target` relation to the
+selected source procedure in the same module. Its raw N symbol describes the
+dispatch signature and must not replace that source identity. The relation is
+required even for generated operator CALLs without a written source binding.
+Relations on nonvirtual/non-CALL nodes, duplicate selections and nonprocedure
+targets are contradictory facts. The selected source method does not prove
+which override will execute at runtime.
 
 Default/initializer/destructor selections are anchored to variable, field, or
 optional parameter declarations. NEW is anchored to its written type. Argument
@@ -460,12 +611,16 @@ family is available for each module.
 
 For an implicit constructor, the property is named
 `construction-observation:<ordinal>` and is attached to the compiler-selected
-owner symbol. Its tab-delimited value contains the selected procedure symbol
+owner symbol. Its logical value contains the selected procedure symbol
 ID, owning UDT symbol ID, constructor kind, statement ID, source-context ID, and
 macro identity (zero when none is recorded). The module closure is a
 `construction-observation-count:<module>` property whose value is the number
 of observations. Ordinals start at one and must form a complete sequence up to
-that count.
+that count. In the default `FBCSEMB1` transport, the value is encoded
+as a tuple in the existing `K` record. The shared codec reconstructs its
+tab-delimited logical value; `-semantic-model-text` exposes the same facts
+as escaped TSV for inspection. Consumers must decode the transport before
+validating property components.
 
 For a written `TYPE(...)`-style temporary construction, the property is named
 `temporary-construction:<ordinal>` and is attached to the result UDT. Its value
@@ -481,6 +636,27 @@ range for source navigation or edit locations, and use the counted properties
 to compare compiler-selected construction behavior across validation passes.
 Consumers must reject duplicate, provisional, malformed, or incomplete
 observation sets and must not infer source locations from statement IDs.
+
+The `redim-constructor-selections` capability advertises REDIM coverage only
+in full mode. Older producers can advertise `implicit-construction-inputs`
+without this extension; consumers must require the new capability before
+treating the absence of REDIM observations as meaningful.
+
+REDIM construction records the constructor actually selected by the array
+runtime lowering helper, after a source REDIM tree is successfully built. The
+same selection applies to runtime-bounded declarations, local STATIC arrays,
+REDIM PRESERVE, fields and BYDESC parameters. Generated dynamic-field setup
+does not invent an additional written REDIM. Scalar and destructor-only
+elements have no constructor selection. This is a selected callback, not proof
+that allocation succeeds or that any element is constructed: conditional and
+empty-bound operations retain their selection.
+
+With `implicit-construction-inputs`, each REDIM also has a
+`construction-observation:<ordinal>` property containing the selected procedure,
+element type, kind, statement, source context and optional macro invocation.
+The statement and source context must be nonzero and agree. Module closure
+counts, native identities and retained `I`/macro selections validate completeness.
+Compact modes mark this capability unavailable and omit these observations.
 
 All source ranges use one-based lines and zero-based UTF-16 columns, with an
 exclusive end. A physical flag of 1 is required before editor projection.
@@ -740,9 +916,12 @@ includes are not dependencies. At 5,000 paths, dependency completeness becomes
 zero; consumers validating source-backed facts must not treat omissions as
 unrelated files. Root modules remain M records only when their stage commits.
 
-Each module buffer is limited to 512 MiB, symbols to one million per module,
-nodes/expressions/bindings/implicit calls to one million per model, and details
-to 16 million per model. Allocation or record/buffer exhaustion invalidates the
+Each module buffer is limited to 1.75 GiB, symbols to one million per module,
+model-wide symbol identity IDs to 4,718,592 per model, nodes to 4,718,592 per
+model, expressions/bindings/implicit calls to one million per model, and details
+to 83,886,080 per model. The strict linter and independent reader default to a
+1.75 GiB complete-sidecar ceiling, separate from the per-module staging limit.
+Allocation or record/buffer exhaustion invalidates the
 model instead of writing END. Call signatures and literal unit counts also have
 bounds. Dependency exhaustion alone writes the explicit incomplete-list flag.
 Compiler modules are serial and exporter state is process-local, not thread-safe.
@@ -983,6 +1162,9 @@ representation. A primitive non-pointer is not a valid list operand.
 `Cva_Arg` remains a typed value expression. The GCC backend represents
 statement-only `Cva_Start`, `Cva_Copy`, and `Cva_End` nodes with AST class 44,
 raw operator -1, invalid data type 2147483648, and an empty source type spelling.
+Raw datatype fields use unsigned 32-bit decimal values on every compiler host.
+The producer converts through an unsigned 32-bit value before widening for
+formatting, so 32-bit hosts preserve the invalid-type sentinel as 2147483648.
 A reader may accept that empty spelling only when the same module advertises
 the capability and a matching, well-formed runtime-macro EX record exists.
 Other missing expression type spellings remain malformed. Backends that retain
@@ -1242,7 +1424,7 @@ ordinary or compound assignments:
 
 The count follows `STE` and all of that statement's input properties. Ordinals
 are contiguous from one; zero-input statements have no input properties. The
-compiler bounds each count at 2,097,152. Readers bound their own work and
+compiler bounds each count at 4,718,592. Readers bound their own work and
 storage by the actual row inventory rather than allocating from that count.
 
 The operator token has `LOC statement statement-ID assignment-operator:ordinal`
@@ -2308,7 +2490,7 @@ a different signature, or an unmatched named header cannot use this exception.
 Compact models mark this capability unavailable and omit these properties.
 Older full models remain valid but cannot establish callback explicitness.
 The existing parser thread owns the module counter, reset at module start
-and bounded by the 16000000-detail limit. These facts retain no native symbol
+and bounded by the 83886080-detail limit. These facts retain no native symbol
 pointers or AST ownership and do not change calling-convention selection.
 
 ## Ordered aggregate source fields
@@ -2791,6 +2973,52 @@ Spelling consumers must refuse incomplete content when their proposition
 requires the entire literal. All observations and this capability are absent
 or unavailable in compact modes. Preprocessor raw strings and QB raw DATA
 are not ordinary parser string inputs; named constant uses are not new tokens.
+
+## Selected member reference roles
+
+Full models with macro provenance advertise `selected-member-roles=available`.
+Binding-only, expression-only and macro-compact modes advertise it as
+unavailable and omit these observations. An older producer without the
+capability makes no coverage claim.
+
+The selected FIELD symbol owns each immutable K observation:
+
+| Property | Payload |
+| --- | --- |
+| `selected-member-binding-<B ordinal>` | role, receiver S identity |
+| `selected-member-reference-<reference identity>` | role, receiver S identity, MI invocation identity |
+| `selected-member-count:<module identity>` on the module global namespace | total observed FIELD references, including zero |
+
+Payload components are separated by escaped tabs within the single K value.
+The binding form identifies the exact existing B reference. The macro form
+identifies the exact existing `MR symbol <FIELD> <MI> reference-<identity>`
+record when the lexer cannot supply a real binding extent. Neither form
+creates an editable source location or replaces existing LOC/MR provenance.
+
+`expression` identifies the object member grammar and `type` identifies the
+type-member grammar used by queries such as `SizeOf(Overlay.member)`.
+Their receiver is the actual aggregate used for member lookup, which need
+not equal the field's declaring owner in anonymous or inherited aggregates.
+`symbol` identifies a resolved field reference outside those grammars, such
+as an assembler field offset, and has receiver zero. These roles do not claim
+that a read executes, that a union field is active, or that storage is valid.
+Unevaluated object expressions retain role `expression`.
+
+Each selection is observed before member-chain lowering. Intermediate members
+remain distinct even when only the final field survives in the AST. Repeated
+uses of one field inside a macro retain separate reference observations,
+including when one use is a type query and another is an object expression.
+FreeBASIC's builtin OffsetOf expands a macro expression; its selected fields
+therefore have expression role. A policy needing that distinction can join
+the existing selected macro definition and symbol origin. A source macro with
+the same name has a separate definition identity and source origin.
+
+Readers verify same-module FIELD/aggregate identities, exact B/MR associations,
+canonical bounded identities, immutable observations and the independent
+module count. Every retained FIELD reference must have an observation when
+the capability is available. Missing metadata is not an implicit expression
+role. The compiler fails the transaction at its member-count limit; the
+observation retains no AST pointers and does not change program emission.
 
 <!-- end of compiler-semantic-model.md -->
 

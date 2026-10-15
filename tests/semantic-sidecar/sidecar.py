@@ -17,10 +17,13 @@ import re
 import stat
 import subprocess
 import sys
+from semantic_binary import decode as decode_binary
 from semantic_flow import validate_flow, validate_sequence_branches
 from semantic_array_storage import validate_array_storage_inputs
 from semantic_literals import validate_wide_literals
 from semantic_queries import validate_query_inputs
+from semantic_member_selections import validate_member_selections
+from semantic_source_memory import validate_source_memory
 from semantic_selects import validate_select_inputs
 from semantic_declarations import validate_declaration_types
 from semantic_procedures import validate_procedure_types
@@ -55,7 +58,8 @@ SCHEMA = "27"
 class ReaderLimits:
     """Resource limits for untrusted semantic-model and source input."""
 
-    max_sidecar_bytes: int = 512 * 1024 * 1024
+    # Match the linter's bounded schema-27 whole-model ceiling.
+    max_sidecar_bytes: int = 1024 * 1024 * 1024
     max_record_bytes: int = 64 * 1024 * 1024
     max_records: int = 24_000_000
     max_source_bytes: int = 512 * 1024 * 1024
@@ -152,6 +156,7 @@ IMPLICIT_KINDS = frozenset((
     "default-constructor", "initializer-constructor", "new-constructor",
     "destructor-call", "argument-constructor", "temporary-destructor",
     "scope-exit-destructor", "delete-destructor", "return-constructor",
+    "redim-constructor",
 ))
 NODE_KINDS = (
     "nop", "load", "assignment", "binary-operator", "unary-operator", "conversion",
@@ -659,6 +664,10 @@ class Model:
                         raise ValueError("Unknown constant value kind")
                     self.constants[key] = row[3], row[4]
                 elif tag == "K":
+                    if row[3].startswith("selected-member-"):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Duplicate or foreign selected member observation")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
                     if row[3].startswith(("parsed-operand-count:", "parsed-expression-inputs:", "parsed-iif-count:")):
                         if row[1] != "symbol" or row[3] in self.properties[key]:
                             raise ValueError("Parsed expression coverage receipt is repeated or has the wrong domain")
@@ -1497,6 +1506,8 @@ class Model:
                     raise ValueError("Storage receipt belongs to another module")
             self.validate_storage_receipts(subject_modules)
             validate_query_inputs(self, number, subject_modules)
+            validate_member_selections(self, number, subject_modules)
+            validate_source_memory(self, number, subject_modules)
             validate_select_inputs(self, number, subject_modules)
             procedure_headers = validate_procedure_types(self, number, subject_modules)
             validate_declaration_types(self, number, subject_modules, procedure_headers)
@@ -2338,9 +2349,22 @@ class Model:
         for row in self.records["H"]:
             if row[1] == "node" and row[3] == "symbol" and row[5] == "static-target":
                 node_id = int(row[2])
-                if node_id in static_targets:
-                    raise ValueError("Repeated static call target")
+                node = self.nodes.get(node_id)
+                target_id = int(row[4])
+                target = self.symbols.get(target_id)
+                if (node_id in static_targets or node is None or node[4] != "9"
+                        or self.properties["node", node_id].get("call-kind") != "virtual"
+                        or target is None or target[3] != "3"
+                        or subject_modules.get(("node", node_id)) != subject_modules.get(("symbol", target_id))):
+                    raise ValueError("Invalid or repeated virtual static call target")
                 static_targets[node_id] = row[4]
+        # The exporter defines virtual dispatch by this selection, even for
+        # operator CALLs that have no written source-binding row. Absence must
+        # not silently turn a known source procedure into an unknown edge.
+        for node_id in self.nodes:
+            if (self.properties["node", node_id].get("call-kind") == "virtual"
+                    and node_id not in static_targets):
+                raise ValueError("Virtual call lacks its selected static target")
         for row in self.records["H"]:
             if row[1] != "node" or row[3] != "binding" or row[5] != "source-binding":
                 continue
@@ -2959,7 +2983,10 @@ class Model:
         if len(data) != metadata.st_size:
             raise ValueError("Semantic sidecar changed while it was being read")
         try:
-            text = data.decode("ascii")
+            mode = "expressions" if options.get("expressions_only") else "bindings" if options.get("bindings_only") else "full"
+            text = decode_binary(data, expected_mode=mode, max_record_bytes=limits.max_record_bytes,
+                                 max_records=limits.max_records,
+                                 max_output_bytes=limits.max_sidecar_bytes).decode("ascii")
         except UnicodeDecodeError as error:
             raise ValueError("Semantic sidecar wire data is not ASCII") from error
         return cls(text, limits=limits, **options)

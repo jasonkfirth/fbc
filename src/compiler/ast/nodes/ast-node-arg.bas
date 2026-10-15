@@ -123,8 +123,8 @@ private function hAllocTempWstrPtr _
 	symbSetIsTemporary( temp )
 	astDtorListAdd( temp )
 
-	'' evil hack: a function returning a "wstring" is actually returning a pointer,
-	'' but NewAssign() shouldn't copy the string, just the pointer
+	'' A function returning a "wstring" uses a pointer as its AST result here.
+	'' NewAssign() must copy the pointer without copying the string.
 	astSetType( n, typeAddrOf( FB_DATATYPE_WCHAR ), NULL )
 
 	'' temp string = src string
@@ -701,7 +701,7 @@ private sub hUDTPassByval _
 	)
 
 	dim as FBSYMBOL ptr tmp = any
-	dim as ASTNODE ptr t = any, callexpr = any
+	dim as ASTNODE ptr t = any
 	dim as integer is_ctorcall = any
 
 	t = astSkipNoConvCAST( n->l )

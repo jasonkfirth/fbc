@@ -1411,7 +1411,8 @@ declare function rtlArrayRedim _
 		byval dimensions as integer, _
 		exprTB() as ASTNODE ptr, _
 		byval dopreserve as integer, _
-		byval doclear as integer _
+		byval doclear as integer, _
+		byval selected_ctor as FBSYMBOL ptr ptr = NULL _
 	) as ASTNODE ptr
 
 declare function rtlArrayRedimTo _

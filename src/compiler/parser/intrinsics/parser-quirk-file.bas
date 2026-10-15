@@ -289,7 +289,6 @@ function cLineInputStmt _
 
 	dim as ASTNODE ptr filestrexpr = NULL, dstexpr = NULL, maxlenexpr = NULL
 	dim as integer isfile = FALSE, addnewline = FALSE, issep = FALSE, addquestion = FALSE
-	dim as integer dtype = any
 	dim as integer semantic_result = FALSE
 
 	function = FALSE
@@ -958,7 +957,7 @@ private function hFileOpen _
 
 	dim as ASTNODE ptr filenum, filename, fmode, faccess, flock, flen, fencoding
 	dim as integer short_form
-	dim as integer file_mode, access_mode, lock_mode, record_len
+	dim as integer file_mode, access_mode, lock_mode
 	dim as FBOPENKIND open_kind
 
 	function = NULL

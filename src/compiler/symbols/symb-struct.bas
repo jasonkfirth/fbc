@@ -337,6 +337,7 @@ function symbCheckBitField _
 
 	case FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT
 		'' Allow 64bit bitfields on 64bit
+		'' FB-LINTER: DISABLE-NEXT-LINE FBL006 REASON: 32-bit targets need dedicated lowering before this support can be enabled
 		'' TODO: Support 64-bit bitfield access on 32-bit targets.
 		'' 64bit bitfields remain unsupported on 32bit because bitfield
 		'' accesses are based on the default word size.

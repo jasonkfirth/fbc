@@ -320,7 +320,7 @@ end function
 
 private function hCallDtorList( byval ptrexpr as ASTNODE ptr ) as ASTNODE ptr
 	dim as FBSYMBOL ptr cnt = any, label = any, exitlabel = any, iter = any, elmts = any
-	dim as ASTNODE ptr tree = any, expr = any
+	dim as ASTNODE ptr tree = any
 
 	cnt = symbAddTempVar( FB_DATATYPE_INTEGER )
 	label = symbAddLabel( NULL )

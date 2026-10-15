@@ -16,6 +16,7 @@ declare sub fbSemanticModelOpenSource _
 	  byval directive as LEX_LOCATION ptr = NULL )
 declare sub fbSemanticModelCloseSource( byval depth as integer )
 declare function fbSemanticModelCurrentSource( ) as longint
+declare function fbSemanticModelSourcePath( byval identity as longint ) as string
 declare function fbSemanticModelSourceHandle( byval identity as longint, byref format as integer ) as integer
 declare sub fbSemanticModelIncludeOutcome _
 	( byref requested as const string, byref resolved as const string, _

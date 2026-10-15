@@ -630,7 +630,8 @@ function rtlArrayRedim _
 		byval dimensions as integer, _
 		exprTB() as ASTNODE ptr, _
 		byval dopreserve as integer, _
-		byval doclear as integer _
+		byval doclear as integer, _
+		byval selected_ctor as FBSYMBOL ptr ptr _
 	) as ASTNODE ptr
 
 	'' no const filtering needed... dynamic arrays can't be const
@@ -640,6 +641,10 @@ function rtlArrayRedim _
 	dim as FBSYMBOL ptr ctor = any, dtor = any
 	dim as integer dtype = any
 	dim as longint elementlen = any
+
+	'' Only the source parser requests this selection. Generated field setup
+	'' uses the default NULL output and must not invent another source REDIM.
+	if( selected_ctor <> NULL ) then *selected_ctor = NULL
 
 	sym = astGetSymbol( arrayexpr )
 	dtype = symbGetFullType( sym )
@@ -749,7 +754,11 @@ function rtlArrayRedim _
 		end if
 	next
 
-	function = rtlErrorCheck( proc )
+	dim as ASTNODE ptr result = rtlErrorCheck( proc )
+	if( (result <> NULL) and (selected_ctor <> NULL) ) then
+		*selected_ctor = ctor
+	end if
+	function = result
 end function
 
 function rtlArrayRedimTo _
