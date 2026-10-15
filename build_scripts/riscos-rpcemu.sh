@@ -199,7 +199,13 @@ download_verified() {
 
     if [ ! -f "$destination" ]; then
         TEMP_DOWNLOAD="$(mktemp "$WORK_DIR/.download.XXXXXX")"
-        curl -fL "$url" -o "$TEMP_DOWNLOAD"
+        # The archive hosts can reset a TLS connection before sending data.
+        # Retry this repeatable GET, keeping partial data in the temporary
+        # file until the pinned checksum permits publication to the cache.
+        printf '==> Downloading %s\n' "${destination##*/}"
+        curl -fL --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 20 --max-time 600 \
+            "$url" -o "$TEMP_DOWNLOAD"
         printf '%s  %s\n' "$expected_sha256" "$TEMP_DOWNLOAD" |
             sha256sum -c -
         mv "$TEMP_DOWNLOAD" "$destination"
