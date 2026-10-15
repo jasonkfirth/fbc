@@ -321,13 +321,40 @@ jobs:
       - name: Seed host bootstrap sources
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
 
+      - name: Restore pinned RISC OS input archives
+        id: riscos_inputs
+        uses: actions/cache/restore@v5
+        continue-on-error: true
+        with:
+          # Only immutable download inputs are cached. The helper verifies
+          # every restored archive against its pinned SHA-256 before use.
+          key: riscos-rpcemu-inputs-${{ hashFiles('build_scripts/riscos-rpcemu.sh') }}
+          path: |
+            out/riscos/rpcemu/rpcemu-*.tar.gz
+            out/riscos/rpcemu/riscos-open-iomd-*.zip
+            out/riscos/rpcemu/riscos-open-harddisc4-*.zip
+
       - name: Build RISC OS toolchains, FreeBASIC, and RPCEmu
+        id: riscos_build
         run: |
           set -euo pipefail
           mkdir -p out/riscos
           bash build_scripts/debianubuntu-build-freebasic-riscos.sh \
             --no-package \
             --jobs "$JOBS" 2>&1 | tee out/riscos/build-riscos.log
+
+      - name: Cache verified RISC OS input archives
+        if: steps.riscos_build.outcome == 'success' && steps.riscos_inputs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          # Save before the runtime tests so a later test failure does not
+          # discard successfully authenticated inputs needed by the next run.
+          key: riscos-rpcemu-inputs-${{ hashFiles('build_scripts/riscos-rpcemu.sh') }}
+          path: |
+            out/riscos/rpcemu/rpcemu-*.tar.gz
+            out/riscos/rpcemu/riscos-open-iomd-*.zip
+            out/riscos/rpcemu/riscos-open-harddisc4-*.zip
 
       - name: Show RISC OS build failure evidence
         if: failure()
