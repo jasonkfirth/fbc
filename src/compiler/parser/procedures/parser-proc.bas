@@ -1873,6 +1873,10 @@ function cProcHeader _
 	dim as integer diagnostic_header_valid, diagnostic_new_header
 	dim as LEX_LOCATION declaration_site = lexGetCurrentLocation( )
 	if( declaration_start <> NULL ) then declaration_site = *declaration_start
+	'' Special members have a header keyword instead of an identifier. Keep
+	'' that original token for ABI provenance without exporting an invented
+	'' identifier binding or replacing the named-procedure diagnostic site.
+	dim as LEX_LOCATION semantic_abi_site = declaration_site
 	dim as longint declaration_nonphysical = lexGetNonphysicalTokenCount( )
 
 	is_nested = FALSE
@@ -1893,6 +1897,7 @@ function cProcHeader _
 
 	if( (tk = FB_TK_SUB) or (tk = FB_TK_FUNCTION) or (tk = FB_TK_PROPERTY) ) then
 		semantic_site = lexGetCurrentLocation( )
+		semantic_abi_site = semantic_site
 		diagnostic_site = semantic_site
 		'' A generated name has no physical identifier range. A written header
 		'' still has a real declaration-start token suitable for a diagnostic.
@@ -1987,7 +1992,7 @@ function cProcHeader _
 				(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 			fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-prototype", id)
 			fbSemanticModelProcedureTyping(proc, tk, "prototype", semantic_result_form)
-			fbSemanticModelProcedureAbiInput(proc, "prototype", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site, _
+			fbSemanticModelProcedureAbiInput(proc, "prototype", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_abi_site, _
 				semantic_written_convention, semantic_dynamic_string, tk, id)
 		end if
 		return proc
@@ -2248,7 +2253,7 @@ function cProcHeader _
 			(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 		fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-definition", id)
 		fbSemanticModelProcedureTyping(proc, tk, "definition", semantic_result_form)
-		fbSemanticModelProcedureAbiInput(proc, "definition", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_site, _
+		fbSemanticModelProcedureAbiInput(proc, "definition", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_abi_site, _
 			semantic_written_convention, semantic_dynamic_string, tk, id)
 	end if
 

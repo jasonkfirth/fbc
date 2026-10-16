@@ -88,7 +88,12 @@ def check_inputs(test):
 def check_rejection(test):
     _, path = test.invoke([test.fixture("macro-calls.bas")])
     model = Model.read(path)
-    base = [row[:] for row in model.rows]
+    # write_rows consumes wire fields. Decoded TAB payloads would otherwise
+    # damage unrelated records and conceal whether the intended check fired.
+    base = [line.split('\t') for line in path.read_text(encoding='ascii').splitlines()]
+    roundtrip = test.working / 'macro-call-roundtrip.fbcsem'
+    write_rows(roundtrip, [row[:] for row in base])
+    test.assertEqual(Model.read(roundtrip).rows, model.rows)
     for mutation in MUTATIONS:
         with test.subTest(mutation=mutation):
             rows = damaged_rows(base, mutation)
@@ -107,13 +112,52 @@ def check_modules(test):
     model.validate_physical_locations()
     counts = {row[3][len(COUNT):]: row[4] for row in model.records["K"] if row[3].startswith(COUNT)}
     test.assertEqual(counts, {"1": "4", "2": "1"})
-    rows = [row[:] for row in model.rows]
+    rows = [line.split('\t') for line in path.read_text(encoding='ascii').splitlines()]
     closure = next(row for row in rows if row[0] == "K" and row[3] == COUNT + "2")
     closure[3] = COUNT + "1"
     damaged = test.working / "foreign-macro-closure.fbcsem"
     write_rows(damaged, rows)
     with test.assertRaises(ValueError):
         Model.read(damaged).validate_physical_locations()
+
+
+def check_runtime_inputs(test):
+    source = test.fixture("runtime-macro-calls.bas")
+    for backend in test.backends:
+        with test.subTest(backend=backend):
+            output = test.emission_path(source.stem, backend)
+            extra = ("-eassert", "-o", str(output))
+            test.invoke([source], mode="off", backend=backend, extra=extra)
+            plain = output.read_bytes()
+            _, path = test.invoke([source], backend=backend, extra=extra)
+            model = Model.read(path)
+            model.validate_physical_locations()
+            links = [row for row in model.records["K"] if row[3] == LINK]
+            test.assertEqual(len(links), 3)
+            for row in links:
+                node = int(row[2])
+                test.assertEqual(model.properties["node", node]["call-kind"], "runtime")
+                test.assertEqual(model.types[int(model.nodes[node][9])][18], "runtime")
+            test.assertEqual(output.read_bytes(), plain)
+            rows = [line.split('\t') for line in path.read_text(encoding='ascii').splitlines()]
+            selected = links[0][2]
+            target = model.nodes[int(selected)][9]
+            for mutation in ("indirect", "source-target", "missing-reference"):
+                damaged = [row[:] for row in rows]
+                if mutation == "indirect":
+                    next(row for row in damaged if row[:4] == ["K", "node", selected, "call-kind"])[4] = "indirect"
+                elif mutation == "source-target":
+                    for row in damaged:
+                        if row[:2] == ["T", target]:
+                            row[18] = "source"
+                else:
+                    reference = links[0][4]
+                    damaged = [row for row in damaged if not
+                               (row[0] == "MR" and row[1] == "symbol" and row[4] == "reference-" + reference)]
+                destination = test.working / ("runtime-call-" + mutation + ".fbcsem")
+                write_rows(destination, damaged)
+                with test.assertRaises(ValueError):
+                    Model.read(destination).validate_physical_locations()
 
 
 # end of macro_call_inputs.py

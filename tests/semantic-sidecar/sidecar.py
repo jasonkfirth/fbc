@@ -118,6 +118,7 @@ MAX_COORDINATE_LINE_BYTES = 16 * 1024 * 1024
 
 from semantic_comments import validate_comments
 from semantic_variable_names import validate_variable_names
+from semantic_primitive_types import validate_primitive_types
 from semantic_for_entry import validate_for_entry
 
 SHAPES = {
@@ -666,6 +667,9 @@ class Model:
                         raise ValueError("Unknown constant value kind")
                     self.constants[key] = row[3], row[4]
                 elif tag == "K":
+                    if row[3].startswith(("primitive-type-input:", "accepted-primitive-type-count:")):
+                        if row[3] in self.properties[key]:
+                            raise ValueError("Duplicate immutable primitive type observation")
                     if row[3].startswith("source-call-macro-"):
                         if row[3] in self.properties[key]:
                             raise ValueError("Duplicate immutable macro call observation")
@@ -1514,6 +1518,7 @@ class Model:
             validate_member_selections(self, number, subject_modules)
             validate_nonfield_members(self, number, subject_modules)
             validate_macro_calls(self, number, subject_modules)
+            validate_primitive_types(self, number, subject_modules)
             validate_source_memory(self, number, subject_modules)
             validate_select_inputs(self, number, subject_modules)
             procedure_headers = validate_procedure_types(self, number, subject_modules)

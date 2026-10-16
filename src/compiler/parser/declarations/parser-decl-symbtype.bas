@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-primitive-types.bi"
 
 declare function fbSemanticModelExpressionCheckpoint( ) as longint
 declare sub fbSemanticModelUnevaluatedQuery(byval checkpoint as longint, byref query_kind as const string)
@@ -770,6 +771,8 @@ function cSymbolType _
 	) as integer
 
 	dim as integer isunsigned = any, isfunction = any
+	dim as integer semantic_primitive_token = 0
+	dim as LEX_LOCATION semantic_primitive_site
 
 	function = FALSE
 
@@ -810,6 +813,11 @@ function cSymbolType _
 
 		'' UNSIGNED?
 		isunsigned = hMatch( FB_TK_UNSIGNED, LEXCHECK_POST_SUFFIX )
+
+		'' Keep the actual base token before pointer/length modifiers.
+		'' Named types and callback containers are filtered by the observer.
+		semantic_primitive_token = lexGetToken( )
+		semantic_primitive_site = lexGetCurrentLocation( )
 
 		''
 		select case as const lexGetToken( )
@@ -1093,6 +1101,7 @@ function cSymbolType _
 		end if
 	end if
 
+	fbSemanticModelPrimitiveType(dtype, semantic_primitive_token, semantic_primitive_site)
 	function = TRUE
 
 end function

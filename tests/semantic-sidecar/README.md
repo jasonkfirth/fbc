@@ -32,7 +32,10 @@ python3 tests/semantic-sidecar/test_binary_transport.py --fbc ./bin/fbc --linter
 
 `macro_call_inputs.py` checks `source-call-macro-references` (capability 118).
 Full models with macro provenance retain the exact original `MR` reference
-identity on surviving direct and virtual CALL nodes. The immutable node
+identity on surviving direct, virtual and source-selected runtime CALL nodes.
+Enabled `ASSERT` and `ASSERTWARN` macros select runtime procedures through the
+ordinary source-call parser. Runtime links also require a runtime-origin target;
+generated helpers without an original MR reference remain unlinked. The immutable node
 property `source-call-macro-reference` selects that reference; the selected
 procedure must agree with the call target and its original macro invocation.
 Physical calls continue to use their `H` source-binding relation. These are

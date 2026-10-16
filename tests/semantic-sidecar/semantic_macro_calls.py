@@ -62,7 +62,7 @@ def validate_macro_calls(model, number, subject_modules):
             raise ValueError("Unknown macro call observation")
         node = model.nodes.get(owner)
         kind = model.properties["node", owner].get("call-kind")
-        if node is None or node[4] != "9" or kind not in ("direct", "virtual") or owner in physical:
+        if node is None or node[4] != "9" or kind not in ("direct", "virtual", "runtime") or owner in physical:
             raise ValueError("Macro call link is not an unambiguous selected call")
         reference = decimal(row[4], 1)
         target = static.get(owner, 0) if kind == "virtual" else decimal(node[9], 1)
@@ -71,6 +71,12 @@ def validate_macro_calls(model, number, subject_modules):
         if (symbol is None or symbol[3] != "3" or origin is None or origin[0] != target
                 or subject_modules.get(("symbol", target)) != module):
             raise ValueError("Macro call reference disagrees with the selected procedure")
+        # ASSERT selects an RTL procedure through the source-call parser.
+        # Keep its exact origin; generated helpers without MR remain unlinked.
+        if kind == "runtime":
+            target_type = model.types.get(target)
+            if target_type is None or target_type[18] != "runtime":
+                raise ValueError("Macro runtime call does not select a runtime procedure")
         invocation = model.macro_invocations.get(origin[1])
         if (invocation is None or model.source_contexts[int(invocation[4])][4] != str(module)):
             raise ValueError("Macro call reference lacks its original module origin")

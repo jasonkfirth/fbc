@@ -70,6 +70,7 @@
 #include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-comments.bi"
 #include once "tooling/semantic-variable-names.bi"
+#include once "tooling/semantic-primitive-types.bi"
 #include once "tooling/semantic-member-names.bi"
 #include once "fbc-semantic-binary.bi"
 
@@ -3675,6 +3676,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelResetCoordinates( )
 	fbSemanticModelResetComments( )
 	fbSemanticModelResetVariableNames( )
+	fbSemanticModelResetPrimitiveTypes( )
 	fbSemanticModelResetMemberNames( )
 	fbSemanticModelResetConstructs( )
 	fbSemanticModelResetExpressions( )
@@ -3723,7 +3725,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 118
+	for capability as integer = 0 to 119
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -3843,6 +3845,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 116: feature = "source-memory-applications": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
 		case 117: feature = "selected-nonfield-member-roles": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
 		case 118: feature = "source-call-macro-references": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 119: feature = "accepted-primitive-type-inputs": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _
@@ -3867,6 +3870,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	if( commit ) then fbSemanticModelExportStringInitializerCopies( )
 	if( commit ) then fbSemanticModelFinishComments( )
 	if( commit ) then fbSemanticModelFinishVariableNames( )
+	if( commit ) then fbSemanticModelFinishPrimitiveTypes( )
 	if( commit ) then fbSemanticModelFinishMemberNames( )
 	if( (commit <> FALSE) and (len(semantic_model_pending_expression_value) > 0) ) then
 		dim as string pending_value = semantic_model_pending_expression_value

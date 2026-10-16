@@ -46,6 +46,10 @@ class SidecarTests(unittest.TestCase):
         from macro_call_inputs import check_modules
         check_modules(self)
 
+    def test_macro_runtime_call_inputs(self) -> None:
+        from macro_call_inputs import check_runtime_inputs
+        check_runtime_inputs(self)
+
     def test_source_memory_application_inputs(self) -> None:
         from source_memory_inputs import check_inputs
         check_inputs(self)
@@ -308,6 +312,18 @@ class SidecarTests(unittest.TestCase):
     def test_procedure_abi_policy_inputs(self) -> None:
         from abi_policy_inputs import check_policy_inputs
         check_policy_inputs(self)
+
+    def test_special_member_abi_header_origins(self) -> None:
+        from special_header_inputs import check_headers
+        check_headers(self)
+
+    def test_original_primitive_type_inputs(self) -> None:
+        from primitive_type_inputs import check_inputs
+        check_inputs(self)
+
+    def test_original_primitive_types_reject_incomplete_observations(self) -> None:
+        from primitive_type_inputs import check_rejection
+        check_rejection(self)
 
     def test_source_header_policy_inputs(self) -> None:
         from header_policy_inputs import check_header_policy

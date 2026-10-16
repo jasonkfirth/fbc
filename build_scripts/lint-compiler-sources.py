@@ -117,17 +117,23 @@ def main() -> int:
     parser.add_argument('--configuration', type=Path, required=True,
                         help='Output from the canonical compiler-lint-configuration Make query')
     parser.add_argument('--output', type=Path, default=Path('build/compiler-lint/pass'))
+    parser.add_argument('--allow-external-output', action='store_true',
+                        help='Explicitly permit a dedicated result/scratch directory on another volume')
     parser.add_argument('--unit', action='append', help='Compiler-relative module; repeatable')
     parser.add_argument('--timeout', type=int, default=600)
     parser.add_argument('--retry-failed', action='store_true')
+    parser.add_argument('--stop-on-failure', action='store_true',
+                        help='Preserve a completed failing root and stop before repeating its failure elsewhere')
     options = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     compiler = options.compiler.resolve(strict=True)
     linter = options.linter.resolve(strict=True)
     configuration = options.configuration.resolve(strict=True)
     output = options.output.resolve()
-    if not output.is_relative_to(root / 'build') or options.timeout <= 0:
-        parser.error('Use a positive timeout and an output directory inside this checkout build/')
+    if options.timeout <= 0 or output == Path(output.anchor):
+        parser.error('Use a positive timeout and a dedicated output directory')
+    if not output.is_relative_to(root / 'build') and not options.allow_external_output:
+        parser.error('External result directories require --allow-external-output')
     output.mkdir(parents=True, exist_ok=True)
     scratch = output / 'scratch'
     scratch.mkdir(exist_ok=True)
@@ -163,6 +169,8 @@ def main() -> int:
         if previous and fresh(previous.get('sources', {})) and (
                 previous['passed'] or not options.retry_failed):
             print(f'{ordinal}/{len(selected)} {name}: retained {previous["passed"]}', flush=True)
+            if options.stop_on_failure and not previous['passed']:
+                break
             continue
         if shutil.disk_usage(output).free < 10 * 1024 ** 3:
             raise ValueError('Compiler lint scratch must retain 10 GiB of disk headroom')
@@ -219,6 +227,8 @@ def main() -> int:
               f'seconds={record["seconds"]}', flush=True)
         if digest(compiler) != pins['compiler'] or digest(linter) != pins['linter']:
             raise ValueError('A qualification tool changed during the pass')
+        if options.stop_on_failure and not record['passed']:
+            break
     # Deduplicate shared-header findings while preserving the per-context logs.
     findings = {}
     for name, record in records.items():
@@ -234,6 +244,13 @@ def main() -> int:
                 findings[key] = row
     save(output / 'findings.json', {'findings': list(findings.values()),
         'rules': dict(Counter(row['rule'] for row in findings.values()))})
+    receipt['coverage'] = {
+        'accepted': [name for name, item in records.items() if item['passed']],
+        'failed': [name for name, item in records.items() if not item['passed']],
+        'unrecorded': [name for name in names if name not in records],
+        'selected': selected,
+    }
+    save(receipt_path, receipt)
     print(f'COMPILER_SEMANTIC_LINT_COMPLETE={receipt.get("complete", False)} '
           f'accepted={sum(item["passed"] for item in records.values())}/{len(names)} '
           f'unique_findings={len(findings)}', flush=True)
