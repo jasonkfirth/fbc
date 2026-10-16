@@ -371,7 +371,7 @@ prepare_cross_sysroot() {
     mkdir -p "$SYSROOT" "$dbpath" "$cache"
     write_cross_pacman_config "$conf"
 
-    run pacman \
+    run bash "$ROOT/build_scripts/msys2-pacman-retry.sh" \
         --config "$conf" \
         --dbpath "$dbpath" \
         --cachedir "$cache" \
@@ -415,7 +415,9 @@ install_deps() {
 
     msg "installing Arch build dependencies via pacman"
     disable_pacman_download_sandbox
-    run pacman -Syu --noconfirm
+    # Reuse cached downloads when a mirror or DNS lookup fails mid-transaction.
+    # The shared wrapper bounds retries and keeps persistent failures fatal.
+    run bash "$ROOT/build_scripts/msys2-pacman-retry.sh" -Syu --noconfirm
 
     if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then
         deps+=(
@@ -425,7 +427,7 @@ install_deps() {
         )
     fi
 
-    run pacman -S --noconfirm --needed "${deps[@]}"
+    run bash "$ROOT/build_scripts/msys2-pacman-retry.sh" -S --noconfirm --needed "${deps[@]}"
     prepare_cross_sysroot
 }
 
@@ -603,3 +605,5 @@ fi
 
 package_current_target
 CLEANUP_SUCCESS=1
+
+# end of archlinux-build-freebasic.sh

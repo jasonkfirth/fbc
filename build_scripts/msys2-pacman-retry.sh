@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-#   Project: FreeBASIC MSYS2 package builds
+#   Project: FreeBASIC pacman package builds
 #   ---------------------------------------
 #
 #   File: msys2-pacman-retry.sh
@@ -14,12 +14,12 @@
 #
 #       * validate the configured retry limits
 #       * repeat failed pacman operations after a short delay
-#       * preserve pacman's final exit status for the calling build script
+#       * keep persistent failures fatal for the calling build script
 #
 #   This file intentionally does NOT contain:
 #
 #       * package selection policy
-#       * MSYS2 repository configuration
+#       * repository configuration
 #       * build or packaging logic
 #
 
@@ -82,7 +82,7 @@ while [ "$attempt" -le "$PACMAN_RETRY_ATTEMPTS" ]; do
 		break
 	fi
 
-	# MSYS2 mirrors occasionally time out after a package has already reached
+	# Repository mirrors occasionally fail after a package has already reached
 	# the local cache.  Repeating the same transaction safely reuses that data.
 	echo "WARNING: pacman failed; retrying in $PACMAN_RETRY_DELAY seconds." >&2
 	sleep "$PACMAN_RETRY_DELAY"
