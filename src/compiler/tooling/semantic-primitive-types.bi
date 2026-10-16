@@ -2,7 +2,7 @@
 '' File: tooling/semantic-primitive-types.bi
 '' Purpose: Define the observer for parsed primitive type operands.
 '' Responsibilities: Non-owning parser inputs and serial module lifecycle.
-'' This file intentionally does NOT contain type grammar or lint policy.
+'' This file intentionally does NOT contain: type grammar or lint policy.
 
 #ifndef __FB_SEMANTIC_PRIMITIVE_TYPES_BI__
 #define __FB_SEMANTIC_PRIMITIVE_TYPES_BI__

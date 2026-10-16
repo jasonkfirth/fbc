@@ -2,14 +2,14 @@
 '' File: tooling/semantic-primitive-types.bas
 '' Purpose: Preserve native primitive type selections at their original tokens.
 '' Responsibilities: Selected types, physical/macro origins and module closure.
-'' This file intentionally does NOT parse types, infer intended types or emit code.
+'' This file intentionally does NOT contain: type grammar, type inference or code emission.
 
 #include once "tooling/semantic-private.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-macros.bi"
-#include once "semantic-primitive-types.bi"
+#include once "tooling/semantic-primitive-types.bi"
 
 '' Like the other observers, this state belongs to the compiler's one active
 '' module. Its lifecycle, not an individual parser call, resets the count.
