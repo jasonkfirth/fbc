@@ -38,6 +38,12 @@ typedef struct FB_AMIGA_GFX_STATE
     size_t present_buffer_size;
     struct BitMap *line_bitmap;
     struct RastPort line_rastport;
+    /* Optional packed source rows avoid repeating expensive planar uploads.
+       The valid flags occupy the tail of this allocation. The graphics lock
+       covers comparisons, updates and invalidation after window damage. */
+    unsigned char *present_cache;
+    unsigned char *present_cache_valid;
+    size_t present_cache_row_bytes;
     int private_screen;
     int rtg;
     int screen_depth;
@@ -68,6 +74,7 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
     int refresh_rate, int flags);
 void fb_amigaGfxDisplayExit(void);
 void fb_amigaGfxPresent(void);
+void fb_amigaGfxInvalidate(void);
 void fb_amigaGfxSetPalette(int index, int red, int green, int blue);
 void fb_amigaGfxWaitVSync(void);
 void fb_amigaGfxSetWindowTitle(char *title);

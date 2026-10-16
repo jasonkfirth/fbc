@@ -490,8 +490,16 @@ typedef struct FONT
 struct _PUT_HEADER {
 	union {
 		struct {
+			/* BASIC bitfields start at the low bits of the native word.
+			   Big-endian C ABIs allocate the first declared field at the
+			   high bits, so reverse the declarations to preserve that ABI. */
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+			unsigned short width:13;
+			unsigned short bpp:3;
+#else
 			unsigned short bpp:3;
 			unsigned short width:13;
+#endif
 			unsigned short height;
 		} old;
 		unsigned int type;

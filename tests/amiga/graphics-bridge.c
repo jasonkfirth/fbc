@@ -94,6 +94,40 @@ int amiga_test_multikey_queued(int code, int scancode)
     return result;
 }
 
+int amiga_test_event_queued(int code, int peek)
+{
+    struct IntuiMessage message;
+    struct MsgPort *reply = CreateMsgPort();
+    EVENT event;
+    int result = -1;
+    int expected_type = code & IECODE_UP_PREFIX ? EVENT_KEY_RELEASE : EVENT_KEY_PRESS;
+
+    if (reply == NULL) return -1;
+    memset(&message, 0, sizeof(message));
+    message.ExecMessage.mn_ReplyPort = reply;
+    message.ExecMessage.mn_Length = sizeof(message);
+    fb_GfxLock();
+    if (fb_amiga_gfx.window != NULL) {
+        /* Clear creation/focus events before queuing the test message. */
+        fb_amigaGfxPollEvents();
+        while (fb_GfxEvent(&event)) { }
+        message.Class = IDCMP_RAWKEY;
+        message.Code = (UWORD)code;
+        message.IDCMPWindow = fb_amiga_gfx.window;
+        PutMsg(fb_amiga_gfx.window->UserPort, &message.ExecMessage);
+        if ((!peek || fb_GfxEvent(NULL)) && fb_GfxEvent(&event) &&
+            event.type == expected_type && event.scancode == SC_A)
+            result = 0;
+        /* If the query failed, consume the native message before its stack
+           storage and reply port disappear. This poll is after the assertion. */
+        fb_amigaGfxPollEvents();
+        if (GetMsg(reply) != &message.ExecMessage) result = -1;
+    }
+    fb_GfxUnlock(0, 0);
+    DeleteMsgPort(reply);
+    return result;
+}
+
 int amiga_test_pointer_hidden(void)
 {
     int result = -1;
@@ -114,6 +148,65 @@ int amiga_test_pointer_hidden(void)
         }
     }
     fb_GfxUnlock(0, 0);
+    return result;
+}
+
+int amiga_test_present_cache(int x, int y)
+{
+    struct IntuiMessage message;
+    struct MsgPort *reply = CreateMsgPort();
+    unsigned char *cache, *valid;
+    LONG original, damaged;
+    int result = -1;
+
+    if (reply == NULL) return -1;
+    memset(&message, 0, sizeof(message));
+    message.ExecMessage.mn_ReplyPort = reply;
+    message.ExecMessage.mn_Length = sizeof(message);
+    fb_GfxLock();
+    if (fb_amiga_gfx.present_cache == NULL || fb_amiga_gfx.window == NULL ||
+        x < 0 || x >= fb_amiga_gfx.width || y < 0 || y >= fb_amiga_gfx.height)
+        goto done;
+    fb_amigaGfxPresent();
+    if (!fb_amiga_gfx.present_cache_valid[y]) goto done;
+
+    original = ReadPixel(fb_amiga_gfx.window->RPort, x, y);
+    if (original < 0) goto done;
+    damaged = original ^ 1;
+    SetAPen(fb_amiga_gfx.window->RPort, (ULONG)damaged);
+    WritePixel(fb_amiga_gfx.window->RPort, x, y);
+    __fb_gfx->dirty[y] = TRUE;
+    fb_amigaGfxPresent();
+    /* A software row which has not changed must use the cache. A real
+       refresh event, rather than that identical row, repairs window damage. */
+    if (ReadPixel(fb_amiga_gfx.window->RPort, x, y) != damaged) goto done;
+    message.Class = IDCMP_REFRESHWINDOW;
+    message.IDCMPWindow = fb_amiga_gfx.window;
+    PutMsg(fb_amiga_gfx.window->UserPort, &message.ExecMessage);
+    fb_amigaGfxPollEvents();
+    if (GetMsg(reply) != &message.ExecMessage) goto done;
+    if (ReadPixel(fb_amiga_gfx.window->RPort, x, y) != original) goto done;
+
+    /* Exercise the allocation-failure path without exhausting guest RAM.
+       Temporarily withhold the optional cache and require an actual upload. */
+    cache = fb_amiga_gfx.present_cache;
+    valid = fb_amiga_gfx.present_cache_valid;
+    fb_amiga_gfx.present_cache = NULL;
+    fb_amiga_gfx.present_cache_valid = NULL;
+    SetAPen(fb_amiga_gfx.window->RPort, (ULONG)damaged);
+    WritePixel(fb_amiga_gfx.window->RPort, x, y);
+    __fb_gfx->dirty[y] = TRUE;
+    fb_amigaGfxPresent();
+    if (ReadPixel(fb_amiga_gfx.window->RPort, x, y) == original) result = 0;
+    fb_amiga_gfx.present_cache = cache;
+    fb_amiga_gfx.present_cache_valid = valid;
+
+done:
+    fb_amigaGfxInvalidate();
+    if (__fb_gfx != NULL && __fb_gfx->dirty != NULL)
+        memset(__fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
+    fb_GfxUnlock(0, 0);
+    DeleteMsgPort(reply);
     return result;
 }
 

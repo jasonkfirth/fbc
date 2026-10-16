@@ -296,6 +296,7 @@ void fb_amigaGfxPollEvents(void)
 
     if (refresh)
     {
+        fb_amigaGfxInvalidate();
         if (__fb_gfx->dirty != NULL)
             memset(__fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
         fb_amigaGfxPresent();

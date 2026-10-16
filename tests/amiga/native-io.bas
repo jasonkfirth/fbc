@@ -2,11 +2,13 @@
 '' -------------------------------------------------
 '' File: native-io.bas
 '' Purpose: Check real command streaming and native filesystem boundaries.
-'' Responsibilities: Exercise binary pipes beyond their ring capacity and EOF.
+'' Responsibilities: Exercise binary pipes, EOF and relative directory traversal.
 '' This file intentionally does NOT contain shell or packet implementation.
 
 #include once "fbc-int/file-info.bi"
 #include once "file.bi"
+#include once "crt/stdio.bi"
+#include once "vbcompat.bi"
 
 const data_size = 200000
 dim payload as string = string(data_size, 0)
@@ -71,6 +73,48 @@ if open pipe("C:fb-cat <pipe-input.bin" for input as #1) <> 0 then end 8
 close #1
 print "Unread stream closed"
 if chdir("missing-volume:missing-directory") = 0 then end 9
+
+'' The C library accepts native DOS paths. CHDIR must apply the same dot
+'' and backslash conversion as file operations before calling that library.
+dim original_directory as string = curdir
+if mkdir("chdir-parent") <> 0 then end 30
+if mkdir("chdir-parent/child") <> 0 then end 31
+if open("chdir-parent/marker.txt" for output as #1) <> 0 then end 32
+print #1, "parent directory"
+close #1
+if chdir("chdir-parent/child") <> 0 then end 33
+if chdir("..") <> 0 then end 34
+if not fileexists("marker.txt") then end 35
+if chdir(".\child") <> 0 then end 36
+if chdir("..\") <> 0 then end 37
+if not fileexists("marker.txt") then end 38
+if chdir("child/../child/.") <> 0 then end 39
+if chdir("../") <> 0 then end 40
+if not fileexists("marker.txt") then end 41
+if chdir("..") <> 0 then end 42
+if curdir <> original_directory then end 43
+'' These representations of an empty string must neither crash nor move us.
+dim empty_directory as string
+dim empty_result as integer = chdir(empty_directory)
+if curdir <> original_directory then end 44
+empty_result = chdir("")
+if curdir <> original_directory then end 45
+kill "chdir-parent/marker.txt"
+if rmdir("chdir-parent/child") <> 0 then end 46
+if rmdir("chdir-parent") <> 0 then end 47
+print "Native parent-directory paths passed"
+
+'' libamiga's legacy sprintf reads DOS-sized words for %d. C callers must
+'' instead retain newlib's 32-bit promoted-argument and return-value contract.
+dim formatted_clock as zstring * 64
+dim formatted_count as long = sprintf(@formatted_clock, "%02d-%02d-%04d", _
+	clng(10), clng(16), clng(2026))
+if formatted_clock <> "10-16-2026" or formatted_count <> 10 then end 48
+formatted_count = sprintf(@formatted_clock, "%02d:%02d:%02d", _
+	clng(13), clng(46), clng(27))
+if formatted_clock <> "13:46:27" or formatted_count <> 8 then end 49
+if isdate(date$) = 0 then end 50
+print "Native C date/time formatting passed"
 
 '' PC port access reports FB_RTERROR_ILLEGALFUNCTIONCALL (1) on Amiga.
 '' INP returns a negative error; OUT returns the positive error number.

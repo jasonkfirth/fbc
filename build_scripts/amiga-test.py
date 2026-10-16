@@ -31,6 +31,7 @@ import re
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import struct
 import sys
@@ -41,6 +42,41 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_GROUPS = ('self-contained', 'fbctests', 'native-probe')
+
+
+def x11_server_ready(socket_path, lock_path, process_id, cookie):
+    """Require our X server and authenticated X11 setup, not just its socket."""
+    try:
+        if int(lock_path.read_text().strip()) != process_id:
+            return False
+        protocol = b'MIT-MAGIC-COOKIE-1'
+        # Xproto.h's xConnClientPrefix uses the byte order selected here.
+        # Both authentication fields are padded to four-byte boundaries.
+        request = struct.pack('<BBHHHHH', ord('l'), 0, 11, 0,
+                              len(protocol), len(cookie), 0)
+        request += protocol + bytes(-len(protocol) % 4)
+        request += cookie + bytes(-len(cookie) % 4)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(0.25)
+            client.connect(str(socket_path))
+            client.sendall(request)
+            reply = b''
+            while len(reply) < 8:
+                block = client.recv(8 - len(reply))
+                if not block:
+                    return False
+                reply += block
+            if reply[0] != 1:
+                return False
+            remaining = struct.unpack_from('<H', reply, 6)[0] * 4
+            while remaining:
+                block = client.recv(min(remaining, 4096))
+                if not block:
+                    return False
+                remaining -= len(block)
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 @contextmanager
@@ -61,8 +97,9 @@ def virtual_display(output):
     log = (output / 'xvfb.log').open('w')
     try:
         for number in range(100, 1000):
-            socket = Path('/tmp/.X11-unix') / ('X' + str(number))
-            if socket.exists() or Path(f'/tmp/.X{number}-lock').exists(): continue
+            socket_path = Path('/tmp/.X11-unix') / ('X' + str(number))
+            lock_path = Path(f'/tmp/.X{number}-lock')
+            if socket_path.exists() or lock_path.exists(): continue
             # Xauthority records use network-order length fields. FamilyWild
             # accepts the local transport; the display number and random
             # cookie still restrict access to this isolated server.
@@ -77,9 +114,13 @@ def virtual_display(output):
                                        '-nolisten', 'tcp', '-auth', str(authority), '-noreset'],
                                       env=env, stdout=log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + 5
-            while server.poll() is None and not socket.exists() and time.monotonic() < deadline:
+            ready = False
+            while server.poll() is None and time.monotonic() < deadline:
+                if socket_path.exists() and x11_server_ready(socket_path, lock_path, server.pid, cookie):
+                    ready = True
+                    break
                 time.sleep(0.05)
-            if server.poll() is None and socket.exists(): break
+            if ready and server.poll() is None: break
             if server.poll() is None:
                 server.terminate(); server.wait(timeout=5)
             server = None
@@ -441,6 +482,9 @@ def stage_batch(args, controller, records, batch):
                       f'jit_compiler = {int(getattr(args, "jit", False))}\n'
                       f'bsdsocket_library = {int(getattr(args, "bsdsocket", False))}\n'
                       'fullscreen = 0\nwindow_width = 800\nwindow_height = 600\n'
+                      # Without a controller, FS-UAE can reserve cursor keys
+                      # for joystick emulation instead of native RAWKEY input.
+                      'joystick_port_1 = none\n'
                       'uae_sound_output = interrupts\n'
                       f'kickstart_file = {args.kickstart}\n'
                       f'hard_drive_0 = {boot}\nhard_drive_0_label = FBCTest\n'

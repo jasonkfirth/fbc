@@ -13,7 +13,9 @@ extern "C"
 		byval x as long, byval y as long) as long
 	declare function amiga_test_multikey_queued(byval code as long, _
 		byval scancode as long) as long
+	declare function amiga_test_event_queued(byval code as long, byval peek as long) as long
 	declare function amiga_test_pointer_hidden() as long
+	declare function amiga_test_present_cache(byval x as long, byval y as long) as long
 	declare function amiga_test_display_mode(byref width as long, byref height as long, _
 		byref mode_id as ulong) as long
 end extern
@@ -60,6 +62,15 @@ for mode as integer = 0 to 2
 		if amiga_test_display_pixel(stripe * 40 + 10, 100) <> expected then end 2
 	next
 	if amiga_test_display_pixel(318, 199) <> &hffffff then end 3
+
+	'' Updating the native title must not draw an Intuition title bar over
+	'' the pixels of a borderless private screen, including unchanged rows.
+	windowtitle "Updated graphics qualification title"
+	for stripe as integer = 0 to 7
+		dim expected as ulong = rgb((stripe and 1) * 255, _
+			((stripe shr 1) and 1) * 255, ((stripe shr 2) and 1) * 255) and &hffffff
+		if amiga_test_display_pixel(stripe * 40 + 10, 5) <> expected then end 51
+	next
 
 	'' Mixed channels expose byte-order errors that pure primaries can miss.
 	'' AGA reduces true-colour frames to RGB332; indexed colours retain their
@@ -122,6 +133,10 @@ for mode as integer = 0 to 2
 	if amiga_test_display_pixel(24, 24) <> &h00ff00 then end 20
 	screenset 0, 0
 	if amiga_test_display_pixel(24, 24) <> &hff0000 then end 21
+	'' Identical rows may skip planar transfers, but window refreshes must
+	'' repaint damaged pixels. Missing optional cache memory must also work.
+	if amiga_test_present_cache(24, 24) <> 0 then end 30
+	if amiga_test_display_pixel(24, 24) <> &hff0000 then end 31
 
 	'' 0x20 is native raw A; bit 7 marks its release.
 	if amiga_test_input(0, &h20, 0, 0) <> 0 then end 4
@@ -134,6 +149,23 @@ for mode as integer = 0 to 2
 	if amiga_test_multikey_queued(&hc5, fb.SC_ESCAPE) <> 0 then end 28
 	'' Drain the translated Escape character before continuing the mouse test.
 	if inkey <> chr(27) then end 29
+	'' Arrow keys must retain the standard two-byte INKEY representation.
+	'' Native messages keep this independent of emulator joystick mappings.
+	dim raw_arrow(0 to 3) as integer => {&h4c, &h4d, &h4e, &h4f}
+	dim fb_arrow(0 to 3) as integer => {fb.SC_UP, fb.SC_DOWN, fb.SC_RIGHT, fb.SC_LEFT}
+	for arrow as integer = 0 to 3
+		if amiga_test_input(0, raw_arrow(arrow), 0, 0) <> 0 then end 32
+		if not multikey(fb_arrow(arrow)) then end 33
+		if inkey <> chr(255) + chr(fb_arrow(arrow)) then end 34
+		if amiga_test_input(0, raw_arrow(arrow) or &h80, 0, 0) <> 0 then end 35
+		if multikey(fb_arrow(arrow)) then end 36
+	next
+	'' SCREENEVENT-only loops must consume native messages without an INKEY
+	'' or MULTIKEY call first. Peeking must leave the same event available.
+	if amiga_test_event_queued(&h20, 0) <> 0 then end 48
+	if inkey <> "a" then end 49
+	if amiga_test_event_queued(&ha0, 1) <> 0 then end 50
+	if multikey(fb.SC_A) then end 51
 	if amiga_test_input(1, 0, 73, 91) <> 0 then end 9
 	dim x as integer, y as integer
 	if getmouse(x, y) <> 0 then end 10

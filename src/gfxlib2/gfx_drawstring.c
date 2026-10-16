@@ -47,11 +47,16 @@ static int parse_font(void *image, int target_bpp, FB_GFX_FONT *font,
 		row_pitch = header.pitch;
 		header_size = sizeof(header);
 	} else {
-		bpp = first_word & 7;
+		uint16_t words[2];
+
+		/* The legacy header contains two native 16-bit words. Treating
+		   them as one integer reverses their roles on big-endian targets. */
+		memcpy(words, image, sizeof(words));
+		bpp = words[0] & 7;
 		if (!bpp)
 			bpp = target_bpp;
-		width = (first_word >> 3) & 0x1FFF;
-		height = first_word >> 16;
+		width = words[0] >> 3;
+		height = words[1];
 		row_pitch = width * bpp;
 		header_size = 4;
 	}

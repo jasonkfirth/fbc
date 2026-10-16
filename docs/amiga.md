@@ -132,7 +132,13 @@ retain AmigaOS
 
 The chipset path uses a one-row temporary bitmap for `WritePixelLine8`.
 Its width is word-aligned independently of BASIC's framebuffer pitch, so
-odd framebuffer widths remain valid. Raw keys use keymap.library; mouse and
+odd framebuffer widths remain valid.
+An optional cache of the last uploaded source rows avoids repeated planar
+transfers when only the hardware palette changes or a frame is unchanged.
+Comparisons use the complete pixel bytes, and window refresh events invalidate
+the cache before repainting. If cache allocation fails, presentation continues
+through the normal row conversion and transfer path.
+Raw keys use keymap.library; mouse and
 window events come from the window's Intuition message port.
 `SETMOUSE` hides the native pointer with a transparent chip-memory sprite and
 restores the system pointer when requested. Intuition retains responsibility
@@ -294,6 +300,71 @@ infinities, out-of-range finite values and WINDOW transform overflow for the
 line, outline-box and filled-box forms. The original vector-field source
 then completed its diagnostic runs without modification.
 
+The Araxia corpus run exposed excessive planar transfers during palette loading.
+After adding the source-row cache, all 14 maintained native probes and all 99
+graphics tests passed, including 469,447 graphics assertions. The native graphics
+probe checks unchanged rows, repainting after a refresh message, and presentation
+with the optional cache withheld at depths 8, 16 and 32. The exact snapshots and
+results are in `out/amiga/corpus-20261015-8E77C4/presentation-cache-probes` and
+`out/amiga/corpus-20261015-8E77C4/presentation-cache-gfx`.
+
+The legacy image-header audit found a separate C/BASIC ABI mismatch. BASIC
+places the pixel-size bitfield in the low three bits of its native word;
+big-endian C placed it at the high end. The C declarations now preserve the
+documented BASIC layout. New tests check metadata at the field boundaries
+and drawing from a header constructed in BASIC. Both graphics suites passed
+all 101 tests, with 928,395 host assertions and 469,643 native assertions, and
+all 14 native probes passed again. Evidence is in the `host-legacy-header-gfx`,
+`legacy-header-gfx-after` and `legacy-header-probes-after` subdirectories of
+the October 15 corpus audit directory. This fixes native memory layout;
+little-endian QB image files still need explicit decoding before native PUT.
+
+A later custom-font check found a second legacy-header reader which treated
+the two native 16-bit words as one 32-bit value. Drawing and measuring legacy
+fonts now read those words separately. Both graphics suites passed all 102
+tests, with 928,431 host and 469,679 native assertions. The font regression
+covers an explicit eight-bit font and destination-depth inheritance when drawing.
+
+The Prospector startup audit also found that generic CHDIR bypassed Amiga's
+existing path wrapper. Parent traversal now follows the same conversion as
+file operations. All 14 native probes passed again, including nested parent
+paths, backslash separators, relative file lookup and empty-string safety.
+Evidence is under `legacy-font-gfx-after`, `host-legacy-font-gfx` and
+`chdir-parent-probes-after` in the October 15 corpus audit directory.
+
+Prospector also exposed a missing foreground-driver poll in SCREENEVENT.
+Applications using only that event API could leave native Intuition messages
+unprocessed. SCREENEVENT now polls before acquiring the event-queue lock;
+peeking still leaves the event available for retrieval. The new native queued
+event test fails with exit 48 before the change and passes afterward. All 14
+native probes and both 102-test graphics suites passed again. Evidence is under
+`screenevent-probes-before`, `screenevent-probes-after`, `screenevent-gfx-after`
+and `host-screenevent-gfx` in the same corpus audit directory.
+
+KLOC exposed a native C formatting ABI collision: libamiga's legacy
+`sprintf` forwards to Exec RawDoFmt, where `%d` consumes a 16-bit word. Newlib
+and generated C pass 32-bit integers, so DATE$ became `00-10-0000` and TIME$
+lost its minute and second fields. The Amiga runtime now forwards sprintf to
+newlib's vsprintf. A deterministic probe fails with exit 40 before the change
+and passes afterward. The new datetime unit checks integer, unsigned, floating
+and string arguments plus return counts. The native datetime and CRT batches
+passed (88 and 84 tests, including repeated common tests); the combined host
+selection passed 93 distinct tests. All 14 maintained native probes passed.
+The original KLOC fixture now emits a valid current date/time and identical
+source metrics. Evidence is under `date-format-before`, `date-format-after`,
+`date-format-probes-after`, `date-format-units-after`, `host-date-format` and
+`fb-ext-subset-consumers-v3` in the same corpus audit directory.
+
+The xInput example exposed a separate presentation problem: Intuition could
+paint a title strip over a borderless private screen during WINDOWTITLE. The
+Amiga driver now invalidates the cached rows and restores the application
+canvas after the title update. Public RTG window decorations remain outside
+the canvas. A native pixel test fails with exit 51 before the change and passes
+afterward at depths 8, 16 and 32. All 14 native probes and the 102-test graphics
+batch passed again (`title-colours-before`, `title-colours-after`, and
+`title-colours-gfx-after`). Three complete original fb-ext sprite frames also
+match GCC exactly, including all 921,600 RGB pixels (`fbext-sprite-colours`).
+
 Corpus asset formats also require explicit byte-order handling. BASIC's binary
 `GET` transfers native representations; it does not decode little-endian texture,
 font or model files automatically. The audit's necessary BASICVERSE source port
@@ -309,6 +380,36 @@ to perform that cleanup; it cannot safely terminate arbitrary application code
 that is still using shared state. BASICVERSE needed its existing stop flags
 connected to that lifecycle. Initialization failure and repeated shutdown are
 covered by the corpus audit as well as the runtime destructor probe.
+
+The corpus audit distinguishes unavailable native providers from compiler
+failures. The requested scope is to document platform gaps and finish compatible
+programs and FBC fixes; large dependency or application ports are separate work.
+A missing provider, source-excluded main, or successful static-library build is
+not an executable runtime pass.
+
+| Corpus requirement | Current Amiga qualification gap |
+| --- | --- |
+| SDL2, SDL2_image, SDL2_ttf, gfxlib3 | No matching native providers in this SDK setup |
+| OpenGL/GLU, Tilengine, FreeImage | No matching native graphics libraries |
+| SQLite, FreeType, JPEG, GIF, PCRE | Required native providers are not all available |
+| Win32 console/UI and X11 | Application APIs require native application ports |
+| Unix socket and timezone bindings | Applications select unsupported OS-specific bindings |
+| ZIP archive opening | Built provider needs secure entropy absent from this ROM setup |
+| Fixed 64-bit pointer casts | Application assumptions do not hold for the 32-bit native ABI |
+
+Some fb-ext examples also have incomplete library build recipes; unresolved
+symbols remain build failures until the corresponding original modules are
+built and linked. They are not automatically classified as operating-system
+limitations. Each corpus target retains its exact compiler log and GCC control.
+
+The later utility checks ran the original Library Master console and graphics
+programs, both flight converters, the regression calculator, and Tic-Tac-Toe.
+All returned zero through the native guest controller. The console programs
+used real CON: handles; redirected input does not exercise INKEY. For the
+regression fixture (1,3), (2,5), (3,7), both targets saved identical data and
+results: correlation 1 and Y = 2 * X + 1. Tic-Tac-Toe's complete board transitions
+and final win/draw messages were checked independently. These observations do
+not establish all library-management or calculator paths.
 
 Other current platform limits are explicit:
 

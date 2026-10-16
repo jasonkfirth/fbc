@@ -11,6 +11,7 @@
         - own Intuition, graphics, and optional CyberGraphX library bases
         - use an RTG public screen when available or a private chipset screen
         - convert dirty rows to ARGB or planar-compatible palette indices
+        - skip unchanged planar rows and invalidate them after window damage
         - release windows and screens before closing their supporting libraries
 
     This file intentionally does NOT contain:
@@ -234,7 +235,8 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
     memset(&fb_amiga_gfx, 0, sizeof(fb_amiga_gfx));
 
     /* Both pixel-transfer APIs use unsigned 16-bit dimensions and pitch.
-       Allocate one converted row, rather than another complete framebuffer. */
+       Conversion needs one scratch row. The optional planar cache below
+       retains source bytes only to avoid uploading unchanged rows. */
     if (width <= 0 || height <= 0 || width > 16383 || height > 32767 ||
         __fb_gfx == NULL || !amiga_open_libraries())
         goto fail;
@@ -310,6 +312,22 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
     memset(fb_amiga_gfx.present_buffer, 0, fb_amiga_gfx.present_buffer_size);
     fb_amiga_gfx.width = width;
     fb_amiga_gfx.height = height;
+    if (!fb_amiga_gfx.rtg) {
+        size_t row_bytes = (size_t)width * (size_t)__fb_gfx->bpp;
+
+        /* PALETTE marks every software row dirty even when SetRGB32 has
+           already changed the displayed colours. Compare actual source
+           bytes so palette updates and repeated frames need no planar
+           transfer. Allocation failure only disables this optimization.
+           The mode bounds above keep this product within 32-bit size_t. */
+        fb_amiga_gfx.present_cache = malloc((row_bytes + 1U) * (size_t)height);
+        if (fb_amiga_gfx.present_cache != NULL) {
+            fb_amiga_gfx.present_cache_row_bytes = row_bytes;
+            fb_amiga_gfx.present_cache_valid = fb_amiga_gfx.present_cache +
+                row_bytes * (size_t)height;
+            memset(fb_amiga_gfx.present_cache_valid, FALSE, (size_t)height);
+        }
+    }
     fb_amiga_gfx.refresh_rate = GfxBase->DisplayFlags & PAL ? 50 : 60;
     fb_amiga_gfx.cursor_visible = TRUE;
     fb_amiga_gfx.active = TRUE;
@@ -336,8 +354,15 @@ void fb_amigaGfxDisplayExit(void)
         else UnlockPubScreen(NULL, fb_amiga_gfx.screen);
     }
     free(fb_amiga_gfx.present_buffer);
+    free(fb_amiga_gfx.present_cache);
     memset(&fb_amiga_gfx, 0, sizeof(fb_amiga_gfx));
     amiga_close_libraries();
+}
+
+void fb_amigaGfxInvalidate(void)
+{
+    if (fb_amiga_gfx.present_cache_valid != NULL)
+        memset(fb_amiga_gfx.present_cache_valid, FALSE, (size_t)fb_amiga_gfx.height);
 }
 
 void fb_amigaGfxPresent(void)
@@ -352,11 +377,21 @@ void fb_amigaGfxPresent(void)
 
     for (row = 0; row < fb_amiga_gfx.height; ++row) {
         const unsigned char *source;
+        unsigned char *cached = NULL;
         unsigned char *destination = fb_amiga_gfx.present_buffer;
         int x;
 
         if (__fb_gfx->dirty != NULL && !__fb_gfx->dirty[row]) continue;
         source = __fb_gfx->framebuffer + (size_t)row * (size_t)__fb_gfx->pitch;
+        if (fb_amiga_gfx.present_cache != NULL) {
+            cached = fb_amiga_gfx.present_cache +
+                (size_t)row * fb_amiga_gfx.present_cache_row_bytes;
+            if (fb_amiga_gfx.present_cache_valid[row] &&
+                memcmp(cached, source, fb_amiga_gfx.present_cache_row_bytes) == 0) {
+                if (__fb_gfx->dirty != NULL) __fb_gfx->dirty[row] = FALSE;
+                continue;
+            }
+        }
         for (x = 0; x < fb_amiga_gfx.width; ++x) {
             unsigned char red, green, blue;
 
@@ -380,10 +415,21 @@ void fb_amigaGfxPresent(void)
                 fb_amiga_gfx.window->BorderLeft,
                 (UWORD)(fb_amiga_gfx.window->BorderTop + row),
                 (UWORD)fb_amiga_gfx.width, 1, RECTFMT_ARGB);
-        else
-            WritePixelLine8(fb_amiga_gfx.window->RPort, 0, (ULONG)row,
+        else {
+            LONG written = WritePixelLine8(fb_amiga_gfx.window->RPort, 0, (ULONG)row,
                 (ULONG)fb_amiga_gfx.width, fb_amiga_gfx.present_buffer,
                 &fb_amiga_gfx.line_rastport);
+            /* An incomplete native transfer must remain dirty for retry. */
+            if (written != fb_amiga_gfx.width) {
+                if (fb_amiga_gfx.present_cache_valid != NULL)
+                    fb_amiga_gfx.present_cache_valid[row] = FALSE;
+                continue;
+            }
+        }
+        if (cached != NULL) {
+            memcpy(cached, source, fb_amiga_gfx.present_cache_row_bytes);
+            fb_amiga_gfx.present_cache_valid[row] = TRUE;
+        }
         if (__fb_gfx->dirty != NULL) __fb_gfx->dirty[row] = FALSE;
     }
     fb_amigaGfxDebug("present end");
@@ -396,8 +442,19 @@ void fb_amigaGfxWaitVSync(void)
 
 void fb_amigaGfxSetWindowTitle(char *title)
 {
-    if (fb_amiga_gfx.window != NULL && title != NULL)
+    if (fb_amiga_gfx.window != NULL && title != NULL) {
         SetWindowTitles(fb_amiga_gfx.window, title, (UBYTE *)~0UL);
+        /* Intuition can repaint a title strip even on our borderless window.
+           Its pixels belong to the BASIC canvas on a private screen. Restore
+           them immediately, including rows whose source bytes did not change.
+           RTG public-screen windows retain their ordinary native decorations. */
+        if (fb_amiga_gfx.private_screen) {
+            fb_amigaGfxInvalidate();
+            if (__fb_gfx != NULL && __fb_gfx->dirty != NULL)
+                memset(__fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
+            fb_amigaGfxPresent();
+        }
+    }
 }
 
 int fb_amigaGfxSetWindowPosition(int x, int y)
