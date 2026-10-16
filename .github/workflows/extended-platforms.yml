@@ -334,27 +334,30 @@ jobs:
             out/riscos/rpcemu/riscos-open-iomd-*.zip
             out/riscos/rpcemu/riscos-open-harddisc4-*.zip
 
-      - name: Build RISC OS toolchains, FreeBASIC, and RPCEmu
-        id: riscos_build
-        run: |
-          set -euo pipefail
-          mkdir -p out/riscos
-          bash build_scripts/debianubuntu-build-freebasic-riscos.sh \
-            --no-package \
-            --jobs "$JOBS" 2>&1 | tee out/riscos/build-riscos.log
+      - name: Fetch and verify pinned RISC OS input archives
+        id: riscos_download
+        run: bash build_scripts/riscos-rpcemu.sh --download-only
 
       - name: Cache verified RISC OS input archives
-        if: steps.riscos_build.outcome == 'success' && steps.riscos_inputs.outputs.cache-hit != 'true'
+        if: steps.riscos_download.outcome == 'success' && steps.riscos_inputs.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         continue-on-error: true
         with:
-          # Save before the runtime tests so a later test failure does not
+          # Save before building so a later build or test failure does not
           # discard successfully authenticated inputs needed by the next run.
           key: riscos-rpcemu-inputs-${{ hashFiles('build_scripts/riscos-rpcemu.sh') }}
           path: |
             out/riscos/rpcemu/rpcemu-*.tar.gz
             out/riscos/rpcemu/riscos-open-iomd-*.zip
             out/riscos/rpcemu/riscos-open-harddisc4-*.zip
+
+      - name: Build RISC OS toolchains, FreeBASIC, and RPCEmu
+        run: |
+          set -euo pipefail
+          mkdir -p out/riscos
+          bash build_scripts/debianubuntu-build-freebasic-riscos.sh \
+            --no-package \
+            --jobs "$JOBS" 2>&1 | tee out/riscos/build-riscos.log
 
       - name: Show RISC OS build failure evidence
         if: failure()

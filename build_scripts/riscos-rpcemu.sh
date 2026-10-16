@@ -54,6 +54,7 @@ WORK_DIR="$ROOT/out/riscos/rpcemu"
 HOSTFS_DIR="$ROOT/out/riscos/hostfs"
 ROM_FILE=""
 RUN=0
+DOWNLOAD_ONLY=0
 INTERPRETER=0
 RPCEMU_MODEL="RPCSA"
 RPCEMU_MEMORY=256
@@ -283,6 +284,7 @@ Options:
   --memory MIB      Emulated RAM. Default: 256 (RPCEmu maximum)
                     Values: 4, 8, 16, 32, 64, 128, 256
   --interpreter     Build/use the interpreter instead of the recompiler.
+  --download-only   Fetch and verify pinned archives without building.
   --run             Launch RPCEmu after preparing it.
   --jobs N          Parallel build jobs.
   -h, --help        Show this help.
@@ -337,6 +339,10 @@ while [ "$#" -gt 0 ]; do
             RUN=1
             shift
             ;;
+        --download-only)
+            DOWNLOAD_ONLY=1
+            shift
+            ;;
         --jobs)
             require_value "$1" "${2-}"
             JOBS="$2"
@@ -370,7 +376,12 @@ esac
 # Host tools and paths
 ##############################################################################
 
-for tool in awk curl dd find make od sed sha256sum tar tr unzip wc; do
+if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
+    [ "$RUN" -eq 0 ] || die "--download-only cannot be combined with --run"
+    [ -z "$ROM_FILE" ] || die "--download-only fetches the pinned ROM; omit --rom"
+fi
+
+for tool in curl sha256sum; do
     command -v "$tool" >/dev/null 2>&1 || die "required host tool not found: $tool"
 done
 
@@ -385,6 +396,19 @@ ROM_ARCHIVE="$WORK_DIR/riscos-open-iomd-$RISCOS_ROM_VERSION.zip"
 OPEN_ROM_FILE="$SOURCE_DIR/roms/RISCOS-Open-$RISCOS_ROM_VERSION"
 HARDDISC_ARCHIVE="$WORK_DIR/riscos-open-harddisc4-$RISCOS_HARDDISC_VERSION.zip"
 HARDDISC_MARKER="$WORK_DIR/harddisc4-$RISCOS_HARDDISC_VERSION.ready"
+
+# CI fetches these inputs before building the cross toolchain. A cold-cache
+# download failure should not consume a complete toolchain build first.
+if [ "$DOWNLOAD_ONLY" -eq 1 ]; then
+    download_verified "$RPCEMU_URL" "$ARCHIVE" "$RPCEMU_SHA256"
+    download_verified "$RISCOS_ROM_URL" "$ROM_ARCHIVE" "$RISCOS_ROM_SHA256"
+    download_verified "$RISCOS_HARDDISC_URL" "$HARDDISC_ARCHIVE" "$RISCOS_HARDDISC_SHA256"
+    exit 0
+fi
+
+for tool in awk dd find make od sed tar tr unzip wc; do
+    command -v "$tool" >/dev/null 2>&1 || die "required host tool not found: $tool"
+done
 
 ##############################################################################
 # Authenticated source acquisition
