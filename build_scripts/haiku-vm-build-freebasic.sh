@@ -2116,7 +2116,7 @@ cleanup() {
 	local vm_dir
 
 	# Retain early boot and transfer failures as well as compiler/test logs.
-	# Stopping the VM first would lose the guest's final serial diagnostics.
+	# These failures can occur before the guest produces a package build log.
 	if [ "$status" -ne 0 ]; then
 		for vm_dir in "$RUN_DIR/build" "$RUN_DIR/test"; do
 			if [ -d "$vm_dir" ]; then
