@@ -1,6 +1,12 @@
 Version 1.20.5
 
 [changed]
+- gfxlib2/Amiga presentation: cache unchanged planar source rows when memory is available, retry incomplete native transfers, invalidate on refresh and restore private-screen canvases after WINDOWTITLE; cover cached, uncached and damaged-window paths.
+- gfxlib2 events: poll foreground drivers before SCREENEVENT queries and peeks so queued native input is delivered without an earlier INKEY or MULTIKEY call; retain queue-lock ordering and native input regressions.
+- gfxlib2 legacy images: match BASIC's low-bit legacy header layout on big-endian C ABIs and decode custom-font dimensions as native 16-bit words; cover image metadata, PUT pixels and explicit or inherited font depths.
+- rtlib/Amiga directories: route CHDIR through native path normalization and supply a valid empty C string for unallocated BASIC strings; cover parent traversal, backslashes and relative file lookup.
+- rtlib/Amiga formatting: forward sprintf to newlib's vsprintf so promoted 32-bit arguments, return counts and DATE$/TIME$ retain the expected C ABI; add formatting regressions shared with native hosts.
+- Amiga qualification: require an authenticated X11 handshake from the owned virtual display, keep emulator joystick mappings from consuming cursor keys, extend native graphics and I/O probes, and document presentation checks and provider limits.
 - compiler semantic primitive types: retain accepted primitive tokens, selected target datatypes and physical or macro origins with bounded module occurrence counts; validate optional full-model observations through the existing schema-27 binary and text transports.
 - compiler semantic header and macro origins: preserve constructor, destructor and operator header tokens for ABI observations, and accept source-selected ASSERT/ASSERTWARN runtime calls only when their macro reference and runtime target agree; keep generated helpers without source references unlinked.
 - compiler semantic indexing: retain the selected overloaded index operator through its implicit BYREF result dereference while preserving raw AST types, explicit dereferences and ordinary BYREF call observations.
