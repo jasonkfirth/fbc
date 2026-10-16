@@ -591,11 +591,15 @@ endif
 		   -o -path '*/obj/*' -name 'deleteme.txt' \
 		   -o -path '*/COM/*' -name '*.html' \) \
 		-delete || true
-	if [ -f debian/tmp/usr/share/freebasic/examples/graphics/SDL/data/Vera.ttf ]; then \
-		rm -f debian/tmp/usr/share/freebasic/examples/graphics/SDL/data/Vera.ttf; \
-		ln -s ../../../../../fonts/truetype/ttf-bitstream-vera/Vera.ttf \
-			debian/tmp/usr/share/freebasic/examples/graphics/SDL/data/Vera.ttf; \
-	fi
+	# Both SDL versions open data/Vera.ttf from the font package already
+	# required by freebasic-examples.
+	for sdl in SDL1 SDL2; do \
+		font="debian/tmp/usr/share/freebasic/examples/graphics/$$sdl/data/Vera.ttf"; \
+		if [ -f "$$font" ]; then \
+			rm -f "$$font" || exit 1; \
+			ln -s ../../../../../fonts/truetype/ttf-bitstream-vera/Vera.ttf "$$font" || exit 1; \
+		fi; \
+	done
 	find debian/tmp/usr/share/freebasic/examples -type d -empty -delete || true
 
 # ------------------------------------------------------------
