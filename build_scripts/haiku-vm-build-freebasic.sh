@@ -723,13 +723,36 @@ ssh_guest() {
 		user@127.0.0.1 "$@"
 }
 
+scp_with_retry() {
+	local attempt
+	local status
+
+	# A guest can close a new SSH connection after package activation.  File
+	# copies can safely overwrite an incomplete transfer; guest commands must
+	# not be retried because they may already have changed the guest state.
+	for attempt in 1 2 3; do
+		if scp "$@"; then
+			return 0
+		else
+			status=$?
+		fi
+
+		warn "Haiku file transfer attempt $attempt/3 failed with status $status"
+		if [ "$attempt" -lt 3 ]; then
+			sleep 5
+		fi
+	done
+
+	return "$status"
+}
+
 scp_to_guest() {
 	local key="$1"
 	local port="$2"
 	local source="$3"
 	local target="$4"
 
-	scp -i "$key" \
+	scp_with_retry -i "$key" \
 		-o BatchMode=yes \
 		-o StrictHostKeyChecking=no \
 		-o UserKnownHostsFile=/dev/null \
@@ -744,7 +767,7 @@ scp_from_guest() {
 	local source="$3"
 	local target="$4"
 
-	scp -i "$key" \
+	scp_with_retry -i "$key" \
 		-o BatchMode=yes \
 		-o StrictHostKeyChecking=no \
 		-o UserKnownHostsFile=/dev/null \
@@ -2089,6 +2112,19 @@ PY
 }
 
 cleanup() {
+	local status=$?
+	local vm_dir
+
+	# Retain early boot and transfer failures as well as compiler/test logs.
+	# Stopping the VM first would lose the guest's final serial diagnostics.
+	if [ "$status" -ne 0 ]; then
+		for vm_dir in "$RUN_DIR/build" "$RUN_DIR/test"; do
+			if [ -d "$vm_dir" ]; then
+				print_vm_failure_logs "$vm_dir" || true
+			fi
+		done
+	fi
+
 	stop_vm "$RUN_DIR/build" || true
 	stop_vm "$RUN_DIR/test" || true
 }

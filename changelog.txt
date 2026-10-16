@@ -167,6 +167,7 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- build/CI Haiku: retry interrupted guest file transfers up to three times and retain early VM diagnostics on failure, while preserving transfer errors and leaving guest commands and qualification gates mandatory.
 - packaging/Debian examples: update the Vera font links for the SDL1 and SDL2 directories so both samples use the installed Bitstream font package and pass strict font validation.
 - build/CI RISC OS: fetch and authenticate the three pinned emulator/system archives before building the toolchain, cache only these download inputs, and revalidate restored bytes so later build or test failures do not force repeated vendor downloads.
 - tests/floating-point grouping: compare literal and variable operand paths using each backend's native intermediate precision, and exercise both SSE and x87 significand boundaries with cancellation so precise-mode regrouping regressions remain observable without requiring binary64 rounding after every operation.
