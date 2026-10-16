@@ -1,3 +1,8 @@
+'' File: SDL2/SDL.bi
+'' Purpose: Declare the SDL2 C interface for FreeBASIC programs.
+'' Responsibilities: Select native C types and expose the public SDL2 API.
+'' This file intentionally does NOT contain SDL or graphics driver implementations.
+''
 '' FreeBASIC binding for SDL2-2.0.14
 ''
 '' based on the C header files:
@@ -30,7 +35,8 @@
 #include once "crt/long.bi"
 #include once "crt/stdarg.bi"
 
-#if defined(__FB_UNIX__) or defined(__FB_XBOX__)
+'' Amiga's native newlib CRT uses C streams without defining the Unix target.
+#if defined(__FB_UNIX__) or defined(__FB_XBOX__) or defined(__FB_AMIGA__)
 	#include once "crt/stdio.bi"
 	#include once "crt/string.bi"
 	#include once "crt/ctype.bi"
@@ -585,7 +591,7 @@ union SDL_RWops_hidden
 		windowsio as SDL_RWops_hidden_windowsio
 	#endif
 
-	#if defined(__FB_UNIX__) or defined(__FB_XBOX__)
+	#if defined(__FB_UNIX__) or defined(__FB_XBOX__) or defined(__FB_AMIGA__)
 		stdio as SDL_RWops_hidden_stdio
 	#else
 		windowsio as SDL_RWops_hidden_windowsio
@@ -607,7 +613,7 @@ end type
 
 declare function SDL_RWFromFile(byval file as const zstring ptr, byval mode as const zstring ptr) as SDL_RWops ptr
 
-#ifdef __FB_UNIX__
+#if defined(__FB_UNIX__) or defined(__FB_AMIGA__)
 	declare function SDL_RWFromFP(byval fp as FILE ptr, byval autoclose as SDL_bool) as SDL_RWops ptr
 #else
 	declare function SDL_RWFromFP(byval fp as any ptr, byval autoclose as SDL_bool) as SDL_RWops ptr
@@ -3314,3 +3320,5 @@ declare function SDL_WasInit(byval flags as Uint32) as Uint32
 declare sub SDL_Quit()
 
 end extern
+
+'' end of SDL2/SDL.bi

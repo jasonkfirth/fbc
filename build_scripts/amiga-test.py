@@ -33,6 +33,7 @@ import shutil
 import signal
 import subprocess
 import struct
+import sys
 import time
 import wave
 import xml.etree.ElementTree as ET
@@ -250,6 +251,10 @@ def compile_probes(args, prefix, env):
     conversion = source / 'build_scripts/amiga/softfloat-convert.c'
     conversion.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / 'build_scripts/amiga/softfloat-convert.c', conversion)
+    hunk_source = source / 'src/compiler/driver'
+    hunk_source.mkdir(parents=True, exist_ok=True)
+    for filename in ('objinfo-hunk.bas', 'objinfo-hunk.bi'):
+        shutil.copy2(ROOT / 'src/compiler/driver' / filename, hunk_source / filename)
     resources = source / 'tests/amiga'
     binaries = args.output / 'bin'
     binaries.mkdir(exist_ok=True)
@@ -257,18 +262,49 @@ def compile_probes(args, prefix, env):
     cflags = ['-m68020', '-msoft-float', '-fno-common', '-O2']
     fbc = [str(prefix / 'bin/fbc'), '-prefix', str(prefix), '-target', 'amiga-m68k',
            '-i', str(prefix / 'inc'), '-i', str(prefix / 'inc/amiga')]
+    code = run_command([sys.executable, str(resources / 'driver-options.py'),
+                        '--fbc', str(prefix / 'bin/fbc'),
+                        '--output', str(args.output / 'driver-options')],
+                       args.output / 'logs/driver-options.log', env=env)
+    if code != 0:
+        raise SystemExit('Compiler option check failed; see logs/driver-options.log')
+    # Header coverage needs no installed SDL2 binary. Compile the public
+    # stream declarations with the native SDK before running guest probes.
+    code = run_command([*fbc, '-c', str(resources / 'sdl-headers.bas'),
+                        '-o', str(binaries / 'sdl-headers.o')],
+                       args.output / 'logs/sdl-headers.compile.log', env=env)
+    if code != 0:
+        raise SystemExit('Amiga SDL2 header check failed; see logs/sdl-headers.compile.log')
+    library_check = args.output / 'work/objinfo-library'
+    code = run_command([sys.executable, str(resources / 'objinfo-library.py'),
+                        '--fbc', str(prefix / 'bin/fbc'), '--prefix', str(prefix),
+                        '--output', str(library_check)],
+                       args.output / 'logs/objinfo-library.log', env=env)
+    if code != 0:
+        raise SystemExit('Amiga object metadata check failed; see logs/objinfo-library.log')
     records = []
-    for name in ('native-io', 'graphics', 'sound', 'softfloat-convert'):
+    for name in ('native-io', 'thread-io', 'thread-exit', 'standard-input',
+                 'graphics', 'image-colours', 'objinfo-reader', 'sound',
+                 'sound-exit', 'softfloat-convert', 'softfloat-multiply',
+                 'softfloat-arithmetic'):
         binary = binaries / name
-        if name == 'softfloat-convert':
-            oracle = binaries / 'host-float-oracle'
-            command = [os.environ.get('HOST_CC', 'cc'), '-O2', '-fno-builtin',
-                       str(resources / (name + '.c')), str(conversion), '-o', str(oracle)]
-            code = run_command(command, args.output / 'logs/oracle-build.log', env=env)
+        if name in ('softfloat-convert', 'softfloat-multiply', 'softfloat-arithmetic'):
+            oracle = binaries / ('host-' + name + '-oracle')
+            reference = {'softfloat-convert': 'float-reference.bin',
+                         'softfloat-multiply': 'multiply-reference.bin',
+                         'softfloat-arithmetic': 'arithmetic-reference.bin'}[name]
+            command = [os.environ.get('HOST_CC', 'cc'), '-O2', '-fno-builtin', '-ffp-contract=off',
+                       str(resources / (name + '.c'))]
+            if name == 'softfloat-convert':
+                command.append(str(conversion))
+            command += ['-o', str(oracle)]
+            oracle_build_log = args.output / 'logs' / (name + '-oracle-build.log')
+            oracle_log = args.output / 'logs' / (name + '-oracle.log')
+            code = run_command(command, oracle_build_log, env=env)
             if code == 0:
-                code = run_command([str(oracle), str(resources / 'float-reference.bin')],
-                                   args.output / 'logs/oracle.log', env=env)
-            if code != 0: raise SystemExit('Host floating-point oracle failed; see logs/oracle.log')
+                code = run_command([str(oracle), str(resources / reference)], oracle_log, env=env)
+            if code != 0:
+                raise SystemExit('Host floating-point oracle failed; see ' + str(oracle_log))
             command = [cc, *cflags, str(resources / (name + '.c')),
                        '-L' + str(prefix / 'lib/freebasic/amiga-m68k'),
                        '-Wl,--whole-archive', '-lfbsoftfloat', '-Wl,--no-whole-archive',
@@ -277,7 +313,12 @@ def compile_probes(args, prefix, env):
         else:
             objects = []
             code = 0
-            if name in ('graphics', 'sound'):
+            if name == 'objinfo-reader':
+                objects += [str(hunk_source / 'objinfo-hunk.bas'), '-m', 'objinfo-reader',
+                            '-i', str(hunk_source.parent)]
+            if name in ('thread-io', 'thread-exit'):
+                objects.append('-mt')
+            if name in ('graphics', 'sound', 'thread-io'):
                 bridge = binaries / (name + '-bridge.o')
                 code = run_command([cc, *cflags, '-c', str(resources / (name + '-bridge.c')),
                                     '-o', str(bridge)], args.output / 'logs' / (name + '-bridge.log'), env=env)
@@ -289,9 +330,17 @@ def compile_probes(args, prefix, env):
                   'group': 'native-probe', 'compile_status': 'pass' if code == 0 else f'fail({code})',
                   'run_status': 'not-run', 'binary': str(binary), 'resources': str(resources),
                   'arguments': '', 'expected': 0}
+        if name == 'standard-input':
+            record['stdin_text'] = 'Amiga input fixture\nsecond line\nZ'
         if name == 'sound': record['audio_capture'] = 'native-sound.wav'
         records.append(record)
         print(f'Amiga probe {name}: {record["compile_status"]}', flush=True)
+    for name in ('program', 'direct-program'):
+        records.append({'id': f'{len(records):06d}',
+                        'path': 'tests/amiga/objinfo-library/' + name,
+                        'group': 'native-probe', 'compile_status': 'pass',
+                        'run_status': 'not-run', 'binary': str(library_check / name),
+                        'resources': str(resources), 'arguments': '', 'expected': 0})
     if args.native_compiler is not None:
         binary = binaries / 'native-fbc'
         shutil.copy2(args.native_compiler, binary)
@@ -353,7 +402,7 @@ def build_controller(args):
 def stage_batch(args, controller, records, batch):
     boot = args.output / 'guests' / f'{batch:04d}'
     boot.mkdir(parents=True, exist_ok=True)
-    for name in ('C', 'S', 'T', 'ENV', 'LIBS', 'DEVS', 'results', 'jobs'):
+    for name in ('C', 'S', 'T', 'ENV', 'LIBS', 'DEVS', 'results', 'jobs', 'inputs'):
         (boot / name).mkdir(exist_ok=True)
     if args.backend_debug:
         (boot / 'ENV/FB_GFX_AMIGA_DEBUG').write_text('1')
@@ -374,6 +423,12 @@ def stage_batch(args, controller, records, batch):
         shutil.copy2(record['binary'], directory / 'program')
         fields = [record['id'], 'SYS:jobs/' + record['id'] + '/program',
                   'SYS:jobs/' + record['id'], record['arguments'], str(record['expected'])]
+        if 'stdin_text' in record:
+            payload = record['stdin_text'].encode('utf-8')
+            if len(payload) > 1024 * 1024:
+                raise SystemExit('Guest standard input exceeds 1 MiB')
+            (boot / 'inputs' / record['id']).write_bytes(payload)
+            fields.append('SYS:inputs/' + record['id'])
         if any(any(char in field for char in '\n\r\t\0') for field in fields):
             raise SystemExit('Invalid guest manifest field')
         lines.append('\t'.join(fields))

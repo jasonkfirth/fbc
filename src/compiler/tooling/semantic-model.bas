@@ -3183,8 +3183,20 @@ sub fbSemanticModelExportExpression _
 		end if
 		semantic_model_pending_operator_override = -1
 	end if
+	'' A BYREF index call has an implicit DEREF around its selected CALL.
+	'' The E receipt describes the written index expression, so keep that
+	'' operator/target while leaving the raw AST class and value type intact.
+	'' Explicit dereferences and ordinary BYREF function calls remain unchanged.
+	dim as ASTNODE ptr operator_expr = expr
+	if( astIsByrefResultDeref(expr) ) then
+		if( hSemanticModelHasSymbol(expr->l->sym) ) then
+			if( symbIsProc(expr->l->sym) andalso symbIsOperator(expr->l->sym) ) then
+				if( symbGetProcOpOvl(expr->l->sym) = AST_OP_PTRINDEX ) then operator_expr = expr->l
+			end if
+		end if
+	end if
 	dim as string operator_kind = "none"
-	dim as string operator_code = hSemanticModelConceptOperator(expr, operator_kind)
+	dim as string operator_code = hSemanticModelConceptOperator(operator_expr, operator_kind)
 	if( effective_operator_override >= 0 ) then
 		'' A parser operation can be lowered to a helper call before its
 		'' enclosing expression is exported. Keep the compiler-known source
@@ -3197,9 +3209,9 @@ sub fbSemanticModelExportExpression _
 		end if
 	end if
 	if( semantic_model_expressions_only = FALSE ) then
-		symbolid = hSemanticModelSymbolId(expr->sym)
-		if( (expr->class = AST_NODECLASS_CALL) andalso (expr->call.semantic_target <> NULL) ) then
-			symbolid = hSemanticModelSymbolId(expr->call.semantic_target)
+		symbolid = hSemanticModelSymbolId(operator_expr->sym)
+		if( (operator_expr->class = AST_NODECLASS_CALL) andalso (operator_expr->call.semantic_target <> NULL) ) then
+			symbolid = hSemanticModelSymbolId(operator_expr->call.semantic_target)
 		end if
 		subtypeid = hSemanticModelSymbolId(expr->subtype)
 	end if

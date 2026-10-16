@@ -1,4 +1,11 @@
-/* console line input function */
+/*
+    FreeBASIC runtime console input
+    ------------------------------
+    File: unix/io_readstr.c
+    Purpose: Read console lines through the active platform input service.
+    Responsibilities: Retain interactive editing and bounded stream reads.
+    This file intentionally does NOT contain: file ownership or key translation.
+*/
 
 #include "../fb.h"
 #include "fb_private_console.h"
@@ -9,6 +16,13 @@ char *fb_ConsoleReadStr( char *buffer, ssize_t len )
 	ssize_t pos = 0;
 	char ch[2] = { 0, '\0' };
 
+#ifdef HOST_AMIGA
+	/* The native console remains initialized when Input() is redirected.
+	   Files carry LF line endings and do not implement console key polling;
+	   sending them through the interactive CR editor can wait forever. */
+	if (fb_ConsoleIsRedirected(TRUE))
+		return fgets(buffer, len, stdin);
+#endif
 	if (!__fb_con.inited)
 		return fgets(buffer, len, stdin);
 
@@ -48,3 +62,5 @@ char *fb_ConsoleReadStr( char *buffer, ssize_t len )
 
 	return buffer;
 }
+
+/* end of unix/io_readstr.c */

@@ -1503,6 +1503,33 @@ print value
                 self.assertFalse([binding for binding in model.records["B"]
                                   if source_range(binding, 4) == source_range(row, 5)])
 
+    def test_byref_index_result_keeps_selected_operator(self) -> None:
+        source = self.source("type Indexed\nvalue as long\n"
+                             "declare operator [](byval index as long) byref as long\n"
+                             "declare operator [](byval index as double) as long ptr\nend type\n"
+                             "operator Indexed.[](byval index as long) byref as long\nreturn value\nend operator\n"
+                             "operator Indexed.[](byval index as double) as long ptr\nreturn @value\nend operator\n"
+                             "function OrdinaryReference() byref as long\nstatic ordinaryValue as long\nreturn ordinaryValue\nend function\n"
+                             "dim instance as Indexed\nprint instance[1]\nprint *instance[cdbl(1)]\nprint OrdinaryReference()\n")
+        for backend in self.backends:
+            with self.subTest(backend=backend):
+                self.invoke([source], mode="off", backend=backend)
+                emission = self.emission_path(source.stem, backend).read_bytes()
+                for mode in ("full", "expressions"):
+                    model = self.compile(source, mode=mode, backend=backend)
+                    facts = self.expressions(model, self.span(source, "print instance[1]", "instance[1]"))
+                    selected = [row for row in facts if row[2] == "1" and row[10:12] == ["index", "overloaded"]]
+                    self.assertTrue(selected, facts)
+                    self.assertTrue(all(row[15].casefold() == "long" for row in selected))
+                    if mode == "full":
+                        self.assertTrue(all(int(row[13]) in model.signatures and
+                                            model.signatures[int(row[13])][2] == "operator" for row in selected))
+                    explicit = self.expressions(model, self.span(source, "print *instance[cdbl(1)]", "*instance[cdbl(1)]"))
+                    self.assertTrue(any(row[10:12] == ["dereference", "builtin"] for row in explicit), explicit)
+                    ordinary = self.expressions(model, self.span(source, "print OrdinaryReference()", "OrdinaryReference()"))
+                    self.assertTrue(any(row[10:12] == ["dereference", "builtin"] for row in ordinary), ordinary)
+                    self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)
+
     def test_overloaded_allocation_operators_have_physical_receipts(self) -> None:
         source = self.source(
             "type AllocatedValue\n"

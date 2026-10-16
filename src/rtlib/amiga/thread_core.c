@@ -12,6 +12,7 @@
 
         - create FreeBASIC threads through the AmigaOS pthread library
         - establish each child thread's FreeBASIC thread-local identity
+        - inherit native standard streams without transferring handle ownership
         - arbitrate the AmigaOS exit-versus-detach race
         - wait for joinable threads and release their handles
 
@@ -33,6 +34,21 @@
 #include "../fb.h"
 #include "../fb_private_thread.h"
 
+#include <dos/dos.h>
+#include <proto/dos.h>
+
+/* The pthread provider creates DOS processes with private standard streams.
+   Capture the creator's handles before starting the child. They are borrowed:
+   restore the provider's handles before it performs process-exit cleanup, so
+   that cleanup cannot close streams still in use by the parent or siblings. */
+typedef struct {
+	FB_THREADPROC proc;
+	void *param;
+	FBTHREAD *thread;
+	BPTR input;
+	BPTR output;
+} FB_AMIGA_THREADINFO;
+
 /* ------------------------------------------------------------------------- */
 /* Child thread proxy                                                        */
 /* ------------------------------------------------------------------------- */
@@ -40,9 +56,11 @@
 static void *threadproc( void *param )
 {
 	static int thread_result;
-	FBTHREADINFO *info = param;
+	FB_AMIGA_THREADINFO *info = param;
 	FBTHREAD *thread = info->thread;
 	FBTHREADFLAGS thread_flags;
+	BPTR previous_input = SelectInput( info->input );
+	BPTR previous_output = SelectOutput( info->output );
 
 	FB_TLSGETCTX( FBTHREAD )->self = thread;
 
@@ -50,6 +68,8 @@ static void *threadproc( void *param )
 
 	free( info );
 	fb_TlsFreeCtxTb( );
+	SelectInput( previous_input );
+	SelectOutput( previous_output );
 
 	thread_flags = fb_AtomicSetThreadFlags( &thread->flags, FBTHREAD_EXITED );
 	if( thread_flags & FBTHREAD_DETACHED ) {
@@ -69,7 +89,7 @@ static void *threadproc( void *param )
 FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack_size )
 {
 	FBTHREAD *thread;
-	FBTHREADINFO *info;
+	FB_AMIGA_THREADINFO *info;
 	pthread_attr_t thread_attributes;
 
 	thread = (FBTHREAD *)malloc( sizeof( FBTHREAD ) );
@@ -77,7 +97,7 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 		return NULL;
 	}
 
-	info = (FBTHREADINFO *)malloc( sizeof( FBTHREADINFO ) );
+	info = (FB_AMIGA_THREADINFO *)malloc( sizeof( FB_AMIGA_THREADINFO ) );
 	if( info == NULL ) {
 		free( thread );
 		return NULL;
@@ -86,6 +106,8 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	info->proc = proc;
 	info->param = param;
 	info->thread = thread;
+	info->input = Input( );
+	info->output = Output( );
 	thread->flags = FBTHREAD_NONE;
 
 	if( pthread_attr_init( &thread_attributes ) ) {

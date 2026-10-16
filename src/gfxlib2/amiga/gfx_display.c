@@ -26,6 +26,8 @@
 #include "fb_gfx_amiga.h"
 
 #include <cybergraphx/cybergraphics.h>
+#include <exec/memory.h>
+#include <graphics/displayinfo.h>
 #include <graphics/gfxbase.h>
 #include <graphics/modeid.h>
 #include <proto/exec.h>
@@ -35,6 +37,7 @@
 #include <proto/intuition.h>
 
 #include <limits.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -102,6 +105,26 @@ void fb_amigaGfxSetPalette(int index, int red, int green, int blue)
         (ULONG)(blue & 255) * 0x01010101UL);
 }
 
+static unsigned char amiga_nearest_component(unsigned int value, int bits)
+{
+    unsigned int maximum, step, index;
+    int best = 0, best_distance = 256;
+
+    if (bits < 1 || bits > 3) return 0;
+    maximum = (1U << bits) - 1U;
+    step = 0xffffffffUL / maximum;
+    for (index = 0; index <= maximum; ++index) {
+        int component = (int)((index * step) >> 24);
+        int distance = (int)value - component;
+        if (distance < 0) distance = -distance;
+        if (distance < best_distance) {
+            best = (int)index;
+            best_distance = distance;
+        }
+    }
+    return (unsigned char)best;
+}
+
 static void amiga_set_truecolour_palette(void)
 {
     int index;
@@ -121,6 +144,82 @@ static void amiga_set_truecolour_palette(void)
             green * (0xffffffffUL / green_mask),
             blue * (0xffffffffUL / blue_mask));
     }
+
+    /* High-bit truncation chooses the wrong entry near palette boundaries.
+       Select the closest actual level once, without divisions or allocation
+       in the per-pixel presentation loop. Indexed images keep their own palette. */
+    for (index = 0; index < 256; ++index) {
+        fb_amiga_gfx.red_pen[index] =
+            amiga_nearest_component((unsigned int)index, red_bits) << (green_bits + blue_bits);
+        fb_amiga_gfx.green_pen[index] =
+            amiga_nearest_component((unsigned int)index, green_bits) << blue_bits;
+        fb_amiga_gfx.blue_pen[index] =
+            amiga_nearest_component((unsigned int)index, blue_bits);
+    }
+}
+
+static ULONG amiga_select_mode(int width, int height, int depth)
+{
+    struct DimensionInfo dimensions;
+    struct DisplayInfo display;
+    struct TagItem tags[] = {
+        { BIDTAG_NominalWidth, (ULONG)width },
+        { BIDTAG_NominalHeight, (ULONG)height },
+        { BIDTAG_DesiredWidth, (ULONG)width },
+        { BIDTAG_DesiredHeight, (ULONG)height },
+        { BIDTAG_Depth, (ULONG)depth },
+        { TAG_IGNORE, 0 },
+        { TAG_DONE, 0 }
+    };
+    ULONG mode = BestModeIDA(tags), candidate = (ULONG)INVALID_ID;
+    ULONG monitor = mode & MONITOR_ID_MASK, length;
+    int max_width = 0, max_height = 0;
+    unsigned int count;
+
+    if (mode == (ULONG)INVALID_ID) return mode;
+    length = GetDisplayInfoData(NULL, (UBYTE *)&dimensions,
+        sizeof(dimensions), DTAG_DIMS, mode);
+    if (length >= offsetof(struct DimensionInfo, Nominal) + sizeof(dimensions.Nominal) &&
+        dimensions.Nominal.MaxX - dimensions.Nominal.MinX + 1 >= width &&
+        dimensions.Nominal.MaxY - dimensions.Nominal.MinY + 1 >= height)
+        return mode;
+
+    /* BestModeID can select a tiny viewport when the desired dimensions
+       exceed every physical mode. Keep the requested virtual bitmap, but
+       bound the desired display dimensions to this monitor's actual modes.
+       Nominal dimensions continue to describe the original aspect ratio. */
+    for (count = 0; count < 65536U; ++count) {
+        /* Normal display databases are much smaller; bound a corrupt or
+           repeating enumeration without keeping an allocation-sized list. */
+        ULONG next = NextDisplayInfo(candidate);
+        int nominal_width, nominal_height;
+        if (next == (ULONG)INVALID_ID || next == candidate) break;
+        candidate = next;
+        if ((candidate & MONITOR_ID_MASK) != monitor) continue;
+        length = GetDisplayInfoData(NULL, (UBYTE *)&display,
+            sizeof(display), DTAG_DISP, candidate);
+        if (length < offsetof(struct DisplayInfo, PropertyFlags) + sizeof(display.PropertyFlags) ||
+            display.NotAvailable != 0 || (display.PropertyFlags & SPECIAL_FLAGS) != 0)
+            continue;
+        length = GetDisplayInfoData(NULL, (UBYTE *)&dimensions,
+            sizeof(dimensions), DTAG_DIMS, candidate);
+        if (length < offsetof(struct DimensionInfo, Nominal) + sizeof(dimensions.Nominal) ||
+            dimensions.MaxDepth < depth)
+            continue;
+        nominal_width = dimensions.Nominal.MaxX - dimensions.Nominal.MinX + 1;
+        nominal_height = dimensions.Nominal.MaxY - dimensions.Nominal.MinY + 1;
+        if (nominal_width > max_width) max_width = nominal_width;
+        if (nominal_height > max_height) max_height = nominal_height;
+    }
+    if (max_width <= 0 || max_height <= 0 ||
+        (width <= max_width && height <= max_height))
+        return mode;
+    tags[2].ti_Data = (ULONG)MIN(width, max_width);
+    tags[3].ti_Data = (ULONG)MIN(height, max_height);
+    tags[5].ti_Tag = BIDTAG_MonitorID;
+    tags[5].ti_Data = monitor;
+    candidate = BestModeIDA(tags);
+    return candidate != (ULONG)INVALID_ID ? candidate : mode;
 }
 
 int fb_amigaGfxDisplayInit(const char *title, int width, int height,
@@ -157,17 +256,7 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
             ? MIN(__fb_gfx->depth, maximum_depth) : maximum_depth;
         if (__fb_gfx->depth <= 8 && __fb_gfx->depth > maximum_depth)
             goto fail;
-        {
-            struct TagItem tags[] = {
-                { BIDTAG_NominalWidth, (ULONG)width },
-                { BIDTAG_NominalHeight, (ULONG)height },
-                { BIDTAG_DesiredWidth, (ULONG)width },
-                { BIDTAG_DesiredHeight, (ULONG)height },
-                { BIDTAG_Depth, (ULONG)fb_amiga_gfx.screen_depth },
-                { TAG_DONE, 0 }
-            };
-            mode_id = BestModeIDA(tags);
-        }
+        mode_id = amiga_select_mode(width, height, fb_amiga_gfx.screen_depth);
         fb_amigaGfxDebug("selected mode=%lx", mode_id);
         if (mode_id == (ULONG)INVALID_ID) goto fail;
         fb_amiga_gfx.screen = OpenScreenTags(NULL,
@@ -196,6 +285,12 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
             IDCMP_REFRESHWINDOW, TAG_DONE);
     if (fb_amiga_gfx.window == NULL) goto fail;
     fb_amigaGfxDebug("window opened");
+
+    /* One transparent sprite row needs two control words, two image words,
+       and two terminating words. Intuition requires DMA-accessible chip RAM
+       and may retain the data while the window is inactive. */
+    fb_amiga_gfx.blank_pointer = AllocMem(6 * sizeof(UWORD), MEMF_CHIP | MEMF_CLEAR);
+    if (fb_amiga_gfx.blank_pointer == NULL) goto fail;
 
     /* WritePixelLine8 needs a one-row temporary bitmap with a word-aligned
        planar pitch. AllocBitMap performs that alignment, including odd widths. */
@@ -233,6 +328,8 @@ void fb_amigaGfxDisplayExit(void)
     fb_amigaGfxDebug("closing display");
     fb_amiga_gfx.active = FALSE;
     if (fb_amiga_gfx.window != NULL) CloseWindow(fb_amiga_gfx.window);
+    if (fb_amiga_gfx.blank_pointer != NULL)
+        FreeMem(fb_amiga_gfx.blank_pointer, 6 * sizeof(UWORD));
     if (fb_amiga_gfx.line_bitmap != NULL) FreeBitMap(fb_amiga_gfx.line_bitmap);
     if (fb_amiga_gfx.screen != NULL) {
         if (fb_amiga_gfx.private_screen) CloseScreen(fb_amiga_gfx.screen);
@@ -273,10 +370,9 @@ void fb_amigaGfxPresent(void)
                 *destination++ = red;
                 *destination++ = green;
                 *destination++ = blue;
-            } else if (fb_amiga_gfx.screen_depth == 8)
-                destination[x] = (red & 0xe0) | ((green >> 3) & 0x1c) | (blue >> 6);
-            else
-                destination[x] = ((red >> 3) & 0x18) | ((green >> 5) & 6) | (blue >> 7);
+            } else
+                destination[x] = fb_amiga_gfx.red_pen[red] |
+                    fb_amiga_gfx.green_pen[green] | fb_amiga_gfx.blue_pen[blue];
         }
         if (fb_amiga_gfx.rtg)
             WritePixelArray(fb_amiga_gfx.present_buffer, 0, 0,

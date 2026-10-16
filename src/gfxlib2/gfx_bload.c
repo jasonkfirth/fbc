@@ -188,10 +188,28 @@ static void convert_8to32(const unsigned char *src, unsigned char *dest, int w, 
 	fb_image_convert_8to32(src, dest, w);
 }
 
-#define CONVERT_DEPTH(c, from, to) \
-	((from) <= (to) ? \
-		((c) << ((to) - (from))) | ((c) >> ((from) - ((to) - (from)))) \
-		: ((c) >> ((from) - (to))))
+static uint32_t convert_depth(uint32_t value, int source_bits, int target_bits)
+{
+	uint32_t result = 0;
+	int remaining_bits = target_bits;
+
+	/* BMP masks occupy at most one 32-bit pixel. An absent component has no
+	   bits to replicate; do not evaluate a negative or word-sized shift. */
+	if (source_bits < 1 || source_bits > 32 || target_bits < 1 || target_bits > 32)
+		return 0;
+	if (source_bits >= target_bits)
+		return value >> (source_bits - target_bits);
+
+	/* Repeat the source pattern until the destination is full. Two copies
+	   suffice for RGB565, but narrow alpha fields can need more: two-bit
+	   opacity 11 must become 11111111, rather than 11000000. */
+	while (remaining_bits > 0) {
+		int copied_bits = MIN(source_bits, remaining_bits);
+		result = (result << copied_bits) | (value >> (source_bits - copied_bits));
+		remaining_bits -= copied_bits;
+	}
+	return result;
+}
 
 static void convert_bf_16to16(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
@@ -202,9 +220,9 @@ static void convert_bf_16to16(const unsigned char *src, unsigned char *dest, int
 		r = (value >> shifts[0]) & masks[0];
 		g = (value >> shifts[1]) & masks[1];
 		b = (value >> shifts[2]) & masks[2];
-		r = CONVERT_DEPTH(r, bits[0], 5);
-		g = CONVERT_DEPTH(g, bits[1], 6);
-		b = CONVERT_DEPTH(b, bits[2], 5);
+		r = convert_depth(r, bits[0], 5);
+		g = convert_depth(g, bits[1], 6);
+		b = convert_depth(b, bits[2], 5);
 		*d = (r << 11) | (g << 5) | b;
 		src += 2;
 		d++;
@@ -220,9 +238,9 @@ static void convert_bf_16to32(const unsigned char *src, unsigned char *dest, int
 		r = (value >> shifts[0]) & masks[0];
 		g = (value >> shifts[1]) & masks[1];
 		b = (value >> shifts[2]) & masks[2];
-		r = CONVERT_DEPTH(r, bits[0], 8);
-		g = CONVERT_DEPTH(g, bits[1], 8);
-		b = CONVERT_DEPTH(b, bits[2], 8);
+		r = convert_depth(r, bits[0], 8);
+		g = convert_depth(g, bits[1], 8);
+		b = convert_depth(b, bits[2], 8);
 		*d = (255 << 24) | (r << 16) | (g << 8) | b;
 		src += 2;
 		d++;
@@ -240,9 +258,9 @@ static void convert_bf_24to16(const unsigned char *src, unsigned char *dest, int
 		r = (c >> shifts[0]) & masks[0];
 		g = (c >> shifts[1]) & masks[1];
 		b = (c >> shifts[2]) & masks[2];
-		r = CONVERT_DEPTH(r, bits[0], 5);
-		g = CONVERT_DEPTH(g, bits[1], 6);
-		b = CONVERT_DEPTH(b, bits[2], 5);
+		r = convert_depth(r, bits[0], 5);
+		g = convert_depth(g, bits[1], 6);
+		b = convert_depth(b, bits[2], 5);
 		*d++ = (r << 11) | (g << 5) | b;
 		src += 3;
 	}
@@ -259,9 +277,9 @@ static void convert_bf_24to32(const unsigned char *src, unsigned char *dest, int
 		r = (c >> shifts[0]) & masks[0];
 		g = (c >> shifts[1]) & masks[1];
 		b = (c >> shifts[2]) & masks[2];
-		r = CONVERT_DEPTH(r, bits[0], 8);
-		g = CONVERT_DEPTH(g, bits[1], 8);
-		b = CONVERT_DEPTH(b, bits[2], 8);
+		r = convert_depth(r, bits[0], 8);
+		g = convert_depth(g, bits[1], 8);
+		b = convert_depth(b, bits[2], 8);
 		*d++ = (255 << 24) | (r << 16) | (g << 8) | b;
 		src += 3;
 	}
@@ -276,9 +294,9 @@ static void convert_bf_32to16(const unsigned char *src, unsigned char *dest, int
 		r = (value >> shifts[0]) & masks[0];
 		g = (value >> shifts[1]) & masks[1];
 		b = (value >> shifts[2]) & masks[2];
-		r = CONVERT_DEPTH(r, bits[0], 5);
-		g = CONVERT_DEPTH(g, bits[1], 6);
-		b = CONVERT_DEPTH(b, bits[2], 5);
+		r = convert_depth(r, bits[0], 5);
+		g = convert_depth(g, bits[1], 6);
+		b = convert_depth(b, bits[2], 5);
 		*d++ = (r << 11) | (g << 5) | b;
 		src += 4;
 	}
@@ -294,10 +312,10 @@ static void convert_bf_32to32(const unsigned char *src, unsigned char *dest, int
 		g = (value >> shifts[1]) & masks[1];
 		b = (value >> shifts[2]) & masks[2];
 		a = (value >> shifts[3]) & masks[3];
-		r = CONVERT_DEPTH(r, bits[0], 8);
-		g = CONVERT_DEPTH(g, bits[1], 8);
-		b = CONVERT_DEPTH(b, bits[2], 8);
-		if (masks[3]) a = CONVERT_DEPTH(a, bits[3], 8);
+		r = convert_depth(r, bits[0], 8);
+		g = convert_depth(g, bits[1], 8);
+		b = convert_depth(b, bits[2], 8);
+		if (masks[3]) a = convert_depth(a, bits[3], 8);
 		*d++ = (a << 24) | (r << 16) | (g << 8) | b;
 		src += 4;
 	}

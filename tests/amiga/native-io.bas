@@ -72,6 +72,15 @@ close #1
 print "Unread stream closed"
 if chdir("missing-volume:missing-directory") = 0 then end 9
 
+'' PC port access reports FB_RTERROR_ILLEGALFUNCTIONCALL (1) on Amiga.
+'' INP returns a negative error; OUT returns the positive error number.
+const ILLEGAL_FUNCTION_CALL = 1
+dim input_status as long = inp(&h3da)
+if input_status <> -ILLEGAL_FUNCTION_CALL or err <> ILLEGAL_FUNCTION_CALL then end 11
+dim output_status as long = out(&h3da, 0)
+if output_status <> ILLEGAL_FUNCTION_CALL or err <> ILLEGAL_FUNCTION_CALL then end 12
+err = 0
+
 '' END also closes streams which the BASIC program leaves open.
 if open pipe("C:fb-cat <pipe-input.bin" for input as #1) <> 0 then end 10
 print "Native Amiga I/O qualification passed"

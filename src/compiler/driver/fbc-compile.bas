@@ -1106,7 +1106,7 @@ function fbcDriverArchiveFiles( ) as integer
 
 	if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
 		(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
-		(not fbIsCrossComp( )) ) then
+		((not fbIsCrossComp( )) or (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_AMIGA)) ) then
 		dim as string archiveobjfile
 		dim as integer compiled = hCompileFbctinf( archiveobjfile )
 		if( len( archiveobjfile ) > 0 ) then

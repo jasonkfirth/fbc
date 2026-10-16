@@ -536,6 +536,12 @@ codes provide a tooling vocabulary. Operator kind is `builtin`, `overloaded`,
 or `none`; `none` has an empty code. Unknown operations remain `none` rather
 than being guessed from numeric fields.
 
+For a BYREF overloaded index result, the `E` operator concept and selected
+symbol identify the index call through its implicit result dereference. The
+raw AST class and value dtype still describe that dereference. The `N` tree
+keeps both nodes unchanged. Explicit dereferences and ordinary BYREF function
+results do not acquire the overloaded index concept.
+
 The vocabulary includes assignment and arithmetic (`add`, `subtract`,
 `multiply`, `divide`, `integer-divide`, `modulo`, `power`), bit/logical operators
 (`and`, `or`, `logical-and`, `logical-or`, `xor`, `equivalence`, `implication`,

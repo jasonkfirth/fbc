@@ -51,6 +51,13 @@ typedef struct FB_AMIGA_GFX_STATE
     int mouse_buttons;
     int mouse_clip;
     int cursor_visible;
+    /* Byte-component lookup tables share the private palette's lifetime.
+       The graphics lock covers their initialization and every presentation. */
+    unsigned char red_pen[256];
+    unsigned char green_pen[256];
+    unsigned char blue_pen[256];
+    /* Intuition borrows this chip-memory sprite until the window closes. */
+    UWORD *blank_pointer;
 } FB_AMIGA_GFX_STATE;
 
 extern FB_AMIGA_GFX_STATE fb_amiga_gfx;

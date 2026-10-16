@@ -1649,9 +1649,10 @@ sub fbCompile _
 		fbSemanticModelExportGlobals( symbGetGlobalTbHead( ) )
 	end if
 
-	'' compiling only, not cross-compiling?
+	'' Hunk fields are decoded bytewise, so Amiga metadata can also be read
+	'' when the compiler host has a different integer size or byte order.
 	if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
-		(not fbIsCrossComp( )) and _
+		((not fbIsCrossComp( )) or (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_AMIGA)) and _
 		(env.clopt.outtype = FB_OUTTYPE_OBJECT) ) then
 		'' store libs, paths and cmd-line options in the obj
 		hEmitObjinfo( )

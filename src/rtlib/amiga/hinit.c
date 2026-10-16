@@ -10,7 +10,8 @@
 
     Responsibilities:
 
-        - use dos.library for console input and raw-mode control
+        - use dos.library for interactive console input and raw-mode control
+        - leave redirected input on the shared buffered stdio fallback
         - translate FreeBASIC text-console operations to AmigaOS CSI commands
         - own runtime and background-thread locks
         - maintain the console geometry used by text-mode operations
@@ -315,12 +316,23 @@ int fb_hTermOut(int code, int param1, int param2)
 int fb_hInitConsole(void)
 {
     BPTR input;
+    BPTR output;
 
     if (__fb_con.inited == FALSE)
         return -1;
 
     input = Input();
-    if (input != BNULL && console_raw_mode == FALSE)
+    output = Output();
+    /* Match the shared Unix console policy: raw keyboard/terminal handling
+       needs an interactive input/output pair. Redirected input must remain
+       on stdio, since LINE INPUT may already have buffered the next key.
+       WaitForChar() neither observes that buffer nor provides a regular-file
+       readiness test. The caller disables console state on this return. */
+    if (input == BNULL || output == BNULL ||
+        IsInteractive(input) == DOSFALSE || IsInteractive(output) == DOSFALSE)
+        return -1;
+
+    if (console_raw_mode == FALSE)
         console_raw_mode = (SetMode(input, 1) == DOSTRUE);
 
     BG_LOCK();

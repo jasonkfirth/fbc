@@ -1,6 +1,15 @@
-/* LINE statement */
+/*
+    FreeBASIC graphics library
+    -------------------------
+    File: gfx_line.c
+    Purpose: Draw clipped, styled lines and the LINE box forms.
+    Responsibilities: Validate endpoint conversion and rasterize valid lines.
+    This file intentionally does NOT contain target allocation or presentation.
+*/
 
 #include "fb_gfx.h"
+#include <limits.h>
+#include <math.h>
 
 static int reverse_mask(int mask)
 {
@@ -200,6 +209,33 @@ void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned
 	DRIVER_UNLOCK();
 }
 
+static int line_coord_is_valid(FB_GFXCTX *context, float fx, float fy)
+{
+	float translated_x = fx, translated_y = fy;
+	double checked_x, checked_y;
+
+	/* Match the shared float transform, including WINDOW's rounding, before
+	   CINT or the subsequent int offsets can receive an invalid value. LINE
+	   has a void ABI; an unrepresentable endpoint leaves the target untouched. */
+	if (context->flags & CTX_WINDOW_ACTIVE) {
+		translated_x = ((fx - context->win_x) * (context->view_w - 1)) / context->win_w;
+		translated_y = ((fy - context->win_y) * (context->view_h - 1)) / context->win_h;
+	}
+	checked_x = translated_x;
+	checked_y = translated_y;
+	if ((context->flags & (CTX_WINDOW_ACTIVE | CTX_WINDOW_SCREEN)) == CTX_WINDOW_ACTIVE)
+		checked_y = (double)context->view_h - 1 - checked_y;
+	if ((context->flags & CTX_VIEW_SCREEN) == 0) {
+		checked_x += context->view_x;
+		checked_y += context->view_y;
+	}
+	return isfinite(translated_x) && isfinite(translated_y) &&
+		(double)translated_x >= INT_MIN && (double)translated_x <= INT_MAX &&
+		(double)translated_y >= INT_MIN && (double)translated_y <= INT_MAX &&
+		checked_x >= INT_MIN && checked_x <= INT_MAX &&
+		checked_y >= INT_MIN && checked_y <= INT_MAX;
+}
+
 FBCALL void fb_GfxLine(void *target, float fx1, float fy1, float fx2, float fy2, unsigned int color, int type, unsigned int style, int flags)
 {
 	FB_GFXCTX *context;
@@ -225,6 +261,10 @@ FBCALL void fb_GfxLine(void *target, float fx1, float fy1, float fx2, float fy2,
 	style &= 0xFFFF;
 	
 	fb_hFixRelative(context, flags, &fx1, &fy1, &fx2, &fy2);
+	if (!line_coord_is_valid(context, fx1, fy1) || !line_coord_is_valid(context, fx2, fy2)) {
+		FB_GRAPHICS_UNLOCK();
+		return;
+	}
 
 	fb_hTranslateCoord(context, fx1, fy1, &x1, &y1);
 	fb_hTranslateCoord(context, fx2, fy2, &x2, &y2);
@@ -238,3 +278,5 @@ FBCALL void fb_GfxLine(void *target, float fx1, float fy1, float fx2, float fy2,
 
 	FB_GRAPHICS_UNLOCK( );
 }
+
+/* end of gfx_line.c */

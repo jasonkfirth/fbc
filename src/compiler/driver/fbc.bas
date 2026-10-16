@@ -337,7 +337,7 @@ end sub
 	'' because they don't contain objinfo anyways.
 	if( fbGetOption( FB_COMPOPT_OBJINFO ) and _
 		(fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_JS) and _
-		(not fbIsCrossComp( )) ) then
+		((not fbIsCrossComp( )) or (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_AMIGA)) ) then
 		fbcDriverCollectObjinfo( )
 	end if
 

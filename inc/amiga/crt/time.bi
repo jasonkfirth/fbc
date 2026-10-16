@@ -9,6 +9,7 @@
 #ifndef __crt_time_bi__
 #define __crt_time_bi__
 
+#include once "crt/long.bi"
 #include once "crt/stddef.bi"
 
 #define CLOCKS_PER_SEC 1000l

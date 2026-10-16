@@ -81,6 +81,18 @@ void fb_hRtExit(void)
     if (__fb_is_inicnt != 0)
         return;
 
+    /* A BASIC destructor may use sound or graphics after fb_End() closed
+       the original context. Stop any new service tasks before the final
+       join, otherwise an idle sound worker can keep the command alive. */
+    if (__fb_ctx.exit_sfxlib != NULL)
+        __fb_ctx.exit_sfxlib();
+    if (__fb_ctx.exit_gfxlib2 != NULL)
+        __fb_ctx.exit_gfxlib2();
+
+    /* BASIC global destructors have now had the opportunity to signal and
+       join their workers. Quiesce remaining tasks before releasing files,
+       TLS and this command's Hunk segments. Doing the wait in fb_End() would
+       deadlock workers whose stop request belongs to a global destructor. */
     fb_hAmigaClosePipes();
     fb_hAmigaStopBgThread();
     __pthread_Exit_Func();
@@ -118,13 +130,6 @@ FBCALL void fb_End(int errlevel)
         __fb_ctx.exit_sfxlib();
     if (__fb_ctx.exit_gfxlib2 != NULL)
         __fb_ctx.exit_gfxlib2();
-
-    /* Amiga tasks share this command's code and globals. Reap them while the
-       runtime and BASIC global objects still exist, before the SDK walks its
-       C++/BASIC destructor list and unloads the command's Hunk segments. */
-    fb_hAmigaClosePipes();
-    fb_hAmigaStopBgThread();
-    __pthread_Exit_Func();
 
     exit(errlevel);
 }

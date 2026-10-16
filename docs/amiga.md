@@ -49,6 +49,12 @@ retain GPLv3 and the GCC Runtime Library Exception; libffi retains its MIT
 license. The runtime install also copies provider licenses and the libffi
 headers under the target library directory.
 
+The pinned CPU arithmetic source is verified before bounded build-time repairs
+are applied. Those repairs retain product guard/sticky bits, correct an
+incomplete single-product mask, classify infinity times NaN, and preserve the
+sign of underflow to zero. They are covered by native comparisons with host
+hardware results; the original downloaded source and its license remain intact.
+
 For an existing SDK, use `--skip-toolchain --toolchain-root /path/to/sdk`.
 `AMIGA_ROOT` selects the support build directory and `--skip-compiler` keeps
 an already-built host compiler. Temporary build files stay in that support
@@ -73,6 +79,12 @@ The resulting program can be copied to an Amiga filesystem and started from
 its shell. Graphics and sound archives are selected through the ordinary
 FreeBASIC commands and include files.
 
+Cross-built Hunk objects and libraries retain FreeBASIC dependency metadata.
+The driver reads both ordinary ar containers and the concatenated Hunk units
+produced by the native SDK archiver, so dependencies declared by a library
+are also selected when linking its callers. External libraries still need
+native Amiga builds; host Linux archives cannot satisfy those dependencies.
+
 The native compiler front end can also be built:
 
 ```sh
@@ -93,6 +105,13 @@ components: the runtime translates them to native parent components before
 opening a file. Empty components in existing native paths retain their
 AmigaDOS meaning.
 
+Worker threads inherit their creator's native standard streams. BASIC global
+destructors can signal and join workers before the runtime performs its final
+task cleanup. That final wait still precedes runtime-state release and Hunk
+unloading, because live native tasks share the command's code and data.
+Sound and graphics contexts reopened by a destructor are closed before that
+wait, while the runtime's locks, streams and thread-local storage still exist.
+
 ## Graphics and sound
 
 gfxlib2 uses the `AMIGA` driver. It presents dirty framebuffer rows through
@@ -100,11 +119,26 @@ Intuition and graphics.library. It can use a CyberGraphX public screen when
 available, or open a private chipset screen. Indexed framebuffers preserve
 their palette. Higher-depth BASIC framebuffers are converted to the available
 chipset palette, including RGB332 on an eight-plane AGA display.
+True-colour conversion selects the closest available component levels using
+tables prepared when the screen opens. It does not change the software
+framebuffer's pixel values. Indexed modes continue to use the program's
+palette, including changes made without drawing another frame.
+
+The requested software canvas can exceed the physical display. The chipset
+backend bounds its display-size request to the selected monitor's available
+ordinary modes and keeps the original nominal aspect ratio. Larger canvases
+retain AmigaOS
+[virtual-screen behavior](https://wiki.amigaos.net/wiki/Intuition_Screens#Overscan_and_the_Display_Clip).
 
 The chipset path uses a one-row temporary bitmap for `WritePixelLine8`.
 Its width is word-aligned independently of BASIC's framebuffer pitch, so
 odd framebuffer widths remain valid. Raw keys use keymap.library; mouse and
 window events come from the window's Intuition message port.
+`SETMOUSE` hides the native pointer with a transparent chip-memory sprite and
+restores the system pointer when requested. Intuition retains responsibility
+for presenting it above graphics updates and across focus changes.
+The sprite allocation and lifetime follow the native
+[Intuition pointer contract](https://wiki.amigaos.net/wiki/Intuition_Pointer).
 
 sfxlib first tries AHI and falls back to Paula's ROM-resident audio.device.
 Paula playback uses a left/right channel pair and chip-memory DMA buffers.
@@ -157,6 +191,12 @@ diagnostics. The default FS-UAE accuracy setting permits accelerated CPU
 execution; `--accuracy 1` can be substantially slower for software floating
 point and needs a larger timeout.
 
+Jobs may provide `stdin_text` for a reproducible UTF-8 input transcript. The
+runner stages that input separately from program resources and selects its
+native DOS handle while the program runs. Five-field manifests remain valid;
+the optional sixth field names an input file. The controller restores its
+previous input and output handles before starting the next job.
+
 The guest controller uses `LoadSeg` and `RunCommand`, records the actual
 return code, and restores process state between jobs. fbctests additionally
 requires complete, consistent XML suite and case counts. Printed markers
@@ -166,13 +206,36 @@ The native probes exercise:
 
 - 200 KB binary command pipes in both directions, backpressure, EOF, early
   close, exit cleanup, metadata, and relative paths;
+- inherited native standard streams in child and nested threads, redirected
+  worker output, and parent output after joining those threads;
+- a worker whose stop request and join belong to a BASIC global destructor;
+- sound initialization from a BASIC global destructor after the initial
+  sound shutdown, followed by a clean native return;
+- direct `LINE INPUT` from LF-terminated redirected standard input, followed
+  by `SLEEP`, `GETKEY` and EOF checks on the same buffered stream;
 - native bitmap and palette readback at BASIC depths 8, 16, and 32 with an
-  odd width, plus raw-key and mouse message translation;
+  odd width, all 256 component values, live palette changes, plus raw-key and
+  mouse message translation, including queued key presses/releases consumed
+  directly by `MULTIKEY`;
+- hidden-page drawing, default `SCREENCOPY`, and visible-page switches at all
+  three framebuffer depths;
+- native mode selection for a 1280x600 virtual canvas, checking the ROM's
+  PAL 1280x512 or NTSC 1280x400 display and pixels at both horizontal edges;
+- 1,024 BMP bitfield samples with one- through eight-bit components, including
+  narrow alpha expansion and alpha drawing;
+- bounded Hunk metadata parsing and native execution of transitive archive
+  and direct-object dependency links;
+- rejected driver-option exit codes and compile-only SDL2/CRT declarations;
 - native sound-driver selection and a quarter-second stereo capture, with
   separate 440 Hz and 880 Hz tones checked for duration, amplitude, and channel
   ordering;
 - 20,000 software floating conversion comparisons against a host hardware
   oracle, including boundary values and reproducible random bit patterns;
+- 20,000 software multiplication comparisons against a host hardware oracle,
+  including signed zeros, subnormals, halfway products, infinities and NaNs,
+  plus eight signed-zero division checks;
+- 60,000 software addition, subtraction and division comparisons, including
+  both operand signs, exact cancellation, overflow and subnormal rounding;
 - optional native compiler emission and execution of its generated program.
 
 ## Recorded results and limits
@@ -212,6 +275,40 @@ build successfully but still need runs with those components installed.
 The captured WAV records samples accepted by the native driver; it does not
 record the emulator's final host audio output. Real hardware timing and
 physical serial/printer devices remain separate qualification work.
+
+The October 16 corpus audit also exposed defects in the imported CPU arithmetic
+helpers. The provider build repairs the verified assembly copy while retaining
+the original pinned source and license notices. These repairs cover guard and
+sticky bits, finite/nonfinite classification, overflow and signed-zero returns.
+All 14 maintained native probes passed after rebuilding through the normal make
+rules, including 100,000 hardware-oracle conversion/arithmetic comparisons and
+eight additional signed-zero checks. This focused run does not replace the
+earlier complete fbctests and Exampleageddon qualifications.
+
+The corpus vector-field example exposed a further shared gfxlib2 failure:
+nonfinite line endpoints could reach integer clipping and raise an Amiga
+divide exception. LINE now checks transformed endpoints before conversion.
+The graphics suite passed all 99 tests on both targets, with 928,199 host
+assertions and 469,447 native assertions. The added regression covers NaNs,
+infinities, out-of-range finite values and WINDOW transform overflow for the
+line, outline-box and filled-box forms. The original vector-field source
+then completed its diagnostic runs without modification.
+
+Corpus asset formats also require explicit byte-order handling. BASIC's binary
+`GET` transfers native representations; it does not decode little-endian texture,
+font or model files automatically. The audit's necessary BASICVERSE source port
+preserves the checked original GCC outputs and decodes all 262,144 texture pixels,
+97,280 glyph coverage bytes, 95 advances, 15,204,000 model weight words and
+32,000 tokenizer records identically on Amiga. Its 11 entry points now compile
+for both targets. A complete model inference step returns successfully and
+selects the same token, although floating scores are not bit-identical.
+
+Persistent application worker pools must stop cooperatively and join before
+executable segments are released. The runtime allows BASIC global destructors
+to perform that cleanup; it cannot safely terminate arbitrary application code
+that is still using shared state. BASICVERSE needed its existing stop flags
+connected to that lifecycle. Initialization failure and repeated shutdown are
+covered by the corpus audit as well as the runtime destructor probe.
 
 Other current platform limits are explicit:
 

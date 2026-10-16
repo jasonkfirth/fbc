@@ -13,7 +13,7 @@
         - map AMIGA raw keys to FreeBASIC scancodes
         - use keymap.library for layout-aware text input
         - track mouse position, buttons, wheel, and focus
-        - preserve the native Intuition cursor above graphics updates
+        - control native Intuition pointer visibility
 
     This file intentionally does NOT contain:
 
@@ -328,13 +328,17 @@ void fb_amigaGfxSetMouse(int x, int y, int cursor, int clip)
     if (clip >= 0)
         fb_amiga_gfx.mouse_clip = (clip != 0);
 
-    /*
-        Intuition owns the visible pointer.  Keeping that pointer selected is
-        deliberate: it guarantees cursor pixels stay above CyberGraphX blits.
-        The requested state is retained for GETMOUSE compatibility.
-    */
-    if (cursor >= 0)
+    /* Intuition owns pointer presentation, including focus transitions and
+       RTG blits. Select transparent native imagery when the program hides
+       it, and restore the system pointer when it becomes visible again.
+       The graphics lock protects both the window and borrowed sprite data. */
+    if (cursor >= 0) {
+        if (cursor != 0)
+            ClearPointer(fb_amiga_gfx.window);
+        else
+            SetPointer(fb_amiga_gfx.window, fb_amiga_gfx.blank_pointer, 1, 16, 0, 0);
         fb_amiga_gfx.cursor_visible = (cursor != 0);
+    }
 }
 
 /* end of gfx_input.c */

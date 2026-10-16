@@ -1826,6 +1826,7 @@ sub fbcDriverCheckArgs()
 			exit select
 		case else
 			errReportEx( FB_ERRMSG_ASMOPTIONGIVENFORNONX86, fbGetTargetId( ), -1 )
+			fbcEnd( 1 )
 		end select
 
 		'' -gen gas only supports -asm intel
@@ -1833,6 +1834,7 @@ sub fbcDriverCheckArgs()
 		case FB_BACKEND_GAS, FB_BACKEND_GAS64
 			if( fbc.asmsyntax <> FB_ASMSYNTAX_INTEL ) then
 				errReportEx( FB_ERRMSG_GENGASWITHOUTINTEL, "", -1 )
+				fbcEnd( 1 )
 			end if
 		end select
 

@@ -98,7 +98,8 @@
 ''    Note that Darwin has two different types of static libraries, both with
 ''    extension .a: normal 'ar' archives, and 'lipo' fat/universal binaries.
 ''    fbc creates ar archives, and it seems to generally be the default.
-''    We only support reading 'ar' archives.
+''    We support reading 'ar' archives and the concatenated Hunk units written
+''    by the classic Amiga SDK's archiver.
 ''
 '' objinfoReadLib():
 ''    searches a libfile for the given libname in the given libpaths,
@@ -106,8 +107,8 @@
 ''
 '' hLoadFbctinfFromObj():
 ''    reads the currently loaded object file,
-''    using either the COFF (Win32, DOS), ELF32/64 (Linux, *BSD) or
-''    Mach-O (Darwin) format.
+''    using either the COFF (Win32, DOS), ELF32/64 (Linux, *BSD),
+''    Mach-O (Darwin), or Hunk (classic AmigaOS) format.
 ''    ELF32 (linux-arm) or ELF64 (linux-aarch64)
 ''    looks for the .fbctinf section,
 ''    and if found, parses its content, and tells the frontend about the
@@ -115,6 +116,7 @@
 ''
 
 #include once "driver/objinfo.bi"
+#include once "driver/objinfo-hunk.bi"
 #include once "core/fb.bi"
 #include once "support/hlp.bi"
 
@@ -907,7 +909,9 @@ private sub hLoadFile _
 end sub
 
 private sub hLoadFbctinfFromObj( )
-	if( fbTargetSupportsCOFF( ) ) then
+	if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_AMIGA ) then
+		objinfoLoadHunk(objdata.p, objdata.size, fbctinf.p, fbctinf.size)
+	elseif( fbTargetSupportsCOFF( ) ) then
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86_64
 			INFO( "reading x86-64 COFF: " + parser.filename )
@@ -1038,7 +1042,17 @@ sub objinfoReadLibfile( byref libfile as string )
 		exit sub
 	end if
 
-	hLoadObjFromAr( )
+	'' The native Amiga librarian concatenates HUNK_UNIT objects instead of
+	'' wrapping them in ar headers. FBC still places its metadata unit first.
+	if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_AMIGA) andalso _
+	    (ardata.size >= 8) andalso (ardata.p[0] = 0) andalso _
+	    (ardata.p[1] = 0) andalso (ardata.p[2] = 3) andalso _
+	    (ardata.p[3] = &he7) ) then
+		objdata.p = ardata.p
+		objdata.size = ardata.size
+	else
+		hLoadObjFromAr( )
+	end if
 	if( objdata.size = 0 ) then
 		exit sub
 	end if
