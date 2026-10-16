@@ -754,7 +754,9 @@ jobs:
     name: Windows ARM64 native
     needs: bootstrap-sources
     runs-on: windows-11-arm
-    timeout-minutes: 120
+    # Native ARM64 reaches the example checks after about 106 minutes. Allow
+    # the full example run and job cleanup to finish after the semantic suite.
+    timeout-minutes: 150
 
     defaults:
       run:
