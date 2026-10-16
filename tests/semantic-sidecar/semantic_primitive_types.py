@@ -99,7 +99,10 @@ def validate_primitive_types(model, number, subject_modules):
             if origin_key in origins or invocation is None or invocation[4] != str(source):
                 raise ValueError('Primitive type macro origin is repeated or foreign')
             origins.add(origin_key)
-        elif location is None or location[11] != 'mapped':
+        # An unverified LOC still owns the physical opening, but carries no
+        # editable byte range. Legacy or malformed source bytes must not
+        # erase an otherwise accepted type observation.
+        elif location is None:
             raise ValueError('Primitive type lacks a physical or macro opening')
         observed[module] = ordinal
     for module in model.capabilities:

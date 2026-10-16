@@ -2,7 +2,7 @@
     FreeBASIC gfxlib2 support for RISC OS
     -------------------------------------
 
-    File: gfx_window.c
+    File: gfx_wimp.c
 
     Purpose:
 
@@ -29,6 +29,10 @@
         Wimp_RedrawWindow or Wimp_UpdateWindow sequence.  This preserves other
         desktop windows and lets the Wimp restore the game after obscuring
         windows move away.
+
+        This module keeps a distinct name from the shared gfx_window.c.
+        Platform sources replace shared sources by basename; using that name
+        here would remove BASIC WINDOW coordinate mapping from the library.
 */
 
 #include "fb_gfx_riscos.h"
@@ -1194,4 +1198,4 @@ ssize_t fb_riscosGfxWindowHandle(void)
     return fb_riscos_gfx.wimp_window_handle;
 }
 
-/* end of gfx_window.c */
+/* end of gfx_wimp.c */

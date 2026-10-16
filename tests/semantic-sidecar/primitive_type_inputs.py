@@ -6,7 +6,7 @@ This file intentionally does NOT find primitive uses by scanning source text.
 """
 import subprocess
 
-from sidecar import Model
+from sidecar import Model, SourceEdit
 from parsed_expression_coverage import write_rows
 from semantic_primitive_types import FEATURE, INPUT, COUNT
 
@@ -49,6 +49,39 @@ def check_inputs(test):
                      {'1': '1', '2': '1'})
 
 
+def check_unverified_inputs(test):
+    source = test.working / 'primitive-unverified.bas'
+    source.write_bytes(b'dim value as string = "\xe9"\nprint value\n')
+    output = test.emission_path(source.stem, 'gcc')
+    extra = ('-o', str(output))
+    test.invoke([source], mode='off', extra=extra)
+    plain = output.read_bytes()
+    _, path = test.invoke([source], extra=extra)
+    model = Model.read(path)
+    model.validate_physical_locations()
+    test.assertEqual(output.read_bytes(), plain)
+    observations = [row for row in model.records['K'] if row[3].startswith(INPUT)]
+    test.assertEqual(len(observations), 1)
+    location = next(row for row in model.records['LOC']
+                    if row[0:2] == ['LOC', 'source-context']
+                    and row[3] == observations[0][3])
+    test.assertEqual(location[9:12], ['-1', '-1', 'unverified'])
+    binding = next(row for row in model.records['LOC']
+                   if row[1] == 'binding' and row[5] == '1')
+    with test.assertRaisesRegex(ValueError, 'not mapped'):
+        model.plan_edits([SourceEdit('binding', int(binding[2]), 'range', b'value')])
+    binary = test.working / 'primitive-unverified-binary.fbcsem'
+    command = [str(test.compiler), '-prefix', str(test.toolchain_prefix),
+               '-i', str(test.root / 'inc'), '-gen', 'gcc', '-maxerr', '20', '-r',
+               '-semantic-model', str(binary), *extra, str(source)]
+    reply = subprocess.run(command, capture_output=True, timeout=120, check=False)
+    test.assertEqual(reply.returncode, 0, reply.stdout + reply.stderr)
+    transported = Model.read(binary)
+    transported.validate_physical_locations()
+    test.assertEqual(transported.rows, model.rows)
+    test.assertEqual(output.read_bytes(), plain)
+
+
 def check_rejection(test):
     _, path = test.invoke([test.fixture('primitive-type-inputs.bas')])
     model = Model.read(path)
@@ -59,7 +92,8 @@ def check_rejection(test):
     test.assertEqual(Model.read(rewritten).rows, model.rows)
     cases = ('missing-input', 'missing-closure', 'count', 'duplicate', 'identity',
              'payload', 'ordinal', 'keyword', 'dtype', 'pointer-depth', 'owner',
-             'macro-origin', 'orphan-openings', 'unavailable')
+             'macro-origin', 'physical-origin', 'unverified-bytes',
+             'orphan-openings', 'unavailable')
     for case in cases:
         with test.subTest(case=case):
             rows = [row[:] for row in base]
@@ -79,6 +113,16 @@ def check_rejection(test):
                 selected[2] = str(next(identity for identity, row in model.symbols.items() if row[3] == '1'))
             elif case == 'macro-origin':
                 rows.remove(next(row for row in rows if row[0] == 'MR' and row[4].startswith(INPUT)))
+            elif case in ('physical-origin', 'unverified-bytes'):
+                location = next(row for row in rows
+                                if row[0:2] == ['LOC', 'source-context']
+                                and row[3] == selected[3])
+                test.assertEqual(location[11], 'mapped')
+                if case == 'physical-origin':
+                    test.assertFalse(any(row[0] == 'MR' and row[4] == selected[3] for row in rows))
+                    rows.remove(location)
+                else:
+                    location[11] = 'unverified'
             elif case == 'orphan-openings':
                 rows = [row for row in rows if not (row[0] == 'K' and row[3].startswith(INPUT))]
                 closure[4] = '0'

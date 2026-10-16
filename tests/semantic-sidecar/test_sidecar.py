@@ -325,6 +325,10 @@ class SidecarTests(unittest.TestCase):
         from primitive_type_inputs import check_rejection
         check_rejection(self)
 
+    def test_primitive_type_unverified_locations_keep_observations(self) -> None:
+        from primitive_type_inputs import check_unverified_inputs
+        check_unverified_inputs(self)
+
     def test_source_header_policy_inputs(self) -> None:
         from header_policy_inputs import check_header_policy
         check_header_policy(self)

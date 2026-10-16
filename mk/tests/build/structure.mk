@@ -4,6 +4,8 @@
 # Verifies the mk/ directory structure matches the refactored layout
 ##############################################################################
 
+PYTHON ?= python3
+
 .PHONY: mk-structure-test
 mk-structure-test:
 	$(call _mt_echo,Verifying $(mkpath)/ structure)
@@ -46,6 +48,8 @@ mk-structure-test:
 		echo "ERROR: Android ARMv7 C flags lost the non-NEON baseline"; \
 		exit 1; \
 	}
+
+	@$(PYTHON) "$(rootdir)/build_scripts/check-gfx-source-graph.py" --root "$(rootdir)" --make "$(MAKE)"
 
 	@dos_default="$$( $(MAKE) --no-print-directory -s print-config \
 		HAVE_PREREQS_MK= TARGET_OS=dos \
