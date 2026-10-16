@@ -1,6 +1,11 @@
 Version 1.20.5
 
 [changed]
+- compiler semantic primitive types: retain accepted primitive tokens, selected target datatypes and physical or macro origins with bounded module occurrence counts; validate optional full-model observations through the existing schema-27 binary and text transports.
+- compiler semantic header and macro origins: preserve constructor, destructor and operator header tokens for ABI observations, and accept source-selected ASSERT/ASSERTWARN runtime calls only when their macro reference and runtime target agree; keep generated helpers without source references unlinked.
+- compiler semantic indexing: retain the selected overloaded index operator through its implicit BYREF result dereference while preserving raw AST types, explicit dereferences and ordinary BYREF call observations.
+- build/compiler semantic lint: permit dedicated external result directories only by explicit option, stop after a retained or newly completed failure when requested, and report accepted, failed, selected and unrecorded roots without claiming incomplete coverage is complete.
+- compiler semantic reader snapshots: include the primitive-type validator in the frozen reader dependencies so isolated binary/text consumers import successfully after the new observation family is added.
 - gfxlib2/LINE: reject nonfinite and unrepresentable transformed endpoints before integer conversion and clipping; retain valid LINE/B/BF rendering and the void ABI, with host/native regressions for every endpoint position and WINDOW overflow.
 - gfxlib2 input: poll foreground event drivers before MULTIKEY reads cached key state, matching GETMOUSE and INKEY; cover queued native presses/releases and real Escape input in delay-only loops on Amiga.
 - rtlib/Amiga console: initialize raw terminal handling only for interactive input/output handles, keeping redirected LINE INPUT, SLEEP, GETKEY and EOF on the shared stdio fallback; cover buffered read-ahead and unchanged ToyBASIC execution.

@@ -58,6 +58,7 @@ SEMANTIC_READER_FILES = (
     "semantic_logical_storage.py",
     "semantic_comments.py",
     "semantic_variable_names.py",
+    "semantic_primitive_types.py",
     "semantic_for_entry.py",
 )
 
