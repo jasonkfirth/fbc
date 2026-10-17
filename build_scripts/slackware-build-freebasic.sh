@@ -258,11 +258,13 @@ configure_slackpkg_network() {
     # The package factory's Docker network has no IPv6 route. Request IPv4
     # records explicitly, preserving the downloader's other options and all
     # package checksum/signature checks. Native builds keep their own policy.
+    # Wget treats DNS failures as final unless explicitly retried. Bound those
+    # retries so a transient lookup does not leave slackpkg a missing archive.
     local config=/etc/slackpkg/slackpkg.conf
     [ -f "$config" ] || die "missing slackpkg configuration: $config"
     cat >> "$config" <<'EOF'
 
-WGETFLAGS="${WGETFLAGS:-} --inet4-only"
+WGETFLAGS="${WGETFLAGS:-} --inet4-only --retry-on-host-error --tries=3 --waitretry=5"
 CURLFLAGS="${CURLFLAGS:-} --ipv4"
 EOF
 }
