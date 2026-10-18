@@ -45,11 +45,17 @@ int fb_hNotifyPermission(void *context, int request)
 
 static FBCALL int tick(void *user)
 {
+	int status;
 	assert(user == &callbacks);
 	++callbacks;
-	assert(fb_IdleStep(callback_state, tick, user, 0) == FB_SERVICE_INVALID);
-	assert(fb_IdleInit(callback_state, 10) == FB_SERVICE_INVALID);
-	if (callbacks == 2) assert(fb_IdleStop(callback_state) == FB_SERVICE_OK);
+	status = fb_IdleStep(callback_state, tick, user, 0);
+	assert(status == FB_SERVICE_INVALID);
+	status = fb_IdleInit(callback_state, 10);
+	assert(status == FB_SERVICE_INVALID);
+	if (callbacks == 2) {
+		status = fb_IdleStop(callback_state);
+		assert(status == FB_SERVICE_OK);
+	}
 	now += 3.0; /* A slow callback must not cause catch-up invocations. */
 	return 1;
 }
@@ -57,30 +63,38 @@ static FBCALL int tick(void *user)
 static void test_idle(void)
 {
 	FB_IDLE_STATE state = {0}, saved;
+	int status;
 	callback_state = &state;
 	assert(sizeof(state) == 32);
 	assert(fb_IdleInit(&state, 0) == FB_SERVICE_INVALID);
 	assert(fb_IdleInit(&state, 86400001u) == FB_SERVICE_INVALID);
 	assert(fb_IdleInit(&state, 100) == FB_SERVICE_OK);
 	saved = state;
-	assert(fb_IdleStep(&state, tick, &callbacks, -1) == FB_SERVICE_INVALID);
+	status = fb_IdleStep(&state, tick, &callbacks, -1);
+	assert(status == FB_SERVICE_INVALID);
 	assert(memcmp(&state, &saved, sizeof(state)) == 0);
-	assert(fb_IdleStep(&state, tick, &callbacks, 0) == FB_SERVICE_OK);
+	status = fb_IdleStep(&state, tick, &callbacks, 0);
+	assert(status == FB_SERVICE_OK);
 	assert(callbacks == 0 && waits == 0);
-	assert(fb_IdleStep(&state, tick, &callbacks, 1000) == FB_SERVICE_OK);
+	status = fb_IdleStep(&state, tick, &callbacks, 1000);
+	assert(status == FB_SERVICE_OK);
 	assert(callbacks == 1 && waits == 1);
 	assert(state.deadline > now);
 	now += 1000;
-	assert(fb_IdleStep(&state, tick, &callbacks, 0) == FB_SERVICE_OK);
+	status = fb_IdleStep(&state, tick, &callbacks, 0);
+	assert(status == FB_SERVICE_OK);
 	assert(callbacks == 2 && !state.running);
-	assert(fb_IdleStep(&state, tick, &callbacks, 1000) == FB_SERVICE_OK);
+	status = fb_IdleStep(&state, tick, &callbacks, 1000);
+	assert(status == FB_SERVICE_OK);
 	assert(waits == 1 && callbacks == 2);
 	assert(fb_IdleInit(&state, 100) == FB_SERVICE_OK);
 	now -= 100;
-	assert(fb_IdleStep(&state, tick, &callbacks, 0) == FB_SERVICE_OK);
+	status = fb_IdleStep(&state, tick, &callbacks, 0);
+	assert(status == FB_SERVICE_OK);
 	assert(state.deadline > now && state.deadline - now < 0.101);
 	clock_ready = FALSE;
-	assert(fb_IdleStep(&state, tick, &callbacks, 0) == FB_SERVICE_UNAVAILABLE);
+	status = fb_IdleStep(&state, tick, &callbacks, 0);
+	assert(status == FB_SERVICE_UNAVAILABLE);
 	clock_ready = TRUE;
 }
 
