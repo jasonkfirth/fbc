@@ -47,6 +47,12 @@ concurrently. The DOS provider holds the existing runtime scheduler exclusion
 lock while using DJGPP's shared real-mode transfer area. A caller must not
 simultaneously modify or read the same output span from another thread.
 
+The `secure-random.bas` and `secure-range.bas` examples print an explicit
+unavailable message and exit successfully when the selected target has no
+provider. Other provider errors remain failures. This lets the examples run on
+targets that cannot supply checked randomness without suggesting that a
+weaker source was used.
+
 ## Providers
 
 | Target | Source and refusal behavior |

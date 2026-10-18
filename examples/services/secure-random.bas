@@ -9,7 +9,10 @@ const TOKEN_BYTES as uinteger = 32
 dim token(0 to TOKEN_BYTES - 1) as ubyte
 '' SIZEOF(array) is the element size in BASIC. Pass the full byte count.
 dim status as long = FBC.secureRandom(@token(0), TOKEN_BYTES)
-if status <> FB.SECURE_RANDOM_OK then
+if status = FB.SECURE_RANDOM_UNAVAILABLE then
+	print "Secure random is unavailable on this target."
+	end 0
+elseif status <> FB.SECURE_RANDOM_OK then
 	'' The API clears the complete valid span on a provider failure.
 	print "No token was generated, status "; status
 	end 1

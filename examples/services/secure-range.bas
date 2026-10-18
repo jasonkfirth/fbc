@@ -27,7 +27,10 @@ end function
 for roll as long = 1 to 12
 	dim face as ulong
 	dim status as long = secure_below(6, face)
-	if status <> FB.SECURE_RANDOM_OK then
+	if status = FB.SECURE_RANDOM_UNAVAILABLE then
+		print "Secure random is unavailable on this target; no values were generated."
+		end 0
+	elseif status <> FB.SECURE_RANDOM_OK then
 		print "No roll was generated, status "; status
 		end 1
 	end if
