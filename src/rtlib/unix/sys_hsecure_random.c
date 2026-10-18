@@ -1,7 +1,7 @@
 /*
  * FreeBASIC Unix runtime: sys_hsecure_random.c
- * Read checked system randomness on Linux/Android, supported FreeBSD and
- * Darwin. Nonblocking kernel requests report an unready pool instead of
+ * Read checked system randomness on Linux/Android, supported FreeBSD, Darwin
+ * and OpenBSD. Nonblocking kernel requests report an unready pool instead of
  * stalling startup. Other Unix targets require a source override, not a weak
  * fallback.
  */
@@ -22,7 +22,7 @@
 	#include <sys/random.h>
 	#define FB_HAVE_CHECKED_GETRANDOM
 	#define FB_GETRANDOM_NONBLOCK GRND_NONBLOCK
-#elif defined(HOST_DARWIN)
+#elif defined(HOST_DARWIN) || defined(HOST_OPENBSD)
 	#include <stdlib.h>
 	#define FB_HAVE_ARC4RANDOM_BUF
 #endif
@@ -57,7 +57,7 @@ int fb_hSecureRandom( void *destination, size_t byte_count )
 	}
 	return FB_SECURE_RANDOM_OK;
 #elif defined(FB_HAVE_ARC4RANDOM_BUF)
-	/* Darwin libc fills the complete span and exposes no per-call status. */
+	/* Darwin and OpenBSD libc fill the span and expose no per-call status. */
 	arc4random_buf( destination, byte_count );
 	return FB_SECURE_RANDOM_OK;
 #else
