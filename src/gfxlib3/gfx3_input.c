@@ -88,10 +88,24 @@ void fb_gfx3_input_destroy(FB_GFX3_INPUT_STATE *input)
 	mutex = input->mutex;
 	fb_MutexLock(mutex);
 	input->initialized = FALSE;
+	fb_hDropClear(&input->drops);
 	input->mutex = NULL;
 	fb_MutexUnlock(mutex);
 	fb_MutexDestroy(mutex);
 	memset(input, 0, sizeof(*input));
+}
+
+int fb_gfx3_input_drop_submit(FB_GFX3_INPUT_STATE *input, int kind,
+	const char *data, size_t bytes, int count)
+{
+	EVENT event;
+	int result;
+	if (input == NULL || input->mutex == NULL) return FB_DROP_UNAVAILABLE;
+	fb_MutexLock(input->mutex);
+	result = fb_hDropPublish(&input->drops, kind, data, bytes, count, &event);
+	if (result == FB_DROP_OK) input_post_event_locked(input, &event);
+	fb_MutexUnlock(input->mutex);
+	return result;
 }
 
 void fb_gfx3_input_platform_focus(FB_GFX3_INPUT_STATE *input, int focused)

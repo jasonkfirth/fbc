@@ -23,6 +23,12 @@ reference.
 - [Compatibility runtime and compiler services](compatibility-services.md)
   documents the byte-string, pathname-attribute, bitmap-font measurement,
   packed-fill, file-copy, indexed-readback, and concurrent-build work.
+- [Platform services and native graphics drops](../doc/platform-services.md)
+  describes checked notifications, cooperative idle polling, Windows and X11
+  file/text drops, examples, and their platform qualification limits.
+- [Checked secure randomness](../doc/secure-random.md)
+  documents the caller-owned API contract, provider and refusal behavior, DOS
+  device protocol, and focused verification boundaries.
 - [gfxlib3](gfxlib3/README.md) describes the opt-in render-threaded GPU graphics
   runtime and links to its architecture, parity, performance, and verification
   records.
@@ -51,6 +57,9 @@ beside the examples:
 
 ## Build and qualification records
 
+- [Compiler semantic model](../doc/compiler-semantic-model.md) defines the
+  schema 27 sidecar, source and macro origins, bounded observations, and the
+  binary/text reader contract.
 - [Cross-build matrix](../build_scripts/cross-build-matrix/README.md)
 - [Emulated native matrix](../build_scripts/emulated-native-matrix/README.md)
 - [gfxlib3 test plan](gfxlib3/test-plan.md)

@@ -227,7 +227,8 @@ namespace FB
 		EVENT_WINDOW_LOST_FOCUS     = 12, _
 		EVENT_WINDOW_CLOSE          = 13, _
 		EVENT_MOUSE_HWHEEL          = 14, _
-		EVENT_WINDOW_RESIZE         = 15
+		EVENT_WINDOW_RESIZE         = 15, _
+		EVENT_DROP                  = 16
 
 
 	'' Event structure, to be used with ScreenEvent
@@ -252,6 +253,11 @@ namespace FB
 			type
 				width as long
 				height as long
+			end type
+			type
+				drop_id as long
+				drop_count as long
+				drop_kind as long
 			end type
 			button as long
 			z as long

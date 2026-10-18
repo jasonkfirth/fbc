@@ -406,6 +406,7 @@ void                fb_hListDynElemRemove   ( FB_LIST *list, FB_LISTELEM *elem )
 #include "fb_string.h"
 #include "fb_array.h"
 #include "fb_system.h"
+#include "fb_secure_random.h"
 #include "fb_math.h"
 #include "fb_data.h"
 #include "fb_console.h"

@@ -27,6 +27,7 @@
 #define __FB_GFX3_INPUT_H__
 
 #include "fb_gfx3.h"
+#include "../rtlib/fb_drop.h"
 
 #define FB_GFX3_INPUT_KEY_COUNT 128u
 #define FB_GFX3_INPUT_KEY_BUFFER_LENGTH 16u
@@ -94,6 +95,7 @@ typedef struct FB_GFX3_GAMEPAD_STATE {
 typedef struct FB_GFX3_INPUT_STATE {
 	FBMUTEX *mutex;
 	EVENT event_queue[MAX_EVENTS];
+	FB_DROP_STATE drops;
 	unsigned char key[FB_GFX3_INPUT_KEY_COUNT];
 	int key_buffer[FB_GFX3_INPUT_KEY_BUFFER_LENGTH];
 	FB_GFX3_MOUSE_REQUEST mouse_request;
@@ -131,6 +133,8 @@ typedef struct FB_GFX3_INPUT_STATE {
 
 int fb_gfx3_input_init(FB_GFX3_INPUT_STATE *input, uint32_t width,
 	uint32_t height);
+int fb_gfx3_input_drop_submit(FB_GFX3_INPUT_STATE *input, int kind,
+	const char *data, size_t bytes, int count);
 void fb_gfx3_input_destroy(FB_GFX3_INPUT_STATE *input);
 
 void fb_gfx3_input_platform_focus(FB_GFX3_INPUT_STATE *input, int focused);

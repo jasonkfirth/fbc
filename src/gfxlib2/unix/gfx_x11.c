@@ -1,4 +1,8 @@
-/* x11 window management code shared by x11 and opengl drivers */
+/* FreeBASIC gfxlib2: gfx_x11.c
+ * Purpose: Share native window handling between X11 and OpenGL drivers.
+ * Responsibilities: Window lifecycle, input and bounded Xdnd reception.
+ * This file does not open dropped files or implement drawing primitives.
+ */
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -9,6 +13,26 @@
 #include "fb_gfx_x11.h"
 #include "../../rtlib/unix/fb_private_scancodes_x11.h"
 #include <pthread.h>
+#include "fb_x11_drop.h"
+
+static FB_X11_DROP drop_windows[3];
+
+static int x11_drop_enabled(void *user)
+{
+	int enabled;
+	(void)user;
+	EVENT_LOCK();
+	enabled = __fb_gfx->drops.enabled;
+	EVENT_UNLOCK();
+	return enabled;
+}
+
+static int x11_drop_submit(void *user, int kind, const char *data,
+	size_t bytes, int count)
+{
+	(void)user;
+	return fb_hGfxDropSubmit(kind, data, bytes, count);
+}
 
 /* Horizontal scroll wheel (6 == left, 7 == right)
    X headers do not define these, as X was not designed for this,
@@ -240,6 +264,8 @@ static void *window_thread(void *arg)
 		}
 
 		fb_x11.update();
+		for (int drop_index = 0; drop_index < 3; ++drop_index)
+			fb_hX11DropTick(&drop_windows[drop_index]);
 
 		/* This line is causing fbgfx OpenGL code to freeze. - GOK
 		 * XSync(fb_x11.display, False);
@@ -247,6 +273,10 @@ static void *window_thread(void *arg)
 		while (XPending(fb_x11.display)) {
 			e.type = 0;
 			XNextEvent(fb_x11.display, &event);
+			if (fb_hX11DropEvent(&drop_windows[0], &event) ||
+			    fb_hX11DropEvent(&drop_windows[1], &event) ||
+			    fb_hX11DropEvent(&drop_windows[2], &event))
+				continue;
 			switch (event.type) {
 				case FocusIn:
 				case MapNotify:
@@ -425,6 +455,9 @@ static void *window_thread(void *arg)
 		usleep(30000);
 	}
 
+	for (int drop_index = 0; drop_index < 3; ++drop_index)
+		if (drop_windows[drop_index].waiting)
+			fb_hX11DropFinish(&drop_windows[drop_index], FALSE);
 	fb_x11.exit();
 
 	return NULL;
@@ -632,6 +665,15 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 
 	if (!fb_x11.window)
 		return -1;
+	fb_hX11DropInit(&drop_windows[0], fb_x11.display, fb_x11.window,
+		x11_drop_enabled, x11_drop_submit, NULL);
+	fb_hX11DropInit(&drop_windows[1], fb_x11.display, fb_x11.wmwindow,
+		x11_drop_enabled, x11_drop_submit, NULL);
+	fb_hX11DropInit(&drop_windows[2], fb_x11.display, fb_x11.fswindow,
+		x11_drop_enabled, x11_drop_submit, NULL);
+	EVENT_LOCK();
+	__fb_gfx->drops.supported = TRUE;
+	EVENT_UNLOCK();
 	fb_hX11SetWindowTitle( title );
 #ifndef DISABLE_XPM
 	if (fb_program_icon) {
@@ -1114,3 +1156,4 @@ ssize_t fb_hGetDisplayHandle(void)
 }
 
 #endif
+/* end of gfx_x11.c */

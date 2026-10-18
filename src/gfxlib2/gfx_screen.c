@@ -1,4 +1,8 @@
-/* screen function and drivers handling */
+/* FreeBASIC gfxlib2: gfx_screen.c
+ * Purpose: Create graphics modes and release their shared resources.
+ * Responsibilities: Driver selection, mode storage and orderly input cleanup.
+ * Native drop decoding and application file handling belong to other modules.
+ */
 
 #include "fb_gfx.h"
 #include <limits.h>
@@ -172,6 +176,8 @@ static void release_gfx_mem(void)
 			free(__fb_gfx->key);
 		if (__fb_gfx->event_queue)
 			free(__fb_gfx->event_queue);
+		/* The native producer has stopped before mode storage is released. */
+		fb_hDropClear(&__fb_gfx->drops);
 		if (__fb_gfx->event_mutex)
 			fb_MutexDestroy(__fb_gfx->event_mutex);
 		free(__fb_gfx);
@@ -998,3 +1004,4 @@ FBCALL void fb_GfxSetWindowTitle(FBSTRING *title)
 
 	FB_GRAPHICS_UNLOCK( );
 }
+/* end of gfx_screen.c */

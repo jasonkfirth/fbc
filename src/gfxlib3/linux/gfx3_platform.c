@@ -38,6 +38,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include "../../gfxlib2/unix/fb_x11_drop.h"
 
 #include "../../rtlib/unix/fb_private_scancodes_x11.h"
 
@@ -104,6 +105,7 @@ enum FB_GFX3_GLX_CONSTANT {
 #endif
 
 typedef struct FB_GFX3_PLATFORM_X11 {
+	FB_X11_DROP drops;
 	Display *display;
 	int screen;
 	Window window;
@@ -245,6 +247,23 @@ typedef struct FB_GFX3_X11_MOTIF_HINTS {
 
 #define FB_GFX3_X11_MOTIF_HINTS_DECORATIONS (1UL << 1)
 
+static int platform_x11_drop_enabled(void *user)
+{
+	FB_GFX3_INPUT_STATE *input = user;
+	int enabled;
+	if (input == NULL || input->mutex == NULL) return FALSE;
+	fb_MutexLock(input->mutex);
+	enabled = input->initialized && input->drops.enabled;
+	fb_MutexUnlock(input->mutex);
+	return enabled;
+}
+
+static int platform_x11_drop_submit(void *user, int kind, const char *data,
+	size_t bytes, int count)
+{
+	return fb_gfx3_input_drop_submit(user, kind, data, bytes, count);
+}
+
 static void platform_x11_remove_decorations(FB_GFX3_PLATFORM_X11 *platform)
 {
 	FB_GFX3_X11_MOTIF_HINTS hints;
@@ -355,6 +374,13 @@ static int platform_x11_create_window_on_display(void **destination,
 		visual, attribute_mask, &attributes);
 	if (platform->window == None)
 		goto fail;
+	fb_hX11DropInit(&platform->drops, platform->display, platform->window,
+		platform_x11_drop_enabled, platform_x11_drop_submit, platform->input);
+	if (platform->input != NULL) {
+		fb_MutexLock(platform->input->mutex);
+		platform->input->drops.supported = TRUE;
+		fb_MutexUnlock(platform->input->mutex);
+	}
 	memset(&size_hints, 0, sizeof(size_hints));
 	if (flags & FB_GFX3_WINDOW_RESIZABLE) {
 		size_hints.flags = PMinSize;
@@ -439,6 +465,8 @@ static void platform_x11_destroy(void *state)
 		return;
 	fb_gfx3_input_platform_window_info(platform->input, 0, 0, 0, 0, 0, 0);
 	if (platform->display != NULL) {
+		if (platform->drops.waiting)
+			fb_hX11DropFinish(&platform->drops, FALSE);
 #if !defined(DISABLE_OPENGL)
 		if ((platform->glx_make_current != NULL) &&
 		    (platform->context != NULL))
@@ -824,8 +852,11 @@ static void platform_x11_pump_events(void *state)
 	if (platform == NULL)
 		return;
 	platform_x11_apply_requests(platform);
+	fb_hX11DropTick(&platform->drops);
 	while (XPending(platform->display)) {
 		XNextEvent(platform->display, &event);
+		if (fb_hX11DropEvent(&platform->drops, &event))
+			continue;
 		switch (event.type) {
 		case MapNotify:
 			/*

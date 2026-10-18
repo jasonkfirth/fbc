@@ -1,3 +1,8 @@
+/* FreeBASIC Android APK template: fb_android_app.c
+ * Purpose: Connect NativeActivity lifetime to the BASIC program and its drivers.
+ * Responsibilities: Native threads, input, assets and optional service binding.
+ * Java permission prompts and application network policy belong elsewhere.
+ */
 #include <android/input.h>
 #include <android/asset_manager.h>
 #include <android/log.h>
@@ -34,6 +39,7 @@ int FB_ANDROID_PROGRAM_MAIN(int argc, char **argv) FB_ANDROID_WEAK;
 extern const int __fb_app_mode_gui_enabled FB_ANDROID_WEAK;
 void fb_AllocateMainFBThread(void) FB_ANDROID_WEAK;
 void fb_hAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
+void fb_hNotifyAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
 void fb_hAndroidSetKeyboardEnabled(int enabled) FB_ANDROID_WEAK;
 void fb_hAndroidSetWindow(ANativeWindow *window) FB_ANDROID_WEAK;
 void fb_hAndroidTouch(float x, float y, int action) FB_ANDROID_WEAK;
@@ -720,6 +726,8 @@ static void fb_android_on_destroy(ANativeActivity *activity)
 		fb_hAndroidSetWindow(NULL);
 	if (fb_hAndroidSetActivity)
 		fb_hAndroidSetActivity(NULL);
+	if (fb_hNotifyAndroidSetActivity)
+		fb_hNotifyAndroidSetActivity(NULL);
 	pthread_cond_destroy(&app->cond);
 	pthread_mutex_destroy(&app->mutex);
 	free(app);
@@ -852,6 +860,8 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void *saved_state, size
 		fb_hAndroidSetKeyboardEnabled(FB_ANDROID_KEYBOARD_ENABLED);
 	if (fb_hAndroidSetActivity)
 		fb_hAndroidSetActivity(activity);
+	if (fb_hNotifyAndroidSetActivity)
+		fb_hNotifyAndroidSetActivity(activity);
 	fb_android_apply_app_mode();
 	fb_android_publish_lifecycle(0, 0, 0);
 	if (pthread_create(&app->looper_thread, NULL, fb_android_looper_thread, app) == 0)
@@ -860,3 +870,4 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void *saved_state, size
 		fb_android_log("FreeBASIC Android looper thread failed to start");
 	fb_android_log("FreeBASIC Android activity created");
 }
+/* end of fb_android_app.c */

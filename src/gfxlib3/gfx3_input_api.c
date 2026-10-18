@@ -252,6 +252,50 @@ int fb_GfxSetMouse(int x, int y, int cursor, int clip)
 /* Event queue and hook ownership                                            */
 /* ------------------------------------------------------------------------- */
 
+FBCALL int fb_GfxDropEnable(int enabled)
+{
+	FB_GFX3_INPUT_STATE *input;
+	int result = FB_DROP_UNAVAILABLE;
+	if (enabled != 0 && enabled != 1 && enabled != -1) return FB_DROP_INVALID;
+	enabled = enabled != 0;
+	FB_GRAPHICS_LOCK();
+	input = input_active_locked(NULL);
+	if (input != NULL) {
+		fb_MutexLock(input->mutex);
+		if (input->drops.supported) {
+			input->drops.enabled = enabled;
+			if (!enabled) fb_hDropClear(&input->drops);
+			result = FB_DROP_OK;
+		}
+		fb_MutexUnlock(input->mutex);
+	}
+	FB_GRAPHICS_UNLOCK();
+	return result;
+}
+
+FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING *output)
+{
+	FB_GFX3_INPUT_STATE *input;
+	char *text = NULL;
+	int result = FB_DROP_UNAVAILABLE;
+	if (output == NULL) return FB_DROP_INVALID;
+	FB_GRAPHICS_LOCK();
+	input = input_active_locked(NULL);
+	if (input != NULL) {
+		fb_MutexLock(input->mutex);
+		result = fb_hDropCopy(&input->drops, identifier, index, &text);
+		fb_MutexUnlock(input->mutex);
+	}
+	FB_GRAPHICS_UNLOCK();
+	/* BASIC string allocation must not run under the platform input mutex. */
+	if (result == FB_DROP_OK) {
+		fb_StrAssign(output, -1, text, 0, FALSE);
+		if ((size_t)output->len != strlen(text)) result = FB_DROP_FAILED;
+		free(text);
+	}
+	return result;
+}
+
 FBCALL int fb_GfxEvent(EVENT *event)
 {
 	FB_GFX3_DRAW_STATE *state;

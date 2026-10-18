@@ -1,3 +1,8 @@
+/* FreeBASIC runtime: fb_event.h
+ * Purpose: Share the fixed SCREENEVENT layout with both graphics libraries.
+ * Responsibilities: Event IDs and pointer-free payload metadata.
+ * Variable-length drops are retained separately by the active graphics mode.
+ */
 struct _EVENT {
 	int type;
 	union {
@@ -11,6 +16,9 @@ struct _EVENT {
 		};
 		struct {			/* window resize events */
 			int width, height;
+		};
+		struct {            /* copied drop payload, retrieved by identifier */
+			int drop_id, drop_count, drop_kind;
 		};
 		int button;
 		int z;
@@ -35,6 +43,7 @@ typedef struct _EVENT EVENT;
 #define EVENT_WINDOW_CLOSE			13
 #define EVENT_MOUSE_HWHEEL			14
 #define EVENT_WINDOW_RESIZE			15
+#define EVENT_DROP                    16
 
 #define MAX_EVENTS					128
 
@@ -162,3 +171,4 @@ typedef struct _EVENT EVENT;
 #define KEY_QUIT        FB_MAKE_EXT_KEY( 'k' )
 
 #define QB_EXTK(x)(((unsigned short)(x))<<8|0xff)
+/* end of fb_event.h */

@@ -9,6 +9,7 @@
 
 #include "../rtlib/fb.h"
 #include "../rtlib/fb_gfx_private.h"
+#include "../rtlib/fb_drop.h"
 
 #define PI			3.1415926535897932384626
 
@@ -266,6 +267,7 @@ typedef struct FBGFX
 	EVENT *event_queue;                     /**< The OS events queue array */
 	int event_head, event_tail;             /**< Indices for the head and tail event in the array */
 	FBMUTEX *event_mutex;                   /**< Mutex lock for accessing the events queue */
+	FB_DROP_STATE drops;                   /**< Payloads protected by event_mutex */
 	volatile int flags;                     /**< Status flags */
 	int lock_count;                         /**<Reference count for SCREENLOCK/UNLOCK */
 	volatile int pending_width;             /**< Coalesced client width requested by the window thread */
@@ -553,6 +555,7 @@ extern void fb_hSetupData(void);
 extern FBCALL int fb_hEncode(const unsigned char *in_buffer, ssize_t in_size, unsigned char *out_buffer, ssize_t *out_size);
 extern FBCALL int fb_hDecode(const unsigned char *in_buffer, ssize_t in_size, unsigned char *out_buffer, ssize_t *out_size);
 extern void fb_hPostEvent(EVENT *e);
+extern int fb_hGfxDropSubmit(int kind, const char *data, size_t bytes, int count);
 extern void fb_hRequestResize(int width, int height);
 extern int fb_hApplyPendingResize(void);
 extern void fb_hPostKey(int key);
@@ -645,6 +648,8 @@ extern FBCALL ssize_t fb_GfxGetTouch(ssize_t index, ssize_t *x, ssize_t *y, ssiz
 extern FBCALL ssize_t fb_GfxGetTouchHit(ssize_t x1, ssize_t y1, ssize_t x2, ssize_t y2);
 extern FBCALL ssize_t fb_GfxGetTouchHitCircle(ssize_t x, ssize_t y, ssize_t radius);
 extern FBCALL int fb_GfxEvent(EVENT *event);
+extern FBCALL int fb_GfxDropEnable(int enabled);
+extern FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING *output);
 extern FBCALL void fb_GfxControl_s(int what, FBSTRING *param);
 extern FBCALL void fb_GfxControl_i(int what, ssize_t *param1, ssize_t *param2, ssize_t *param3, ssize_t *param4);
 extern FBCALL void fb_GfxControl_i32(int what, int *param1, int *param2, int *param3, int *param4);

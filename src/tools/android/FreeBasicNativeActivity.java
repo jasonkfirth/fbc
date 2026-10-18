@@ -14,6 +14,7 @@
         * catch soft-keyboard Backspace events that Android dispatches
           through the Java view hierarchy
         * forward those events to the native FreeBASIC Android gfx driver
+        * post native-requested notifications and marshal permission prompts
 
     This file intentionally does NOT contain:
 
@@ -25,6 +26,11 @@
 package org.freebasic.android;
 
 import android.app.NativeActivity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.os.Build;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -37,6 +43,11 @@ import android.text.InputType;
 public class FreeBasicNativeActivity extends NativeActivity {
 	private static final int INPUT_VIEW_ID = 0x0fb60001;
 	private FreeBasicInputView keyboardInputView;
+	private volatile boolean notificationsDestroyed;
+	private boolean notificationPermissionPending;
+	private static final int NOTIFICATION_PERMISSION_REQUEST = 0x0fb6;
+	private static final String NOTIFICATION_CHANNEL = "freebasic.messages";
+	private static final String NOTIFICATION_PERMISSION = "android.permission.POST_NOTIFICATIONS";
     static {
         System.loadLibrary("freebasicapp");
     }
@@ -168,6 +179,137 @@ public class FreeBasicNativeActivity extends NativeActivity {
             */
         }
     }
+
+	/* --------------------------------------------------------------------- */
+	/* Notifications requested by the native runtime                          */
+	/* --------------------------------------------------------------------- */
+
+	/*
+		These status numbers are the fbnotify.bi ABI. NotificationManager may
+		suppress presentation after accepting a post, for example during Do Not
+		Disturb. Success means accepted by the platform, not seen by the user.
+		Reflection keeps the APK template buildable with an API-23 compile jar;
+		channels and notification policy are queried only on supporting devices.
+	*/
+	private int notificationPermissionFromNative(final boolean request) {
+		if (notificationsDestroyed) {
+			return 1;
+		}
+		if (Build.VERSION.SDK_INT >= 33 &&
+			checkSelfPermission(NOTIFICATION_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
+			if (request) {
+				runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						if (!notificationsDestroyed && !notificationPermissionPending &&
+							checkSelfPermission(NOTIFICATION_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
+							notificationPermissionPending = true;
+							requestPermissions(new String[] { NOTIFICATION_PERMISSION },
+								NOTIFICATION_PERMISSION_REQUEST);
+						}
+					}
+				});
+			}
+			return 4;
+		}
+		try {
+			NotificationManager manager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+			if (manager == null) {
+				return 1;
+			}
+			if (Build.VERSION.SDK_INT >= 24 && !((Boolean)NotificationManager.class
+				.getMethod("areNotificationsEnabled").invoke(manager)).booleanValue()) {
+				return 4;
+			}
+			/* A user can block this channel while leaving the whole app enabled.
+			 * Permission queries must report that policy before a caller posts.
+			 * An absent channel is allowed; the first send creates it.
+			 */
+			if (Build.VERSION.SDK_INT >= 26) {
+				Class<?> channelClass = Class.forName("android.app.NotificationChannel");
+				Object channel = NotificationManager.class.getMethod("getNotificationChannel", String.class)
+					.invoke(manager, NOTIFICATION_CHANNEL);
+				if (channel != null && ((Integer)channelClass.getMethod("getImportance")
+					.invoke(channel)).intValue() == 0) {
+					return 4;
+				}
+			}
+			return 0;
+		} catch (ReflectiveOperationException error) {
+			return 3;
+		}
+	}
+
+	private int notificationSendFromNative(String title, String body, int identifier) {
+		int permission = notificationPermissionFromNative(false);
+		if (permission != 0) {
+			return permission;
+		}
+		try {
+			NotificationManager manager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+			Notification.Builder builder;
+			if (Build.VERSION.SDK_INT >= 26) {
+				Class<?> channelClass = Class.forName("android.app.NotificationChannel");
+				Object channel = channelClass.getConstructor(String.class, CharSequence.class, int.class)
+					.newInstance(NOTIFICATION_CHANNEL, getApplicationInfo().loadLabel(getPackageManager()), 3);
+				NotificationManager.class.getMethod("createNotificationChannel", channelClass)
+					.invoke(manager, channel);
+				Object current = NotificationManager.class.getMethod("getNotificationChannel", String.class)
+					.invoke(manager, NOTIFICATION_CHANNEL);
+				if (current != null && ((Integer)channelClass.getMethod("getImportance")
+					.invoke(current)).intValue() == 0) {
+					return 4;
+				}
+				builder = Notification.Builder.class.getConstructor(android.content.Context.class, String.class)
+					.newInstance(this, NOTIFICATION_CHANNEL);
+			} else {
+				builder = new Notification.Builder(this);
+			}
+			/* An immutable explicit intent reopens this APK; untrusted post text
+			 * never becomes an Intent URI, package name or executable command.
+			 */
+			Intent intent = new Intent(this, getClass());
+			intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+			int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+			if (Build.VERSION.SDK_INT >= 23) {
+				flags |= 0x04000000; /* PendingIntent.FLAG_IMMUTABLE, added in API 23 */
+			}
+			builder.setSmallIcon(android.R.drawable.stat_notify_chat)
+				.setContentTitle(title).setContentText(body).setAutoCancel(true)
+				.setContentIntent(PendingIntent.getActivity(this, identifier, intent, flags));
+			manager.notify("FreeBASIC", identifier, builder.build());
+			return 0;
+		} catch (SecurityException error) {
+			return 4;
+		} catch (ReflectiveOperationException error) {
+			return 3;
+		} catch (IllegalArgumentException error) {
+			return 3;
+		}
+	}
+
+	private int notificationCloseFromNative(int identifier) {
+		NotificationManager manager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+		if (manager == null) {
+			return 1;
+		}
+		manager.cancel("FreeBASIC", identifier);
+		return 0;
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+		super.onRequestPermissionsResult(requestCode, permissions, results);
+		if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+			notificationPermissionPending = false;
+		}
+	}
+
+	@Override
+	protected void onDestroy() {
+		notificationsDestroyed = true;
+		super.onDestroy();
+	}
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {

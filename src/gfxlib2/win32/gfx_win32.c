@@ -1,9 +1,21 @@
-/* common win32 routines and drivers list */
+/* FreeBASIC gfxlib2: gfx_win32.c
+ * Purpose: Own the shared Windows graphics window and native event translation.
+ * Responsibilities: Driver setup, input, window layout and copied file drops.
+ * Drawing algorithms and application file handling belong to other modules.
+ */
 
 #include "../fb_gfx.h"
 #include "fb_gfx_win32.h"
 #include "../../rtlib/win32/fb_private_console.h"
 #include <process.h>
+#include "fb_win32_drop.h"
+
+static int win32_drop_submit(void *user, int kind, const char *data,
+	size_t bytes, int count)
+{
+	(void)user;
+	return fb_hGfxDropSubmit(kind, data, bytes, count);
+}
 
 #define WM_MOUSEENTER WM_USER
 
@@ -891,6 +903,10 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 
 			break;
 
+		case WM_DROPFILES:
+			(void)fb_hWin32DropReceive((HDROP)wParam, win32_drop_submit, NULL);
+			return FALSE;
+
 		case WM_CLOSE:
 			fb_hPostKey( KEY_QUIT ); /* ALT + F4 */
 			e.type = EVENT_WINDOW_CLOSE;
@@ -1014,10 +1030,13 @@ int fb_hInitWindow(DWORD style, DWORD ex_style, int x, int y, int w, int h)
 	fb_win32.fullw = w;
 	fb_win32.fullh = h;
 
-	fb_win32.wnd = CreateWindowEx(ex_style, fb_win32.window_class, fb_win32.window_title, style,
+	fb_win32.wnd = CreateWindowEx(ex_style | WS_EX_ACCEPTFILES, fb_win32.window_class, fb_win32.window_title, style,
 		x, y, w, h, HWND_DESKTOP, NULL, fb_win32.hinstance, NULL);
 	if (!fb_win32.wnd)
 		return -1;
+	EVENT_LOCK();
+	__fb_gfx->drops.supported = TRUE;
+	EVENT_UNLOCK();
 
 	fb_hWin32UpdateWindowLayout();
 
@@ -1445,3 +1464,4 @@ static unsigned int hIntlConvertChar( int key, int source_cp, int dest_cp )
 
 	return keyconv2.a[0];
 }
+/* end of gfx_win32.c */

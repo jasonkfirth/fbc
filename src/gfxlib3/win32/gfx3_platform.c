@@ -34,6 +34,7 @@
 #include <windows.h>
 #include <GL/gl.h>
 #include <GL/wglext.h>
+#include "../../gfxlib2/win32/fb_win32_drop.h"
 
 #include "../../rtlib/win32/fb_private_console.h"
 
@@ -368,6 +369,12 @@ static int platform_win32_mouse_in_client(HWND window)
 		GetClientRect(window, &client) && PtInRect(&client, position);
 }
 
+static int platform_win32_drop_submit(void *user, int kind, const char *data,
+	size_t bytes, int count)
+{
+	return fb_gfx3_input_drop_submit(user, kind, data, bytes, count);
+}
+
 static LRESULT CALLBACK platform_win32_window_proc(HWND window, UINT message,
 	WPARAM wparam, LPARAM lparam)
 {
@@ -560,6 +567,11 @@ static LRESULT CALLBACK platform_win32_window_proc(HWND window, UINT message,
 			fb_gfx3_input_platform_character(platform->input,
 				character, (uint32_t)LOWORD(lparam));
 		}
+		return 0;
+
+	case WM_DROPFILES:
+		(void)fb_hWin32DropReceive((HDROP)wparam, platform_win32_drop_submit,
+			platform->input);
 		return 0;
 
 	case WM_CLOSE:
@@ -916,13 +928,16 @@ static int platform_win32_create_window_base(void **destination, void *input,
 			window_y += ((monitor_info.rcWork.bottom -
 				monitor_info.rcWork.top) - window_height) / 2;
 	}
-	platform->window = CreateWindowExA(0, FB_GFX3_WIN32_WINDOW_CLASS,
+	platform->window = CreateWindowExA(WS_EX_ACCEPTFILES, FB_GFX3_WIN32_WINDOW_CLASS,
 		(title != NULL) ? title : "FreeBASIC gfxlib3",
 		style, window_x, window_y, window_width,
 		window_height, NULL, NULL, GetModuleHandleA(NULL), NULL);
 	if (platform->window == NULL)
 		goto fail;
 	SetWindowLongPtrA(platform->window, GWLP_USERDATA, (LONG_PTR)platform);
+	fb_MutexLock(platform->input->mutex);
+	platform->input->drops.supported = TRUE;
+	fb_MutexUnlock(platform->input->mutex);
 	if ((flags & FB_GFX3_WINDOW_FULLSCREEN) == 0u) {
 		/*
 			Some desktop policies still cap the initial overlapped window to the
