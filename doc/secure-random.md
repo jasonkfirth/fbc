@@ -56,6 +56,8 @@ simultaneously modify or read the same output span from another thread.
 | FreeBSD 12 or later | `getrandom` with `GRND_NONBLOCK`, with the same complete-read and retry rules. Older versions do not acquire a weaker fallback. |
 | macOS / Darwin | libc `arc4random_buf` fills the complete span from Apple's system random source. Its `void` API has no per-call status; the provider reports success after the call returns. |
 | OpenBSD | libc `arc4random_buf` fills the complete span using OpenBSD's high-quality random data source. Its `void` API has no per-call status; the provider reports success after the call returns. |
+| DragonFlyBSD | libc `arc4random_buf` fills the complete span using DragonFlyBSD's cryptographic pseudorandom generator. Its `void` API has no per-call status; the provider reports success after the call returns. |
+| NetBSD 6.0 or later | libc `arc4random_buf` fills the complete span using the system entropy pool. Its `void` API has no per-call status; the provider reports success after the call returns. Earlier versions remain unavailable. |
 | Haiku x86-64 | Check CPUID for RDRAND, then check carry on every instruction with at most ten attempts. Compare consecutive full 64-bit words, including a discarded first word for short requests. Missing CPU support is unavailable; a failed or repeated result fails the request. |
 | Extended DOS | Open the `XLRNG$` character device, verify its control protocol, then perform exact reads of at most 4096 bytes. An ordinary file with that name is rejected. The qualified emulator/host is a prerequisite. |
 | Other native targets | The generic provider reports unavailable. A platform build or security qualification is required before claiming additional target support. |
@@ -70,6 +72,9 @@ Apple documents that its system random generator uses `arc4random_buf` in
 [SystemRandomNumberGenerator](https://developer.apple.com/documentation/swift/systemrandomnumbergenerator).
 OpenBSD documents the `arc4random_buf` interface and its successful buffer fill
 in the [`arc4random(3)` manual](https://man.openbsd.org/arc4random.3).
+DragonFlyBSD documents the generator and its always-successful interface in
+[`arc4random(3)`](https://man.dragonflybsd.org/?command=arc4random). NetBSD
+documents the interface in its [6.0.6 `arc4random(3)` manual](https://man.netbsd.org/NetBSD-6.0.6/arc4random.3).
 Intel documents CPUID, carry handling and bounded retries in the
 [DRNG software implementation guide](https://www.intel.com/content/www/us/en/developer/articles/guide/intel-digital-random-number-generator-drng-software-implementation-guide.html).
 The implementation uses these platform facilities directly, without defining
