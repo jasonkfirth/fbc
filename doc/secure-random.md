@@ -54,6 +54,7 @@ simultaneously modify or read the same output span from another thread.
 | Windows | CNG `BCryptGenRandom` with the system-preferred generator. Load `bcrypt.dll` from the system directory with restricted DLL search. Missing provider support is unavailable; an unsuccessful CNG call or cleanup fails the whole request. |
 | Linux / Android | The `getrandom` system call with `GRND_NONBLOCK`, in at most 256-byte chunks. An unready pool or missing syscall is unavailable. Interrupted calls have a bounded retry count. |
 | FreeBSD 12 or later | `getrandom` with `GRND_NONBLOCK`, with the same complete-read and retry rules. Older versions do not acquire a weaker fallback. |
+| macOS / Darwin | libc `arc4random_buf` fills the complete span from Apple's system random source. Its `void` API has no per-call status; the provider reports success after the call returns. |
 | Haiku x86-64 | Check CPUID for RDRAND, then check carry on every instruction with at most ten attempts. Compare consecutive full 64-bit words, including a discarded first word for short requests. Missing CPU support is unavailable; a failed or repeated result fails the request. |
 | Extended DOS | Open the `XLRNG$` character device, verify its control protocol, then perform exact reads of at most 4096 bytes. An ordinary file with that name is rejected. The qualified emulator/host is a prerequisite. |
 | Other native targets | The generic provider reports unavailable. A platform build or security qualification is required before claiming additional target support. |
@@ -64,6 +65,8 @@ provider falls back to timer seeds, a software PRNG, a user seed file or `RND`.
 
 Microsoft documents the CNG call and its system-preferred mode in
 [BCryptGenRandom](https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom).
+Apple documents that its system random generator uses `arc4random_buf` in
+[SystemRandomNumberGenerator](https://developer.apple.com/documentation/swift/systemrandomnumbergenerator).
 Intel documents CPUID, carry handling and bounded retries in the
 [DRNG software implementation guide](https://www.intel.com/content/www/us/en/developer/articles/guide/intel-digital-random-number-generator-drng-software-implementation-guide.html).
 The implementation uses these platform facilities directly, without defining
