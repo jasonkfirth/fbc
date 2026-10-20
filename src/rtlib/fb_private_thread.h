@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_private_thread.h
+ * Purpose: Provide fb private thread runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 /* FreeBASIC runtime: fb_private_thread.h
  * Private thread handles, startup records and platform mutex storage.
  * Public threading declarations and scheduler implementations live elsewhere.
@@ -8,7 +15,7 @@
 #endif
 
 #if defined(HOST_DOS) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
-	#include "dos/fb_dos_thread.h"
+	#include "drivers/dos/fb_dos_thread.h"
 	struct FB_DOS_MUTEX_WAITER;
 	struct _FBMUTEX {
 		int owner;

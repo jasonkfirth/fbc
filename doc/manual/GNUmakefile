@@ -1,8 +1,15 @@
+# Project: FreeBASIC manual
+# File: GNUmakefile
+# Purpose: Generate and package each supported manual format.
+# Responsibilities: Order shared HTML generation and verify fresh help output.
+# This file intentionally does NOT build the documentation tools.
+include ../common.mk
 include ../../mk/version.mk
+.DEFAULT_GOAL := all
 
 HHC := hhc
-FBDOC := ../fbdoc/fbdoc
-MAKEFBHELP := ../makefbhelp/makefbhelp
+FBDOC := ../fbdoc/fbdoc$(EXEEXT)
+MAKEFBHELP := ../makefbhelp/makefbhelp$(EXEEXT)
 
 # Nice names for the resulting .zip's and the important files
 TITLE       = FB-manual-$(FBVERSION)
@@ -19,18 +26,29 @@ ifdef QUIET
   HIDE := > /dev/null
 endif
 
+# File dependencies detect edits; the cache directory detects page additions
+# and removals, which otherwise leave an existing manual looking up to date.
+MANUAL_INPUTS := $(wildcard cache cache/*.wakka)
+html/fbdoc.hhp fbhelp/DocToc.txt txt/fbdoc.txt $(WAKKAZIP): $(MANUAL_INPUTS)
+
 ################################################################################
 
+.PHONY: all refresh
+.DELETE_ON_ERROR:
 all: $(CHMZIP) $(FBHELPZIP) $(HTMLZIP) $(TXTZIP) $(WAKKAZIP)
 
 ################################################################################
 # chm
 
 html/fbdoc.hhp:
+	rm -f html/*.html
 	$(FBDOC) -chm $(HIDE)
+	@test -f "$@" && test -f html/DocToc.html
 
 html/fbdoc.chm: html/fbdoc.hhp
+	rm -f "$@"
 	-$(HHC) $< $(HIDE)
+	@test -s "$@"
 
 $(CHM): html/fbdoc.chm
 	cp $< $@
@@ -56,13 +74,18 @@ $(FBHELPZIP): $(FBHELP)
 ################################################################################
 # html
 
-html/DocToc.html:
-	$(FBDOC) -chm $(HIDE)
+# Both HTML entry points are produced by the same invocation. Order requests
+# through the help project first so parallel manual formats cannot overwrite
+# one another's generated files. Regenerate if just the table was removed.
+html/DocToc.html: html/fbdoc.hhp
+	@if [ ! -f "$@" ]; then $(FBDOC) -chm $(HIDE); fi
+	@test -f "$@"
 
 html/00index.html: html/DocToc.html
 	cp $< $@
 
 $(HTMLZIP): html/00index.html
+	rm -f "$@"
 	cd html && zip -q -r -9 ../$@ *.html style.css images
 
 ################################################################################
@@ -81,6 +104,7 @@ $(TXTZIP): $(TXT)
 # wakka
 
 $(WAKKAZIP):
+	rm -f "$@"
 	cd cache && zip -q -9 ../$@ *.wakka
 
 ################################################################################
@@ -98,3 +122,5 @@ clean:
 	-rm -f $(CHMZIP) $(FBHELPZIP) $(HTMLZIP) $(TXTZIP) $(WAKKAZIP)
 
 .PHONY: clean
+
+# end of GNUmakefile

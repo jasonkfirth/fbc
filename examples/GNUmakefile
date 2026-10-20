@@ -1,4 +1,9 @@
 # examples GNUmakefile - attempts to build all examples
+# Project: FreeBASIC examples
+# File: GNUmakefile
+# Purpose: Build selected examples and their local helper libraries.
+# Responsibilities: Delegate helper dependencies and clean owned outputs.
+# This file intentionally does NOT provide optional external libraries.
 #
 # Several examples will not build if their libraries are not
 # present.
@@ -284,6 +289,14 @@ win32/COM/WebBrowser/test: win32/COM/WebBrowser/test.bas win32/COM/WebBrowser/li
 win32/variants/libvariant.a:
 	$(MAKE) -C win32/variants/libvariant FBC="$(FBC)"
 
+# The child owns its source/header graph. Check it once per invocation even
+# when its archive already exists; the child leaves unchanged objects alone.
+.PHONY: check-example-helpers
+check-example-helpers:
+win32/COM/MoviePlayer/libmovctrl.a \
+win32/COM/WebBrowser/libwebctrl.a \
+win32/variants/libvariant.a: check-example-helpers
+
 %: %.bas
 ifeq ($(STOP_ON_ERROR),n)
 	@echo fbc -p $(dir $@) $<
@@ -293,6 +306,18 @@ else
 	$(FBC) -p $(dir $@) $<
 endif
 
+.PHONY: all basics compression console database dll dos files graphics gui manual math misc network optimize regex sfxlib sound threads unicode win32 xpad xml clean
+# Keep the complete cleanup list out of Windows process arguments. A single
+# Make write and bounded xargs batches avoid one shell command per example.
+EXAMPLE_CLEAN_LIST := .example-clean-files.lst
 clean:
 	@echo CLEAN binary files
-	@$(RM) $(ALL_FILES)
+	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(file >$(EXAMPLE_CLEAN_LIST),$(sort $(ALL_FILES) $(addsuffix $(EXEEXT),$(filter-out %$(DLLEXT) %.a,$(ALL_FILES))))))
+	@set -e; \
+	trap 'rm -f "$(EXAMPLE_CLEAN_LIST)"' 0; \
+	xargs -r $(RM) < "$(EXAMPLE_CLEAN_LIST)"
+	@set -e; for directory in win32/COM/MoviePlayer/movctrl win32/COM/WebBrowser/webctrl win32/variants/libvariant; do \
+		if [ -f "$$directory/GNUmakefile" ]; then $(MAKE) -C "$$directory" clean; fi; \
+	done
+
+# end of GNUmakefile

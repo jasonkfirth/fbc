@@ -56,9 +56,17 @@ Things to verify first:
 - `FBTARGET`
 - `FBPACK_DIR`
 - install and build runtime directories
+- `HOST_TRIPLET`, `HOST_CC_FOR_PROBE`, and `CROSS_BUILD`
+- `CC`, `CXX`, `AR`, `AS`, `LD`, and `BUILD_FBC`
 
 If those values are wrong, fix `platform.mk`, `cpu.mk`, or `layout.mk` first.
 Do not start changing compile rules until identity is correct.
+
+Use `CC` for the target compiler and, when native-driver discovery is
+ambiguous, `HOST_CC` for a compiler that describes the build machine.
+`BUILD_FBC` must execute on that machine. Missing inferred cross tools fail
+concrete build prerequisites; an explicitly supplied equivalent SDK driver
+can replace the inferred triplet prefix.
 
 ## Normal Bring-Up Ladder
 

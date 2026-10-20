@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_hook.h
+ * Purpose: Provide fb hook runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 typedef FBSTRING   *(*FB_INKEYPROC)     ( void );
 typedef int         (*FB_GETKEYPROC)    ( void );
 typedef int         (*FB_KEYHITPROC)    ( void );
@@ -120,3 +127,5 @@ typedef struct FB_HOOKSTB {
     FB_PAGESETPROC			pagesetproc;
     FB_POSTEVENTPROC		posteventproc;
 } FB_HOOKSTB;
+
+/* end of fb_hook.h */

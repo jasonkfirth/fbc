@@ -19,7 +19,7 @@
 #include "../fb_sfx_internal.h"
 #include "../fb_sfx_driver.h"
 #if FB_SFX_DOS_THREADS
-#include "../../rtlib/dos/fb_dos_thread.h"
+#include "../../rtlib/drivers/dos/fb_dos_thread.h"
 #endif
 
 #include <dpmi.h>

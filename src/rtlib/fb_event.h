@@ -1,7 +1,9 @@
-/* FreeBASIC runtime: fb_event.h
+/* Project: FreeBASIC runtime: fb_event.h
  * Purpose: Share the fixed SCREENEVENT layout with both graphics libraries.
  * Responsibilities: Event IDs and pointer-free payload metadata.
  * Variable-length drops are retained separately by the active graphics mode.
+ * File: fb_event.h
+ * This file intentionally does NOT contain: unrelated runtime subsystems.
  */
 struct _EVENT {
 	int type;
@@ -171,4 +173,5 @@ typedef struct _EVENT EVENT;
 #define KEY_QUIT        FB_MAKE_EXT_KEY( 'k' )
 
 #define QB_EXTK(x)(((unsigned short)(x))<<8|0xff)
+
 /* end of fb_event.h */

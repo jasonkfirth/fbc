@@ -1,9 +1,9 @@
 /*
-    FreeBASIC Runtime Library
+    Project: FreeBASIC Runtime Library
     File: fb_ustring.h
     Purpose: Define UTF-8 string services using the FBSTRING descriptor ABI.
     Responsibilities: Scalar decoding, checked storage, and text operations.
-    This file intentionally does NOT contain compiler type selection.
+    This file intentionally does NOT contain: compiler type selection.
 
     Descriptor lengths and capacities are bytes, including embedded NULs.
     Public text positions are one-based Unicode scalar positions. Indexing

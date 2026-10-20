@@ -1,6 +1,10 @@
 ################
 # dist.mk
 ################
+# Project: FreeBASIC build system
+# Purpose: Stage complete binary distributions and produce tar/zip archives.
+# Responsibilities: Order cleanup, staging, and packaging of the native SDK.
+# This file intentionally does NOT define installation layout or compile rules.
 
 DISTROOT := dist
 DISTDIR  := $(DISTROOT)/freebasic
@@ -15,7 +19,7 @@ DIST_RUNTIME_DIR := $(patsubst $(prefix)%,%,$(FBINSTALL_RUNTIME_DIR))
 endif
 
 .PHONY: dist
-dist: dist-clean dist-stage dist-package
+dist: dist-package
 
 .PHONY: dist-clean
 dist-clean:
@@ -24,39 +28,34 @@ dist-clean:
 .PHONY: dist-stage
 dist-stage: dist-bin dist-includes dist-runtime
 
+# Cleanup must finish before any staging starts, including under parallel
+# make. Packaging then reads the complete shared stage without modifying it.
+dist-bin dist-includes dist-runtime: | dist-clean
+
 .PHONY: dist-bin
-dist-bin:
+dist-bin: $(FBC_EXE)
 	mkdir -p "$(DISTDIR)$(DIST_BINDIR)"
 	cp "$(FBC_EXE)" "$(DISTDIR)$(DIST_BINDIR)/fbc$(EXEEXT)"
 
 .PHONY: dist-includes
 dist-includes:
 	mkdir -p "$(DISTDIR)$(DIST_INCDIR)"
-	set -e; \
-	for f in "$(rootdir)"/inc/*; do \
-		[ -e "$$f" ] || continue; \
-		if [ -f "$$f" ]; then \
-			b=$$(basename "$$f"); \
-			cp "$$f" "$(DISTDIR)$(DIST_INCDIR)/$$b"; \
-		fi; \
-	done
+	cp -a "$(rootdir)/inc/." "$(DISTDIR)$(DIST_INCDIR)/"
 
 .PHONY: dist-runtime
-dist-runtime:
-	mkdir -p "$(DISTDIR)$(DIST_RUNTIME_DIR)"
-	set -e; \
-	for f in "$(libdir)"/*; do \
-		[ -e "$$f" ] || continue; \
-		if [ -f "$$f" ]; then \
-			b=$$(basename "$$f"); \
-			cp "$$f" "$(DISTDIR)$(DIST_RUNTIME_DIR)/$$b"; \
-		fi; \
-	done
+dist-runtime: runtime-libs
+# Platform runtime headers and provider source bundles are part of the same
+# payload as installation. Keep that selection in one owner; its file loop
+# also excludes private archive-membership metadata.
+	$(MAKE) DESTDIR="$(abspath $(DISTDIR))" install-runtime
 
 .PHONY: dist-package
-dist-package:
+dist-package: dist-stage
 	tar -C "$(DISTROOT)" -cf freebasic-dist.tar freebasic
 
 .PHONY: dist-zip
-dist-zip:
+dist-zip: dist-stage
+	rm -f freebasic-dist.zip
 	cd "$(DISTROOT)" && zip -r ../freebasic-dist.zip freebasic
+
+# end of dist.mk

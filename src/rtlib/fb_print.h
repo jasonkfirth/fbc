@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_print.h
+ * Purpose: Provide fb print runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 #define FB_PRINT_NEWLINE      0x00000001
 #define FB_PRINT_PAD          0x00000002
 #define FB_PRINT_BIN_NEWLINE  0x00000004
@@ -176,3 +183,5 @@ FBCALL int          fb_PrintUsingULongint( int fnum, unsigned long long value_ul
 FBCALL int          fb_PrintUsingEnd    ( int fnum );
 
 FBCALL int          fb_LPrintUsingInit  ( FBSTRING *fmtstr );
+
+/* end of fb_print.h */

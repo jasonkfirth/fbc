@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_data.h
+ * Purpose: Provide fb data runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 #ifndef FB_DATADESC_PACKED
 #define FB_DATADESC_PACKED FBPACKED
 #endif
@@ -35,3 +42,5 @@ FBCALL void         fb_DataReadLongint  ( long long *dst );
 FBCALL void         fb_DataReadULongint ( unsigned long long *dst );
 FBCALL void         fb_DataReadSingle   ( float *dst );
 FBCALL void         fb_DataReadDouble   ( double *dst );
+
+/* end of fb_data.h */

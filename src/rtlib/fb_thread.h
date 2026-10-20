@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_thread.h
+ * Purpose: Provide fb thread runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 typedef void (FBCALL *FB_THREADPROC)( void *param );
 
 struct _FBTHREAD;
@@ -59,3 +66,5 @@ FBCALL void              fb_TlsFreeCtxTb     ( void );
 #endif
 
 #define FB_TLSGETCTX(id) ((FB_##id##CTX *)fb_TlsGetCtx( FB_TLSKEY_##id, sizeof( FB_##id##CTX ), fb_##id##CTX_Destructor ))
+
+/* end of fb_thread.h */

@@ -10,8 +10,8 @@
 #include "fb_sfx_msdos.h"
 
 #if FB_SFX_DOS_THREADS
-#include "../../rtlib/dos/fb_dos.h"
-#include "../../rtlib/dos/fb_dos_thread.h"
+#include "../../rtlib/drivers/dos/fb_dos.h"
+#include "../../rtlib/drivers/dos/fb_dos_thread.h"
 #include <pc.h>
 #include <time.h>
 

@@ -183,9 +183,11 @@ endif
 # Write each response entry through GNU make.  Expanding the complete source
 # list into a shell loop exceeds the Windows command-line limit before MSYS2
 # can execute it, leaving Bash with a truncated and invalid loop.
+# File functions also run during recipe expansion under -n; leave existing
+# response files untouched when Make is only displaying its commands.
 bootstrap-emit-source-response: | $(BOOTSTRAP_OUT)
-	$(file >$(BOOTSTRAP_SRC_RSP))
-	$(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(file >>$(BOOTSTRAP_SRC_RSP),-b $(call bootstrap_response_source,$(f))))
+	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(file >$(BOOTSTRAP_SRC_RSP)))
+	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(file >>$(BOOTSTRAP_SRC_RSP),-b $(call bootstrap_response_source,$(f)))))
 	@test -s "$(BOOTSTRAP_SRC_RSP)" || { \
 		echo "ERROR: no compiler sources found for bootstrap emission"; \
 		exit 1; \
@@ -206,7 +208,7 @@ bootstrap-emit: bootstrap-check
 	mkdir -p "$(BOOTSTRAP_OUT)"
 
 	@echo "==> Cleaning previous bootstrap output"
-	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm "$(BOOTSTRAP_SRC_RSP)"
+	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm "$(BOOTSTRAP_OUT)"/*.ll "$(BOOTSTRAP_SRC_RSP)"
 
 	@echo "==> Writing bootstrap source response file"
 	@$(MAKE) bootstrap-emit-source-response
@@ -245,7 +247,7 @@ bootstrap-emit: bootstrap-check
 		done; \
 	done < "$(BOOTSTRAP_SRC_RSP)"
 
-	@if ! ls "$(BOOTSTRAP_OUT)"/* >/dev/null 2>&1; then \
+	@if ! find "$(BOOTSTRAP_OUT)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' -o -name '*.ll' \) -print | grep -q .; then \
 		echo "ERROR: bootstrap emission produced no sources"; \
 		exit 1; \
 	fi

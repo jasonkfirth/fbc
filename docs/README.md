@@ -8,6 +8,14 @@ reference.
 
 ## Start here
 
+- [Graphics maintenance guide](gfx-maintenance.md) maps gfxlib2 and gfxlib3
+  ownership, locking, image contracts, backend modules and validation workflows.
+- [Graphics restructuring verification](gfx-restructure-verification.md)
+  records native regression gates and their scope.
+- [Runtime maintenance guide](../src/rtlib/README.md) maps runtime subsystems,
+  platform drivers, source selection, ABI contracts, ownership and regression workflows.
+- [Runtime restructuring verification](rtlib-restructure-verification.md)
+  records the refactor inputs and native qualification scope.
 - [Current changelog](../changelog.txt) records the 1.20.5 changes.
 - [1.20.4 release notes](release-1.20.4.md) summarize the user-visible work
   completed since the 1.20.2 development baseline.
@@ -57,6 +65,10 @@ beside the examples:
 
 ## Build and qualification records
 
+- [Make system review](make-system-review.md) tracks the full build-system
+  audit, confirmed defects, corrections, and remaining review coverage.
+- [Compiler log tests and retries](compiler-test-harness.md) documents failure
+  details, retry artifact ownership, and the focused harness regression.
 - [Compiler semantic model](../doc/compiler-semantic-model.md) defines the
   schema 27 sidecar, source and macro origins, bounded observations, and the
   binary/text reader contract.

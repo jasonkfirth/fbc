@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_error.h
+ * Purpose: Provide fb error runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 typedef enum _FB_RTERROR {
 	FB_RTERROR_OK = 0,
 	FB_RTERROR_ILLEGALFUNCTIONCALL,
@@ -67,3 +74,5 @@ FBCALL const char   *fb_ErrorSetFuncName( const char *fun_name );
 #ifdef __cplusplus
 }
 #endif
+
+/* end of fb_error.h */

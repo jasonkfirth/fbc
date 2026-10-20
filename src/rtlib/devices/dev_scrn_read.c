@@ -1,0 +1,83 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: devices/dev_scrn_read.c
+ * Purpose: file device.
+ * Responsibilities: File-device callbacks and private stream state.
+ * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
+ */
+#include "fb.h"
+
+int fb_DevScrnRead( FB_FILE *handle, void* value, size_t *pLength )
+{
+    size_t length, copy_length;
+    DEV_SCRN_INFO *info;
+    FB_FILE *real_handle;
+    char *pachBuffer = (char*) value;
+
+    FB_LOCK();
+
+    DBG_ASSERT(pLength!=NULL);
+    length = *pLength;
+
+    real_handle = FB_HANDLE_DEREF( handle );
+    if( (real_handle == NULL) || (real_handle->opaque == NULL) ) {
+        FB_UNLOCK();
+        *pLength = 0;
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+    }
+
+    info = (DEV_SCRN_INFO*) real_handle->opaque;
+
+    while( length > 0 ) {
+        copy_length = (length > info->length) ? info->length : length;
+        if (copy_length==0) {
+
+        	while( fb_KeyHit( ) == 0 )
+           		fb_Delay( 25 );				/* release time slice */
+
+            fb_DevScrnFillInput( info );
+            if( info->length != 0 )
+                continue;
+
+            break;
+        }
+        memcpy(pachBuffer, info->buffer, copy_length);
+        info->length -= copy_length;
+        if (info->length!=0) {
+            memmove(info->buffer,
+                    info->buffer + copy_length,
+                    info->length);
+        }
+        length -= copy_length;
+        pachBuffer += copy_length;
+    }
+
+    FB_UNLOCK();
+
+    if (length!=0)
+        memset(pachBuffer, 0, length);
+
+    *pLength -= length;
+
+	return fb_ErrorSetNum( FB_RTERROR_OK );
+}
+
+static int hReadFromStdin( FB_FILE *handle, void* dst, size_t *pLength )
+{
+    return fb_DevFileRead( NULL, dst, pLength );
+}
+
+void fb_DevScrnInit_Read( void )
+{
+	fb_DevScrnInit_NoOpen( );
+
+	FB_LOCK( );
+    if( FB_HANDLE_SCREEN->hooks->pfnRead == NULL )
+    {
+    	FB_HANDLE_SCREEN->hooks->pfnRead =
+    				(fb_IsRedirected( TRUE )? hReadFromStdin : fb_DevScrnRead);
+    }
+	FB_UNLOCK( );
+}
+
+/* end of devices/dev_scrn_read.c */

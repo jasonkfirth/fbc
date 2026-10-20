@@ -1,0 +1,49 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: strings/str_tempdescf.c
+ * Purpose: temp string descriptor allocation for fixed-len strings.
+ * Responsibilities: Byte string descriptors, temporaries and string operations.
+ * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
+ */
+#include "fb.h"
+
+FBCALL FBSTRING *fb_StrAllocTempDescF( const char *str, ssize_t str_size )
+{
+	FBSTRING *dsc;
+
+	FB_STRLOCK();
+
+ 	/* alloc a temporary descriptor */
+ 	dsc = fb_hStrAllocTempDesc( );
+
+	FB_STRUNLOCK();
+
+    if( dsc == NULL )
+        return &__fb_ctx.null_desc;
+
+    dsc->data = (char *)str;
+
+	/* can't use strlen() if the size is known */
+	if( str_size > 0 )
+	{
+		/* less the null-term */
+		dsc->len = str_size - 1;
+	}
+	else if( str_size & FB_STRISFIXED )
+	{
+		dsc->len = str_size & FB_STRSIZEMSK;
+	}
+	else
+	{
+		if( str != NULL )
+			dsc->len = strlen( str );
+		else
+			dsc->len = 0;
+	}
+
+	dsc->size = dsc->len;
+
+	return dsc;
+}
+
+/* end of strings/str_tempdescf.c */

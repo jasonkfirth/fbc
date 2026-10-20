@@ -1,11 +1,10 @@
-OS := $(shell uname)
-ifeq ($(OS),Linux)
-	EXEEXT :=
-else
-	EXEEXT := .exe
-endif
+# Project: FreeBASIC documentation tools
+# File: GNUmakefile
+# Purpose: Build the manual's compressed-help database generator.
+# Responsibilities: Compile makefbhelp using shared host and compiler defaults.
+# This file intentionally does NOT generate the manual itself.
 
-FBC := fbc
+include ../common.mk
 
 MAKEFBHELP := makefbhelp$(EXEEXT)
 
@@ -18,3 +17,5 @@ clean:
 	-rm -f $(MAKEFBHELP)
 
 .PHONY : clean
+
+# end of GNUmakefile

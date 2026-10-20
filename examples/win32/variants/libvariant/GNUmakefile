@@ -1,4 +1,9 @@
 ##########################
+# Project: FreeBASIC variant examples
+# File: GNUmakefile
+# Purpose: Build the variant helper archive.
+# Responsibilities: Track implementation and public interface dependencies.
+# This file intentionally does NOT build the example applications.
 
 SRCS := variant-ctor.bas variant-dtor.bas variant-assign.bas variant-cast.bas
 SRCS += variant-add.bas variant-add-inv.bas variant-add-self.bas variant-sub.bas variant-sub-inv.bas variant-sub-self.bas
@@ -12,6 +17,7 @@ SRCS += variant-eq.bas variant-eq-inv.bas variant-ne.bas variant-ne-inv.bas vari
 SRCS += variant-gt.bas variant-gt-inv.bas variant-le.bas variant-le-inv.bas variant-ge.bas variant-ge-inv.bas
 SRCS += variant-neg.bas variant-not.bas 
 OBJS := $(patsubst %.bas,obj/%.o,$(SRCS))
+HEADERS := $(wildcard *.bi ../*.bi)
 
 ##########################
 
@@ -30,7 +36,7 @@ LIBRARY := ../libvariant.a
 .SUFFIXES:
 .SUFFIXES: .bas
 
-obj/%.o : %.bas | obj
+obj/%.o : %.bas $(HEADERS) | obj
 	$(FBC) $(FBCFLAGS) -c $< -o $@
 
 obj:
@@ -47,3 +53,5 @@ $(LIBRARY): $(OBJS)
 .PHONY : clean
 clean:
 	-$(RM) $(OBJS) $(LIBRARY)
+
+# end of GNUmakefile

@@ -41,7 +41,7 @@
 #include "../fb_sfx_driver.h"
 #include "fb_sfx_msdos.h"
 #if FB_SFX_DOS_THREADS
-#include "../../rtlib/dos/fb_dos_thread.h"
+#include "../../rtlib/drivers/dos/fb_dos_thread.h"
 #endif
 
 #include <ctype.h>
@@ -53,7 +53,7 @@
 
 #ifdef __DJGPP__
 #include <dos.h>
-#include "../../rtlib/dos/fb_dos.h"
+#include "../../rtlib/drivers/dos/fb_dos.h"
 #endif
 
 static FB_SFX_MSDOS_CONFIG g_fb_sfx_msdos;

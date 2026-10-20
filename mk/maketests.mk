@@ -2,6 +2,10 @@
 # mk/maketests.mk
 #
 # Test harness entrypoint
+# Project: FreeBASIC build system
+# Purpose: Compose build-system checks into public test workflows.
+# Responsibilities: Load test modules and order quick/full validation stages.
+# This file intentionally does NOT define individual fixtures or compiler rules.
 #
 # Loads all test modules from tests/
 ##############################################################################
@@ -78,6 +82,8 @@ quick-test: quick-test-body
 
 quick-test-body: sanity \
 	mk-structure-test \
+	make-contracts-test \
+	rtlib-structure-test \
 	compiler-structure-test \
 	compiler-host-policy-test \
 	compiler-storage-test \
@@ -107,6 +113,8 @@ full-test: full-test-body
 
 full-test-body: sanity \
 	mk-structure-test \
+	make-contracts-test \
+	rtlib-structure-test \
 	compiler-structure-test \
 	compiler-host-policy-test \
 	compiler-storage-test \

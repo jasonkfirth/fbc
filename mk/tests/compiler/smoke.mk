@@ -2,6 +2,10 @@
 # tests/compiler/smoke.mk
 #
 # Compiler smoke test
+# Project: FreeBASIC build system
+# Purpose: Verify native compilation and selected cross-target emission.
+# Responsibilities: Check produced artifacts and reject incomplete observations.
+# This file intentionally does NOT implement the semantic reader or compiler.
 ##############################################################################
 
 # The scope-exit relationship first appears in schema 15. Schema 19 adds
@@ -114,6 +118,7 @@ compiler-semantic-model-smoke: compiler
 	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model "$(TEST_TMP)/semantic-model.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
 	$(PYTHON) "$(rootdir)/build_scripts/check-semantic-smoke-transport.py" --root "$(rootdir)" "$(TEST_TMP)/semantic-model.fbcsem" "$(TEST_TMP)/semantic-model.tsv"
 	@awk -F '\t' -v minimum_schema="$(SEMANTIC_MODEL_SMOKE_MIN_SCHEMA)" '\
+		footer { exit 1 } \
 		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 !~ /^[1-9][0-9]*$$/ || ($$2 + 0) < minimum_schema) exit 1; schema = $$2; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
@@ -178,7 +183,6 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "DI" { if (schema < 27 || NF != 12) exit 1; details++; next } \
 		$$1 == "COM" { if (schema < 27 || NF != 4) exit 1; details++; next } \
 		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != procedures || $$5 != symbols || $$6 != typefacts || $$7 != nodes || $$8 != expressions || $$9 != bindings || $$10 != implicit_calls || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
-		footer { exit 1 } \
 		{ exit 1 } \
 		END { for (line in nested_operands) if (line in nested_comparisons) nested_typeof = 1; if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || procedures < 2 || symbols < 1 || typefacts < 2 || nodes < 1 || expressions < 2 || bindings < 2 || !binding_declarations || !binding_references || implicit_calls < 6 || default_constructors < 1 || initializer_constructors < 2 || new_constructors < 2 || destructor_calls < 2 || !scope_exit_destructors || !scope_exit_destructor || !field_default_constructor || !field_initializer_constructor || !optional_parameter_constructor || !field_destructor || !local_destructor || directive_expressions < 3 || !direct_range || !expanded_range || !macro_range_withheld || !nested_typeof || !builtin_add || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1; for (i = 1; i <= symbol_ref_count; i++) if (!(symbol_refs[i] in symbol_ids)) exit 1 }' \
 		"$(TEST_TMP)/semantic-model.tsv" || { echo "ERROR: invalid or incomplete compiler semantic model"; exit 1; }
@@ -344,6 +348,7 @@ compiler-semantic-model-smoke: compiler
 		"$(TEST_TMP)/semantic-this-bindings.tsv" || { echo "ERROR: member binding inventory omitted a compiler-resolved This reference or implicit method call"; exit 1; }
 	$(call _mt_run,$(TEST_FBC_CMD) -semantic-model-text -semantic-model-expressions "$(TEST_TMP)/semantic-expressions.tsv" -r "$(TEST_TMP)/semantic-model.bas" "$(TEST_TMP)/semantic-model-helper.bas")
 	@awk -F '\t' -v minimum_schema="$(SEMANTIC_MODEL_SMOKE_MIN_SCHEMA)" '\
+		footer { exit 1 } \
 		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 !~ /^[1-9][0-9]*$$/ || ($$2 + 0) < minimum_schema) exit 1; schema = $$2; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; if ($$2 ~ /semantic-model-header\.bi$$/) header_dependency = 1; dependency_count++; next } \
@@ -380,7 +385,6 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "EX" { if (schema < 26 || NF != 13) exit 1; details++; next } \
 		$$1 == "DI" { if (schema < 27 || NF != 12) exit 1; details++; next } \
 		$$1 == "END" { if (NF != (schema >= 19 ? 13 : 12) || $$2 != schema || $$3 != modules || $$4 != 0 || $$5 != 0 || $$6 != 0 || $$7 != 0 || $$8 != expressions || $$9 != 0 || $$10 != 0 || $$11 != dependency_count || $$12 != "1" || (schema >= 19 && $$13 != details)) exit 1; footer = 1; next } \
-		footer { exit 1 } \
 		{ exit 1 } \
 		END { if (!header || !footer || modules != 2 || dependency_count != 3 || !header_dependency || expressions < 2 || !builtin_subtract || !builtin_power || !builtin_concatenate || !builtin_unary_plus || !identity_test) exit 1 }' \
 		"$(TEST_TMP)/semantic-expressions.tsv" || { echo "ERROR: expression-only semantic model contains unrelated or invalid records"; exit 1; }
@@ -441,6 +445,7 @@ compiler-semantic-model-smoke: compiler
 	@set +e; $(TEST_FBC_CMD) -semantic-model-text -semantic-model-expressions "$(TEST_TMP)/semantic-recovery.tsv" -c "$(TEST_TMP)/semantic-recovery.bas" -o "$(TEST_TMP)/semantic-recovery.o" >/dev/null 2>&1; status=$$?; set -e; \
 		test $$status -eq 1 || { echo "ERROR: malformed semantic-recovery fixture did not fail compilation"; exit 1; }
 	@awk -F '\t' -v minimum_schema="$(SEMANTIC_MODEL_SMOKE_MIN_SCHEMA)" '\
+		footer { exit 1 } \
 		NR == 1 { if (NF != 3 || $$1 != "FBCSEM" || $$2 !~ /^[1-9][0-9]*$$/ || ($$2 + 0) < minimum_schema) exit 1; schema = $$2; header = 1; next } \
 		$$1 == "M" { if (NF != 2) exit 1; modules++; next } \
 		$$1 == "D" { if (NF != 2 || $$2 == "" || dependencies[$$2]++) exit 1; dependency_count++; next } \
@@ -478,7 +483,6 @@ compiler-semantic-model-smoke: compiler
 		$$1 == "EX" { if (schema < 26 || NF != 13) exit 1; next } \
 		$$1 == "DI" { if (schema < 27 || NF != 12) exit 1; next } \
 		$$1 == "RECOVERY" { if (NF != 8 || $$2 != schema || $$3 != modules || $$4 != expressions || $$5 != recovered_modules || $$6 != 0 || $$7 != dependency_count || $$8 != "1") exit 1; footer = 1; next } \
-		footer { exit 1 } \
 		{ exit 1 } \
 		END { if (!header || !footer || modules != 1 || dependency_count != 1 || expressions < 1 || recovered_modules != 1 || !later_expression) exit 1 }' \
 		"$(TEST_TMP)/semantic-recovery.tsv" || { echo "ERROR: expression-only recovery snapshot is incomplete or mistyped"; exit 1; }

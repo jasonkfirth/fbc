@@ -71,8 +71,8 @@ Options:
   --cppcheck-exhaustive   Use cppcheck --check-level=exhaustive.
   --cppcheck-inconclusive Include cppcheck inconclusive findings.
   --cppcheck-build-dir DIR
-                           Use a cppcheck analysis/cache directory. Addon
-                           runs default to out/cppcheck/rt-gfx-sfx-<key>.
+                           Persist cppcheck analysis data in DIR. Exhaustive
+                           analysis can create very large per-file dumps.
   --cppcheck-platform NAME
                            Pass cppcheck --platform=NAME.
   --no-linters            Skip optional cppcheck/clang-tidy probes.
@@ -208,20 +208,32 @@ target_platform() {
 
 collect_lint_paths() {
 	local platform="$1"
+	local path
+	local -a native_paths=()
 
-	find \
+	for path in \
 		"$ROOT/src/rtlib" \
-		"$ROOT/src/rtlib/unix" \
-		"$ROOT/src/rtlib/$platform" \
-		"$ROOT/src/gfxlib2" \
-		"$ROOT/src/gfxlib2/unix" \
-		"$ROOT/src/gfxlib2/$platform" \
-		"$ROOT/src/gfxlib3" \
-		"$ROOT/src/gfxlib3/$platform" \
+		"$ROOT/src/rtlib/drivers/unix" \
+		"$ROOT/src/rtlib/drivers/$platform" \
+		"$ROOT/src/gfxlib2/drivers/unix" \
+		"$ROOT/src/gfxlib2/drivers/$platform" \
+		"$ROOT/src/gfxlib3/drivers/$platform" \
 		"$ROOT/src/sfxlib" \
 		"$ROOT/src/sfxlib/unix" \
-		"$ROOT/src/sfxlib/$platform" \
-		-maxdepth 1 -type f \( -name '*.c' -o -name '*.cpp' \) 2>/dev/null |
+		"$ROOT/src/sfxlib/$platform"
+	do
+		if [ -d "$path" ]; then
+			native_paths+=("$path")
+		fi
+	done
+	{
+	find "${native_paths[@]}" -maxdepth 1 -type f \( -name '*.c' -o -name '*.cpp' \)
+	# Shared implementations have subsystem owners. Prune native and generated
+	# trees here; the target's native adapters are selected explicitly above.
+	find "$ROOT/src/rtlib" "$ROOT/src/gfxlib2" "$ROOT/src/gfxlib3" \
+		\( -name obj -o -name drivers -o -name gfxdata -o -name shaders \) -prune -o \
+		-type f \( -name '*.c' -o -name '*.cpp' \) -print
+	} |
 	sort -u
 }
 
@@ -232,7 +244,7 @@ collect_clang_tidy_paths() {
 	collect_lint_paths "$platform" |
 	while IFS= read -r path; do
 		case "$path" in
-			"$ROOT/src/rtlib/unix/"*|"$ROOT/src/gfxlib2/unix/"*|"$ROOT/src/sfxlib/unix/"*)
+			"$ROOT/src/rtlib/drivers/unix/"*|"$ROOT/src/gfxlib2/drivers/unix/"*|"$ROOT/src/sfxlib/unix/"*)
 				case "$platform" in
 					android|darwin|dragonfly|freebsd|haiku|linux|netbsd|openbsd|solaris)
 						;;
@@ -349,9 +361,9 @@ run_linters() {
 			--suppress=toomanyconfigs
 			--suppress=allocaCalled
 			--suppress='nullPointer:*/src/rtlib/fb_unicode.h'
-			--suppress='syntaxError:*/src/rtlib/profile_cycles.c'
-			--suppress='subtractPointers:*/src/gfxlib2/dos/gfx_dos.c'
-			--suppress='syntaxError:*/src/gfxlib2/gfx_xpad.c'
+			--suppress='syntaxError:*/src/rtlib/profiling/profile_cycles.c'
+			--suppress='subtractPointers:*/src/gfxlib2/drivers/dos/gfx_dos.c'
+			--suppress='syntaxError:*/src/gfxlib2/input/gfx_xpad.c'
 			--suppress='*:*/src/sfxlib/third_party/*'
 			-I "$ROOT/src"
 			-I "$ROOT/src/gfxlib2"
@@ -360,7 +372,7 @@ run_linters() {
 			-I "$ROOT/src/rtlib"
 			-i "$ROOT/src/rtlib/obj"
 			-i "$ROOT/src/gfxlib2/obj"
-			-i "$ROOT/src/gfxlib2/js"
+			-i "$ROOT/src/gfxlib2/drivers/js"
 			-i "$ROOT/src/gfxlib3/obj"
 			-i "$ROOT/src/sfxlib/obj"
 			-i "$ROOT/src/sfxlib/js"
@@ -372,9 +384,8 @@ run_linters() {
 		fi
 
 		cppcheck_build_dir="$CPPCHECK_BUILD_DIR"
-		if [ "${#CPPCHECK_ADDONS[@]}" -gt 0 ] && [ -z "$cppcheck_build_dir" ]; then
-			cppcheck_build_dir="$ROOT/out/cppcheck/rt-gfx-sfx-$(target_key)"
-		fi
+		# Cppcheck's persistent dumps can grow far beyond source size when an
+		# exhaustive pass expands large generated tables. Keep caching opt-in.
 
 		if [ "$RUN_CPPCHECK_EXHAUSTIVE" -ne 0 ]; then
 			cppcheck_args+=(--check-level=exhaustive)

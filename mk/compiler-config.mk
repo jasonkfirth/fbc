@@ -2,6 +2,10 @@
 # compiler-config.mk
 #
 # Toolchain configuration and compiler selection
+# Project: FreeBASIC build system
+# Purpose: Select host and target tools without confusing their identities.
+# Responsibilities: Resolve SDK prefixes and a runnable build compiler.
+# This file intentionally does NOT compile sources or define installation paths.
 # (regenerated with layout-safe FBC handling)
 ##############################################################################
 
@@ -96,7 +100,12 @@ ifeq ($(HOST_UNAME_S),Darwin)
   HOMEBREW_GXX := $(strip $(shell find /opt/homebrew/bin /usr/local/bin -maxdepth 1 \( -type f -o -type l \) -name 'g++-*' 2>/dev/null | grep -E '/g[+][+]-[0-9]+$$' | $(HOST_VERSION_SORT) | tail -n1))
 endif
 
-HOST_CC_FOR_PROBE := $(strip $(or $(LOCAL_GCC),$(MSYS_HOST_GCC),$(HOMEBREW_GCC),$(CC),gcc))
+# CC may already be a cross compiler. Identify the build machine through an
+# independent native driver, or an explicit HOST_CC, before deciding which
+# FreeBASIC executable can run during compilation.
+HOST_CC_FOR_PROBE := $(strip $(or $(HOST_CC),$(LOCAL_GCC),$(MSYS_HOST_GCC),$(HOMEBREW_GCC),\
+$(if $(shell command -v gcc 2>/dev/null),gcc),\
+$(if $(shell command -v clang 2>/dev/null),clang),$(CC),cc))
 HOST_TRIPLET := $(shell $(HOST_CC_FOR_PROBE) -dumpmachine 2>/dev/null || echo unknown)
 HOST_TRIPLET_LC := $(strip $(shell printf '%s' "$(HOST_TRIPLET)" | tr 'A-Z' 'a-z'))
 HOST_UNAME_OS := $(strip $(shell uname -o 2>/dev/null | tr 'A-Z' 'a-z'))
@@ -235,10 +244,23 @@ endif
 
 BUILD_PREFIX ?=
 
+# A same-OS x86 multilib build uses its native driver with -m32/-m64. It
+# needs the requested SDK width, but does not require another triplet prefix.
+MULTILIB_HOST_TOOLS :=
+ifneq ($(filter 32 64,$(MULTILIB)),)
+ifeq ($(TARGET_OS),$(HOST_OS))
+ifneq ($(filter x86 x86_64,$(HOST_ARCH)),)
+MULTILIB_HOST_TOOLS := yes
+endif
+endif
+endif
+
 ifeq ($(CROSS_BUILD),yes)
 
   ifeq ($(strip $(BUILD_PREFIX)),)
+  ifeq ($(MULTILIB_HOST_TOOLS),)
     BUILD_PREFIX := $(TARGET_TRIPLET)-
+  endif
   endif
 
 endif
@@ -256,6 +278,7 @@ endif
 
 BOOTSTRAP_EMIT_GOALS := bootstrap-emit bootstrap-emit-matrix bootstrap-emit-source-response
 BOOTSTRAP_EMIT_GOAL  := $(filter $(BOOTSTRAP_EMIT_GOALS),$(MAKECMDGOALS))
+MISSING_CROSS_CC :=
 
 ifneq ($(strip $(BUILD_PREFIX)),)
 
@@ -268,6 +291,7 @@ ifneq ($(wildcard $(MSYS_TARGET_PREFIX)/bin/gcc.exe $(MSYS_TARGET_PREFIX)/bin/cl
 BUILD_PREFIX :=
 else ifeq ($(strip $(BOOTSTRAP_EMIT_GOAL)),)
 $(warning Requested cross toolchain '$(PREFIXED_GCC)' not found)
+MISSING_CROSS_CC := $(PREFIXED_GCC)
 
 # fallback to host compiler
 BUILD_PREFIX :=
@@ -275,6 +299,7 @@ BUILD_PREFIX :=
 endif
 else ifeq ($(strip $(BOOTSTRAP_EMIT_GOAL)),)
 $(warning Requested cross toolchain '$(PREFIXED_GCC)' not found)
+MISSING_CROSS_CC := $(PREFIXED_GCC)
 
 # fallback to host compiler
 BUILD_PREFIX :=

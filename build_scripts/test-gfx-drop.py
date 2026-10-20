@@ -78,7 +78,7 @@ def main():
         flags += ['-DDISABLE_D3D10']
     elif target == 'freebsd':
         flags += ['-I/usr/local/include']
-    for path in (ROOT / 'src/rtlib', ROOT / 'src/rtlib' / ('win32' if os.name == 'nt' else 'unix')):
+    for path in (ROOT / 'src/rtlib', ROOT / 'src/rtlib/drivers' / ('win32' if os.name == 'nt' else 'unix')):
         flags += ['-I', str(path)]
     if target == 'linux':
         drm = subprocess.run(['pkg-config', '--cflags', 'libdrm', 'gbm'], capture_output=True, text=True)
@@ -94,8 +94,8 @@ def main():
     input_paths.update((ROOT / 'inc/crt').rglob('*.bi'))
     input_paths.update(ROOT / name for name in (
         'mk/source-graph.mk', 'mk/compiler-sources.mk',
-        'src/rtlib/sys_drop.c', 'src/rtlib/sys_service_utf8.c',
-        'src/rtlib/win32/sys_hidle.c' if os.name == 'nt' else 'src/rtlib/unix/sys_hidle.c',
+        'src/rtlib/services/sys_drop.c', 'src/rtlib/services/sys_service_utf8.c',
+        'src/rtlib/drivers/win32/sys_hidle.c' if os.name == 'nt' else 'src/rtlib/drivers/unix/sys_hidle.c',
         'tests/services/drop-receiver.bas', 'tests/services/win32-drop-source.c',
         'examples/graphics/drag-drop.bas', 'build_scripts/test-gfx-drop.py'))
     pins = {str(path.relative_to(ROOT)): digest(path) for path in input_paths}
@@ -118,8 +118,8 @@ def main():
         run('archive-' + group, [ar, 'rcs', archive, *objects])
         print(group + '_ARCHIVE=PASS sources=' + str(len(paths)), flush=True)
     helpers = []
-    runtime_names = ['sys_drop.c', 'sys_service_utf8.c']
-    runtime_names += ['win32/sys_hidle.c' if os.name == 'nt' else 'unix/sys_hidle.c']
+    runtime_names = ['services/sys_drop.c', 'services/sys_service_utf8.c']
+    runtime_names += ['drivers/win32/sys_hidle.c' if os.name == 'nt' else 'drivers/unix/sys_hidle.c']
     for name in runtime_names:
         path = ROOT / 'src/rtlib' / name
         obj = output / ('runtime-' + path.stem + '.o')

@@ -67,6 +67,30 @@ class ResultContracts(unittest.TestCase):
         self.assertEqual(result.compile_status, "fail(missing-output)")
         self.assertEqual(result.output, "")
 
+    def test_clock_examples_are_compile_only_on_every_host(self):
+        for source in ("setdate.bas", "settime.bas"):
+            for target in ("windows", "linux", "freebsd"):
+                with self.subTest(source=source, target=target):
+                    result = runner.classify(ROOT / "examples/manual/system" / source, ROOT, target, True)
+                    self.assertEqual(result.group, "system-changing")
+                    self.assertFalse(result.runnable)
+
+    def test_run_all_cannot_execute_clock_examples(self):
+        # The fake compiler creates an invalid executable. Attempting to run
+        # it would fail, so this exercises the real compile/run decision with
+        # no possibility of changing the test machine's clock.
+        self.source = self.root / "examples/manual/system/setdate.bas"
+        self.source.parent.mkdir(parents=True)
+        self.source.write_text('SetDate "4/17/1994"\n', encoding="ascii")
+        args = runner.parse_args([
+            "--root", str(self.root), "--outdir", str(self.output),
+            "--fbc", sys.executable, "--no-prefix", "--target-os", "windows", "--run-all",
+        ])
+        args.fbc = [sys.executable, str(self.compiler)]
+        result = runner.compile_one(self.source, self.root, args)
+        self.assertEqual(result.compile_status, "pass")
+        self.assertEqual(result.run_status, "skipped-system-changing")
+
     def test_retained_resources_reach_each_guest_manifest(self):
         result = self.compile()
         runner.write_csv([result], self.output / "results.csv")

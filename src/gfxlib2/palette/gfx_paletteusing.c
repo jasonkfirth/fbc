@@ -1,0 +1,35 @@
+/*
+ * FreeBASIC gfxlib2: gfx_paletteusing.c
+ * Purpose: Implement the PALETTEUSING palette ABI entry point.
+ * Responsibilities: palette lookup, conversion and compatibility state.
+ * This file intentionally does NOT contain window creation or pixel rasterization.
+ */
+
+#include "../fb_gfx.h"
+
+FBCALL void fb_GfxPaletteUsing(int *data)
+{
+	int i;
+
+	FB_GRAPHICS_LOCK( );
+
+	if ((!__fb_gfx) || (__fb_gfx->depth > 8)) {
+		FB_GRAPHICS_UNLOCK( );
+		return;
+	}
+
+	DRIVER_LOCK();
+
+	for (i = 0; i < (1 << __fb_gfx->depth); i++) {
+		if (data[i] >= 0)
+			fb_hSetPaletteColor(i, data[i]);
+	}
+
+	fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h);
+
+	DRIVER_UNLOCK();
+
+	FB_GRAPHICS_UNLOCK( );
+}
+
+/* end of gfx_paletteusing.c */

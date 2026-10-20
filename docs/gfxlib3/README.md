@@ -14,6 +14,10 @@ non-windowed image work.
 This directory is the design and implementation record for gfxlib3. A feature
 is only marked implemented after it is built and tested.
 
+For source ownership and change workflows, start with the
+[source map](../../src/gfxlib3/README.md) and shared
+[graphics maintenance guide](../gfx-maintenance.md).
+
 ## Current implementation state
 
 The common core is now buildable with `make gfxlib3`. It includes:

@@ -35,7 +35,7 @@ def main():
     cc = shutil.which(args.cc)
     assert cc and compiler.is_file() and (headers / 'fb.h').is_file()
     target = {'Windows': 'win32', 'Linux': 'unix', 'FreeBSD': 'unix', 'Haiku': 'haiku'}[platform.system()]
-    provider = ROOT / 'src/rtlib' / target / 'sys_hsecure_random.c'
+    provider = ROOT / 'src/rtlib/drivers' / target / 'sys_hsecure_random.c'
     assert provider.is_file(), 'the selected target has no provider source'
     output = args.output.resolve()
     assert not output.exists() and output.parent.is_dir() and not output.parent.is_symlink()
@@ -48,7 +48,7 @@ def main():
     if platform.system() == 'Haiku':
         environment['LIBRARY_PATH'] = '/boot/system/lib'
     pins = {str(path): digest(path) for path in (compiler, Path(cc), headers / 'fb.h')}
-    sources = [ROOT / 'src/rtlib/sys_secure_random.c', provider,
+    sources = [ROOT / 'src/rtlib/services/sys_secure_random.c', provider,
                ROOT / 'src/rtlib/fb_secure_random.h', ROOT / 'inc/fbrandom.bi',
                ROOT / 'tests/secure-random/live.bas', ROOT / 'tests/secure-random/failure-provider.c']
     source_pins = {str(path.relative_to(ROOT)): digest(path) for path in sources}
@@ -76,7 +76,8 @@ def main():
             raise RuntimeError('secure-random test failed: ' + label)
         return result
 
-    include_paths = [headers, headers / target, ROOT / 'src/rtlib', ROOT / 'src/rtlib' / target]
+    include_paths = [headers, headers / 'drivers' / target,
+                     ROOT / 'src/rtlib', ROOT / 'src/rtlib/drivers' / target]
     flags = ['-O2', '-Wall', '-Wextra', '-Werror', '-DENABLE_MT']
     for path in include_paths:
         flags += ['-I', str(path)]

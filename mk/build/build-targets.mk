@@ -1,7 +1,10 @@
 ##############################################################################
-# build-targets.mk
+# Project: FreeBASIC build system
+# File: build-targets.mk
 #
-# High-level build graph for FreeBASIC
+# Purpose: Define high-level build targets and compiler link dependencies.
+# Responsibilities: Select embedded runtime inputs and native platform libraries.
+# This file intentionally does NOT compile sources or define archive contents.
 #
 # Consumes artifact definitions from archives.mk
 #
@@ -124,7 +127,11 @@ endif
 # The compiler only links against rtlib.  Keeping optional graphics and sound
 # libraries out of this order-only prerequisite lets a compiler be rebuilt on
 # a small bootstrap host before those platform backends are available.
-$(FBC_EXE): $(FBC_OBJS) | rtlib
+# These files are embedded in each compiler executable. They must be normal
+# prerequisites so a runtime repair relinks an otherwise unchanged compiler.
+COMPILER_LINK_INPUTS := $(COMPILER_RT0) $(COMPILER_RTL)
+
+$(FBC_EXE): $(FBC_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
@@ -136,7 +143,7 @@ $(FBC_EXE): $(FBC_OBJS) | rtlib
 		$(TERM_LIB) \
 		$(COMPILER_PLATFORM_LIBS)
 
-$(FBC_JS_EXE): $(FBC_JS_OBJS) | rtlib
+$(FBC_JS_EXE): $(FBC_JS_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking JS-targeting compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
@@ -147,7 +154,7 @@ $(FBC_JS_EXE): $(FBC_JS_OBJS) | rtlib
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
-$(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) | rtlib
+$(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking Android-targeting compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
@@ -158,7 +165,7 @@ $(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) | rtlib
 		$(THREAD_FLAGS) \
 		$(TERM_LIB)
 
-$(FBC_WII_EXE): $(FBC_WII_OBJS) | rtlib
+$(FBC_WII_EXE): $(FBC_WII_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
 	@mkdir -p "$(dir $@)"
 	@echo "Linking Wii-targeting compiler: $@"
 	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \

@@ -1,5 +1,10 @@
-/* Unicode definitions */
-
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_unicode.h
+ * Purpose: Unicode definitions.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 typedef uint32_t UTF_32;
 typedef uint16_t UTF_16;
 typedef uint8_t  UTF_8;
@@ -196,7 +201,7 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #endif
 
 #ifdef HOST_XBOX
-#include "xbox/fb_unicode_xbox.h"
+#include "drivers/xbox/fb_unicode_xbox.h"
 #endif
 
 #ifndef FB_WSTR_FROM_INT
@@ -372,3 +377,5 @@ static __inline__ int fb_wstr_Compare( const FB_WCHAR *str1, const FB_WCHAR *str
 {
 	return wcsncmp( str1, str2, chars );
 }
+
+/* end of fb_unicode.h */

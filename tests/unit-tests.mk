@@ -2,6 +2,10 @@
 # This file is part of the FreeBASIC test suite
 #
 # make file for building fbcunit tests
+# Project: FreeBASIC test suite
+# Purpose: Select, compile, link, and run the fbcunit language tests.
+# Responsibilities: Preserve target and provider selection in object manifests.
+# This file intentionally does NOT implement fbcunit or compiler semantics.
 #
 
 # ------------------------------------------------------------------------
@@ -95,14 +99,17 @@ SRCLIST += $(UNIT_TESTS_EXPLICIT_SRCS)
 SRCLIST := $(sort $(SRCLIST))
 SRCLIST := $(patsubst .bmk,.bas,$(SRCLIST))
 SRCLIST_DOS_FILTER_OUT :=
+DOS_UNIT_OBJECT_FILTER :=
 ifeq ($(TARGET_OS),dos)
 	# The monolithic select_const2 test produces a huge DOS assembly unit.
 	# DOS runs the same coverage through smaller tests/dos/compound shards.
 	SRCLIST_DOS_FILTER_OUT := \
 		./interactive/% interactive/% \
 		./compound/select_const2.bas compound/select_const2.bas
+	DOS_UNIT_OBJECT_FILTER := -e '/^\.\/interactive\//d' -e '/^\.\/compound\/select_const2\.o/d'
 	ifneq ($(DOS_UNIT_THREADS),yes)
 		SRCLIST_DOS_FILTER_OUT += ./threads/% threads/%
+		DOS_UNIT_OBJECT_FILTER += -e '/^\.\/threads\//d'
 	endif
 	SRCLIST := $(filter-out $(SRCLIST_DOS_FILTER_OUT),$(SRCLIST))
 endif
@@ -369,7 +376,7 @@ endif
 $(UNIT_TESTS_OBJ_LST) : $(UNIT_TESTS_INC)
 	@$(GREP) -i -e 'SRCLIST +=' $(UNIT_TESTS_INC) \
 | $(SED) -e 's/^SRCLIST += \(.*\)\(\.b.*\)/\1\.o/g' \
-$(if $(filter dos,$(TARGET_OS)),-e '/^\.\/interactive\//d' -e '/^\.\/threads\//d' -e '/^\.\/compound\/select_const2\.o/d') \
+$(DOS_UNIT_OBJECT_FILTER) \
 > $(UNIT_TESTS_OBJ_LST)
 	@$(PRINTF) '%s\n' $(UNIT_TESTS_EXPLICIT_OBJS) >> $(UNIT_TESTS_OBJ_LST)
 
@@ -422,3 +429,5 @@ clean_fbcu :
 .PHONY: clean_include
 clean_include : clean_tests
 	$(RM) $(UNIT_TESTS_INC) $(UNIT_TESTS_OBJ_LST)
+
+# end of unit-tests.mk

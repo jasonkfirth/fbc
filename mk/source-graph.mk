@@ -2,6 +2,10 @@
 # source-graph.mk
 #
 # Source discovery with override precedence
+# Project: FreeBASIC build system
+# Purpose: Resolve selected implementations into unambiguous object lists.
+# Responsibilities: Apply platform precedence and reject archive-member collisions.
+# This file intentionally does NOT invoke compilers or publish archives.
 #
 # precedence:
 #   target_os/target_arch > target_os > unix > generic
@@ -54,41 +58,35 @@ ifneq ($(filter $(UNIX_LAYER_OS),$(TARGET_OS)),)
 USE_UNIX_LAYER := yes
 endif
 
-RTLIB_DIRS := $(srcdir)/rtlib
-ifneq ($(USE_UNIX_LAYER),)
-RTLIB_DIRS += $(srcdir)/rtlib/unix
-endif
-RTLIB_DIRS += $(srcdir)/rtlib/$(SOURCE_OS)
-RTLIB_DIRS += $(srcdir)/rtlib/$(SOURCE_OS)/$(TARGET_ARCH)
-ifeq ($(TARGET_ARCH),x86)
-RTLIB_DIRS += $(srcdir)/rtlib/x86
-endif
+include $(mkpath)/rtlib-sources.mk
 
 FBRT_DIRS := \
 $(srcdir)/fbrt
 
-GFXLIB2_DIRS := $(srcdir)/gfxlib2
+include $(mkpath)/gfx-sources.mk
+
+GFXLIB2_DIRS := $(srcdir)/gfxlib2 $(GFX2_GENERIC_DIRS)
 ifneq ($(USE_UNIX_LAYER),)
-GFXLIB2_DIRS += $(srcdir)/gfxlib2/unix
+GFXLIB2_DIRS += $(srcdir)/gfxlib2/drivers/unix
 endif
-GFXLIB2_DIRS += $(srcdir)/gfxlib2/$(SOURCE_OS)
+GFXLIB2_DIRS += $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)
 ifeq ($(TARGET_ARCH),x86)
-GFXLIB2_DIRS += $(srcdir)/gfxlib2/x86
+GFXLIB2_DIRS += $(srcdir)/gfxlib2/drivers/x86
 endif
 ifneq ($(filter x86_64 aarch64,$(TARGET_ARCH)),)
-GFXLIB2_DIRS += $(srcdir)/gfxlib2/$(TARGET_ARCH)
+GFXLIB2_DIRS += $(srcdir)/gfxlib2/drivers/$(TARGET_ARCH)
 endif
 ifeq ($(TARGET_ARCH),arm)
   ifneq ($(filter v7 v8,$(ARM_VER)),)
-GFXLIB2_DIRS += $(srcdir)/gfxlib2/arm
+GFXLIB2_DIRS += $(srcdir)/gfxlib2/drivers/arm
   endif
 endif
 
 GFXLIB3_PLATFORM_OS := android darwin linux win32
 
-GFXLIB3_DIRS := $(srcdir)/gfxlib3
+GFXLIB3_DIRS := $(srcdir)/gfxlib3 $(GFX3_GENERIC_DIRS)
 ifneq ($(filter $(SOURCE_OS),$(GFXLIB3_PLATFORM_OS)),)
-GFXLIB3_DIRS += $(srcdir)/gfxlib3/$(SOURCE_OS)
+GFXLIB3_DIRS += $(srcdir)/gfxlib3/drivers/$(SOURCE_OS)
 endif
 
 SFXLIB_DIRS := $(srcdir)/sfxlib
@@ -115,48 +113,7 @@ include $(mkpath)/compiler-sources.mk
 # RTLIB sources
 ##############################################################################
 
-RTLIB_SRC_GENERIC := $(wildcard $(srcdir)/rtlib/*.c)
-RTLIB_SRC_UNIX :=
-ifneq ($(USE_UNIX_LAYER),)
-RTLIB_SRC_UNIX := $(wildcard $(srcdir)/rtlib/unix/*.c)
-endif
-RTLIB_SRC_TARGET := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/*.c)
-RTLIB_SRC_TARGET_ARCH := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/$(TARGET_ARCH)/*.c)
-RTLIB_SRC_ARCH :=
-ifeq ($(TARGET_ARCH),x86)
-RTLIB_SRC_ARCH := $(wildcard $(srcdir)/rtlib/x86/*.s)
-endif
-RTLIB_SRC_TARGET_ASM := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/*.s)
-RTLIB_SRC_TARGET_ARCH_ASM := $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/$(TARGET_ARCH)/*.s)
-
-RTLIB_BASE_GENERIC := $(notdir $(RTLIB_SRC_GENERIC))
-RTLIB_BASE_UNIX := $(notdir $(RTLIB_SRC_UNIX))
-RTLIB_BASE_TARGET := $(notdir $(RTLIB_SRC_TARGET))
-RTLIB_BASE_TARGET_ARCH := $(notdir $(RTLIB_SRC_TARGET_ARCH))
-
-RTLIB_SRC_TARGET := $(filter-out \
-$(addprefix $(srcdir)/rtlib/$(SOURCE_OS)/,$(RTLIB_BASE_TARGET_ARCH)), \
-$(RTLIB_SRC_TARGET))
-
-RTLIB_SRC_UNIX := $(filter-out \
-$(addprefix $(srcdir)/rtlib/unix/,$(RTLIB_BASE_TARGET)) \
-$(addprefix $(srcdir)/rtlib/unix/,$(RTLIB_BASE_TARGET_ARCH)), \
-$(RTLIB_SRC_UNIX))
-
-RTLIB_SRC_GENERIC := $(filter-out \
-$(addprefix $(srcdir)/rtlib/,$(RTLIB_BASE_UNIX)) \
-$(addprefix $(srcdir)/rtlib/,$(RTLIB_BASE_TARGET)) \
-$(addprefix $(srcdir)/rtlib/,$(RTLIB_BASE_TARGET_ARCH)), \
-$(RTLIB_SRC_GENERIC))
-
-RTLIB_SRC := $(RTLIB_SRC_GENERIC) $(RTLIB_SRC_UNIX) $(RTLIB_SRC_TARGET) $(RTLIB_SRC_TARGET_ARCH) $(RTLIB_SRC_ARCH) $(RTLIB_SRC_TARGET_ASM) $(RTLIB_SRC_TARGET_ARCH_ASM)
-
-ifdef DISABLE_X11
-RTLIB_SRC := $(filter-out \
-$(srcdir)/rtlib/unix/io_xfocus.c \
-$(srcdir)/rtlib/unix/scancodes_x11.c, \
-$(RTLIB_SRC))
-endif
+# Discovery and platform precedence are owned by rtlib-sources.mk above.
 
 ##############################################################################
 # FBRT sources
@@ -168,52 +125,53 @@ FBRT_SRC := $(wildcard $(srcdir)/fbrt/*.bas)
 # GFXLIB2 sources
 ##############################################################################
 
-GFX_SRC_GENERIC := \
-$(wildcard $(srcdir)/gfxlib2/*.c)
+GFX_SRC_GENERIC := $(foreach directory,$(GFX2_GENERIC_DIRS),\
+$(wildcard $(directory)/*.c))
 
 ifneq ($(USE_RUNTIME_CXX),)
-GFX_SRC_GENERIC += $(wildcard $(srcdir)/gfxlib2/*.cpp)
+GFX_SRC_GENERIC += $(foreach directory,$(GFX2_GENERIC_DIRS),\
+$(wildcard $(directory)/*.cpp))
 endif
 
 GFX_SRC_UNIX :=
 ifneq ($(USE_UNIX_LAYER),)
  GFX_SRC_UNIX := \
-$(wildcard $(srcdir)/gfxlib2/unix/*.c)
+$(wildcard $(srcdir)/gfxlib2/drivers/unix/*.c)
  ifneq ($(USE_RUNTIME_CXX),)
-GFX_SRC_UNIX += $(wildcard $(srcdir)/gfxlib2/unix/*.cpp)
+GFX_SRC_UNIX += $(wildcard $(srcdir)/gfxlib2/drivers/unix/*.cpp)
  endif
 endif
 
 GFX_SRC_TARGET := \
-$(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/*.c)
+$(wildcard $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/*.c)
 
 ifneq ($(USE_RUNTIME_CXX),)
-GFX_SRC_TARGET += $(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/*.cpp)
+GFX_SRC_TARGET += $(wildcard $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/*.cpp)
 endif
 
 GFX_SRC_TARGET_ARCH := \
-$(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/$(TARGET_ARCH)/*.c)
+$(wildcard $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/$(TARGET_ARCH)/*.c)
 
 ifneq ($(USE_RUNTIME_CXX),)
-GFX_SRC_TARGET_ARCH += $(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/$(TARGET_ARCH)/*.cpp)
+GFX_SRC_TARGET_ARCH += $(wildcard $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/$(TARGET_ARCH)/*.cpp)
 endif
 
 GFX_SRC_ARCH :=
 ifeq ($(TARGET_ARCH),x86)
-GFX_SRC_ARCH := $(wildcard $(srcdir)/gfxlib2/x86/*.s)
+GFX_SRC_ARCH := $(wildcard $(srcdir)/gfxlib2/drivers/x86/*.s)
 endif
 
 GFX_SRC_ARCH_C :=
 ifneq ($(filter x86_64 aarch64,$(TARGET_ARCH)),)
-GFX_SRC_ARCH_C := $(wildcard $(srcdir)/gfxlib2/$(TARGET_ARCH)/*.c)
+GFX_SRC_ARCH_C := $(wildcard $(srcdir)/gfxlib2/drivers/$(TARGET_ARCH)/*.c)
 endif
 ifeq ($(TARGET_ARCH),arm)
   ifneq ($(filter v7 v8,$(ARM_VER)),)
-GFX_SRC_ARCH_C := $(wildcard $(srcdir)/gfxlib2/arm/*.c)
+GFX_SRC_ARCH_C := $(wildcard $(srcdir)/gfxlib2/drivers/arm/*.c)
   endif
 endif
 
-GFX_SRC_TARGET_ASM := $(wildcard $(srcdir)/gfxlib2/$(SOURCE_OS)/*.s)
+GFX_SRC_TARGET_ASM := $(wildcard $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/*.s)
 
 GFX_BASE_GENERIC := $(notdir $(GFX_SRC_GENERIC))
 GFX_BASE_UNIX := $(notdir $(GFX_SRC_UNIX))
@@ -222,18 +180,16 @@ GFX_BASE_TARGET_ARCH := $(notdir $(GFX_SRC_TARGET_ARCH))
 GFX_BASE_ARCH_C := $(notdir $(GFX_SRC_ARCH_C))
 
 GFX_SRC_TARGET := $(filter-out \
-$(addprefix $(srcdir)/gfxlib2/$(SOURCE_OS)/,$(GFX_BASE_TARGET_ARCH)), \
+$(addprefix $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/,$(GFX_BASE_TARGET_ARCH)), \
 $(GFX_SRC_TARGET))
 
 GFX_SRC_UNIX := $(filter-out \
-$(addprefix $(srcdir)/gfxlib2/unix/,$(GFX_BASE_TARGET)), \
+$(addprefix $(srcdir)/gfxlib2/drivers/unix/,$(GFX_BASE_TARGET)), \
 $(GFX_SRC_UNIX))
 
 GFX_SRC_GENERIC := $(filter-out \
-$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_UNIX)) \
-$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET)) \
-$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_TARGET_ARCH)) \
-$(addprefix $(srcdir)/gfxlib2/,$(GFX_BASE_ARCH_C)), \
+$(foreach filename,$(GFX_BASE_UNIX) $(GFX_BASE_TARGET) \
+$(GFX_BASE_TARGET_ARCH) $(GFX_BASE_ARCH_C),%/$(filename)), \
 $(GFX_SRC_GENERIC))
 
 GFX_SRC := $(GFX_SRC_GENERIC) $(GFX_SRC_UNIX) $(GFX_SRC_TARGET) \
@@ -242,18 +198,18 @@ $(GFX_SRC_TARGET_ASM)
 
 ifdef DISABLE_X11
 GFX_SRC := $(filter-out \
-$(srcdir)/gfxlib2/unix/gfx_driver_opengl_x11.c \
-$(srcdir)/gfxlib2/unix/gfx_driver_x11.c \
-$(srcdir)/gfxlib2/unix/gfx_x11.c \
-$(srcdir)/gfxlib2/unix/gfx_x11_icon_stub.c, \
+$(srcdir)/gfxlib2/drivers/unix/gfx_driver_opengl_x11.c \
+$(srcdir)/gfxlib2/drivers/unix/gfx_driver_x11.c \
+$(srcdir)/gfxlib2/drivers/unix/gfx_x11.c \
+$(srcdir)/gfxlib2/drivers/unix/gfx_x11_icon_stub.c, \
 $(GFX_SRC))
 endif
 
 ifdef DISABLE_OPENGL
 GFX_SRC := $(filter-out \
-$(srcdir)/gfxlib2/darwin/gfx_driver_opengl.c \
-$(srcdir)/gfxlib2/haiku/gfx_driver_opengl.cpp \
-$(srcdir)/gfxlib2/haiku/haiku_gl_view.cpp, \
+$(srcdir)/gfxlib2/drivers/darwin/gfx_driver_opengl.c \
+$(srcdir)/gfxlib2/drivers/haiku/gfx_driver_opengl.cpp \
+$(srcdir)/gfxlib2/drivers/haiku/haiku_gl_view.cpp, \
 $(GFX_SRC))
 endif
 
@@ -265,18 +221,37 @@ endif
 # Linux DRM/GBM/EGL, and Win32/WGL adapters. Target sources override generic
 # stubs with the same basename, matching the source precedence used by
 # gfxlib2, rtlib, and sfxlib.
-GFX3_SRC_GENERIC := $(wildcard $(srcdir)/gfxlib3/*.c)
+GFX3_SRC_GENERIC := $(foreach directory,$(GFX3_GENERIC_DIRS),\
+$(wildcard $(directory)/*.c))
 GFX3_SRC_TARGET :=
 ifneq ($(filter $(SOURCE_OS),$(GFXLIB3_PLATFORM_OS)),)
-GFX3_SRC_TARGET := $(wildcard $(srcdir)/gfxlib3/$(SOURCE_OS)/*.c)
+GFX3_SRC_TARGET := $(wildcard $(srcdir)/gfxlib3/drivers/$(SOURCE_OS)/*.c)
 endif
 
 GFX3_BASE_TARGET := $(notdir $(GFX3_SRC_TARGET))
 GFX3_SRC_GENERIC := $(filter-out \
-$(addprefix $(srcdir)/gfxlib3/,$(GFX3_BASE_TARGET)), \
+$(foreach filename,$(GFX3_BASE_TARGET),%/$(filename)), \
 $(GFX3_SRC_GENERIC))
 
 GFX3_SRC := $(GFX3_SRC_TARGET) $(GFX3_SRC_GENERIC)
+
+# ar stores member basenames even though objects retain their source paths.
+# Reject duplicate selected names rather than silently replacing an archive
+# member when someone adds a unit in the wrong subsystem.
+GFX_ARCHIVE_MEMBERS := $(addsuffix .o,$(basename $(notdir $(GFX_SRC))))
+GFX3_ARCHIVE_MEMBERS := $(addsuffix .o,$(basename $(notdir $(GFX3_SRC))))
+GFX_DUPLICATE_BASENAMES := $(strip $(foreach member,\
+$(sort $(GFX_ARCHIVE_MEMBERS)),\
+$(if $(word 2,$(filter $(member),$(GFX_ARCHIVE_MEMBERS))),$(member))))
+GFX3_DUPLICATE_BASENAMES := $(strip $(foreach member,\
+$(sort $(GFX3_ARCHIVE_MEMBERS)),\
+$(if $(word 2,$(filter $(member),$(GFX3_ARCHIVE_MEMBERS))),$(member))))
+ifneq ($(GFX_DUPLICATE_BASENAMES),)
+$(error Duplicate gfxlib2 source basenames: $(GFX_DUPLICATE_BASENAMES))
+endif
+ifneq ($(GFX3_DUPLICATE_BASENAMES),)
+$(error Duplicate gfxlib3 source basenames: $(GFX3_DUPLICATE_BASENAMES))
+endif
 
 ##############################################################################
 # SFXLIB sources
@@ -385,6 +360,16 @@ $(srcdir)/sfxlib/linux/sfx_driver_pulse.c, \
 $(SFX_SRC))
 endif
 
+# C and C++ selections must also have distinct archive member names. Their
+# different source suffixes still map to the same .o basename.
+SFX_ARCHIVE_MEMBERS := $(addsuffix .o,$(basename $(notdir $(SFX_SRC))))
+SFX_DUPLICATE_BASENAMES := $(strip $(foreach member,\
+$(sort $(SFX_ARCHIVE_MEMBERS)),\
+$(if $(word 2,$(filter $(member),$(SFX_ARCHIVE_MEMBERS))),$(member))))
+ifneq ($(SFX_DUPLICATE_BASENAMES),)
+$(error Duplicate sfxlib source basenames: $(SFX_DUPLICATE_BASENAMES))
+endif
+
 ##############################################################################
 # Canonical object lists
 ##############################################################################
@@ -441,10 +426,16 @@ $(SFX_OBJ) $(SFX_PIC_OBJ) $(SFX_MT_OBJ) $(SFX_MT_PIC_OBJ)
 # Headers
 ##############################################################################
 
-LIBFB_H := $(wildcard $(srcdir)/rtlib/*.h) $(wildcard $(srcdir)/rtlib/*/*.h)
+LIBFB_H := $(wildcard $(srcdir)/rtlib/*.h) $(wildcard $(srcdir)/rtlib/*/*.h) \
+$(wildcard $(RTLIB_DRIVER_DIR)/*/*.h) $(wildcard $(RTLIB_DRIVER_DIR)/*/*/*.h) \
+$(foreach directory,$(RTLIB_GENERIC_DIRS),$(wildcard $(directory)/*.h))
 LIBFBRT_BI := $(wildcard $(srcdir)/fbrt/*.bi)
-LIBFBGFX_H := $(wildcard $(srcdir)/gfxlib2/*.h) $(wildcard $(srcdir)/gfxlib2/*/*.h)
+LIBFBGFX_H := $(wildcard $(srcdir)/gfxlib2/*.h) $(wildcard $(srcdir)/gfxlib2/*/*.h) \
+$(wildcard $(GFX2_DRIVER_DIR)/*/*.h) $(wildcard $(GFX2_DRIVER_DIR)/*/*/*.h) \
+$(wildcard $(GFX2_DRIVER_DIR)/*/*.inc) \
+$(wildcard $(srcdir)/gfxlib2/*.inc)
 LIBFBGFX3_H := $(wildcard $(srcdir)/gfxlib3/*.h) $(wildcard $(srcdir)/gfxlib3/*/*.h) \
+$(wildcard $(GFX3_DRIVER_DIR)/*/*.h) \
 $(srcdir)/gfxlib2/gfx_font.h $(srcdir)/gfxlib2/gfx_paint_pattern.h
 LIBSFX_H := $(wildcard $(srcdir)/sfxlib/*.h) $(wildcard $(srcdir)/sfxlib/*/*.h)
 

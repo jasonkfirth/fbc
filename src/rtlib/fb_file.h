@@ -1,9 +1,9 @@
 /*
-    FreeBASIC Runtime Library
+    Project: FreeBASIC Runtime Library
     File: fb_file.h
     Purpose: Define the runtime file ABI and device interface.
     Responsibilities: File state, callbacks, constants, and I/O declarations.
-    This file does not implement platform filesystems or compiler grammar.
+    This file intentionally does NOT contain: platform filesystems or compiler grammar.
 */
 
 #include <stdio.h>

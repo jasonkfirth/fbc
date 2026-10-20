@@ -46,7 +46,7 @@ def main():
     records = []
     inputs = {}
     flags = ['-O2', '-Wall', '-Wextra', '-Werror', '-DENABLE_MT',
-             '-I', str(ROOT / 'src/rtlib'), '-I', str(ROOT / 'src/rtlib' / target)]
+             '-I', str(ROOT / 'src/rtlib'), '-I', str(ROOT / 'src/rtlib/drivers' / target)]
 
     def run(label, command, seconds=60):
         result = subprocess.run([str(item) for item in command], cwd=output, env=env,
@@ -69,8 +69,8 @@ def main():
         return path
 
     # A deterministic clock/provider test is separate from the native objects.
-    common = ['src/rtlib/sys_idle.c', 'src/rtlib/sys_notify.c',
-              'src/rtlib/sys_service_utf8.c', 'src/rtlib/sys_drop.c']
+    common = ['src/rtlib/services/sys_idle.c', 'src/rtlib/services/sys_notify.c',
+              'src/rtlib/services/sys_service_utf8.c', 'src/rtlib/services/sys_drop.c']
     run('build-contracts', [cc, *flags, *[source(name) for name in common],
                            source('tests/services/contracts.c'), '-lm',
                            '-o', output / ('contracts' + extension)])
@@ -78,10 +78,10 @@ def main():
     assert b'PLATFORM_SERVICE_CONTRACTS=PASS' in result.stdout
 
     objects = []
-    native = common + ['src/rtlib/' + target + '/sys_hidle.c',
-                       'src/rtlib/' + target + '/sys_hnotify.c',
-                       'src/rtlib/sys_secure_random.c',
-                       'src/rtlib/' + target + '/sys_hsecure_random.c']
+    native = common + ['src/rtlib/drivers/' + target + '/sys_hidle.c',
+                       'src/rtlib/drivers/' + target + '/sys_hnotify.c',
+                       'src/rtlib/services/sys_secure_random.c',
+                       'src/rtlib/drivers/' + target + '/sys_hsecure_random.c']
     for name in native:
         obj = output / (Path(name).stem + '.o')
         run('compile-' + obj.stem, [cc, *flags, '-c', source(name), '-o', obj])

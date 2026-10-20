@@ -186,7 +186,7 @@ CLANG_FLAGS=(
 	-msoft-float
 	-ffreestanding
 	-fno-builtin
-	-I"$ROOT/src/rtlib/wince/mips32el"
+	-I"$ROOT/src/rtlib/drivers/wince/mips32el"
 	-I"$TOOLCHAIN_ROOT/include"
 	-I"$ROOT/src/sfxlib"
 	-I"$ROOT/src/rtlib"

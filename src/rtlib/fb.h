@@ -1,10 +1,10 @@
 /*
- * FreeBASIC runtime
+ * Project: FreeBASIC runtime
  * File: fb.h
  * Purpose: Declare shared runtime types, entry points and platform helpers.
  * Responsibilities: Keep the compiler-facing runtime contracts and internal
  *     memory, string and synchronization helpers available to runtime modules.
- * This file does not implement compiler parsing or graphics drivers.
+ * This file intentionally does NOT contain: compiler parsing or graphics drivers.
  */
 #ifndef __FB_H__
 #define __FB_H__
@@ -119,26 +119,26 @@
 #endif
 
 #if defined HOST_DOS
-	#include "dos/fb_dos.h"
+	#include "drivers/dos/fb_dos.h"
 #elif defined HOST_AMIGA
-	#include "amiga/fb_amiga.h"
+	#include "drivers/amiga/fb_amiga.h"
 #elif defined HOST_UNIX
-	#include "unix/fb_unix.h"
+	#include "drivers/unix/fb_unix.h"
 	#if defined HOST_AROS
-		#include "aros/fb_aros.h"
+		#include "drivers/aros/fb_aros.h"
 	#elif defined HOST_DARWIN
-		#include "darwin/fb_darwin.h"
+		#include "drivers/darwin/fb_darwin.h"
 	#endif
 #elif defined HOST_WINCE
-	#include "wince/fb_wince.h"
+	#include "drivers/wince/fb_wince.h"
 #elif defined HOST_WIN32
-	#include "win32/fb_win32.h"
+	#include "drivers/win32/fb_win32.h"
 #elif defined HOST_XBOX
-	#include "xbox/fb_xbox.h"
+	#include "drivers/xbox/fb_xbox.h"
 #elif defined HOST_WII
-	#include "wii/fb_wii.h"
+	#include "drivers/wii/fb_wii.h"
 #elif defined HOST_NUTTX
-	#include "nuttx/fb_nuttx.h"
+	#include "drivers/nuttx/fb_nuttx.h"
 #endif
 
 #if defined HOST_SOLARIS
@@ -451,4 +451,5 @@ typedef struct FB_RTLIB_CTX_ {
 extern FB_RTLIB_CTX __fb_ctx;
 
 #endif /*__FB_H__*/
+
 /* end of fb.h */

@@ -2,6 +2,10 @@
 # tests/harness.mk
 #
 # Shared test harness utilities
+# Project: FreeBASIC build system
+# Purpose: Share tool environments and bounded test artifact ownership.
+# Responsibilities: Preserve the host compiler and validate produced archives.
+# This file intentionally does NOT define language fixtures or SDK policy.
 ##############################################################################
 
 ##############################################################################
@@ -71,8 +75,14 @@ define _mt_fail
 endef
 
 define _mt_cleanup_success
+	@if [ -f "$(TEST_TMP)/created-archives.lst" ]; then \
+		while IFS= read -r archive; do \
+			[ -n "$$archive" ] || continue; \
+			rm -f "$$archive" || exit $$?; \
+		done < "$(TEST_TMP)/created-archives.lst"; \
+	fi
 	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)" "stage"
-	@rm -f "$(TEST_TMP).install_manifest" FreeBASIC-*source-bootstrap-*.tar.xz
+	@rm -f "$(TEST_TMP).install_manifest"
 endef
 
 ##############################################################################
@@ -96,28 +106,19 @@ maketests-preserve-host-fbc: | prereqs-fbc
 	@$(TEST_TOOLCHAIN_ENV) "$(TEST_HOST_FBC)" -version >/dev/null
 
 ##############################################################################
-# Run a command and detect which FreeBASIC-*.tar.xz archive was created
+# Run a producer and validate the configured bootstrap archive
 ##############################################################################
 
 define _mt_find_new_archives
 	tmpdir="$(SRC_ROOT)/$(TEST_TMP)"; \
 	mkdir -p "$$tmpdir"; \
-	before="$$tmpdir/archives.before"; \
-	after="$$tmpdir/archives.after"; \
-	new="$$tmpdir/archives.new"; \
-	ls -1 FreeBASIC-*.tar.xz 2>/dev/null | sort >"$$before" || true; \
-	$(TEST_TOOLCHAIN_ENV) sh -ec '$(1)' >&2; \
-	ls -1 FreeBASIC-*.tar.xz 2>/dev/null | sort >"$$after" || true; \
-	comm -13 "$$before" "$$after" >"$$new" || true; \
-	ARCHIVE=$$(head -n1 "$$new"); \
-	if [ -z "$$ARCHIVE" ]; then \
-	        echo "" >&2; \
-	        echo "ERROR: no new FreeBASIC-*.tar.xz produced" >&2; \
-	        echo "" >&2; \
-	        ls -1 >&2; \
-	        exit 1; \
-	fi; \
-	printf '%s\n' "$$ARCHIVE"
+	archive="$(BOOTSTRAP_ARCHIVE)"; \
+	test -n "$$archive" || { echo "ERROR: bootstrap archive name is empty" >&2; exit 1; }; \
+	$(TEST_TOOLCHAIN_ENV) sh -ec '$(1)' >&2 || exit $$?; \
+	test -s "$$archive" || { echo "ERROR: bootstrap archive missing: $$archive" >&2; exit 1; }; \
+	tar -tf "$$archive" >/dev/null || exit $$?; \
+	printf '%s\n' "$$archive" >> "$$tmpdir/created-archives.lst"; \
+	printf '%s\n' "$$archive"
 endef
 
 ##############################################################################
@@ -156,8 +157,7 @@ clean-maketests:
 .PHONY: clean-maketests-success
 clean-maketests-success:
 	$(call _mt_echo,Cleaning successful test artifacts)
-	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)" "stage"
-	@rm -f "$(TEST_TMP).install_manifest" FreeBASIC-*source-bootstrap-*.tar.xz
+	$(call _mt_cleanup_success)
 
 .PHONY: clean-maketests-host
 clean-maketests-host:

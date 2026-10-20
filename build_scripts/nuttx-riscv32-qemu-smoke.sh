@@ -1527,7 +1527,7 @@ for extra_src in $EXTRA_GENERATED_CSRCS; do
     cp "$WORK_DIR/$extra_src" "$APP_DIR/$extra_src"
 done
 
-for rt_src in "$ROOT/src/rtlib/nuttx"/fb_nuttx_*.c; do
+for rt_src in "$ROOT/src/rtlib/drivers/nuttx"/fb_nuttx_*.c; do
     cp "$rt_src" "$APP_DIR/"
 done
 
@@ -1535,7 +1535,7 @@ done
 # The public GPIO API is shared across targets, so the NuttX implementation
 # uses the API name instead of the fb_nuttx_ private-runtime prefix.
 #
-cp "$ROOT/src/rtlib/nuttx/gpiopins.c" "$APP_DIR/"
+cp "$ROOT/src/rtlib/drivers/nuttx/gpiopins.c" "$APP_DIR/"
 
 FBCUNIT_CSRCS=""
 EXTRA_CSRCS=""
@@ -1550,7 +1550,7 @@ case "$USE_GENERIC_MEMORY" in
         # fb_MemCopyClear is target-neutral in the normal runtime.  Build it
         # separately and leave the local fallback shim staged but disabled.
         #
-        cp "$ROOT/src/rtlib/mem_copyclear.c" "$APP_DIR/fb_nuttx_generic_memory.c"
+        cp "$ROOT/src/rtlib/memory/mem_copyclear.c" "$APP_DIR/fb_nuttx_generic_memory.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_generic_memory.c"
         ;;
     *)
@@ -1568,7 +1568,7 @@ case "$USE_GENERIC_GOSUB" in
         # this target can share that implementation while keeping the fallback
         # shim in the staged tree.
         #
-        cp "$ROOT/src/rtlib/gosub.c" "$APP_DIR/fb_nuttx_generic_gosub.c"
+        cp "$ROOT/src/rtlib/core/gosub.c" "$APP_DIR/fb_nuttx_generic_gosub.c"
         sed -i 's|#include <setjmp.h>|#include "setjmp.h"|' \
             "$APP_DIR/fb_nuttx_generic_gosub.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_generic_gosub.c"
@@ -1587,8 +1587,8 @@ case "$USE_GENERIC_OBJECT" in
         # FreeBASIC runtime.  The local fallback shim stays in the staged tree
         # but is disabled by CFLAGS while the generic sources provide the ABI.
         #
-        cp "$ROOT/src/rtlib/oop_object.c" "$APP_DIR/fb_nuttx_oop_object.c"
-        cp "$ROOT/src/rtlib/oop_istypeof.c" "$APP_DIR/fb_nuttx_oop_istypeof.c"
+        cp "$ROOT/src/rtlib/objects/oop_object.c" "$APP_DIR/fb_nuttx_oop_object.c"
+        cp "$ROOT/src/rtlib/objects/oop_istypeof.c" "$APP_DIR/fb_nuttx_oop_istypeof.c"
         ;;
     *)
         die "FB_NUTTX_USE_GENERIC_OBJECT must be 0 or 1"
@@ -1623,7 +1623,7 @@ case "$USE_GENERIC_MATH_FIX" in
         # normal SGN helpers.  Build the shared implementation as a separate
         # app source; the local compatibility body is disabled by CFLAGS.
         #
-        cp "$ROOT/src/rtlib/math_fix.c" "$APP_DIR/fb_nuttx_math_fix.c"
+        cp "$ROOT/src/rtlib/math/math_fix.c" "$APP_DIR/fb_nuttx_math_fix.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_math_fix.c"
         ;;
     *)
@@ -1640,7 +1640,7 @@ case "$USE_GENERIC_MATH_CVN" in
         # runtime.  Build the shared implementation as a separate app source
         # and disable the duplicate local copies by CFLAGS.
         #
-        cp "$ROOT/src/rtlib/math_cvn.c" "$APP_DIR/fb_nuttx_math_cvn.c"
+        cp "$ROOT/src/rtlib/math/math_cvn.c" "$APP_DIR/fb_nuttx_math_cvn.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_math_cvn.c"
         ;;
     *)
@@ -1657,7 +1657,7 @@ case "$USE_GENERIC_MATH_FRAC" in
         # Since the lab already stages the shared FIX() helper, keep FRAC()
         # shared too instead of adding another NuttX-only math shim.
         #
-        cp "$ROOT/src/rtlib/math_frac.c" "$APP_DIR/fb_nuttx_math_frac.c"
+        cp "$ROOT/src/rtlib/math/math_frac.c" "$APP_DIR/fb_nuttx_math_frac.c"
         python3 - "$APP_DIR/fb_nuttx_math_frac.c" <<'PY'
 import sys
 
@@ -1697,7 +1697,7 @@ case "$USE_GENERIC_MATH_LOG10" in
         # normal formatting code.  They have no hosted runtime state, so keep
         # them shared instead of adding NuttX-specific copies later.
         #
-        cp "$ROOT/src/rtlib/math_log10.c" "$APP_DIR/fb_nuttx_math_log10.c"
+        cp "$ROOT/src/rtlib/math/math_log10.c" "$APP_DIR/fb_nuttx_math_log10.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_math_log10.c"
         ;;
     *)
@@ -1715,7 +1715,7 @@ case "$USE_GENERIC_MATH_RND" in
         # Build it separately so the mini runtime no longer owns a compact
         # NuttX-only PRNG.
         #
-        cp "$ROOT/src/rtlib/math_rnd.c" "$APP_DIR/fb_nuttx_math_rnd.c"
+        cp "$ROOT/src/rtlib/math/math_rnd.c" "$APP_DIR/fb_nuttx_math_rnd.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_math_rnd.c"
         ;;
     *)
@@ -1732,7 +1732,7 @@ case "$USE_GENERIC_MATH_SGN" in
         # shared implementation in the NuttX lab and disable the duplicate
         # local copies in the compatibility math file by CFLAGS.
         #
-        cp "$ROOT/src/rtlib/math_sgn.c" "$APP_DIR/fb_nuttx_math_sgn.c"
+        cp "$ROOT/src/rtlib/math/math_sgn.c" "$APP_DIR/fb_nuttx_math_sgn.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_math_sgn.c"
         ;;
     *)
@@ -1749,7 +1749,7 @@ case "$USE_GENERIC_DATETIME_MATH" in
         # Keep NuttX-specific clock, parsing, and formatting edges local, but
         # share the parts that define DATEADD/DATEPART/DATEDIFF semantics.
         #
-        cp "$ROOT/src/rtlib/time_core.c" "$APP_DIR/fb_nuttx_time_core.c"
+        cp "$ROOT/src/rtlib/datetime/time_core.c" "$APP_DIR/fb_nuttx_time_core.c"
         python3 - "$APP_DIR/fb_nuttx_time_core.c" <<'PY'
 from pathlib import Path
 import sys
@@ -1766,14 +1766,14 @@ replacement = '''#include "fb.h"
 text = text.replace('#include "fb.h"\n', replacement, 1)
 path.write_text(text, encoding="utf-8")
 PY
-        cp "$ROOT/src/rtlib/time_dateserial.c" "$APP_DIR/fb_nuttx_time_dateserial.c"
-        cp "$ROOT/src/rtlib/time_timeserial.c" "$APP_DIR/fb_nuttx_time_timeserial.c"
-        cp "$ROOT/src/rtlib/time_decodeserdate.c" "$APP_DIR/fb_nuttx_time_decodeserdate.c"
-        cp "$ROOT/src/rtlib/time_decodesertime.c" "$APP_DIR/fb_nuttx_time_decodesertime.c"
-        cp "$ROOT/src/rtlib/time_week.c" "$APP_DIR/fb_nuttx_time_week.c"
-        cp "$ROOT/src/rtlib/time_datepart.c" "$APP_DIR/fb_nuttx_time_datepart.c"
-        cp "$ROOT/src/rtlib/time_dateadd.c" "$APP_DIR/fb_nuttx_time_dateadd.c"
-        cp "$ROOT/src/rtlib/time_datediff.c" "$APP_DIR/fb_nuttx_time_datediff.c"
+        cp "$ROOT/src/rtlib/datetime/time_dateserial.c" "$APP_DIR/fb_nuttx_time_dateserial.c"
+        cp "$ROOT/src/rtlib/datetime/time_timeserial.c" "$APP_DIR/fb_nuttx_time_timeserial.c"
+        cp "$ROOT/src/rtlib/datetime/time_decodeserdate.c" "$APP_DIR/fb_nuttx_time_decodeserdate.c"
+        cp "$ROOT/src/rtlib/datetime/time_decodesertime.c" "$APP_DIR/fb_nuttx_time_decodesertime.c"
+        cp "$ROOT/src/rtlib/datetime/time_week.c" "$APP_DIR/fb_nuttx_time_week.c"
+        cp "$ROOT/src/rtlib/datetime/time_datepart.c" "$APP_DIR/fb_nuttx_time_datepart.c"
+        cp "$ROOT/src/rtlib/datetime/time_dateadd.c" "$APP_DIR/fb_nuttx_time_dateadd.c"
+        cp "$ROOT/src/rtlib/datetime/time_datediff.c" "$APP_DIR/fb_nuttx_time_datediff.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_time_core.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_time_dateserial.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_time_timeserial.c"
@@ -1798,9 +1798,9 @@ case "$USE_GENERIC_CLOCK" in
         # on POSIX-like targets.  Share the normal implementations so the
         # NuttX target does not keep a second copy of the formatting logic.
         #
-        cp "$ROOT/src/rtlib/time_date.c" "$APP_DIR/fb_nuttx_time_date.c"
-        cp "$ROOT/src/rtlib/time_time.c" "$APP_DIR/fb_nuttx_time_time.c"
-        cp "$ROOT/src/rtlib/unix/time_timer.c" "$APP_DIR/fb_nuttx_time_timer.c"
+        cp "$ROOT/src/rtlib/datetime/time_date.c" "$APP_DIR/fb_nuttx_time_date.c"
+        cp "$ROOT/src/rtlib/datetime/time_time.c" "$APP_DIR/fb_nuttx_time_time.c"
+        cp "$ROOT/src/rtlib/drivers/unix/time_timer.c" "$APP_DIR/fb_nuttx_time_timer.c"
         python3 - "$APP_DIR/fb_nuttx_time_date.c" \
             "$APP_DIR/fb_nuttx_time_time.c" \
             "$APP_DIR/fb_nuttx_time_timer.c" <<'PY'
@@ -1810,7 +1810,7 @@ import sys
 for raw_path in sys.argv[1:]:
     path = Path(raw_path)
     text = path.read_text(encoding="utf-8")
-    text = text.replace('#include "../fb.h"\n', '#include "fb.h"\n', 1)
+    text = text.replace('#include "../../fb.h"\n', '#include "fb.h"\n', 1)
     replacement = '''#include "fb.h"
 
 #ifndef FB_LOCK
@@ -1837,7 +1837,7 @@ case "$USE_GENERIC_ENVIRON" in
     0)
         ;;
     1)
-        cp "$ROOT/src/rtlib/sys_environ.c" "$APP_DIR/fb_nuttx_sys_environ.c"
+        cp "$ROOT/src/rtlib/system/sys_environ.c" "$APP_DIR/fb_nuttx_sys_environ.c"
         python3 - "$APP_DIR/fb_nuttx_sys_environ.c" <<'PY'
 from pathlib import Path
 import sys
@@ -1874,10 +1874,10 @@ case "$USE_GENERIC_DIR" in
     0)
         ;;
     1)
-        cp "$ROOT/src/rtlib/sys_mkdir.c" "$APP_DIR/fb_nuttx_sys_mkdir.c"
-        cp "$ROOT/src/rtlib/sys_rmdir.c" "$APP_DIR/fb_nuttx_sys_rmdir.c"
-        cp "$ROOT/src/rtlib/sys_chdir.c" "$APP_DIR/fb_nuttx_sys_chdir.c"
-        cp "$ROOT/src/rtlib/sys_cdir.c" "$APP_DIR/fb_nuttx_sys_cdir.c"
+        cp "$ROOT/src/rtlib/system/sys_mkdir.c" "$APP_DIR/fb_nuttx_sys_mkdir.c"
+        cp "$ROOT/src/rtlib/system/sys_rmdir.c" "$APP_DIR/fb_nuttx_sys_rmdir.c"
+        cp "$ROOT/src/rtlib/system/sys_chdir.c" "$APP_DIR/fb_nuttx_sys_chdir.c"
+        cp "$ROOT/src/rtlib/system/sys_cdir.c" "$APP_DIR/fb_nuttx_sys_cdir.c"
         python3 - "$APP_DIR/fb_nuttx_sys_mkdir.c" \
             "$APP_DIR/fb_nuttx_sys_rmdir.c" \
             "$APP_DIR/fb_nuttx_sys_chdir.c" <<'PY'
@@ -1936,7 +1936,7 @@ case "$USE_GENERIC_FILE_COPY" in
     0)
         ;;
     1)
-        cp "$ROOT/src/rtlib/file_copy_crt.c" "$APP_DIR/fb_nuttx_file_copy_crt.c"
+        cp "$ROOT/src/rtlib/files/file_copy_crt.c" "$APP_DIR/fb_nuttx_file_copy_crt.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_file_copy_crt.c"
         ;;
     *)
@@ -1948,16 +1948,16 @@ case "$USE_GENERIC_STR_BASE" in
     0)
         ;;
     1)
-        cp "$ROOT/src/rtlib/str_base.c" "$APP_DIR/fb_nuttx_str_base.c"
-        cp "$ROOT/src/rtlib/str_hex.c" "$APP_DIR/fb_nuttx_str_hex.c"
-        cp "$ROOT/src/rtlib/str_hex_lng.c" "$APP_DIR/fb_nuttx_str_hex_lng.c"
-        cp "$ROOT/src/rtlib/str_hex_ptr.c" "$APP_DIR/fb_nuttx_str_hex_ptr.c"
-        cp "$ROOT/src/rtlib/str_oct.c" "$APP_DIR/fb_nuttx_str_oct.c"
-        cp "$ROOT/src/rtlib/str_oct_lng.c" "$APP_DIR/fb_nuttx_str_oct_lng.c"
-        cp "$ROOT/src/rtlib/str_oct_ptr.c" "$APP_DIR/fb_nuttx_str_oct_ptr.c"
-        cp "$ROOT/src/rtlib/str_bin.c" "$APP_DIR/fb_nuttx_str_bin.c"
-        cp "$ROOT/src/rtlib/str_bin_lng.c" "$APP_DIR/fb_nuttx_str_bin_lng.c"
-        cp "$ROOT/src/rtlib/str_bin_ptr.c" "$APP_DIR/fb_nuttx_str_bin_ptr.c"
+        cp "$ROOT/src/rtlib/strings/str_base.c" "$APP_DIR/fb_nuttx_str_base.c"
+        cp "$ROOT/src/rtlib/strings/str_hex.c" "$APP_DIR/fb_nuttx_str_hex.c"
+        cp "$ROOT/src/rtlib/strings/str_hex_lng.c" "$APP_DIR/fb_nuttx_str_hex_lng.c"
+        cp "$ROOT/src/rtlib/strings/str_hex_ptr.c" "$APP_DIR/fb_nuttx_str_hex_ptr.c"
+        cp "$ROOT/src/rtlib/strings/str_oct.c" "$APP_DIR/fb_nuttx_str_oct.c"
+        cp "$ROOT/src/rtlib/strings/str_oct_lng.c" "$APP_DIR/fb_nuttx_str_oct_lng.c"
+        cp "$ROOT/src/rtlib/strings/str_oct_ptr.c" "$APP_DIR/fb_nuttx_str_oct_ptr.c"
+        cp "$ROOT/src/rtlib/strings/str_bin.c" "$APP_DIR/fb_nuttx_str_bin.c"
+        cp "$ROOT/src/rtlib/strings/str_bin_lng.c" "$APP_DIR/fb_nuttx_str_bin_lng.c"
+        cp "$ROOT/src/rtlib/strings/str_bin_ptr.c" "$APP_DIR/fb_nuttx_str_bin_ptr.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_base.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_hex.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_hex_lng.c"
@@ -1978,8 +1978,8 @@ case "$USE_GENERIC_STR_FILL" in
     0)
         ;;
     1)
-        cp "$ROOT/src/rtlib/str_misc.c" "$APP_DIR/fb_nuttx_str_misc.c"
-        cp "$ROOT/src/rtlib/str_fill.c" "$APP_DIR/fb_nuttx_str_fill.c"
+        cp "$ROOT/src/rtlib/strings/str_misc.c" "$APP_DIR/fb_nuttx_str_misc.c"
+        cp "$ROOT/src/rtlib/strings/str_fill.c" "$APP_DIR/fb_nuttx_str_fill.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_misc.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_fill.c"
         ;;
@@ -1992,19 +1992,19 @@ case "$USE_GENERIC_STR_EXTRA" in
     0)
         ;;
     1)
-        cp "$ROOT/src/rtlib/str_hskip.c" "$APP_DIR/fb_nuttx_str_hskip.c"
-        cp "$ROOT/src/rtlib/str_left.c" "$APP_DIR/fb_nuttx_str_left.c"
-        cp "$ROOT/src/rtlib/str_right.c" "$APP_DIR/fb_nuttx_str_right.c"
-        cp "$ROOT/src/rtlib/str_mid.c" "$APP_DIR/fb_nuttx_str_mid.c"
-        cp "$ROOT/src/rtlib/str_instr.c" "$APP_DIR/fb_nuttx_str_instr.c"
-        cp "$ROOT/src/rtlib/str_instrrev.c" "$APP_DIR/fb_nuttx_str_instrrev.c"
-        cp "$ROOT/src/rtlib/str_comp.c" "$APP_DIR/fb_nuttx_str_comp.c"
-        cp "$ROOT/src/rtlib/str_len.c" "$APP_DIR/fb_nuttx_str_len.c"
-        cp "$ROOT/src/rtlib/str_lcase.c" "$APP_DIR/fb_nuttx_str_lcase.c"
-        cp "$ROOT/src/rtlib/str_ucase.c" "$APP_DIR/fb_nuttx_str_ucase.c"
-        cp "$ROOT/src/rtlib/str_ltrim.c" "$APP_DIR/fb_nuttx_str_ltrim.c"
-        cp "$ROOT/src/rtlib/str_rtrim.c" "$APP_DIR/fb_nuttx_str_rtrim.c"
-        cp "$ROOT/src/rtlib/str_trim.c" "$APP_DIR/fb_nuttx_str_trim.c"
+        cp "$ROOT/src/rtlib/strings/str_hskip.c" "$APP_DIR/fb_nuttx_str_hskip.c"
+        cp "$ROOT/src/rtlib/strings/str_left.c" "$APP_DIR/fb_nuttx_str_left.c"
+        cp "$ROOT/src/rtlib/strings/str_right.c" "$APP_DIR/fb_nuttx_str_right.c"
+        cp "$ROOT/src/rtlib/strings/str_mid.c" "$APP_DIR/fb_nuttx_str_mid.c"
+        cp "$ROOT/src/rtlib/strings/str_instr.c" "$APP_DIR/fb_nuttx_str_instr.c"
+        cp "$ROOT/src/rtlib/strings/str_instrrev.c" "$APP_DIR/fb_nuttx_str_instrrev.c"
+        cp "$ROOT/src/rtlib/strings/str_comp.c" "$APP_DIR/fb_nuttx_str_comp.c"
+        cp "$ROOT/src/rtlib/strings/str_len.c" "$APP_DIR/fb_nuttx_str_len.c"
+        cp "$ROOT/src/rtlib/strings/str_lcase.c" "$APP_DIR/fb_nuttx_str_lcase.c"
+        cp "$ROOT/src/rtlib/strings/str_ucase.c" "$APP_DIR/fb_nuttx_str_ucase.c"
+        cp "$ROOT/src/rtlib/strings/str_ltrim.c" "$APP_DIR/fb_nuttx_str_ltrim.c"
+        cp "$ROOT/src/rtlib/strings/str_rtrim.c" "$APP_DIR/fb_nuttx_str_rtrim.c"
+        cp "$ROOT/src/rtlib/strings/str_trim.c" "$APP_DIR/fb_nuttx_str_trim.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_hskip.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_left.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_str_right.c"
@@ -2035,24 +2035,24 @@ case "$USE_GENERIC_WSTRING" in
         # base conversion, and delete routines now come from the shared
         # implementation.
         #
-        cp "$ROOT/src/rtlib/strw_alloc.c" "$APP_DIR/fb_nuttx_strw_alloc.c"
-        cp "$ROOT/src/rtlib/strw_assign.c" "$APP_DIR/fb_nuttx_strw_assign.c"
-        cp "$ROOT/src/rtlib/strw_asc.c" "$APP_DIR/fb_nuttx_strw_asc.c"
-        cp "$ROOT/src/rtlib/strw_len.c" "$APP_DIR/fb_nuttx_strw_len.c"
-        cp "$ROOT/src/rtlib/strw_fill.c" "$APP_DIR/fb_nuttx_strw_fill.c"
-        cp "$ROOT/src/rtlib/strw_space.c" "$APP_DIR/fb_nuttx_strw_space.c"
-        cp "$ROOT/src/rtlib/strw_comp.c" "$APP_DIR/fb_nuttx_strw_comp.c"
-        cp "$ROOT/src/rtlib/strw_lcase.c" "$APP_DIR/fb_nuttx_strw_lcase.c"
-        cp "$ROOT/src/rtlib/strw_ucase.c" "$APP_DIR/fb_nuttx_strw_ucase.c"
-        cp "$ROOT/src/rtlib/strw_concat.c" "$APP_DIR/fb_nuttx_strw_concat.c"
-        cp "$ROOT/src/rtlib/strw_convconcat.c" "$APP_DIR/fb_nuttx_strw_convconcat.c"
-        cp "$ROOT/src/rtlib/strw_bin.c" "$APP_DIR/fb_nuttx_strw_bin.c"
-        cp "$ROOT/src/rtlib/strw_bin_lng.c" "$APP_DIR/fb_nuttx_strw_bin_lng.c"
-        cp "$ROOT/src/rtlib/strw_hex.c" "$APP_DIR/fb_nuttx_strw_hex.c"
-        cp "$ROOT/src/rtlib/strw_hex_lng.c" "$APP_DIR/fb_nuttx_strw_hex_lng.c"
-        cp "$ROOT/src/rtlib/strw_oct.c" "$APP_DIR/fb_nuttx_strw_oct.c"
-        cp "$ROOT/src/rtlib/strw_oct_lng.c" "$APP_DIR/fb_nuttx_strw_oct_lng.c"
-        cp "$ROOT/src/rtlib/strw_del.c" "$APP_DIR/fb_nuttx_strw_del.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_alloc.c" "$APP_DIR/fb_nuttx_strw_alloc.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_assign.c" "$APP_DIR/fb_nuttx_strw_assign.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_asc.c" "$APP_DIR/fb_nuttx_strw_asc.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_len.c" "$APP_DIR/fb_nuttx_strw_len.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_fill.c" "$APP_DIR/fb_nuttx_strw_fill.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_space.c" "$APP_DIR/fb_nuttx_strw_space.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_comp.c" "$APP_DIR/fb_nuttx_strw_comp.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_lcase.c" "$APP_DIR/fb_nuttx_strw_lcase.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_ucase.c" "$APP_DIR/fb_nuttx_strw_ucase.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_concat.c" "$APP_DIR/fb_nuttx_strw_concat.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_convconcat.c" "$APP_DIR/fb_nuttx_strw_convconcat.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_bin.c" "$APP_DIR/fb_nuttx_strw_bin.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_bin_lng.c" "$APP_DIR/fb_nuttx_strw_bin_lng.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_hex.c" "$APP_DIR/fb_nuttx_strw_hex.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_hex_lng.c" "$APP_DIR/fb_nuttx_strw_hex_lng.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_oct.c" "$APP_DIR/fb_nuttx_strw_oct.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_oct_lng.c" "$APP_DIR/fb_nuttx_strw_oct_lng.c"
+        cp "$ROOT/src/rtlib/strings/wide/strw_del.c" "$APP_DIR/fb_nuttx_strw_del.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_strw_alloc.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_strw_assign.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_strw_asc.c"
@@ -2081,8 +2081,8 @@ case "$USE_GENERIC_ASSERT" in
     0)
         ;;
     1)
-        cp "$ROOT/src/rtlib/error_assert.c" "$APP_DIR/fb_nuttx_error_assert.c"
-        cp "$ROOT/src/rtlib/error_assert_wstr.c" \
+        cp "$ROOT/src/rtlib/errors/error_assert.c" "$APP_DIR/fb_nuttx_error_assert.c"
+        cp "$ROOT/src/rtlib/errors/error_assert_wstr.c" \
             "$APP_DIR/fb_nuttx_error_assert_wstr.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_error_assert.c"
         EXTRA_CSRCS="$EXTRA_CSRCS fb_nuttx_error_assert_wstr.c"
@@ -2249,10 +2249,10 @@ GFX_CSRCS=""
 SFX_CSRCS=""
 
 if [ "$USES_SFX" -eq 1 ]; then
-    mkdir -p "$APP_DIR/rtlib/nuttx" "$APP_DIR/sfxlib/nuttx" "$APP_DIR/sfxlib/third_party"
+    mkdir -p "$APP_DIR/rtlib/drivers/nuttx" "$APP_DIR/sfxlib/nuttx" "$APP_DIR/sfxlib/third_party"
 
     cp "$ROOT/src/rtlib"/*.h "$APP_DIR/rtlib/"
-    cp "$ROOT/src/rtlib/nuttx"/*.h "$APP_DIR/rtlib/nuttx/"
+    cp "$ROOT/src/rtlib/drivers/nuttx"/*.h "$APP_DIR/rtlib/drivers/nuttx/"
     cp "$ROOT/src/sfxlib"/*.h "$APP_DIR/sfxlib/"
     if [ "$SFX_NO_MEDIA_DECODERS" -eq 0 ]; then
         cp "$ROOT/src/sfxlib/third_party"/*.c "$APP_DIR/sfxlib/third_party/"
@@ -2341,24 +2341,27 @@ EOF
     done
 
     if [ "$WITH_GFXLIB" -eq 0 ]; then
-        cp "$ROOT/src/rtlib/nuttx/fb_nuttx_sfx_context.c" "$APP_DIR/"
+        cp "$ROOT/src/rtlib/drivers/nuttx/fb_nuttx_sfx_context.c" "$APP_DIR/"
         SFX_CSRCS="$SFX_CSRCS fb_nuttx_sfx_context.c"
     fi
 fi
 
 if [ "$WITH_GFXLIB" -eq 1 ]; then
-    mkdir -p "$APP_DIR/gfxlib2/nuttx" "$APP_DIR/rtlib/nuttx"
+    mkdir -p "$APP_DIR/gfxlib2/drivers/nuttx" "$APP_DIR/rtlib/drivers/nuttx" "$APP_DIR/rtlib/console"
     cp "$ROOT/src/rtlib"/*.h "$APP_DIR/rtlib/"
-    cp "$ROOT/src/rtlib/nuttx"/*.h "$APP_DIR/rtlib/nuttx/"
-    cp "$ROOT/src/rtlib/con_print_raw.c" "$APP_DIR/rtlib/"
-    cp "$ROOT/src/rtlib/con_print_raw_uni.h" "$APP_DIR/rtlib/"
-    cp "$ROOT/src/rtlib/con_print_tty.c" "$APP_DIR/rtlib/"
-    cp "$ROOT/src/rtlib/con_print_tty_uni.h" "$APP_DIR/rtlib/"
+    cp "$ROOT/src/rtlib/drivers/nuttx"/*.h "$APP_DIR/rtlib/drivers/nuttx/"
+    # Keep runtime-relative template includes valid in the reduced source tree.
+    cp "$ROOT/src/rtlib/console/con_print_raw.c" "$APP_DIR/rtlib/console/"
+    cp "$ROOT/src/rtlib/console/con_print_raw_uni.h" "$APP_DIR/rtlib/console/"
+    cp "$ROOT/src/rtlib/console/con_print_tty.c" "$APP_DIR/rtlib/console/"
+    cp "$ROOT/src/rtlib/console/con_print_tty_uni.h" "$APP_DIR/rtlib/console/"
 
     cp "$ROOT/src/gfxlib2/fb_gfx.h" "$APP_DIR/gfxlib2/"
     cp "$ROOT/src/gfxlib2/fb_gfx_gl.h" "$APP_DIR/gfxlib2/"
     cp "$ROOT/src/gfxlib2/fb_gfx_lzw.h" "$APP_DIR/gfxlib2/"
     cp "$ROOT/src/gfxlib2/gfxdata_inline.h" "$APP_DIR/gfxlib2/"
+    cp "$ROOT/src/gfxlib2/"*.h "$APP_DIR/gfxlib2/"
+    cp "$ROOT/src/gfxlib2/"*.inc "$APP_DIR/gfxlib2/"
 
     for gfx_src in \
         gfx_access.c \
@@ -2392,15 +2395,26 @@ if [ "$WITH_GFXLIB" -eq 1 ]; then
         gfx_vsync.c \
         gfx_width.c
     do
-        cp "$ROOT/src/gfxlib2/$gfx_src" "$APP_DIR/gfxlib2/"
-        GFX_CSRCS="$GFX_CSRCS gfxlib2/$gfx_src"
+        # Shared sources retain their subsystem directory so their relative
+        # header paths mean the same thing in this reduced NuttX source tree.
+        gfx_source_path=
+        for gfx_group in core draw image input text pixels palette presentation data; do
+            if [ -f "$ROOT/src/gfxlib2/$gfx_group/$gfx_src" ]; then
+                [ -z "$gfx_source_path" ] || die "Ambiguous gfx source: $gfx_src"
+                gfx_source_path="$gfx_group/$gfx_src"
+            fi
+        done
+        [ -n "$gfx_source_path" ] || die "Missing gfx source: $gfx_src"
+        mkdir -p "$APP_DIR/gfxlib2/$(dirname -- "$gfx_source_path")"
+        cp "$ROOT/src/gfxlib2/$gfx_source_path" "$APP_DIR/gfxlib2/$gfx_source_path"
+        GFX_CSRCS="$GFX_CSRCS gfxlib2/$gfx_source_path"
     done
 
-    cp "$ROOT/src/gfxlib2/nuttx/gfx_driver.c" "$APP_DIR/gfxlib2/nuttx/"
-    cp "$ROOT/src/gfxlib2/nuttx/gfx_rp2350_dvi.c" "$APP_DIR/gfxlib2/nuttx/"
-    GFX_CSRCS="$GFX_CSRCS gfxlib2/nuttx/gfx_driver.c"
-    GFX_CSRCS="$GFX_CSRCS gfxlib2/nuttx/gfx_rp2350_dvi.c"
-    GFX_CSRCS="$GFX_CSRCS rtlib/con_print_raw.c rtlib/con_print_tty.c fb_nuttx_gfx_compat.c"
+    cp "$ROOT/src/gfxlib2/drivers/nuttx/gfx_driver.c" "$APP_DIR/gfxlib2/drivers/nuttx/"
+    cp "$ROOT/src/gfxlib2/drivers/nuttx/gfx_rp2350_dvi.c" "$APP_DIR/gfxlib2/drivers/nuttx/"
+    GFX_CSRCS="$GFX_CSRCS gfxlib2/drivers/nuttx/gfx_driver.c"
+    GFX_CSRCS="$GFX_CSRCS gfxlib2/drivers/nuttx/gfx_rp2350_dvi.c"
+    GFX_CSRCS="$GFX_CSRCS rtlib/console/con_print_raw.c rtlib/console/con_print_tty.c fb_nuttx_gfx_compat.c"
 fi
 
 cat > "$APP_DIR/fb.h" <<'EOF'
@@ -2844,6 +2858,10 @@ EOF
 
 if [ "$WITH_GFXLIB" -eq 1 ]; then
     printf 'CFLAGS += -DFB_NUTTX_WITH_GFXLIB=1\n' >> "$APP_DIR/Makefile"
+    # The generated program owns a minimal fb.h in the application directory.
+    # Runtime subdirectory sources need the full header before ordinary -I
+    # paths; their -iquote search still lets the program use its local stub.
+    printf 'CFLAGS += -iquote"%s/rtlib"\n' "$APP_DIR" >> "$APP_DIR/Makefile"
     printf 'CFLAGS += -I$(TOPDIR)/arch/risc-v/src/common\n' >> "$APP_DIR/Makefile"
     printf 'CFLAGS += -I$(TOPDIR)/arch/risc-v/src/rp23xx-rv\n' >> "$APP_DIR/Makefile"
 fi

@@ -7,7 +7,7 @@
  */
 
 #include "../../src/rtlib/fb.h"
-#include "../../src/rtlib/dos/fb_dos_thread.h"
+#include "../../src/rtlib/drivers/dos/fb_dos_thread.h"
 #include "../../src/sfxlib/fb_sfx.h"
 #include "../../src/sfxlib/fb_sfx_internal.h"
 #include "../../src/sfxlib/dos/fb_sfx_msdos.h"

@@ -2,6 +2,9 @@
 # platform.mk
 #
 # Canonical platform identity layer
+# Project: FreeBASIC build system
+# Purpose: Resolve a consistent target ABI before source and layout selection.
+# This file intentionally does NOT select SDK tools or filesystem paths.
 #
 # Responsibilities:
 #   - resolve host / target triplet
@@ -245,6 +248,29 @@ ifneq ($(filter asmjs wasm32,$(TARGET_ARCH_RAW)),)
   TARGET_ARCH := asmjs
 endif
 
+# A multilib width changes the ABI, not just a compiler option. Resolve it
+# before source selection and layout so 32-bit objects cannot enter a 64-bit
+# runtime directory. The triplet still identifies the selected SDK driver.
+ifneq ($(strip $(MULTILIB)),)
+ifeq ($(filter 32 64,$(MULTILIB)),)
+$(error MULTILIB must be 32 or 64)
+endif
+ifneq ($(words $(MULTILIB)),1)
+$(error MULTILIB must contain one width)
+endif
+ifeq ($(filter x86 x86_64,$(TARGET_ARCH)),)
+$(error MULTILIB supports only x86 targets; select another architecture with TARGET_TRIPLET)
+endif
+ifeq ($(MULTILIB),64)
+ifneq ($(filter dos wince xbox,$(TARGET_OS)),)
+$(error $(TARGET_OS) does not support a 64-bit MULTILIB build)
+endif
+TARGET_ARCH := x86_64
+else
+TARGET_ARCH := x86
+endif
+endif
+
 
 ##############################################################################
 # 3) ISA family (directory key for src/*/<family>)
@@ -355,6 +381,18 @@ endif
 ##############################################################################
 # 6) Runtime directory identity (CANONICAL)
 ##############################################################################
+
+ifneq ($(strip $(MULTILIB)),)
+MULTILIB_FBC_TARGET := $(TARGET_OS)-$(TARGET_ARCH)
+ifeq ($(TARGET_OS),win32)
+MULTILIB_FBC_TARGET := $(if $(filter 32,$(MULTILIB)),win32,win64)
+else ifeq ($(TARGET_OS),dos)
+MULTILIB_FBC_TARGET := dos
+endif
+ifneq ($(FBC_TARGET),$(MULTILIB_FBC_TARGET))
+$(error FBC_TARGET=$(FBC_TARGET) conflicts with MULTILIB=$(MULTILIB); expected $(MULTILIB_FBC_TARGET))
+endif
+endif
 
 ifdef FBTARGET_DIR_OVERRIDE
   FBTARGET_DIR := $(FBTARGET_DIR_OVERRIDE)

@@ -1,8 +1,10 @@
 /*
- * FreeBASIC graphics services: fb_drop.h
+ * Project: FreeBASIC graphics services: fb_drop.h
  * Purpose: Describe bounded, copied drag-and-drop payloads beside SCREENEVENT.
  * Responsibilities: Shared queue ABI, limits and platform-independent parsing.
  * Native window protocols, input locks and file opening belong elsewhere.
+ * File: fb_drop.h
+ * This file intentionally does NOT contain: unrelated runtime subsystems.
  */
 #ifndef FB_DROP_H
 #define FB_DROP_H
@@ -57,4 +59,5 @@ int fb_hDropUriList(const char *source, size_t length, char *output,
 #endif
 
 #endif
+
 /* end of fb_drop.h */

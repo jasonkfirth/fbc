@@ -1,6 +1,10 @@
 ###############
 # multilib.mk #
 ###############
+# Project: FreeBASIC build system
+# Purpose: Apply the already selected x86 ABI width to every compiler stage.
+# Responsibilities: Forward matching BASIC, C, C++, and linker width flags.
+# This file intentionally does NOT resolve platform identity or SDK paths.
 
 ##############################################################################
 # Multilib / -arch plumbing
@@ -9,7 +13,9 @@
 #  - Do NOT pass GNU triplets (e.g. x86_64-w64-mingw32) to fbc's -target.
 #    fbc wants lowering targets (win32/win64/linux-x86_64/...)
 #    and that is already handled in compiler-config.mk via FB_LOWER_TARGET.
-#  - Keep MULTILIB working for fbc via -arch, and for GCC via -m where valid.
+#  - Keep the selected x86 width consistent across BASIC, C, C++, and linking.
+#    platform.mk resolves the effective target and rejects incompatible widths
+#    before layout or source discovery. This file only realizes tool flags.
 ##############################################################################
 
 # fbc -target is handled in compiler-config.mk (FB_LOWER_TARGET), not here.
@@ -20,11 +26,9 @@ ifdef MULTILIB
   ALLFBRTCFLAGS  += -arch $(MULTILIB)
   ALLFBRTLFLAGS  += -arch $(MULTILIB)
 
-  # GCC/Clang multilib flags: only for platforms that accept -m32/-m64, etc.
-  # Avoid ARM where -m$(MULTILIB) isn't meaningful in the same way.
-  ifeq ($(filter arm arm64,$(ISA_FAMILY)),)
-    ALLCFLAGS += -m$(MULTILIB)
-  endif
+  ALLCFLAGS   += -m$(MULTILIB)
+  ALLCXXFLAGS += -m$(MULTILIB)
+  ALLLDFLAGS  += -m$(MULTILIB)
 endif
 
 ######################

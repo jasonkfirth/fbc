@@ -365,6 +365,14 @@ INTERACTIVE_SOURCES = {
     "examples/unicode/hello_UTF8.bas",
 }
 
+# These examples change the host clock when the account has that privilege.
+# They remain compile-only even under --run-all; a smoke sweep must not alter
+# the machine's date or time while validating unrelated runtime behavior.
+SYSTEM_CHANGING_SOURCES = {
+    "examples/manual/system/setdate.bas",
+    "examples/manual/system/settime.bas",
+}
+
 INTERACTIVE_RE = re.compile(
     r"\b("
     r"getkey|inkey|input|line\s+input|messagebox|open\s+lpt|sleep|screen|screenres|"
@@ -544,6 +552,9 @@ def classify(path: Path, root: Path, target_os: str, supports_gas64: bool) -> Cl
     lowered_path = "/" + rel.lower()
     text = read_text(path)
     lowered_text = text.lower()
+
+    if rel in SYSTEM_CHANGING_SOURCES:
+        return Classification("system-changing", "example changes the host system clock", False)
 
     if rel in INTENTIONAL_FAILURES:
         return Classification("intentional-failure", "example intentionally demonstrates an error path", False)
@@ -1207,7 +1218,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
         if args.no_run:
             should_run = False
             run_status = "skipped-no-run"
-        elif args.run_all and classification.group not in ("external-library", "platform-specific", "helper-module", "intentional-failure"):
+        elif args.run_all and classification.group not in ("external-library", "platform-specific", "helper-module", "intentional-failure", "system-changing"):
             should_run = True
 
         if should_run:

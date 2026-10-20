@@ -1,4 +1,10 @@
-       /* CONS */
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_device.h
+ * Purpose: CONS.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
        int          fb_DevConsOpen          ( FB_FILE *handle, const char *filename, size_t filename_len );
 
        /* ERR */
@@ -85,3 +91,5 @@ typedef struct {
        /* TCP */
        int          fb_DevTcpOpen           ( FB_FILE *handle, const char *filename, size_t filename_len );
        int          fb_DevTcpOpenServer     ( FB_FILE *handle, const char *filename, size_t filename_len );
+
+/* end of fb_device.h */

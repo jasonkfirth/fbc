@@ -8,7 +8,7 @@
 #include "../fb_sfx_internal.h"
 
 #if FB_SFX_DOS_THREADS
-#include "../../rtlib/dos/fb_dos.h"
+#include "../../rtlib/drivers/dos/fb_dos.h"
 #include <dpmi.h>
 #include <pc.h>
 

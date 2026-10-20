@@ -1,4 +1,9 @@
 #!/usr/bin/make -f
+# Project: FreeBASIC documentation tools
+# File: GNUmakefile
+# Purpose: Coordinate the documentation tool subdirectories.
+# Responsibilities: Run each child once and forward optional feature switches.
+# This file intentionally does NOT duplicate child source dependency graphs.
 #
 # top level GNUmakefile that will run other makefiles for documentation
 # and wiki tools
@@ -14,14 +19,7 @@
 #   'USE_PCRE_STATIC=1' to indicate we should link with static version of libpcre
 #   'FBC=d:/path/fbc to' to override path to execute fbc compiler 
 
-UNAME_S := $(shell uname -s 2>/dev/null || echo unknown)
-ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(UNAME_S)))
-	EXEEXT := .exe
-else ifeq ($(OS),Windows_NT)
-	EXEEXT := .exe
-else
-	EXEEXT :=
-endif
+include common.mk
 
 ifndef MAKE
     MAKE := make
@@ -41,19 +39,10 @@ endif
 
 FBC ?= fbc
 
-FBDOC_MAKE := fbdoc/GNUmakefile
-FBDOC_SRCS := $(wildcard fbdoc/*.bas)
-FBDOC_HDRS := $(wildcard fbdoc/*.bi)
 FBDOC_BINS := fbdoc/fbdoc$(EXEEXT)
 
-LIBFBDOC_MAKE := libfbdoc/GNUmakefile
-LIBFBDOC_SRCS := $(wildcard libfbdoc/*.bas)
-LIBFBDOC_HDRS := $(wildcard libfbdoc/*.bi)
 LIBFBDOC_BINS := libfbdoc/libfbdoc.a
 
-FBCHKDOC_MAKE := fbchkdoc/GNUmakefile
-FBCHKDOC_SRCS := $(wildcard fbchkdoc/*.bas) 
-FBCHKDOC_HDRS := $(wildcard fbchkdoc/*.bi) 
 FBCHKDOC_BINS := fbchkdoc/getindex$(EXEEXT)  
 FBCHKDOC_BINS += fbchkdoc/getpage$(EXEEXT)
 FBCHKDOC_BINS += fbchkdoc/putpage$(EXEEXT)
@@ -66,33 +55,42 @@ FBCHKDOC_BINS += fbchkdoc/delextra$(EXEEXT)
 FBCHKDOC_BINS += fbchkdoc/mkimglst$(EXEEXT)
 FBCHKDOC_BINS += fbchkdoc/getimage$(EXEEXT)
 
-#ifdef HAVE_APSPELL
+ifdef HAVE_ASPELL
 FBCHKDOC_BINS += fbchkdoc/spellit$(EXEEXT)
 FBCHKDOC_BINS += fbchkdoc/spell$(EXEEXT)
-#endif
+endif
 
 FBCHKDOC_BINS += fbchkdoc/samps$(EXEEXT)
 FBCHKDOC_BINS += fbchkdoc/pretty$(EXEEXT)
+FBCHKDOC_BINS += fbchkdoc/insert$(EXEEXT)
 
-MAKEFBHELP_MAKE := makefbhelp/GNUmakefile
-MAKEFBHELP_SRCS := $(wildcard makefbhelp/*.bas)
-MAKEFBHELP_HDRS := $(wildcard makefbhelp/*.bi)
 MAKEFBHELP_BINS := makefbhelp/makefbhelp$(EXEEXT) 
 
-.PHONY: clean
-all: $(FBDOC_BINS) $(FBCHKDOC_BINS) $(MAKEFBHELP_BINS)
+.PHONY: all fbdoc-tools libfbdoc-tools fbchkdoc-tools makefbhelp-tools
+all: fbdoc-tools fbchkdoc-tools makefbhelp-tools
 
-$(FBDOC_BINS): $(FBDOC_SRCS) $(FBDOC_HDRS) $(FBDOC_MAKE) $(LIBFBDOC_BINS) 
+# Each child owns its incremental graph. A recipe attached separately to every
+# child binary would start competing sub-makes in the same directory under -j.
+fbdoc-tools: libfbdoc-tools
 	cd fbdoc && $(MAKE) FBC="$(FBC)" $(MAKEOPTS)
 
-$(LIBFBDOC_BINS): $(LIBFBDOC_SRCS) $(LIBFBDOC_HDRS) $(LIBFBDOC_MAKE) 
+libfbdoc-tools:
 	cd libfbdoc && $(MAKE) FBC="$(FBC)" $(MAKEOPTS)
 
-$(FBCHKDOC_BINS): $(FBCHKDOC_SRCS) $(FBCHKDOC_HDRS) $(FBCHKDOC_MAKE) $(LIBFBDOC_BINS)
+fbchkdoc-tools: libfbdoc-tools
 	cd fbchkdoc && $(MAKE) FBC="$(FBC)" $(MAKEOPTS)
 
-$(MAKEFBHELP_BINS): $(MAKEFBHELP_SRCS) $(MAKEFBHELP_HDRS) $(MAKEFBHELP_MAKE)
+makefbhelp-tools:
 	cd makefbhelp && $(MAKE) FBC="$(FBC)" $(MAKEOPTS)
+
+$(FBDOC_BINS): | fbdoc-tools
+	@test -f "$@"
+$(LIBFBDOC_BINS): | libfbdoc-tools
+	@test -f "$@"
+$(FBCHKDOC_BINS): | fbchkdoc-tools
+	@test -f "$@"
+$(MAKEFBHELP_BINS): | makefbhelp-tools
+	@test -f "$@"
 
 .PHONY: clean
 clean:
@@ -100,3 +98,5 @@ clean:
 	cd fbchkdoc && $(MAKE) clean HAVE_ASPELL=1 HAVE_MYSQL=1
 	cd makefbhelp && $(MAKE) clean HAVE_ASPELL=1 HAVE_MYSQL=1
 	cd libfbdoc && $(MAKE) clean HAVE_ASPELL=1 HAVE_MYSQL=1
+
+# end of GNUmakefile

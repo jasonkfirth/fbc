@@ -1,4 +1,9 @@
 #!/usr/bin/make -f
+# Project: FreeBASIC documentation tools
+# File: GNUmakefile
+# Purpose: Build the manual generator.
+# Responsibilities: Link fbdoc with the shared documentation library.
+# This file intentionally does NOT generate manual packages.
 #
 # makes the wiki tools and documentation support library
 #
@@ -9,14 +14,8 @@
 #   'FBC=d:/path/fbc to' to override path to execute fbc compiler 
 
 
-OS := $(shell uname)
-ifeq ($(OS),Linux)
-    EXEEXT :=
-else
-    EXEEXT := .exe
-endif
+include ../common.mk
 
-FBC := fbc
 FBDOC := fbdoc$(EXEEXT)
 
 ifndef MAKE
@@ -52,3 +51,5 @@ $(FBDOC): fbdoc.bas ../libfbdoc/libfbdoc.a
 .PHONY: clean
 clean:
 	-rm -f $(FBDOC)
+
+# end of GNUmakefile

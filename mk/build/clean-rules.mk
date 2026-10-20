@@ -3,6 +3,10 @@
 ##############################################################################
 #
 # Centralized cleaning policy
+# Project: FreeBASIC build system
+# Purpose: Remove explicitly requested generated artifact sets.
+# Responsibilities: Keep component cleanup and bootstrap-source aliases together.
+# This file intentionally does NOT create or install build products.
 #
 # clean                → normal developer clean
 # distclean            → remove all build artifacts
@@ -92,6 +96,8 @@ clean-libs:
 	@rm -f $(libdir)/libfbrt*.a
 	@rm -f $(libdir)/libfbgfx*.a
 	@rm -f $(libdir)/libsfx*.a
+	@rm -f $(libdir)/.archive-members/*.a
+	@rmdir "$(libdir)/.archive-members" 2>/dev/null || true
 	@rm -f $(libdir)/fbrt0.o
 	@rm -f $(libdir)/fbrt0pic.o
 	@rm -f $(libdir)/fbrt1.o
@@ -182,9 +188,12 @@ clean-bootstrap:
 
 
 # Explicit removal of emitted bootstrap sources
+clean-bootstrap-sources: clean-bootstrap-src
+
 clean-bootstrap-src:
 	@rm -f bootstrap/*/*.c
 	@rm -f bootstrap/*/*.asm
+	@rm -f bootstrap/*/*.ll
 
 
 ##############################################################################

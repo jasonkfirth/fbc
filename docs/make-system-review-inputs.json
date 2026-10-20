@@ -1,0 +1,747 @@
+{
+    "schema_version":  1,
+    "project":  "FreeBASIC build system",
+    "file":  "make-system-review-inputs.json",
+    "purpose":  "Pin the maintained Make inputs and focused validation evidence for the Make system review.",
+    "responsibilities":  [
+                             "Identify reviewed inputs by exact content",
+                             "Record validation scope and validator identities"
+                         ],
+    "excludes":  [
+                     "Generated build and bootstrap output",
+                     "Imported legacy library trees",
+                     "Native SDK and device qualification",
+                     "Full language suites and complete quick/full rebuilds"
+                 ],
+    "date":  "2026-10-20",
+    "counts":  {
+                   "makefiles":  85,
+                   "multi_module_fixtures":  44,
+                   "total":  129
+               },
+    "validations":  [
+                        {
+                            "name":  "make-contracts-test",
+                            "result":  "PASS",
+                            "cases":  37,
+                            "failures":  0,
+                            "invocation":  "make --no-print-directory -s make-contracts-test PYTHON=C:/freebasic-js/toolchain/ucrt64/bin/python.exe"
+                        },
+                        {
+                            "name":  "compiler-test-harness",
+                            "result":  "PASS",
+                            "cases":  25,
+                            "compiler_timeout":  "passed"
+                        },
+                        {
+                            "name":  "compiler-structure",
+                            "result":  "PASS",
+                            "documented_files":  264,
+                            "host_graphs":  21
+                        },
+                        {
+                            "name":  "gfx-structure",
+                            "result":  "PASS",
+                            "graphs":  31
+                        },
+                        {
+                            "name":  "rtlib-structure",
+                            "result":  "PASS",
+                            "files":  1241,
+                            "groups":  21,
+                            "graph_cases":  126,
+                            "guard_cases":  3
+                        }
+                    ],
+    "compiler":  {
+                     "path":  "bin/fbc.exe",
+                     "sha256":  "17c0fe049c35ec18764f7a5bb3e40c33d3e763a90f686dcd79e088a00492be4c",
+                     "rebuilt":  false,
+                     "installed":  false
+                 },
+    "verification_note":  "Final functional checks passed before file-header comments and review documentation were completed. No functional code changed afterward.",
+    "validators":  [
+                       {
+                           "path":  "build_scripts/test-make-contracts.py",
+                           "sha256":  "64d0c9630848b5fbb290e98d3298ef7e75a8a524217868ba7cf368d915baa504"
+                       },
+                       {
+                           "path":  "build_scripts/test-compiler-test-harness.py",
+                           "sha256":  "e0496278cea1a57e573371b0164ed029ad8b9a9c3bcc9be0631f10686b2c8532"
+                       },
+                       {
+                           "path":  "build_scripts/check-compiler-structure.py",
+                           "sha256":  "f937b35e71c7e396ad31396ea3d84ccfce17f3bad976422f65c585a1c87d38fa"
+                       },
+                       {
+                           "path":  "build_scripts/check-gfx-source-graph.py",
+                           "sha256":  "fecb3e622c0b3fdc3c9ba1b780384dbe823f02501998d639654cffd07e1747b0"
+                       },
+                       {
+                           "path":  "build_scripts/check-rtlib-structure.py",
+                           "sha256":  "f8f44ac1056e9cf8211306e3a9d39c851ce3387e2946d99c1706f357720176bd"
+                       }
+                   ],
+    "local_receipts":  [
+                           {
+                               "path":  "build/make-review-20261020/make-contracts.txt",
+                               "sha256":  "066396e899464d54fceffba82ce773e47747cb2ea4d7ba7f3c628fe24b206d5b"
+                           },
+                           {
+                               "path":  "build/make-review-20261020/compiler-log-harness.txt",
+                               "sha256":  "03e81618485b84bf2e69563f87e58af80e6c2cbf3639f29d63b5145b64142041"
+                           },
+                           {
+                               "path":  "build/make-review-20261020/runtime-structure.txt",
+                               "sha256":  "bd7a85a644f5d916ac8226191a1cfdd00468264d0c03a2697a8ebf791ceff71d"
+                           }
+                       ],
+    "inputs":  [
+                   {
+                       "path":  "contrib/nsis-installer/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "4e6933c30928b15638da30dc5cd824878ebf291f7503c816fbca787c9f912f57"
+                   },
+                   {
+                       "path":  "doc/common.mk",
+                       "kind":  "makefile",
+                       "sha256":  "894e119a6d13c59a0e2b20e3776b7395d5db2fac521ae949c93193a19ee06b3f"
+                   },
+                   {
+                       "path":  "doc/fbchkdoc/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "e4552e0e87bea95ff3564acfefda4b25474f9014ad6a17447152593d9efdbaf3"
+                   },
+                   {
+                       "path":  "doc/fbdoc/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "f613ea2913ddd62685beadaa842062899b00b6bb8679f148440d25caee3fb55d"
+                   },
+                   {
+                       "path":  "doc/fbhelp/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "e8a0ac5fd64eab5f009b16e5d367f2d309b8b006cf12ec950860f233eb321c2a"
+                   },
+                   {
+                       "path":  "doc/fbhelp/version.mk",
+                       "kind":  "makefile",
+                       "sha256":  "f12cf908c791f4e909e3324f4c6bea22271872eba8b1042ce98b4c77e54f81a1"
+                   },
+                   {
+                       "path":  "doc/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "b2aa13ef4f341097934d6bc1d1d281ce90a91ad21a46026e869a5d01ddb60f57"
+                   },
+                   {
+                       "path":  "doc/libfbdoc/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "1952993b3fdf0e771a3ef26c57bffeef54cba0b2e3aca18065becb69001fccba"
+                   },
+                   {
+                       "path":  "doc/makefbhelp/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "14135309b59bb389b91c703cdb4aa0c48881d289f74669856d1db17883262e14"
+                   },
+                   {
+                       "path":  "doc/manual/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "b4ce0932fe88ed88d92df7ff4d3fea7eb56b2a6ccc8441b457f5d6598ec58996"
+                   },
+                   {
+                       "path":  "examples/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "37531eada4ceda8ec876fe81a95b2517972938d0c7535a2f234b051dc5739170"
+                   },
+                   {
+                       "path":  "examples/win32/COM/MoviePlayer/movctrl/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "7bba3774cb890b9501e3573e0c7df573161652a72659e0238fc6b6f8dec08873"
+                   },
+                   {
+                       "path":  "examples/win32/COM/WebBrowser/webctrl/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "a6d13928304436b37f7a416c67506487e40c1dd89a62b82667a02fa10f579505"
+                   },
+                   {
+                       "path":  "examples/win32/variants/libvariant/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "d8ca1a23175eae4bc7aec323514c382a2156ef87387d229058c4933081dbfab0"
+                   },
+                   {
+                       "path":  "GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "a7b07b7235becc058fad11caa947f10777c7a1c9ae8dd461c6570f25a628e831"
+                   },
+                   {
+                       "path":  "lib/win32/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "e85954c5635b9764472590818e1c016cdf146773bcfed374c4c026fa2738ad3e"
+                   },
+                   {
+                       "path":  "mk/amiga/toolchain-flags.mk",
+                       "kind":  "makefile",
+                       "sha256":  "1bd89240dd54db7b4481b33d28562ab7aebe21342f91d99a9ee3a27231f1ada1"
+                   },
+                   {
+                       "path":  "mk/android/toolchain-flags.mk",
+                       "kind":  "makefile",
+                       "sha256":  "80e826fbd057d84334602b0cba75299b1bb40ae39b0e6b021a3e4133aeeb719b"
+                   },
+                   {
+                       "path":  "mk/archives.mk",
+                       "kind":  "makefile",
+                       "sha256":  "59ca242720344b46c7ae3a64fb742d08ce0a858f3f3ce215c485249bc12931e4"
+                   },
+                   {
+                       "path":  "mk/aros/toolchain-flags.mk",
+                       "kind":  "makefile",
+                       "sha256":  "fbbfbf81bed33adf335e84b5bd9d2c4e6300b595a82904d69ae3ec8e9cd9ee22"
+                   },
+                   {
+                       "path":  "mk/bootstrap/bootstrap-core.mk",
+                       "kind":  "makefile",
+                       "sha256":  "4d686aa56f17d7fb3527642e0963d3031918f342ccddf585c35b6e9d45c5ee9a"
+                   },
+                   {
+                       "path":  "mk/bootstrap/bootstrap-dist.mk",
+                       "kind":  "makefile",
+                       "sha256":  "5742efa0be8cce31cd2c20f26d9b0a24fbf3c769173549331f32bcee2674ad42"
+                   },
+                   {
+                       "path":  "mk/bootstrap/bootstrap-emit.mk",
+                       "kind":  "makefile",
+                       "sha256":  "9a5b0a902551983e65939799d207120d0301b1377c2b8c1634803bc82281ae26"
+                   },
+                   {
+                       "path":  "mk/build/archive-rules.mk",
+                       "kind":  "makefile",
+                       "sha256":  "815afee358000bd68536a691255421ccbeec702789a1e8a7eacd3b9db0c3bb71"
+                   },
+                   {
+                       "path":  "mk/build/build-dirs.mk",
+                       "kind":  "makefile",
+                       "sha256":  "a135edaa7134b6a40d534d5780f9da1bf304a3a48b8142d5be5b56f660de43ad"
+                   },
+                   {
+                       "path":  "mk/build/build-targets.mk",
+                       "kind":  "makefile",
+                       "sha256":  "9b0eaa2877463ef0da229893d69f58a1a9468f1ad0fe360a249ce32badddbc74"
+                   },
+                   {
+                       "path":  "mk/build/clean-rules.mk",
+                       "kind":  "makefile",
+                       "sha256":  "fa8e9ce9075e91d9232d184ddcc289bb0c26f483a05146c2939c1dbb61229c9c"
+                   },
+                   {
+                       "path":  "mk/build/compile-rules.mk",
+                       "kind":  "makefile",
+                       "sha256":  "8f8416c5ec1d28a2f3c1fdb61f9b74013439df202bd41cba790ae8163d193bdb"
+                   },
+                   {
+                       "path":  "mk/build/dependency-rules.mk",
+                       "kind":  "makefile",
+                       "sha256":  "ad299a3b992044f4ce891951a7ee164fbac6d917c8ce25a735af7409024f1141"
+                   },
+                   {
+                       "path":  "mk/build-layout.mk",
+                       "kind":  "makefile",
+                       "sha256":  "1525da1c95ab3b439ca126bea1f0c2ee0aad9379dad49199951c68244858f4ea"
+                   },
+                   {
+                       "path":  "mk/compiler-config.mk",
+                       "kind":  "makefile",
+                       "sha256":  "ff7b3dc2eb23a0e789a20068f62f5392401426ee4fcb940fb6fd262068c324a3"
+                   },
+                   {
+                       "path":  "mk/compiler-sources.mk",
+                       "kind":  "makefile",
+                       "sha256":  "d9dd2bdad6694b066b29289377b1448dac7c9ddad67854811a9f9a5a04171c57"
+                   },
+                   {
+                       "path":  "mk/cpu.mk",
+                       "kind":  "makefile",
+                       "sha256":  "244cc905592e414c9b18e75fc191e3d14ce52ab58e601a6f3be5a4cecbaed684"
+                   },
+                   {
+                       "path":  "mk/dist.mk",
+                       "kind":  "makefile",
+                       "sha256":  "ecc00b000b1f95a88ba852ec54906af7433ad5cb0b76ef74f85a80328359ebe2"
+                   },
+                   {
+                       "path":  "mk/feature-policy.mk",
+                       "kind":  "makefile",
+                       "sha256":  "3364b178eacaced59b8e359f01548421e69013e022bd177231c241de1d69bdc6"
+                   },
+                   {
+                       "path":  "mk/gfx-sources.mk",
+                       "kind":  "makefile",
+                       "sha256":  "23af3ed9113544a3176689f4273786233a46758176b96fc37e1f21930366fe43"
+                   },
+                   {
+                       "path":  "mk/host-tools.mk",
+                       "kind":  "makefile",
+                       "sha256":  "852fbbd0d2d4f75b6c76f95e3b40adc6a93df53ce1c9ee0262f629c3fc01c7ef"
+                   },
+                   {
+                       "path":  "mk/inst_uninst.mk",
+                       "kind":  "makefile",
+                       "sha256":  "e287159834243e743b8e67927e321762259b46339705aeb7bd0d6ec20335297f"
+                   },
+                   {
+                       "path":  "mk/layout.mk",
+                       "kind":  "makefile",
+                       "sha256":  "b2e2d55058d6ac1a371f80c27394db01ba9e04198ff4513b6805c5388a06bbaa"
+                   },
+                   {
+                       "path":  "mk/maketests.mk",
+                       "kind":  "makefile",
+                       "sha256":  "c98ae30e35b42c26f00d6bae303d376bd28f11a018d8ac8559788bd0bbd8cdfe"
+                   },
+                   {
+                       "path":  "mk/multilib.mk",
+                       "kind":  "makefile",
+                       "sha256":  "2e919be0e483c078ba12c9e00b4849ef8c3c350214bd833106f5d97d0dd3522b"
+                   },
+                   {
+                       "path":  "mk/naming.mk",
+                       "kind":  "makefile",
+                       "sha256":  "af98724f8ed60c7fd5a93f4ccaa2bedbd43401019898d16dd746bd79b2a6ccab"
+                   },
+                   {
+                       "path":  "mk/os-flags.mk",
+                       "kind":  "makefile",
+                       "sha256":  "e963fb8649335c41f9a0b0db3131b599bdf53851cd2c05cbfa2e6d559153f039"
+                   },
+                   {
+                       "path":  "mk/platform.mk",
+                       "kind":  "makefile",
+                       "sha256":  "6618b567710f0bfe623197c93cb68331ad81345627769c52e1f52b62b8071976"
+                   },
+                   {
+                       "path":  "mk/platform-features.mk",
+                       "kind":  "makefile",
+                       "sha256":  "7c9b89ae2f3e7ae3d04b488db361420b8fc91c093703e82d4aba7e775fc88c9f"
+                   },
+                   {
+                       "path":  "mk/prereqs.mk",
+                       "kind":  "makefile",
+                       "sha256":  "277166554c17365eadbfa7466068cb9fdeae2f6e27b58f0a85c910c2f1ea7823"
+                   },
+                   {
+                       "path":  "mk/rtlib-sources.mk",
+                       "kind":  "makefile",
+                       "sha256":  "82478c51e4e411c24d9aa86a8c2184a7bc13ab528c675123c97d7686ff729614"
+                   },
+                   {
+                       "path":  "mk/source-graph.mk",
+                       "kind":  "makefile",
+                       "sha256":  "7edbb8d47e42920e829478d1928d8d6a2f2c0db8d00e30aa40c3d8776e10c0d9"
+                   },
+                   {
+                       "path":  "mk/supported_targets.mk",
+                       "kind":  "makefile",
+                       "sha256":  "47277d829a7b878a36597f62cba81f3b1de0b2ece4e2b2fe5437a00b26ff0791"
+                   },
+                   {
+                       "path":  "mk/tests.mk",
+                       "kind":  "makefile",
+                       "sha256":  "2e4c50ddeffdd4d9263727851c252d56db726e98d9b673bbf951f1da5609e17b"
+                   },
+                   {
+                       "path":  "mk/tests/bootstrap/bootstrap.mk",
+                       "kind":  "makefile",
+                       "sha256":  "30283117265eebff2c0cfbc1b353b8c9bb9e8d2f8b30725fbab7fe79d5b1be10"
+                   },
+                   {
+                       "path":  "mk/tests/bootstrap/dist.mk",
+                       "kind":  "makefile",
+                       "sha256":  "bd6b3760f9a90353ba4146b279bbf409f7a86a4610e52da9023646afc1fc1348"
+                   },
+                   {
+                       "path":  "mk/tests/bootstrap/matrix.mk",
+                       "kind":  "makefile",
+                       "sha256":  "cc8ff317bc0422c3fabdc5bb757b2080e6af0d5afe0d54c69def7494e2c81f9d"
+                   },
+                   {
+                       "path":  "mk/tests/bootstrap/stage.mk",
+                       "kind":  "makefile",
+                       "sha256":  "1125fcd2cf5fd26708747815be92f42c2b153f15cdadaca43721da0ef7223324"
+                   },
+                   {
+                       "path":  "mk/tests/build/clean.mk",
+                       "kind":  "makefile",
+                       "sha256":  "1b62e57ab95ad8bc1022b5be8d216e1c1b4ee8c27247c295a978b509e238c063"
+                   },
+                   {
+                       "path":  "mk/tests/build/dependency.mk",
+                       "kind":  "makefile",
+                       "sha256":  "87cf66551ab2447eca52119477a13baf69d3e25f5fd5f6d3a673496a7d6b5620"
+                   },
+                   {
+                       "path":  "mk/tests/build/example-artifacts.mk",
+                       "kind":  "makefile",
+                       "sha256":  "20b1958670a76137407392ac5be3597973eaecc4437a88e6bfa5da952a79c731"
+                   },
+                   {
+                       "path":  "mk/tests/build/graph.mk",
+                       "kind":  "makefile",
+                       "sha256":  "06502fb5b059a4b89c84f8f1607f6771aa735cc9613b9e900181a4d77937dd54"
+                   },
+                   {
+                       "path":  "mk/tests/build/structure.mk",
+                       "kind":  "makefile",
+                       "sha256":  "9c73148f42877d4ab845dfa939c844838c4498d25e9b594d88acab62530b0d2a"
+                   },
+                   {
+                       "path":  "mk/tests/compiler/language.mk",
+                       "kind":  "makefile",
+                       "sha256":  "f328667f4135ada75d4ff8736316f789c41fc85265542c87e44e713bd595bb26"
+                   },
+                   {
+                       "path":  "mk/tests/compiler/semantic.mk",
+                       "kind":  "makefile",
+                       "sha256":  "96730ec48e2e45e955e32c695f0c92c9cea4a224a6d9de79e0fbfe06c6fd517a"
+                   },
+                   {
+                       "path":  "mk/tests/compiler/smoke.mk",
+                       "kind":  "makefile",
+                       "sha256":  "888f61ad868482edae5beaba05f4c00eac7cfa8b1bb8858bf8f5b64bd7e9d32a"
+                   },
+                   {
+                       "path":  "mk/tests/compiler/structure.mk",
+                       "kind":  "makefile",
+                       "sha256":  "1722ca1170cbc4fd31ee750d3a0ab9c88fc760905a34f376f73da272c5b4153f"
+                   },
+                   {
+                       "path":  "mk/tests/harness.mk",
+                       "kind":  "makefile",
+                       "sha256":  "84989e5cac255172a221ecb87be43e11870367429757762b7d0aeed23c880c2e"
+                   },
+                   {
+                       "path":  "mk/tests/packaging/install.mk",
+                       "kind":  "makefile",
+                       "sha256":  "f4093afcc928fe02ac8704f206384d56696abf27709e42d8b725cae34da0367a"
+                   },
+                   {
+                       "path":  "mk/tests/packaging/packaging.mk",
+                       "kind":  "makefile",
+                       "sha256":  "fdc7ca4c4e5792bd3cae1dc42153fc22dcd5082bc1086e389907a0eaaf52aa0e"
+                   },
+                   {
+                       "path":  "mk/toolchain-flags.mk",
+                       "kind":  "makefile",
+                       "sha256":  "ce0dc60985e04afd0a53ea8a4dbf2e12e8f449b00b4078256929fc2760ab4413"
+                   },
+                   {
+                       "path":  "mk/version.mk",
+                       "kind":  "makefile",
+                       "sha256":  "eba46b3c06ce812888305d41f6759cd7b71790b9f89185de7e81e91f8c502a38"
+                   },
+                   {
+                       "path":  "mk/wince/toolchain-flags.mk",
+                       "kind":  "makefile",
+                       "sha256":  "811d24d17b5e75300b20626633e76562c14575b9df3899f5de43a23930f790c8"
+                   },
+                   {
+                       "path":  "src/rtlib/drivers/dos/libfbexp.mk",
+                       "kind":  "makefile",
+                       "sha256":  "6b0a577a3210e9e81eed8ff3b6f1e78fa799a8d69f031cdda84830c093c2affe"
+                   },
+                   {
+                       "path":  "src/rtlib/drivers/win32/fbportio/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "ca5091c732618e311e2bec2fc568c144d9c122eb87c1e5e941d7f7a788d161a7"
+                   },
+                   {
+                       "path":  "src/rtlib/drivers/wince/fbportio/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "ca5091c732618e311e2bec2fc568c144d9c122eb87c1e5e941d7f7a788d161a7"
+                   },
+                   {
+                       "path":  "tests/bmk-make.mk",
+                       "kind":  "makefile",
+                       "sha256":  "bf0bea4603aab8570df4b57d980cf3eab82558723bd96209f590011305a4b147"
+                   },
+                   {
+                       "path":  "tests/common.mk",
+                       "kind":  "makefile",
+                       "sha256":  "af0719f35ae03d67f035ff64aaabe13b69c4bfad3e26182923d7fb602cb7c11c"
+                   },
+                   {
+                       "path":  "tests/cpp/bop.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "15471e83c6d498837c5cc512abc53ee4d7fb60bfb698d2299d77e19edf91acc7"
+                   },
+                   {
+                       "path":  "tests/cpp/call.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "dec3bd4ac9faec7640f618430bd8c5e635db4d046287199b7151922eddf70a95"
+                   },
+                   {
+                       "path":  "tests/cpp/call2.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "11b0a1c3dc0c056b85fc42c9d1c876a52f60fa4ab861aa124e35d469cc8a9ab3"
+                   },
+                   {
+                       "path":  "tests/cpp/class.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "e90076038736ec25f884a152e85506bfc314f150d0be4dc3ad70fc7200a880ff"
+                   },
+                   {
+                       "path":  "tests/cpp/derived.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "53327ae40d1203ab7a3aae7e3b930ddd21d07c3844b926a4166ab7f4e24fb96a"
+                   },
+                   {
+                       "path":  "tests/cpp/fastcall.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "e4ed283e2ef791bae4a5cc91d4a0241348430ca24b29b5b8ddd03a6a942478d2"
+                   },
+                   {
+                       "path":  "tests/cpp/fbcall.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "bac3ede8facea14b30f8bdfb55719b3cba775a4b2f03a1c03005490e33edfa7b"
+                   },
+                   {
+                       "path":  "tests/cpp/mangle.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "83e7e1a940b9abecc6c339f911aed94d1460beae267a6f773efed1b3cf8381ec"
+                   },
+                   {
+                       "path":  "tests/cpp/mangle-enum.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "d1d6939cdba0c712e05a4498c5e8a18b8358dc3a70dd22c32e9ea0b40e1f641b"
+                   },
+                   {
+                       "path":  "tests/cpp/mangle-struct.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "0f943ddbd1131268d02146113399faaad00da8c4b06f2fee7b8e27e4706e63ec"
+                   },
+                   {
+                       "path":  "tests/cpp/this.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "ed71e3b4fdd328c17ac1a9a8bc1affb0c9dea044252f2275908a198eebee42bc"
+                   },
+                   {
+                       "path":  "tests/cpp/thiscall.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "fba6d720e5204103255c7f5639cb49cf5ddd99645311285c534db91fced37226"
+                   },
+                   {
+                       "path":  "tests/dim/mod_common/submod.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "99f135f263ca78beb4e9e6835817cc4fbae5dda53922cbc35677aae4787407b5"
+                   },
+                   {
+                       "path":  "tests/dim/mod_extern/submod.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "99f135f263ca78beb4e9e6835817cc4fbae5dda53922cbc35677aae4787407b5"
+                   },
+                   {
+                       "path":  "tests/dim/submod/submod.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "99f135f263ca78beb4e9e6835817cc4fbae5dda53922cbc35677aae4787407b5"
+                   },
+                   {
+                       "path":  "tests/dirlist.mk",
+                       "kind":  "makefile",
+                       "sha256":  "25cea11f9efc1d8150448341746f954b41529a540f036f45add6e6faf371a649"
+                   },
+                   {
+                       "path":  "tests/fbcprint/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "131e15a4b54ccc31ad0d4208346198bf030cddbb758ab5c5e8ece2fec65636d1"
+                   },
+                   {
+                       "path":  "tests/fbcunit/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "6466c1d2264d88c1fcd6eb9475661990fee6e0207d3c7d644ed0b6a620f9066c"
+                   },
+                   {
+                       "path":  "tests/file/tcp.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "fb12b2e7111b0291367046718ee7500e81c985ec8dc8c6a0ea0857e9c2d78b72"
+                   },
+                   {
+                       "path":  "tests/functions/backend-global-mangling.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "ef3817dba26908fb00d2eda92b2e9f176865293383d58a514780e44fcd6638e0"
+                   },
+                   {
+                       "path":  "tests/functions/stack-align/stack-alignment.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "05c100c07552856eeccff91f3b1cf95f74d8ec4ebcb498bdae602f476aeae1aa"
+                   },
+                   {
+                       "path":  "tests/gfx/paint-alloc.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "103f17d43c4fa41417aa78d035c57bb30259e2e4b74399c7ccb881b641d8d38a"
+                   },
+                   {
+                       "path":  "tests/gfx3/gfx3-log-tests.mk",
+                       "kind":  "makefile",
+                       "sha256":  "07bd6184c3d1bc90f16ab8a9a0c7554ade82be74f3cb5f079b8bac207e800b47"
+                   },
+                   {
+                       "path":  "tests/gfx3/gfx3-unit-tests.mk",
+                       "kind":  "makefile",
+                       "sha256":  "1ee59c4b3a80cd9f17f861536686f94cb833905ccc6583615d6b9d07b544f4a4"
+                   },
+                   {
+                       "path":  "tests/gfx3/gfx-only-dirlist.mk",
+                       "kind":  "makefile",
+                       "sha256":  "9971dc634d325776f6657740c11d9583aa450bb214e1a0a4d31038853c4ce633"
+                   },
+                   {
+                       "path":  "tests/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "0c08af4380c1901b9d06073c506b39af18317a7632146e762a8ed97d885091fe"
+                   },
+                   {
+                       "path":  "tests/log-tests.mk",
+                       "kind":  "makefile",
+                       "sha256":  "a28b9448fd72264c5f52c3054a902659e19a07b37a48548d862c7394668227ed"
+                   },
+                   {
+                       "path":  "tests/namespace/cpp/cpp.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "c4a2f259e98fdff56a09575f677a9bea4050b481bb2afa6a3d0069877076b236"
+                   },
+                   {
+                       "path":  "tests/namespace/submod/submod.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "a0aa4ad7407351db2d91a5b67bc2e9c91432b1d83baa50761116c075109c2591"
+                   },
+                   {
+                       "path":  "tests/pretest/multi_module_fail.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "a5bace63596c9062cc2aff924ee317ce695455c1681aa16eb325aeff16ac95e1"
+                   },
+                   {
+                       "path":  "tests/pretest/multi_module_ok.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "c0e09f1065412c9ae2b1ff46e57ce79c24c8d2938978e541afafc82ba829285b"
+                   },
+                   {
+                       "path":  "tests/serial-pty/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "033fe351875718c5dfb026e7124f13b47d8d86de5e64b79bb60262014783bf05"
+                   },
+                   {
+                       "path":  "tests/sfx/capture-buffer.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "92cd4c48b70aa47fbd8ec44a726bc2289876fabde36a79f01522ee1b2174b365"
+                   },
+                   {
+                       "path":  "tests/sfx/command-latency.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "02620806b364d9099b99261896ba927f1634e9893cc8172be94f4e75b1409941"
+                   },
+                   {
+                       "path":  "tests/sfx/convert-float-s16.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "fa4c0c35040389eae428859be4a937f6eb60fc9163b904459f85ac5e797e46e6"
+                   },
+                   {
+                       "path":  "tests/sfx/driver-dump.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "cf5220c843c754f58bfe936ea4d58cd793a76c4212c7d02423c47351e987d3d3"
+                   },
+                   {
+                       "path":  "tests/sfx/driver-null.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "2747b7002f9d23b35411156b50e34225a37310ef54bca5efcc6f0bfc37537261"
+                   },
+                   {
+                       "path":  "tests/sfx/lifecycle-stress.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "9645503be9f0240afcf5cb5b00f2f90d044bc97b27d69968fb82682aa9d1d6cf"
+                   },
+                   {
+                       "path":  "tests/sfx/midi-fm-controls.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "6f1da2d6a92ede22060edbb3aa4fee6bcd93c6c960b1a75540753b46d1131f01"
+                   },
+                   {
+                       "path":  "tests/sfx/midi-fm-fallback.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "a50adcd9c2293ecbbe1a2ebaf1d8e13809902b64d3dde59a7615ab92482fce89"
+                   },
+                   {
+                       "path":  "tests/sfx/midi-fm-playback.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "4f98f9767cd426c9c71936ab8636e3d34ab64154be676e775603cdd8d8f16fd6"
+                   },
+                   {
+                       "path":  "tests/sfx/midi-fm-polyphony.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "080411e3ea80e4f88aadff78de39927183d1f2093efd695cf62bc8dc562ce0ac"
+                   },
+                   {
+                       "path":  "tests/sfx/midi-fm-programs.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "85f8ab307f8b6fefaf925529797a8f29ecc8d4bbcd83379df105dd44d1e7a161"
+                   },
+                   {
+                       "path":  "tests/sfx/midi-fm-rates.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "235daa813d16064121233c1219ef25cd1ff20b8ae0d480e3238a2ed11929c546"
+                   },
+                   {
+                       "path":  "tests/sfx/mixer-frame-clock.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "a820554864d8973e5cdf88ac4acff483f03334e7fe14aeff1603e79644ea0be3"
+                   },
+                   {
+                       "path":  "tests/sfx/noise-pitch.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "24c8f1af23a75985cce776f84fad3c20d2971a5c81dca2f3465c083f9c559782"
+                   },
+                   {
+                       "path":  "tests/sfx/play-64-voice-smoke.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "3d7831a41cbfa80f046ddae1b5d094763387e257b6e88ab929a1e23cec5c6375"
+                   },
+                   {
+                       "path":  "tests/sfx/render-polyphony.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "cbcfa3c07237e1fc7fe5dda6fe75eb0757babf69bcd5746bbc7d40614868c140"
+                   },
+                   {
+                       "path":  "tests/sfx/render-tone.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "2f344e095bf552f41ca8fba8acf8fe8fbff13acd7b8e65cbb1c9611b3a7cb20a"
+                   },
+                   {
+                       "path":  "tests/sfx/sample-pitch.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "d1f1e2f9f6e3d57199a4a22ca3e346023105af146d19a7abb7aba989e1459922"
+                   },
+                   {
+                       "path":  "tests/sfx/sample-rate.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "feaf3718057a175c53c15e7b0baf93bee1fbce75478903149b6fdb787ee4072c"
+                   },
+                   {
+                       "path":  "tests/sfx/state.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "4598c024662e605259bc835e783fa912956dfefff4c364d29199cab6467739f1"
+                   },
+                   {
+                       "path":  "tests/sfx/voice-effects-stress.bmk",
+                       "kind":  "multi-module-fixture",
+                       "sha256":  "0f2a82e600f0843ceef877e7682c81cfeddb4b25679f7da830b9af1d5923eb59"
+                   },
+                   {
+                       "path":  "tests/unit-tests.mk",
+                       "kind":  "makefile",
+                       "sha256":  "97d1ab277efaa9004462e94c536a57fdbd8072caeda4f15d5ee87ce115a3348d"
+                   },
+                   {
+                       "path":  "tests/unix-tty/GNUmakefile",
+                       "kind":  "makefile",
+                       "sha256":  "2e2db9de905f0dded6168f3f0bbee075099a7c446ac91e59d928cebd98ca9a59"
+                   }
+               ],
+    "end":  "make-system-review-inputs.json"
+}

@@ -2,6 +2,10 @@
 # tests/bootstrap/matrix.mk
 #
 # Multi-architecture bootstrap distribution matrix test
+# Project: FreeBASIC build system
+# Purpose: Validate bootstrap archive production across the selected target matrix.
+# Responsibilities: Check each archive and release its owned storage before the next.
+# This file intentionally does NOT build native SDKs or retain every matrix archive.
 ##############################################################################
 
 BOOTSTRAP_TEST_ARCHES := \
@@ -48,36 +52,31 @@ BOOTSTRAP_REQUIRED_EMIT_MATRIX := \
 bootstrap-dist-matrix-test:
 	$(call _mt_echo,Testing bootstrap distribution matrix)
 
-	rm -f FreeBASIC-*.tar.xz 2>/dev/null || true
 	mkdir -p "$(TEST_TMP)"
 
 	@set -e; \
 	out="$(TEST_TMP)/bootstrap-dist-matrix.out"; \
-	before="$(TEST_TMP)/archives.before"; \
-	after="$(TEST_TMP)/archives.after"; \
-	new="$(TEST_TMP)/archives.new"; \
 	forbidden='(^|/)\.[^/]+/|(^|/)(stage|dist|out|packages|package-root[^/]*|pkgroot[^/]*)/'; \
 	: > "$$out"; \
 	for arch in $(BOOTSTRAP_TEST_ARCHES); do \
 	        echo "==> Building bootstrap distribution for $$arch"; \
-	        ls -1 FreeBASIC-*.tar.xz 2>/dev/null | sort > "$$before" || true; \
 	        $(TEST_TOOLCHAIN_ENV) $(MAKE) bootstrap-dist-target BOOTSTRAP_DIST_WORKTREE=1 FBTARGET_DIR_OVERRIDE=$$arch; \
-	        ls -1 FreeBASIC-*.tar.xz 2>/dev/null | sort > "$$after" || true; \
-	        comm -13 "$$before" "$$after" > "$$new" || true; \
-	        ARCHIVE=$$(head -n1 "$$new"); \
-	        if [ -z "$$ARCHIVE" ]; then \
+	        ARCHIVE="FreeBASIC-$(FBVERSION)-source-bootstrap-$$arch.$(BOOT_DIST_EXT)"; \
+	        if [ ! -s "$$ARCHIVE" ]; then \
 	                echo ""; \
 	                echo "ERROR: no archive produced for $$arch"; \
 	                echo ""; \
 	                ls -1; \
 	                exit 1; \
 	        fi; \
-	        if tar -tf "$$ARCHIVE" | grep -E "$$forbidden"; then \
+	        tar -tf "$$ARCHIVE" > "$(TEST_TMP)/archive-members.lst"; \
+	        if grep -E "$$forbidden" "$(TEST_TMP)/archive-members.lst"; then \
 	                echo ""; \
 	                echo "ERROR: bootstrap archive $$ARCHIVE contains excluded generated directories"; \
 	                exit 1; \
 	        fi; \
 	        echo "$$arch -> $$ARCHIVE" | tee -a "$$out"; \
+	        rm -f "$$ARCHIVE"; \
 	done; \
 	echo ""; \
 	echo "==> Matrix results:"; \

@@ -1,8 +1,15 @@
+# Project: FreeBASIC Windows import libraries
+# File: GNUmakefile
+# Purpose: Generate import archives from the maintained DEF files.
+# Responsibilities: Preserve library-specific dlltool options and cleanup aliases.
+# This file intentionally does NOT compile runtime or compiler sources.
+
 DLLTOOL := dlltool
 
 libs := $(wildcard *.def)
 libs := $(patsubst %.def,lib%.dll.a,$(libs))
 
+.PHONY: all clean
 all: $(libs)
 
 # Some libraries need extra dlltool flags
@@ -16,3 +23,5 @@ $(libs): lib%.dll.a: %.def
 
 clean:
 	rm -f $(libs)
+
+# end of GNUmakefile

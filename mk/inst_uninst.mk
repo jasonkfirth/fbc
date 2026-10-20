@@ -1,7 +1,10 @@
 ##############################################################################
 # inst_uninst.mk
 #
-# Install / uninstall rules for FreeBASIC
+# Project: FreeBASIC build system
+# Purpose: Install and remove native and cross-target SDK payloads.
+# Responsibilities: Copy owned files, record manifests, and retain failed retries.
+# This file intentionally does NOT define build rules or installation layout.
 # Layout policy comes from layout.mk
 ##############################################################################
 
@@ -22,6 +25,13 @@ INSTALL_INCDIR  := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_INCDIR),$(
 INSTALL_LIBDIR  := $(if $(strip $(DESTDIR)),$(DESTDIR)$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))
 
 INSTALL_MANIFEST := $(DESTDIR).install_manifest
+
+# Record the source tree we copied, rather than scanning the destination.
+# A destination may contain unrelated user headers which uninstall must retain.
+# Construct logical paths literally; DESTDIR is a path, not a sed expression.
+define record_install_tree
+(cd "$(1)" && find . \( -type f -o -type l \) -print) | while IFS= read -r f; do printf '%s/%s\n' "$(2)" "$${f#./}"; done >> "$(INSTALL_MANIFEST)"
+endef
 
 INSTALL_FILE ?= install -m 644
 INSTALL_EXE  ?= install -m 755
@@ -119,9 +129,7 @@ install-bin:
 install-includes:
 	$(MKDIR_P) "$(INSTALL_INCDIR)"
 	cp -a "$(rootdir)/inc/." "$(INSTALL_INCDIR)/"
-	@find "$(INSTALL_INCDIR)" -type f \
-			| sed "s|^$(DESTDIR)||" \
-				>> "$(INSTALL_MANIFEST)"
+	@$(call record_install_tree,$(rootdir)/inc,$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_INCDIR),$(prefixincdir)))
 
 .PHONY: install-runtime
 install-runtime:
@@ -140,7 +148,7 @@ install-runtime:
 	if [ "$(TARGET_OS)" = amiga ] && [ -d "$(libdir)/include" ]; then \
 		mkdir -p "$(INSTALL_LIBDIR)/include"; \
 		cp -a "$(libdir)/include/." "$(INSTALL_LIBDIR)/include/"; \
-		find "$(INSTALL_LIBDIR)/include" -type f | sed "s|^$(DESTDIR)||" >> "$(INSTALL_MANIFEST)"; \
+		$(call record_install_tree,$(libdir)/include,$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))/include); \
 	fi
 	@set -e; \
 	if [ -f "$(libdir)/libfblwp.a" ]; then \
@@ -149,7 +157,9 @@ install-runtime:
 		cp -a "$(rootdir)/contrib/dos/pdmlwp/." "$$dst/contrib/dos/pdmlwp/"; \
 		cp "$(rootdir)/build_scripts/build-dos-pdmlwp.py" "$$dst/build_scripts/"; \
 		cp "$(rootdir)/docs/freedos-providers.md" "$$dst/docs/"; \
-		find "$$dst" -type f | sed "s|^$(DESTDIR)||" >> "$(INSTALL_MANIFEST)"; \
+		$(call record_install_tree,$(rootdir)/contrib/dos/pdmlwp,$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))/pdmlwp-source/contrib/dos/pdmlwp); \
+		printf '%s\n' "$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))/pdmlwp-source/build_scripts/build-dos-pdmlwp.py" \
+			"$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_LIBDIR),$(FBINSTALL_RUNTIME_DIR))/pdmlwp-source/docs/freedos-providers.md" >> "$(INSTALL_MANIFEST)"; \
 	fi
 
 .PHONY: install-js install-js-bin install-js-includes install-js-runtime
@@ -167,9 +177,7 @@ install-js-bin:
 install-js-includes:
 	$(MKDIR_P) "$(INSTALL_JS_INCDIR)"
 	cp -a "$(rootdir)/inc/." "$(INSTALL_JS_INCDIR)/"
-	@find "$(INSTALL_JS_INCDIR)" -type f \
-			| sed "s|^$(DESTDIR)||" \
-				>> "$(INSTALL_MANIFEST)"
+	@$(call record_install_tree,$(rootdir)/inc,$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_JS_INCDIR),$(prefixjsincdir)))
 
 .PHONY: install-js-runtime
 install-js-runtime:
@@ -203,9 +211,7 @@ install-android-bin:
 install-android-includes:
 	$(MKDIR_P) "$(INSTALL_ANDROID_INCDIR)"
 	cp -a "$(rootdir)/inc/." "$(INSTALL_ANDROID_INCDIR)/"
-	@find "$(INSTALL_ANDROID_INCDIR)" -type f \
-			| sed "s|^$(DESTDIR)||" \
-				>> "$(INSTALL_MANIFEST)"
+	@$(call record_install_tree,$(rootdir)/inc,$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_ANDROID_INCDIR),$(prefixandroidincdir)))
 
 .PHONY: install-android-runtime
 install-android-runtime:
@@ -262,9 +268,7 @@ install-wii-bin:
 install-wii-includes:
 	$(MKDIR_P) "$(INSTALL_WII_INCDIR)"
 	cp -a "$(rootdir)/inc/." "$(INSTALL_WII_INCDIR)/"
-	@find "$(INSTALL_WII_INCDIR)" -type f \
-			| sed "s|^$(DESTDIR)||" \
-				>> "$(INSTALL_MANIFEST)"
+	@$(call record_install_tree,$(rootdir)/inc,$(if $(strip $(DESTDIR)),$(INSTALL_STAGE_WII_INCDIR),$(prefixwiiincdir)))
 
 .PHONY: install-wii-runtime
 install-wii-runtime:
@@ -282,27 +286,24 @@ install-wii-runtime:
 
 .PHONY: uninstall
 uninstall:
-	@if [ ! -f "$(INSTALL_MANIFEST)" ]; then \
+	@set -e; \
+	if [ ! -f "$(INSTALL_MANIFEST)" ]; then \
 		echo "No install manifest found."; \
 		exit 0; \
-	fi
-
-	@echo "Removing installed files..."
-	@set -e; \
+	fi; \
+	echo "Removing installed files..."; \
 	while IFS= read -r f; do \
 		[ -n "$$f" ] || continue; \
 		path="$(DESTDIR)$$f"; \
-		rm -f "$$path" || true; \
-	done < "$(INSTALL_MANIFEST)"
-
-	@echo "Pruning empty directories..."
-	@rmdir --ignore-fail-on-non-empty \
+		rm -f "$$path"; \
+	done < "$(INSTALL_MANIFEST)"; \
+	echo "Pruning empty directories..."; \
+	rmdir \
 		"$(INSTALL_BINDIR)" \
 		"$(INSTALL_INCDIR)" \
 		"$(INSTALL_LIBDIR)" \
-		2>/dev/null || true
-
-	@rm -f "$(INSTALL_MANIFEST)"
+		2>/dev/null || true; \
+	rm -f "$(INSTALL_MANIFEST)"
 
 .PHONY: pkg-tar pkg-zip
 pkg-tar:
@@ -314,3 +315,5 @@ pkg-zip:
 	rm -rf pkgroot
 	$(MAKE) DESTDIR="$(SRC_ROOT)/pkgroot" install
 	cd pkgroot && zip -r ../freebasic-package.zip .
+
+# end of inst_uninst.mk

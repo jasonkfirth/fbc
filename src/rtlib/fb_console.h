@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_console.h
+ * Purpose: Provide fb console runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
     typedef struct _fb_Rect {
         int Left, Top, Right, Bottom;
     } fb_Rect;
@@ -100,3 +107,5 @@ FBCALL int          fb_ConsoleInput     ( FBSTRING *text, int addquestion, int a
        int          fb_ConsoleLineInputWstr( const FB_WCHAR *text, FB_WCHAR *dst, ssize_t max_chars, int addquestion, int addnewline );
 
        int          fb_hConsoleInputBufferChanged( void );
+
+/* end of fb_console.h */

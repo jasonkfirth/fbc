@@ -12,7 +12,7 @@
     and palette, independently of BASIC's POINT framebuffer operation.
 */
 
-#include "../../src/gfxlib2/amiga/fb_gfx_amiga.h"
+#include "../../src/gfxlib2/drivers/amiga/fb_gfx_amiga.h"
 #include <proto/exec.h>
 #include <proto/graphics.h>
 #include <graphics/displayinfo.h>

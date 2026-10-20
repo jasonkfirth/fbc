@@ -16,11 +16,11 @@ namespace FBC
 
 '' declarations must follow:
 ''  ./src/rtlib/fb_config.h
-''  ./src/rtlib/dos/fb_dos.h     :#define FBCALL
-''  ./src/rtlib/unix/fb_unix.h   :#define FBCALL
-''  ./src/rtlib/win32/fb_win32.h :#define FBCALL __stdcall
-''  ./src/rtlib/win32/fb_win32.h :#define FBCALL
-''  ./src/rtlib/xbox/fb_xbox.h   :#define FBCALL __stdcall
+''  ./src/rtlib/drivers/dos/fb_dos.h     :#define FBCALL
+''  ./src/rtlib/drivers/unix/fb_unix.h   :#define FBCALL
+''  ./src/rtlib/drivers/win32/fb_win32.h :#define FBCALL __stdcall
+''  ./src/rtlib/drivers/win32/fb_win32.h :#define FBCALL
+''  ./src/rtlib/drivers/xbox/fb_xbox.h   :#define FBCALL __stdcall
 
 #if defined( __FB_WIN32__ ) or defined (__FB_XBOX__)
 	#if defined( __FB_64BIT__)

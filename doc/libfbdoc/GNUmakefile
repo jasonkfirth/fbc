@@ -1,4 +1,9 @@
 #!/usr/bin/make -f
+# Project: FreeBASIC documentation tools
+# File: GNUmakefile
+# Purpose: Build the shared wiki and manual support library.
+# Responsibilities: Select optional SQL modules and compile the library.
+# This file intentionally does NOT build documentation applications.
 #
 # define's that can override build options
 #
@@ -7,15 +12,9 @@
 #   'FBC=d:/path/fbc to' to override path to execute fbc compiler 
 #
 
-OS := $(shell uname)
-ifeq ($(OS),Linux)
-    EXEEXT :=
-else
-    EXEEXT := .exe
-endif
+include ../common.mk
 
 FBFLAGS := -exx -g
-FBC := fbc
 
 INC := $(wildcard *.bi)
 SRC := $(wildcard *.bas)
@@ -52,3 +51,5 @@ libfbdoc.a: $(OBJ)
 .PHONY: clean
 clean:
 	-rm -f $(OBJ) $(MYSQL_OBJ) libfbdoc.a
+
+# end of GNUmakefile

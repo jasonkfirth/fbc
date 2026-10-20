@@ -1,4 +1,11 @@
 /*
+ * Project: FreeBASIC runtime library
+ * File: fb_secure_random.h
+ * Purpose: Provide fb secure random runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
+/*
  * FreeBASIC runtime: fb_secure_random.h
  * Checked system-randomness status, bounds and entry points.
  * The public call owns validation and failure clearing; platform helpers own
@@ -36,4 +43,5 @@ int fb_hSecureRandom( void *destination, size_t byte_count );
 #endif
 
 #endif
+
 /* end of fb_secure_random.h */

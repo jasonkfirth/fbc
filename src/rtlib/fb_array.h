@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_array.h
+ * Purpose: Provide fb array runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 typedef struct _FBARRAYDIM {
 	size_t elements;
 	ssize_t lbound;
@@ -116,3 +123,5 @@ int fb_hArrayRealloc
 		size_t dimensions,
 		va_list ap
 	);
+
+/* end of fb_array.h */

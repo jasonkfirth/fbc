@@ -134,10 +134,10 @@ def test_target(root, compiler, cc, prefix, target_flags, working, backends, tag
     # with the i386 runtime, just as the FreeBASIC target flags do.
     c_driver = [cc] + (["-m32"] if tag == "32" and os.name != "nt" else [])
     codec = working / f"codec-{tag}.o"
-    run(c_driver + warning_flags + includes + ["-c", root / "src/rtlib/serialization.c", "-o", codec], working, environment)
+    run(c_driver + warning_flags + includes + ["-c", root / "src/rtlib/objects/serialization.c", "-o", codec], working, environment)
     fault_codec = working / f"fault-codec-{tag}.o"
     run(c_driver + warning_flags + includes + ["-Dcalloc=ser_test_calloc", "-Drealloc=ser_test_realloc",
-        "-Dfree=ser_test_free", "-c", root / "src/rtlib/serialization.c", "-o", fault_codec], working, environment)
+        "-Dfree=ser_test_free", "-c", root / "src/rtlib/objects/serialization.c", "-o", fault_codec], working, environment)
     runtime_test = working / f"runtime-{tag}.exe"
     # The direct C link pulls in FreeBASIC's runtime initialization, including
     # Unix terminal services. Match the runtime's ncurses dependency even
@@ -205,7 +205,7 @@ def test_ubsan(root, clang, cc, libdir, working, environment):
     warnings = ["-Wall", "-Wextra", "-Werror"]
     run([clang] + warnings + includes + ["-fsanitize=undefined", "-fsanitize-trap=all",
         "-Dcalloc=ser_test_calloc", "-Drealloc=ser_test_realloc", "-Dfree=ser_test_free",
-        "-c", root / "src/rtlib/serialization.c", "-o", codec], working, environment)
+        "-c", root / "src/rtlib/objects/serialization.c", "-o", codec], working, environment)
     runtime_objects = [libdir / "fbrt0.o"] if (libdir / "fbrt0.o").exists() else []
     system_flags = [] if os.name == "nt" else ["-lm", "-pthread", "-lncurses"]
     executable = working / "runtime-ubsan.exe"

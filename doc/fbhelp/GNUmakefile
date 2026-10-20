@@ -1,4 +1,9 @@
 #!/usr/bin/make -f
+# Project: FreeBASIC documentation tools
+# File: GNUmakefile
+# Purpose: Build and package the standalone help viewer.
+# Responsibilities: Select one supported viewer target and its backend.
+# This file intentionally does NOT generate the manual database.
 #
 # commands:
 #    <none>|all TARGET=win32|dos|linux 
@@ -23,7 +28,10 @@
 #
 ##########################
 
-ifeq (,$(findstring $(TARGET),dos linux win32))
+ifneq ($(words $(TARGET)),1)
+$(error need TARGET=dos | linux | win32)
+endif
+ifeq (,$(filter dos linux win32,$(TARGET)))
 $(error need TARGET=dos | linux | win32)
 endif
 
@@ -158,6 +166,7 @@ $(objpath)/%.o : %.bas $(HDRS) | $(objpath)
 
 ##########################
 
+.PHONY: all
 all: $(APP)
 
 $(objpath):
@@ -201,3 +210,5 @@ dist-clean:
 	rm -f "$(packsrc).tar.gz"
 	rm -f "$(packbin).zip"
 	rm -f "$(packbin).tar.gz"
+
+# end of GNUmakefile

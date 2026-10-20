@@ -281,7 +281,7 @@ emit-only check.
 ## TCP and alternatives
 
 The independent `DOS_TCP_PROVIDER=watt32` profile supplies the guarded IPv4
-adapter in src/rtlib/dev_tcp.c. It requires matching Watt-32 headers,
+adapter in src/rtlib/devices/dev_tcp.c. It requires matching Watt-32 headers,
 libwatt.a, a packet driver and WATTCP.CFG. It does not itself enable threads.
 Missing-packet-driver initialization was tested as a recoverable error.
 The [SuperDuel investigation](msdos-superduel.md) tested actual TCP traffic

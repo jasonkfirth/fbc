@@ -16,7 +16,7 @@
 ''   1) this header documents runtime library internals
 ''      and is subject to change without notice
 ''
-'' declarations must follow ./src/rtlib/profile.c
+'' declarations must follow ./src/rtlib/profiling/profile.c
 ''
 
 namespace FBC

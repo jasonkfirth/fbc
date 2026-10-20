@@ -35,13 +35,14 @@ This document intentionally does NOT contain:
 - `dist.mk`: stages and archives a distributable build tree.
 - `feature-policy.mk`: applies high-level feature toggles that do not belong in
   target detection.
+- `gfx-sources.mk`: lists shared graphics subsystem and native driver owners.
 - `host-tools.mk`: chooses host-side utility behavior such as install/copy
   commands.
 - `inst_uninst.mk`: installs, uninstalls, and creates simple package payloads.
 - `layout.mk`: defines install-prefix and install-runtime layout policy.
 - `maketests.mk`: loads the build-system test harness and high-level test
   targets.
-- `multilib.mk`: applies `MULTILIB` settings to FreeBASIC and C toolchains.
+- `multilib.mk`: applies the resolved x86 width to BASIC, C, C++, and link flags.
 - `naming.mk`: defines installed namespace and linker-script names.
 - `os-flags.mk`: carries narrowly-scoped OS quirks that do not belong in the
   broader flag policy.
@@ -51,6 +52,8 @@ This document intentionally does NOT contain:
   packaging directory naming.
 - `prereqs.mk`: checks host tools, libraries, compiler availability, and
   bootstrap recovery state.
+- `rtlib-sources.mk`: selects runtime subsystems and native replacements and
+  rejects ambiguous archive member names.
 - `source-graph.mk`: selects source files and derives canonical object lists.
 - `supported_targets.mk`: defines the supported bootstrap distribution matrix.
 - `tests.mk`: provides direct wrappers for the language test suites.
@@ -93,7 +96,8 @@ implementation logic.
 - `tests/harness.mk`: shared helpers, temporary directories, and command
   wrappers.
 - `tests/build/structure.mk`: checks that the `mk/` tree contains the expected
-  modules and rejects stray backup files.
+  modules, rejects stray backup files, and exposes the isolated Make contract
+  regression runner.
 - `tests/build/graph.mk`: exercises the build graph, rebuild behavior, and
   selected matrix combinations.
 - `tests/build/clean.mk`: verifies clean behavior and idempotence.

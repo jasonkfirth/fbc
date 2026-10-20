@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_config.h
+ * Purpose: Provide fb config runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 #ifndef __FB_CONFIG_H__
 #define __FB_CONFIG_H__
 
@@ -21,7 +28,7 @@
 	#define HOST_MINGW
 	#define HOST_WIN32
 	#define WIN32_LEAN_AND_MEAN
-	#define FB_UNICODE_HEADER "wince/fb_unicode.h"
+	#define FB_UNICODE_HEADER "drivers/wince/fb_unicode.h"
 #elif defined __MINGW32__ /* MinGW, MinGW-w64, TDM-GCC */
 	#define HOST_MINGW
 	#define HOST_WIN32
@@ -54,7 +61,7 @@
 	/* GCCSDK/UnixLib presents RISC OS as an ELF Unix-like target. */
 	#define HOST_RISCOS
 	#define HOST_UNIX
-	#define FB_UNICODE_HEADER "riscos/fb_unicode.h"
+	#define FB_UNICODE_HEADER "drivers/riscos/fb_unicode.h"
 #elif defined __linux__
 	/* GNU/Linux, i.e. glibc */
 	#define HOST_LINUX
@@ -133,3 +140,5 @@
 #endif
 
 #endif
+
+/* end of fb_config.h */

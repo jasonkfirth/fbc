@@ -2,6 +2,10 @@
 # compile-rules.mk
 #
 # Object compilation rules for FreeBASIC build system
+# Project: FreeBASIC build system
+# Purpose: Compile selected sources with the target's toolchain contracts.
+# Responsibilities: Preserve flags, dependency files, and per-object overrides.
+# This file intentionally does NOT select sources or link final artifacts.
 #
 # Consumes canonical object lists from source-graph.mk
 ##############################################################################
@@ -175,6 +179,12 @@ $(fbcwiiobjdir)/%.o: %.bas $(FBC_BI) $(mkpath)/version.mk | $(fbcwiiobjdir)
 # rtlib (C runtime)
 ##############################################################################
 
+# Portable implementations include shared contracts relative to src/rtlib.
+# Scope this search root to runtime objects so a platform SDK used by another
+# library cannot accidentally resolve one of our private headers.
+# Append it even when a caller supplies CPPFLAGS on the Make command line.
+$(RTLIB_OBJ) $(RTLIB_PIC_OBJ) $(RTLIB_MT_OBJ) $(RTLIB_MT_PIC_OBJ): override CPPFLAGS += -I$(srcdir)/rtlib
+
 RTLIB_GOSUB_CFLAGS :=
 ifeq ($(TARGET_OS),win32)
   ifeq ($(TARGET_ARCH),x86_64)
@@ -198,19 +208,19 @@ $(libfbmtpicobjdir)/%.o: $(srcdir)/rtlib/%.c $(LIBFB_H) | $(libfbmtpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbobjdir)
+$(libfbobjdir)/core/gosub.o: $(srcdir)/rtlib/core/gosub.c $(LIBFB_H) | $(libfbobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbpicobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbpicobjdir)
+$(libfbpicobjdir)/core/gosub.o: $(srcdir)/rtlib/core/gosub.c $(LIBFB_H) | $(libfbpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbmtobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbmtobjdir)
+$(libfbmtobjdir)/core/gosub.o: $(srcdir)/rtlib/core/gosub.c $(LIBFB_H) | $(libfbmtobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbmtpicobjdir)/gosub.o: $(srcdir)/rtlib/gosub.c $(LIBFB_H) | $(libfbmtpicobjdir)
+$(libfbmtpicobjdir)/core/gosub.o: $(srcdir)/rtlib/core/gosub.c $(LIBFB_H) | $(libfbmtpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) $(RTLIB_GOSUB_CFLAGS) -MMD -MP -c $< -o $@
 
@@ -237,9 +247,9 @@ $(libfbmtpicobjdir)/%.o: $(srcdir)/rtlib/%.s $(LIBFB_H) | $(libfbmtpicobjdir)
 # Platform directories may replace the complete startup source.  Startup is
 # intentionally selected by filename, matching the replacement model used by
 # rtlib, gfxlib2, and sfxlib instead of accumulating OS conditionals here.
-FBRT0_SOURCE := $(or $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/static/fbrt0.c),$(srcdir)/rtlib/static/fbrt0.c)
-FBRT1_SOURCE := $(or $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/static/fbrt1.c),$(srcdir)/rtlib/static/fbrt1.c)
-FBRT2_SOURCE := $(or $(wildcard $(srcdir)/rtlib/$(SOURCE_OS)/static/fbrt2.c),$(srcdir)/rtlib/static/fbrt2.c)
+FBRT0_SOURCE := $(or $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/static/fbrt0.c),$(srcdir)/rtlib/static/fbrt0.c)
+FBRT1_SOURCE := $(or $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/static/fbrt1.c),$(srcdir)/rtlib/static/fbrt1.c)
+FBRT2_SOURCE := $(or $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/static/fbrt2.c),$(srcdir)/rtlib/static/fbrt2.c)
 
 $(libdir)/fbrt0.o: $(FBRT0_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
@@ -303,10 +313,10 @@ $(DOS_GFX_TIMER_PROFILE_STAMP): dos-gfx-timer-profile-force | $(libfbgfxobjdir)
 		printf '%s\n' "timer=$(ENABLE_DOS_GFX_LOW_POWER)" > "$@"; \
 	fi
 
-$(libfbgfxobjdir)/dos/gfx_dos.o \
-$(libfbgfxpicobjdir)/dos/gfx_dos.o \
-$(libfbgfxmtobjdir)/dos/gfx_dos.o \
-$(libfbgfxmtpicobjdir)/dos/gfx_dos.o: $(DOS_GFX_TIMER_PROFILE_STAMP)
+$(libfbgfxobjdir)/drivers/dos/gfx_dos.o \
+$(libfbgfxpicobjdir)/drivers/dos/gfx_dos.o \
+$(libfbgfxmtobjdir)/drivers/dos/gfx_dos.o \
+$(libfbgfxmtpicobjdir)/drivers/dos/gfx_dos.o: $(DOS_GFX_TIMER_PROFILE_STAMP)
 endif
 
 GFXLIB2_ARCH_CFLAGS :=
@@ -330,19 +340,19 @@ $(GFXLIB2_SIMD_CFLAGS)
 
 ifeq ($(TARGET_OS),darwin)
 
-$(libfbgfxobjdir)/darwin/%.o: $(srcdir)/gfxlib2/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxobjdir)
+$(libfbgfxobjdir)/drivers/darwin/%.o: $(srcdir)/gfxlib2/drivers/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbgfxpicobjdir)/darwin/%.o: $(srcdir)/gfxlib2/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxpicobjdir)
+$(libfbgfxpicobjdir)/drivers/darwin/%.o: $(srcdir)/gfxlib2/drivers/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbgfxmtobjdir)/darwin/%.o: $(srcdir)/gfxlib2/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxmtobjdir)
+$(libfbgfxmtobjdir)/drivers/darwin/%.o: $(srcdir)/gfxlib2/drivers/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxmtobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbgfxmtpicobjdir)/darwin/%.o: $(srcdir)/gfxlib2/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxmtpicobjdir)
+$(libfbgfxmtpicobjdir)/drivers/darwin/%.o: $(srcdir)/gfxlib2/drivers/darwin/%.c $(LIBFBGFX_H) | $(libfbgfxmtpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
@@ -372,37 +382,37 @@ ifneq ($(USE_RUNTIME_CXX),)
 
 $(libfbgfxobjdir)/%.o: $(srcdir)/gfxlib2/%.cpp $(LIBFBGFX_H) | $(libfbgfxobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfxpicobjdir)/%.o: $(srcdir)/gfxlib2/%.cpp $(LIBFBGFX_H) | $(libfbgfxpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfxmtobjdir)/%.o: $(srcdir)/gfxlib2/%.cpp $(LIBFBGFX_H) | $(libfbgfxmtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libfbgfxmtpicobjdir)/%.o: $(srcdir)/gfxlib2/%.cpp $(LIBFBGFX_H) | $(libfbgfxmtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
 
 endif
 
 $(libfbgfxobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(ALLCFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
 
 $(libfbgfxpicobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(ALLCFLAGS) $(PIC_CFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
 
 $(libfbgfxmtobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxmtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(ALLCFLAGS) $(MT_CFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
 
 $(libfbgfxmtpicobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxmtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(ALLCFLAGS) $(MTPIC_CFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -x assembler-with-cpp -MMD -MP -c $< -o $@
 
 ##############################################################################
 # gfxlib3 common core (C sources)
@@ -418,19 +428,19 @@ endif
 
 ifeq ($(TARGET_OS),darwin)
 
-$(libfbgfx3objdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
+$(libfbgfx3objdir)/drivers/darwin/%.o: $(srcdir)/gfxlib3/drivers/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbgfx3picobjdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3picobjdir)
+$(libfbgfx3picobjdir)/drivers/darwin/%.o: $(srcdir)/gfxlib3/drivers/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3picobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbgfx3mtobjdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtobjdir)
+$(libfbgfx3mtobjdir)/drivers/darwin/%.o: $(srcdir)/gfxlib3/drivers/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
-$(libfbgfx3mtpicobjdir)/darwin/%.o: $(srcdir)/gfxlib3/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtpicobjdir)
+$(libfbgfx3mtpicobjdir)/drivers/darwin/%.o: $(srcdir)/gfxlib3/drivers/darwin/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_DARWIN_CLANG) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) $(DARWIN_BLOCKS_CFLAGS) -MMD -MP -c $< -o $@
 
@@ -530,19 +540,19 @@ ifneq ($(USE_RUNTIME_CXX),)
 
 $(libsfxobjdir)/%.o: $(srcdir)/sfxlib/%.cpp $(LIBSFX_H) | $(libsfxobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) -MMD -MP -c $< -o $@
 
 $(libsfxpicobjdir)/%.o: $(srcdir)/sfxlib/%.cpp $(LIBSFX_H) | $(libsfxpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libsfxmtobjdir)/%.o: $(srcdir)/sfxlib/%.cpp $(LIBSFX_H) | $(libsfxmtobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
 
 $(libsfxmtpicobjdir)/%.o: $(srcdir)/sfxlib/%.cpp $(LIBSFX_H) | $(libsfxmtpicobjdir)
 	@mkdir -p "$(dir $@)"
-	$(RUN_CXX) $(ALLCXXFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
+	$(RUN_CXX) $(CPPFLAGS) $(ALLCXXFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
 
 endif
 

@@ -1,0 +1,108 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: devices/dev_pipe_open.c
+ * Purpose: file device.
+ * Responsibilities: File-device callbacks and private stream state.
+ * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
+ */
+#include "fb.h"
+
+#if defined(HOST_JS)
+
+int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
+{
+	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+}
+
+#else
+
+static FB_FILE_HOOKS hooks_dev_pipe = {
+    fb_DevFileEof,
+    fb_DevPipeClose,
+    NULL,
+    NULL,
+    fb_DevFileRead,
+    fb_DevFileReadWstr,
+    fb_DevFileWrite,
+    fb_DevFileWriteWstr,
+    NULL,
+    NULL,
+    fb_DevFileReadLine,
+    fb_DevFileReadLineWstr,
+    NULL,
+    fb_DevFileFlush
+};
+
+int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
+	{
+	    int res = fb_ErrorSetNum( FB_RTERROR_OK );
+	    FILE *fp = NULL;
+	    const char *openmask = NULL;
+
+    FB_LOCK();
+
+    handle->hooks = &hooks_dev_pipe;
+
+	    switch( handle->mode )
+	    {
+    case FB_FILE_MODE_INPUT:
+        if ( handle->access == FB_FILE_ACCESS_ANY)
+            handle->access = FB_FILE_ACCESS_READ;
+
+        if( handle->access != FB_FILE_ACCESS_READ )
+            res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	        openmask = "r";
+	        break;
+
+    case FB_FILE_MODE_OUTPUT:
+        if ( handle->access == FB_FILE_ACCESS_ANY)
+            handle->access = FB_FILE_ACCESS_WRITE;
+
+        if( handle->access != FB_FILE_ACCESS_WRITE )
+            res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	        openmask = "w";
+	        break;
+
+    case FB_FILE_MODE_BINARY:
+        if ( handle->access == FB_FILE_ACCESS_ANY)
+            handle->access = FB_FILE_ACCESS_WRITE;
+
+			openmask = (handle->access == FB_FILE_ACCESS_WRITE? "wb" : "rb");
+
+        break;
+
+    default:
+    	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+    }
+
+	    if( openmask == NULL )
+			res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	    if( (res == FB_RTERROR_OK) && (openmask != NULL) )
+    {
+        /* try to open/create pipe */
+        /* OPEN PIPE is specified as a command-backed pipe on host targets. */
+#ifdef HOST_MINGW
+        // NOLINTNEXTLINE(bugprone-command-processor)
+        if( (fp = _popen( filename, openmask )) == NULL )
+#else
+        // NOLINTNEXTLINE(bugprone-command-processor)
+        if( (fp = popen( filename, openmask )) == NULL )
+#endif
+        {
+            res = fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+        }
+        handle->opaque = fp;
+        handle->type = FB_FILE_TYPE_PIPE;
+    }
+
+    FB_UNLOCK();
+
+	return res;
+}
+
+#endif
+
+/* end of devices/dev_pipe_open.c */

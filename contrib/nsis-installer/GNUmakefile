@@ -1,4 +1,9 @@
-include ../../version.mk
+# Project: FreeBASIC Windows installer
+# File: GNUmakefile
+# Purpose: Build an NSIS installer from the prepared Windows ZIP.
+# Responsibilities: Read the release version and generate the NSIS payload.
+# This file intentionally does NOT build or publish the compiler distribution.
+include ../../mk/version.mk
 
 FBTITLE := FreeBASIC-$(FBVERSION)-win32
 MAKENSIS := makensis
@@ -22,3 +27,5 @@ $(FBTITLE).exe: makescript.bas template.nsi $(FBTITLE).zip \
 .PHONY: clean
 clean:
 	-rm -f $(FBTITLE).exe
+
+# end of GNUmakefile

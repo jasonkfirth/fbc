@@ -1,4 +1,9 @@
 #!/usr/bin/make -f
+# Project: FreeBASIC documentation tools
+# File: GNUmakefile
+# Purpose: Build the documentation maintenance applications.
+# Responsibilities: Select optional spelling tools and link shared helpers.
+# This file intentionally does NOT update or publish wiki content.
 #
 # makes the documentation maintenance tools
 #
@@ -13,12 +18,7 @@
 #   'USE_PCRE_STATIC=1' to indicate we should link with static version of libpcre
 #
 
-OS := $(shell uname)
-ifeq ($(OS),Linux)
-    EXEEXT :=
-else
-    EXEEXT := .exe
-endif
+include ../common.mk
 
 ifndef MAKE
     MAKE := make
@@ -39,7 +39,6 @@ endif
 export HAVE_MYSQL
 export USE_PCRE_STATIC
 
-FBC := fbc
 
 LIBFUNCS_SRC := \
     cmd_opts.bas \
@@ -170,3 +169,5 @@ clean:
 	-rm -f $(APPS)
 	-rm -f $(LIBFUNCS)
 	-rm -f $(TEMP_FILES)
+
+# end of GNUmakefile

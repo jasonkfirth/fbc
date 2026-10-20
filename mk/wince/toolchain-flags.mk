@@ -52,7 +52,7 @@ WINCE_ARCH_FLAGS := \
   -D_M_MRX000=4000 \
   -DMIPS
 
-CPPFLAGS := -I$(srcdir)/rtlib/wince/mips32el $(CPPFLAGS)
+CPPFLAGS := -I$(srcdir)/rtlib/drivers/wince/mips32el $(CPPFLAGS)
 TOOLCHAIN_CFLAGS   += $(WINCE_ARCH_FLAGS)
 TOOLCHAIN_CXXFLAGS += $(WINCE_ARCH_FLAGS)
 

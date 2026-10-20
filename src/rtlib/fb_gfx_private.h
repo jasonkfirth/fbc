@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_gfx_private.h
+ * Purpose: Provide fb gfx private runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 #define PUT_MODE_TRANS		0
 #define PUT_MODE_PSET		1
 #define PUT_MODE_PRESET		2
@@ -42,3 +49,5 @@ typedef struct FB_GFXCTX {
 	PUTTER **putter[PUT_MODES];
 	int flags;
 } FB_GFXCTX;
+
+/* end of fb_gfx_private.h */

@@ -15,9 +15,7 @@
         - define portable modem status, error, capability, and purge flags
         - declare stream and raw-control backend entry points
 
-    This file intentionally does NOT contain:
-
-        - OPEN COM option parsing
+    This file intentionally does NOT contain: - OPEN COM option parsing
         - platform-native handle layouts
         - serial driver implementations
 */

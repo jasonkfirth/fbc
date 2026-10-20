@@ -117,8 +117,8 @@ def main():
             executable = working / "runtime-sanitized"
             sources = [root / "tests/string/ustring-runtime.c"]
             sources.extend(root / "src/rtlib" / name for name in
-                           ("ustr_core.c", "ustr_slice.c", "ustr_search.c", "ustr_case.c", "ustr_io.c",
-                            "ustr_optional.c", "ustr_paths.c", "ustr_profile.c", "str_core.c", "io_printusg.c"))
+                           ("strings/unicode/ustr_core.c", "strings/unicode/ustr_slice.c", "strings/unicode/ustr_search.c", "strings/unicode/ustr_case.c", "strings/unicode/ustr_io.c",
+                            "strings/unicode/ustr_optional.c", "strings/unicode/ustr_paths.c", "strings/unicode/ustr_profile.c", "strings/str_core.c", "console/io_printusg.c"))
             command = shlex.split(os.environ.get("CC", "gcc")) + [
                 "-g", "-O1", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
                 "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-I", str(root / "src/rtlib"),

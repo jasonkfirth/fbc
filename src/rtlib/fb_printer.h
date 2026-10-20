@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_printer.h
+ * Purpose: Provide fb printer runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 typedef struct {
 	char * proto;
 	int iPort;
@@ -28,3 +35,5 @@ typedef struct {
        int          fb_PrinterWrite     ( DEV_LPT_INFO *devInfo, const void *data, size_t length );
        int          fb_PrinterWriteWstr ( DEV_LPT_INFO *devInfo, const FB_WCHAR *data,size_t length );
        int          fb_PrinterClose     ( DEV_LPT_INFO *devInfo );
+
+/* end of fb_printer.h */

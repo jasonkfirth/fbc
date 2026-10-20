@@ -1,6 +1,11 @@
 ############
 # Makefile #
 ############
+# Project: FreeBASIC build system
+# File: GNUmakefile
+# Purpose: Compose platform policy, artifact graphs, and public workflows.
+# Responsibilities: Load layers in order and gate object builds on prerequisites.
+# This file intentionally does NOT select individual subsystem sources.
 
 #!/usr/bin/make -f
 
@@ -147,6 +152,13 @@ else
 maybe-build-fbc:
 endif
 
+# A prerequisite on an aggregate target is a sibling of its object graph.
+# Under -j it does not hold back those objects. Attach the checks to the
+# concrete compile inputs as well, including the standalone runtime startup.
+$(ALL_RUNTIME_OBJS) $(RTL_LIBS): | maybe-prereqs
+$(FBC_OBJS) $(FBC_JS_OBJS) $(FBC_ANDROID_OBJS) $(FBC_WII_OBJS) \
+$(FBRT_OBJ) $(FBRT_PIC_OBJ) $(FBRT_MT_OBJ) $(FBRT_MT_PIC_OBJ): | maybe-prereqs maybe-build-fbc
+
 ##############################################################################
 # Targets that require prereqs
 ##############################################################################
@@ -230,6 +242,7 @@ compiler-stage: rtlib compiler
 # Default target
 ##############################################################################
 
+.PHONY: all compiler-stage
 all: libs compiler-stage
 
 .PHONY: wii
@@ -250,6 +263,18 @@ print-config:
 	@echo "TARGET_TRIPLET=$(TARGET_TRIPLET)"
 	@echo "TARGET_OS=$(TARGET_OS)"
 	@echo "TARGET_ARCH=$(TARGET_ARCH)"
+	@echo "HOST_TRIPLET=$(HOST_TRIPLET)"
+	@echo "HOST_CC_FOR_PROBE=$(HOST_CC_FOR_PROBE)"
+	@echo "CROSS_BUILD=$(CROSS_BUILD)"
+	@echo "BUILD_PREFIX=$(BUILD_PREFIX)"
+	@echo "CC=$(CC)"
+	@echo "CXX=$(CXX)"
+	@echo "AR=$(AR)"
+	@echo "RANLIB=$(RANLIB)"
+	@echo "AS=$(AS)"
+	@echo "LD=$(LD)"
+	@echo "BUILD_FBC=$(BUILD_FBC)"
+	@echo "BUILD_FBC_TARGET=$(BUILD_FBC_TARGET)"
 	@echo "ISA_FAMILY=$(ISA_FAMILY)"
 	@echo "ARM_VER=$(ARM_VER)"
 	@echo "ARM_FLOAT_ABI=$(ARM_FLOAT_ABI)"
@@ -300,7 +325,7 @@ help:
 	@echo ""
 	@echo "Primary targets:"
 	@echo "  all                     Build native libraries and native compiler"
-	@echo "  libs                    Build rtlib + fbrt + gfxlib2 + sfxlib"
+	@echo "  libs                    Build rtlib + fbrt + gfxlib2 + gfxlib3 + sfxlib"
 	@echo "  runtime                 Build all runtime archives"
 	@echo "  compiler                Build native fbc"
 	@echo "  compiler-js             Build fbc-js driver/compiler"

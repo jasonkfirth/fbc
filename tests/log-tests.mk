@@ -1,7 +1,9 @@
-# log-tests.mk
-# This file is part of the FreeBASIC test suite
+# Project: FreeBASIC test suite
+# File: log-tests.mk
 #
-# make file for building non-fbcunit tests
+# Purpose: Build non-fbcunit tests and report their saved results.
+# Responsibilities: Select tests, retain failure details, and clean retry artifacts.
+# This file intentionally does NOT define fbcunit tests or platform defaults.
 #
 
 # ------------------------------------------------------------------------
@@ -110,6 +112,17 @@ LOG_TESTS_OBJ_LST := log-tests-obj-$(FB_LANG).lst
 LOG_TESTS_RESULTS_LOG := log-tests-results-$(FB_LANG).log
 FAILED_LOG_TESTS_INC := failed-log-tests-$(FB_LANG).inc
 FAILED_LOG := failed-$(FB_LANG).log
+
+# A retry owns only the artifacts selected by its failure include. Separate
+# manifests also prevent a subsequent full run from reusing the retry's list.
+ifeq ($(FAILED_ONLY),1)
+LOG_TESTS_LOG_LST := log-tests-log-failed-$(FB_LANG).lst
+LOG_TESTS_OBJ_LST := log-tests-obj-failed-$(FB_LANG).lst
+LOG_TESTS_RESULTS_LOG := log-tests-results-failed-$(FB_LANG).log
+LOG_TESTS_LIST_INC := $(FAILED_LOG_TESTS_INC)
+else
+LOG_TESTS_LIST_INC := $(LOG_TESTS_INC)
+endif
 
 SRCLIST_COMPILE_ONLY_OK :=
 SRCLIST_COMPILE_ONLY_FAIL :=
@@ -389,7 +402,7 @@ $(FAILED_LOG_TESTS_INC) :
 	@$(PRINTF) "."
 	@$(FIND) $(DIRLIST) -mindepth 1 -type f -name '*.log' \
 | $(XARGS) $(GREP) -l -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' \
-| $(SED) -e 's/\(^.*\)[[:space:]]:[[:space:]]TESTMODE=\(.*\)/SRCLIST_\2 \+\= \1/g' \
+| $(XARGS) -r $(SED) -n -e 's/^\(.*\) : TEST_MODE=\([A-Z_]*\)$$/SRCLIST_\2 += \1/p' \
 >> $(FAILED_LOG_TESTS_INC)
 	@$(ECHO) "#" >> $(FAILED_LOG_TESTS_INC)
 
@@ -446,19 +459,23 @@ $(LOG_TESTS_INC) :
 >> $(LOG_TESTS_INC)
 	@$(ECHO) "#" >> $(LOG_TESTS_INC)
 
-# hack: use the auto-generated list of tests to create a temporary file
-# containing a list of all the .o & .log files.  The command line can be
-# very long and some shells (like cmd.exe) won't handle it.
+# Store cleanup paths in files because a whole-suite command line can exceed
+# shell limits. Each manifest has its own rule so deleting it does not require
+# regenerating the source include. Repeated failed attempts may append the
+# same test more than once, so keep only one path per artifact.
 
+$(LOG_TESTS_OBJ_LST) : $(LOG_TESTS_LIST_INC)
 	@$(PRINTF) "."
-	@$(GREP) -i -e ".*+=.*\.b.*" $(LOG_TESTS_INC) \
+	@$(GREP) -i -e ".*+=.*\.b.*" $(LOG_TESTS_LIST_INC) \
 | $(SED) 's/^.* += \(.*\)\(\.b.*\)/\1\.o/g' \
+| sort -u \
 > $(LOG_TESTS_OBJ_LST)
 
-$(LOG_TESTS_LOG_LST) : $(LOG_TESTS_INC)
+$(LOG_TESTS_LOG_LST) : $(LOG_TESTS_LIST_INC)
 	@$(PRINTF) "."
-	@$(GREP) -i -e "^.*+=.*\.b.*" $(LOG_TESTS_INC) \
+	@$(GREP) -i -e "^.*+=.*\.b.*" $(LOG_TESTS_LIST_INC) \
 | $(SED) 's/^.* += \(.*\)\(\.b.*\)/\1\.log/g' \
+| sort -u \
 > $(LOG_TESTS_LOG_LST)
 
 	@$(ECHO) " Done"
@@ -476,8 +493,9 @@ $(LOG_TESTS_RESULTS_LOG): $(LOG_TESTS_LOG_LST) $(LOGLIST_ALL)
 		records=$$($(GREP) -c -E '^.* : RESULT=(PASSED|FAILED)( |$$)' "$$logfile"); \
 		test "$$records" = 1 || { $(ECHO) "Incomplete test log: $$logfile"; exit 1; }; \
 	done < $(LOG_TESTS_LOG_LST)
-	@$(CAT) $(LOG_TESTS_LOG_LST) | $(XARGS) $(GREP) -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' | $(TAIL) -n +1 > $@ 
+	@$(CAT) $(LOG_TESTS_LOG_LST) | $(XARGS) -r $(GREP) -H -i -E '^.*[[:space:]]*:[[:space:]]*RESULT=FAILED' | $(TAIL) -n +1 > $@
 
+.PHONY: results
 results : $(LOG_TESTS_RESULTS_LOG)
 
 	@$(PRINTF) "\n\nFAILED LOG - for log-tests -lang $(FB_LANG)\n" > $(FAILED_LOG)
@@ -513,7 +531,7 @@ clean : clean_tests clean_include clean_failed_include
 mostlyclean : clean_tests
 
 .PHONY: clean_tests
-clean_tests :
+clean_tests : $(LOG_TESTS_OBJ_LST) $(LOG_TESTS_LOG_LST)
 	@$(ECHO) Cleaning log-tests for -lang $(FB_LANG) ...
 	$(RM) $(LOG_TESTS_RESULTS_LOG)
 ifneq ($(LOG_TESTS_LOG_LST),)
@@ -546,3 +564,5 @@ clean_include :
 .PHONY: clean_failed_include
 clean_failed_include :
 	$(RM) $(FAILED_LOG_TESTS_INC)
+
+# end of log-tests.mk

@@ -1,8 +1,10 @@
 /*
- * FreeBASIC runtime: fb_services.h
+ * Project: FreeBASIC runtime: fb_services.h
  * Purpose: Define checked notification and cooperative idle-loop contracts.
  * Responsibilities: Shared status values, public ABI and platform hooks.
  * Native UI code, scheduling policy and network clients belong elsewhere.
+ * File: fb_services.h
+ * This file intentionally does NOT contain: unrelated runtime subsystems.
  */
 #ifndef FB_SERVICES_H
 #define FB_SERVICES_H
@@ -68,4 +70,5 @@ int fb_hServiceUtf8(const char *text, size_t length);
 #endif
 
 #endif
+
 /* end of fb_services.h */

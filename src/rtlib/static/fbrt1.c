@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: static/fbrt1.c
+ * Purpose: Provide fbrt1 runtime support.
+ * Responsibilities: Platform startup, constructor ordering and runtime shutdown.
+ * This file intentionally does NOT contain: BASIC statement implementations or compiler parsing.
+ */
 /* FB runtime initialization and cleanup for profiler
 
    We use a global constructor and destructor for this. Where possible they
@@ -77,3 +84,5 @@
 	static void * priorityhDoInit __attribute__((section(".ctors.65435"), used)) = fb_hDoInit;
 	static void * priorityhDoExit __attribute__((section(".dtors.65435"), used)) = fb_hDoExit;
 #endif
+
+/* end of static/fbrt1.c */

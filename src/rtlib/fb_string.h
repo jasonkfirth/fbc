@@ -1,9 +1,9 @@
 /*
-    FreeBASIC Runtime Library
+    Project: FreeBASIC Runtime Library
     File: fb_string.h
     Purpose: Define the runtime string ABI and internal string services.
     Responsibilities: Descriptors, ownership flags, and narrow/wide declarations.
-    This file does not contain the compiler's string expression rules.
+    This file intentionally does NOT contain: the compiler's string expression rules.
 */
 
 /** Flag to identify a string as a temporary string.

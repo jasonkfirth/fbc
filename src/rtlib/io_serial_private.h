@@ -13,9 +13,7 @@
         - define Windows, POSIX terminal, and DOS serial handle records
         - keep platform-native types out of the generic COM device layer
 
-    This file intentionally does NOT contain:
-
-        - public fbcom.bi types
+    This file intentionally does NOT contain: - public fbcom.bi types
         - device-opening or modem-control logic
         - ownership of parsed OPEN COM options
 */

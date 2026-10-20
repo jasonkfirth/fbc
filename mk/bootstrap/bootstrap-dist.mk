@@ -1,9 +1,13 @@
 ##############################################################################
 # bootstrap-dist.mk
 # Bootstrap distribution packaging
+# Project: FreeBASIC build system
+# Purpose: Package emitted bootstrap sources for supported target identities.
+# Responsibilities: Stage source trees and expose target and matrix workflows.
+# This file intentionally does NOT implement source emission or native compilation.
 ##############################################################################
 
-.PHONY: \\
+.PHONY: \
 	bootstrap-emit-matrix \
 	bootstrap-dist \
 	bootstrap-dist-target \

@@ -2,6 +2,10 @@
 # This file is part of the FreeBASIC test suite
 #
 # main entry point for making the FreeBASIC tests
+# Project: FreeBASIC test suite
+# Purpose: Coordinate language suites and compiler sanity checks.
+# Responsibilities: Forward dialect options and report failed checks to Make.
+# This file intentionally does NOT own per-source compile or link recipes.
 #
 
 include common.mk
@@ -66,7 +70,7 @@ LOGTESTS_MAKEFILE := log-tests.mk
 
 
 # ------------------------------------------------------------------------
-.PHONY all :
+.PHONY: all
 all : 
 
 	@$(ECHO) "usage: make target [options]"
@@ -108,13 +112,13 @@ all :
 
 # ------------------------------------------------------------------------
 # Sanity checks
-# these tests do not generate any files, only output to the screen
+# Temporary sanity-check sources and executables are removed after use.
 #
 .PHONY: check
 check :
 # ------------------------------------------------------------------------
 	@$(PRINTF) "Checking that fb compiler $(FBC) exists: "
-	@-if $(FBC) -version > /dev/null 2>&1 \
+	@if $(FBC) -version > /dev/null 2>&1 \
 	; then \
 		$(ECHO) "OK" && \
 		true \
@@ -125,7 +129,7 @@ check :
 # ------------------------------------------------------------------------
 	@$(PRINTF) "Checking that $(FBC) working: "
 	@$(ECHO) "end 0" > fbcworks.bas
-	@-if $(FBC) fbcworks.bas > /dev/null 2>&1 \
+	@if $(FBC) fbcworks.bas > /dev/null 2>&1 \
 	; then \
 		$(ECHO) "OK" && \
 		$(RM) -f fbcworks.bas && \
@@ -138,7 +142,7 @@ check :
 	; fi
 # ------------------------------------------------------------------------
 	@$(PRINTF) "Checking that compiled program executes: "
-	@-if ./fbcworks$(EXEEXT) > /dev/null 2>&1 \
+	@if ./fbcworks$(EXEEXT) > /dev/null 2>&1 \
 	; then \
 		$(ECHO) "OK" && \
 		$(RM) -f fbcworks$(EXEEXT) && \
@@ -268,3 +272,5 @@ clean-qb :
 .PHONY: clean-deprecated
 clean-deprecated :
 	cd . && $(MAKE) -f $(LOGTESTS_MAKEFILE) clean FB_LANG=deprecated
+
+# end of GNUmakefile

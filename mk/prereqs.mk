@@ -2,6 +2,10 @@
 # prereqs.mk
 #
 # Extended prerequisite checks
+# Project: FreeBASIC build system
+# Purpose: Diagnose missing tools and inputs before concrete build recipes run.
+# Responsibilities: Validate paths, SDK commands, and a runnable build compiler.
+# This file intentionally does NOT compile sources or infer target identities.
 #
 # Philosophy:
 #   - Checks run ONLY when "make prereqs" is invoked
@@ -173,6 +177,14 @@ prereqs-paths:
 
 prereqs-tools:
 	@echo "==> Checking required tools"
+# Metadata queries may inspect an unavailable target without building it.
+# Concrete builds must not silently use a host compiler in its place. An
+# explicitly supplied SDK compiler is allowed to replace the inferred prefix.
+ifneq ($(strip $(MISSING_CROSS_CC)),)
+ifeq ($(filter command% environment%,$(origin CC)),)
+	@$(call pr_error_block,Missing requested cross compiler: $(MISSING_CROSS_CC). Set CC explicitly for an equivalent SDK)
+endif
+endif
 	@$(call pr_check_cmd,$(PR_CC))
 	@$(foreach t,$(PR_COMMON_TOOLS),$(call pr_check_cmd,$(t));)
 

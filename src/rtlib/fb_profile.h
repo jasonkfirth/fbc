@@ -1,9 +1,9 @@
 /*
-    FreeBASIC Runtime Library
+    Project: FreeBASIC Runtime Library
     File: fb_profile.h
     Purpose: Define profiler controls, shared layouts, and report options.
     Responsibilities: Describe the C ABI and profiler storage/locking helpers.
-    This file intentionally does NOT contain collectors or report writers.
+    This file intentionally does NOT contain: collectors or report writers.
 */
 
 /* reporting options */

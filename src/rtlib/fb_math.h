@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_math.h
+ * Purpose: Provide fb math runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 typedef enum _FB_RND_ALGORITHMS {
 	FB_RND_AUTO = 0,
 	FB_RND_CRT,
@@ -58,3 +65,5 @@ FBCALL long long    fb_CVLONGINTFROMD   ( double d );
 
 FBCALL int fb_IntLog10_32 ( unsigned int x );
 FBCALL int fb_IntLog10_64 ( unsigned long long x );
+
+/* end of fb_math.h */

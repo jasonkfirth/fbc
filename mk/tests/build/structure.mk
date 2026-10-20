@@ -2,12 +2,23 @@
 # tests/build/structure.mk
 #
 # Verifies the mk/ directory structure matches the refactored layout
+# Project: FreeBASIC build system
+# Purpose: Expose source-structure and isolated Make contract checks.
+# Responsibilities: Run validators and check the maintained fragment inventory.
+# This file intentionally does NOT define compiler or runtime implementations.
 ##############################################################################
 
 PYTHON ?= python3
 
-.PHONY: mk-structure-test
-mk-structure-test:
+.PHONY: make-contracts-test
+make-contracts-test:
+	$(PYTHON) "$(rootdir)/build_scripts/test-make-contracts.py" --root "$(rootdir)"
+
+.PHONY: mk-structure-test gfx-structure-test
+gfx-structure-test:
+	@$(PYTHON) "$(rootdir)/build_scripts/check-gfx-source-graph.py" --root "$(rootdir)" --make "$(MAKE)"
+
+mk-structure-test: gfx-structure-test
 	$(call _mt_echo,Verifying $(mkpath)/ structure)
 
 	@test -f $(rootdir)/GNUmakefile || { echo "ERROR: missing $(rootdir)/GNUmakefile"; exit 1; }
@@ -48,8 +59,6 @@ mk-structure-test:
 		echo "ERROR: Android ARMv7 C flags lost the non-NEON baseline"; \
 		exit 1; \
 	}
-
-	@$(PYTHON) "$(rootdir)/build_scripts/check-gfx-source-graph.py" --root "$(rootdir)" --make "$(MAKE)"
 
 	@dos_default="$$( $(MAKE) --no-print-directory -s print-config \
 		HAVE_PREREQS_MK= TARGET_OS=dos \

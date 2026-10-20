@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_system.h
+ * Purpose: Provide fb system runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
        unsigned int fb_CpuDetect        ( void );
 FBCALL void         fb_Init             ( int argc, char **argv, int lang );
 FBCALL void         fb_End              ( int errlevel );
@@ -49,3 +56,5 @@ FBCALL int          fb_Wait             ( unsigned short port, int val_and, int 
 
        void         fb_hRtInit          ( void );
        void         fb_hRtExit          ( void );
+
+/* end of fb_system.h */

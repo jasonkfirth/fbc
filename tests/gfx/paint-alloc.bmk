@@ -1,8 +1,11 @@
 # TEST_MODE : MULTI_MODULE_OK
-# paint-alloc.bmk: instrument only PAINT's allocations, then run the ABI fixture.
+# FreeBASIC graphics allocation tests: paint-alloc.bmk
+# Purpose: Instrument PAINT allocations and run the ABI fixture.
+# Responsibilities: Select the source under test and allocation hooks.
+# This file intentionally does NOT contain the fixture implementation.
 MAIN := paint-alloc.bas
 SRCS :=
-PAINT_ALLOC_CORE := $(SRCDIR)../../src/gfxlib2/gfx_paint.c
+PAINT_ALLOC_CORE := $(SRCDIR)../../src/gfxlib2/draw/gfx_paint.c
 
 ifneq ($(wildcard $(PAINT_ALLOC_CORE)),)
 EXTRA_OBJS := paint-alloc-hooks.o paint-alloc-core.o

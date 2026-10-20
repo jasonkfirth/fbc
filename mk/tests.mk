@@ -68,7 +68,7 @@ warning-tests: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
 	@test -n "$(TESTS_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
 	@chmod +x tests/warnings/test.sh 2>/dev/null || true
 	cd tests/warnings && \
-		FBC="$(TESTS_FBC_CMD)" ./test.sh
+		$(TESTS_FBC_ENV) FBC="$(TESTS_FBC)" bash ./test.sh
 
 ##############################################################################
 # USTRING needs the compiler and runtime built from the same source tree.
@@ -104,9 +104,14 @@ quicklz-test: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
 # Guest runners consume the output names and retained resource paths from the
 # host inventory. Check that contract without requiring an SDK or emulator.
 .PHONY: exampleageddon-contract-test
-quick-test: exampleageddon-contract-test
+quick-test full-test: exampleageddon-contract-test
 exampleageddon-contract-test:
 	$(PYTHON) "$(rootdir)/build_scripts/test-exampleageddon-contracts.py"
+
+# Source ownership and platform replacements are checked without a cross SDK.
+.PHONY: rtlib-structure-test
+rtlib-structure-test:
+	$(PYTHON) "$(rootdir)/build_scripts/check-rtlib-structure.py" --root "$(rootdir)" --make "$(MAKE)"
 
 ##############################################################################
 # END tests.mk

@@ -1,3 +1,10 @@
+/*
+ * Project: FreeBASIC runtime library
+ * File: fb_datetime.h
+ * Purpose: Provide fb datetime runtime support.
+ * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
+ * This file intentionally does NOT contain: Platform implementations or compiler parsing.
+ */
 FBCALL double       fb_Timer            ( void );
 FBCALL FBSTRING    *fb_Time             ( void );
 FBCALL int          fb_SetTime          ( FBSTRING *timestr );
@@ -126,3 +133,5 @@ FBCALL int          fb_I18nGet          ( void );
        int          fb_DrvIntlGetTimeFormat ( char *buffer, size_t len );
        FBSTRING   * fb_DrvIntlGetMonthName  ( int month, int short_name );
        FBSTRING   * fb_DrvIntlGetWeekdayName( int weekday, int short_names );
+
+/* end of fb_datetime.h */

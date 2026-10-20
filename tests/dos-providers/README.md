@@ -183,7 +183,7 @@ as banked VESA drivers do. This checks publication contracts rather than the
 emulator's final window surface.
 
 Compile `cursor_capture.c` with the target library's C flags and these include
-paths: `-Isrc/gfxlib2 -Isrc/gfxlib2/dos`. Add
+paths: `-Isrc/gfxlib2 -Isrc/gfxlib2/drivers/dos`. Add
 `-fno-toplevel-reorder -fno-reorder-functions` so the callback's end marker
 still bounds the code locked for interrupt use. Link its object with the
 ordinary DOS gfxlib or `fbgfxmt` for the threaded runtime. The linked library

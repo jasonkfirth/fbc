@@ -18,7 +18,7 @@ typedef struct {
 typedef struct {
 	unsigned int first, last;
 } UTF8_CASE_RANGE;
-#include "ustr_case_data.h"
+#include "strings/unicode/ustr_case_data.h"
 
 static void checkBytes( FBSTRING *str, const char *expected, ssize_t length )
 {

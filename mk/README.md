@@ -51,6 +51,11 @@ The important design rule is that each layer answers one class of question:
   "what gets built?"
 - `compiler-sources.mk`, included by `source-graph.mk`, owns compiler subsystem
   discovery and host policy replacement.
+- `gfx-sources.mk` lists shared graphics subsystem owners and the native
+  `drivers` roots. Graphics target
+  replacements remain in `source-graph.mk`, which rejects colliding archive
+  member names across C, C++ and assembly sources. See the
+  [graphics maintenance guide](../docs/gfx-maintenance.md).
 - `mk/build/*.mk` answer "how do we build and clean it?"
 - `mk/bootstrap/*.mk` answer "how do we recover or regenerate the compiler?"
 - `mk/tests*.mk` and `mk/tests/*.mk` answer "how do we verify the build graph?"
@@ -103,6 +108,7 @@ The default target is `all`.
 - `rtlib`
 - `fbrt`
 - `gfxlib2`
+- `gfxlib3`
 - `sfxlib`
 
 `compiler-stage` then builds the compiler after the runtime pieces it needs are
@@ -130,6 +136,32 @@ That value is intentionally separate from packaging aliases such as
 `linux-amd64` or `mingw-x86_64`. The build tree and install tree use the
 canonical runtime key so that different packaging names do not silently create
 different runtime layouts.
+
+`MULTILIB=32` and `MULTILIB=64` select an x86 ABI before source and directory
+selection. BASIC, C, C++, and final C-driver links use the same width. The
+selected SDK must provide that width. Other processor families use an explicit
+`TARGET_TRIPLET`; a conflicting explicit `FBC_TARGET` is rejected.
+
+`CC` selects the target compiler. `HOST_CC`, when supplied, identifies the
+machine running Make. Host detection otherwise prefers an independent native
+driver, so a cross compiler cannot make a target-only `fbc` look runnable.
+Missing inferred cross tools remain inspectable with `print-config`, but
+concrete builds fail prerequisite checks unless an equivalent SDK compiler
+was explicitly supplied.
+
+Source and header dependencies, embedded runtime changes, and archive-member
+selection are tracked incrementally. Arbitrary changes to compiler commands
+or feature/optimization flags still require rebuilding the affected objects:
+
+```sh
+make clean-compiler clean-libs
+make all
+```
+
+Keep the same target configuration on both commands. These component clean
+targets preserve compiler executables and emitted bootstrap sources. Compiler
+BI dependencies are deliberately conservative, so an interface change can
+rebuild more modules than a minimal include graph would require.
 
 ## Bootstrap And Compiler Availability
 
@@ -172,6 +204,16 @@ Build-tree layout lives in `build-layout.mk`.
 That separation is important because a target may need one runtime layout for
 the in-tree compiler and a different destination prefix for final installation.
 
+Distribution cleanup precedes every staging branch, and packaging waits for
+the complete stage. Runtime staging reuses installation's platform payload
+selection. Install manifests record copied source-tree files, retaining
+unrelated destination headers. A failed uninstall keeps its manifest for a
+retry.
+
+Archives are indexed before replacing their previous image. Their selected
+members are recorded under `$(libdir)/.archive-members`; this private metadata
+detects source removals and is excluded from installed runtime payloads.
+
 ## Test Entrypoints
 
 There are two broad test entry styles:
@@ -182,6 +224,7 @@ There are two broad test entry styles:
 Useful high-level targets:
 
 - `make sanity`
+- `make make-contracts-test` (isolated graph, packaging, and ownership regressions)
 - `make quick-test`
 - `make full-test`
 - `make compiler-smoke`
@@ -198,6 +241,11 @@ Useful high-level targets:
 The test harness is designed to preserve enough state to avoid rebuilding the
 entire world unnecessarily while still checking that the graph behaves the way
 the build expects.
+
+`make-contracts-test` uses small disposable fixtures and the production Make
+rules. Quick/full workflows also perform shared clean, bootstrap, and packaging
+operations; run one such workflow per owned worktree. Their cleanup is broader
+than the isolated contract test.
 
 Native smoke commands select the compiler after their prerequisites finish.
 This allows an invocation that starts without `bin/fbc` to test the compiler
