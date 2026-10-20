@@ -155,7 +155,7 @@ jobs:
           sudo bash build_scripts/github-actions-apt-update.sh
           sudo apt-get install -y --no-install-recommends \
             gcc g++ make binutils pkg-config rsync curl \
-            tar xz-utils gzip dos2unix python3 \
+            tar xz-utils gzip zip dos2unix python3 \
             libncurses-dev libffi-dev libgpm-dev \
             libasound2-dev libpulse-dev \
             libx11-dev libxext-dev libxpm-dev \
@@ -273,6 +273,7 @@ jobs:
             tar
             xz
             gzip
+            zip
             rsync
             curl
             dos2unix
@@ -684,6 +685,7 @@ jobs:
             tar
             xz
             gzip
+            zip
             rsync
             curl
             pkgconf
@@ -776,6 +778,7 @@ jobs:
             tar
             xz
             gzip
+            zip
             rsync
             curl
             dos2unix

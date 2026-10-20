@@ -9,8 +9,10 @@
 # Consumes object lists from source-graph.mk
 ##############################################################################
 
-# Keep the object list out of the native command line. On Windows, the
-# expanded rtlib list can exceed the process argument limit.
+# Keep the object list out of Make's recipe command line. On Windows, the
+# expanded rtlib list can exceed the process argument limit. Apple's ar does
+# not accept GNU response files, so xargs feeds every archiver bounded batches.
+# The 16 KiB limit leaves room below Windows' 32 KiB native command limit.
 # GNU Make expands file functions even under -n. Inspect only its initial
 # short-option word so --no-print-directory does not count as the n flag.
 # Publish only a fully indexed replacement, retaining the previous archive
@@ -21,7 +23,7 @@ define DO_AR
 	members="$(ARCHIVE_MEMBERS_DIR)/$(notdir $@)"; \
 	trap 'rm -f "$@.tmp" "$@.rsp" "$$members.tmp"' 0; \
 	rm -f "$@.tmp"; \
-	$(AR) $(ARFLAGS) "$@.tmp" @"$@.rsp"; \
+	xargs -s 16384 $(AR) $(ARFLAGS) "$@.tmp" < "$@.rsp"; \
 	$(RANLIB) "$@.tmp"; \
 	mv -f "$@.tmp" "$@"; \
 	cp "$@.rsp" "$$members.tmp"; \

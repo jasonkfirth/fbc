@@ -34,8 +34,17 @@ def include(root: Path, name: str) -> str:
 
 
 def make(working: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    # Each fixture owns its target and tool selection. Parent make overrides
+    # and CI's exported cross tools must not redefine that miniature build.
+    environment = os.environ.copy()
+    for name in ("MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "GNUMAKEFLAGS",
+                 "CC", "CXX", "AR", "AS", "LD", "RANLIB", "STRIP", "DLLTOOL", "WINDRES",
+                 "HOST_CC", "TARGET", "TARGET_TRIPLET", "TARGET_OS", "TARGET_ARCH",
+                 "CROSS_BUILD", "BUILD_PREFIX", "BUILD_FBC", "BOOT_FBC",
+                 "BUILD_FBC_TARGET", "BUILD_FBC_BUILDPREFIX"):
+        environment.pop(name, None)
     return subprocess.run(["make", "--no-print-directory", "-s", *arguments],
-                          cwd=working, capture_output=True, text=True,
+                          cwd=working, env=environment, capture_output=True, text=True,
                           timeout=30, check=False)
 
 
@@ -228,6 +237,40 @@ def test_archive_dryrun(root: Path, working: Path) -> None:
     require(not list((working / "runtime").glob("*.tmp"))
             and not list((working / "runtime").glob("*.rsp")),
             "successful archive left temporary files")
+
+
+def test_archive_portable_arguments(root: Path, working: Path) -> None:
+    # Model Apple's rejection of GNU response files and Windows' command
+    # limit while letting the native archiver verify the resulting members.
+    names = ["unit-" + str(index) + "-" + "x" * 60 + ".o" for index in range(600)]
+    for name in names:
+        write(working / name)
+    write(working / "ar.sh", "#!/bin/sh\nset -eu\nlength=0\n"
+          "for argument in \"$@\"; do\n"
+          "  case \"$argument\" in @*) exit 1 ;; esac\n"
+          "  length=$((length + ${#argument} + 1))\n"
+          "done\n[ \"$length\" -lt 32768 ] || exit 1\n"
+          "if [ -f fail-after-first ] && [ -e \"$2\" ]; then exit 1; fi\n"
+          "exec ar \"$@\"\n")
+    write(working / "GNUmakefile",
+          ".DEFAULT_GOAL := runtime/libfb.a\nlibdir := runtime\n"
+          "RTLIB_OBJ := " + " ".join(names) + "\n"
+          "AR := sh ar.sh\nARFLAGS := rcs\nRANLIB := ranlib\n"
+          + include(root, "build/archive-rules.mk") + "\nruntime:\n\t@mkdir -p runtime\n")
+    result = make(working)
+    require(result.returncode == 0, "archive exceeded portable tool arguments", result)
+    result = subprocess.run(["ar", "t", "runtime/libfb.a"], cwd=working,
+                            capture_output=True, text=True, timeout=10, check=False)
+    require(result.returncode == 0 and result.stdout.splitlines() == names,
+            "batched archive lost or reordered members", result)
+    published = (working / "runtime/libfb.a").read_bytes()
+    write(working / "fail-after-first")
+    result = make(working, "-B")
+    require(result.returncode != 0 and (working / "runtime/libfb.a").read_bytes() == published,
+            "a later archiver batch failure published a partial archive", result)
+    require(not list((working / "runtime").glob("*.tmp"))
+            and not list((working / "runtime").glob("*.rsp")),
+            "failed archive batch left temporary files")
 
 
 def archive_probe(root: Path, working: Path, producer_exit: int) -> None:
@@ -533,8 +576,10 @@ def test_bootstrap_clean_alias(root: Path, working: Path) -> None:
 
 
 def test_missing_cross_toolchain(root: Path, working: Path) -> None:
+    # The fixture must remain a cross build when the runner itself is ARM64.
+    write(working / "host.sh", "#!/bin/sh\necho x86_64-fixture-linux-gnu\n")
     write(working / "GNUmakefile",
-          "rootdir := .\nTARGET_OS := linux\nTARGET_ARCH := aarch64\n"
+          "rootdir := .\nHOST_CC := sh host.sh\nTARGET_OS := linux\nTARGET_ARCH := aarch64\n"
           "TARGET_TRIPLET := aarch64-fixture-linux-gnu\n"
           "TARGET_TRIPLET_LC := $(TARGET_TRIPLET)\nFBTARGET := linux-aarch64\n"
           "FBC_TARGET := linux-aarch64\nEXEEXT :=\n"
@@ -738,7 +783,8 @@ def main() -> int:
     tests = (test_relink, test_relink_pic, test_dist_headers, test_dist_order, test_dist_zip,
              test_dist_runtime_payload,
              test_uninstall_absent, test_uninstall_failure, test_install_ownership,
-             test_archive_failure, test_archive_dryrun, test_archive_producer_failure,
+             test_archive_failure, test_archive_dryrun, test_archive_portable_arguments,
+             test_archive_producer_failure,
              test_archive_replacement, test_bootstrap_no_output, test_doc_parallel,
              test_archive_cleanup_scope, test_manual_parallel, test_manual_chm_failure,
              test_dos_timer_profile, test_dos_thread_selection, test_sanity_failure,

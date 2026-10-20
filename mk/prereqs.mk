@@ -97,6 +97,7 @@ PR_COMMON_TOOLS := \
 	awk \
 	grep \
 	find \
+	xargs \
 	rsync
 
 ifeq ($(TARGET_OS),js)
@@ -111,6 +112,7 @@ PR_COMMON_TOOLS := \
 	awk \
 	grep \
 	find \
+	xargs \
 	rsync
 endif
 

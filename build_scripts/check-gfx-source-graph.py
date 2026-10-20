@@ -157,6 +157,15 @@ def validate(root: Path, make: str) -> int:
                 for name in ("draw/gfx_window.c", "drivers/riscos/gfx_wimp.c"):
                     if rows["GFX_SRC"].count((root / "src/gfxlib2" / name).resolve()) != 1:
                         raise ValueError("RISC OS must retain shared WINDOW and native Wimp")
+            if target == "wince":
+                # A missing native directory still leaves a valid generic
+                # graph, but it cannot link without the driver registration
+                # and Windows CE's screen implementation.
+                for name in ("gfx_display.c", "gfx_driver.c", "gfx_input.c",
+                             "gfx_joystick.c", "gfx_screen.c", "gfx_xpad.c"):
+                    source = (root / "src/gfxlib2/drivers/wince" / name).resolve()
+                    if rows["GFX_SRC"].count(source) != 1:
+                        raise ValueError("Windows CE must retain its native backend: " + name)
             count += 1
         for switches in (("DISABLE_X11=1",), ("DISABLE_OPENGL=1",),
                          ("DISABLE_X11=1", "DISABLE_OPENGL=1")):
