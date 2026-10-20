@@ -13,7 +13,7 @@
 FBCALL int fb_FileGetAttr(const char *filename)
 {
     BPTR lock;
-    struct FileInfoBlock information;
+    FB_AMIGA_FILE_INFO information;
     int attributes;
     if (filename == NULL || *filename == '\0') {
         fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL); return -1;
@@ -34,7 +34,7 @@ FBCALL int fb_FileGetAttr(const char *filename)
 FBCALL int fb_FileSetAttr(const char *filename, int attributes)
 {
     BPTR lock;
-    struct FileInfoBlock information;
+    FB_AMIGA_FILE_INFO information;
     if (filename == NULL || *filename == '\0' || (attributes & ~FB_FILE_ATTR_READONLY) != 0)
         return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
     lock = Lock(filename, SHARED_LOCK);

@@ -94,7 +94,7 @@ static BPTR descriptor_handle(int descriptor)
 
 static int file_length(BPTR handle, LONG *length)
 {
-    struct FileInfoBlock information;
+    FB_AMIGA_FILE_INFO information;
     if (!ExamineFH(handle, &information) || information.fib_Size < 0) {
         errno = EIO;
         return -1;
@@ -230,7 +230,7 @@ long _lseek(int descriptor, long offset, int origin)
 int _fstat(int descriptor, struct stat *information)
 {
     BPTR handle = descriptor_handle(descriptor);
-    struct FileInfoBlock native;
+    FB_AMIGA_FILE_INFO native;
     if (handle == 0) return -1;
     if (information == NULL) { errno = EINVAL; return -1; }
     memset(information, 0, sizeof(*information));

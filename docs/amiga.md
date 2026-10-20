@@ -374,6 +374,49 @@ preserves the checked original GCC outputs and decodes all 262,144 texture pixel
 for both targets. A complete model inference step returns successfully and
 selects the same token, although floating scores are not bit-identical.
 
+The fb-ext corpus image loaders needed source fixes of their own. Their
+packed BMP/TGA headers were little-endian data read as native structures. The
+original BMP row converters and grayscale loops also read past row bounds;
+TGA used pointer-sized pixel writes and could free borrowed raw-file memory.
+ASan reproduces those original failures. The applied library port decodes
+checked byte fields, bounds rows/RLE packets, owns its file buffers, and uses
+32-bit native pixel words. RGB565 fields now follow the file's red/green/blue
+masks. The original 24-bit BMP and real RGBA TGA host pixels remain identical.
+
+All 159 loader cases pass on GCC and Amiga: 54 valid images with 626,530 exact
+RGBA pixels and 105 malformed inputs rejected. Grayscale adds 330 full images
+and 3,759,270 exact RGBA pixels across both color-key modes and 8/16/32-bit
+screen contexts. The decoder-only and grayscale ASan runs report no memory
+errors or leaks. A separate automatic-loader registration path retains its
+preexisting 16-byte leak; it is outside the modified decoder code.
+
+The library's test makefile now discovers a graphics suite. Its normal builds
+pass six tests and 72 assertions on each target. An earlier 20-assertion run
+was rejected as coverage because Testly's fatal assertion helper returned
+false after successful assertions, skipping subsequent pixel checks. The new
+tests use explicit guards and ordinary assertions. Actual BMP, TGA and grayscale
+applications then display their original assets and quit normally on both
+targets. Six necessary source/test/build files changed; other project files
+and existing user edits are preserved by `fbext-applied-raster-port.json`.
+Evidence is under `fbext-raster-candidate-v2`, `fbext-grayscale-candidate`,
+`fbext-raster-asan`, `fbext-grayscale-asan`, `fbext-raster-normal-make-v2` and
+`fbext-raster-actual` in the October 15 audit directory.
+
+Correct software pixels do not imply identical true-color presentation on AGA.
+The native true-color fallback uses a fixed RGB332 palette, whose blue channel
+has fewer levels than red and green. A neutral source gray may therefore acquire
+a visible tint. The pixel exports above check the full source RGBA values;
+the maintained native display tests independently check the chosen palette
+colors. Indexed modes continue to use the application's palette directly.
+
+The full original BASICVERSE benchmark completed its 20 frames with native
+DONE 0/COMPLETE and 14,748 triangles per frame (`basicverse-full-bench`). Reported
+rates describe software emulation. Asteroids also returns zero after a diagnostic
+native Intuition close message, with three complete 800x600 color frames
+validated (`asteroids-close-diagnostic`). Its private chipset screen has no
+clickable close gadget, so that result is recorded as diagnostic event processing
+rather than an ordinary user-close observation.
+
 Persistent application worker pools must stop cooperatively and join before
 executable segments are released. The runtime allows BASIC global destructors
 to perform that cleanup; it cannot safely terminate arbitrary application code
@@ -421,5 +464,34 @@ Other current platform limits are explicit:
   Native Amiga library vectors require their own bindings.
 - OpenGL, shaped/resizable graphics windows, and joystick polling are not
   implemented by this backend.
+
+The October 16 corpus checkpoint records 98 of 184 inventory targets compiling
+for Amiga, with 93 targets having verified execution: 77 ordinary runs and
+20 diagnostic runs, with overlap. This is cumulative evidence from frozen
+build snapshots, not a complete run with one latest compiler binary. The
+86 documented gaps retain matching build-log hashes; 76 have successful GCC
+controls, two have failed controls, and eight have no recorded control.
+
+Two compatible original BASICVERSE programs remain pending: the older island
+demo and the full 300-frame recording. Six complete recording frames have
+been compared with GCC so far. Each has a maximum channel difference of one;
+the sixth differs at 138 of 1,024,000 pixels. This does not establish completion
+of the recording. An actual recording checkpoint has loaded into a filesystem
+isolation that makes a writable copy available at the original guest path.
+That copy continued from saved frame index 5 and produced the next complete
+frame byte-identical to the live native recording. The preceding five files
+were preserved. This qualifies the recovery method for this workload; the
+diagnostic copy stopped after one new frame and does not establish completion
+of all 300 frames. A newer hourly checkpoint has a verified checksum and an
+inspected loop counter of 6, but has not itself been restored. The original
+recording continues separately, with its files protected from the experiment.
+
+A managed continuation waits for the original host controller's configured
+limit and verifies that its emulator has terminated before preparing recovery.
+It restores into a private volume copy, preserves the inspected output prefix,
+and removes later frames only from that copy so they must be recomputed. The
+checkpoint selector verifies the executable, loop counter and completed-frame
+hashes. Full recording coverage still requires all 300 original frames and
+native DONE 0/COMPLETE; a successful recovery experiment alone is insufficient.
 
 <!-- end of amiga.md -->

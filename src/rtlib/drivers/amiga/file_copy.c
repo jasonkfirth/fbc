@@ -17,7 +17,7 @@
 FBCALL int fb_FileCopy(const char *source, const char *destination)
 {
     BPTR input = 0, output = 0, input_lock = 0, output_lock = 0;
-    struct FileInfoBlock information;
+    FB_AMIGA_FILE_INFO information;
     unsigned char buffer[16384];
     LONG count, offset, written;
     int result = FB_RTERROR_ILLEGALFUNCTIONCALL;

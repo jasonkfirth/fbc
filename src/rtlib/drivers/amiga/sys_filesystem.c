@@ -58,7 +58,7 @@ static int amiga_directory_error(void)
 
 static BPTR amiga_directory_lock(const char *path)
 {
-    struct FileInfoBlock information;
+    FB_AMIGA_FILE_INFO information;
     BPTR lock;
 
     if (path == NULL) {
@@ -187,7 +187,7 @@ int fb_hAmigaFileStat(const struct FileInfoBlock *native, struct stat *informati
 
 int stat(const char *source, struct stat *information)
 {
-    struct FileInfoBlock native;
+    FB_AMIGA_FILE_INFO native;
     BPTR lock;
 
     if (source == NULL || information == NULL) { errno = EINVAL; return -1; }
@@ -205,7 +205,7 @@ int stat(const char *source, struct stat *information)
 
 int lstat(const char *source, struct stat *information)
 {
-    struct FileInfoBlock native;
+    FB_AMIGA_FILE_INFO native;
     const char *name;
     char *parent;
     size_t length;

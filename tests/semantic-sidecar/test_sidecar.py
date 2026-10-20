@@ -1729,6 +1729,36 @@ print value
             self.assertEqual(model.symbol_name(proc).lower(), "selectargument")
             self.assertEqual(model.types[int(row[3])][2], "TRACKED")
 
+    def test_trivial_argument_constructor_receipts_preserve_runtime(self) -> None:
+        source = self.source("dim shared constructorCalls as long\ntype TrivialArgument\nvalue as long\n"
+                             "declare constructor(byval initial as long)\nend type\n"
+                             "constructor TrivialArgument(byval initial as long)\n"
+                             "this.value = initial + 1\nconstructorCalls += 1\nend constructor\n"
+                             "sub consumeTrivial(byval item as TrivialArgument)\nprint item.value\nend sub\n"
+                             "consumeTrivial(17)\nsub exercise()\nconsumeTrivial(23)\nend sub\nexercise()\nprint constructorCalls\n")
+        for backend in self.backends:
+            outputs = []
+            for mode in ("off", "full", "bindings"):
+                with self.subTest(backend=backend, mode=mode):
+                    executable = self.working / (backend + "-" + mode + (".exe" if os.name == "nt" else ""))
+                    _, model_path = self.invoke([source], mode=mode, backend=backend, emit=False,
+                                                extra=("-x", str(executable)))
+                    result = subprocess.run([str(executable)], cwd=self.working, capture_output=True,
+                                            timeout=20, check=False)
+                    outputs.append((result.returncode, result.stdout, result.stderr))
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout.split(), [b"18", b"24", b"2"])
+                    if mode != "off":
+                        model = Model.read(model_path, bindings_only=mode == "bindings")
+                        for value in ("17", "23"):
+                            span = self.span(source, "consumeTrivial(" + value + ")", "(" + value + ")")
+                            rows = [row for row in model.records["I"] if row[4] == "argument-constructor"
+                                    and source_range(row, 6) == span]
+                            self.assertEqual(len(rows), 1, (backend, mode, value))
+                            self.assertEqual(model.symbol_name(rows[0][3]).casefold(), "trivialargument")
+            self.assertEqual(outputs[0], outputs[1])
+            self.assertEqual(outputs[0], outputs[2])
+
     def test_target_context_and_primitive_storage(self) -> None:
         source = self.source("dim value as integer\ndim pointer_value as long ptr\nprint value\n")
         for architecture, pointer_size in (("x86", 4), ("x86_64", 8)):

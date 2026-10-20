@@ -68,6 +68,11 @@ void fb_hAmigaDebugNumber(const char *message, unsigned long value);
 /* File-device callers hold FB_LOCK while consulting newlib's descriptor table. */
 int fb_hAmigaGetFileHandle(FILE *stream, unsigned long *handle);
 struct FileInfoBlock;
+/* DOS metadata packets require a longword-aligned FileInfoBlock even though
+   the NDK's struct and the 68k C stack need only word alignment. Keep the
+   native layout, but make GCC realign automatic query buffers explicitly.
+   AllocDosObject(DOS_FIB) already provides the required heap alignment. */
+typedef struct FileInfoBlock FB_AMIGA_FILE_INFO __attribute__((aligned(4)));
 struct stat;
 int fb_hAmigaFileStat(const struct FileInfoBlock *native, struct stat *information);
 

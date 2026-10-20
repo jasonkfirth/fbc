@@ -12,7 +12,7 @@
 
 FBCALL double fb_FileDateTime(const char *filename)
 {
-    struct FileInfoBlock information;
+    FB_AMIGA_FILE_INFO information;
     BPTR lock;
     if (filename == NULL || *filename == '\0') return 0.0;
     lock = Lock(filename, SHARED_LOCK);

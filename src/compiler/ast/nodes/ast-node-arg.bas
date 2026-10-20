@@ -799,6 +799,11 @@ private function hImplicitCtor _
 	n->l = astNewCALLCTOR( astPatchCtorCall( arg, astNewVAR( tmp ) ), astNewVAR( tmp ) )
 
 	if( symbGetParamMode( param ) = FB_PARAMMODE_BYVAL ) then
+		'' Trivial UDTs bypass the temporary-copy path in hUDTPassByval(),
+		'' but this already-selected conversion still calls its constructor.
+		if( symbCompIsTrivial( symbGetSubtype( param ) ) ) then
+			fbSemanticModelExportArgumentConstructor(param, arg->sym, semantic_source_range)
+		end if
 		hUDTPassByval( param, n, semantic_source_range )
 	else
 		fbSemanticModelExportArgumentConstructor(param, arg->sym, semantic_source_range)

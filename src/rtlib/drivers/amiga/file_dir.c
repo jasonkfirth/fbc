@@ -195,7 +195,7 @@ FBCALL FBSTRING *fb_Dir(FBSTRING *filespec, int attrib, int *out_attrib)
     char *separator;
     int temporary_attrib;
     ssize_t length;
-    struct FileInfoBlock information;
+    FB_AMIGA_FILE_INFO information;
     BPTR exact_lock;
 
     if (out_attrib == NULL)

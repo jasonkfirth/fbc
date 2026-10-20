@@ -324,7 +324,7 @@ def compile_probes(args, prefix, env):
     if code != 0:
         raise SystemExit('Amiga object metadata check failed; see logs/objinfo-library.log')
     records = []
-    for name in ('native-io', 'thread-io', 'thread-exit', 'standard-input',
+    for name in ('native-io', 'file-info', 'thread-io', 'thread-exit', 'standard-input',
                  'graphics', 'image-colours', 'objinfo-reader', 'sound',
                  'sound-exit', 'softfloat-convert', 'softfloat-multiply',
                  'softfloat-arithmetic'):
@@ -359,7 +359,7 @@ def compile_probes(args, prefix, env):
                             '-i', str(hunk_source.parent)]
             if name in ('thread-io', 'thread-exit'):
                 objects.append('-mt')
-            if name in ('graphics', 'sound', 'thread-io'):
+            if name in ('graphics', 'sound', 'thread-io', 'file-info'):
                 bridge = binaries / (name + '-bridge.o')
                 code = run_command([cc, *cflags, '-c', str(resources / (name + '-bridge.c')),
                                     '-o', str(bridge)], args.output / 'logs' / (name + '-bridge.log'), env=env)
