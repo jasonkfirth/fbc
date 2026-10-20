@@ -3,6 +3,15 @@
 This chapter collects the pages used by developers working on the compiler,
 runtime libraries, build system, package scripts, and platform ports.
 
+{{fbdoc item="section" value="Source code and source trees"}}
+
+	- [[DevSourceCode|Repository map and compilation-to-runtime flow]]
+	- [[DevSourceCompiler|Compiler phases, source tree, and PRINT walkthrough]]
+	- [[DevSourceRuntime|Core runtime, descriptors, startup, and native layers]]
+	- [[DevSourceGraphics|Software and queued graphics source trees]]
+	- [[DevSourceSound|Sound commands, mixing, buffers, and audio drivers]]
+	- [[DevSourceTools|Target tools, declarations, build ownership, and tests]]
+
 {{fbdoc item="section" value="Building FreeBASIC"}}
 <<
 <table class="fb_box"><tr><td><ul>
@@ -49,7 +58,7 @@ runtime libraries, build system, package scripts, and platform ports.
 {{fbdoc item="section" value="Compiler internals"}}
 <<
 <table class="fb_box"><tr><td><ul>
-<li> [[DevFbcModules|Compiler platform modules]]
+<li> [[DevFbcModules|Compiler modules and source paths]]
 <li> [[DevObjinfo|Object information]]
 <li> [[DevFbcMem|Compiler memory management]]
 <li> [[DevFbcLexer|Lexer]]

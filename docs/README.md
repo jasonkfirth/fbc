@@ -2,12 +2,17 @@
 
 This directory collects the documentation added or substantially revised from
 the 1.10.0 release through the current 1.20.5 tree. The generated language
-manual remains under `doc/manual`; these guides cover release, package, port,
-and experimental runtime subjects that do not fit naturally in the language
-reference.
+manual remains under `doc/manual`; these guides cover source architecture,
+release, package, port, and runtime subjects that do not fit naturally in the
+language reference.
 
 ## Start here
 
+- [Source code guide](source-code/README.md) explains the source trees,
+  compiler phases, runtime libraries, graphics, sound, target tools and tests.
+  The manual's matching pages start at
+  [DevSourceCode.wakka](../doc/manual/cache/DevSourceCode.wakka) and are linked
+  from its main and developer tables of contents.
 - [Graphics maintenance guide](gfx-maintenance.md) maps gfxlib2 and gfxlib3
   ownership, locking, image contracts, backend modules and validation workflows.
 - [Graphics restructuring verification](gfx-restructure-verification.md)

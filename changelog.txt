@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- source documentation: add repository and Wakka manual source-tree guides with compiler, core runtime, graphics, sound, target-tool and test pages; link both manual tables of contents, the documentation index, and the src entry point; update compiler module paths to the current subsystem layout.
 - build system: relink compiler variants after embedded runtime changes, order parallel distribution staging and include nested headers, support standalone distribution ZIPs, record only copied include files for uninstall, preserve failed uninstall manifests, and publish archives only after successful indexing; add isolated Make contract regressions to quick/full workflows.
 - build/toolchains: separate native host probing from target CC, reject missing inferred cross compilers before compilation, gate parallel object recipes on prerequisites, resolve x86 multilib identity before layout, forward C++/assembly preprocessor flags, and track successfully published archive members so source removals and failed retries remain correct across filesystem timestamp granularities.
 - build/tests: preserve DOS provider-enabled thread objects in link manifests, propagate sanity-check failures, reject semantic records after completion footers, validate bootstrap producer status and source emission, preserve unrelated release archives during cleanup, and restore packaging's bootstrap-source cleanup alias.

@@ -108,6 +108,13 @@
 {{fbdoc item="section" value="Hacking on FreeBASIC"}}
 	
 	{{fbdoc item="keyword" value="DevToc|Developer's Table of Contents"}}
+	{{fbdoc item="subsect" value="Source code and implementation"}}
+		{{fbdoc item="keyword" value="DevSourceCode|Repository and source tree guide"}}
+		{{fbdoc item="keyword" value="DevSourceCompiler|Compiler source tree"}}
+		{{fbdoc item="keyword" value="DevSourceRuntime|Core runtime source tree"}}
+		{{fbdoc item="keyword" value="DevSourceGraphics|Graphics source trees"}}
+		{{fbdoc item="keyword" value="DevSourceSound|Sound source tree"}}
+		{{fbdoc item="keyword" value="DevSourceTools|Supporting tools and tests"}}
 
 >>::c::
 

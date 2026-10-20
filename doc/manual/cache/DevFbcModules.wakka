@@ -4,14 +4,32 @@ This is a quick map of the main compiler modules.  It is not a complete list of
 every source file, but it should point new contributors at the right subsystem
 before they start changing code.
 
+The names below are module names. Implementations now live in explicit
+subsystem directories under ##src/compiler## rather than a flat directory:
+
+	- ##driver/##: ##fbc.bas##, the driver phase modules, and ##objinfo.bas##.
+	- ##core/##: ##fb.bas##, ##fb.bi##, and ##fbint.bi##.
+	- ##lexer/## and ##preprocessor/##: ##lex*.bas## and ##pp*.bas##.
+	- ##parser/## and its declaration, expression, procedure, statement, and intrinsic subdirectories: ##parser*.bas##.
+	- ##symbols/##, ##ast/##, and ##runtime/##: ##symb*.bas##, typed AST construction/lowering, and ##rtl*.bas## call builders.
+	- ##backend/##: shared IR interfaces and C, LLVM, GAS64, x86, and debug emission.
+	- ##support/##: allocation, container, string, and numeric helpers.
+	- ##platform/##: compiler-host policies; ##driver/platforms/##: compilation-target driver policies.
+	- ##tooling/##: compiler-derived semantic observations and sidecar publication.
+
+See [[DevSourceCompiler|Compiler source tree]] for the phase map and a complete
+PRINT walkthrough, and [[DevSourceCode|Source code guide]] for the runtime,
+graphics, sound, tools, and test trees. ##mk/compiler-sources.mk## owns the
+selected compiler source groups.
+
 ''fbc''
 	Compiler driver and command-line frontend.  It parses driver options, manages
 	the compile/assemble/link pipeline, invokes external tools, adds libraries,
 	and performs final driver-side actions such as linking or post-link commands.
 
-	Generic driver flow belongs here.  Target-specific OS behavior should usually
-	live in ''fbc-platform'' or one of the ''fbc-*-platform'' files instead of
-	being added directly to ''fbc.bas''.
+	Generic driver flow belongs in the corresponding ##driver/fbc-*.bas## phase
+	module. Target-specific OS behavior belongs in the platform hooks rather
+	than being added directly to ##driver/fbc.bas##.
 
 ''fbc-platform''
 	Compiler-driver platform hook dispatcher.  This module defines the hook table
@@ -31,10 +49,11 @@ before they start changing code.
 	OS target.  It is not the place for parser rules, AST behavior, ABI layout,
 	or backend code generation policy.
 
-''fbc-*-platform''
-	Per-target driver modules.  One compile target maps to one file named
-	''fbc-[target-id]-platform.bi'', where ''[target-id]'' matches the target id
-	from ''fb.bas:targetinfo()''.
+''##driver/platforms/<target>/fbc-platform.bi##''
+	Per-target driver hooks. Each platform directory contains a
+	##fbc-platform.bi## implementation included by ##driver/fbc-platform.bas##.
+	These policies describe the user's compilation target. The separate
+	##platform/## tree describes the machine running the compiler.
 
 	These files keep target-specific linking and packaging rules out of
 	''fbc.bas''.  Examples include Win32 default system libraries, Darwin linker
@@ -42,9 +61,9 @@ before they start changing code.
 	paths, X11 library search paths, OpenBSD library spelling differences, and
 	other target toolchain quirks.
 
-	Platform modules currently exist for Win32, Cygwin, Linux, Android, Haiku,
-	DOS, Xbox, FreeBSD, DragonFly, Solaris, illumos, OpenBSD, Darwin, NetBSD,
-	JavaScript/Emscripten, and Wii.
+	Read the selected platform directory and the shared driver phase when
+	changing a toolchain rule. Parser, AST, and backend behavior retain their
+	own subsystem owners.
 
 ''objinfo''
 	[[DevObjinfo|Object/library information]] section reader/writer, used by
@@ -68,7 +87,8 @@ before they start changing code.
 ''rtl''
 	Helper functions that build ''ast'' nodes for rtlib/gfxlib/sfxlib function
 	calls.  Declarations here must match the actual functions in the runtime,
-	gfxlib2, and sfxlib source code.
+	gfxlib2/gfxlib3, and sfxlib source code. These builders describe calls;
+	the runtime libraries implement the functions executed by the user's program.
 
 ''symb''
 	Symbol lookup and storage: variables, functions, scopes, namespaces, and name
@@ -122,5 +142,6 @@ before they start changing code.
 ''stack''
 	Generic ''list''-based stack.
 
+{{fbdoc item="back" value="DevSourceCompiler|Compiler source tree"}}
 {{fbdoc item="back" value="DevToc|FreeBASIC Developer Information"}}
 {{fbdoc item="back" value="DocToc|Table of Contents"}}
