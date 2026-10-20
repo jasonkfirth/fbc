@@ -494,4 +494,26 @@ checkpoint selector verifies the executable, loop counter and completed-frame
 hashes. Full recording coverage still requires all 300 original frames and
 native DONE 0/COMPLETE; a successful recovery experiment alone is insufficient.
 
+## October 20 source restructure qualification
+
+The compiler and Amiga libraries were rebuilt after the source restructure and
+the Amiga compatibility changes in `d7cd78367`. Both qualification runs used
+the same frozen compiler and library inputs. The compiler SHA-256 was
+`6fe69dcc24788a9f07429242e4f5280b8dcf09d9a9af36a15ac136a99a23908c`.
+
+All 37 fbctests groups compiled and passed under FS-UAE: 5,264 tests and
+1,167,113 assertions, with no failures or errors. Exampleageddon inventoried
+1,773 entries; 1,318 compiled and all 654 self-contained examples passed in
+the guest. The remaining 455 compile failures belonged to other categories.
+Those categories were not required guest runs, so this does not establish
+execution coverage for interactive examples or unavailable native providers.
+
+The first Exampleageddon run launched the serialization file example without
+its documented filename argument. The Amiga adapter now carries the shared
+`EXAMPLE_RUN_ARGUMENTS` metadata into its guest manifest. Resuming with
+`saved-state.bin` passed that example and left zero required failures. The
+initial report is retained alongside the final report in
+`out/amiga/refactor-exampleageddon-20261020`; fbctests evidence is in
+`out/amiga/refactor-fbctests-20261020`.
+
 <!-- end of amiga.md -->

@@ -257,6 +257,7 @@ def compile_unit_tests(args, prefix, env):
 
 
 def compile_examples(args, prefix, env):
+    example_module = load_example_module()
     inventory = args.output / 'inventory'
     source_root = args.output / 'source'
     copy_sources(ROOT / 'examples', source_root / 'examples')
@@ -277,7 +278,8 @@ def compile_examples(args, prefix, env):
             records.append({'id': f'{index:06d}', 'path': row['path'], 'group': row['group'],
                             'compile_status': row['compile_status'], 'run_status': 'not-run',
                             'binary': str(inventory / row['output']), 'resources': str(source.parent),
-                            'arguments': '', 'expected': 0})
+                            'arguments': ' '.join(example_module.EXAMPLE_RUN_ARGUMENTS.get(row['path'], ())),
+                            'expected': 0})
     return records
 
 
