@@ -8,7 +8,9 @@
 ifeq ($(TESTS_TARGET_OS),win32)
 MAIN := ../bindings/import-data.bas
 EXTRA_OBJS := ../bindings/libimport-data.dll.a
-FBC_LFLAGS += -p $(SRCDIR)../bindings
+# The log harness supplies FBC_LFLAGS on the make command line. This required
+# import-library directory must remain present with those caller flags.
+override FBC_LFLAGS += -p $(SRCDIR)../bindings
 
 $(SRCDIR)../bindings/libimport-data.dll.a : $(SRCDIR)../bindings/import-data.c
 	$(CC) -Wall -Wextra -Werror -shared $< \
