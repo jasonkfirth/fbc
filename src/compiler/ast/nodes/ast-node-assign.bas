@@ -826,7 +826,11 @@ function astNewASSIGN _
 			dim as integer doconv = TRUE
 			if( env.clopt.backend = FB_BACKEND_GAS ) then
 				if( (ldclass = FB_DATACLASS_FPOINT) or (rdclass = FB_DATACLASS_FPOINT) ) then
-					if( ldtype <> FB_DATATYPE_ULONGINT ) then
+					'' Wide integers need their runtime conversion before the
+					'' assignment; the x87 cannot convert a 128-bit operand.
+					if( (ldtype <> FB_DATATYPE_ULONGINT) andalso _
+					    (typeIsInteger128Scalar( ldfull ) = FALSE) andalso _
+					    (typeIsInteger128Scalar( rdfull ) = FALSE) ) then
 						doconv = irGetOption( IR_OPT_FPUCONV )
 					end if
 				end if
