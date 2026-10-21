@@ -3049,6 +3049,31 @@ kind, capability or producer behavior. It permits indexed consumers to avoid
 constructing and splitting an intermediate TSV line for every binary record.
 Text exports continue through the existing text reader.
 
+## Accepted primitive type inputs
+
+Full models advertise `accepted-primitive-type-inputs` as available, including
+macro-compact models. Binding-only and expression-only modes omit the family.
+The global namespace owns a closed set of observations:
+
+    K symbol namespace-ID primitive-type-input:detail-ID statement%09source-context%09keyword-token%09dtype%09ordinal
+    LOC source-context source-context primitive-type-input:detail-ID ...
+    K symbol namespace-ID accepted-primitive-type-count:module-ID count
+
+Ordinals start at one within each module; the count includes an empty set.
+The keyword token and dtype are compiler values, not a public type-name enum.
+Consumers may classify the occurrence as an accepted primitive without decoding
+those values. Aliases with the same final dtype use their symbol bindings and
+do not acquire a primitive receipt. Preprocessor probes are not program type
+occurrences.
+
+LOC status independently controls physical projection. The lexer can also have
+no source extent for a replacement token; that occurrence has no LOC. Full macro
+provenance retains its MR origin under the same role. Compact macro mode still
+counts the accepted type, without claiming that additional origin coverage.
+Absent or unverified locations do not grant an editable keyword range. Readers
+validate namespace/module ownership, statement and source identities,
+ordinal/count closure and matching LOC/MR roles.
+
 <!-- end of compiler-semantic-model.md -->
 
 The independent FBCDIA diagnostic transport also advertises `unclosed-procedures`.

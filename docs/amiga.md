@@ -544,6 +544,48 @@ projection trig words reproduce further native edge weights, depth, texture
 coordinates and final pixels exactly. The native arithmetic and controls are
 preserved under `record-camera-trig-probe` and `record-observed-projection-controls`.
 
+The buffered batch completed all 142 selected pixels and passed all three
+independent scalar controls. Its review explains all 142 cases. The final four
+bark-texture cases are reproduced exactly by supplying the exported native
+static geometry and projection inputs to the unchanged GCC raster equations.
+All integer material and flag fields match across the 12,992 static triangles;
+their maximum position difference is approximately 0.00000191 world units.
+The before/after allocator builds export byte-identical native geometry.
+The same complete geometry export is also byte-identical with JIT disabled.
+These are the large differences selected
+from the first 226 captured frames, not a comparison of all 300 final frames.
+
+## Allocator and emulator follow-up
+
+The Amiga allocator previously moved and copied every reallocation, including
+unchanged sizes. It now reuses bounded spare capacity and reserves additional
+room for incremental growth. An unsuccessful reservation retries the exact
+requested size, preserving the original block on failure. The allocation
+header and public interfaces are unchanged. Size checks also leave room for
+Exec's eight-byte block rounding, rejecting the seven unsafe sizes at the top
+of the native address range before calling the OS.
+
+The maintained allocator probe covers preserved contents, bounded moves,
+shrinking, overflow, injected allocation failures and BASIC array clearing.
+Native controls returned 40 before capacity reuse and 0 afterward. A second
+control returned 68 for an unsafe forwarded request before the rounding guard,
+and 0 afterward. Private libraries built with normal Make object rules retain
+every other archive member from the qualified baseline.
+
+An emulator discrepancy affected the wider checks: the exact same string-suite
+executable passes with JIT disabled and fails one signed-boundary assertion with
+JIT enabled. Replaying the previously passing reference executable also
+reproduces the JIT failure. This is independent of the allocator change. The
+arithmetic probe passes under the interpreter, and the 300-camera diagnostic is
+byte-identical in both modes. The allocator candidate therefore uses interpreter
+mode for its regression gates. All 16 maintained native probes passed with the
+October 20 compiler baseline and candidate libraries. All 37 frozen fbctests
+groups also passed: 5,264 tests and 1,167,113 assertions, with no failures or
+errors. These results do not qualify unrelated current
+working-tree changes. Evidence is under `allocator-full-probes`,
+`allocator-full-fbctests`, `allocator-string-interpreter` and
+`allocator-string-reference-replay` in the corpus audit directory.
+
 The file-query audit also found a native ABI defect: DOS requires four-byte
 alignment for FileInfoBlock, while the NDK type and 68k C stack require only
 two bytes. An aligned internal typedef now makes automatic query buffers meet

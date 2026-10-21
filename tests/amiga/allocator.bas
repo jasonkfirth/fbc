@@ -12,7 +12,6 @@ if result <> 0 then end result
 
 dim values(any) as ulong
 for i as long = 0 to 4095
-
 	redim preserve values(0 to i)
 	if values(i) <> 0 then end 80
 	values(i) = culng(i) xor &h5a93c617u

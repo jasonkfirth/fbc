@@ -8,7 +8,7 @@
 
 '' Threading using "ThreadCall"
 
-Sub thread( id As String, tlock As Any Ptr, count As Integer )
+Sub worker( id As String, tlock As Any Ptr, count As Integer )
 	For i As Integer = 1 To count
 		MutexLock tlock
 		Print "thread " & id;
@@ -19,8 +19,8 @@ Sub thread( id As String, tlock As Any Ptr, count As Integer )
 End Sub
 
 Dim tlock As Any Ptr = MutexCreate()
-Dim a As Any Ptr = ThreadCall thread("A", tlock, 6)
-Dim b As Any Ptr = ThreadCall thread("B", tlock, 4)
+Dim a As Any Ptr = ThreadCall worker("A", tlock, 6)
+Dim b As Any Ptr = ThreadCall worker("B", tlock, 4)
 ThreadWait a
 ThreadWait b
 MutexDestroy tlock

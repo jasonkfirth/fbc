@@ -22,7 +22,6 @@ end sub
 
 sub fbSemanticModelFinishPrimitiveTypes( )
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
-	if( fbSemanticModelMacroProvenanceEnabled( ) = FALSE ) then exit sub
 	dim as string row = "K" + TABCHAR + "symbol" + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
 		TABCHAR + "accepted-primitive-type-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
@@ -34,8 +33,10 @@ sub fbSemanticModelPrimitiveType _
 	( byval dtype as integer, byval token as integer, byref source as LEX_LOCATION )
 
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
-	if( fbSemanticModelMacroProvenanceEnabled( ) = FALSE ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
+	'' Physical primitive selections are useful with compact macro output too.
+	'' LOC status still decides whether a spelling is editable; MR attachments
+	'' remain controlled by the independent macro-provenance capability.
 	'' Only cSymbolType's actual primitive branch is observed. An alias with
 	'' the same final dtype has a different source identity and uses B/MR.
 	select case token

@@ -11,6 +11,7 @@
         - check allocation sizes and preserve the size required by FreeMem
         - implement the public and reentrant newlib allocation interfaces
         - preserve failed reallocations and avoid overflowing calloc products
+        - reuse bounded spare capacity during incremental resizing
 
     This file intentionally does NOT contain: - a private free list, garbage collection, or C++ allocator state
 
@@ -20,11 +21,15 @@
     application lock and works before constructors and on worker tasks.
 
     Allocation layout:
-        0..3  : total native allocation size
+        0..3  : total reserved native allocation size
         4..7  : requested payload size
         8..11 : previous live allocation
         12..15: next live allocation
         16..  : caller-owned payload
+
+    Reallocation may retain more storage than the requested payload. FreeMem
+    must receive the reserved size, including this header, rather than the
+    current logical payload length.
 */
 
 #include "../../fb.h"
