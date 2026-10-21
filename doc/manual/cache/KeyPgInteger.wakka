@@ -18,6 +18,8 @@ Standard data type: 32-bit or 64-bit signed, same size as ##[[KeyPgSizeof|SizeOf
 
 	LLVM emits native i128 arithmetic and bitwise operations; ABS and SGN use the two-word runtime helper. GCC and Clang use native `__int128` on targets that support it, with ABS and SGN using that same helper. On 32-bit targets, they use a two-word type and lower arithmetic through the runtime. Its alignment is 16 bytes except on Windows CE (8 bytes) and classic m68k targets (2 bytes). C interop must use that structure layout; a native `__int128` declaration is compatible only when the compiler supports it and uses a matching ABI.
 
+	On 32-bit Windows, the GAS backend keeps the four-byte stack ABI for local variables. UDT field offsets still use 16-byte alignment, but C code receiving a pointer to such a local must accept its four-byte alignment. The runtime helpers accept unaligned storage.
+
 	The native GAS and GAS64 backends lower arithmetic through the runtime library. GAS32 passes 128-bit arguments as 16-byte stack copies and returns values through a hidden result pointer, matching the i386 ABI for the aligned two-word C structure. GAS64 uses the SysV two-register ABI where available and stack arguments when those registers are exhausted. The GAS64 non-SysV path passes the 16-byte value through a caller-owned copy and returns through a hidden result pointer.
 
 {{fbdoc item="ex"}}

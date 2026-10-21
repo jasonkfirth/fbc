@@ -85,4 +85,20 @@ Dim As Integer128AddCallback addCallback = @gas32AddUnsigned
 If addCallback(highValue, 11) <> (highValue + 11) Then End 13
 If gas32LocalAlignment() <> 0 Then End 14
 
+'' These assignments need runtime conversions even when the x87 can defer
+'' ordinary float/integer conversions until the final store.
+Dim As Single singleTie = 3.5, singleEvenTie = 2.5
+Dim As Double doubleTie = -2.5
+Dim As Integer<128> fromSingle = singleTie
+Dim As UInteger<128> unsignedFromSingle = singleEvenTie
+Dim As Integer<128> fromDouble = doubleTie
+If fromSingle <> 4 Then End 16
+If unsignedFromSingle <> 2 Then End 17
+If fromDouble <> -2 Then End 18
+
+Dim As Single backToSingle = fromSingle
+Dim As Double backToDouble = fromDouble
+If backToSingle <> 4.0 Then End 19
+If backToDouble <> -2.0 Then End 20
+
 '' end of integer128-gas32.bas

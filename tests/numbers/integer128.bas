@@ -80,7 +80,13 @@ SUITE( fbc_tests.numbers.integer128 )
 			CU_ASSERT_EQUAL( cuint( @layoutValue.unsignedValue ) - cuint( baseAddress ), 32 )
 			CU_ASSERT_EQUAL( cuint( @layoutValue.suffix ) - cuint( baseAddress ), 48 )
 			CU_ASSERT_EQUAL( sizeof( layoutValue ), 64 )
+			#if defined( __FB_WIN32__ ) and (__FB_BACKEND__ = "gas")
+				'' GAS32 preserves the four-byte Win32 stack ABI. Field layout
+				'' still uses the natural 16-byte alignment within the UDT.
+				CU_ASSERT_EQUAL( cuint( baseAddress ) and 3, 0 )
+			#else
 			CU_ASSERT_EQUAL( cuint( baseAddress ) and 15, 0 )
+			#endif
 		#endif
 	END_TEST
 
