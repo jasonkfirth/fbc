@@ -174,10 +174,10 @@ private function fbcDarwinPlatformGetDeploymentTarget( ) as string
 		function = "11.0"
 	case else
 		''
-		'' macOS 10.5 keeps Intel builds on an old deployment floor without
-		'' tripping modern ld64 warnings about pre-10.5 dynamic symbol flags.
+		'' Native thread-local storage and libc++ require macOS 10.7.
+		'' Keep this fallback aligned with the makefile's deployment baseline.
 		''
-		function = "10.5"
+		function = "10.7"
 	end select
 end function
 

@@ -164,6 +164,12 @@ jobs:
             libcairo2-dev libcunit1-dev \
             libcurl4-openssl-dev libpcre3-dev libpcre2-dev
 
+      - name: Install 32-bit backend test dependencies
+        if: matrix.name == 'x86_64'
+        # Backend regressions compile and execute i386 C/GAS programs on the
+        # x86_64 host, including the portable 128-bit runtime helpers.
+        run: sudo apt-get install -y --no-install-recommends gcc-multilib g++-multilib
+
       - name: Select parallelism
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
 

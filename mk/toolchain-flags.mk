@@ -578,7 +578,8 @@ ifeq ($(strip $(DARWIN_DEPLOYMENT_TARGET)),)
   ifeq ($(TARGET_ARCH),aarch64)
     DARWIN_BASE_DEPLOYMENT_TARGET := 11.0
   else
-    DARWIN_BASE_DEPLOYMENT_TARGET := 10.5
+    # Native TLS and libc++ are available starting with macOS 10.7.
+    DARWIN_BASE_DEPLOYMENT_TARGET := 10.7
   endif
   DARWIN_DEPLOYMENT_TARGET := $(strip $(shell \
     printf '%s\n%s\n' '$(DARWIN_BASE_DEPLOYMENT_TARGET)' '$(DARWIN_PKG_MIN_DEPLOYMENT_TARGET)' \

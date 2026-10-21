@@ -13,6 +13,8 @@ External C declarations belong inside an ##[[KeyPgExternBlock|Extern...End Exter
 
 	The declared type must be trivially stored and its initializer must be constant. Managed strings, objects with constructors or destructors, dynamic arrays, and dynamic initializers are not supported.
 
+	On macOS, native C and LLVM thread-local storage requires macOS 10.7 or later. Apple Silicon targets require macOS 11.0 or later.
+
 	Use ##[[KeyPgThreadCreate|ThreadCreate]]## to start additional FreeBASIC threads. Without additional threads, a ##**Thread Local**## variable behaves like a normal shared variable within the current thread.
 
 	External C ##**Thread Local**## imports are supported by the native GAS backends for Linux executables. GAS backends diagnose these imports for other targets and dynamic libraries, where the platform TLS relocation model is different.
