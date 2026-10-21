@@ -13,6 +13,11 @@ FBCALL int fb_FileExists
 	)
 {
 	FILE *fp;
+
+	/* Empty BASIC strings may pass a NULL data pointer. In particular, the
+	   Windows path converter requires an actual filename before strlen(). */
+	if( filename == NULL || filename[0] == '\0' )
+		return FB_FALSE;
 	
 	fp = fb_hOpenFile(filename, "r");
 	if (fp) 

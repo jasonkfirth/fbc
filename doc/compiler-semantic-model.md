@@ -3074,6 +3074,29 @@ Absent or unverified locations do not grant an editable keyword range. Readers
 validate namespace/module ownership, statement and source identities,
 ordinal/count closure and matching LOC/MR roles.
 
+## Accepted primitive type layouts
+
+Full models advertise `accepted-primitive-type-layouts`, including macro-compact
+models. Each accepted primitive input has one optional-family companion with
+the same detail identity and namespace owner:
+
+    K symbol namespace-ID primitive-type-layout:detail-ID name%09storage-kind%09storage-bytes%09pointer-depth
+
+`name` is the compiler's canonical type spelling, including accepted qualifiers,
+pointer levels and fixed string length. Storage kinds are `value`, `pointer`,
+`string-descriptor` and `unsized`. Byte widths are canonical unsigned decimal
+strings; unsized types report zero. Pointer depth is a nonnegative integer.
+Readers require one layout per input when this capability is available and
+reject orphan, duplicate or mismatched companions. Older models without the
+capability retain their existing primitive input contract.
+
+The width belongs to the accepted type component, not an enclosing array or an
+ABI argument slot. Pointer widths do not describe pointee storage. STRING and
+USTRING descriptors do not include separately allocated character data. Fixed
+Z/W/STRING types retain their complete accepted width, not just a character's
+width. These public facts avoid requiring editor consumers to decode dtype
+bit fields. They do not change parsing, symbol selection or emitted code.
+
 <!-- end of compiler-semantic-model.md -->
 
 The independent FBCDIA diagnostic transport also advertises `unclosed-procedures`.

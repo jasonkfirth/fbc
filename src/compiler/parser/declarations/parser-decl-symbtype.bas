@@ -1109,7 +1109,7 @@ function cSymbolType _
 		end if
 	end if
 
-	fbSemanticModelPrimitiveType(dtype, semantic_primitive_token, semantic_primitive_site)
+	fbSemanticModelPrimitiveType(dtype, lgt, is_fixlenstr, semantic_primitive_token, semantic_primitive_site)
 	function = TRUE
 
 end function

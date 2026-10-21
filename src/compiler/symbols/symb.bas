@@ -512,6 +512,13 @@ private function hCanDuplicate _
 					continue do
 				end if
 
+				'' THREAD is a keyword only for the THREAD LOCAL storage prefix.
+				if( symbIsKeyword( head_sym ) andalso _
+				    (head_sym->key.id = FB_TK_THREAD) ) then
+					head_sym = head_sym->hash.next
+					continue do
+				end if
+
 				if( env.clopt.lang <> FB_LANG_QB ) then
 					exit function
 				end if

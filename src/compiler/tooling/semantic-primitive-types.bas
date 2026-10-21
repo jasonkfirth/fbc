@@ -30,7 +30,8 @@ sub fbSemanticModelFinishPrimitiveTypes( )
 end sub
 
 sub fbSemanticModelPrimitiveType _
-	( byval dtype as integer, byval token as integer, byref source as LEX_LOCATION )
+	( byval dtype as integer, byval length as longint, byval is_fixlenstr as integer, _
+	  byval token as integer, byref source as LEX_LOCATION )
 
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
@@ -66,7 +67,8 @@ sub fbSemanticModelPrimitiveType _
 	'' modules which share the same canonical global namespace.
 	'' Pointer/const bits and target-sized INTEGER remain compiler selections.
 	'' One ordinal and a separate module count retain empty and nonempty sets.
-	dim as string role = "primitive-type-input:" + fbSemanticModelNumber(fbSemanticModelNextDetailIdentity( ))
+	dim as longint detail = fbSemanticModelNextDetailIdentity( )
+	dim as string role = "primitive-type-input:" + fbSemanticModelNumber(detail)
 	dim as string payload = fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(sourceid) + _
 		TABCHAR + fbSemanticModelNumber(token) + TABCHAR + fbSemanticModelNumber(dtype) + _
 		TABCHAR + fbSemanticModelNumber(accepted_primitive_type_count)
@@ -75,6 +77,29 @@ sub fbSemanticModelPrimitiveType _
 	fbSemanticModelAppendDetail(row)
 	fbSemanticModelExportCoordinates("source-context", sourceid, role, source, source)
 	fbSemanticModelMacroOrigin("symbol", owner, source.macro_identity, role)
+
+	'' Report the accepted type component, not the enclosing variable, array or
+	'' ABI argument slot. A pointer's value width is separate from its pointee;
+	'' dynamic strings likewise report their descriptor, not character storage.
+	dim as integer pointers = typeGetPtrCnt(dtype)
+	dim as string storage_kind = "value"
+	if( pointers > 0 ) then
+		storage_kind = "pointer"
+	elseif( typeIsDynamicString(typeGetDtOnly(dtype)) ) then
+		storage_kind = "string-descriptor"
+	elseif( length <= 0 ) then
+		storage_kind = "unsized"
+	end if
+	dim as longint display_length = length
+	if( pointers > 0 ) then
+		'' The formatter's length describes string elements, not pointer bytes.
+		display_length = symb_dtypeTB(typeGetDtOnly(dtype)).size
+	end if
+	dim as string type_name = symbTypeToStr(dtype, NULL, display_length, is_fixlenstr)
+	dim as string layout = type_name + TABCHAR + storage_kind + TABCHAR + _
+		fbSemanticModelNumber(iif(length > 0, length, 0)) + TABCHAR + fbSemanticModelNumber(pointers)
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+		TABCHAR + "primitive-type-layout:" + fbSemanticModelNumber(detail) + TABCHAR + fbSemanticModelEscape(layout))
 end sub
 
 '' end of tooling/semantic-primitive-types.bas

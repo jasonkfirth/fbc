@@ -90,6 +90,11 @@ function cVariableDecl( byval attrib as FB_SYMBATTRIB ) as integer
 	select case as const tk
 	'' THREAD LOCAL
 	case FB_TK_THREAD
+		'' Outside the modifier form, THREAD is an identifier name.
+		if( lexGetLookAhead( 1 ) <> FB_TK_LOCAL ) then
+			exit select
+		end if
+
 		if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_DECL or FB_CMPSTMT_MASK_CODE ) = FALSE ) then
 			hSkipStmt( )
 			return TRUE
@@ -1836,9 +1841,19 @@ function cVarDecl _
 			dimensions, have_bounds, exprTB() )
 
 		palias = NULL
-		if( (attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) <> 0 ) then
+		if( (attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) <> 0 or _
+		    ((attrib and FB_SYMBATTRIB_SHARED) <> 0 and _
+		     (attrib and FB_SYMBATTRIB_PRIVATE) = 0) ) then
 			'' [ALIAS "id"]
+			'' Shared module data can use a C linker name independent of its
+			'' FreeBASIC identifier, just like a public procedure definition.
 			palias = cAliasAttribute()
+			if( palias <> NULL and _
+			    (attrib and (FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_PRIVATE or _
+			                 FB_SYMBATTRIB_EXTERN)) = _
+			    FB_SYMBATTRIB_SHARED ) then
+				attrib or= FB_SYMBATTRIB_PUBLIC
+			end if
 		end if
 
 		'' Data type

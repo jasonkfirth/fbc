@@ -1,0 +1,19 @@
+# Project: FreeBASIC compiler tests
+# File: shared-alias-data.bmk
+# Purpose: Link a C reader and writer with aliased FreeBASIC shared storage.
+# Responsibilities: Compile the C observer and configure the main test module.
+# This file intentionally does NOT implement either language module.
+
+# TEST_MODE : MULTI_MODULE_OK
+
+ifeq ($(TESTS_TARGET_OS),linux)
+MAIN := shared-alias-data.bas
+EXTRA_OBJS := shared-alias-data-c.o
+
+$(SRCDIR)shared-alias-data-c.o: $(SRCDIR)shared-alias-data.c
+	$(CC) -c -o $@ $<
+else
+MAIN := shared-alias-data-noop.bas
+endif
+
+# end of shared-alias-data.bmk

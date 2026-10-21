@@ -9,7 +9,8 @@
 #include once "lexer/lex.bi"
 
 declare sub fbSemanticModelPrimitiveType _
-	( byval dtype as integer, byval token as integer, byref source as LEX_LOCATION )
+	( byval dtype as integer, byval length as longint, byval is_fixlenstr as integer, _
+	  byval token as integer, byref source as LEX_LOCATION )
 declare sub fbSemanticModelResetPrimitiveTypes( )
 declare sub fbSemanticModelFinishPrimitiveTypes( )
 

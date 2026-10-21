@@ -8,6 +8,8 @@ This file intentionally does NOT infer type uses from value types or names.
 FEATURE = 'accepted-primitive-type-inputs'
 INPUT = 'primitive-type-input:'
 COUNT = 'accepted-primitive-type-count:'
+LAYOUT_FEATURE = 'accepted-primitive-type-layouts'
+LAYOUT = 'primitive-type-layout:'
 LIMIT = 1_000_000
 
 # Native dtype base codes. INTEGER<bits> keeps the accepted explicit width;
@@ -35,6 +37,26 @@ def validate_primitive_types(model, number, subject_modules):
 
     keywords = None
     observed, closures, identities, keys = {}, {}, set(), set()
+    layouts, used_layouts = {}, set()
+    for row in model.records['K']:
+        if not row[3].startswith(LAYOUT):
+            continue
+        module = subject_modules.get((row[1], int(row[2])))
+        key = (row[1], int(row[2]), row[3][len(LAYOUT):])
+        fields = row[4].split('\t')
+        if (model.capabilities.get(module, {}).get(LAYOUT_FEATURE) != 'available'
+                or not available(module) or key in layouts or len(fields) != 4
+                or not fields[0] or len(fields[0]) > 512 or any(char in fields[0] for char in '\r\n\0`\\')
+                or fields[1] not in ('value', 'pointer', 'string-descriptor', 'unsized')
+                or not fields[2].isascii() or not fields[2].isdecimal() or len(fields[2]) > 20
+                or str(int(fields[2])) != fields[2]):
+            raise ValueError('Invalid primitive type layout')
+        depth = decimal(fields[3])
+        if (depth > 15 or (fields[1] == 'pointer') != (depth > 0)
+                or (fields[1] == 'unsized') != (fields[2] == '0')):
+            raise ValueError('Primitive type layout kind or width disagrees')
+        decimal(row[3][len(LAYOUT):], 1)
+        layouts[key] = fields
     locations, origins = set(), set()
     work_left = len(model.rows) * 8 + 8_000_000
     for row in model.records['K']:
@@ -63,6 +85,11 @@ def validate_primitive_types(model, number, subject_modules):
         if detail in identities or len(fields) != 5:
             raise ValueError('Primitive type identity or payload is invalid')
         identities.add(detail)
+        layout_key = ('symbol', identity, str(detail))
+        if model.capabilities.get(module, {}).get(LAYOUT_FEATURE) == 'available':
+            if layout_key not in layouts:
+                raise ValueError('Primitive type observation lacks its layout')
+            used_layouts.add(layout_key)
         statement, source, token, dtype, ordinal = (
             decimal(text, 0 if index == 3 else 1) for index, text in enumerate(fields))
         if (statement not in model.statements or source not in model.source_contexts
@@ -109,6 +136,8 @@ def validate_primitive_types(model, number, subject_modules):
     for module in model.capabilities:
         if available(module) and closures.get(module) != observed.get(module, 0):
             raise ValueError('Primitive type occurrence inventory is incomplete')
+    if layouts.keys() != used_layouts:
+        raise ValueError('Primitive type layout has no observation')
     for location_key in model.physical_locations:
         if location_key[2].startswith(INPUT) and location_key not in locations:
             raise ValueError('Primitive type location has no observation')

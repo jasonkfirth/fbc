@@ -621,3 +621,306 @@ initial report is retained alongside the final report in
 `out/amiga/refactor-fbctests-20261020`.
 
 <!-- end of amiga.md -->
+
+## October 21 corpus audit recovery
+
+The active `out/amiga/corpus-20261015-8E77C4` directory was removed during
+execution. Both its original recording controller and its expanded colour
+diagnostic subsequently exited. The user requested recovery and continuation.
+Historical results above describe completed checks before that removal; many
+of their detailed artifacts are no longer available at the listed paths.
+
+Surviving inputs are preserved outside the build output tree in
+`/home/jkfirth/fbc-audit-recovery-20261021`. Its `salvage.json` records the sizes
+and SHA-256 hashes of the original native recording executable, model and
+texture assets, 25 complete original-resolution frames, an earlier RAM state,
+and the expanded diagnostic executable with all 2,623 coordinates. Only those
+25 recording images were recovered; the earlier set of 226 images has not
+been recovered. The saved original executable has SHA-256
+`400939f4db974d587471883e6e3f0c6e13a5400f653a634dff356a04253c675e`.
+
+Offline inspection identifies the surviving RAM state at frame 22, with the
+main task waiting for rendering workers and runnable workers present. Recovery
+preserves frames 0 through 21 in a private volume. Later salvaged images remain
+separate evidence while the unchanged application recomputes frames 22 onward.
+The recording retains its original 300 frames, 1280 by 800 resolution and
+language-model inference. A restored snapshot alone does not establish native
+completion. That still requires all 300 complete output images and the native
+controller's `DONE 0` and `COMPLETE` records, followed by colour review.
+
+Recovery also located the same 184-target corpus registry and all 184 historical
+GCC artifacts outside the removed audit directory. Their build-result metadata
+survives, but nearly all original build logs are missing. These artifacts alone
+do not establish fresh compilation or native execution.
+
+The maintained fb-ext raster suite was rebuilt from unchanged frozen corpus
+sources through its module and test Make rules. Both GCC and native Amiga
+passed all six tests and 72 assertions, with no failures or errors; the native
+controller recorded return zero and COMPLETE. The checks cover BMP row order,
+palettes, RGB565 masks and top-down alpha; raw and RLE TGA; truncated and invalid
+inputs; and grayscale in 8-, 16- and 32-bit screen contexts. This fresh result
+uses the frozen October 20 compiler and native libraries. It does not qualify
+unrelated current working-tree changes or recreate the larger lost loader
+matrix. Evidence is in `fbext-raster-requalification-v3/qualification.json`
+under the recovery directory.
+
+An unmasked comparison of the 22 preserved native prefix frames against
+completed individual images from the rebuilt GCC control checks 22,528,000
+pixels. There are 168 pixels differing by more than one channel step, including
+eight differing by more than 16. All 168 coordinates exactly match the preserved
+original diagnostic case list for those frames. This restores the prefix
+comparison evidence; it does not establish full recording completion or replace
+numeric review of the differences. Raw RGB values and hashes are retained in
+`recovered-prefix-review/review.json` and its per-frame difference files.
+
+The rebuilt GCC recording subsequently completed all 300 original frames and
+its original inference step, with exit zero. Its source, compiler, libraries,
+assets and frame hashes are preserved in `host-reference`. A separate rebuilt
+GCC diagnostic evaluated all 2,623 preserved coordinates. Twelve independent
+scalar controls match every edge, depth, UV, winner and raw-colour event from
+that diagnostic, including all eight large differences in the recovered prefix.
+
+Fresh native traces show edge or depth selection changes at seven of those
+eight pixels. For the remaining bark pixel, frame 10 at (700, 300), replacing
+only GCC's yaw with the observed native word, one representable Single step
+away, reproduces the native triangle weights, depth, UV, winner and raw RGB
+exactly. The source comparison verifies that this yaw assignment is the only
+change. These are raster explanations for the eight selected prefix pixels;
+they do not prove bloom/overlay equality or completion of all native frames.
+Evidence is in `numeric-scalar-validation/validation.json`,
+`observed-yaw-replay/validation.json` and `prefix-large-colour-review.json` under
+the recovery directory. The larger native diagnostic and original recording
+continue independently.
+
+Eight original corpus CLI programs were subsequently rebuilt and re-executed
+with paired GCC controls: the four fbJson examples (including its regression
+program), ChessbrainFB's UCI exchange, fb-linter help, Kiwi's URL parser, and
+fbeauty's source formatting. All eight returned zero natively and matched the
+complete normalized GCC stdout. Both fbJson archive builds remain separate
+library-build evidence. These repeat existing inventory targets, so they do
+not increase the historical distinct-target total. Frozen sources were checked
+unchanged after execution. Evidence is in `cli-requalification`.
+
+A direct operand audit also reconstructs observed binary32 raster arithmetic.
+The captured GCC trace has 2,588 exact geometry checks and 2,542 eligible exact
+shade checks; the captured native prefix has 464 and 431 respectively, with no
+mismatches. Water paths, fog requiring unlogged direction inputs, sky-only
+pixels and ambiguous clipping fans are explicitly outside individual checks.
+This validates those observed calculations, not full colour parity or the
+unobserved upstream inputs (`raster-operand-review/review.json`).
+
+Historical tool receipts recovered from this conversation independently retain
+the pre-removal cumulative counts: 184 targets, 98 native compilations, 78
+ordinary executions and 20 diagnostic executions, covering 94 distinct targets.
+`historical-native-coverage-v2/latest-summary.json` identifies its original
+call, output and timestamp. These are archived observations, not fresh runs or
+recreated per-target files; missing underlying artifacts remain explicit.
+
+The restored linter executable also completed eight additional paired native
+workflows: version, catalog, rule explanation, file diagnostics, warning exit,
+stdin diagnostics, repair dry-run and repair application. Diagnostic output,
+intended exit codes and resulting fixture bytes match GCC. The version and
+ruleset match; separate compiler build timestamps are validated and retained
+rather than reported as identical. Semantic integration is explicitly disabled
+on both sides for these lexical and repair checks.
+
+A guard rejected the historical fixture as repair coverage because it produced
+only a non-repairable warning. A separate disposable whitespace/final-newline
+fixture then established a nonempty repair plan, an unchanged dry-run file,
+and actual applied fixes. The real corpus sources remain untouched. Evidence
+is in `linter-requalification/results.json` and `completion.json` under the
+recovery directory. These workflows repeat one existing corpus target.
+
+The native static mesh was also recovered read-only from the recording's owned
+RAM snapshot. One validated array descriptor identifies the original 148-byte
+triangle records. Exporting its first 12,992 static triangles with the original
+mesh header produces exactly 1,922,828 bytes and SHA-256
+`a1a8e0c6aaae8abc5d80dbf81216e4872d2c949c399d167d879e692d0cf63daa`,
+matching the previously qualified native export byte for byte. This restores
+lost replay data without rerunning scene generation, changing guest memory or
+feeding cached data to the original recording. Source-state and descriptor
+provenance are in `recovered-native-mesh/recovery.json` under the recovery
+folder.
+
+### Completed recovered numeric colour diagnostic
+
+The expanded native diagnostic completed all 2,623 unique preserved coordinates
+with native DONE 0/COMPLETE. Its closed trace is preserved and hashed. All 2,623
+raw RGB values and winning states (triangle, material, colour and depth, or sky)
+match the separate GCC replay exactly when supplied with the observed native
+static geometry, camera and projection words. No mask or tolerance is applied.
+Before substitution, the replay reproduces all 186,894 ordered baseline raster
+and camera events for the same 2,623 cases. All 125 camera frames in the actual
+pixel trace match the independent native camera diagnostic.
+
+The independent camera diagnostic covers all 300 original camera inputs and
+1,200 projection trig values. A 90-digit comparison using each exact native
+binary32 argument finds 1,160 native results nearest-rounded and 40 one float
+step away. Host C `cosf`/`sinf` at those same arguments produce 1,189 nearest
+results and 11 adjacent results. These measurements cover the observed camera
+argument domain, not arbitrary libm inputs.
+
+The completed native operand audit has 2,584 exact eligible geometry checks and
+2,538 exact eligible shade checks, with no mismatches. Unlogged water/fog inputs
+and sky-only cases remain outside those individual checks. The input replay
+has one dynamic billboard case whose weights/UV are not bit-identical although
+its raw colour, winner and depth are identical; it is retained explicitly.
+Thus these results establish the checked raw raster behaviour, not universal
+intermediate-bit equality or full-frame bloom/overlay parity. Evidence is in
+`completed-colour-diagnostic-audit.json`, `native-input-replay`,
+`raster-operand-review-complete` and
+`camera-trig-requalification/precision-validation.json` under the recovery
+folder.
+
+### Original recording remains in progress
+
+Read-only inspection of the owned RAM snapshots confirms progress within
+original frame 22. Generated SKY_ROWS code reuses its incoming y0 stack slot as
+the current row counter; the instruction at text offset 0x2848 increments it.
+Earlier and later snapshots contain changing normalized ray inputs and later
+row counters. The next inspected checkpoint has moved from DRAW_SKY to RENDER,
+verified against the original executable's call sites. This is real in-frame
+work, not a completed frame or completion of the original 300-frame workload.
+The unchanged recording continues with rotating durable checkpoints. See
+`sky-work-progress.json` for snapshot hashes and bounded stack observations.
+
+The original continuation has since recomputed frame 22, byte-identical to its
+recovered predecessor, bringing its durable map to 23 images including the
+preserved 22-frame prefix. A separate full-length GCC composite replay retains
+all 300 frames and original inference. Its first complete baseline matches all
+300 stock GCC image hashes. The first controlled run was superseded after a
+diagnostic injection-order error: yaw inputs were replaced after `to_camera`
+had consumed them. The corrected v2 replay reruns both complete modes; no
+original corpus source or active native executable is changed.
+
+A save-slot navigation error also wrote an extra snapshot into private slot 9.
+The log records no additional restore and the canonical input outside the UI
+slot directory is unchanged. That extra save was preserved. An independent
+observer now retains four verified checkpoint copies outside the UI filenames;
+transient service-status query failures are treated as unknown state. A separate
+terminal audit checks actual DONE 0 and all 300 original-resolution PPMs before
+reporting completion, including any last file missed by the old collector's
+two-second stability interval. Original native computation continues separately.
+
+The first late-yaw controlled composite run is explicitly marked superseded;
+its unchanged-input baseline remains valid. The corrected v2 applies each yaw
+pair before yaw expressions and each pitch pair before pitch expressions. It
+retains both full 300-frame runs and original inference. Composite observers
+continue independently until actual native completion, rather than stopping
+when the host replay finishes. Service-status read errors now preserve unknown
+state and continue observation instead of being mistaken for job termination.
+
+### Full-length composite replay, corrected and completed
+
+Both corrected v2 GCC modes completed all 300 frames and the original inference
+at frame 205 with exit zero. Independent rehashing verified all 600 output
+images. Every baseline hash equals the original stock GCC recording. The
+inference source is unchanged, and inspection verifies that yaw/pitch words are
+substituted before their respective expressions consume them.
+
+All 25 preserved native composite images were then compared without masks,
+covering 25,600,000 RGB pixels including bloom and overlays. Against stock GCC,
+169 pixels differ by more than one channel value, including eight by more than
+16. Against the corrected native-input replay, none differ by more than one;
+the maximum remaining channel difference is one. These are raw descriptive
+measurements, not a changed tolerance or automatic whole-corpus pass. Native
+images were neither modified nor replaced. The audit is
+`full-frame-input-replay-v2/audit.json`, with per-frame measurements in
+`full-frame-replay-review-v2/review.json` under the recovery directory.
+
+The original native continuation remains separate and active. Its durable map
+has 23 images: 22 preserved checkpoint-prefix images plus the recomputed frame
+22. The latest inspected checkpoint is at frame 23. Completing and comparing
+all 300 original native frames is still required.
+
+### Restored complete image-loader regression matrix
+
+The larger BMP/TGA matrix was also rebuilt against the frozen original
+providers and executed on both GCC and Amiga: 54 valid images with 626,530
+exact RGBA pixels per target, and 105 malformed inputs rejected on each. All
+159 case identities and native DONE 0/COMPLETE were verified. The driver calls
+the real public loaders and exports actual image words using explicit channel
+shifts; it contains no decoder or expected-pixel substitute. All alpha bytes
+are included, with no tolerance or masks. This is null-display decoder
+qualification, not physical palette presentation.
+
+Restoring the initial fixture generator exposed an oracle-version discrepancy:
+eight synthetic 16-bit TGA cases rounded five-bit expansion, while the library's
+legacy conversion and independent Pillow decoder truncate. Only those expected
+bytes were regenerated. Every encoded input and actual decoded output remained
+unchanged; all corrected TGA16 expectations were independently checked against
+Pillow. No compiler, decoder or corpus source change was needed. The result is
+`fbext-raster-matrix/completion.json`; the original expectations and regenerated
+`fbext-raster-matrix-oracles-v2` remain available for comparison.
+
+The original continuation has now also recomputed frame 23, byte-identical to
+its recovered predecessor. Its durable map contains 24 images including the
+22 preserved checkpoint-prefix images. Full native 300-frame completion remains
+pending.
+
+The restored full grayscale matrix also passes on both targets: all 54 decoded
+valid images plus a 15-pixel alpha/colour-key boundary fixture, transformed in
+both keying modes under 8-, 16- and 32-bit null-display contexts. That is 330
+complete output images and 3,759,270 exact RGBA pixels per target. Alpha is
+preserved, colour-key behaviour is checked explicitly, and all native case
+identities and DONE 0/COMPLETE are verified. Expected channels use independent
+binary64 luminance arithmetic over the validated source RGBA oracles. No
+compiler, decoder, grayscale implementation or corpus source change was needed.
+Evidence is in `fbext-grayscale-matrix/completion.json` under the recovery
+folder; this remains image-processing qualification, not physical display
+palette qualification.
+
+Additional recovery indexed 66 exact historical stdout receipts containing 18
+structured project records and 188 project-specific text observations, covering
+118 distinct inventory targets. Records retain original call/output line
+numbers, timestamps and tool exit status. Several failures precede later fixes,
+so these observations must not be flattened into a current pass/fail table.
+The original full 184-target matrix has not been reconstructed from fragments.
+The index is `historical-project-receipts/index.json` under the recovery
+folder, with the exact stdout files alongside it. These receipts add provenance
+without counting new compilations or executions.
+
+The previously unresolved PCEM recipe was also investigated using a fresh
+snapshot of 241 unchanged source inputs. Its normal `build.py` GCC recipe
+passes with the frozen compiler and an explicit include/runtime prefix. The
+recipe's existing `vendor/omaGUI` include path removes the earlier native
+missing-header error. Native BASIC compilation then rejects pointer conversions
+through `ULongInt` on the 32-bit m68k target, while a separate native compile of
+the real network bridge fails at its POSIX `dlfcn.h` dependency. These identify
+a source platform interface gap; they do not demonstrate an FBC regression.
+No corpus or compiler source was changed. The successful GCC build and two
+native preflights do not imply a native execution pass. Commands, source hashes
+and exact diagnostics are in `pcem-recipe-requalification/audit.json` under the
+recovery folder. The earlier private GCC include-path failure is retained
+separately from the successful control.
+
+### Restored native display colour readback
+
+Fresh native display observations also confirm the AGA palette distinction.
+All 256 grayscale inputs match the independently calculated RGB332 component
+levels when read through native `ReadPixel` and `GetRGB32`. A 32-bit source
+gray of `(128,128,128)` becomes colour-map RGB `(146,146,170)`, explaining a
+visible tint despite correct source pixels. No image pixels or conversion
+rules were changed. This observes the emulated native display, not a physical
+monitor's calibration. Evidence is `aga-palette-requalification/completion.json`
+under the recovery folder.
+
+The complete frozen maintained graphics probe passes again at depths 8, 16
+and 32, including 256 mixed-channel samples per depth, live indexed-palette
+updates, page copying, title preservation, cache refresh, queued input and the
+oversized canvas. Both jobs return zero with native DONE 0/COMPLETE and JIT
+disabled. `native-graphics-requalification/completion.json` records the exact
+compiler, library archives, observer and executable hashes. These checks do
+not qualify concurrent root-tree changes or complete the original 300-frame
+native recording.
+
+The continuation has since completed frame 25, its first output beyond the
+25 salvaged images. The actual native file and durable copy both match the
+corrected native-input GCC frame byte for byte across the full 1280x800
+composite. Stock GCC differs at one pixel by up to 72 channel values; complete
+image equality with the controlled replay explains that difference without
+masking pixels. `continuation-r6/first-new-frame-proof.json` retains hashes,
+coordinates and raw channel values. The reviewed native total is now 26 images
+and 26,624,000 RGB pixels, including 22 preserved prefix images and four frames
+recomputed since the checkpoint. The original 300-frame native run remains
+incomplete.

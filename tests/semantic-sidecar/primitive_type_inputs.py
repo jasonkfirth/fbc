@@ -8,7 +8,7 @@ import subprocess
 
 from sidecar import Model, SourceEdit
 from parsed_expression_coverage import write_rows
-from semantic_primitive_types import FEATURE, INPUT, COUNT
+from semantic_primitive_types import FEATURE, INPUT, COUNT, LAYOUT_FEATURE, LAYOUT
 
 
 def check_inputs(test):
@@ -23,6 +23,12 @@ def check_inputs(test):
     test.assertEqual(output.read_bytes(), plain)
     test.assertEqual(model.capabilities[1][FEATURE], 'available')
     test.assertEqual(sum(row[3].startswith(INPUT) for row in model.records['K']), 13)
+    test.assertEqual(model.capabilities[1][LAYOUT_FEATURE], 'available')
+    layouts = [row for row in model.records['K'] if row[3].startswith(LAYOUT)]
+    test.assertEqual(len(layouts), 13)
+    test.assertEqual(layouts[0][4].split('\t'), ['long', 'value', '4', '0'])
+    test.assertTrue(any(row[4].split('\t') == ['const long ptr', 'pointer', model.records['Q'][0][6], '1'] for row in layouts))
+    test.assertTrue(any(row[4].split('\t') == ['string * 8', 'value', '8', '0'] for row in layouts))
     binary = test.working / 'primitive-binary.fbcsem'
     command = [str(test.compiler), '-prefix', str(test.toolchain_prefix), '-i', str(test.root / 'inc'),
                '-gen', 'gcc', '-maxerr', '20', '-r', '-semantic-model', str(binary), *extra, str(source)]
@@ -38,11 +44,12 @@ def check_inputs(test):
             reduced.validate_physical_locations()
             test.assertEqual(reduced.capabilities[1][FEATURE], 'available')
             test.assertEqual(sum(row[3].startswith(INPUT) for row in reduced.records['K']), 13)
+            test.assertEqual(sum(row[3].startswith(LAYOUT) for row in reduced.records['K']), 13)
             test.assertFalse(any(row[4].startswith(INPUT) for row in reduced.records['MR']))
         else:
             reduced = test.compile(source, mode=mode, extra=extra)
             test.assertEqual(reduced.capabilities[1][FEATURE], 'unavailable')
-            test.assertFalse(any(row[3].startswith((INPUT, COUNT)) for row in reduced.records['K']))
+            test.assertFalse(any(row[3].startswith((INPUT, COUNT, LAYOUT)) for row in reduced.records['K']))
         test.assertEqual(output.read_bytes(), plain)
     first = test.source('#lang "fb"\nDim first_value As Long\n', 'primitive-first.bas')
     second = test.source('#lang "fb"\nDim second_value As Double\n', 'primitive-second.bas')
