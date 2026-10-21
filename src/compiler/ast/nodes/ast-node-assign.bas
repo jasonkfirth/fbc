@@ -632,6 +632,14 @@ function astNewASSIGN _
 		exit function
 	end if
 
+	'' An incomplete object can be named and addressed, but its value has no
+	'' known size or layout to copy.
+	if( astTypeIsIncompleteValue( astGetFullType( l ) ) or _
+	    astTypeIsIncompleteValue( astGetFullType( r ) ) ) then
+		errReport( FB_ERRMSG_INCOMPLETETYPE )
+		exit function
+	end if
+
 	if( l->class = AST_NODECLASS_USTRINDEX ) then
 		if( astIsConstant( l->l ) ) then return NULL
 		return astBuildUstrIndexAssign( l, r )
@@ -832,6 +840,17 @@ function astNewASSIGN _
 				end if
 			end if
 		end if
+	end if
+
+	if( ((env.clopt.backend = FB_BACKEND_GAS) or _
+	     (env.clopt.backend = FB_BACKEND_GAS64)) andalso _
+	    typeIsInteger128Scalar( ldfull ) ) then
+		if( (env.clopt.backend = FB_BACKEND_GAS64) andalso _
+		    ((env.target.options and FB_TARGETOPT_GAS64_SYSV_ABI) <> 0) andalso _
+		    astIsCALL( astSkipNoConvCAST( r ) ) ) then
+			return hNewAssignNode( l, r, ldfull, lsubtype, options )
+		end if
+		return astBuildNativeInt128Copy( l, r )
 	end if
 
 	function = hNewAssignNode( l, r, ldfull, lsubtype, options )

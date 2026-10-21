@@ -969,7 +969,8 @@ declare sub hSymbolType _
 		byref subtype as FBSYMBOL ptr, _
 		byref lgt as longint, _
 		byval is_byref as integer = FALSE, _
-		byval is_extends as integer = FALSE _
+		byval is_extends as integer = FALSE, _
+		byval allow_forward as integer = FALSE _
 	)
 
 declare sub hMaybeComplainTypeUsage _

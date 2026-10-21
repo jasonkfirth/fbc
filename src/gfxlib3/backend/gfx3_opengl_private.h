@@ -76,6 +76,12 @@
 #define FB_GFX3_OPENGL_PRIMITIVE_LINE 1u
 #define FB_GFX3_OPENGL_PRIMITIVE_ELLIPSE 2u
 #define FB_GFX3_OPENGL_PRIMITIVE_POINT 3u
+#define FB_GFX3_OPENGL_PRIMITIVE_RECTANGLE 4u
+/*
+	Small rectangles may join the mixed atomic-winner pass. Larger filled
+	rectangles stay in the instanced raster path to avoid atomics per pixel.
+*/
+#define FB_GFX3_OPENGL_PRIMITIVE_RECTANGLE_COVERAGE_LIMIT 4096u
 /*
 	One workgroup owns the exact flood queue, so retain a conservative limit.
 	Lane zero discovers spans in gfxlib2 order while the full workgroup writes
@@ -292,10 +298,10 @@ typedef struct FB_GFX3_OPENGL_ELLIPSE_BATCH_ITEM {
 } FB_GFX3_OPENGL_ELLIPSE_BATCH_ITEM;
 
 /*
-	Opaque points, lines, and ellipses can share one winner image even when
-	their public commands alternate. The order field is the low thirteen-bit
-	winner key, so the final resolve retains exact BASIC submission order across
-	all three shapes.
+	Opaque points, lines, rectangles, and ellipses can share one winner image
+	even when their public commands alternate. The order field is the low
+	thirteen-bit winner key, so the final resolve retains exact BASIC submission
+	order across all four shapes.
 */
 typedef struct FB_GFX3_OPENGL_PRIMITIVE_BATCH_ITEM {
 	int32_t geometry_x1;

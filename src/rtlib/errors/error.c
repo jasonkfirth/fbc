@@ -198,6 +198,7 @@ void *fb_ErrorResume( void )
 	/* don't loop forever */
 	ctx->res_lbl = NULL;
 	ctx->resnxt_lbl = NULL;
+	ctx->err_num = FB_RTERROR_OK;
 
 	return label;
 }
@@ -215,6 +216,7 @@ void *fb_ErrorResumeNext( void )
 	/* don't loop forever */
 	ctx->res_lbl = NULL;
 	ctx->resnxt_lbl = NULL;
+	ctx->err_num = FB_RTERROR_OK;
 
 	return label;
 }

@@ -12,7 +12,7 @@ def validate_for_entry(model, number, subject_modules):
         symbol = model.symbols.get(identity) if domain == "symbol" else None
         scalar = symbol is not None and int(symbol[3]) == 1 and (
             (not int(symbol[5]) and int(symbol[4]) & 0x1ff in
-             (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)) or
+             (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)) or
             (int(symbol[4]) & 0x1ff == 10 and
              int(model.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9))
         module = subject_modules[domain, identity]

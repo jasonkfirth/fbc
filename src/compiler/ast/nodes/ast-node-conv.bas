@@ -531,12 +531,26 @@ function astNewCONV _
 		*perrmsg = FB_ERRMSG_OK
 	end if
 
+	if( astTypeIsIncompleteValue( to_dtype ) or _
+	    ((l <> NULL) andalso _
+	     astTypeIsIncompleteValue( astGetFullType( l ) )) ) then
+		errReport( FB_ERRMSG_INCOMPLETETYPE )
+		if( perrmsg ) then *perrmsg = FB_ERRMSG_INCOMPLETETYPE
+		return NULL
+	end if
+
 	'' same type?
 	if( hCheckSameTypeCONV( to_dtype, to_subtype, l, options, n ) ) then
 		return n
 	end if
 
 	ldtype = astGetFullType( l )
+	if( typeIsInteger128Scalar( to_dtype ) andalso _
+	    typeIsInteger128Scalar( ldtype ) ) then
+		'' Signed and unsigned 128-bit values have the same representation.
+		astSetType( l, to_dtype, to_subtype )
+		return l
+	end if
 
 	if( typeGetDtAndPtrOnly( to_dtype ) = FB_DATATYPE_USTRING ) then
 		return rtlToUstr( l )
@@ -686,15 +700,36 @@ function astNewCONV _
 	'' constant? evaluate at compile-time
 	if( astIsCONST( l ) ) then
 		astCheckConst( to_dtype, l )
+		if( (typeGetSizeType( to_dtype ) <> FB_SIZETYPE_INT128) and _
+		    (typeGetSizeType( to_dtype ) <> FB_SIZETYPE_UINT128) ) then
+			hConstConv( to_dtype, l )
 
-		hConstConv( to_dtype, l )
-
-		l->dtype = to_dtype
-		l->subtype = to_subtype
-		return l
+			l->dtype = to_dtype
+			l->subtype = to_subtype
+			return l
+		end if
 	end if
 
 	doconv = hConvNeedsConversion( ldtype, to_dtype, ldclass )
+
+	if( astUsesInt128Helpers( ) ) then
+		if( (typeIsInteger128Scalar( ldtype ) andalso _
+		     typeIsInteger128Scalar( to_dtype )) = FALSE ) then
+			if( typeIsInteger128Scalar( to_dtype ) ) then
+				if( ldclass = FB_DATACLASS_FPOINT ) then
+					return astBuildNativeInt128FromFloat( l, to_dtype )
+				else
+					return astBuildNativeInt128FromInteger( l, to_dtype )
+				end if
+			elseif( typeIsInteger128Scalar( ldtype ) ) then
+				if( typeGetClass( to_dtype ) = FB_DATACLASS_FPOINT ) then
+					return astBuildNativeInt128ToFloat( l, to_dtype )
+				else
+					return astBuildNativeInt128ToInteger( l, to_dtype )
+				end if
+			end if
+		end if
+	end if
 
 	'' casting another cast?
 	if( l->class = AST_NODECLASS_CONV ) then

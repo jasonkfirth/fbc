@@ -617,7 +617,10 @@ private sub _emitPushArg _
 		end if
 	end if
 
-	if( udtlen = 0 ) then
+	if( typeIsInteger128Scalar( vr->dtype ) ) then
+		'' GAS32 arguments are copied to the stack as four 32-bit words.
+		_emit( AST_OP_PUSHUDT, vr, NULL, NULL, NULL, typeGetSize( vr->dtype ) )
+	elseif( udtlen = 0 ) then
 		_emitStack( AST_OP_PUSH, vr, NULL )
 	else
 		_emit( AST_OP_PUSHUDT, vr, NULL, NULL, NULL, udtlen )
@@ -811,6 +814,10 @@ private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
 	dim realsubtype as FBSYMBOL ptr
 	symbGetRealType( sym, realtype, realsubtype )
 	emitVARINIi( realtype, value )
+end sub
+
+private sub _emitVarIni128( byval sym as FBSYMBOL ptr, byval low as longint, byval high as longint )
+	emitVARINI128( low, high )
 end sub
 
 private sub _emitVarIniF( byval sym as FBSYMBOL ptr, byval value as double )
@@ -2817,6 +2824,7 @@ dim shared as IR_VTBL irtac_vtbl = _
 	@_emitVarIniBegin, _
 	@_emitVarIniEnd, _
 	@_emitVarIniI, _
+	@_emitVarIni128, _
 	@_emitVarIniF, _
 	@_emitVarIniOfs, _
 	@_emitVarIniStr, _

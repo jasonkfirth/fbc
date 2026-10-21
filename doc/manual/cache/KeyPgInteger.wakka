@@ -7,14 +7,18 @@ Standard data type: 32-bit or 64-bit signed, same size as ##[[KeyPgSizeof|SizeOf
 ##
 {{fbdoc item="param"}}
 	##//bits//##
-		A numeric constant expression indicating the size in bits of integer desired.  The values allowed are ##8##, ##16##, ##32## or ##64##.
+		A numeric constant expression indicating the size in bits of integer desired. The values allowed are ##8##, ##16##, ##32##, ##64## or ##128##.
 
 {{fbdoc item="desc"}}
 	**Integer** is the main data type ""FreeBASIC"" uses for integer math and bitwise operations. It is the default type for number literals.
-	
+
 	In the first form Integer is a 32-bit or 64-bit signed whole-number data type, depending on the target platform.
 	
-	If an explicit bit size is given (the second form), a data type is provided that can hold values from ##-1LL [[KeyPgOpShiftLeft|Shl]] (//bits//-1)## up to ##(1LL [[KeyPgOpShiftLeft|Shl]] (//bits//-1)) - 1##. The selected data type is ##[[KeyPgByte|Byte]]## for **Integer<8>**, ##[[KeyPgShort|Short]]## for **Integer<16>**, ##[[KeyPgLong|Long]]## for **Integer<32>** and ##[[KeyPgLongint|LongInt]]## for **Integer<64>**.
+	If an explicit bit size is given (the second form), the data type uses the requested signed integer width. **Integer<128>** holds values from -2^127 through 2^127-1. The selected data type is ##[[KeyPgByte|Byte]]## for **Integer<8>**, ##[[KeyPgShort|Short]]## for **Integer<16>**, ##[[KeyPgLong|Long]]## for **Integer<32>** and ##[[KeyPgLongint|LongInt]]## for **Integer<64>**. **Integer<128>** is a distinct 16-byte scalar type.
+
+	LLVM emits native i128 arithmetic and bitwise operations; ABS and SGN use the two-word runtime helper. GCC and Clang use native `__int128` on targets that support it, with ABS and SGN using that same helper. On 32-bit targets, they use a 16-byte aligned two-word type and lower arithmetic through the runtime. C interop must use that structure layout; a native `__int128` declaration is compatible only when the compiler supports it and uses a matching ABI.
+
+	The native GAS and GAS64 backends lower arithmetic through the runtime library. GAS32 passes 128-bit arguments as 16-byte stack copies and returns values through a hidden result pointer, matching the i386 ABI for the aligned two-word C structure. GAS64 uses the SysV two-register ABI where available and stack arguments when those registers are exhausted. The GAS64 non-SysV path passes the 16-byte value through a caller-owned copy and returns through a hidden result pointer.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/datatype/integer.bas"}}%%(freebasic)

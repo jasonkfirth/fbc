@@ -15,10 +15,10 @@ LIMIT = 1_000_000
 BASES = {
     'ANY': {0}, 'BOOLEAN': {1}, 'BYTE': {2, 3}, 'UBYTE': {3},
     'SHORT': {5, 6}, 'USHORT': {6},
-    'INTEGER': {2, 3, 5, 6, 8, 9, 11, 12, 13, 14},
-    'UINTEGER': {3, 6, 9, 12, 14}, 'LONG': {11, 12}, 'ULONG': {12},
-    'LONGINT': {13, 14}, 'ULONGINT': {14}, 'SINGLE': {15}, 'DOUBLE': {16},
-    'STRING': {17, 18}, 'ZSTRING': {4}, 'WSTRING': {7}, 'USTRING': {26},
+    'INTEGER': {2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16},
+    'UINTEGER': {3, 6, 9, 12, 14, 16}, 'LONG': {11, 12}, 'ULONG': {12},
+    'LONGINT': {13, 14}, 'ULONGINT': {14}, 'SINGLE': {17}, 'DOUBLE': {18},
+    'STRING': {19, 20}, 'ZSTRING': {4}, 'WSTRING': {7}, 'USTRING': {28},
 }
 DTYPE_MASK = 0x1FBFFFF  # Base, pointer, const, ByRef and native C-mangling bits.
 

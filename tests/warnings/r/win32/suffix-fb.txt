@@ -882,9 +882,10 @@ warning expected
 	Suffix ignored in 'rset%'
 ---- parser-quirk-thread.bas ----
 none expected
+suffix-fb.bas(1201) error 4: Duplicated definition, found 'thread' in 'sub thread( )'
 2 warnings expected
 	Suffix ignored in 'threadcall%'
-	Suffix ignored in 'thread%'
+suffix-fb.bas(1204) error 289: Expected sub, found 'thread' in 'dim thrptr as any ptr = threadcall% thread%()'
 ---- parser-quirk-vafirst.bas ----
 warning expected
 	Suffix ignored in 'cva_start%'

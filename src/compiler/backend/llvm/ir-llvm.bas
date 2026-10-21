@@ -262,6 +262,11 @@ declare function hEmitType _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr _
 	) as string
+declare function hInteger128StorageAlignment _
+	( _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr _
+	) as integer
 declare sub hEmitStruct( byval s as FBSYMBOL ptr )
 declare sub _emitDBG _
 	( _
@@ -305,6 +310,8 @@ dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
 	@"i32"      , _ '' ulong
 	@"i64"      , _ '' longint
 	@"i64"      , _ '' ulongint
+	@"i128"     , _ '' integer128
+	@"i128"     , _ '' uinteger128
 	@"float"    , _ '' single
 	@"double"   , _ '' double
 	@"%FBSTRING", _ '' string
@@ -720,6 +727,7 @@ private function hEmitProcHeader _
 	dim as string ln
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
+	dim as integer i386_int128_result = any
 
 	assert( symbIsProc( proc ) )
 
@@ -728,9 +736,17 @@ private function hEmitProcHeader _
 	'' the symbol, which hEmitProcCallConv supplies at the indirect call.
 	if( is_type = FALSE ) then ln += hEmitProcCallConv( proc )
 
-	'' Function result type (is 'void' for subs)
-	ln += hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
-				symbGetProcRealSubtype( proc ) )
+	i386_int128_result = hIsI386Integer128Result( proc )
+
+	'' The i386 C ABI returns aligned 16-byte aggregates through an sret pointer.
+	'' Keep the source scalar type in the body, but expose that target ABI here.
+	if( i386_int128_result ) then
+		ln += "void"
+	else
+		'' Function result type (is 'void' for subs)
+		ln += hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
+					symbGetProcRealSubtype( proc ) )
+	end if
 
 	ln += " "
 
@@ -745,7 +761,21 @@ private function hEmitProcHeader _
 	'' If returning a struct, there's an extra parameter
 	dim as FBSYMBOL ptr hidden = NULL
 	if( symbProcReturnsOnStack( proc ) ) then
-		if( is_proto ) then
+		if( i386_int128_result ) then
+			if( is_proto ) then
+				ln += hEmitType( typeAddrOf( symbGetFullType( proc ) ), NULL )
+			else
+				hidden = proc->proc.ext->res
+				ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), _
+				                symbGetSubtype( hidden ) )
+			end if
+			if( is_type = FALSE ) then
+				ln += " sret(i128) align " + str( LLVM_I386_INT128_ABI_ALIGNMENT )
+			end if
+			if( is_proto = FALSE ) then
+				ln += " " + hEmitParamName( hidden )
+			end if
+		elseif( is_proto ) then
 			hidden = symbGetSubType( proc )
 			ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), hidden )
 		else
@@ -767,12 +797,29 @@ private function hEmitProcHeader _
 			DZstrConcatAssign( params, "..." )
 		else
 			symbGetRealParamDtype( param, dtype, subtype )
+			dim as FBSYMBOL ptr paramvar = NULL
 			if( (symbGetParamMode( param ) = FB_PARAMMODE_BYVAL) andalso _
 			    (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
 				'' C's array typedef decays to a pointer at this boundary.
 				dtype = typeAddrOf( dtype )
 			end if
-			if( hIsMemoryByval( dtype, subtype, symbGetParamMode(param) ) ) then
+			dim as integer split_i386_int128 = _
+				hIsI386Integer128Param( dtype, symbGetParamMode( param ) )
+			if( split_i386_int128 ) then
+				DZstrConcatAssign( params, "i64" )
+				if( is_proto = FALSE ) then
+					paramvar = symbGetParamVar( param )
+					if( paramvar <> NULL ) then
+						DZstrConcatAssign( params, " " + hEmitParamName( paramvar ) + ".low" )
+					end if
+				end if
+				DZstrConcatAssign( params, ", i64" )
+				if( is_proto = FALSE ) then
+					if( paramvar <> NULL ) then
+						DZstrConcatAssign( params, " " + hEmitParamName( paramvar ) + ".high" )
+					end if
+				end if
+			elseif( hIsMemoryByval( dtype, subtype, symbGetParamMode(param) ) ) then
 				DZstrConcatAssign( params, hEmitType( typeAddrOf(dtype), subtype ) )
 				if( is_type = FALSE ) then
 					DZstrConcatAssign( params, hMemoryByvalAttribute( subtype ) )
@@ -781,11 +828,11 @@ private function hEmitProcHeader _
 				DZstrConcatAssign( params, hEmitType( dtype, subtype ) )
 			end if
 
-			if( is_proto = FALSE ) then
+			if( (is_proto = FALSE) andalso (split_i386_int128 = FALSE) ) then
 				'' Proc body? Emit the mangled name of the param var
 				'' (the param itself isn't mangled). NAKED procedures have
 				'' no parameter variables; their assembly reads the ABI registers.
-				var paramvar = symbGetParamVar( param )
+				paramvar = symbGetParamVar( param )
 				if( paramvar <> NULL ) then
 					DZstrConcatAssign( params, " " + hEmitParamName( paramvar ) )
 				end if
@@ -1066,17 +1113,18 @@ private function hGlobalVarLinkage( byval sym as FBSYMBOL ptr, byval has_initial
 	    (symbIsStatic( sym ) andalso _
 	     ((symbGetAttrib( sym ) and _
 	       (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) = 0)) ) then
-		return "private global"
+		return "private"
 	end if
 	if( symbIsCommon( sym ) andalso (has_initializer = FALSE) ) then
-		return "common global"
+		return "common"
 	end if
-	return "global"
+	return ""
 end function
 
 private sub hEmitVariable( byval sym as FBSYMBOL ptr )
 	dim as string ln
 	dim as integer is_global = any, length = any
+	dim as integer storage_alignment = any
 
 	'' literal?
 	if( symbGetIsLiteral( sym ) ) then
@@ -1147,7 +1195,14 @@ private sub hEmitVariable( byval sym as FBSYMBOL ptr )
 		'' An EXTERN is a declaration. Defining it here creates duplicate
 		'' symbols when several modules use the same BASIC or runtime global.
 		if( symbGetIsAccessed( sym ) ) then
-			hWriteLine( hEmitVarName( sym ) + " = external global " + hEmitSymType( sym ) )
+			ln = hEmitVarName( sym ) + " = external"
+			if( symbIsThreadLocal( sym ) ) then ln += " thread_local"
+			ln += " global " + hEmitSymType( sym )
+			storage_alignment = hInteger128StorageAlignment( _
+				symbGetType( sym ), symbGetSubtype( sym ) )
+			if( storage_alignment > 0 ) then _
+				ln += ", align " + str( storage_alignment )
+			hWriteLine( ln )
 		end if
 		exit sub
 	end if
@@ -1164,7 +1219,10 @@ private sub hEmitVariable( byval sym as FBSYMBOL ptr )
 	ln = hEmitVarName( sym )
 	ln += " = "
 	if( is_global ) then
-		ln += hGlobalVarLinkage( sym, FALSE )
+		var linkage = hGlobalVarLinkage( sym, FALSE )
+		if( len(linkage) > 0 ) then ln += linkage + " "
+		if( symbIsThreadLocal( sym ) ) then ln += "thread_local "
+		ln += "global"
 	else
 		ln += "alloca"
 	end if
@@ -1173,7 +1231,11 @@ private sub hEmitVariable( byval sym as FBSYMBOL ptr )
 		'' Globals without initializer are zeroed in FB
 		ln += " zeroinitializer"
 	end if
-	if( symbGetType( sym ) = FB_DATATYPE_WCHAR ) then
+	storage_alignment = hInteger128StorageAlignment( _
+		symbGetType( sym ), symbGetSubtype( sym ) )
+	if( storage_alignment > 0 ) then
+		ln += ", align " + str( storage_alignment )
+	elseif( symbGetType( sym ) = FB_DATATYPE_WCHAR ) then
 		ln += ", align " & typeGetSize( FB_DATATYPE_WCHAR )
 	end if
 	if( is_global or (ctx.inproc = FALSE) ) then
@@ -1234,9 +1296,51 @@ private sub hMaybeEmitProcProto( byval s as FBSYMBOL ptr )
 	ctx.section = oldsection
 end sub
 
-private function hUDTHasExplicitPadding( byval s as FBSYMBOL ptr ) as integer
+private function hUDTHasInteger128Value( byval s as FBSYMBOL ptr ) as integer
+	var fld = symbUdtGetFirstField( s )
+	while( fld )
+		if( symbIsDynamic( fld ) = FALSE ) then
+			var dtype = symbGetType( fld )
+			if( typeIsInteger128Scalar( dtype ) ) then return TRUE
+			if( (typeGetPtrCnt( dtype ) = 0) andalso _
+			    (typeGetDtOnly( dtype ) = FB_DATATYPE_STRUCT) andalso _
+			    (symbGetSubtype( fld ) <> NULL) andalso _
+			    hUDTHasInteger128Value( symbGetSubtype( fld ) ) ) then
+				return TRUE
+			end if
+		end if
+		fld = symbUdtGetNextField( fld )
+	wend
+	return FALSE
+end function
+
+private function hUDTUsesPackedLayout( byval s as FBSYMBOL ptr ) as integer
+	'' Some i386 LLVM targets give i128 less than FreeBASIC's 16-byte alignment.
+	'' Preserve the compiler-computed member offsets instead of relying on that
+	'' target data layout for aggregates that contain 128-bit values.
 	return ((s->udt.align > 0) and (s->udt.align < 8)) or _
+	       (hUsesI386Integer128ABI( ) andalso hUDTHasInteger128Value( s ))
+end function
+
+private function hUDTHasExplicitPadding( byval s as FBSYMBOL ptr ) as integer
+	return hUDTUsesPackedLayout( s ) or _
 		symbGetUDTIsUnion( s ) or symbGetUDTHasAnonUnion( s )
+end function
+
+private function hInteger128StorageAlignment _
+	( _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr _
+	) as integer
+
+	if( typeIsInteger128Scalar( dtype ) ) then return LLVM_INT128_STORAGE_ALIGNMENT
+	if( hUsesI386Integer128ABI( ) andalso _
+	    (typeGetPtrCnt( dtype ) = 0) andalso _
+	    (typeGetDtOnly( dtype ) = FB_DATATYPE_STRUCT) andalso _
+	    (subtype <> NULL) andalso hUDTHasInteger128Value( subtype ) ) then
+		return typeCalcNaturalAlign( dtype, subtype )
+	end if
+	return 0
 end function
 
 private function hUDTAlignmentType( byval s as FBSYMBOL ptr ) as string
@@ -1303,9 +1407,9 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr )
 		ln += "%" + *symbUniqueId( )
 	end if
 
-	'' LLVM's natural struct alignment can exceed a FIELD limit. Use a
-	'' packed layout with explicit gaps so its offsets match FBC's layout.
-	var packed = (s->udt.align > 0) and (s->udt.align < 8)
+	'' LLVM's natural field alignment can differ from the FBC layout, including
+	'' on i386 i128 fields. Use explicit gaps where needed to preserve offsets.
+	var packed = hUDTUsesPackedLayout( s )
 	var has_padding = hUDTHasExplicitPadding( s )
 
 	ln += " = type "
@@ -1587,15 +1691,25 @@ private sub _procAllocArg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr
 	    (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
 		dtype = typeAddrOf( dtype )
 	end if
+	dim as integer split_i386_int128 = _
+		symbIsParamVarByval( sym ) andalso _
+		hIsI386Integer128Param( dtype, FB_PARAMMODE_BYVAL )
 
 	'' %myparam = alloca type
 	ln = hEmitVarName( sym ) + " = alloca "
 	ln += hEmitType( dtype, subtype )
+	var storage_alignment = hInteger128StorageAlignment( dtype, subtype )
+	if( storage_alignment > 0 ) then ln += ", align " + str( storage_alignment )
 	hWriteLine( ln )
 
 	'' store type %myparam$, type* %myparam
 	ln = "store "
-	if( symbIsParamVarByval( sym ) andalso _
+	if( split_i386_int128 ) then
+		dim as string low_name = hEmitParamName( sym ) + ".low"
+		dim as string high_name = hEmitParamName( sym ) + ".high"
+		dim as string incoming = hJoinI386Integer128Words( low_name, high_name )
+		ln += hEmitType( dtype, subtype ) + " " + incoming
+	elseif( symbIsParamVarByval( sym ) andalso _
 	    hIsMemoryByval( dtype, subtype, FB_PARAMMODE_BYVAL ) ) then
 		var incoming = irhlAllocVreg( dtype, subtype )
 		hWriteLine( hVregToStr(incoming) + " = load " + hEmitType(dtype, subtype) + _
@@ -1959,7 +2073,7 @@ private function hEmitInt _
 	select case( dtype )
 	case FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, _
 	     FB_DATATYPE_LONG, FB_DATATYPE_ULONG, _
-	     FB_DATATYPE_ENUM
+	     FB_DATATYPE_ENUM, FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128
 		'' It seems like llc doesn't care whether we emit -1 or
 		'' 4294967295, it's the bit pattern that matters.
 		s = str( value )
@@ -2863,14 +2977,21 @@ private sub hDoCall _
 	dim as IRCALLARG ptr arg = any, prev = any
 	dim as IRVREG ptr varg = any, v0 = any
 	dim as DZSTRING args
+	dim as integer i386_int128_result = any
 	DZstrZero( args )
 
 	assert( symbIsProc( proc ) )
+	i386_int128_result = hIsI386Integer128Result( proc )
+	if( i386_int128_result ) then
+		'' The caller-owned slot is the LLVM result for this target ABI.
+		vr = NULL
+	end if
 
 	if( vr = NULL ) then
 		'' Result discarded? Not allowed in LLVM, so assign to a
 		'' temporary result vreg that will be unused.
-		if( symbGetType( proc ) <> FB_DATATYPE_VOID ) then
+		if( (symbGetType( proc ) <> FB_DATATYPE_VOID) andalso _
+		    (i386_int128_result = FALSE) ) then
 			vr = irhlAllocVreg( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
 						symbGetProcRealSubtype( proc ) )
 		end if
@@ -2903,17 +3024,31 @@ private sub hDoCall _
 		prev = listGetPrev( arg )
 
 		varg = hLoadCallArg( arg )
-		DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
-		if( arg->param andalso (symbGetParamMode(arg->param) <> FB_PARAMMODE_VARARG) ) then
+		if( arg->param = NULL andalso i386_int128_result ) then
+			DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
+			DZstrConcatAssign( args, " sret(i128) align " + _
+			                         str( LLVM_I386_INT128_ABI_ALIGNMENT ) )
+			DZstrConcatAssign( args, " " + hVregToStr( varg ) )
+		elseif( arg->param andalso _
+		        (symbGetParamMode(arg->param) <> FB_PARAMMODE_VARARG) ) then
 			dim dtype as integer, subtype as FBSYMBOL ptr
 			symbGetRealParamDtype( arg->param, dtype, subtype )
-			if( hIsMemoryByval( dtype, subtype, symbGetParamMode(arg->param) ) ) then
+			if( hIsI386Integer128Param( dtype, symbGetParamMode(arg->param) ) ) then
+				dim as string low_name, high_name
+				hSplitI386Integer128( varg, low_name, high_name )
+				DZstrConcatAssign( args, "i64 " + low_name + ", i64 " + high_name )
+			elseif( hIsMemoryByval( dtype, subtype, symbGetParamMode(arg->param) ) ) then
+				DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
 				DZstrConcatAssign( args, hMemoryByvalAttribute( subtype ) )
+				DZstrConcatAssign( args, " " + hVregToStr( varg ) )
+			else
+				DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
+				DZstrConcatAssign( args, " " + hVregToStr( varg ) )
 			end if
+		else
+			DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
+			DZstrConcatAssign( args, " " + hVregToStr( varg ) )
 		end if
-
-		DZstrConcatAssign( args, " " )
-		DZstrConcatAssign( args, hVregToStr( varg ) )
 
 		listDelNode( @irhl.callargs, arg )
 
@@ -3152,7 +3287,11 @@ end sub
 
 private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )
 	ctx.varini = *symbGetMangledName( sym )
-	ctx.varini += " = " + hGlobalVarLinkage( sym, TRUE ) + " "
+	ctx.varini += " = "
+	var linkage = hGlobalVarLinkage( sym, TRUE )
+	if( len(linkage) > 0 ) then ctx.varini += linkage + " "
+	if( symbIsThreadLocal( sym ) ) then ctx.varini += "thread_local "
+	ctx.varini += "global "
 	ctx.varini += hEmitSymType( sym )
 	ctx.varini += " "
 	ctx.variniscopelevel = 0
@@ -3160,6 +3299,10 @@ private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )
 end sub
 
 private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
+	var storage_alignment = hInteger128StorageAlignment( _
+		symbGetType( sym ), symbGetSubtype( sym ) )
+	if( storage_alignment > 0 ) then _
+		ctx.varini += ", align " + str( storage_alignment )
 	hWriteLine( ctx.varini )
 	ctx.varini = ""
 end sub
@@ -3236,6 +3379,49 @@ private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
 		ctx.varini += hEmitInt( dtype, sym->subtype, value )
 	end if
 
+	hVarIniSeparator( )
+end sub
+
+private function hEmitInt128Decimal _
+	( _
+		byval low as ulongint, _
+		byval high as ulongint _
+	) as string
+	dim as ulong chunks(0 to 3)
+	chunks(0) = culng( low )
+	chunks(1) = culng( low shr 32 )
+	chunks(2) = culng( high )
+	chunks(3) = culng( high shr 32 )
+
+	dim as string result = ""
+	do
+		dim as ulongint remainder_value = 0
+		for i as integer = 3 to 0 step -1
+			dim as ulongint current = (remainder_value shl 32) or chunks(i)
+			chunks(i) = culng( current \ 10 )
+			remainder_value = current mod 10
+		next i
+
+		result = chr( cint(remainder_value) + asc("0") ) + result
+		if( (chunks(0) or chunks(1) or chunks(2) or chunks(3)) = 0 ) then exit do
+	loop
+
+	function = result
+end function
+
+private sub _emitVarIni128( byval sym as FBSYMBOL ptr, byval low as longint, byval high as longint )
+	hVarIniElementType( sym )
+	dim as ulongint source_low = culngint( low )
+	dim as ulongint source_high = culngint( high )
+	dim as ulongint magnitude_low = source_low
+	dim as ulongint magnitude_high = source_high
+	dim as integer is_negative = typeIsSigned( symbGetType( sym ) ) andalso (high < 0)
+	if( is_negative ) then
+		magnitude_low = 0ull - source_low
+		magnitude_high = 0ull - source_high - iif( source_low <> 0, 1ull, 0ull )
+		ctx.varini += "-"
+	end if
+	ctx.varini += hEmitInt128Decimal( magnitude_low, magnitude_high )
 	hVarIniSeparator( )
 end sub
 
@@ -3449,7 +3635,7 @@ private sub _emitVarIniScopeBegin( byval sym as FBSYMBOL ptr, byval is_array as 
 		'' A packed LLVM struct requires a packed initializer too.
 		if( sym andalso sym->subtype andalso symbIsStruct( sym->subtype ) ) then
 			ctx.variniscopes(ctx.variniscopelevel).is_packed = _
-				(sym->subtype->udt.align > 0) and (sym->subtype->udt.align < 8)
+				hUDTUsesPackedLayout( sym->subtype )
 			ctx.variniscopes(ctx.variniscopelevel).has_padding = _
 				hUDTHasExplicitPadding( sym->subtype )
 		end if
@@ -3632,6 +3818,8 @@ private sub _emitProcEnd _
 	'' for the basic block that follows the assembly in the IR.
 	if( proc->pattrib and FB_PROCATTRIB_NAKED ) then
 		hWriteLine( "unreachable" )
+	elseif( hIsI386Integer128Result( proc ) ) then
+		hWriteLine( "ret void" )
 	'' Sub? Add ret manually, the AST doesn't do a LOAD[RES] for this
 	elseif( symbGetType( proc ) = FB_DATATYPE_VOID ) then
 		hWriteLine( "ret void" )
@@ -3724,6 +3912,7 @@ static as IR_VTBL irllvm_vtbl = _
 	@_emitVarIniBegin, _
 	@_emitVarIniEnd, _
 	@_emitVarIniI, _
+	@_emitVarIni128, _
 	@_emitVarIniF, _
 	@_emitVarIniOfs, _
 	@_emitVarIniStr, _

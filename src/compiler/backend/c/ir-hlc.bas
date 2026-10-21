@@ -212,6 +212,10 @@ enum
 	BUILTIN_D2L           = (1 shl 4)
 	BUILTIN_D2UL          = (1 shl 5)
 	BUILTIN_STATICASSERT  = (1 shl 6)
+	BUILTIN_F2I128        = (1 shl 7)
+	BUILTIN_F2U128        = (1 shl 8)
+	BUILTIN_D2I128        = (1 shl 9)
+	BUILTIN_D2U128        = (1 shl 10)
 end enum
 
 type IRHLCCTX
@@ -281,6 +285,8 @@ dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
 	@"uint32"   , _ '' ulong
 	@"int64"    , _ '' longint
 	@"uint64"   , _ '' ulongint
+	@"__int128" , _ '' integer128
+	@"unsigned __int128", _ '' uinteger128
 	@"float"    , _ '' single
 	@"double"   , _ '' double
 	@"FBSTRING" , _ '' string
@@ -1369,14 +1375,23 @@ private sub hEmitVarDecl _
 	elseif( symbIsStatic( sym ) and ((symbGetAttrib( sym ) and (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) = 0) ) then
 		ln += "static "
 	end if
+	if( symbIsThreadLocal( sym ) ) then ln += "__thread "
 
 	dim dtype as integer
 	dim subtype as FBSYMBOL ptr
 	symbGetRealType( sym, dtype, subtype )
 
-	'' C permits the pointee of a local pointer to remain const even though
-	'' top-level const on the BASIC variable itself is not emitted here.
-	ln += hEmitType( typeUnsetIsConst( dtype ), sym->subtype, TRUE )
+	if( use_extern and (typeGetPtrCnt(dtype) = 0) and _
+	    (typeGet(dtype) = FB_DATATYPE_FWDREF) ) then
+		'' C allows an extern object declaration with an incomplete type.
+		'' The C backend only needs a concrete spelling to form its address;
+		'' accesses that require the missing layout are rejected by the parser.
+		ln += "char"
+	else
+		'' C permits the pointee of a local pointer to remain const even though
+		'' top-level const on the BASIC variable itself is not emitted here.
+		ln += hEmitType( typeUnsetIsConst( dtype ), sym->subtype, TRUE )
+	end if
 	ln += " " + *symbGetMangledName( sym )
 	ln += hEmitArrayDecl( sym )
 
@@ -2041,6 +2056,11 @@ private function _emitBegin( ) as integer
 	hWriteLine( "typedef unsigned int       uint32;", TRUE )
 	hWriteLine( "typedef   signed long long  int64;", TRUE )
 	hWriteLine( "typedef unsigned long long uint64;", TRUE )
+	if( fbGetBits( ) = 32 ) then
+		'' Use the shared two-word runtime representation instead of relying on
+		'' native __int128 support. Its alignment also defines the by-value ABI.
+		hWriteLine( "typedef struct __attribute__((aligned(16))) { uint64 low; uint64 high; } FB_INT128;", TRUE )
+	end if
 	if( fbIs64bit( ) ) then
 		hWriteLine( "typedef struct { char *data; int64 len; int64 size; } FBSTRING;", TRUE )
 	else
@@ -2077,6 +2097,10 @@ private sub _emitEnd( )
 	if( ctx.usedbuiltins and BUILTIN_D2I  ) then hWriteF2I( "D2I" , FB_DATATYPE_LONG    , FB_DATATYPE_DOUBLE )
 	if( ctx.usedbuiltins and BUILTIN_D2L  ) then hWriteF2I( "D2L" , FB_DATATYPE_LONGINT , FB_DATATYPE_DOUBLE )
 	if( ctx.usedbuiltins and BUILTIN_D2UL ) then hWriteF2I( "D2UL", FB_DATATYPE_ULONGINT, FB_DATATYPE_DOUBLE )
+	if( ctx.usedbuiltins and BUILTIN_F2I128 ) then hWriteF2I( "F2I128", FB_DATATYPE_INTEGER128, FB_DATATYPE_SINGLE )
+	if( ctx.usedbuiltins and BUILTIN_F2U128 ) then hWriteF2I( "F2U128", FB_DATATYPE_UINTEGER128, FB_DATATYPE_SINGLE )
+	if( ctx.usedbuiltins and BUILTIN_D2I128 ) then hWriteF2I( "D2I128", FB_DATATYPE_INTEGER128, FB_DATATYPE_DOUBLE )
+	if( ctx.usedbuiltins and BUILTIN_D2U128 ) then hWriteF2I( "D2U128", FB_DATATYPE_UINTEGER128, FB_DATATYPE_DOUBLE )
 
 	'' Append global declarations to the header of the toplevel section.
 	'' This must be done during _emitEnd() instead of _emitBegin() because
@@ -2313,6 +2337,13 @@ private function hEmitType _
 	ptrcount = typeGetPtrCnt( dtype )
 
 	select case as const( typeGetDtOnly( dtype ) )
+	case FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128
+		if( fbGetBits( ) = 32 ) then
+			s = "FB_INT128"
+		else
+			s = *dtypeName(typeGetDtOnly( dtype ))
+		end if
+
 	case FB_DATATYPE_STRUCT, FB_DATATYPE_ENUM
 		if( subtype ) then
 			hEmitUDT( subtype, (ptrcount > 0) )
@@ -2827,7 +2858,7 @@ private function hEmitInt _
 		'' literal, and 2147483648 is too big to fit into a signed int,
 		'' so according to C99 it is an unsigned int. We must add a cast
 		'' to make it signed.
-		if( typeGetSize( dtype ) = 8 ) then
+		if( (typeGetSize( dtype ) = 8) or typeIsInteger128Scalar( dtype ) ) then
 			if( value = -9223372036854775808ull ) then
 				s = "(int64)" + s + "u"
 			end if
@@ -2838,7 +2869,7 @@ private function hEmitInt _
 			end if
 		end if
 	else
-		if( typeGetSize( dtype ) = 8 ) then
+		if( (typeGetSize( dtype ) = 8) or typeIsInteger128Scalar( dtype ) ) then
 			s = str( culngint( value ) ) + "ull"
 		else
 			s = str( culng( value ) ) + "u"
@@ -4266,6 +4297,20 @@ private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 				s = "fb_D2L" : ctx.usedbuiltins or= BUILTIN_D2L
 			end if
 			tempdtype = FB_DATATYPE_LONGINT
+		case FB_SIZETYPE_INT128
+			if( r->dtype = FB_DATATYPE_SINGLE ) then
+				s = "fb_F2I128" : ctx.usedbuiltins or= BUILTIN_F2I128
+			else
+				s = "fb_D2I128" : ctx.usedbuiltins or= BUILTIN_D2I128
+			end if
+			tempdtype = FB_DATATYPE_INTEGER128
+		case FB_SIZETYPE_UINT128
+			if( r->dtype = FB_DATATYPE_SINGLE ) then
+				s = "fb_F2U128" : ctx.usedbuiltins or= BUILTIN_F2U128
+			else
+				s = "fb_D2U128" : ctx.usedbuiltins or= BUILTIN_D2U128
+			end if
+			tempdtype = FB_DATATYPE_UINTEGER128
 		case else
 			if( r->dtype = FB_DATATYPE_SINGLE ) then
 				s = "fb_F2UL" : ctx.usedbuiltins or= BUILTIN_F2UL
@@ -5029,6 +5074,26 @@ private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
 	hVarIniSeparator( )
 end sub
 
+private function hEmitInt128Word( byval value as longint ) as string
+	var result = hex( culngint( value ) )
+	if( len( result ) < 16 ) then result = string( 16 - len( result ), "0" ) + result
+	function = result
+end function
+
+private sub _emitVarIni128( byval sym as FBSYMBOL ptr, byval low as longint, byval high as longint )
+	dim as string value
+	if( fbGetBits( ) = 32 ) then
+		value = "((FB_INT128){ 0x" + hEmitInt128Word( low ) + _
+			"ull, 0x" + hEmitInt128Word( high ) + "ull })"
+	else
+		value = "((unsigned __int128)0x" + hEmitInt128Word( high ) + _
+			"ull << 64) | (unsigned __int128)0x" + hEmitInt128Word( low ) + "ull"
+		if( typeIsSigned( symbGetType( sym ) ) ) then value = "((__int128)(" + value + "))"
+	end if
+	hVarIniSeparator( )
+	ctx.varini += value
+end sub
+
 private sub _emitVarIniF( byval sym as FBSYMBOL ptr, byval value as double )
 	var dtype = symbGetType( sym )
 	var l = exprNewIMMf( value, dtype )
@@ -5420,6 +5485,7 @@ dim shared as IR_VTBL irhlc_vtbl = _
 	@_emitVarIniBegin, _
 	@_emitVarIniEnd, _
 	@_emitVarIniI, _
+	@_emitVarIni128, _
 	@_emitVarIniF, _
 	@_emitVarIniOfs, _
 	@_emitVarIniStr, _

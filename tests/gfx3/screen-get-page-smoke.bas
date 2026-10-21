@@ -13,18 +13,19 @@
 ''
 ''     - draw a transparent CPU image onto work page one
 ''     - copy work page one to the visible page
-''     - capture work page one into an IMAGECREATE allocation
+''     - capture a page with GET and a region with Gfx3ScreenCapture
+''     - preserve authoritative SCREENLOCK shadow writes through both paths
 ''     - restore the captured image with PUT PSET and verify its pixels
 ''
 '' This file intentionally does NOT contain:
 ''
 ''     - timing thresholds
-''     - partial GET clipping tests
 ''     - image file decoding
 ''
 
 #define __FB_GFXLIB3__
 #include once "fbgfx.bi"
+#include once "fbgfx3.bi"
 
 #ifdef GFX3_VULKAN_TEST
 	const backend_flags = fb.GFX_VULKAN
@@ -71,26 +72,46 @@ line ( 0, 0 )-( 63, 47 ), background_color, bf
 dim source_image as any ptr = imagecreate( 64, 40, transparent_color, _
 	screen_depth )
 dim captured_image as any ptr = imagecreate( 64, 48 )
-if source_image = 0 orelse captured_image = 0 then end 2
+dim partial_image as any ptr = imagecreate( 12, 12, 0, screen_depth )
+if source_image = 0 orelse captured_image = 0 orelse _
+	partial_image = 0 then end 2
 
 line source_image, ( 9, 7 )-( 18, 16 ), marker_color, bf
 put ( 0, 0 ), source_image, trans
 screencopy 1, 0
 
+'' The first small screen capture exercises a GPU-to-CPU regional download.
+if fb.Gfx3ScreenCapture( partial_image, 8, 6, 12, 12 ) <> 0 then end 16
+if culng( point( 2, 2, partial_image ) ) <> _
+	screen_color( marker_color ) then end 9
+if culng( point( 0, 0, partial_image ) ) <> _
+	screen_color( background_color ) then end 10
+if culng( point( 11, 11, partial_image ) ) <> _
+	screen_color( background_color ) then end 11
+
+'' A valid CPU shadow remains authoritative while SCREENLOCK is active.
+screenlock
+pset ( 30, 20 ), marker_color
+if fb.Gfx3ScreenCapture( partial_image, 25, 15, 12, 12 ) <> 0 then end 17
+screenunlock
+if culng( point( 5, 5, partial_image ) ) <> _
+	screen_color( marker_color ) then end 12
+
 get ( 0, 0 )-( 63, 47 ), captured_image
 if culng( point( 10, 8, captured_image ) ) <> _
 	screen_color( marker_color ) then end 3
 if culng( point( 30, 20, captured_image ) ) <> _
-	screen_color( background_color ) then end 4
+	screen_color( marker_color ) then end 13
 if culng( point( 30, 44, captured_image ) ) <> _
 	screen_color( background_color ) then end 5
 
 line ( 0, 0 )-( 63, 47 ), rgb( 0, 0, 0 ), bf
 put ( 0, 0 ), captured_image, pset
 if culng( point( 10, 8 ) ) <> screen_color( marker_color ) then end 6
-if culng( point( 30, 20 ) ) <> screen_color( background_color ) then end 7
+if culng( point( 30, 20 ) ) <> screen_color( marker_color ) then end 14
 if culng( point( 30, 44 ) ) <> screen_color( background_color ) then end 8
 
+imagedestroy partial_image
 imagedestroy captured_image
 imagedestroy source_image
 screen 0

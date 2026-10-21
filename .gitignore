@@ -99,6 +99,7 @@
 /tests/**/*.a
 /tests/**/*.lib
 /tests/log-tests-*.lst
+/tests/failed-log-tests-*.inc
 # Direct emission of the semantic binding fixture is generated test output.
 /tests/semantic-sidecar/bindings.c
 /tests/sfx/render-polyphony

@@ -178,6 +178,12 @@ function cDeclaration _
 	case FB_TK_DIM, FB_TK_REDIM, FB_TK_COMMON, FB_TK_EXTERN, FB_TK_VAR
 		function = cVariableDecl( attrib )
 
+	case FB_TK_THREAD
+		'' THREAD is only a declaration prefix when followed by LOCAL.
+		if( lexGetLookAhead( 1 ) = FB_TK_LOCAL ) then
+			function = cVariableDecl( attrib )
+		end if
+
 	case else
 		if( attrib <> FB_SYMBATTRIB_NONE ) then
 			errReport( FB_ERRMSG_SYNTAXERROR )

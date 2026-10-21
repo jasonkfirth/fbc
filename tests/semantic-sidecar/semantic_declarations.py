@@ -82,7 +82,7 @@ def validate_declaration_types(model, number, subject_modules, procedure_headers
             raise ValueError('Invalid variable declaration type')
         if initializer == '3':
             dtype = int(symbol[4])
-            if declared in array_symbols or not dtype & 0x1e0 and not 1 <= dtype & 31 <= 16:
+            if declared in array_symbols or not dtype & 0x1e0 and not 1 <= dtype & 31 <= 18:
                 raise ValueError('Simple initializer does not target a numeric scalar')
         observed[identity].add(ordinal)
     for identity, (owner, module, count) in endings.items():

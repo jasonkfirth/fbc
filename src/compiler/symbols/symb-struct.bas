@@ -185,7 +185,7 @@ function typeCalcNaturalAlign _
 		end if
 	end if
 
-	assert( (align >= 1) and (align <= 8) )
+	assert( (align >= 1) and (align <= 16) )
 
 	function = align
 end function

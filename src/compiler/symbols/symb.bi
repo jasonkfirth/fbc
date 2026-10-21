@@ -42,6 +42,8 @@ end enum
 '' - symb-mangling.bas::typecodeTB() array
 '' - symb-data.bas::symb_dtypeTB() array
 '' - emit_x86.bas::dtypeTB() array
+'' - gas64/ir-gas64.bas::remapTB() array
+'' - inc/fbc-int/symbol.bi::FB_DATATYPE mirror
 
 enum FB_DATATYPE
 	FB_DATATYPE_VOID
@@ -59,6 +61,8 @@ enum FB_DATATYPE
 	FB_DATATYPE_ULONG
 	FB_DATATYPE_LONGINT
 	FB_DATATYPE_ULONGINT
+	FB_DATATYPE_INTEGER128
+	FB_DATATYPE_UINTEGER128
 	FB_DATATYPE_SINGLE
 	FB_DATATYPE_DOUBLE
 	FB_DATATYPE_STRING
@@ -116,6 +120,8 @@ enum
 	FB_SIZETYPE_UINT32
 	FB_SIZETYPE_INT64
 	FB_SIZETYPE_UINT64
+	FB_SIZETYPE_INT128
+	FB_SIZETYPE_UINT128
 	FB_SIZETYPE_FLOAT32
 	FB_SIZETYPE_FLOAT64
 end enum
@@ -212,6 +218,8 @@ enum FB_SYMBATTRIB
 	FB_SYMBATTRIB_VIS_PROTECTED    = &h00400000  '' UDT members only
 	FB_SYMBATTRIB_INTERNAL         = &h00800000  '' default UDT members / vtable / rtti - affects name mangling
 	FB_SYMBATTRIB_ANONYMOUS        = &h01000000  '' anonymous / unnamed id
+	FB_SYMBATTRIB_THREADLOCAL      = &h02000000  '' VARs: one instance per thread
+	FB_SYMBATTRIB_THREADLOCALC     = &h04000000  '' VARs: external C TLS declaration
 end enum
 
 '' proc symbol attributes mask
@@ -2607,6 +2615,8 @@ declare sub symbProcRecalcRealType( byval proc as FBSYMBOL ptr )
 #define symbIsShared(s) (((s)->attrib and FB_SYMBATTRIB_SHARED) <> 0)
 
 #define symbIsStatic(s) (((s)->attrib and FB_SYMBATTRIB_STATIC) <> 0)
+#define symbIsThreadLocal(s) (((s)->attrib and FB_SYMBATTRIB_THREADLOCAL) <> 0)
+#define symbIsThreadLocalC(s) (((s)->attrib and FB_SYMBATTRIB_THREADLOCALC) <> 0)
 
 #define symbIsDynamic(s) (((s)->attrib and FB_SYMBATTRIB_DYNAMIC) <> 0)
 
@@ -2746,6 +2756,10 @@ declare sub symbProcRecalcRealType( byval proc as FBSYMBOL ptr )
 	(dt and FB_DT_MANGLEMASK))
 
 #define typeIsPtr( dt ) ((((dt) and FB_DT_PTRMASK) <> 0))
+#define typeIsInteger128Scalar( dt ) _
+	((typeIsPtr( dt ) = FALSE) and _
+	 ((typeGetDtOnly( dt ) = FB_DATATYPE_INTEGER128) or _
+	  (typeGetDtOnly( dt ) = FB_DATATYPE_UINTEGER128)))
 #define typeGetPtrCnt( dt ) (((dt) and FB_DT_PTRMASK) shr FB_DT_PTRPOS)
 
 #define typeIsConstAt( dt, at ) (((dt) and (1 shl (FB_DT_CONSTPOS + (at)))) <> 0)

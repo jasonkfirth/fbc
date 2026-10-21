@@ -1,5 +1,5 @@
 {{fbdoc item="title" value="UNLOCK"}}----
-Removes a previous access restriction (lock) on a file
+Releases a file range lock
 
 {{fbdoc item="syntax"}}##
 	**Unlock** #//filenum//, //record//
@@ -16,18 +16,15 @@ Removes a previous access restriction (lock) on a file
 		The last byte position (##[[KeyPgBinary|Binary]]## files) in a range to unlock.
 
 {{fbdoc item="desc"}}
-	##**Unlock**## removes the temporary access restriction set by ##[[KeyPgLock|Lock]]##.
+	##**Unlock**## releases the byte or record range locked by ##[[KeyPgLock|Lock]]##. The first and final positions are inclusive.
 	
-	It is strongly recommended to use the same arguments used in the previous ##[[KeyPgLock|Lock]]##.
-	
-	**Note: This command does not always work, neither as documented nor as expected. It appears to be broken at the moment.**
+	Use the same arguments as the matching ##[[KeyPgLock|Lock]]##. On Unix-like systems, file locks are advisory. Native unlock failures set a file I/O error, and targets without native byte-range locking report the operation as unsupported.
 
 {{fbdoc item="ex"}}
 		 For an example see ##[[KeyPgLock|Lock]]##.
 
 {{fbdoc item="diff"}}
-	- Currently, FB cannot implicitly unlock the entire file
-	- In ##[[KeyPgRandom|Random]]## mode, FB cannot unlock a range of records
+	- A single position or explicit range is required; the entire file cannot be unlocked implicitly
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgLock|Lock]]##

@@ -904,12 +904,14 @@ end sub
 '' Return FB_DATATYPE_INTEGER, or the given dtype if it's a bigger integer-class dtype
 private function hGetIntegerOrBigger( byval dtype as integer ) as integer
 	select case( dtype )
-	case FB_DATATYPE_UINT, FB_DATATYPE_ULONGINT  '' these are always > integer
+	case FB_DATATYPE_UINT, FB_DATATYPE_ULONGINT, FB_DATATYPE_UINTEGER128  '' these are always > integer
 		return dtype
 	case FB_DATATYPE_LONGINT '' this is only > integer on 32bit
 		if( fbIs64bit( ) = FALSE ) then
 			return dtype
 		end if
+	case FB_DATATYPE_INTEGER128
+		return dtype
 	end select
 	return FB_DATATYPE_INTEGER
 end function
@@ -1708,6 +1710,14 @@ private function hNewBOP _
 
 	function = NULL
 
+	'' Binary operators need a complete value representation. Pointer values
+	'' to incomplete types remain valid and are handled by the pointer rules.
+	if( astTypeIsIncompleteValue( astGetFullType( l ) ) or _
+	    astTypeIsIncompleteValue( astGetFullType( r ) ) ) then
+		errReport( FB_ERRMSG_INCOMPLETETYPE )
+		exit function
+	end if
+
 	'' check op overloading
 	hDoGlobOpOverload( op, l, r )
 
@@ -1883,6 +1893,11 @@ private function hNewBOP _
 	fbSemanticModelSelectedNumericOperands(semantic_operands, l, r, ldtype, rdtype)
 	fbSemanticModelSelectedCaseOperands(case_operands, l, r, ldtype, rdtype, "scalar")
 	hPostCheckBop( op, r, ldtype, rdtype, rdclass, dtype, subtype )
+
+	if( astUsesInt128Helpers( ) andalso _
+	    (typeIsInteger128Scalar( ldtype ) or typeIsInteger128Scalar( rdtype )) ) then
+		return astBuildNativeInt128Bop( op, l, r, dtype, ldtype, ex, options )
+	end if
 
 	'' constant folding (won't handle commutation, ie: "1+a+2+3" will become "1+a+5", not "a+6")
 	''

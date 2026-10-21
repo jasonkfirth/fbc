@@ -22,13 +22,15 @@
 #include once "core/fbint.bi"
 #include once "ast/ast.bi"
 #include once "backend/ir.bi"
+#include once "runtime/rtl.bi"
 
 function astNewVAR _
 	( _
 		byval sym as FBSYMBOL ptr, _
 		byval ofs as longint, _
 		byval dtype as integer, _
-		byval subtype as FBSYMBOL ptr _
+		byval subtype as FBSYMBOL ptr, _
+		byval no_thread_local as integer _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr n = any
@@ -56,6 +58,47 @@ function astNewVAR _
 				dtype = typeAddrOf( dtype )
 			end if
 		end select
+	end if
+
+	if( sym andalso symbIsThreadLocal( sym ) andalso (no_thread_local = FALSE) andalso _
+	    ((env.clopt.backend = FB_BACKEND_GAS) or _
+	     (env.clopt.backend = FB_BACKEND_GAS64)) andalso _
+	    (symbIsThreadLocalC( sym ) = FALSE orElse _
+	     env.clopt.target <> FB_COMPTARGET_LINUX orElse _
+	     fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB)) then
+		dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_TLSGETVAR, FB_RTL_IDX_TLSGETVAR ) )
+		dim as integer pointer_integer_type = _
+			iif( env.pointersize = 8, FB_DATATYPE_ULONGINT, FB_DATATYPE_ULONG )
+		if( astNewARG( call_node, astNewCONSTstr( symbGetMangledName( sym ) ) ) = NULL ) then
+			astDelTREE( call_node )
+			return NULL
+		end if
+		if( astNewARG( call_node, astNewCONSTi( symbGetRealSize( sym ), FB_DATATYPE_ULONG ) ) = NULL ) then
+			astDelTREE( call_node )
+			return NULL
+		end if
+		dim as integer align = sym->var_.align
+		if( align = 0 ) then align = typeCalcNaturalAlign( symbGetFullType( sym ), symbGetSubtype( sym ) )
+		if( align < 1 ) then align = 1
+		if( astNewARG( call_node, astNewCONSTi( align, FB_DATATYPE_ULONG ) ) = NULL ) then
+			astDelTREE( call_node )
+			return NULL
+		end if
+		if( symbGetTypeIniTree( sym ) andalso (symbIsExtern( sym ) = FALSE) ) then
+			dim as ASTNODE ptr initial_address = astNewADDROF( _
+				astNewVAR( sym, 0, FB_DATATYPE_INVALID, NULL, TRUE ) )
+			initial_address = astNewCONV( pointer_integer_type, NULL, initial_address )
+			if( astNewARG( call_node, initial_address ) = NULL ) then
+				astDelTREE( call_node )
+				return NULL
+			end if
+		else
+			if( astNewARG( call_node, astNewCONSTi( 0, pointer_integer_type ) ) = NULL ) then
+				astDelTREE( call_node )
+				return NULL
+			end if
+		end if
+		return astNewDEREF( call_node, dtype, subtype, ofs )
 	end if
 
 	'' alloc new node

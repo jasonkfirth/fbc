@@ -6,14 +6,14 @@
 ''
 '' Purpose:
 ''
-''     Verify opaque rectangles can share one ordered Vulkan primitive packet
-''     with points and styled lines.
+''     Verify opaque rectangles preserve order when batched with other desktop
+''     GPU primitives.
 ''
 '' Responsibilities:
 ''
 ''     - alternate filled boxes, outline boxes, PSET, and LINE commands
 ''     - verify last-writer behavior at overlapping interiors and borders
-''     - verify an adjacent ellipse retains exact fallback ordering
+''     - verify ellipse overlaps retain exact fallback ordering
 ''     - reuse the in-flight submission slots with changing final colours
 ''
 '' This file intentionally does NOT contain:

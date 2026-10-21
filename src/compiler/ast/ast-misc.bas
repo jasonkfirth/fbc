@@ -670,6 +670,24 @@ sub astCheckConst _
 				result = ((dval >= -9223372036854775808ull) and _
 					  (dval <= 18446744073709551615ull))
 			end if
+
+		case FB_SIZETYPE_INT128
+			if( typeGetClass( n->dtype ) = FB_DATACLASS_FPOINT ) then
+				dval = astConstGetAsDouble( n )
+				const INT128_LIMIT = 1.7014118346046923173e38
+				result = (dval >= -INT128_LIMIT) and (dval < INT128_LIMIT)
+			else
+				result = TRUE
+			end if
+
+		case FB_SIZETYPE_UINT128
+			if( typeGetClass( n->dtype ) = FB_DATACLASS_FPOINT ) then
+				dval = astConstGetAsDouble( n )
+				result = (dval >= 0.0) and (dval < 3.4028236692093846346e38)
+			else
+				result = (typeIsSigned( n->dtype ) = FALSE) or _
+				         (astConstGetAsInt64( n ) >= 0)
+			end if
 		end select
 
 	end select

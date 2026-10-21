@@ -473,7 +473,8 @@ private sub hForAssign _
 
 		'' initial condition is a non-UDT constant?
 		fbSemanticModelScalarForBound( stk->for.cnt.sym, expr, "start" )
-		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) ) then
+		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) and _
+		    (typeIsInteger128Scalar( dtype ) = FALSE) ) then
 			'' convert the constant to counter's type
 			expr = astNewCONV( dtype, subtype, expr )
 			if( expr = NULL ) then
@@ -546,7 +547,8 @@ private sub hForTo _
 
 		'' EndCondition is a non-UDT constant?
 		fbSemanticModelScalarForBound( stk->for.cnt.sym, expr, "limit" )
-		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) ) then
+		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) and _
+		    (typeIsInteger128Scalar( dtype ) = FALSE) ) then
 			expr = astNewCONV( dtype, subtype, expr )
 			if( expr = NULL ) then
 				errReport( FB_ERRMSG_INVALIDDATATYPES )
@@ -641,7 +643,8 @@ private sub hForStep _
 		'' store step into a temp var
 
 		'' non-UDT constant?
-		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) ) then
+		if( astIsCONST( expr ) and ((flags and FOR_ISUDT) = 0) and _
+		    (typeIsInteger128Scalar( dtype ) = FALSE) ) then
 			expr = astNewCONV( dtype, subtype, expr )
 			if( expr = NULL ) then
 				errReport( FB_ERRMSG_INVALIDDATATYPES )
@@ -826,6 +829,8 @@ sub cForStmtBegin( )
 	case FB_DATATYPE_LONG,FB_DATATYPE_ULONG
 		exit select
 	case FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT
+		exit select
+	case FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128
 		exit select
 	case FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE
 		exit select

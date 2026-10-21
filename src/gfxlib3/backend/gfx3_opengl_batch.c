@@ -803,11 +803,39 @@ uint32_t fb_gfx3_gl_ellipse_batch_count(
 }
 
 /*
-	Count an adjacent opaque POINTS/LINE/LINES/ELLIPSE stream and its flattened
-	GPU operations. A single public command stays on its existing specialized
-	path; the mixed winner pass is valuable when it removes at least one
-	intermediate resolve.
+	Count an adjacent opaque POINTS/LINE/LINES/RECTANGLE/RECTANGLES/ELLIPSE
+	stream and its flattened GPU operations. Keep large areas on the existing
+	raster path; the atomic winner batch only admits bounded rectangles.
 */
+static int opengl_primitive_rectangle_coverage(
+	const FB_GFX3_RECTANGLE_COMMAND *rectangle, uint64_t *coverage)
+{
+	uint64_t width;
+	uint64_t height;
+
+	if ((rectangle == NULL) || (coverage == NULL) ||
+	    (rectangle->x1 > rectangle->x2) ||
+	    (rectangle->y1 > rectangle->y2) ||
+	    ((rectangle->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u))
+		return FALSE;
+	width = (uint64_t)((int64_t)rectangle->x2 - rectangle->x1) + 1u;
+	height = (uint64_t)((int64_t)rectangle->y2 - rectangle->y1) + 1u;
+	if (rectangle->filled != 0u) {
+		if ((width > FB_GFX3_OPENGL_PRIMITIVE_RECTANGLE_COVERAGE_LIMIT) ||
+		    (height > FB_GFX3_OPENGL_PRIMITIVE_RECTANGLE_COVERAGE_LIMIT) ||
+		    (width > FB_GFX3_OPENGL_PRIMITIVE_RECTANGLE_COVERAGE_LIMIT /
+		     height))
+			return FALSE;
+		*coverage = width * height;
+	} else {
+		if (width + height >
+		    FB_GFX3_OPENGL_PRIMITIVE_RECTANGLE_COVERAGE_LIMIT / 2u)
+			return FALSE;
+		*coverage = (width + height) * 2u;
+	}
+	return TRUE;
+}
+
 uint32_t fb_gfx3_gl_primitive_batch_count(
 	FB_GFX3_COMMAND *const *commands, uint32_t available,
 	uint32_t *primitive_count_result)
@@ -894,6 +922,51 @@ uint32_t fb_gfx3_gl_primitive_batch_count(
 			if (index != lines->count)
 				break;
 			added_count = lines->count;
+		} else if (command->type == FB_GFX3_COMMAND_RECTANGLE) {
+			const FB_GFX3_RECTANGLE_COMMAND *rectangle;
+			uint64_t coverage;
+
+			if (fb_gfx3_command_payload_size(command) !=
+			    sizeof(*rectangle))
+				break;
+			rectangle =
+				(const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+			if (!opengl_primitive_rectangle_coverage(rectangle, &coverage))
+				break;
+			added_count = 1u;
+		} else if (command->type == FB_GFX3_COMMAND_RECTANGLES) {
+			const FB_GFX3_RECTANGLES_COMMAND *rectangles;
+			size_t rectangle_bytes;
+			size_t expected_size;
+			uint32_t rectangle_index;
+
+			if (fb_gfx3_command_payload_size(command) <
+			    offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle))
+				break;
+			rectangles =
+				(const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+			if ((rectangles->count == 0u) ||
+			    (rectangles->count >
+			     FB_GFX3_OPENGL_LINE_BATCH_LIMIT - primitive_count) ||
+			    (fb_gfx3_size_multiply(rectangles->count,
+			     sizeof(rectangles->rectangle[0]), &rectangle_bytes) !=
+			     FB_GFX3_OK) ||
+			    (fb_gfx3_size_add(
+			     offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle),
+			     rectangle_bytes, &expected_size) != FB_GFX3_OK) ||
+			    (expected_size != fb_gfx3_command_payload_size(command)))
+				break;
+			for (rectangle_index = 0u;
+			     rectangle_index < rectangles->count; rectangle_index++) {
+				uint64_t coverage;
+
+				if (!opengl_primitive_rectangle_coverage(
+				    &rectangles->rectangle[rectangle_index], &coverage))
+					break;
+			}
+			if (rectangle_index != rectangles->count)
+				break;
+			added_count = rectangles->count;
 		} else if (command->type == FB_GFX3_COMMAND_ELLIPSE) {
 			const FB_GFX3_ELLIPSE_COMMAND *ellipse;
 
@@ -975,7 +1048,7 @@ static int opengl_primitive_batch_add_line(
 	const FB_GFX3_OPENGL_SURFACE *destination,
 	const FB_GFX3_LINE_COMMAND *line,
 	FB_GFX3_OPENGL_PRIMITIVE_BATCH_ITEM *item, uint32_t order,
-	uint32_t *maximum_line_count, int32_t *resolve_x1,
+	uint32_t *maximum_coverage_count, int32_t *resolve_x1,
 	int32_t *resolve_y1, int32_t *resolve_x2, int32_t *resolve_y2)
 {
 	FB_GFX3_RECT clip;
@@ -988,7 +1061,7 @@ static int opengl_primitive_batch_add_line(
 	uint32_t line_count;
 
 	if ((destination == NULL) || (line == NULL) || (item == NULL) ||
-	    (order == 0u) || (maximum_line_count == NULL))
+	    (order == 0u) || (maximum_coverage_count == NULL))
 		return FB_GFX3_INVALID;
 	difference_x = llabs((long long)line->x2 - line->x1);
 	difference_y = llabs((long long)line->y2 - line->y1);
@@ -997,8 +1070,8 @@ static int opengl_primitive_batch_add_line(
 		return FB_GFX3_UNSUPPORTED;
 	line_count = (uint32_t)((difference_x > difference_y) ?
 		difference_x : difference_y) + 1u;
-	if (line_count > *maximum_line_count)
-		*maximum_line_count = line_count;
+	if (line_count > *maximum_coverage_count)
+		*maximum_coverage_count = line_count;
 	item->geometry_x1 = line->x1;
 	item->geometry_y1 = line->y1;
 	item->geometry_x2_or_radius_x = line->x2;
@@ -1143,6 +1216,61 @@ static int opengl_primitive_batch_add_point(
 	return FB_GFX3_OK;
 }
 
+static int opengl_primitive_batch_add_rectangle(
+	const FB_GFX3_OPENGL_SURFACE *destination,
+	const FB_GFX3_RECTANGLE_COMMAND *rectangle,
+	FB_GFX3_OPENGL_PRIMITIVE_BATCH_ITEM *item, uint32_t order,
+	uint32_t *maximum_coverage_count,
+	int32_t *resolve_x1, int32_t *resolve_y1,
+	int32_t *resolve_x2, int32_t *resolve_y2)
+{
+	FB_GFX3_RECT clip;
+	uint64_t coverage;
+	int32_t visible_x1;
+	int32_t visible_y1;
+	int32_t visible_x2;
+	int32_t visible_y2;
+
+	if ((destination == NULL) || (rectangle == NULL) || (item == NULL) ||
+	    (maximum_coverage_count == NULL) || (order == 0u) ||
+	    !opengl_primitive_rectangle_coverage(rectangle, &coverage))
+		return FB_GFX3_UNSUPPORTED;
+	if (coverage > UINT32_MAX)
+		return FB_GFX3_UNSUPPORTED;
+	if ((uint32_t)coverage > *maximum_coverage_count)
+		*maximum_coverage_count = (uint32_t)coverage;
+	item->geometry_x1 = rectangle->x1;
+	item->geometry_y1 = rectangle->y1;
+	item->geometry_x2_or_radius_x = rectangle->x2;
+	item->geometry_y2_or_radius_y = rectangle->y2;
+	item->color = rectangle->color;
+	item->type = FB_GFX3_OPENGL_PRIMITIVE_RECTANGLE;
+	item->style_or_filled = rectangle->style & 0xFFFFu;
+	if (rectangle->filled != 0u)
+		item->style_or_filled |= 0x80000000u;
+	item->order = order;
+
+	if (!fb_gfx3_gl_clip_rect(destination, &rectangle->clip, &clip)) {
+		item->clip_x1 = 1;
+		item->clip_y1 = 1;
+		item->clip_x2 = 0;
+		item->clip_y2 = 0;
+		return FB_GFX3_OK;
+	}
+	item->clip_x1 = clip.x1;
+	item->clip_y1 = clip.y1;
+	item->clip_x2 = clip.x2;
+	item->clip_y2 = clip.y2;
+	visible_x1 = (rectangle->x1 > clip.x1) ? rectangle->x1 : clip.x1;
+	visible_y1 = (rectangle->y1 > clip.y1) ? rectangle->y1 : clip.y1;
+	visible_x2 = (rectangle->x2 < clip.x2) ? rectangle->x2 : clip.x2;
+	visible_y2 = (rectangle->y2 < clip.y2) ? rectangle->y2 : clip.y2;
+	opengl_primitive_batch_expand_bounds(visible_x1, visible_y1,
+		visible_x2, visible_y2, resolve_x1, resolve_y1,
+		resolve_x2, resolve_y2);
+	return FB_GFX3_OK;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Ordered primitive execution                                              */
 /* ------------------------------------------------------------------------- */
@@ -1155,7 +1283,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 	FB_GFX3_OPENGL_SURFACE *destination = NULL;
 	uint32_t item_index = 0u;
 	uint32_t command_index;
-	uint32_t maximum_line_count = 1u;
+	uint32_t maximum_coverage_count = 1u;
 	uint32_t generation;
 	uint32_t groups_x;
 	uint32_t groups_y;
@@ -1209,7 +1337,8 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 				(const FB_GFX3_LINE_COMMAND *)command->payload;
 
 			result = opengl_primitive_batch_add_line(destination, line,
-				&items[item_index], item_index + 1u, &maximum_line_count,
+				&items[item_index], item_index + 1u,
+				&maximum_coverage_count,
 				&resolve_x1, &resolve_y1, &resolve_x2, &resolve_y2);
 			item_index++;
 		} else if (command->type == FB_GFX3_COMMAND_LINES) {
@@ -1223,7 +1352,58 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 			     line_index++) {
 				result = opengl_primitive_batch_add_line(destination,
 					&lines->line[line_index], &items[item_index],
-					item_index + 1u, &maximum_line_count,
+					item_index + 1u, &maximum_coverage_count,
+					&resolve_x1, &resolve_y1, &resolve_x2,
+					&resolve_y2);
+				item_index++;
+			}
+		} else if (command->type == FB_GFX3_COMMAND_RECTANGLE) {
+			const FB_GFX3_RECTANGLE_COMMAND *rectangle;
+
+			if (fb_gfx3_command_payload_size(command) !=
+			    sizeof(*rectangle)) {
+				result = FB_GFX3_INVALID;
+				goto done;
+			}
+			rectangle =
+				(const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+			result = opengl_primitive_batch_add_rectangle(destination, rectangle,
+				&items[item_index], item_index + 1u,
+				&maximum_coverage_count,
+				&resolve_x1, &resolve_y1, &resolve_x2, &resolve_y2);
+			item_index++;
+		} else if (command->type == FB_GFX3_COMMAND_RECTANGLES) {
+			const FB_GFX3_RECTANGLES_COMMAND *rectangles;
+			size_t rectangle_bytes;
+			size_t expected_size;
+			uint32_t rectangle_index;
+
+			if (fb_gfx3_command_payload_size(command) <
+			    offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle)) {
+				result = FB_GFX3_INVALID;
+				goto done;
+			}
+			rectangles =
+				(const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+			if ((rectangles->count == 0u) ||
+			    (fb_gfx3_size_multiply(rectangles->count,
+			     sizeof(rectangles->rectangle[0]), &rectangle_bytes) !=
+			     FB_GFX3_OK) ||
+			    (fb_gfx3_size_add(
+			     offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle),
+			     rectangle_bytes, &expected_size) != FB_GFX3_OK) ||
+			    (expected_size != fb_gfx3_command_payload_size(command))) {
+				result = FB_GFX3_INVALID;
+				goto done;
+			}
+			result = FB_GFX3_OK;
+			for (rectangle_index = 0u;
+			     (rectangle_index < rectangles->count) &&
+			     (result == FB_GFX3_OK); rectangle_index++) {
+				result = opengl_primitive_batch_add_rectangle(destination,
+					&rectangles->rectangle[rectangle_index],
+					&items[item_index], item_index + 1u,
+					&maximum_coverage_count,
 					&resolve_x1, &resolve_y1, &resolve_x2,
 					&resolve_y2);
 				item_index++;
@@ -1250,7 +1430,8 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 		result = FB_GFX3_OK;
 		goto done;
 	}
-	groups_x = (maximum_line_count + FB_GFX3_OPENGL_POINT_GROUP_SIZE - 1u) /
+	groups_x = (maximum_coverage_count +
+		FB_GFX3_OPENGL_POINT_GROUP_SIZE - 1u) /
 		FB_GFX3_OPENGL_POINT_GROUP_SIZE;
 	if ((groups_x > state->maximum_compute_groups_x) ||
 	    (primitive_count > state->maximum_compute_groups_y) ||

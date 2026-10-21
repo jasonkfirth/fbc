@@ -147,12 +147,13 @@ PROCEDURE_KINDS = frozenset(("sub", "function", "constructor", "destructor", "pr
                              "property-set", "operator", "procedure-pointer"))
 CALLING_CONVENTIONS = frozenset(("cdecl", "stdcall", "stdcall-ms", "pascal", "thiscall", "fastcall"))
 STORAGE_KINDS = frozenset(("parameter", "field", "constant", "external", "static", "local",
-                          "shared", "global", "none"))
+                          "shared", "global", "thread-local", "none"))
 # The schema records internal datatype slots too. Keep the full vocabulary so
 # removing the last slot cannot pass as a shorter, still contiguous table.
 PRIMITIVE_NAMES = ("any", "boolean", "byte", "ubyte", "zstring", "short", "ushort",
                    "wstring", "integer", "uinteger", "enum", "long", "ulong",
-                   "longint", "ulongint", "single", "double", "string", "fixed-string",
+                   "longint", "ulongint", "integer128", "uinteger128",
+                   "single", "double", "string", "fixed-string",
                    "va_list", "type", "namepace", "function", "fwdref", "pointer",
                    "xmmword", "ustring")
 IMPLICIT_KINDS = frozenset((
@@ -1862,7 +1863,7 @@ class Model:
             target = self.symbols.get(symbol)
             if target is None or subject_modules.get(("symbol", symbol)) != module or int(target[3]) not in (1, 12):
                 raise ValueError("String initializer has no declaration target")
-            if dtype & 511 not in (4, 7, 18) or dtype != int(target[4]) or capacity != int(target[9]) or int(target[7]) & 0x40000:
+            if dtype & 511 not in (4, 7, 20) or dtype != int(target[4]) or capacity != int(target[9]) or int(target[7]) & 0x40000:
                 raise ValueError("String initializer capacity or type disagrees with storage")
             statement = self.statement_owners.get((domain, identity))
             start, ending = self.statements.get(statement), self.statement_endings.get(statement)
@@ -1915,7 +1916,7 @@ class Model:
             start, ending = self.statements.get(statement), self.statement_endings.get(statement)
             if start is None or int(start[7]) != module or ending is None or ending[3] != "parsed":
                 raise ValueError("String intrinsic lacks accepted statement ownership")
-            if int(expressions[identity][12]) & 511 not in (4, 7, 17, 26):
+            if int(expressions[identity][12]) & 511 not in (4, 7, 19, 28):
                 raise ValueError("String intrinsic has a non-string result")
             expression = expressions[identity]
             if is_format:
@@ -2019,7 +2020,7 @@ class Model:
                 symbol = self.symbols[identity]
                 dtype = int(symbol[4]) & 0x1ff
                 enum_counter = dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9
-                ordinary_counter = not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)
+                ordinary_counter = not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)
                 if int(symbol[3]) != 1 or not (ordinary_counter or enum_counter):
                     raise ValueError("FOR step has no scalar counter")
                 start = self.statements.get(statement)
@@ -2046,7 +2047,7 @@ class Model:
                 dtype = int(symbol[4]) & 0x1ff
                 enum_counter = (dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9
                                 and self.capabilities[module].get("enum-for-step-inputs") == "available")
-                ordinary_counter = not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)
+                ordinary_counter = not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)
                 scalar = int(symbol[3]) == 1 and (ordinary_counter or enum_counter)
                 if scalar and self.capabilities[module].get("scalar-for-step-inputs") == "available":
                     for key in properties:
@@ -2077,7 +2078,7 @@ class Model:
                 symbol = self.symbols[identity]
                 dtype = int(symbol[4]) & 0x1ff
                 scalar = int(symbol[3]) == 1 and (
-                    (not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)) or
+                    (not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)) or
                     (dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9))
                 start = self.statements.get(statement)
                 module = subject_modules[domain, identity]
@@ -2101,13 +2102,14 @@ class Model:
                 if not bound:
                     selected_dtype = number(properties[f"for-step-selected-dtype:{statement}"], 0)
                     selected_type = selected_dtype & 0x1ff
-                    if selected_type not in (2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16) or \
+                    if selected_type not in (2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18) or \
                             self.primitives[module - 1][selected_type][4] != self.primitives[module - 1][dtype][4]:
                         raise ValueError("Selected FOR step has another storage width")
                     explicit = properties.get(f"for-step-explicit:{statement}")
                     if not expression:
                         original = int(properties.get(f"for-step-expression:{statement}", "0"))
-                        if explicit != "1" or ("expression", original) in self.constants:
+                        if selected_type not in (15, 16) and (
+                                explicit != "1" or ("expression", original) in self.constants):
                             raise ValueError("Known FOR step lacks selected constant")
                     else:
                         row = expressions[expression]
@@ -2121,7 +2123,7 @@ class Model:
                 symbol = self.symbols[identity]
                 dtype = int(symbol[4]) & 0x1ff
                 scalar = int(symbol[3]) == 1 and (
-                    (not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16)) or
+                    (not int(symbol[5]) and dtype in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)) or
                     (dtype == 10 and int(self.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9))
                 if not scalar:
                     continue
@@ -2151,14 +2153,14 @@ class Model:
                 raise ValueError("Numeric operand selections have no original binary operation")
             for operand_id in operands[4:6]:
                 operand = expressions.get(int(operand_id))
-                if operand is None or int(operand[14]) or int(operand[12]) & 0x1e0 or int(operand[12]) & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
+                if operand is None or int(operand[14]) or int(operand[12]) & 0x1e0 or int(operand[12]) & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18):
                     raise ValueError("Numeric selection has no original primitive operand")
             module = subject_modules[domain, identity]
             for side in ("left", "right"):
                 if self.capabilities[module].get("selected-numeric-operands") == "unavailable":
                     raise ValueError("Numeric selections contradict unavailable coverage")
                 dtype = number(properties[f"numeric-selected-{side}-dtype"], 0)
-                if dtype & 0x1e0 or dtype & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
+                if dtype & 0x1e0 or dtype & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18):
                     raise ValueError("Numeric selection has an unsupported dtype")
                 if dtype & 31 not in self.primitives[module - 1]:
                     raise ValueError("Numeric selection lacks a primitive type receipt")
@@ -2184,11 +2186,11 @@ class Model:
                 raise ValueError("Numeric literal is not a primitive scalar")
             dtype = int(expression[12]) & 31
             module = subject_modules[domain, identity]
-            if dtype not in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16) or dtype not in self.primitives[module - 1]:
+            if dtype not in (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18) or dtype not in self.primitives[module - 1]:
                 raise ValueError("Numeric literal lacks a primitive type")
             value = self.constants.get((domain, identity))
             kind = properties["numeric-literal-kind"]
-            if value is None or (dtype in (15, 16) and (kind != "float" or value[0] != "float64-bits")) or (dtype not in (15, 16) and (kind != "integer" or value[0] not in ("signed", "unsigned"))):
+            if value is None or (dtype in (17, 18) and (kind != "float" or value[0] != "float64-bits")) or (dtype not in (17, 18) and (kind != "integer" or value[0] not in ("signed", "unsigned"))):
                 raise ValueError("Numeric literal kind disagrees with its compiler value")
             text = properties["numeric-literal-text"]
             complete = properties["numeric-literal-text-complete"]
@@ -2290,7 +2292,7 @@ class Model:
             primitive_types = self.primitives[subject_modules["expression", identity] - 1]
             if target & 0x1E0 or target & 31 not in primitive_types:
                 raise ValueError("Invalid numeric assignment destination type")
-            if target & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16):
+            if target & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18):
                 raise ValueError("Assignment destination is not a primitive numeric scalar")
 
     def validate_source_assignments(self, subject_modules: dict[tuple[str, int], int]) -> None:

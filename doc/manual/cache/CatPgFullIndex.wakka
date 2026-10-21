@@ -655,6 +655,7 @@ Alphabetical listing of keywords, macros and procedures.
 	- {{fbdoc item="keyword" value="KeyPgThreadCreate|THREADCREATE"}}
 	- {{fbdoc item="keyword" value="KeyPgThreadDetach|THREADDETACH"}}
 	- {{fbdoc item="keyword" value="KeyPgThreadSelf|THREADSELF"}}
+	- {{fbdoc item="keyword" value="KeyPgThreadLocal|THREAD LOCAL"}}
 	- {{fbdoc item="keyword" value="KeyPgThreadWait|THREADWAIT"}}
 	- {{fbdoc item="keyword" value="KeyPgTime|TIME"}}
 	- {{fbdoc item="keyword" value="KeyPgTimer|TIMER"}}

@@ -1,0 +1,24 @@
+# Project: FreeBASIC test suite
+# File: libpath-link.bmk
+# Purpose: Verify #LIBPATH finds a generated static library at link time.
+# Responsibilities: Build the provider archive and link the test executable.
+# This file intentionally does NOT contain: platform-specific linker flags.
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := libpath-main.bas
+
+LIBPATH_ARCHIVE := $(SRCDIR)libfbc-libpath-test.a
+LIBPATH_PROVIDER_OBJECT := $(SRCDIR)libpath-provider.o
+
+$(SRCDIR)libpath-main$(TARGET_EXEEXT): $(LIBPATH_ARCHIVE)
+
+$(LIBPATH_ARCHIVE): $(SRCDIR)libpath-provider.bas
+	$(FBC) $(FBC_CFLAGS) -c $< -o $(LIBPATH_PROVIDER_OBJECT)
+	$(AR) rcs $@ $(LIBPATH_PROVIDER_OBJECT)
+
+clean: clean-libpath-library
+.PHONY: clean-libpath-library
+clean-libpath-library:
+	$(RM) $(LIBPATH_ARCHIVE) $(LIBPATH_PROVIDER_OBJECT)
+
+# end of libpath-link.bmk

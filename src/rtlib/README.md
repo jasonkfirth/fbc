@@ -34,7 +34,7 @@ portable responsibilities rather than a list of platforms.
 | `errors` | Runtime error state, assertions, bound/pointer diagnostics and signal integration |
 | `files` | BASIC file policy, numbered handles, typed I/O, path attributes and VFS entry points; see `fb_file.h` |
 | `datetime` | Date serial values, calendar arithmetic, time and locale formatting |
-| `math` | Numeric intrinsics and the language RND/RANDOMIZE state |
+| `math` | Numeric intrinsics, portable two-word 128-bit arithmetic, and the language RND/RANDOMIZE state |
 | `memory` | Raw memory operations and internal intrusive-list storage |
 | `objects` | Object type checks and logical serialization; serialization owns no transport |
 | `profiling` | Profiling measurements, call records and report output |

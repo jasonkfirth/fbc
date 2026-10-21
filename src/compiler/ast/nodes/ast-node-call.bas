@@ -91,7 +91,6 @@ function astNewCALL _
 	''
 	dtype = symbGetFullType( sym )
 	subtype = symbGetSubType( sym )
-
 	''
 	symbSetIsAccessed( sym )
 
@@ -122,8 +121,9 @@ function astNewCALL _
 
 	'' Allocate temp struct result if needed
 	if( symbProcReturnsOnStack( sym ) ) then
-		'' create a temp struct (can't be static, could be an object)
-		n->call.tmpres = symbAddTempVar( FB_DATATYPE_STRUCT, symbGetSubtype( sym ) )
+		'' The result slot may be a structure or an extended scalar.
+		n->call.tmpres = symbAddTempVar( symbGetFullType( sym ), _
+		                                 symbGetSubtype( sym ) )
 		astDtorListAdd( n->call.tmpres )
 	else
 		n->call.tmpres = NULL
@@ -218,7 +218,7 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 			arg = arg->r
 		wend
 
-		'' Include the size of the hidden ptr parameter, for returning structs
+		'' Include the size of the hidden result pointer.
 		'' (We don't care who pops it)
 		if( symbProcReturnsOnStack( proc ) ) then
 			argbytes += env.pointersize
@@ -303,7 +303,7 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 		arg = nextarg
 	wend
 
-	'' Hidden param for functions returning big structs on stack
+	'' Hidden param for functions returning values through a result slot.
 	if( symbProcReturnsOnStack( proc ) ) then
 		'' Pop hidden ptr if cdecl/thiscall/fastcall and target doesn't
 		'' want the callee to do it, despite it being cdecl/thiscall/fastcall.
@@ -317,20 +317,19 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 			exit select
 		end select
 		if( ast.doemit ) then
-			'' Clear the temp struct (so the function can safely
-			'' do assignments to it in case it includes STRINGs),
-			'' unless it has a constructor (which the function will
-			'' call anyways).
-			if( symbHasCtor( n->call.tmpres ) = FALSE ) then
+			'' Clear a structure result so assignments to its fields start from
+			'' a defined state. Scalar result slots are written by the callee.
+			if( (symbGetType( proc ) = FB_DATATYPE_STRUCT) andalso _
+			    (symbHasCtor( n->call.tmpres ) = FALSE) ) then
 				astLoad( astBuildTempVarClear( n->call.tmpres ) )
 			end if
 
-			'' Pass the address of the temp result struct
+			'' Pass the address of the temp result slot.
 			l = astNewVAR( n->call.tmpres )
 			l = astNewADDROF( l )
 			v1 = astLoad( l )
-			'' (passing NULL param, because no PARAM symbol exists
-			'' for the hidden struct result param)
+			'' (passing NULL param, because the hidden result parameter has
+			'' no source-level PARAM symbol)
 			irEmitPUSHARG( NULL, v1, 0, reclevel, NULL )
 		end if
 		totalstackbytes += env.pointersize
@@ -353,10 +352,16 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 						TRUE ) )
 			end if
 
-			vr = irAllocVREG( symbGetProcRealType( proc ), _
-							symbGetProcRealSubtype( proc ) )
+			if( symbProcReturnsOnStack( proc ) andalso _
+			    typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then
+				'' The hidden result slot already contains the full scalar value.
+				vr = NULL
+			else
+				vr = irAllocVREG( symbGetProcRealType( proc ), _
+								symbGetProcRealSubtype( proc ) )
+			end if
 
-			if( proc->proc.returnMethod <> FB_RETURN_SSE ) then
+			if( vr andalso (proc->proc.returnMethod <> FB_RETURN_SSE) ) then
 				vr->regFamily = IR_REG_FPU_STACK
 			end if
 		end if
@@ -400,6 +405,14 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 			irEmitCALLPTR( proc, v1, vr, bytestopop, reclevel )
 		else
 			irEmitCALLFUNCT( proc, bytestopop, vr, reclevel )
+		end if
+
+		if( symbProcReturnsOnStack( proc ) andalso _
+		    typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then
+			'' Expose the caller-owned result slot as the scalar expression value.
+			l = astNewVAR( n->call.tmpres )
+			vr = astLoad( l )
+			astDelNode( l )
 		end if
 	end if
 
@@ -710,6 +723,7 @@ end function
 '' Build a fake CALL to the given procedure, to be used for error recovery.
 function astBuildFakeCall( byval proc as FBSYMBOL ptr ) as ASTNODE ptr
 	var c = astNewCALL( proc )
+	if( c = NULL ) then return astNewNOP( )
 
 	'' Build fake arg for each param (including the THIS param for methods)
 	var param = symbGetProcHeadParam( proc )

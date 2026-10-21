@@ -1,3 +1,9 @@
+' Project: FreeBASIC test suite
+' File: threadcall.bas
+' Purpose: Test THREADCALL across procedures, argument types and namespaces.
+' Responsibilities: Exercise thread launch, result checks and identifier compatibility.
+' This file intentionally does NOT contain: thread runtime implementation.
+
 #include "fbcunit.bi"
 
 '' !!! TODO !!! arm targets fail
@@ -157,6 +163,9 @@ SUITE( fbc_tests.threads.threadcall_ )
         dim as any ptr Namespace_Thread, ONamespace_Thread
         dim as any ptr testWindowsMs_thread
 
+        thread = 0
+        CU_ASSERT_TRUE( thread = 0 )
+
         '' call threads
 	#ifdef __FB_WIN32__
         SmallInt_Thread = threadcall SmallInt( 20, 1, 19, 2 )
@@ -207,3 +216,5 @@ SUITE( fbc_tests.threads.threadcall_ )
 END_SUITE
 
 #endif
+
+' end of threadcall.bas

@@ -848,8 +848,8 @@ private function hDeclVarsForProcParams( byval proc as FBSYMBOL ptr ) as integer
 
 	function = FALSE
 
-	'' proc returns an UDT?
-	if( symbGetType( proc ) = FB_DATATYPE_STRUCT ) then
+	'' Allocate the hidden result parameter for stack-returned values.
+	if( symbProcReturnsOnStack( proc ) ) then
 		symbAddVarForProcResultParam( proc )
 	end if
 
@@ -879,6 +879,13 @@ private sub hLoadProcResult( byval proc as FBSYMBOL ptr )
 	dim as ASTNODE ptr n = any
 
 	s = symbGetProcResult( proc )
+
+	if( symbProcReturnsOnStack( proc ) andalso _
+	    typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then
+		'' The function body wrote the result through its hidden destination.
+		'' No scalar return registers are used by this assembly ABI.
+		exit sub
+	end if
 
 	'' if result is a string, a temp descriptor is needed, as the current one (on stack)
 	'' will be trashed when the function returns (also, the string returned will be

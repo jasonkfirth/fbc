@@ -457,6 +457,8 @@ declare function hMakeParamDesc _
 		/'FB_ERRMSG_ILLEGALRTLIBCOMMANDREDEF           '/ @"Illegal redefinition of rtlib command", _
 		/'FB_ERRMSG_ILLEGALGFXLIBCOMMANDREDEF          '/ @"Illegal redefinition of gfxlib command. If gfxlib is not used, define FB_NO_GFXLIB before using this name", _
 		/'FB_ERRMSG_ILLEGALSFXLIBCOMMANDREDEF          '/ @"Illegal redefinition of sfxlib command. If sfxlib is not used, define FB_NO_SFXLIB before using this name", _
+		/'FB_ERRMSG_INTEGER128UNSUPPORTED              '/ @"128-bit integer operations are not supported by the native assembly backend", _
+		/'FB_ERRMSG_THREADLOCALUNSUPPORTED             '/ @"Thread Local declaration is not supported for this type, initializer, or target", _
 		/'FB_ERRMSGS                                   '/ @"FB_ERRMSGS"  _
 	}
 

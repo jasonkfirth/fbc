@@ -54,6 +54,7 @@ private function hStorage(byval sym as FBSYMBOL ptr) as string
 	if( sym->class = FB_SYMBCLASS_PARAM ) then return "parameter"
 	if( symbIsField(sym) ) then return "field"
 	if( symbIsConst(sym) ) then return "constant"
+	if( symbIsThreadLocal(sym) ) then return "thread-local"
 	if( sym->attrib and FB_SYMBATTRIB_EXTERN ) then return "external"
 	if( sym->attrib and FB_SYMBATTRIB_STATIC ) then return "static"
 	if( sym->attrib and FB_SYMBATTRIB_LOCAL ) then return "local"

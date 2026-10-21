@@ -582,6 +582,113 @@ declare function    hThreadCall_cb      ( byval sym as FBSYMBOL ptr ) as integer
 				( typeSetIsConst( FB_DATATYPE_STRING ), FB_PARAMMODE_BYREF, FALSE ) _
 			} _
 		), _
+		/' function fb_TlsGetVar( byval name as const zstring ptr, byval size as ulong, byval align as ulong, byval initial as any ptr ) as any ptr '/ _
+		( _
+			@FB_RTL_TLSGETVAR, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			4, _
+			{ _
+				( typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_ULONG, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_ULONG, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_ULONGINT, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128Bop( byval destination as any ptr, byval left as const any ptr, byval right as const any ptr, byval operation as long, byval is_signed as long, byval shift_count as ulongint ) as any ptr '/ _
+		( _
+			@FB_RTL_INT128BOP, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			6, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_ULONGINT, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128Uop( byval destination as any ptr, byval source as const any ptr, byval operation as long, byval is_signed as long ) as any ptr '/ _
+		( _
+			@FB_RTL_INT128UOP, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			4, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128Copy( byval destination as any ptr, byval source as const any ptr ) as any ptr '/ _
+		( _
+			@FB_RTL_INT128COPY, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			2, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128FromU64( byval destination as any ptr, byval value as ulongint, byval sign_extend as long ) as any ptr '/ _
+		( _
+			@FB_RTL_INT128FROMU64, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			3, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_ULONGINT, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128FromDouble( byval destination as any ptr, byval value as double, byval is_signed as long ) as any ptr '/ _
+		( _
+			@FB_RTL_INT128FROMDOUBLE, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			3, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_DOUBLE, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128ToU64( byval source as const any ptr ) as ulongint '/ _
+		( _
+			@FB_RTL_INT128TOU64, NULL, _
+			FB_DATATYPE_ULONGINT, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128ToBool( byval source as const any ptr ) as long '/ _
+		( _
+			@FB_RTL_INT128TOBOOL, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128ToDouble( byval source as const any ptr, byval is_signed as long ) as double '/ _
+		( _
+			@FB_RTL_INT128TODOUBLE, NULL, _
+			FB_DATATYPE_DOUBLE, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			2, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
 		/' EOL '/ _
 		( _
 			NULL _
@@ -590,6 +697,13 @@ declare function    hThreadCall_cb      ( byval sym as FBSYMBOL ptr ) as integer
 
 '':::::
 sub rtlSystemModInit( )
+	for i as integer = lbound( funcdata ) to ubound( funcdata )
+		if( funcdata(i).name = @FB_RTL_TLSGETVAR ) then
+			funcdata(i).paramTb(3).dtype = _
+				iif( env.pointersize = 8, FB_DATATYPE_ULONGINT, FB_DATATYPE_ULONG )
+			exit for
+		end if
+	next
 
 	rtlAddIntrinsicProcs( @funcdata(0) )
 

@@ -1066,6 +1066,8 @@ static int opengl_execute(FB_GFX3_BACKEND *backend,
 		if ((command->type == FB_GFX3_COMMAND_POINTS) ||
 		    (command->type == FB_GFX3_COMMAND_LINE) ||
 		    (command->type == FB_GFX3_COMMAND_LINES) ||
+		    (command->type == FB_GFX3_COMMAND_RECTANGLE) ||
+		    (command->type == FB_GFX3_COMMAND_RECTANGLES) ||
 		    (command->type == FB_GFX3_COMMAND_ELLIPSE)) {
 			batch_count = fb_gfx3_gl_primitive_batch_count(commands + i,
 				(uint32_t)(((count - i) > UINT32_MAX) ? UINT32_MAX :

@@ -1699,6 +1699,19 @@ int fb_gfx3_vulkan_runtime_open(FB_GFX3_VULKAN_RUNTIME *runtime)
 	return vulkan_runtime_open_internal(runtime, 0, 0, 0, 0);
 }
 
+int fb_gfx3_vulkan_runtime_supports_float64(
+	const FB_GFX3_VULKAN_RUNTIME *runtime)
+{
+	const FB_GFX3_VULKAN_IMPLEMENTATION *implementation;
+
+	if ((runtime == NULL) || !runtime->initialized ||
+	    (runtime->implementation == NULL))
+		return FALSE;
+	implementation = (const FB_GFX3_VULKAN_IMPLEMENTATION *)
+		runtime->implementation;
+	return implementation->shader_float64 ? TRUE : FALSE;
+}
+
 int fb_gfx3_vulkan_runtime_open_windowed(FB_GFX3_VULKAN_RUNTIME *runtime,
 	uintptr_t native_instance, uintptr_t native_window, uint32_t width,
 	uint32_t height)
@@ -1723,6 +1736,13 @@ int fb_gfx3_vulkan_runtime_open(FB_GFX3_VULKAN_RUNTIME *runtime)
 	if (runtime != NULL)
 		memset(runtime, 0, sizeof(*runtime));
 	return FB_GFX3_UNSUPPORTED;
+}
+
+int fb_gfx3_vulkan_runtime_supports_float64(
+	const FB_GFX3_VULKAN_RUNTIME *runtime)
+{
+	(void)runtime;
+	return FALSE;
 }
 
 int fb_gfx3_vulkan_runtime_open_windowed(FB_GFX3_VULKAN_RUNTIME *runtime,

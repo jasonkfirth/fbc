@@ -291,6 +291,8 @@ def compile_probes(args, prefix, env):
             destination = source / header.relative_to(ROOT)
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(header, destination)
+    allocator_source = Path('src/rtlib/drivers/amiga/allocator.c')
+    shutil.copy2(ROOT / allocator_source, source / allocator_source)
     conversion = source / 'build_scripts/amiga/softfloat-convert.c'
     conversion.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / 'build_scripts/amiga/softfloat-convert.c', conversion)
@@ -326,7 +328,7 @@ def compile_probes(args, prefix, env):
     if code != 0:
         raise SystemExit('Amiga object metadata check failed; see logs/objinfo-library.log')
     records = []
-    for name in ('native-io', 'file-info', 'thread-io', 'thread-exit', 'standard-input',
+    for name in ('native-io', 'file-info', 'allocator', 'thread-io', 'thread-exit', 'standard-input',
                  'graphics', 'image-colours', 'objinfo-reader', 'sound',
                  'sound-exit', 'softfloat-convert', 'softfloat-multiply',
                  'softfloat-arithmetic'):
@@ -361,11 +363,21 @@ def compile_probes(args, prefix, env):
                             '-i', str(hunk_source.parent)]
             if name in ('thread-io', 'thread-exit'):
                 objects.append('-mt')
-            if name in ('graphics', 'sound', 'thread-io', 'file-info'):
+            if name in ('graphics', 'sound', 'thread-io', 'file-info', 'allocator'):
                 bridge = binaries / (name + '-bridge.o')
                 code = run_command([cc, *cflags, '-c', str(resources / (name + '-bridge.c')),
                                     '-o', str(bridge)], args.output / 'logs' / (name + '-bridge.log'), env=env)
                 objects.append(str(bridge))
+            if name == 'allocator' and code == 0:
+                # Qualify failure fallback without exhausting guest memory.
+                # This explicit object also exercises allocator.c directly;
+                # every other probe uses the production archive member.
+                allocator = binaries / 'allocator-runtime.o'
+                code = run_command([cc, *cflags, '-I', str(source / 'src/rtlib'),
+                                    '-include', str(resources / 'allocator-hooks.h'), '-c',
+                                    str(source / 'src/rtlib/drivers/amiga/allocator.c'),
+                                    '-o', str(allocator)], args.output / 'logs/allocator-runtime.log', env=env)
+                objects.append(str(allocator))
             if code == 0:
                 code = run_command([*fbc, str(resources / (name + '.bas')), *objects,
                                     '-x', str(binary)], args.output / 'logs' / (name + '.compile.log'), env=env)

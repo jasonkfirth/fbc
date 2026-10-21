@@ -1,0 +1,42 @@
+{{fbdoc item="title" value="THREAD LOCAL"}}----
+Declares per-thread storage for a variable
+
+{{fbdoc item="syntax"}}##
+	[ [[KeyPgPrivate|Private]] ] **Thread Local** [[KeyPgDim|Dim]] **Shared** //symbol// [[KeyPgAs|As]] [[DataType|DataType]] [ = //constant-expression// ]
+		//or//
+	**Thread Local** [[KeyPgExtern|Extern]] //symbol// [ [[KeyPgAlias|Alias]] "//external-name//" ] [[KeyPgAs|As]] [[DataType|DataType]]
+##
+External C declarations belong inside an ##[[KeyPgExternBlock|Extern...End Extern]]## block.
+
+{{fbdoc item="desc"}}
+	Each thread that accesses a ##**Thread Local**## variable gets its own value. A thread's value starts at zero, or at the declared constant initializer. Changes made by one thread do not change the value seen by other threads.
+
+	The declared type must be trivially stored and its initializer must be constant. Managed strings, objects with constructors or destructors, dynamic arrays, and dynamic initializers are not supported.
+
+	Use ##[[KeyPgThreadCreate|ThreadCreate]]## to start additional FreeBASIC threads. Without additional threads, a ##**Thread Local**## variable behaves like a normal shared variable within the current thread.
+
+	External C ##**Thread Local**## imports are supported by the native GAS backends for Linux executables. GAS backends diagnose these imports for other targets and dynamic libraries, where the platform TLS relocation model is different.
+
+{{fbdoc item="ex"}}
+{{fbdoc item="filename" value="examples/manual/variable/thread-local.bas"}}%%(freebasic)
+Thread Local Dim Shared currentRequest As Integer = 0
+
+Sub HandleRequest(ByVal requestNumber As Integer)
+	currentRequest = requestNumber
+	Print currentRequest
+End Sub
+
+HandleRequest(1)
+%%
+
+{{fbdoc item="lang"}}
+	- Not available in the //[[CompilerOptlang|-lang qb]]// dialect.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgDim|Dim]]##
+	- ##[[KeyPgExtern|Extern]]##, ##[[KeyPgExternBlock|Extern...End Extern]]##
+	- ##[[KeyPgShared|Shared]]##
+	- ##[[KeyPgThreadCreate|ThreadCreate]]##
+	- ##[[ProPgStorageClasses|Storage Classes]]##
+
+{{fbdoc item="back" value="CatPgVariables|Variable Declarations"}}

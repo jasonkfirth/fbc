@@ -43,6 +43,8 @@ dim shared symb_dtypeTB( 0 to FB_DATATYPES-1 ) as SYMB_DATATYPE => _
 	( FB_DATACLASS_INTEGER,  4, FALSE, 45, FB_DATATYPE_ULONG   , FB_SIZETYPE_UINT32 , @"ulong"    ), _
 	( FB_DATACLASS_INTEGER,  8, TRUE , 80, FB_DATATYPE_LONGINT , FB_SIZETYPE_INT64  , @"longint"  ), _
 	( FB_DATACLASS_INTEGER,  8, FALSE, 85, FB_DATATYPE_ULONGINT, FB_SIZETYPE_UINT64 , @"ulongint" ), _
+	( FB_DATACLASS_INTEGER, 16, TRUE ,  0, FB_DATATYPE_INTEGER128, FB_SIZETYPE_INT128, @"integer128" ), _
+	( FB_DATACLASS_INTEGER, 16, FALSE,  0, FB_DATATYPE_UINTEGER128, FB_SIZETYPE_UINT128, @"uinteger128" ), _
 	( FB_DATACLASS_FPOINT ,  4, TRUE ,  0, FB_DATATYPE_SINGLE  , FB_SIZETYPE_FLOAT32, @"single"   ), _
 	( FB_DATACLASS_FPOINT ,  8, TRUE ,  0, FB_DATATYPE_DOUBLE  , FB_SIZETYPE_FLOAT64, @"double"   ), _
 	( FB_DATACLASS_STRING , -1, FALSE,  0, FB_DATATYPE_STRING  , -1                 , @"string"   ), _
@@ -91,6 +93,8 @@ sub symbDataInit( )
 	'' Keep the 64bit native integer ranks between LONGINT and ULONGINT.
 	const INTEGER_64BIT_INTRANK = 81
 	const UINT_64BIT_INTRANK = 86
+	const INTEGER_128BIT_INTRANK = 121
+	const UINT_128BIT_INTRANK = 126
 	const INTEGER_32BIT_INTRANK = 41
 	const UINT_32BIT_INTRANK = 46
 
@@ -139,6 +143,9 @@ sub symbDataInit( )
 	symb_dtypeTB(FB_DATATYPE_WCHAR).intrank   = symb_dtypeTB(env.target.wchar).intrank
 	symb_dtypeTB(FB_DATATYPE_WCHAR).remaptype = symb_dtypeTB(env.target.wchar).remaptype
 	symb_dtypeTB(FB_DATATYPE_WCHAR).sizetype  = symb_dtypeTB(env.target.wchar).sizetype
+
+	symb_dtypeTB(FB_DATATYPE_INTEGER128).intrank = INTEGER_128BIT_INTRANK
+	symb_dtypeTB(FB_DATATYPE_UINTEGER128).intrank = UINT_128BIT_INTRANK
 
 
 	'' Create symb_dtypeMatchTB(), used to score overload resolutions
@@ -271,6 +278,9 @@ function typeToSigned _
 	case FB_DATATYPE_ULONGINT
 		nd = FB_DATATYPE_LONGINT
 
+	case FB_DATATYPE_UINTEGER128
+		nd = FB_DATATYPE_INTEGER128
+
 	case else
 		nd = dtype
 	end select
@@ -314,6 +324,9 @@ function typeToUnsigned _
 
 	case FB_DATATYPE_LONGINT
 		nd = FB_DATATYPE_ULONGINT
+
+	case FB_DATATYPE_INTEGER128
+		nd = FB_DATATYPE_UINTEGER128
 
 	case else
 		nd = dtype

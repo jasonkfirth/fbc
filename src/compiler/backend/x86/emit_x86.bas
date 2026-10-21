@@ -85,6 +85,8 @@ declare function _getTypeString( byval dtype as integer ) as const zstring ptr
 		( 2, "dword ptr" ), _ '' ulong
 		( 2, "qword ptr" ), _ '' longint
 		( 2, "qword ptr" ), _ '' ulongint
+		( 3, "xmmword ptr" ), _ '' integer128
+		( 3, "xmmword ptr" ), _ '' uinteger128
 		( 3, "dword ptr" ), _ '' single
 		( 3, "qword ptr" ), _ '' double
 		( 0, ""          ), _ '' string
@@ -420,6 +422,56 @@ sub hPrepOperand _
 
 	if( dtype = FB_DATATYPE_INVALID ) then
 		dtype = vreg->dtype
+	end if
+
+	if( (vreg->typ = IR_VREGTYPE_VAR) andalso _
+	    symbIsThreadLocalC( vreg->sym ) andalso _
+	    (env.clopt.target = FB_COMPTARGET_LINUX) ) then
+		if( addprefix ) then
+			operand = dtypeTB(dtype).mname + " "
+		else
+			operand = ""
+		end if
+		operand += "gs:" + *symbGetMangledName( vreg->sym ) + "@NTPOFF"
+		ofs += vreg->ofs
+		if( isaux ) then ofs += 4
+		if( ofs > 0 ) then
+			operand += "+" + str( ofs )
+		elseif( ofs < 0 ) then
+			operand += str( ofs )
+		end if
+		exit sub
+	end if
+
+	if( (vreg->typ = IR_VREGTYPE_IDX) andalso _
+	    symbIsThreadLocalC( vreg->sym ) andalso _
+	    (env.clopt.target = FB_COMPTARGET_LINUX) ) then
+		dim as string tls_name
+		tls_name = *symbGetMangledName( vreg->sym )
+		dim as zstring ptr idx_name
+		idx_name = hGetIdxName( vreg )
+		dim as string index_expression
+		if( idx_name <> NULL ) then
+			index_expression = mid( *idx_name, len(tls_name) + 1 )
+			if( left(index_expression, 1) = "+" ) then _
+				index_expression = mid(index_expression, 2)
+		end if
+		if( addprefix ) then
+			operand = dtypeTB(dtype).mname + " "
+		else
+			operand = ""
+		end if
+		operand += "gs:[" + tls_name + "@NTPOFF"
+		if( index_expression <> "" ) then operand += "+" + index_expression
+		ofs += vreg->ofs
+		if( isaux ) then ofs += 4
+		if( ofs > 0 ) then
+			operand += "+" + str(ofs)
+		elseif( ofs < 0 ) then
+			operand += str(ofs)
+		end if
+		operand += "]"
+		exit sub
 	end if
 
 	select case as const vreg->typ
@@ -782,7 +834,9 @@ private sub hEndRegTB
 end sub
 
 private function hGetGlobalTypeAlign( byval dtype as integer ) as integer
-	if( dtype = FB_DATATYPE_DOUBLE ) then
+	if( typeIsInteger128Scalar( dtype ) ) then
+		function = 16
+	elseif( dtype = FB_DATATYPE_DOUBLE ) then
 		function = 8
 	else
 		function = 4
@@ -6383,6 +6437,17 @@ private sub _emitADDROF _
 
 	dim as string dst, src
 	dim as string ostr
+	if( (svreg->typ = IR_VREGTYPE_VAR) andalso _
+	    symbIsThreadLocalC( svreg->sym ) andalso _
+	    (env.clopt.target = FB_COMPTARGET_LINUX) ) then
+		dim as string regname
+		regname = *hGetRegName( dvreg->dtype, dvreg->reg )
+		outp "mov " + regname + ", OFFSET " + *symbGetMangledName( svreg->sym ) + "@NTPOFF"
+		outp "add " + regname + ", DWORD PTR gs:0"
+		if( svreg->ofs <> 0 ) then _
+			outp "add " + regname + ", " + str( svreg->ofs )
+		exit sub
+	end if
 
 	hPrepOperand( dvreg, dst )
 	hPrepOperand( svreg, src, , , , FALSE )
@@ -7511,6 +7576,11 @@ sub emitVARINIi( byval dtype as integer, byval value as longint )
 	outEx( s )
 end sub
 
+sub emitVARINI128( byval low as longint, byval high as longint )
+	emitVARINIi( FB_DATATYPE_ULONGINT, low )
+	emitVARINIi( FB_DATATYPE_ULONGINT, high )
+end sub
+
 sub emitVARINIf( byval dtype as integer, byval value as double )
 	'' can't use STR() because GAS doesn't support the 1.#INF notation
 	outEx( *_getTypeString( dtype ) + " " + hFloatToHex( value, dtype ) + NEWLINE )
@@ -7967,6 +8037,7 @@ private sub _procAllocLocal _
 	dim as integer ofs = any, lgt = any
 	const STACK_ALIGNMENT = 4
 	const STACK_ALIGNMENT_MASK = STACK_ALIGNMENT - 1
+	const STACK_FRAME_POINTER_MODULO_16 = 8
 
 	'' Do not allocate stack space for fake dynamic array symbols; only the
 	'' corresponding descriptors will be emitted.
@@ -7977,6 +8048,20 @@ private sub _procAllocLocal _
 	if( symbIsDynamic( sym ) ) then
 		assert( sym->ofs = 0 )
 		exit sub
+	end if
+
+	'' Call sites with a 16-byte aligned stack leave EBP at offset 8 modulo 16
+	'' after the return address and saved frame pointer are pushed. Account for
+	'' that fixed offset so locals and hidden scalar result slots keep their type
+	'' alignment instead of merely aligning the total stack frame.
+	if( (env.target.options and FB_TARGETOPT_STACKALIGN16) <> 0 ) then
+		var align = typeCalcNaturalAlign( symbGetType( sym ), symbGetSubtype( sym ) )
+		if( align > STACK_ALIGNMENT ) then
+			var alignmask = align - 1
+			var frameoffset = STACK_FRAME_POINTER_MODULO_16 and alignmask
+			var localoffset = proc->proc.ext->stk.localofs and alignmask
+			proc->proc.ext->stk.localofs += (frameoffset - localoffset) and alignmask
+		end if
 	end if
 
 	lgt = symbGetRealSize( sym )
@@ -8000,6 +8085,7 @@ private sub _procAllocArg _
 	)
 
 	dim as integer lgt = any
+	dim as FBSYMBOL ptr param = any
 	const STACK_ALIGNMENT = 4
 	const STACK_ALIGNMENT_MASK = STACK_ALIGNMENT - 1
 
@@ -8058,9 +8144,57 @@ private sub _procAllocArg _
 		exit select
 	end select
 
+	'' A 128-bit byval argument can follow the hidden result pointer, leaving
+	'' its incoming stack address only four-byte aligned. Give the BASIC param
+	'' variable an aligned local copy so taking its address preserves the type's
+	'' natural alignment. Keep the incoming offset on the parameter for prologue
+	'' initialization after the final frame size is known.
+	if( (env.target.options and FB_TARGETOPT_STACKALIGN16) <> 0 ) then
+		if( symbIsParamVarByVal( sym ) andalso _
+		    typeIsInteger128Scalar( symbGetType( sym ) ) ) then
+			param = symbGetProcHeadParam( proc )
+			while( param )
+				if( symbGetParamVar( param ) = sym ) then exit while
+				param = symbGetParamNext( param )
+			wend
+
+			if( param ) then
+				param->ofs = proc->proc.ext->stk.argofs
+				_procAllocLocal( proc, sym )
+				proc->proc.ext->stk.argofs += ((lgt + STACK_ALIGNMENT_MASK) and not STACK_ALIGNMENT_MASK)
+				exit sub
+			end if
+		end if
+	end if
+
 	sym->ofs = proc->proc.ext->stk.argofs
 	proc->proc.ext->stk.argofs += ((lgt + STACK_ALIGNMENT_MASK) and not STACK_ALIGNMENT_MASK)
 
+end sub
+
+private sub hCopyStackInteger128Params( byval proc as FBSYMBOL ptr )
+	if( (env.target.options and FB_TARGETOPT_STACKALIGN16) = 0 ) then exit sub
+
+	var param = symbGetProcHeadParam( proc )
+	while( param )
+		if( (param->param.mode = FB_PARAMMODE_BYVAL) andalso _
+		    typeIsInteger128Scalar( symbGetFullType( param ) ) andalso _
+		    (param->ofs >= EMIT_ARGSTART) andalso _
+		    (symbGetParamVar( param ) <> NULL) andalso _
+		    (symbGetParamVar( param )->ofs < 0) ) then
+			var source_offset = param->ofs
+			var destination_offset = symbGetParamVar( param )->ofs
+			for word_offset as integer = 0 to 12 step 4
+				outp( "mov eax, dword ptr [ebp+" + str( source_offset + word_offset ) + "]" )
+				var destination = "dword ptr [ebp"
+				if( (destination_offset + word_offset) > 0 ) then destination += "+"
+				destination += str( destination_offset + word_offset ) + "]"
+				outp( "mov " + destination + ", eax" )
+			next
+			param->ofs = 0
+		end if
+		param = symbGetParamNext( param )
+	wend
 end sub
 
 '':::::
@@ -8122,6 +8256,7 @@ private sub _procFooter _
 
 	'' frame
 	hCreateFrame( proc )
+	hCopyStackInteger128Params( proc )
 
 	edbgEmitLineFlush( proc, procext->dbg.iniline, proc )
 

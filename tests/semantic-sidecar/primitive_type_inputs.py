@@ -136,7 +136,7 @@ def check_rejection(test):
                 if case == 'keyword':
                     symbol = next(row[1] for row in model.records['T'] if row[3] == 'keyword' and row[2].upper() == 'DIM')
                     fields[2] = model.properties['symbol', int(symbol)]['keyword-token']
-                if case == 'dtype': fields[3] = '16'  # DOUBLE cannot be a selected LONG.
+                if case == 'dtype': fields[3] = '18'  # DOUBLE cannot be a selected LONG.
                 if case == 'pointer-depth': fields[3] = str(11 | (9 << 5))
                 selected[4] = '%09'.join(fields)
             damaged = test.working / ('primitive-' + case + '.fbcsem')

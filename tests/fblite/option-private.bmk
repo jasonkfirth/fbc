@@ -1,0 +1,11 @@
+# Project: FreeBASIC test suite
+# File: option-private.bmk
+# Purpose: Verify OPTION PRIVATE gives module-local procedure linkage.
+# Responsibilities: Link same-named procedures from separate modules.
+# This file intentionally does NOT contain: a custom linker implementation.
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := option-private-main.bas
+SRCS := option-private-provider.bas
+
+# end of option-private.bmk

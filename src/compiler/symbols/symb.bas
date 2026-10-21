@@ -2264,6 +2264,14 @@ function symbTypeToStr _
 			s += ")"
 		end if
 
+	case FB_DATATYPE_INTEGER128
+		'' Canonical types are also used by tooling and diagnostics. These
+		'' primitives require the width modifier, not their internal names.
+		s += "integer<128>"
+
+	case FB_DATATYPE_UINTEGER128
+		s += "uinteger<128>"
+
 	case else
 		s += *symb_dtypeTB(dtypeonly).name
 	end select

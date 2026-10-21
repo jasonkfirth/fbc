@@ -365,6 +365,7 @@ type IR_VTBL
 	emitVarIniBegin as sub( byval sym as FBSYMBOL ptr )
 	emitVarIniEnd as sub( byval sym as FBSYMBOL ptr )
 	emitVarIniI   as sub( byval sym as FBSYMBOL ptr, byval value as longint )
+	emitVarIni128 as sub( byval sym as FBSYMBOL ptr, byval low as longint, byval high as longint )
 	emitVarIniF   as sub( byval sym as FBSYMBOL ptr, byval value as double )
 	emitVarIniOfs as sub _
 	( _
@@ -574,6 +575,7 @@ declare sub vregDump( byval v as IRVREG ptr )
 #define irEmitVARINIBEGIN(sym) ir.vtbl.emitVarIniBegin( sym )
 #define irEmitVARINIEND(sym) ir.vtbl.emitVarIniEnd( sym )
 #define irEmitVARINIi(sym, value) ir.vtbl.emitVarIniI( sym, value )
+#define irEmitVARINI128(sym, low, high) ir.vtbl.emitVarIni128( sym, low, high )
 #define irEmitVARINIf(sym, value) ir.vtbl.emitVarIniF( sym, value )
 #define irEmitVARINIOFS(sym, rhs, ofs) ir.vtbl.emitVarIniOfs( sym, rhs, ofs )
 #define irEmitVARINISTR(totlgt, litstr, litlgt, noterm) ir.vtbl.emitVarIniStr( totlgt, litstr, litlgt, noterm )

@@ -8,9 +8,11 @@
 #include "fb.h"
 #include "fb_private_thread.h"
 
+static void hFreeTlsContext( void *ctx );
+
 #if defined ENABLE_MT && defined HOST_UNIX
 	#define FB_TLSENTRY           pthread_key_t
-	#define FB_TLSALLOC(key)      pthread_key_create( &(key), NULL )
+	#define FB_TLSALLOC(key)      pthread_key_create( &(key), hFreeTlsContext )
 	#define FB_TLSSET(key,value)  pthread_setspecific( (key), (const void *)(value) )
 	#define FB_TLSGET(key)        pthread_getspecific( (key) )
 	#ifdef HOST_NETBSD
@@ -50,6 +52,17 @@ static FB_TLSENTRY __fb_tls_ctxtb[FB_TLSKEYS];
 
 #define FB_TLS_DATA_TO_HEADER( data ) ( ( ( FB_TLS_CTX_HEADER *)data ) - 1 )
 #define FB_TLS_HEADER_TO_DATA( header ) ( ( void *) ( header + 1 ) )
+
+static void hFreeTlsContext( void *ctx )
+{
+	if( ctx != NULL ) {
+		FB_TLS_CTX_HEADER *ctxHeader = FB_TLS_DATA_TO_HEADER( ctx );
+		if( ctxHeader->destructor != NULL ) {
+			( ctxHeader->destructor )( ctx );
+		}
+		free( ctxHeader );
+	}
+}
 
 /* Retrieve or create new TLS context for given key */
 FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn )

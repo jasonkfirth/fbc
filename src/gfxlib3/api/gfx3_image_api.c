@@ -713,6 +713,108 @@ FBCALL int fb_GfxGetQB(void *target, float x1, float y1, float x2, float y2,
 		array, FALSE);
 }
 
+/*
+	Renderer integrations sometimes keep their own CPU image cache and only
+	need a bounded screen rectangle. Keep ordinary BASIC GET's reusable full
+	shadow behavior, while giving those integrations a direct regional capture.
+	Coordinates are physical pixels on the current work page, within VIEW. A
+	valid screen shadow remains authoritative for locked SCREENPTR writes.
+*/
+FBCALL int fb_Gfx3ScreenCapture(void *destination, int x, int y,
+	int width, int height)
+{
+	FB_GFX3_DRAW_STATE *state;
+	FB_GFX3_MODE *mode;
+	FB_GFX3_IMAGE_VIEW destination_view;
+	const unsigned char *shadow_row;
+	uint64_t row_bytes;
+	size_t destination_size;
+	uint32_t bytes_per_pixel;
+	uint32_t page;
+	uint32_t row;
+	int result = FB_GFX3_INVALID;
+
+	if ((destination == NULL) || (x < 0) || (y < 0) || (width <= 0) ||
+	    (height <= 0))
+		return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+	memset(&destination_view, 0, sizeof(destination_view));
+	if (fb_gfx3_image_parse(destination, &destination_view) != FB_GFX3_OK)
+		return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+
+	FB_GRAPHICS_LOCK();
+	state = fb_gfx3_api_get_draw_state_locked();
+	if (state == NULL)
+		goto done;
+	result = fb_gfx3_compat_flush_points_graphics_locked(state);
+	if (result != FB_GFX3_OK)
+		goto done;
+	mode = state->mode;
+	page = state->work_page;
+	bytes_per_pixel = image_api_bytes_per_pixel(mode->depth);
+	row_bytes = (uint64_t)(uint32_t)width * bytes_per_pixel;
+	if ((bytes_per_pixel == 0u) ||
+	    (destination_view.bytes_per_pixel != bytes_per_pixel) ||
+	    (destination_view.width < (uint32_t)width) ||
+	    (destination_view.height < (uint32_t)height) ||
+	    (page >= mode->page_count) ||
+	    (mode->pages == NULL) || (row_bytes > UINT32_MAX) ||
+	    ((uint64_t)destination_view.pitch < row_bytes) ||
+	    (fb_gfx3_size_multiply(destination_view.pitch, (size_t)height,
+	     &destination_size) != FB_GFX3_OK) ||
+	    (destination_size > UINT32_MAX) ||
+	    ((uint64_t)(uint32_t)x + (uint32_t)width > mode->width) ||
+	    ((uint64_t)(uint32_t)y + (uint32_t)height > mode->height) ||
+	    (x < state->view.x1) || (y < state->view.y1) ||
+	    ((int64_t)x + width - 1 > state->view.x2) ||
+	    ((int64_t)y + height - 1 > state->view.y2)) {
+		result = FB_GFX3_INVALID;
+		goto done;
+	}
+
+	if ((mode->shadow_pages != NULL) &&
+	    (mode->shadow_valid != NULL) &&
+	    (mode->shadow_pages[page] != NULL) &&
+	    mode->shadow_valid[page]) {
+		if ((uint64_t)mode->shadow_pitch <
+		    ((uint64_t)mode->width * bytes_per_pixel)) {
+			result = FB_GFX3_INVALID;
+			goto done;
+		}
+		for (row = 0; row < (uint32_t)height; row++) {
+			shadow_row = mode->shadow_pages[page] +
+				((size_t)(y + (int)row) * mode->shadow_pitch) +
+				((size_t)x * bytes_per_pixel);
+			memcpy(destination_view.pixels +
+				((size_t)row * destination_view.pitch),
+				shadow_row, (size_t)row_bytes);
+			if ((uint64_t)destination_view.pitch > row_bytes)
+				memset(destination_view.pixels +
+					((size_t)row * destination_view.pitch) +
+					(size_t)row_bytes, 0,
+					(size_t)((uint64_t)destination_view.pitch - row_bytes));
+		}
+		result = FB_GFX3_OK;
+	} else {
+		result = fb_gfx3_surface_download(&mode->pages[page], x, y,
+			(uint32_t)width, (uint32_t)height,
+			destination_view.pitch, destination_view.pixels);
+		if ((result == FB_GFX3_OK) &&
+		    ((uint64_t)destination_view.pitch > row_bytes)) {
+			for (row = 0; row < (uint32_t)height; row++)
+				memset(destination_view.pixels +
+					((size_t)row * destination_view.pitch) +
+					(size_t)row_bytes, 0,
+					(size_t)((uint64_t)destination_view.pitch - row_bytes));
+		}
+	}
+	if (result == FB_GFX3_OK)
+		fb_gfx3_image_cache_metadata_touch(&destination_view);
+
+done:
+	FB_GRAPHICS_UNLOCK();
+	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+}
+
 /* ------------------------------------------------------------------------- */
 /* PUT                                                                       */
 /* ------------------------------------------------------------------------- */

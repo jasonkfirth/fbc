@@ -86,6 +86,12 @@ function hIsConstInRange _
 	'' TODO: Centralize the integer limit constants used here and by
 	'' astCheckConst() so the two diagnostic policies share one source of
 	'' numeric bounds without sharing their decision logic.
+	select case typeGetSizeType( todtype )
+	case FB_SIZETYPE_INT128
+		return TRUE
+	case FB_SIZETYPE_UINT128
+		return (typeIsSigned( dtype ) = FALSE) or (value >= 0)
+	end select
 
 	static range( FB_SIZETYPE_BOOLEAN to FB_SIZETYPE_UINT64 ) as RANGEVALUES = _
 		{ _
@@ -448,6 +454,8 @@ function hIntegerTypeFromBitSize _
 		dtype = FB_DATATYPE_LONG
 	case 64
 		dtype = FB_DATATYPE_LONGINT
+	case 128
+		dtype = FB_DATATYPE_INTEGER128
 	case else
 		errReport( FB_ERRMSG_INVALIDSIZE, TRUE )
 		dtype = FB_DATATYPE_INTEGER

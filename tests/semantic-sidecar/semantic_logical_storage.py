@@ -25,7 +25,7 @@ def validate_logical_storage(model, number, subject_modules, node_kind_count, co
 
     def original_strings(original):
         return all(identity in expressions and
-                   int(expressions[identity][12]) & 0x1ff in (4, 7, 17, 18)
+                   int(expressions[identity][12]) & 0x1ff in (4, 7, 19, 20)
                    for identity in map(int, original[4:6]))
 
     def decimal(text, minimum=0, maximum=9223372036854775807):

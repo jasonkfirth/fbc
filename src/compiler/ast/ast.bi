@@ -782,7 +782,8 @@ declare function astNewVAR _
 		byval sym as FBSYMBOL ptr, _
 		byval ofs as longint = 0, _
 		byval dtype as integer = FB_DATATYPE_INVALID, _
-		byval subtype as FBSYMBOL ptr = NULL _
+		byval subtype as FBSYMBOL ptr = NULL, _
+		byval no_thread_local as integer = FALSE _
 	) as ASTNODE ptr
 
 declare function astNewIDX( byval var_ as ASTNODE ptr, byval idx as ASTNODE ptr ) as ASTNODE ptr
@@ -1241,6 +1242,17 @@ declare function astRemSideFx( byref n as ASTNODE ptr ) as ASTNODE ptr
 
 declare function astBuildVarDeref( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
 declare function astBuildVarAddrof( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
+declare function astTypeIsIncompleteValue( byval dtype as integer ) as integer
+
+declare function astBuildNativeInt128Address( byval expr as ASTNODE ptr ) as ASTNODE ptr
+declare function astUsesInt128Helpers( ) as integer
+declare function astBuildNativeInt128FromInteger( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+declare function astBuildNativeInt128FromFloat( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+declare function astBuildNativeInt128ToInteger( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+declare function astBuildNativeInt128ToFloat( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+declare function astBuildNativeInt128Copy( byval lhs as ASTNODE ptr, byval rhs as ASTNODE ptr ) as ASTNODE ptr
+declare function astBuildNativeInt128Bop( byval op as integer, byval lhs as ASTNODE ptr, byval rhs as ASTNODE ptr, byval result_dtype as integer, byval operand_dtype as integer, byval branch_label as FBSYMBOL ptr, byval options as AST_OPOPT ) as ASTNODE ptr
+declare function astBuildNativeInt128Uop( byval op as integer, byval expr as ASTNODE ptr, byval result_dtype as integer, byval is_signed as integer ) as ASTNODE ptr
 
 declare function astBuildVarInc _
 	( _

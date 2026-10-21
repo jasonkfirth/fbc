@@ -472,6 +472,8 @@ function hMangleBuiltInType _
 		@"j", _ '' ULong: unsigned int
 		@"x", _ '' LongInt: long long
 		@"y", _ '' ULongInt: unsigned long long
+		@"n", _ '' Integer128: __int128
+		@"o", _ '' UInteger128: unsigned __int128
 		@"f", _ '' Single: float
 		@"d", _ '' double
 		NULL, _ '' var-len string

@@ -42,8 +42,8 @@ def validate_select_lowering(model, inputs, clauses, alternatives, observations,
         if selected_type & 0x1e0:
             return False
         if kind == "unicode":
-            return base == 26
-        return base in ((4, 7, 17, 18) if kind == "wide" else (4, 17, 18))
+            return base == 28
+        return base in ((4, 7, 19, 20) if kind == "wide" else (4, 19, 20))
 
     for owner, module, parts, fields in observations:
         work_left -= 1

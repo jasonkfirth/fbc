@@ -46,6 +46,7 @@ enum {
 	FB_TLSKEY_GFX,
 	FB_TLSKEY_FBTHREAD,
 	FB_TLSKEY_PROFILE,
+	FB_TLSKEY_USERVAR,
 	FB_TLSKEYS
 };
 
@@ -58,6 +59,7 @@ typedef struct _FB_TLS_CTX_HEADER {
 } FB_TLS_CTX_HEADER;
 
 FBCALL void             *fb_TlsGetCtx        ( int index, size_t len, FB_TLS_DESTRUCTOR destructor );
+FBCALL void             *fb_TlsGetVar        ( const char *name, unsigned int len, unsigned int align, uintptr_t initial );
 FBCALL void              fb_TlsDelCtx        ( int index );
 FBCALL void              fb_TlsFreeCtxTb     ( void );
 #ifdef ENABLE_MT

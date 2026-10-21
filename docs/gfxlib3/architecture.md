@@ -862,10 +862,22 @@ sequence. That sequence becomes complete only after all older GL fences have
 retired. This preserves resource lifetime and completion order without asking
 the OpenGL driver to allocate and query a fence for every idle window pump.
 
-The outline box shader treats the perimeter as one indexed sequence in the
-same bottom, top, right, left order used by gfxlib2. The 16-bit line style
-therefore continues across edges and clipped portions instead of restarting at
-each corner. Filled boxes reuse the clipped GPU clear dispatch.
+The individual outline-box shader treats the perimeter as one indexed sequence
+in the same bottom, top, right, left order used by gfxlib2. The 16-bit line
+style therefore continues across edges and clipped portions instead of
+restarting at each corner. An individual filled box reuses the clipped GPU
+clear dispatch.
+
+Adjacent opaque points, lines, small rectangles, and ellipses can share one
+ordered primitive batch. The renderer flattens their geometry, clipping, style,
+and color metadata into three `ivec4` values per primitive. One compute pass
+records the last primitive reaching each pixel in a GPU winner image; a resolve
+pass writes that primitive's color. Small filled rectangles and outlines join
+only when their full coverage is at most 4,096 pixels or edge samples. Larger
+rectangles and alpha-blended primitives keep their established exact paths.
+This avoids splitting a CAD primitive stream at every rectangle while retaining
+the existing coverage and submission order. Neither pass reads pixels back to
+the CPU.
 
 When PUT reads and writes the same GPU surface, the backend copies the source
 rectangle into a temporary GPU texture before dispatch. Compute invocations
@@ -1108,6 +1120,12 @@ selection is:
    matching gfxlib2's final window-mode retry. An explicit null request remains
    a single non-windowed attempt.
 9. Initialization fails after both GPU passes are exhausted.
+
+The exact Vulkan midpoint-ellipse shader requires `shaderFloat64`. Vulkan
+probing rejects adapters without that feature before opening a mode, so an
+ordinary desktop request can continue to OpenGL instead of accepting Vulkan
+and failing later when the program draws a circle. An explicit
+`FB.GFX_VULKAN` request reports mode-open failure on such an adapter.
 
 This follows gfxlib2's driver-list policy: a request changes priority, while
 the platform list still supplies fallbacks. Selection is capability and

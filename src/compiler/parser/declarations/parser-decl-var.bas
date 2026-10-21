@@ -88,6 +88,24 @@ function cVariableDecl( byval attrib as FB_SYMBATTRIB ) as integer
 	tk = lexGetToken( )
 
 	select case as const tk
+	'' THREAD LOCAL
+	case FB_TK_THREAD
+		if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_DECL or FB_CMPSTMT_MASK_CODE ) = FALSE ) then
+			hSkipStmt( )
+			return TRUE
+		end if
+
+		lexSkipToken( LEXCHECK_POST_SUFFIX )
+		if( hMatch( FB_TK_LOCAL, LEXCHECK_POST_SUFFIX ) = FALSE ) then
+			errReport( FB_ERRMSG_SYNTAXERROR )
+			hSkipStmt( )
+			return TRUE
+		end if
+
+		attrib or= FB_SYMBATTRIB_THREADLOCAL or FB_SYMBATTRIB_STATIC
+		function = cVariableDecl( attrib )
+		exit function
+
 	'' REDIM
 	case FB_TK_REDIM
 		'' REDIM generates code, check if allowed
@@ -123,6 +141,17 @@ function cVariableDecl( byval attrib as FB_SYMBATTRIB ) as integer
 
 	'' EXTERN
 	case FB_TK_EXTERN
+		if( ((attrib and FB_SYMBATTRIB_THREADLOCAL) <> 0) andalso _
+		    (parser.mangling = FB_MANGLING_CDECL) andalso _
+		    ((env.clopt.backend = FB_BACKEND_GAS) or _
+		     (env.clopt.backend = FB_BACKEND_GAS64)) andalso _
+		    ((env.clopt.target <> FB_COMPTARGET_LINUX) or _
+		     (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB)) ) then
+			errReport( FB_ERRMSG_THREADLOCALUNSUPPORTED )
+			hSkipStmt( )
+			return TRUE
+		end if
+
 		if( attrib = FB_SYMBATTRIB_NONE ) then
 			'' Disambiguate from <EXTERN "..." : ... : END EXTERN> blocks
 			if( lexGetLookAheadClass( 1 ) = FB_TKCLASS_STRLITERAL ) then
@@ -132,6 +161,10 @@ function cVariableDecl( byval attrib as FB_SYMBATTRIB ) as integer
 
 		attrib or= FB_SYMBATTRIB_EXTERN
 		attrib or= FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_STATIC
+		if( ((attrib and FB_SYMBATTRIB_THREADLOCAL) <> 0) andalso _
+		    (parser.mangling = FB_MANGLING_CDECL) ) then
+			attrib or= FB_SYMBATTRIB_THREADLOCALC
+		end if
 
 		'' can't use EXTERN inside a proc
 		if( hCheckScope( ) = FALSE ) then
@@ -507,6 +540,11 @@ private function hCheckForIdToken( byval parent as FBSYMBOL ptr ) as integer
 		end if
 
 	case FB_TKCLASS_QUIRKWD
+		'' THREAD is contextual: outside THREAD LOCAL it can still be an identifier.
+		if( lexGetToken( ) = FB_TK_THREAD ) then
+			exit select
+		end if
+
 		'' Ok in -lang qb, but otherwise, need additional checks
 		if( env.clopt.lang <> FB_LANG_QB ) then
 			'' only if inside a ns and if not local
@@ -668,6 +706,13 @@ private function hVarInitDefault _
 		exit function
 	end if
 
+	if( symbIsThreadLocal( sym ) andalso _
+	    (symbIsDynamic( sym ) or typeIsDynamicString( symbGetType( sym ) ) or _
+	     symbHasCtor( sym ) or symbHasDtor( sym )) ) then
+		errReport( FB_ERRMSG_THREADLOCALUNSUPPORTED )
+		exit function
+	end if
+
 	'' No default initialization for EXTERNs
 	'' (they're initialized when defined by corresponding DIM)
 	if( symbIsExtern( sym ) ) then
@@ -745,6 +790,22 @@ private sub hValidateGlobalVarInit( byval sym as FBSYMBOL ptr, byref initree as 
 	'' Not a global?
 	if( (symbGetAttrib( sym ) and (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED)) = 0 ) then
 		return
+	end if
+
+	if( symbIsThreadLocal( sym ) ) then
+		if( symbIsDynamic( sym ) or typeIsDynamicString( symbGetType( sym ) ) or _
+		    symbHasCtor( sym ) or symbHasDtor( sym ) ) then
+			errReport( FB_ERRMSG_THREADLOCALUNSUPPORTED )
+			astDelTree( initree )
+			initree = NULL
+			return
+		end if
+		if( (initree <> NULL) andalso (astTypeIniIsConst( initree ) = FALSE) ) then
+			errReport( FB_ERRMSG_THREADLOCALUNSUPPORTED )
+			astDelTree( initree )
+			initree = NULL
+			return
+		end if
 	end if
 
 	'' Disallow initialization of global dynamic strings
@@ -1584,7 +1645,8 @@ private sub hParseLeadingVarType _
 	end if
 
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
-	hSymbolType( dtype, subtype, lgt, has_byref )
+	hSymbolType( dtype, subtype, lgt, has_byref, FALSE, _
+	             (baseattrib and FB_SYMBATTRIB_EXTERN) <> 0 )
 
 	if( has_byref = FALSE ) then
 		hComplainIfAbstractClass( dtype, subtype )
@@ -1797,7 +1859,8 @@ function cVarDecl _
 				var is_ref = ((attrib and FB_SYMBATTRIB_REF) <> 0)
 
 				'' parse the symbol type (INTEGER, STRING, etc...)
-				hSymbolType( dtype, subtype, lgt, is_ref )
+				hSymbolType( dtype, subtype, lgt, is_ref, FALSE, _
+				             (attrib and FB_SYMBATTRIB_EXTERN) <> 0 )
 
 				if( is_ref = FALSE ) then
 					'' Disallow creating objects of abstract classes
@@ -1887,6 +1950,16 @@ function cVarDecl _
 				'' -lang fb: typeless REDIM without pre-existing array not allowed
 				hErrorDefTypeNotAllowed( dtype, subtype, lgt )
 			end if
+		end if
+
+		'' An incomplete object may be declared extern only as a scalar. An
+		'' array would need the element size even though no storage is emitted.
+		if( ((attrib and FB_SYMBATTRIB_EXTERN) <> 0) and _
+		    (dimensions <> 0) and astTypeIsIncompleteValue( dtype ) ) then
+			errReport( FB_ERRMSG_INCOMPLETETYPE, TRUE )
+			dtype = FB_DATATYPE_INTEGER
+			subtype = NULL
+			lgt = typeGetSize( dtype )
 		end if
 
 		if( have_bounds ) then
@@ -1992,7 +2065,9 @@ function cVarDecl _
 		    have_bounds, varexpr, exprTB(), dopreserve, semantic_site, semantic_initializer ) = FALSE ) then
 			exit function
 		end if
-		if( semantic_group <> 0 ) then
+		'' Rejected declarations have no symbol. Count only accepted inputs,
+		'' as the VAR path does, so diagnostics do not invalidate the sidecar.
+		if( (semantic_group <> 0) and (sym <> NULL) ) then
 			semantic_ordinal += 1
 			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, sym, _
 				semantic_written_type, semantic_initializer, semantic_site)

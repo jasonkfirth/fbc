@@ -472,19 +472,21 @@ build snapshots, not a complete run with one latest compiler binary. The
 86 documented gaps retain matching build-log hashes; 76 have successful GCC
 controls, two have failed controls, and eight have no recorded control.
 
-Two compatible original BASICVERSE programs remain pending: the older island
-demo and the full 300-frame recording. Six complete recording frames have
-been compared with GCC so far. Each has a maximum channel difference of one;
-the sixth differs at 138 of 1,024,000 pixels. This does not establish completion
-of the recording. An actual recording checkpoint has loaded into a filesystem
-isolation that makes a writable copy available at the original guest path.
+Two compatible original BASICVERSE programs were pending at that checkpoint:
+the older island demo and the full 300-frame recording. The island subsequently
+completed its original rendering loop and ordinary Escape exit with native
+return zero. Cumulative coverage is now 94 targets with verified execution,
+including 78 ordinary runs and 20 diagnostic runs, with overlap.
+
+The recording's first six frames each had a maximum channel difference of one
+from GCC. An actual recording checkpoint loaded into a filesystem isolation
+that makes a writable copy available at the original guest path.
 That copy continued from saved frame index 5 and produced the next complete
 frame byte-identical to the live native recording. The preceding five files
 were preserved. This qualifies the recovery method for this workload; the
 diagnostic copy stopped after one new frame and does not establish completion
-of all 300 frames. A newer hourly checkpoint has a verified checksum and an
-inspected loop counter of 6, but has not itself been restored. The original
-recording continues separately, with its files protected from the experiment.
+of all 300 frames. The original recording later reached 23 complete frames
+before its host controller limit; its selected recovery state was at frame 22.
 
 A managed continuation waits for the original host controller's configured
 limit and verifies that its emulator has terminated before preparing recovery.
@@ -493,6 +495,66 @@ and removes later frames only from that copy so they must be recomputed. The
 checkpoint selector verifies the executable, loop counter and completed-frame
 hashes. Full recording coverage still requires all 300 original frames and
 native DONE 0/COMPLETE; a successful recovery experiment alone is insufficient.
+
+The continuation reached 226 complete frames before the October 21 machine
+shutdown. It has no native completion marker. Its last available RAM checkpoint
+was still at frame 22, so those later calculations must be repeated; the 226
+images remain preserved for comparison. The next recovery uses a memory-backed
+working volume, with completed images and two rotating, inspected save slots
+on durable storage. Image storage may reuse a byte-identical earlier file only
+after the native application has recomputed and validated that frame. The
+application's original resolution, frame count and inference work are retained.
+
+All 226 captured frames were compared without masks: 231,424,000 RGB pixels.
+Of these, 2,623 differ by more than one channel value, and 142 differ by more
+than 16; no frame has more than five of the latter. Traced original raster
+equations explain three selected large differences: one-ULP camera-yaw changes
+flip a leaf edge test or a nearly equal water/sand depth test. These are
+different material selections, not channel-order corruption. Other flagged
+pixels remain recorded for review, and these diagnostic cases do not establish
+full recording completion (`record-colour-investigation` in the audit directory).
+
+A further controlled check explains two bark-texture differences at frame 10,
+pixel (700, 300), and frame 27, pixel (857, 480). Changing only GCC's camera yaw
+to the observed native value, one ULP away, reproduces the native edge weights,
+depth, UV coordinates and final RGB exactly. Their projected triangles cover
+about 0.063 and 0.130 square pixels, respectively, making interpolation sensitive
+to small projection changes. This is evidence for these two pixels, not a
+blanket tolerance increase. The inputs and both controls are preserved under
+`record-camera-yaw-control`. All of the initial ten completed pixel diagnostics
+have a traced explanation. The buffered batch continues the remaining checks;
+its current counts and unresolved cases are in `record-boundary-batch/trace-review.json`.
+
+The initial pixel batch stalled while writing diagnostic console output. Its
+saved state contains no ready task, with the application waiting in DOS output;
+the cause is not established. That diagnostic was stopped after preserving its
+state and partial trace. A separate rerun uses buffered file tracing, retaining
+all 142 checks and adding shader operands. All 142 GCC control pixels remain
+unchanged. The full recording continues separately with its original workload.
+
+An isolated native diagnostic completed the original camera equations and
+projection trigonometry for all 300 frame inputs. Its camera words match the
+original pixel traces. Comparing 1,200 sine/cosine results against a 90-digit
+reference, using each exact native binary32 argument, found 1,160 native values
+equal to the nearest rounded result and 40 one representable float step away.
+For the same inputs, the host library returned 1,189 nearest results and 11
+adjacent results. These measurements cover the recording's projection angles,
+not arbitrary libm inputs. GCC controls supplied with the native camera and
+projection trig words reproduce further native edge weights, depth, texture
+coordinates and final pixels exactly. The native arithmetic and controls are
+preserved under `record-camera-trig-probe` and `record-observed-projection-controls`.
+
+The file-query audit also found a native ABI defect: DOS requires four-byte
+alignment for FileInfoBlock, while the NDK type and 68k C stack require only
+two bytes. An aligned internal typedef now makes automatic query buffers meet
+the DOS boundary without changing their layout. A guarded native regression
+passes the ordinary stack path before the fix but rejects a word-aligned stat
+buffer with exit 83. Afterward both paths pass, with all 47 DOS queries aligned.
+All 15 maintained probes passed, as did the file suite's 133 tests and 7,260
+assertions and the graphics suite's 102 tests and 469,679 assertions. This
+establishes the alignment fix, not the cause of the earlier historical seek
+stall. Evidence is under `fileinfo-alignment-review`, `fileinfo-probes-final`,
+`fileinfo-file-tests` and `fileinfo-gfx-tests` in the audit directory.
 
 ## October 20 source restructure qualification
 

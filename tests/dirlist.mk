@@ -1,5 +1,8 @@
-# dirlist.mk
-# This file is part of the FreeBASIC test suite
+# Project: FreeBASIC test suite
+# File: dirlist.mk
+# Purpose: Select directories used by unit and dialect log tests.
+# Responsibilities: Define the source tree for each supported language mode.
+# This file intentionally does NOT contain: per-test compile or link rules.
 #
 
 # EDIT this file when new directories are added to the testing tree
@@ -31,6 +34,7 @@ pointers \
 pp \
 quirk \
 scopes \
+serialization \
 sfx \
 string \
 structs \
@@ -51,3 +55,5 @@ qb
 
 DIRLIST_DEPRECATED := \
 deprecated
+
+# end of dirlist.mk

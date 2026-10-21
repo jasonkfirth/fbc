@@ -949,6 +949,22 @@ private sub hFlushExprStatic( byval n as ASTNODE ptr, byval basesym as FBSYMBOL 
 
 	'' not a literal string?
 	if( litsym = NULL ) then
+		if( typeIsInteger128Scalar( sfulldtype ) ) then
+			var source_expr = expr
+			while( source_expr->class = AST_NODECLASS_CONV )
+				source_expr = source_expr->l
+			wend
+			if( astIsCONST( source_expr ) ) then
+				dim as longint value = astConstGetAsInt64( source_expr )
+				dim as longint high_word = iif( _
+					typeIsSigned( astGetFullType( source_expr ) ) andalso (value < 0), -1, 0 )
+				irEmitVARINI128( sym, value, high_word )
+				astDelTree( n->l )
+				n->l = NULL
+				exit sub
+			end if
+		end if
+
 		'' offset?
 		if( astIsOFFSET( expr ) ) then
 			irEmitVARINIOFS( sym, astGetSymbol( expr ), expr->ofs.ofs )

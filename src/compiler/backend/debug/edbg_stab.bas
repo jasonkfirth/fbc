@@ -89,6 +89,8 @@ declare function hGetDataType _
 		 8, _                                   '' ulong
 		 9, _                                   '' longint
 		10, _                                   '' ulongint
+		 0, _                                   '' integer128
+		 0, _                                   '' uinteger128
 		11, _                                   '' single
 		12, _                                   '' double
 		13, _                                   '' string

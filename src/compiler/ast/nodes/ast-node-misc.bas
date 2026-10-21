@@ -349,6 +349,11 @@ function astNewLOAD _
 		byval isresult as integer _
 	) as ASTNODE ptr
 
+	if( astTypeIsIncompleteValue( dtype ) ) then
+		errReport( FB_ERRMSG_INCOMPLETETYPE )
+		return NULL
+	end if
+
 	'' alloc new node
 	dim as ASTNODE ptr n = astNewNode( AST_NODECLASS_LOAD, dtype )
 

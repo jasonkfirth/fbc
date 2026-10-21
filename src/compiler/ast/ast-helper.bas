@@ -128,6 +128,265 @@ function astBuildVarAddrof( byval sym as FBSYMBOL ptr ) as ASTNODE ptr
 	function = astNewADDROF( astNewVAR( sym ) )
 end function
 
+function astTypeIsIncompleteValue( byval dtype as integer ) as integer
+	function = (typeGetPtrCnt( dtype ) = 0) and _
+	           (typeGet( dtype ) = FB_DATATYPE_FWDREF)
+end function
+
+private function hNativeInt128Arg( byval call_node as ASTNODE ptr, byval expr as ASTNODE ptr ) as integer
+	if( astNewARG( call_node, expr ) = NULL ) then
+		astDelTREE( call_node )
+		return FALSE
+	end if
+	return TRUE
+end function
+
+function astUsesInt128Helpers( ) as integer
+	select case( env.clopt.backend )
+	case FB_BACKEND_GAS, FB_BACKEND_GAS64
+		return TRUE
+	case FB_BACKEND_GCC, FB_BACKEND_CLANG
+		'' Keep 32-bit C targets independent of compiler-specific __int128 support.
+		return (fbGetBits( ) = 32)
+	end select
+	return FALSE
+end function
+
+function astBuildNativeInt128Address( byval expr as ASTNODE ptr ) as ASTNODE ptr
+	dim as integer has_byval_result = FALSE
+	if( expr = NULL ) then return NULL
+	while( (expr->class = AST_NODECLASS_CONV) andalso _
+	       (expr->cast.doconv = FALSE) andalso (expr->cast.convconst = FALSE) )
+		expr = astRemoveNoConvCAST( expr )
+	wend
+	if( astIsCALL( expr ) andalso typeIsInteger128Scalar( expr->dtype ) andalso _
+	    symbProcReturnsOnStack( expr->sym ) ) then
+		'' Stack-returned values already have addressable caller storage.
+		return astNewLINK( expr, astNewADDROF( astNewVAR( expr->call.tmpres ) ), _
+		                   AST_LINK_RETURN_RIGHT )
+	end if
+	if( astIsCALL( expr ) andalso typeIsInteger128Scalar( expr->dtype ) ) then
+		if( env.clopt.backend = FB_BACKEND_GAS64 ) then
+			has_byval_result = (env.target.options and FB_TARGETOPT_GAS64_SYSV_ABI) <> 0
+		elseif( (env.clopt.backend = FB_BACKEND_GCC) orElse _
+		        (env.clopt.backend = FB_BACKEND_CLANG) ) then
+			has_byval_result = TRUE
+		elseif( env.clopt.backend = FB_BACKEND_LLVM ) then
+			has_byval_result = TRUE
+		end if
+	end if
+
+	if( astCanTakeAddrOf( expr ) ) then
+		return astNewADDROF( expr )
+	end if
+	if( has_byval_result ) then
+		dim as FBSYMBOL ptr temp = symbAddTempVar( expr->dtype, expr->subtype )
+		dim as ASTNODE ptr assignment = astNewASSIGN( astNewVAR( temp ), expr, AST_OPOPT_ISINI )
+		if( assignment = NULL ) then return NULL
+		return astNewLINK( assignment, astNewADDROF( astNewVAR( temp ) ), _
+		                   AST_LINK_RETURN_RIGHT )
+	end if
+
+	'' A constant must live in addressable storage before the helper can read it.
+	if( astIsCONST( expr ) ) then
+		dim as integer temp_dtype = iif( typeIsSigned( expr->dtype ), _
+			FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128 )
+		dim as FBSYMBOL ptr temp = symbAddTempVar( temp_dtype )
+		dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128FROMU64, FB_RTL_IDX_INT128FROMU64 ) )
+		dim as longint value = astConstGetAsInt64( expr )
+		dim as longint sign_extend = iif( typeIsSigned( expr->dtype ) andalso (value < 0), 1, 0 )
+		if( hNativeInt128Arg( call_node, astNewADDROF( astNewVAR( temp ) ) ) = FALSE ) then return NULL
+		if( hNativeInt128Arg( call_node, astNewCONSTi( value, FB_DATATYPE_ULONGINT ) ) = FALSE ) then return NULL
+		if( hNativeInt128Arg( call_node, astNewCONSTi( sign_extend, FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+		return call_node
+	end if
+
+	errReport( FB_ERRMSG_INTEGER128UNSUPPORTED )
+	return NULL
+end function
+
+function astBuildNativeInt128FromInteger( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+	dim as FBSYMBOL ptr temp = symbAddTempVar( dtype )
+	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128FROMU64, FB_RTL_IDX_INT128FROMU64 ) )
+	dim as integer sign_extend = iif( typeIsSigned( astGetFullType( expr ) ), 1, 0 )
+	var value = astNewCONV( FB_DATATYPE_ULONGINT, NULL, astCloneTree( expr ) )
+	if( value = NULL ) then
+		astDelTREE( call_node )
+		return NULL
+	end if
+	if( hNativeInt128Arg( call_node, astNewADDROF( astNewVAR( temp ) ) ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, value ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, astNewCONSTi( sign_extend, FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+	return astNewDEREF( call_node, dtype, NULL, 0 )
+end function
+
+function astBuildNativeInt128FromFloat( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+	dim as FBSYMBOL ptr temp = symbAddTempVar( dtype )
+	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128FROMDOUBLE, FB_RTL_IDX_INT128FROMDOUBLE ) )
+	var value = astNewCONV( FB_DATATYPE_DOUBLE, NULL, expr )
+	if( value = NULL ) then
+		astDelTREE( call_node )
+		return NULL
+	end if
+	if( hNativeInt128Arg( call_node, astNewADDROF( astNewVAR( temp ) ) ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, value ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, astNewCONSTi( typeIsSigned( dtype ), FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+	return astNewDEREF( call_node, dtype, NULL, 0 )
+end function
+
+function astBuildNativeInt128ToInteger( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+	dim as ASTNODE ptr source_address = astBuildNativeInt128Address( expr )
+	if( source_address = NULL ) then return NULL
+
+	if( typeGet( dtype ) = FB_DATATYPE_BOOLEAN ) then
+		dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128TOBOOL, FB_RTL_IDX_INT128TOBOOL ) )
+		if( hNativeInt128Arg( call_node, source_address ) = FALSE ) then return NULL
+		return astNewCONV( dtype, NULL, call_node )
+	else
+		dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128TOU64, FB_RTL_IDX_INT128TOU64 ) )
+		if( hNativeInt128Arg( call_node, source_address ) = FALSE ) then return NULL
+		return astNewCONV( dtype, NULL, call_node )
+	end if
+end function
+
+function astBuildNativeInt128ToFloat( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
+	dim as integer is_signed = typeIsSigned( astGetFullType( expr ) )
+	dim as ASTNODE ptr source_address = astBuildNativeInt128Address( expr )
+	if( source_address = NULL ) then return NULL
+	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128TODOUBLE, FB_RTL_IDX_INT128TODOUBLE ) )
+	if( hNativeInt128Arg( call_node, source_address ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, astNewCONSTi( is_signed, FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+	return astNewCONV( dtype, NULL, call_node )
+end function
+
+function astBuildNativeInt128Copy( byval lhs as ASTNODE ptr, byval rhs as ASTNODE ptr ) as ASTNODE ptr
+	dim as integer dtype = astGetFullType( lhs )
+	dim as FBSYMBOL ptr subtype = lhs->subtype
+	dim as ASTNODE ptr destination_address = astNewADDROF( lhs )
+	dim as ASTNODE ptr source_address = astBuildNativeInt128Address( rhs )
+	if( (destination_address = NULL) or (source_address = NULL) ) then
+		astDelTREE( destination_address )
+		astDelTREE( source_address )
+		return NULL
+	end if
+	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128COPY, FB_RTL_IDX_INT128COPY ) )
+	if( hNativeInt128Arg( call_node, destination_address ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, source_address ) = FALSE ) then return NULL
+	return astNewDEREF( call_node, dtype, subtype, 0 )
+end function
+
+function astBuildNativeInt128Bop _
+	( _
+		byval op as integer, _
+		byval lhs as ASTNODE ptr, _
+		byval rhs as ASTNODE ptr, _
+		byval result_dtype as integer, _
+		byval operand_dtype as integer, _
+		byval branch_label as FBSYMBOL ptr, _
+		byval options as AST_OPOPT _
+	) as ASTNODE ptr
+	dim as integer operation = 0
+	select case op
+	case AST_OP_ADD : operation = FB_INT128_BOP_ADD
+	case AST_OP_SUB : operation = FB_INT128_BOP_SUB
+	case AST_OP_MUL : operation = FB_INT128_BOP_MUL
+	case AST_OP_INTDIV : operation = FB_INT128_BOP_INTDIV
+	case AST_OP_MOD : operation = FB_INT128_BOP_MOD
+	case AST_OP_SHL : operation = FB_INT128_BOP_SHL
+	case AST_OP_SHR : operation = FB_INT128_BOP_SHR
+	case AST_OP_AND : operation = FB_INT128_BOP_AND
+	case AST_OP_OR : operation = FB_INT128_BOP_OR
+	case AST_OP_XOR : operation = FB_INT128_BOP_XOR
+	case AST_OP_EQV : operation = FB_INT128_BOP_EQV
+	case AST_OP_IMP : operation = FB_INT128_BOP_IMP
+	case AST_OP_EQ : operation = FB_INT128_BOP_EQ
+	case AST_OP_NE : operation = FB_INT128_BOP_NE
+	case AST_OP_GT : operation = FB_INT128_BOP_GT
+	case AST_OP_LT : operation = FB_INT128_BOP_LT
+	case AST_OP_LE : operation = FB_INT128_BOP_LE
+	case AST_OP_GE : operation = FB_INT128_BOP_GE
+	end select
+	if( operation = 0 ) then
+		errReport( FB_ERRMSG_INTEGER128UNSUPPORTED )
+		astDelTREE( lhs )
+		astDelTREE( rhs )
+		return astNewCONSTi( 0, result_dtype )
+	end if
+
+	dim as FBSYMBOL ptr result = symbAddTempVar( result_dtype )
+	dim as ASTNODE ptr left_address = astBuildNativeInt128Address( lhs )
+	if( left_address = NULL ) then
+		astDelTREE( rhs )
+		return NULL
+	end if
+	dim as ASTNODE ptr right_address = NULL
+	dim as ASTNODE ptr shift_count = astNewCONSTi( 0, FB_DATATYPE_ULONGINT )
+	if( (op = AST_OP_SHL) or (op = AST_OP_SHR) ) then
+		right_address = astNewCONSTi( 0, typeAddrOf( FB_DATATYPE_VOID ) )
+		if( astIsCONST( rhs ) ) then
+			shift_count = astNewCONSTi( astConstGetAsInt64( rhs ), FB_DATATYPE_ULONGINT )
+		else
+			shift_count = astNewCONV( FB_DATATYPE_ULONGINT, NULL, rhs )
+		end if
+		if( shift_count = NULL ) then
+			astDelTREE( left_address )
+			return NULL
+		end if
+		astDelTREE( rhs )
+	else
+		right_address = astBuildNativeInt128Address( rhs )
+		if( right_address = NULL ) then
+			astDelTREE( left_address )
+			return NULL
+		end if
+	end if
+
+	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128BOP, FB_RTL_IDX_INT128BOP ) )
+	if( hNativeInt128Arg( call_node, astNewADDROF( astNewVAR( result ) ) ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, left_address ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, right_address ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, astNewCONSTi( operation, FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, astNewCONSTi( typeIsSigned( operand_dtype ), FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, shift_count ) = FALSE ) then return NULL
+	dim as ASTNODE ptr result_expr = astNewDEREF( call_node, result_dtype, NULL, 0 )
+	if( branch_label <> NULL ) then
+		return astNewBOP( AST_OP_NE, result_expr, astNewCONSTi( 0, result_dtype ), _
+		                  branch_label, options )
+	end if
+	return result_expr
+end function
+
+function astBuildNativeInt128Uop _
+	( _
+		byval op as integer, _
+		byval expr as ASTNODE ptr, _
+		byval result_dtype as integer, _
+		byval is_signed as integer _
+	) as ASTNODE ptr
+	dim as integer operation = 0
+	select case op
+	case AST_OP_NEG : operation = FB_INT128_UOP_NEG
+	case AST_OP_NOT : operation = FB_INT128_UOP_NOT
+	case AST_OP_ABS : operation = FB_INT128_UOP_ABS
+	case AST_OP_SGN : operation = FB_INT128_UOP_SGN
+	end select
+	if( operation = 0 ) then
+		errReport( FB_ERRMSG_INTEGER128UNSUPPORTED )
+		astDelTREE( expr )
+		return astNewCONSTi( 0, result_dtype )
+	end if
+
+	dim as FBSYMBOL ptr result = symbAddTempVar( result_dtype )
+	dim as ASTNODE ptr source_address = astBuildNativeInt128Address( expr )
+	if( source_address = NULL ) then return NULL
+	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128UOP, FB_RTL_IDX_INT128UOP ) )
+	if( hNativeInt128Arg( call_node, astNewADDROF( astNewVAR( result ) ) ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, source_address ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, astNewCONSTi( operation, FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+	if( hNativeInt128Arg( call_node, astNewCONSTi( is_signed, FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
+	return astNewDEREF( call_node, result_dtype, NULL, 0 )
+end function
+
 function astBuildVarDtorCall overload _
 	( _
 		byval varexpr as ASTNODE ptr _
@@ -739,9 +998,10 @@ function astBuildProcResultVar _
 		byval res as FBSYMBOL ptr _
 	) as ASTNODE ptr
 
-	'' proc returns UDT in hidden byref UDT param?
+	'' Stack-returned values use a hidden byref result parameter.
 	if( symbProcReturnsOnStack( proc ) ) then
-		function = astNewDEREF( astNewVAR( res, 0, typeAddrOf( FB_DATATYPE_STRUCT ), symbGetSubtype( res ) ) )
+		function = astNewDEREF( astNewVAR( res, 0, typeAddrOf( symbGetFullType( proc ) ), _
+		                                  symbGetSubType( proc ) ) )
 	else
 		function = astNewVAR( res )
 	end if

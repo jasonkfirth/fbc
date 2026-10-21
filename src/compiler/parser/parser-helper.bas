@@ -312,7 +312,8 @@ sub hSymbolType _
 		byref subtype as FBSYMBOL ptr, _
 		byref lgt as longint, _
 		byval is_byref as integer, _
-		byval is_extends as integer _
+		byval is_extends as integer, _
+		byval allow_forward as integer _
 	)
 
 	dim as integer options = FB_SYMBTYPEOPT_DEFAULT
@@ -322,6 +323,9 @@ sub hSymbolType _
 	end if
 	if( is_extends ) then
 		options and= not FB_SYMBTYPEOPT_CHECKSTRPTR
+	end if
+	if( allow_forward ) then
+		options or= FB_SYMBTYPEOPT_ALLOWFORWARD
 	end if
 
 	'' parse the symbol type (INTEGER, STRING, etc...)

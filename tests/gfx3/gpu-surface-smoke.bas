@@ -12,6 +12,7 @@
 '' Responsibilities:
 ''
 ''     - create, clear, draw, read, upload, download, map, and blit GPU surfaces
+''     - copy current screen pixels into GPU surfaces without CPU readback
 ''     - verify PSET, POINT, LINE/BF, and CIRCLE target routing
 ''     - present a non-page surface without constructing a CPU FB.IMAGE
 ''     - verify usage flags reject unavailable render, sample, and transfer paths
@@ -180,6 +181,16 @@ if fb.Gfx3SurfaceBlit( 0, destination_surface, 0, 0, 32, 32, _
 	5, 7, fb.GFX3_PUT_PSET ) <> 0 then end 70
 if point( 13, 15 ) <> rgb( 0, 255, 0 ) then end 71
 
+dim as any ptr copied_surface = fb.Gfx3SurfaceCreate( 32, 32, 32 )
+if copied_surface = 0 then end 72
+if fb.Gfx3SurfaceCopyFromScreen( copied_surface, 5, 7, 32, 32, _
+	0, 0 ) <> 0 then end 73
+if point( 8, 8, copied_surface ) <> rgb( 0, 255, 0 ) then end 74
+if fb.Gfx3SurfaceBlit( 0, copied_surface, 0, 0, 32, 32, _
+	32, 24, fb.GFX3_PUT_PSET ) <> 0 then end 75
+if point( 40, 32 ) <> rgb( 0, 255, 0 ) then end 76
+if fb.Gfx3SurfaceDestroy( copied_surface ) <> 0 then end 77
+
 if fb.Gfx3SurfacePresent( destination_surface, true ) <> 0 then end 12
 
 ''
@@ -234,7 +245,16 @@ if fb.Gfx3SurfaceDestroy( render_surface ) <> 0 then end 39
 if fb.Gfx3SurfaceUpload( transfer_surface, 0, 0, 1, 1, 4, _
 	@capability_pixel ) <> 0 then end 40
 paint transfer_surface, ( 0, 0 ), rgb( 71, 72, 73 ), rgb( 81, 82, 83 )
+' GPU surfaces do not expose CPU pixels to a custom PUT callback.
+dim as integer custom_put_rejected = 0
+on error goto custom_put_error
 put transfer_surface, ( 0, 0 ), custom_source, custom, @capability_blender, 0
+goto custom_put_check
+custom_put_error:
+	custom_put_rejected = -1
+custom_put_check:
+on error goto 0
+if custom_put_rejected = 0 then end 44
 if fb.Gfx3SurfaceDownload( transfer_surface, 0, 0, 1, 1, 4, _
 	@download_pixels( 0 ) ) <> 0 then end 41
 if download_pixels( 0 ) <> capability_pixel then end 42

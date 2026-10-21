@@ -15,6 +15,7 @@
         - register generation-tagged Vulkan surfaces
         - execute surface creation, destruction, transfer, clear, and readback
         - route point, styled-line, and rectangle commands to compute shaders
+        - preserve long clipped lines through bounded ordered point packets
         - own the Win32 window and visible swapchain on the render thread
         - convert and present indexed, RGB565, and 32-bit pages on the GPU
         - preserve command sequence and synchronous completion behavior
@@ -1074,6 +1075,166 @@ cleanup:
 	return result;
 }
 
+/*
+	The regular line shader uses signed 32-bit products for nearest-pixel
+	coverage, so it deliberately accepts no more than 32,767 steps. A long
+	compatibility line can still cross only a small part of the screen. Generate
+	that visible raster run on the CPU with the same rounded integer formula and
+	submit its unique pixels together; this preserves the original style phase
+	without iterating over the offscreen part of the line.
+*/
+static int vulkan_backend_long_line_points(
+	FB_GFX3_VULKAN_BACKEND_STATE *state,
+	FB_GFX3_VULKAN_BACKEND_SURFACE *surface,
+	const FB_GFX3_LINE_COMMAND *line)
+{
+	FB_GFX3_RECT clip;
+	FB_GFX3_POINT *points = NULL;
+	int64_t signed_difference_x;
+	int64_t signed_difference_y;
+	int64_t direction_x;
+	int64_t direction_y;
+	int64_t start_major;
+	int64_t start_minor;
+	int64_t first_step;
+	int64_t last_step;
+	uint64_t major;
+	uint64_t minor;
+	uint64_t point_capacity;
+	uint64_t step;
+	size_t allocation_size;
+	uint32_t point_count = 0u;
+	int x_major;
+	int result;
+
+	if ((state == NULL) || (surface == NULL) || (line == NULL))
+		return FB_GFX3_INVALID;
+
+	signed_difference_x = (int64_t)line->x2 - line->x1;
+	signed_difference_y = (int64_t)line->y2 - line->y1;
+	direction_x = (signed_difference_x < 0) ? -1 : 1;
+	direction_y = (signed_difference_y < 0) ? -1 : 1;
+	if (signed_difference_x < 0)
+		signed_difference_x = -signed_difference_x;
+	if (signed_difference_y < 0)
+		signed_difference_y = -signed_difference_y;
+	x_major = signed_difference_x >= signed_difference_y;
+	major = (uint64_t)(x_major ? signed_difference_x :
+		signed_difference_y);
+	minor = (uint64_t)(x_major ? signed_difference_y :
+		signed_difference_x);
+	if (major <= 32767u)
+		return FB_GFX3_INVALID;
+
+	clip = line->clip;
+	if (clip.x1 < 0)
+		clip.x1 = 0;
+	if (clip.y1 < 0)
+		clip.y1 = 0;
+	if (clip.x2 >= (int32_t)surface->surface.width)
+		clip.x2 = (int32_t)surface->surface.width - 1;
+	if (clip.y2 >= (int32_t)surface->surface.height)
+		clip.y2 = (int32_t)surface->surface.height - 1;
+	if ((clip.x1 > clip.x2) || (clip.y1 > clip.y2) ||
+	    ((line->x1 < clip.x1) && (line->x2 < clip.x1)) ||
+	    ((line->x1 > clip.x2) && (line->x2 > clip.x2)) ||
+	    ((line->y1 < clip.y1) && (line->y2 < clip.y1)) ||
+	    ((line->y1 > clip.y2) && (line->y2 > clip.y2)))
+		return FB_GFX3_OK;
+
+	if (x_major) {
+		start_major = line->x1;
+		start_minor = line->y1;
+		if (direction_x > 0) {
+			first_step = (int64_t)clip.x1 - line->x1;
+			last_step = (int64_t)clip.x2 - line->x1;
+		} else {
+			first_step = (int64_t)line->x1 - clip.x2;
+			last_step = (int64_t)line->x1 - clip.x1;
+		}
+	} else {
+		start_major = line->y1;
+		start_minor = line->x1;
+		if (direction_y > 0) {
+			first_step = (int64_t)clip.y1 - line->y1;
+			last_step = (int64_t)clip.y2 - line->y1;
+		} else {
+			first_step = (int64_t)line->y1 - clip.y2;
+			last_step = (int64_t)line->y1 - clip.y1;
+		}
+	}
+	if (first_step < 0)
+		first_step = 0;
+	if (last_step > (int64_t)major)
+		last_step = (int64_t)major;
+	if (last_step < first_step)
+		return FB_GFX3_OK;
+
+	point_capacity = (uint64_t)(last_step - first_step) + 1u;
+	if ((point_capacity > UINT32_MAX) ||
+	    (fb_gfx3_size_multiply((size_t)point_capacity, sizeof(*points),
+	     &allocation_size) != FB_GFX3_OK))
+		return FB_GFX3_UNSUPPORTED;
+	points = (FB_GFX3_POINT *)malloc(allocation_size);
+	if (points == NULL)
+		return FB_GFX3_OUT_OF_MEMORY;
+
+	for (step = (uint64_t)first_step; step <= (uint64_t)last_step; step++) {
+		/*
+			Both factors fit in 32 bits. Their product fits in uint64_t even
+			for INT32_MIN-to-INT32_MAX endpoints, and the half-major rounding
+			term also remains below UINT64_MAX.
+		*/
+		uint64_t minor_offset =
+			(step * minor + (major / 2u)) / major;
+		int64_t major_position = start_major +
+			((x_major ? direction_x : direction_y) * (int64_t)step);
+		int64_t minor_position = start_minor +
+			((x_major ? direction_y : direction_x) *
+			(int64_t)minor_offset);
+		int64_t pixel_x = x_major ? major_position : minor_position;
+		int64_t pixel_y = x_major ? minor_position : major_position;
+		uint32_t style_bit = 0x8000u >> ((uint32_t)step & 15u);
+
+		if ((pixel_x < clip.x1) || (pixel_x > clip.x2) ||
+		    (pixel_y < clip.y1) || (pixel_y > clip.y2) ||
+		    ((line->style & style_bit) == 0u))
+			continue;
+		points[point_count].x = (int32_t)pixel_x;
+		points[point_count].y = (int32_t)pixel_y;
+		points[point_count].color = line->color;
+		points[point_count].flags =
+			line->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND;
+		point_count++;
+	}
+
+	if (point_count == 0u) {
+		result = FB_GFX3_OK;
+	} else {
+		result = fb_gfx3_vulkan_surface_points(&state->runtime,
+			&surface->surface, &clip, points, point_count);
+	}
+	free(points);
+	return result;
+}
+
+static int vulkan_backend_line_requires_point_fallback(
+	const FB_GFX3_LINE_COMMAND *line)
+{
+	int64_t difference_x;
+	int64_t difference_y;
+
+	if (line == NULL)
+		return FALSE;
+	difference_x = (int64_t)line->x2 - line->x1;
+	difference_y = (int64_t)line->y2 - line->y1;
+	if (difference_x < 0)
+		difference_x = -difference_x;
+	if (difference_y < 0)
+		difference_y = -difference_y;
+	return (difference_x > 32767) || (difference_y > 32767);
+}
+
 static int vulkan_backend_lines(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	FB_GFX3_COMMAND *command)
 {
@@ -1102,11 +1263,25 @@ static int vulkan_backend_lines(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	if (result != FB_GFX3_OK)
 		return result;
 	while (source_index < payload->count) {
-		size_t count = payload->count - source_index;
+		const FB_GFX3_LINE_COMMAND *first =
+			&payload->line[source_index];
+		size_t count = 0u;
+		size_t available = payload->count - source_index;
 		size_t index;
 
-		if (count > FB_GFX3_VULKAN_BACKEND_LINE_BATCH_LIMIT)
-			count = FB_GFX3_VULKAN_BACKEND_LINE_BATCH_LIMIT;
+		if (vulkan_backend_line_requires_point_fallback(first)) {
+			result = vulkan_backend_long_line_points(state, surface, first);
+			if (result != FB_GFX3_OK)
+				break;
+			source_index++;
+			continue;
+		}
+		if (available > FB_GFX3_VULKAN_BACKEND_LINE_BATCH_LIMIT)
+			available = FB_GFX3_VULKAN_BACKEND_LINE_BATCH_LIMIT;
+		while ((count < available) &&
+		       !vulkan_backend_line_requires_point_fallback(
+			       &payload->line[source_index + count]))
+			count++;
 		for (index = 0u; index < count; ++index) {
 			const FB_GFX3_LINE_COMMAND *source =
 				&payload->line[source_index + index];
@@ -1128,10 +1303,49 @@ static int vulkan_backend_lines(FB_GFX3_VULKAN_BACKEND_STATE *state,
 		} else {
 			result = fb_gfx3_vulkan_surface_line_batch(&state->runtime,
 				&surface->surface, lines, count);
+			if (result == FB_GFX3_UNSUPPORTED) {
+				/*
+					The batched host buffer can exceed a device-specific storage
+					limit even when each line is individually representable. Keep
+					FIFO order and retry those lines with the bounded single-line
+					packet rather than failing the renderer queue.
+				*/
+				result = FB_GFX3_OK;
+				for (index = 0u; index < count; ++index) {
+					result = fb_gfx3_vulkan_surface_line(
+						&state->runtime, &surface->surface,
+						&lines[index].clip, lines[index].x1,
+						lines[index].y1, lines[index].x2,
+						lines[index].y2, lines[index].color,
+						lines[index].style, lines[index].flags);
+					if (result != FB_GFX3_OK)
+						break;
+				}
+			}
 		}
 		if (result != FB_GFX3_OK)
 			break;
 		source_index += count;
+	}
+	if ((result != FB_GFX3_OK) && (source_index < payload->count)) {
+		const FB_GFX3_LINE_COMMAND *failed =
+			&payload->line[source_index];
+		int64_t difference_x = (int64_t)failed->x2 - failed->x1;
+		int64_t difference_y = (int64_t)failed->y2 - failed->y1;
+
+		if (difference_x < 0)
+			difference_x = -difference_x;
+		if (difference_y < 0)
+			difference_y = -difference_y;
+		fb_gfx3_log_write(state->logger, FB_GFX3_LOG_ERROR,
+			"Vulkan line packet failed: sequence %llu item %llu/%u, "
+			"(%d,%d)-(%d,%d), delta=(%lld,%lld), style=%04x, result=%d",
+			(unsigned long long)command->sequence,
+			(unsigned long long)source_index, payload->count,
+			(int)failed->x1, (int)failed->y1, (int)failed->x2,
+			(int)failed->y2, (long long)difference_x,
+			(long long)difference_y,
+			(unsigned int)(failed->style & 0xFFFFu), result);
 	}
 	fb_gfx3_resource_release(state->resources, command->target);
 	return result;
@@ -1957,6 +2171,15 @@ static int vulkan_backend_probe(FB_GFX3_BACKEND_CAPS *caps)
 	result = fb_gfx3_vulkan_runtime_open(&runtime);
 	if (result != FB_GFX3_OK)
 		return result;
+	/*
+		The compatibility ellipse path relies on the exact Float64 midpoint
+		shader. Do not select a partial Vulkan adapter and fail later when a
+		circle is first drawn; ordinary selection can continue to desktop GL.
+	*/
+	if (!fb_gfx3_vulkan_runtime_supports_float64(&runtime)) {
+		fb_gfx3_vulkan_runtime_close(&runtime);
+		return FB_GFX3_UNSUPPORTED;
+	}
 	fb_gfx3_vulkan_runtime_close(&runtime);
 	memset(caps, 0, sizeof(*caps));
 	caps->abi_version = FB_GFX3_BACKEND_ABI_VERSION;
@@ -2801,8 +3024,14 @@ static int vulkan_backend_execute(FB_GFX3_BACKEND *backend,
 		}
 
 command_executed:
-		if (result != FB_GFX3_OK)
+		if (result != FB_GFX3_OK) {
+			fb_gfx3_log_write(state->logger, FB_GFX3_LOG_ERROR,
+				"Vulkan command batch type %u sequence %llu count %llu "
+				"failed: %d",
+				command->type, (unsigned long long)command->sequence,
+				(unsigned long long)execute_count, result);
 			return result;
+		}
 		/*
 			Only runtime calls that submitted GPU work advance this tag. Pure
 			state commands leave the latest tag unchanged, so a later wait does

@@ -726,8 +726,16 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86
 			ln += "-march=x86 "
+			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32 ) then
+				'' LLVM IR has no target triple, so tell llc which Windows
+				'' object format to use instead of the host's ELF format.
+				ln += "-mtriple=i686-w64-windows-gnu "
+			end if
 		case FB_CPUFAMILY_X86_64
 			ln += "-march=x86-64 "
+			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_WIN32 ) then
+				ln += "-mtriple=x86_64-w64-windows-gnu "
+			end if
 		case FB_CPUFAMILY_ARM
 			if( fbcLinuxPlatformGetArmLlvmTargetTriple( llvmtargettriple ) ) then
 				ln += "-mtriple=" + llvmtargettriple + " "

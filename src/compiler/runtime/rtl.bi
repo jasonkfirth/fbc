@@ -550,6 +550,43 @@
 #define FB_RTL_DTOUL                    "fb_dtoul"
 
 #define FB_RTL_THREADCALL               "fb_ThreadCall"
+#define FB_RTL_TLSGETVAR                "fb_TlsGetVar"
+#define FB_RTL_INT128BOP                "fb_Int128Bop"
+#define FB_RTL_INT128UOP                "fb_Int128Uop"
+#define FB_RTL_INT128COPY               "fb_Int128Copy"
+#define FB_RTL_INT128FROMU64             "fb_Int128FromU64"
+#define FB_RTL_INT128FROMDOUBLE          "fb_Int128FromDouble"
+#define FB_RTL_INT128TOU64               "fb_Int128ToU64"
+#define FB_RTL_INT128TOBOOL              "fb_Int128ToBool"
+#define FB_RTL_INT128TODOUBLE            "fb_Int128ToDouble"
+
+enum FB_INT128_BOP
+	FB_INT128_BOP_ADD = 1
+	FB_INT128_BOP_SUB
+	FB_INT128_BOP_MUL
+	FB_INT128_BOP_INTDIV
+	FB_INT128_BOP_MOD
+	FB_INT128_BOP_SHL
+	FB_INT128_BOP_SHR
+	FB_INT128_BOP_AND
+	FB_INT128_BOP_OR
+	FB_INT128_BOP_XOR
+	FB_INT128_BOP_EQV
+	FB_INT128_BOP_IMP
+	FB_INT128_BOP_EQ
+	FB_INT128_BOP_NE
+	FB_INT128_BOP_GT
+	FB_INT128_BOP_LT
+	FB_INT128_BOP_LE
+	FB_INT128_BOP_GE
+end enum
+
+enum FB_INT128_UOP
+	FB_INT128_UOP_NEG = 1
+	FB_INT128_UOP_NOT
+	FB_INT128_UOP_ABS
+	FB_INT128_UOP_SGN
+end enum
 
 
 '' Runtime procedure index
@@ -1030,6 +1067,7 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_DTOUL
 
 	FB_RTL_IDX_THREADCALL
+	FB_RTL_IDX_TLSGETVAR
 
 	''
 	'' Appended to preserve the cache indices embedded in compiler objects
@@ -1071,6 +1109,17 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_USTRRTRIMANY
 	FB_RTL_IDX_USTRUCASE
 	FB_RTL_IDX_USTRLCASE
+
+	'' Native GAS/GAS64 use pointer-based helpers so the 128-bit value does not
+	'' need to fit in the backends' scalar register allocator.
+	FB_RTL_IDX_INT128BOP
+	FB_RTL_IDX_INT128UOP
+	FB_RTL_IDX_INT128COPY
+	FB_RTL_IDX_INT128FROMU64
+	FB_RTL_IDX_INT128FROMDOUBLE
+	FB_RTL_IDX_INT128TOU64
+	FB_RTL_IDX_INT128TOBOOL
+	FB_RTL_IDX_INT128TODOUBLE
 
 	FB_RTL_IDX_USTRINDEXGET
 	FB_RTL_IDX_USTRINDEXSET

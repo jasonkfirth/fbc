@@ -216,6 +216,8 @@ uint64_t fb_gfx3_vulkan_device_score(uint32_t device_type,
 	int shader_float64, uint32_t queue_flags);
 
 int fb_gfx3_vulkan_runtime_open(FB_GFX3_VULKAN_RUNTIME *runtime);
+int fb_gfx3_vulkan_runtime_supports_float64(
+	const FB_GFX3_VULKAN_RUNTIME *runtime);
 int fb_gfx3_vulkan_runtime_open_windowed(FB_GFX3_VULKAN_RUNTIME *runtime,
 	uintptr_t native_instance, uintptr_t native_window, uint32_t width,
 	uint32_t height);

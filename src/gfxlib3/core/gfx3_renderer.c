@@ -465,7 +465,7 @@ static int fb_gfx3_renderer_execute(FB_GFX3_RENDERER *renderer,
 		command = commands[0];
 		fb_gfx3_log_write(renderer->backend_config.logger,
 			FB_GFX3_LOG_ERROR,
-			"%s command %u sequence %llu execution failed: %d",
+			"%s command batch starting at type %u sequence %llu failed: %d",
 			renderer->backend_vtable->name, command->type,
 			(unsigned long long)command->sequence, result);
 		return result;

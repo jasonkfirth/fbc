@@ -1,5 +1,5 @@
 {{fbdoc item="title" value="LOCK"}}----
-Restricts read/write access to a file or portion of a file
+Requests a lock on a file range
 
 {{fbdoc item="syntax"}}##
 	**Lock** #//filenum//, //record//
@@ -16,11 +16,11 @@ Restricts read/write access to a file or portion of a file
 		The last byte position (##[[KeyPgBinary|Binary]]## files) to lock to.
 
 {{fbdoc item="desc"}}
-	##**Lock**## temporarily restricts access by other threads or programs to a file, or portion of a file, usually to allow safe writing to it.
+	##**Lock**## requests a lock on a file range, usually to allow safe writing to it. The first position and final position are inclusive. A single position locks one byte in a ##[[KeyPgBinary|Binary]]## file or one record in a ##[[KeyPgRandom|Random]]## file. A ##//start//## to ##//end//## range locks every byte or record in that range. If the requested range is already locked incompatibly, the request returns a file I/O error immediately.
 	
-	After modifying the data, an ##[[KeyPgUnlock|Unlock]]## with the same parameters as the ##**Lock**## should be issued.
+	After modifying the data, issue ##[[KeyPgUnlock|Unlock]]## with the same range. Locking behavior depends on the target operating system. On Unix-like systems, file locks are advisory and process-associated, so cooperating programs must use compatible locks. Separate handles in the same process do not conflict with each other, and closing any handle for a file releases all POSIX record locks that process holds on it. A conflict or native lock failure sets a file I/O error. Invalid file numbers or ranges set an illegal function call error.
 	
-	**Note: This command does not always work, neither as documented nor as expected. It appears to be broken at the moment.**
+	Targets without a native byte-range locking implementation report a file I/O error instead of claiming that a lock was acquired.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/fileio/lock.bas"}}%%(freebasic)
@@ -41,8 +41,7 @@ close #f
 %%
 
 {{fbdoc item="diff"}}
-	- Currently, FB cannot implicitly lock the entire file
-	- In ##[[KeyPgRandom|Random]]## mode, FB cannot lock a range of records
+	- A single position or explicit range is required; the entire file cannot be locked implicitly
 
 {{fbdoc item="see"}}
 	- ##[[KeyPgOpen|Open]]##

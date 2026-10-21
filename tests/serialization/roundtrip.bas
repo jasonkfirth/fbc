@@ -3,6 +3,7 @@
 '' Purpose: Exercise generated traversal and transactional reconstruction.
 '' Responsibilities: Deep ownership, numeric values, strings, arrays and failures.
 '' This file intentionally contains no transport or handwritten field codec.
+' TEST_MODE : COMPILE_AND_RUN_OK
 
 #include once "fbserialize.bi"
 

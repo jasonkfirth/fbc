@@ -13,6 +13,7 @@
 
         - allocate and track mode-owned opaque surface descriptors
         - load assets and expose checked surface lifecycle and transfer calls
+        - copy the current work page into a GPU surface without CPU readback
         - submit scaling, rotation, and Mode 7 as projective GPU commands
         - preserve image-target coordinate and color behavior for primitives
         - reject stale, foreign, and already destroyed descriptors safely
@@ -21,7 +22,7 @@
 
         - CPU-visible FB.IMAGE allocation or writable pixel pointers
 		- shader code or backend resource layouts
-		- screen page ownership and presentation policy
+		- page lifecycle, page switching, or presentation policy
 */
 
 #include "../gfx3_api_internal.h"
@@ -597,6 +598,79 @@ FBCALL int fb_Gfx3SurfaceBlit(void *destination_pointer,
 
 unlock:
 	FB_GRAPHICS_UNLOCK();
+	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+}
+
+/*
+	Copy an already-rendered screen rectangle to an opaque surface entirely on
+	the GPU. The synchronous GET-style screen capture remains available to
+	callers that need CPU pixels, while retained render caches can stay GPU-owned.
+*/
+FBCALL int fb_Gfx3SurfaceCopyFromScreen(void *destination_pointer,
+	int source_x, int source_y, int width, int height,
+	int destination_x, int destination_y)
+{
+	FB_GFX3_DRAW_STATE *state;
+	FB_GFX3_SURFACE *destination;
+	FB_GFX3_SURFACE *source;
+	FB_GFX3_RECT clip;
+	FB_GFX3_RECT source_rect;
+	int64_t source_x2 = (int64_t)source_x + width - 1;
+	int64_t source_y2 = (int64_t)source_y + height - 1;
+	int64_t destination_x2 = (int64_t)destination_x + width - 1;
+	int64_t destination_y2 = (int64_t)destination_y + height - 1;
+	uint32_t page;
+	int result = FB_GFX3_INVALID;
+
+	if ((destination_pointer == NULL) || (width <= 0) || (height <= 0) ||
+	    (source_x < 0) || (source_y < 0) || (destination_x < 0) ||
+	    (destination_y < 0) || (source_x2 > INT32_MAX) ||
+	    (source_y2 > INT32_MAX) || (destination_x2 > INT32_MAX) ||
+	    (destination_y2 > INT32_MAX))
+		goto done;
+
+	FB_GRAPHICS_LOCK();
+	state = fb_gfx3_api_get_draw_state_locked();
+	if ((state == NULL) || (state->mode == NULL) ||
+	    (state->mode->pages == NULL))
+		goto unlock;
+	page = state->work_page;
+	if (page >= state->mode->page_count)
+		goto unlock;
+	result = fb_gfx3_gpu_surface_lookup_locked(destination_pointer,
+		state->mode, &destination);
+	if (result != FB_GFX3_OK)
+		goto unlock;
+	source = &state->mode->pages[page];
+	if ((source_x2 >= state->mode->width) ||
+	    (source_y2 >= state->mode->height) ||
+	    (source_x < state->view.x1) || (source_y < state->view.y1) ||
+	    (source_x2 > state->view.x2) || (source_y2 > state->view.y2) ||
+	    (destination_x2 >= destination->width) ||
+	    (destination_y2 >= destination->height) ||
+	    (destination->depth != source->depth)) {
+		result = FB_GFX3_INVALID;
+		goto unlock;
+	}
+	result = fb_gfx3_compat_commit_shadow(state);
+	if (result == FB_GFX3_OK)
+		result = fb_gfx3_compat_flush_points_graphics_locked(state);
+	if (result != FB_GFX3_OK)
+		goto unlock;
+	clip.x1 = 0;
+	clip.y1 = 0;
+	clip.x2 = (int32_t)destination->width - 1;
+	clip.y2 = (int32_t)destination->height - 1;
+	source_rect.x1 = source_x;
+	source_rect.y1 = source_y;
+	source_rect.x2 = (int32_t)source_x2;
+	source_rect.y2 = (int32_t)source_y2;
+	result = fb_gfx3_surface_blit_graphics_locked(destination, &clip, source,
+		&source_rect, destination_x, destination_y, FB_GFX3_BLIT_PSET, 255u);
+
+unlock:
+	FB_GRAPHICS_UNLOCK();
+done:
 	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
 }
 

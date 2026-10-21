@@ -1782,6 +1782,39 @@ print value
                 self.assertEqual(primitives["xmmword"][4:6], ["16", ""])
                 self.assertEqual(len(primitives), len(model.records["Y"]))
 
+    def test_integer128_for_counters_preserve_semantic_inputs(self) -> None:
+        source = self.source("""Dim signedTotal As Integer<128> = 0
+For signedIndex As Integer<128> = 0 To 3 Step 1
+    signedTotal += signedIndex
+Next
+Dim unsignedTotal As UInteger<128> = 0
+For unsignedIndex As UInteger<128> = 1 To 3 Step 1
+    unsignedTotal += unsignedIndex
+Next
+""")
+        model = self.compile(source)
+        primitives = {row[2]: row for row in model.records["Y"]}
+        self.assertEqual(primitives["integer128"][3:7], ["integer", "16", "16", "1"])
+        self.assertEqual(primitives["uinteger128"][3:7], ["integer", "16", "16", "0"])
+        for name in ("signedIndex", "unsignedIndex"):
+            identity = self.one(model, name, "variable")
+            properties = model.properties["symbol", identity]
+            self.assertEqual(len([key for key in properties if key.startswith("for-start-expression:")]), 1)
+            self.assertEqual(len([key for key in properties if key.startswith("for-limit-expression:")]), 1)
+            self.assertEqual(len([key for key in properties if key.startswith("for-step-expression:")]), 1)
+
+    def test_thread_local_storage_is_preserved_in_symbol_facts(self) -> None:
+        source = self.source("""Thread Local Dim Shared sharedValue As Long
+Thread Local Extern externalValue As Long
+Sub Worker()
+    Thread Local Dim localValue As Long
+End Sub
+""")
+        model = self.compile(source)
+        for name in ("sharedValue", "externalValue", "localValue"):
+            identity = self.one(model, name, "variable")
+            self.assertEqual(model.types[identity][17], "thread-local")
+
     def test_reader_rejects_invalid_identities_ranges_flags_and_payloads(self) -> None:
         _, path = self.invoke([self.fixture("types.bas")])
         rows = [line.split("\t") for line in path.read_text().splitlines()]
@@ -4873,7 +4906,7 @@ Delete Allocated
                 scalars = [fields for fields in comparisons if fields[3] == "scalar"]
                 unsigned_type = "9" if model.records["Q"][0][6] == "8" else "14"
                 self.assertEqual([fields[4:6] for fields in scalars],
-                                 [["8", "8"]] * 2 + [["16", "16"]] * 3 + [[unsigned_type, unsigned_type]] * 2)
+                                 [["8", "8"]] * 2 + [["18", "18"]] * 3 + [[unsigned_type, unsigned_type]] * 2)
                 # Distinct generated casts must retain the selector and call
                 # origins even when their type, range and AST class coincide.
                 self.assertTrue(all(fields[6] != fields[7] for fields in comparisons))

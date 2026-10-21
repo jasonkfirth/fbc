@@ -607,15 +607,15 @@ static const char opengl_ellipse_batch_resolve_shader[] =
 	"}\n";
 
 /*
-	A game often alternates scanline-filled polygons with outline circles.
+	A drawing can alternate points, lines, small rectangles, and outline circles.
 	Resolving each public packet separately leaves the pixel work on the GPU but
-	still makes the renderer thread issue thousands of driver dispatches. This
-	selection shader accepts both primitive types and stores their unified BASIC
-	order in the shared winner image. One resolve then writes the final colors.
+	still makes the renderer thread issue repeated dispatches. This selection
+	shader stores their unified BASIC order in the shared winner image. One
+	resolve then writes the final colors.
 
-	Clipping remains a per-invocation GPU decision. The CPU computes only a
-	conservative resolve rectangle so workgroups which cannot contain a result
-	are not launched at all.
+	Large rectangles stay on the dedicated raster path. Clipping remains a
+	per-invocation GPU decision, and the CPU computes only a conservative resolve
+	rectangle so workgroups which cannot contain a result are not launched.
 */
 static const char opengl_primitive_batch_shader[] =
 	"#version 430 core\n"
@@ -729,6 +729,38 @@ static const char opengl_primitive_batch_shader[] =
 	"    imageAtomicMax(winner_image, position,\n"
 	"        operation_batch_key + uint(metadata.w));\n"
 	"}\n"
+	"void select_rectangle(ivec4 geometry, ivec4 clip, ivec4 metadata)\n"
+	"{\n"
+	"    uint index = gl_WorkGroupID.x * gl_WorkGroupSize.x +\n"
+	"        gl_LocalInvocationID.x;\n"
+	"    uint width = uint(geometry.z - geometry.x) + 1u;\n"
+	"    uint height = uint(geometry.w - geometry.y) + 1u;\n"
+	"    uint style = uint(metadata.z);\n"
+	"    bool filled = (style & 0x80000000u) != 0u;\n"
+	"    uint count = filled ? width * height : (width + height) * 2u;\n"
+	"    ivec2 position;\n"
+	"    if (index >= count) return;\n"
+	"    if (filled) {\n"
+	"        position = ivec2(geometry.x + int(index % width),\n"
+	"            geometry.y + int(index / width));\n"
+	"    } else if (index < width) {\n"
+	"        position = ivec2(geometry.x + int(index), geometry.w);\n"
+	"    } else if (index < width * 2u) {\n"
+	"        position = ivec2(geometry.x + int(index - width), geometry.y);\n"
+	"    } else if (index < width * 2u + height) {\n"
+	"        position = ivec2(geometry.z, geometry.y +\n"
+	"            int(index - width * 2u));\n"
+	"    } else {\n"
+	"        position = ivec2(geometry.x, geometry.y +\n"
+	"            int(index - width * 2u - height));\n"
+	"    }\n"
+	"    if ((position.x < clip.x) || (position.y < clip.y) ||\n"
+	"        (position.x > clip.z) || (position.y > clip.w)) return;\n"
+	"    if (filled ||\n"
+	"        ((style & (0x8000u >> (index & 15u))) != 0u))\n"
+	"        imageAtomicMax(winner_image, position,\n"
+	"            operation_batch_key + uint(metadata.w));\n"
+	"}\n"
 	"void main(void)\n"
 	"{\n"
 	"    int base = int(gl_WorkGroupID.y) * 3;\n"
@@ -738,6 +770,7 @@ static const char opengl_primitive_batch_shader[] =
 	"    if (metadata.y == 1) select_line(geometry, clip, metadata);\n"
 	"    else if (metadata.y == 2) select_ellipse(geometry, clip, metadata);\n"
 	"    else if (metadata.y == 3) select_point(geometry, clip, metadata);\n"
+	"    else if (metadata.y == 4) select_rectangle(geometry, clip, metadata);\n"
 	"}\n";
 
 static const char opengl_primitive_batch_resolve_shader[] =

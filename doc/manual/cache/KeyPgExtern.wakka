@@ -13,6 +13,8 @@ Declares a variable, array or object having external linkage
 {{fbdoc item="desc"}}
 	Declares ##//symbolname//## as an external name, meaning it is global to external modules including those to be compiled as static and dynamic libraries (DLLs).
 	##**Extern**## only declares variables, arrays and objects, and does not define them (different from ##[[KeyPgCommon|Common]]## or ##[[KeyPgDim|Dim]]##). It also has the effect of making ##//symbolname//## a //shared// name, meaning it is visible within procedures (see ##[[KeyPgShared|Shared]]##). A ##//symbolname//## declared as external name can be (re)defined (using Dim or Redim) only in a single external module.
+
+	An external variable may use a forward-referenced ##[[KeyPgType|Type]]##. The variable may be addressed or passed by reference while the Type is incomplete. Reading, assigning, indexing, or accessing members requires a complete Type definition. An array cannot use an incomplete element Type because the compiler needs its size.
 	
 	If ##[[KeyPgAlias|Alias]]## is used, ##//aliasname//## will be used as the external name rather than ##//symbolname//##, and its case will be preserved.
 	

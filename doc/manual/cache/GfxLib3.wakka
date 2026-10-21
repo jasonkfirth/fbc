@@ -27,6 +27,8 @@ An opt-in render-threaded implementation of the FreeBASIC graphics interface.
 
 	GPU operations stay ordered with ordinary graphics commands.  POINT, GET, DOWNLOAD, MAP, SCREENPTR, and CPU-only custom blenders can require a synchronization and readback boundary, so they should not be placed in a per-pixel render loop.
 
+	Renderer integrations that need a small screen rectangle can use ##Gfx3ScreenCapture##. It fills an ##FB.IMAGE## from the current work page, using a valid CPU shadow when available or synchronously downloading only the requested rectangle. Ordinary BASIC ##GET## retains its reusable full-page shadow behavior.
+
 {{fbdoc item="section" value="Legacy SCREEN modes"}}
 	gfxlib3 adds historical modes that gfxlib2 still leaves undefined: SCREEN 3 Hercules 720 by 348 monochrome, SCREEN 4 Olivetti/AT&T 640 by 400 monochrome, SCREEN 5 PCjr/Tandy 320 by 200 with 16 colours, and SCREEN 6 PCjr/Tandy 640 by 200 with 4 colours.
 

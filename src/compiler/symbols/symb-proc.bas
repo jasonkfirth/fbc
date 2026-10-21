@@ -78,6 +78,25 @@ end sub
 function symbProcReturnsOnStack( byval proc as FBSYMBOL ptr ) as integer
 	assert( symbIsProc( proc ) )
 
+	'' The 32-bit GAS backend has no single register capable of returning a
+	'' 128-bit scalar. The 32-bit LLVM backend also needs the caller-provided
+	'' result slot to match the target C ABI for an aligned two-word value.
+	'' GAS64 targets without the SysV two-register ABI have the same register
+	'' limitation, so they use the aggregate result slot too.
+	if( (symbIsReturnByRef( proc ) = FALSE) and _
+	    typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then
+		if( env.clopt.backend = FB_BACKEND_GAS ) then
+			return TRUE
+		elseif( (env.clopt.backend = FB_BACKEND_LLVM) andalso _
+		        (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) andalso _
+		        (fbGetBits( ) = 32) ) then
+			return TRUE
+		elseif( (env.clopt.backend = FB_BACKEND_GAS64) andalso _
+		        ((env.target.options and FB_TARGETOPT_GAS64_SYSV_ABI) = 0) ) then
+			return TRUE
+		end if
+	end if
+
 	'' BYREF result never is on stack, instead it's always a pointer,
 	'' which will always be returned in registers
 	if( symbIsReturnByRef( proc ) ) then
@@ -1587,12 +1606,22 @@ end function
 function symbAddVarForProcResultParam( byval proc as FBSYMBOL ptr ) as FBSYMBOL ptr
 	dim as FBARRAYDIM dTB(0) = any
 	dim as FBSYMBOL ptr s = any
+	dim as integer dtype = any
+	dim as FBSYMBOL ptr subtype = any
 
 	if( symbProcReturnsOnStack( proc ) = FALSE ) then
 		return NULL
 	end if
 
-	s = symbAddVar( symbUniqueId( ), NULL, FB_DATATYPE_STRUCT, proc->subtype, 0, _
+	if( typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then
+		dtype = symbGetFullType( proc )
+		subtype = symbGetSubType( proc )
+	else
+		dtype = FB_DATATYPE_STRUCT
+		subtype = proc->subtype
+	end if
+
+	s = symbAddVar( symbUniqueId( ), NULL, dtype, subtype, 0, _
 	                0, dTB(), FB_SYMBATTRIB_PARAMVARBYREF, FB_SYMBOPT_PRESERVECASE )
 
 	symbProcAllocExt( proc )

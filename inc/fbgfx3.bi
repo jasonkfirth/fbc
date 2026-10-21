@@ -13,6 +13,7 @@
 ''     - create, load, and destroy opaque renderer-owned surfaces
 ''     - explicitly upload, download, map, clear, blit, transform, and present
 ''       surfaces
+''     - copy a screen rectangle to a GPU surface without CPU readback
 ''     - allow an application renderer to own native window presentation
 ''     - define usage flags without exposing backend GPU handles
 ''
@@ -134,6 +135,13 @@ namespace fb
 		( byval surface as any ptr, byval x as long, byval y as long, _
 		  byval width as long, byval height as long, byval pitch as long, _
 		  byval pixels as any ptr ) as long
+	'' Capture a physical-pixel rectangle from the current work page into a CPU
+	'' FB.IMAGE. A valid SCREENLOCK shadow remains authoritative; otherwise only
+	'' the requested rectangle is downloaded. The call is synchronous.
+	declare function Gfx3ScreenCapture GFX3CALL _
+		alias "fb_Gfx3ScreenCapture" _
+		( byval destination as any ptr, byval x as long, byval y as long, _
+		  byval width as long, byval height as long ) as long
 	declare function Gfx3SurfaceMap GFX3CALL alias "fb_Gfx3SurfaceMap" _
 		( byval surface as any ptr, byval access as ulong, _
 		  byref pixels as any ptr, byref pitch as long ) as long
@@ -154,6 +162,14 @@ namespace fb
 		  byval destination_x as long, byval destination_y as long, _
 		  byval mode as long = GFX3_PUT_PSET, _
 		  byval alpha as ulong = 255 ) as long
+	'' Copy a physical-pixel rectangle from the current work page into a GPU
+	'' surface. This stays on the GPU and does not create a CPU readback barrier.
+	declare function Gfx3SurfaceCopyFromScreen GFX3CALL _
+		alias "fb_Gfx3SurfaceCopyFromScreen" _
+		( byval destination as any ptr, _
+		  byval source_x as long, byval source_y as long, _
+		  byval width as long, byval height as long, _
+		  byval destination_x as long, byval destination_y as long ) as long
 	'' Scale an exact source rectangle into a destination rectangle. Source and
 	'' destination dimensions must be positive. A null destination selects the
 	'' current work page.

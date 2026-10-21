@@ -486,6 +486,14 @@ private function hOvlProcArgList _
 	if( procexpr <> NULL ) then
 		procexpr->semantic_binding = semantic_binding
 		fbSemanticModelSetAccess(procexpr, "callee")
+	else
+		arg = arg_list->head
+		do while( arg <> NULL )
+			nxt = arg->next
+			symbFreeOvlCallArg( @parser.ovlarglist, arg )
+			arg = nxt
+		loop
+		return astNewNOP( )
 	end if
 
 	'' add to tree
@@ -614,6 +622,14 @@ function cProcArgList _
 	if( procexpr <> NULL ) then
 		procexpr->semantic_binding = semantic_binding
 		fbSemanticModelSetAccess(procexpr, "callee")
+	else
+		arg = arg_list->head
+		do while( arg <> NULL )
+			dim as FB_CALL_ARG ptr nxt = arg->next
+			symbFreeOvlCallArg( @parser.ovlarglist, arg )
+			arg = nxt
+		loop
+		return astNewNOP( )
 	end if
 
 	params = symbGetProcParams( proc )

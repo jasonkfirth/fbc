@@ -915,6 +915,15 @@ private function hCheckParam _
 	param_dtype = symbGetType( param )
 	arg_dtype   = astGetDatatype( n->l )
 
+	'' An incomplete object can only cross a call boundary by reference.
+	if( astTypeIsIncompleteValue( arg_dtype ) ) then
+		if( (symbGetParamMode( param ) <> FB_PARAMMODE_BYREF) or _
+		    (n->arg.mode = FB_PARAMMODE_BYVAL) ) then
+			errReport( FB_ERRMSG_INCOMPLETETYPE )
+			exit function
+		end if
+	end if
+
 	select case symbGetParamMode( param )
 	'' by descriptor?
 	case FB_PARAMMODE_BYDESC

@@ -5134,4 +5134,50 @@ multithreaded PIC archives rebuilt successfully. The attached AGM A8 selects
 GLES because it exposes no Vulkan HAL; this Vulkan-only optimization therefore
 has no physical Android execution path to qualify on that device.
 
+## 2026-10-20 Vulkan capability fallback and long-line coverage
+
+The Intel Iris Xe on the Linux host reports `shaderFloat64=false`. gfxlib3's
+exact Vulkan midpoint-ellipse pipeline requires that feature; the previous
+probe accepted the adapter anyway and the first circle later failed on the
+renderer thread. Vulkan probing now reports the adapter unsupported before a
+mode opens when Float64 is unavailable. A `FBGFX=Vulkan` preference therefore
+continues through the normal backend order and selects accelerated OpenGL on
+this machine. The editor's 177-record clipped drawing opened and completed its
+20-frame full-redraw run through that fallback, reporting zero `READ_PIXEL`
+commands and zero downloads.
+
+Vulkan also rejected a packed line packet when one clipped compatibility line
+spanned more than 32,767 pixels. The backend now preserves that line's original
+nearest-pixel rounding and 16-bit style phase by calculating only the bounded
+visible pixel run and submitting it as one ordered GPU point packet. The new
+`tests/gfx3/long-line-vulkan-smoke.bas` combines a normal short line, long
+horizontal and diagonal lines, and a fully clipped line, then checks their
+visible pixels. It exited zero on Vulkan llvmpipe, whose Float64 support allows
+the Vulkan backend to initialize.
+
+On accelerated OpenGL through the Iris Xe, reusing the clipped-background GPU
+surface within each full scene redraw raised the same uncached fixture from
+7.11 to 9.35 frames per second. Mean render time fell from 138.65 to 106.27 ms
+and p95 from 164.01 to 123.48 ms. Surface creates and destroys fell from about
+60 each per second to about 8 each per second, with no framebuffer readbacks.
+This improves the synchronous batch boundaries, but the full-redraw path
+remains below an interactive high-frame-rate target.
+
+## 2026-10-20 OpenGL mixed rectangle batching
+
+OpenGL now keeps bounded opaque `RECTANGLE` and `RECTANGLES` commands inside
+the existing ordered mixed-primitive batch with points, lines, and ellipses.
+The full-redraw workload uses the 177-record `spatial-frame-0.dxf` fixture with
+render caching disabled. On the accelerated Iris Xe display, a 120-frame run
+measured 16.16 FPS, 59.88 ms mean render time, and 88.03 ms p95. The preceding
+measurement on this fixture was 9.35 FPS, 106.27 ms mean, and 123.48 ms p95.
+
+`mixed-rectangle-primitive-order-smoke.bas` passed on accelerated OpenGL and
+Vulkan llvmpipe, including overlapping filled boxes, outlines, points, styled
+lines, and ellipse ordering. A `FBGFX3_PROFILE=1` run of the 177-record fixture
+reported `read=0` and `download=0` throughout; one-second windows spent
+289-416 ms executing renderer work and 164-462 ms waiting on GPU fences. The
+batch reduces render cost substantially, while forced full redraw remains well
+below a high-frame-rate target.
+
 <!-- end of verification.md -->

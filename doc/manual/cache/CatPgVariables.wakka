@@ -9,6 +9,8 @@ Statements to declare and allocate space for variables.
 	Begins a new scope block.
 **{{fbdoc item="keyword" value="KeyPgStatic|STATIC"}}**
 	Declares variables in a procedure that retain their value between calls.
+**{{fbdoc item="keyword" value="KeyPgThreadLocal|THREAD LOCAL"}}**
+	Declares a variable with separate storage for each thread.
 <<>>**{{fbdoc item="keyword" value="KeyPgShared|SHARED"}}**
 	Used with ##[[KeyPgDim|Dim]]## allows variables to be visible throughout a module.
 **{{fbdoc item="keyword" value="KeyPgVar|VAR"}}**

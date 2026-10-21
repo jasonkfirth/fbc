@@ -187,10 +187,16 @@ function astNewUOP _
 	dim as integer dtype = any, rank = any, intrank = any, uintrank = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as integer do_promote = any
+	dim as integer use_int128_helper = FALSE
 
 	function = NULL
 
 	if( o = NULL ) then
+		exit function
+	end if
+
+	if( astTypeIsIncompleteValue( astGetFullType( o ) ) ) then
+		errReport( FB_ERRMSG_INCOMPLETETYPE )
 		exit function
 	end if
 
@@ -365,6 +371,18 @@ function astNewUOP _
 		return o
 
 	end select
+
+	use_int128_helper = astUsesInt128Helpers( )
+	if( (op = AST_OP_ABS) orElse (op = AST_OP_SGN) ) then
+		select case( env.clopt.backend )
+		case FB_BACKEND_GCC, FB_BACKEND_CLANG, FB_BACKEND_LLVM
+			use_int128_helper = TRUE
+		end select
+	end if
+
+	if( typeIsInteger128Scalar( o->dtype ) andalso use_int128_helper ) then
+		return astBuildNativeInt128Uop( op, o, dtype, typeIsSigned( o->dtype ) )
+	end if
 
 	'' constant folding
 	if( astIsCONST( o ) ) then

@@ -179,10 +179,14 @@ int32 fb_FileLock(const int32 file_num, const uint32 start, const uint32 end)
     (void)start;
     (void)end;
 
-    if (fb_nuttx_stream_for_file(file_num) == NULL)
+    if (fb_nuttx_stream_for_file(file_num) == NULL) {
+        fb_nuttx_error_num = FB_RTERROR_ILLEGALFUNCTIONCALL;
         return -1;
+    }
 
-    return 0;
+    /* NuttX has no byte-range locking backend; never claim that a lock was taken. */
+    fb_nuttx_error_num = FB_RTERROR_FILEIO;
+    return -1;
 }
 
 int32 fb_FileUnlock(const int32 file_num, const uint32 start, const uint32 end)
@@ -190,10 +194,13 @@ int32 fb_FileUnlock(const int32 file_num, const uint32 start, const uint32 end)
     (void)start;
     (void)end;
 
-    if (fb_nuttx_stream_for_file(file_num) == NULL)
+    if (fb_nuttx_stream_for_file(file_num) == NULL) {
+        fb_nuttx_error_num = FB_RTERROR_ILLEGALFUNCTIONCALL;
         return -1;
+    }
 
-    return 0;
+    fb_nuttx_error_num = FB_RTERROR_FILEIO;
+    return -1;
 }
 
 int32 fb_FileInput(const int32 file_num)

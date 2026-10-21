@@ -60,8 +60,8 @@ End Function
 EXPECTED = {
     'boolean-return': (1, 10), 'boolean-assign': (1, 10),
     'byte-return': (2, 13), 'integer-return': (8, 13),
-    'wide-return': (13, 8), 'single-return': (15, 16),
-    'double-return': (16, 15), 'constant-return': (1, 10),
+    'wide-return': (13, 8), 'single-return': (17, 18),
+    'double-return': (18, 17), 'constant-return': (1, 10),
 }
 
 

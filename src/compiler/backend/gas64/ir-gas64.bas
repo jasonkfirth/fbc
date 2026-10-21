@@ -143,6 +143,8 @@ const GAS64_BYTE_BYTES = 1
 const GAS64_WORD_BYTES = 2
 const GAS64_DWORD_BYTES = 4
 const GAS64_QWORD_BYTES = 8
+const GAS64_INT128_BYTES = GAS64_QWORD_BYTES * 2
+const GAS64_INT128_ALIGNMENT = GAS64_INT128_BYTES
 const GAS64_BYTE_BITS = 8
 const GAS64_WORD_BITS = 16
 const GAS64_DWORD_BITS = 32
@@ -451,6 +453,10 @@ declare sub _emitscopeend( byval s as FBSYMBOL ptr )
 declare sub _emitMacro( byval op as integer,byval v1 as IRVREG ptr, byval v2 as IRVREG ptr, byval vr as IRVREG ptr )
 declare sub save_call(byref func as string,byval vr as IRVREG ptr,byval vrreg as integer)
 declare function hGetMagicStructNumber( byval sym as FBSYMBOL ptr ) as integer
+declare function hIsNativeElfTlsSymbol( byval sym as FBSYMBOL ptr ) as integer
+declare function hNativeElfTlsOperand( byval sym as FBSYMBOL ptr, byval ofs as longint ) as string
+declare sub hLoadNativeElfTlsAddress( byval sym as FBSYMBOL ptr, byval regname as const zstring ptr, byval ofs as longint )
+declare function hOffsetMemoryOperand( byval operand as string, byval byte_offset as integer ) as string
 declare sub dbg_addstab(byref txt as string="",byval cod as ubyte,byval desc as short=0,byref value as string="0")
 ''===================== globals ===========================================
 dim shared as DBGCTX        ctxdbg
@@ -490,6 +496,8 @@ dim shared remapTB(0 to FB_DATATYPES-1) as integer = _
 8, _                                   '' ulong
 9, _                                   '' longint
 10, _                                   '' ulongint
+ 0, _                                   '' integer128
+ 0, _                                   '' uinteger128
 11, _                                   '' single
 12, _                                   '' double
 13, _                                   '' string
@@ -3040,7 +3048,11 @@ private sub hemitvariable( byval sym as FBSYMBOL ptr )
 		end if
 		asm_info("var total size="+Str(length)+"align="+str(align))
 		align=pw2(align) ''must be a power of 2
-		if align>8 then align=8
+		if( typeIsInteger128Scalar( symbGetType( sym ) ) ) then
+			if( align > 16 ) then align = 16
+		elseif( align > 8 ) then
+			align = 8
+		end if
 		'if symbIsPublic( sym ) then
 		'    asm_info("Not for variable report please : .globl "+*symbGetMangledName( sym ))
 		'end if
@@ -3461,6 +3473,14 @@ end sub
 private function param_analyze_sysv(byval dtype as FB_DATATYPE, _
 	byval struc as FBSYMBOL ptr,byref cptarg as integer, _
 	byref cptint as integer,byref cptfloat as integer) as integer
+	if( typeIsInteger128Scalar( dtype ) ) then
+		if( cptint <= GAS64_SYSTEMV_INTEGER_ARG_REGISTERS - 2 ) then
+			cptint += 2
+			return KPARAMRR
+		end if
+		cptarg += 1
+		return KPARAMSK0
+	end if
 
 	if dtype<>FB_DATATYPE_STRUCT then
 		if typeGetClass( dtype ) = FB_DATACLASS_FPOINT then
@@ -3530,6 +3550,15 @@ end function
 
 private function param_analyze_windows(byval dtype as FB_DATATYPE, _
 	byval struc as FBSYMBOL ptr,byval cptarg as integer) as integer
+	if( typeIsInteger128Scalar( dtype ) ) then
+		'' Windows x64 has no 128-bit integer argument register. Use the same
+		'' pointer-to-copy convention used for 16-byte aggregate parameters.
+		if cptarg>GAS64_WINDOWS_ARG_REGISTERS then
+			return KPARAMSK3
+		else
+			return KPARAMSK2
+		end if
+	end if
 
 	if dtype<>FB_DATATYPE_STRUCT then
 		if cptarg>GAS64_WINDOWS_ARG_REGISTERS then return KPARAMSK0
@@ -3853,6 +3882,21 @@ private sub _procallocarg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr
 				paramtype=param_analyze(FB_DATATYPE_STRUCT,sym->subtype,,ctx.arginteg,ctx.argfloat )
 				asm_info("KPARAM="+str(paramtype))
 				procallocarg_sysv_struct(sym,paramtype)
+			elseif( typeIsInteger128Scalar( dtype ) ) then
+				paramtype = param_analyze( dtype, NULL, , ctx.arginteg, ctx.argfloat )
+				if( paramtype = KPARAMRR ) then
+					ctx.stk = (GAS64_INT128_BYTES + ctx.stk + GAS64_INT128_ALIGNMENT - 1) And _
+					          (Not(GAS64_INT128_ALIGNMENT - 1))
+					sym->ofs = -ctx.stk
+					reg_fillm( sym->ofs, listreg(), GAS64_QWORD_BYTES, 1 )
+					asm_code( "mov QWORD PTR " + str( sym->ofs + GAS64_QWORD_BYTES ) + _
+						"[rbp], " + *regstrq( listreg( ctx.arginteg ) ) )
+				elseif( paramtype = KPARAMSK0 ) then
+					sym->ofs = ctx.ofs
+					ctx.ofs += GAS64_INT128_BYTES
+				else
+					asm_error( "128-bit parameter classification failed" )
+				end if
 			else
 				''byval simple datatype
 				lgt = symbGetSizeOf( sym )
@@ -3927,6 +3971,11 @@ private sub _procallocarg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr
 			if typeGetDtAndPtrOnly(dtype)= FB_DATATYPE_STRUCT then
 				''byval structure
 				paramtype=param_analyze(FB_DATATYPE_STRUCT,sym->subtype,ctx.arginteg)
+				asm_info("KPARAM="+str(paramtype))
+				procallocarg_windows_struct(sym,paramtype)
+			elseif( typeIsInteger128Scalar( dtype ) ) then
+				''The caller passes a pointer to its 16-byte argument copy.
+				paramtype=param_analyze(dtype,NULL,ctx.arginteg)
 				asm_info("KPARAM="+str(paramtype))
 				procallocarg_windows_struct(sym,paramtype)
 			else
@@ -4062,6 +4111,11 @@ private sub prepare_idx(byval v1 as IRVREG ptr, byref op1 as string, byref op3 a
 
 		if v1->sym=0 then
 			op1=str(v1->ofs)+"["+regtempo+"]"
+		elseif hIsNativeElfTlsSymbol(v1->sym) then
+			dim as string regtempo2 = *reg_tempo()
+			hLoadNativeElfTlsAddress( v1->sym, strptr(regtempo2), v1->ofs )
+			asm_code("lea "+regtempo2+", ["+regtempo2+"+"+regtempo+"]")
+			op1="["+regtempo2+"]"
 		elseif symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
 			dim as string regtempo2
 			regtempo2=*reg_tempo()
@@ -4109,7 +4163,9 @@ private sub prepare_idx(byval v1 as IRVREG ptr, byref op1 as string, byref op3 a
 	else
 		''format  varname ofs1= [dt] vidx=<reg>  /// vidx=<var varname ofs
 		regtempo=*reg_tempo()
-		if symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
+		if hIsNativeElfTlsSymbol(v1->sym) then
+			hLoadNativeElfTlsAddress( v1->sym, strptr(regtempo), v1->ofs )
+		elseif symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
 			asm_code("lea "+regtempo+", "+*symbGetMangledName(v1->sym)+"[rip+"+Str(v1->ofs)+"]")' #NO"
 		else
 			asm_code("lea "+regtempo+", "+Str(v1->ofs)+"[rbp]")
@@ -4585,6 +4641,40 @@ private function hPointerOperand(byval vreg as IRVREG ptr) as string
 	return str(vreg->ofs) + "[" + *regstrq(reg_findreal(vreg->vidx->reg)) + "]"
 end function
 
+private function hIsNativeElfTlsSymbol(byval sym as FBSYMBOL ptr) as integer
+	function = FALSE
+	if( sym = NULL ) then exit function
+	function = symbIsThreadLocalC(sym) andalso _
+	           (env.clopt.target = FB_COMPTARGET_LINUX) andalso (ctx.systemv <> 0)
+	if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB ) then _
+		function = FALSE
+end function
+
+private function hNativeElfTlsOperand _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byval ofs as longint _
+	) as string
+	dim as string result = "fs:" + *symbGetMangledName(sym) + "@TPOFF"
+	if( ofs > 0 ) then
+		result += "+" + str(ofs)
+	elseif( ofs < 0 ) then
+		result += str(ofs)
+	end if
+	function = result
+end function
+
+private sub hLoadNativeElfTlsAddress _
+	( _
+		byval sym as FBSYMBOL ptr, _
+		byval regname as const zstring ptr, _
+		byval ofs as longint _
+	)
+	asm_code("mov " + *regname + ", OFFSET " + *symbGetMangledName(sym) + "@TPOFF")
+	asm_code("add " + *regname + ", QWORD PTR fs:0")
+	if( ofs <> 0 ) then asm_code("add " + *regname + ", " + str(ofs))
+end sub
+
 private sub hBopLoadOperand _
 	( _
 		byval vreg as IRVREG ptr, _
@@ -4629,7 +4719,9 @@ private sub hBopLoadOperand _
 		prefix = ""
 
 	case IR_VREGTYPE_VAR
-		if( ctx.systemv andalso _
+		if( hIsNativeElfTlsSymbol( vreg->sym ) ) then
+			operand = hNativeElfTlsOperand( vreg->sym, vreg->ofs )
+		elseif( ctx.systemv andalso _
 		    (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) andalso _
 		    symbIsCommon( vreg->sym ) ) then
 			dim as integer temp_reg = reg_findtemp( )
@@ -5726,7 +5818,9 @@ private sub _emituop(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRVR
 			exit select
 
 		case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
-			if symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
+			if hIsNativeElfTlsSymbol(v1->sym) then
+				op1 = hNativeElfTlsOperand(v1->sym, v1->ofs)
+			elseif symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
 				op1=*symbGetMangledName(v1->sym)+"[rip+"+Str(v1->ofs)+"]"
 			else
 				op1=Str(v1->ofs)+"[rbp]"
@@ -5933,7 +6027,9 @@ private function hConvertLoadSource _
 		op2 = hBopRegisterName( srcreg, v2dtype )
 
 	case IR_VREGTYPE_VAR
-		if( symbIsStatic( v2->sym ) orElse symbIsShared( v2->sym ) ) then
+		if( hIsNativeElfTlsSymbol( v2->sym ) ) then
+			op2 = hNativeElfTlsOperand( v2->sym, v2->ofs )
+		elseif( symbIsStatic( v2->sym ) orElse symbIsShared( v2->sym ) ) then
 			if( ctx.systemv andalso _
 			    (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) ) then
 				op2 = *symbGetMangledName( v2->sym ) + "@GOTPCREL[rip]"
@@ -6584,7 +6680,9 @@ private sub hStoreLoadDestination _
 		end if
 
 	case IR_VREGTYPE_VAR
-		if( symbIsStatic( v1->sym ) orElse symbIsShared( v1->sym ) ) then
+		if( hIsNativeElfTlsSymbol( v1->sym ) ) then
+			op1 = hNativeElfTlsOperand( v1->sym, v1->ofs )
+		elseif( symbIsStatic( v1->sym ) orElse symbIsShared( v1->sym ) ) then
 			op1 = *symbGetMangledName( v1->sym ) + _
 			      "[rip+" + str( v1->ofs ) + "]"
 		else
@@ -6638,7 +6736,9 @@ private sub hStoreLoadSource _
 		op2 = hBopRegisterName( reg_findreal( v2->reg ), dtype )
 
 	case IR_VREGTYPE_VAR
-		if( (v2->sym <> NULL) andalso _
+		if( hIsNativeElfTlsSymbol( v2->sym ) ) then
+			op2 = hNativeElfTlsOperand( v2->sym, v2->ofs )
+		elseif( (v2->sym <> NULL) andalso _
 		    (symbIsStatic( v2->sym ) orElse symbIsShared( v2->sym )) ) then
 			op2 = *symbGetMangledName( v2->sym ) + _
 			      "[rip+" + str( v2->ofs ) + "]"
@@ -6918,6 +7018,34 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	asm_info("store " + vregPretty( v1 ) + " := " + vregPretty( v2 ) )
 	asm_info("v1="+vregdumpfull(v1))
 	asm_info("v2="+vregdumpfull(v2))
+	if( typeIsInteger128Scalar( v1->dtype ) andalso _
+	    typeIsInteger128Scalar( v2->dtype ) ) then
+		if( (hStoreUsesMemory( v1 ) = FALSE) orElse _
+		    (hStoreUsesMemory( v2 ) = FALSE) ) then
+			asm_error( "128-bit store requires addressable operands" )
+			exit sub
+		end if
+		if( hStoreUsesSystemVGOT( ) andalso _
+		    (((v1->sym <> NULL) andalso symbIsCommon( v1->sym )) orElse _
+		     ((v2->sym <> NULL) andalso symbIsCommon( v2->sym ))) ) then
+			asm_error( "128-bit stores to common dynamic-library symbols are not supported" )
+			exit sub
+		end if
+		hStoreLoadDestination( v1, v2, op1, op3 )
+		hStoreLoadSource( v1, v2, op2, op4 )
+		if( op4 <> "" ) then emitop3_op4( op4 )
+		if( op3 <> "" ) then emitop3_op4( op3 )
+		dim as integer scratch_reg = reg_findtemp( )
+		dim as string scratch = *regstrq( scratch_reg )
+		asm_code( "mov " + scratch + ", QWORD PTR " + op2 )
+		asm_code( "mov QWORD PTR " + op1 + ", " + scratch )
+		asm_code( "mov " + scratch + ", QWORD PTR " + _
+			hOffsetMemoryOperand( op2, GAS64_QWORD_BYTES ) )
+		asm_code( "mov QWORD PTR " + _
+			hOffsetMemoryOperand( op1, GAS64_QWORD_BYTES ) + ", " + scratch )
+		reghandle( scratch_reg ) = KREGFREE
+		exit sub
+	end if
 
 
 	if( typeGetSize( v1->dtype ) < typeGetSize( v2->dtype ) ) then
@@ -6976,7 +7104,9 @@ private sub _emitloadres(byval v1 as IRVREG ptr,byval vr as IRVREG Ptr)
 			prepare_idx(v1,op1,op3)
 
 		case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
-			if symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
+			if hIsNativeElfTlsSymbol(v1->sym) then
+				op1 = hNativeElfTlsOperand(v1->sym, v1->ofs)
+			elseif symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
 				op1=*symbGetMangledName(v1->sym)+"[rip+"+Str(v1->ofs)+"]"
 			else
 				op1=Str(v1->ofs)+"[rbp]"
@@ -6995,6 +7125,17 @@ private sub _emitloadres(byval v1 as IRVREG ptr,byval vr as IRVREG Ptr)
 		case else
 			asm_error("in loadres typ not handled")
 	end select
+
+	if( typeIsInteger128Scalar( v1->dtype ) ) then
+		if( v1->typ <> IR_VREGTYPE_VAR ) then
+			asm_error( "128-bit return value is not stored in a local result slot" )
+			exit sub
+		end if
+		asm_code( "mov rax, QWORD PTR " + op1 )
+		asm_code( "mov rdx, QWORD PTR " + _
+			hOffsetMemoryOperand( op1, GAS64_QWORD_BYTES ) )
+		exit sub
+	end if
 
 	if( hIsStructIn2Regs( v1 ) ) then
 		''Structure returned in 2 registers, linux only
@@ -7084,6 +7225,7 @@ end sub
 private sub _emitaddr(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRVREG Ptr)
 
 	dim as string op1,op3
+	dim as integer is_native_tls_address = FALSE
 
 	asm_info( IIf(op=AST_OP_ADDROF,"addrof ","deref ") + vregPretty( v1 ) )
 	asm_info("v1="+vregdumpfull(v1))
@@ -7112,7 +7254,11 @@ private sub _emitaddr(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRV
 					prepare_idx(v1,op1,op3)
 
 				case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
-					if symbIsStatic(v1->sym) Or symbisshared(v1->sym) or symbIsLabel(v1->sym) then
+					if hIsNativeElfTlsSymbol(v1->sym) then
+						hLoadNativeElfTlsAddress( _
+							v1->sym, regstrq(reg_findreal(vr->reg)), v1->ofs)
+						is_native_tls_address = TRUE
+					elseif symbIsStatic(v1->sym) Or symbisshared(v1->sym) or symbIsLabel(v1->sym) then
 						op1=*symbGetMangledName(v1->sym)+"[rip+"+Str(v1->ofs)+"]"
 					else
 						op1=Str(v1->ofs)+"[rbp]"
@@ -7133,7 +7279,8 @@ private sub _emitaddr(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRV
 				'asm_info("CANCEL addrof ptr=")
 				'asm_code("mov "+*regstrq(reg_findreal(vr->reg))+", "+*regstrq(reg_findreal(v1->vidx->reg)))
 			'else
-				asm_code("lea "+*regstrq(reg_findreal(vr->reg))+", "+op1)
+				if( is_native_tls_address = FALSE ) then _
+					asm_code("lea "+*regstrq(reg_findreal(vr->reg))+", "+op1)
 			'end if
 		case AST_OP_DEREF '' ====== DEREF =========================================================
 			select case v1->typ ''source
@@ -7142,7 +7289,9 @@ private sub _emitaddr(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRV
 					if op3<>"" then emitop3_op4(op3)
 
 				case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
-					if symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
+					if hIsNativeElfTlsSymbol(v1->sym) then
+						op1 = hNativeElfTlsOperand(v1->sym, v1->ofs)
+					elseif symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
 						if (symbIsCommon(v1->sym)) andalso ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
 							asm_code("mov rax, "+*symbGetMangledName(v1->sym)+"@GOTPCREL[rip]")
 							op1="[rax]"
@@ -7231,7 +7380,9 @@ private sub hCallLoadArgument _
 		end if
 
 	case IR_VREGTYPE_VAR
-		if( (vreg->sym <> NULL) andalso _
+		if( hIsNativeElfTlsSymbol( vreg->sym ) ) then
+			operand = hNativeElfTlsOperand( vreg->sym, vreg->ofs )
+		elseif( (vreg->sym <> NULL) andalso _
 		    (symbIsStatic( vreg->sym ) orElse symbIsShared( vreg->sym )) ) then
 			operand = *symbGetMangledName( vreg->sym ) + _
 			          "[rip+" + str( vreg->ofs ) + "]"
@@ -7324,8 +7475,13 @@ private sub hCallQueueSystemVStackArgument _
 			hCallQueuePush( pushstr(), pushnbstr, "mov rax, "+op1 )
 		end if
 	else
-		if dtype=FB_DATATYPE_STRUCT then
-			lgt=v2->subtype->lgt
+		if( (dtype=FB_DATATYPE_STRUCT) orElse typeIsInteger128Scalar( dtype ) ) then
+			if( typeIsInteger128Scalar( dtype ) ) then
+				lgt = GAS64_INT128_BYTES
+			else
+				lgt = v2->subtype->lgt
+			end if
+			var total_length = lgt
 			pushsize+=lgt
 			if lgt>8 then
 				ofst=lgt mod 8
@@ -7342,8 +7498,12 @@ private sub hCallQueueSystemVStackArgument _
 					end if
 					lgt-=8
 				wend
-				hCallQueuePush( pushstr(), pushnbstr, "add rax, "+str(v2->subtype->lgt-ofst) )
+				hCallQueuePush( pushstr(), pushnbstr, "add rax, "+str(total_length-ofst) )
 				if v2->typ=IR_VREGTYPE_REG then
+					if( typeIsInteger128Scalar( dtype ) ) then
+						asm_error( "128-bit stack argument is not in addressable storage" )
+						exit sub
+					end if
 					hCallQueuePush( pushstr(), pushnbstr, "mov rax, "+op1 )
 				else
 					hCallQueuePush( pushstr(), pushnbstr, "lea rax, "+op1 )
@@ -7487,20 +7647,42 @@ private sub hCallEmitWindowsStackArgument _
 		'asm_info("datatype="+str(typeGetDtOnly( v2->dtype ))+" "+str(FB_DATATYPE_FUNCTION))
 		'asm_info("DLL="+str(fbGetOption( FB_COMPOPT_OUTTYPE ))+" "+str(FB_OUTTYPE_DYNAMICLIB))
 
-		asm_code("lea "+*regstrq(listreg(cptint))+", "+op1)
+		if( typeIsInteger128Scalar( dtype ) = FALSE ) then
+			asm_code("lea "+*regstrq(listreg(cptint))+", "+op1)
+		end if
 
 		''byval structure passed by pointer
 		asm_info("copying byval parameter on stack")
 		asm_info("stk="+Str(ctx.stkcopy))
-		'ctx.stkcopy=(symbGetRealSize( v2->subtype )+ctx.stkcopy+v2->subtype->lgt-1) And (Not(v2->subtype->lgt-1))
-		ctx.stkcopy=(v2->subtype->lgt +ctx.stkcopy+v2->subtype->lgt-1) And (Not(v2->subtype->lgt-1))
+		if( typeIsInteger128Scalar( dtype ) ) then
+			lgt = GAS64_INT128_BYTES
+		else
+			lgt = v2->subtype->lgt
+		end if
+		ctx.stkcopy=(lgt +ctx.stkcopy+lgt-1) And (Not(lgt-1))
 		if( hCallAlignStackCopy( ctx.stkcopy ) = FALSE ) then
 			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
 			exit sub
 		end if
 		asm_info("stk12="+Str(ctx.stkcopy))
 		regtempo=*regstrq(listreg(cptint))
-		memcopy(v2->subtype->lgt,regtempo,str(-ctx.stkcopy)+"[rbp]",KUSE_LEA,KUSE_LEA)
+		if( typeIsInteger128Scalar( dtype ) ) then
+			if( v2->typ = IR_VREGTYPE_IMM ) then
+				asm_code( "mov rax, " + op1 )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy) + "[rbp], rax" )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy + GAS64_QWORD_BYTES) + _
+					"[rbp], " + IIf( typeIsSigned( dtype ) andalso (v2->value.i < 0), "-1", "0" ) )
+			else
+				asm_code( "mov rax, QWORD PTR " + op1 )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy) + "[rbp], rax" )
+				asm_code( "mov rax, QWORD PTR " + _
+					hOffsetMemoryOperand( op1, GAS64_QWORD_BYTES ) )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy + GAS64_QWORD_BYTES) + _
+					"[rbp], rax" )
+			end if
+		else
+			memcopy(lgt,regtempo,str(-ctx.stkcopy)+"[rbp]",KUSE_LEA,KUSE_LEA)
+		end if
 		asm_code("lea "+*regstrq(listreg(cptint))+", "+str(-ctx.stkcopy)+"[rbp]")
 
 		if variadic=true and ctx.target=FB_COMPTARGET_WIN32 then
@@ -7508,7 +7690,29 @@ private sub hCallEmitWindowsStackArgument _
 		end if
 	else
 		''KPARAMSK3
-		if v2->typ=IR_VREGTYPE_IMM then
+		if( typeIsInteger128Scalar( dtype ) ) then
+			lgt = GAS64_INT128_BYTES
+			ctx.stkcopy=(lgt +ctx.stkcopy+lgt-1) And (Not(lgt-1))
+			if( hCallAlignStackCopy( ctx.stkcopy ) = FALSE ) then
+				errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+				exit sub
+			end if
+			if( v2->typ = IR_VREGTYPE_IMM ) then
+				asm_code( "mov rax, " + op1 )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy) + "[rbp], rax" )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy + GAS64_QWORD_BYTES) + _
+					"[rbp], " + IIf( typeIsSigned( dtype ) andalso (v2->value.i < 0), "-1", "0" ) )
+			else
+				asm_code( "mov rax, QWORD PTR " + op1 )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy) + "[rbp], rax" )
+				asm_code( "mov rax, QWORD PTR " + _
+					hOffsetMemoryOperand( op1, GAS64_QWORD_BYTES ) )
+				asm_code( "mov QWORD PTR " + str(-ctx.stkcopy + GAS64_QWORD_BYTES) + _
+					"[rbp], rax" )
+			end if
+			asm_code( "lea rax, " + str(-ctx.stkcopy) + "[rbp]" )
+			asm_code( "mov QWORD PTR " + Str((cptarg-1)*8) + "[rsp], rax" )
+		elseif v2->typ=IR_VREGTYPE_IMM then
 			''Immediat
 			if dtype=FB_DATATYPE_SINGLE then
 				if v2->value.f=0 then
@@ -7692,6 +7896,68 @@ private sub hCallEmitStructRegisterArgument _
 	end if
 end sub
 
+private function hOffsetMemoryOperand( byval operand as string, byval byte_offset as integer ) as string
+	dim as integer bracket = instr( operand, "[" )
+	if( bracket = 0 ) then
+		function = operand + "+" + str( byte_offset )
+		exit function
+	end if
+
+	dim as string prefix = left( operand, bracket - 1 )
+	dim as string address = mid( operand, bracket )
+	if( (len( prefix ) = 0) orElse (valint( prefix ) <> 0) orElse (trim( prefix ) = "0") ) then
+		prefix = str( valint( prefix ) + byte_offset )
+	elseif( left( address, 5 ) = "[rip+" ) then
+		dim as integer close_bracket = instr( address, "]" )
+		if( close_bracket > 0 ) then
+			dim as string displacement = mid( address, 6, close_bracket - 6 )
+			address = "[rip+" + str( valint( displacement ) + byte_offset ) + "]"
+		end if
+	else
+		address = left( address, len( address ) - 1 ) + "+" + str( byte_offset ) + "]"
+	end if
+
+	function = prefix + address
+end function
+
+private sub hCallEmitInteger128RegisterArgument _
+	( _
+		byval v2 as IRVREG ptr, _
+		byval dtype as FB_DATATYPE, _
+		byval cptarg as integer, _
+		byval cptint as integer, _
+		byval cptfloat as integer, _
+		byval reg2 as integer, _
+		byval variadic as boolean, _
+		byref operand as string, _
+		byval setup_code as string _
+	)
+	dim as integer low_reg = listreg( cptint - 1 )
+	dim as integer high_reg = listreg( cptint )
+	reg_transfer( low_reg, reg2 )
+	reg_transfer( high_reg, reg2 )
+	if( setup_code <> "" ) then emitop3_op4( setup_code )
+
+	select case v2->typ
+	case IR_VREGTYPE_IMM
+		hCallEmitImmediateRegisterArgument( v2, FB_DATATYPE_ULONGINT, cptarg, _
+			cptint - 1, cptfloat, reg2, variadic, operand )
+		asm_code( "mov " + *regstrq( high_reg ) + ", " + _
+			IIf( v2->value.i < 0, "-1", "0" ) )
+	case IR_VREGTYPE_VAR, IR_VREGTYPE_IDX, IR_VREGTYPE_PTR
+		asm_code( "mov " + *regstrq( low_reg ) + ", QWORD PTR " + operand )
+		asm_code( "mov " + *regstrq( high_reg ) + ", QWORD PTR " + _
+			hOffsetMemoryOperand( operand, GAS64_QWORD_BYTES ) )
+	case IR_VREGTYPE_OFS
+		asm_code( "lea rax, " + operand )
+		asm_code( "mov " + *regstrq( low_reg ) + ", QWORD PTR [rax]" )
+		asm_code( "mov " + *regstrq( high_reg ) + ", QWORD PTR [rax+" + _
+			str( GAS64_QWORD_BYTES ) + "]" )
+	case else
+		asm_error( "128-bit argument is not in addressable storage" )
+	end select
+end sub
+
 private sub hCallEmitRegisterArgument _
 	( _
 		byval v2 as IRVREG ptr, _
@@ -7716,6 +7982,9 @@ private sub hCallEmitRegisterArgument _
 		hCallEmitImmediateRegisterArgument( v2, dtype, cptarg, cptint, _
 		                                    cptfloat, reg2, variadic, op1 )
 
+	elseif( typeIsInteger128Scalar( dtype ) ) then
+		hCallEmitInteger128RegisterArgument( v2, dtype, cptarg, cptint, _
+			cptfloat, reg2, variadic, op1, op3 )
 	elseif dtype=FB_DATATYPE_STRUCT then
 		hCallEmitStructRegisterArgument( v2, paramtype, cptarg, cptint, _
 		                                 cptfloat, reg2, op1 )
@@ -7797,6 +8066,16 @@ private sub hCallStoreResult _
 	dim as FB_DATATYPE dtype
 	dim as string op1
 if( vr ) then ''return value
+	if( typeIsInteger128Scalar( vr->dtype ) ) then
+		ctx.stk = (GAS64_INT128_BYTES + ctx.stk + GAS64_INT128_ALIGNMENT - 1) And _
+		          (Not(GAS64_INT128_ALIGNMENT - 1))
+		vr->typ = IR_VREGTYPE_VAR
+		vr->ofs = -ctx.stk
+		asm_code( "mov QWORD PTR " + str( vr->ofs ) + "[rbp], rax" )
+		asm_code( "mov QWORD PTR " + str( vr->ofs + GAS64_QWORD_BYTES ) + _
+			"[rbp], rdx" )
+		exit sub
+	end if
 
 	if( hIsStructIn2Regs( vr ) ) then
 		''Structure returned in 2 registers
@@ -8078,7 +8357,9 @@ private sub _emitcallptr _
 		case IR_VREGTYPE_IMM
 			asm_error("Never IMM as first operand")
 		case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
-			if symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
+			if hIsNativeElfTlsSymbol(v1->sym) then
+				op1 = hNativeElfTlsOperand(v1->sym, v1->ofs)
+			elseif symbIsStatic(v1->sym) Or symbisshared(v1->sym) then
 				op1=*symbGetMangledName(v1->sym)+"[rip+"+Str(v1->ofs)+"]"
 			else
 				op1=Str(v1->ofs)+"[rbp]"
@@ -8639,6 +8920,17 @@ private sub _emitvarinii( byval sym as FBSYMBOL ptr, byval value as longint )
 	asm_code(siz+" 0x" + right(hex( value ),lgt)+" # "+Str(value))
 
 end sub
+
+private function hEmitInt128Word( byval value as longint ) as string
+	var result = hex( culngint( value ) )
+	if( len( result ) < 16 ) then result = string( 16 - len( result ), "0" ) + result
+	function = result
+end function
+
+private sub _emitVarIni128( byval sym as FBSYMBOL ptr, byval low as longint, byval high as longint )
+	asm_code( ".quad 0x" + hEmitInt128Word( low ) )
+	asm_code( ".quad 0x" + hEmitInt128Word( high ) )
+end sub
 private sub _emitvarinif( byval sym as FBSYMBOL ptr, byval value as double )
 	asm_code(hFloatToHex_asm64(value,symbGetType( sym )))
 end sub
@@ -9192,6 +9484,7 @@ NULL, _ /' _emitStackAlign '/
 @_emitVarIniBegin, _
 @_emitVarIniEnd, _
 @_emitVarIniI, _
+@_emitVarIni128, _
 @_emitVarIniF, _
 @_emitVarIniOfs, _
 @_emitVarIniStr, _
