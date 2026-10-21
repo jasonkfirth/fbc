@@ -2058,8 +2058,11 @@ private function _emitBegin( ) as integer
 	hWriteLine( "typedef unsigned long long uint64;", TRUE )
 	if( fbGetBits( ) = 32 ) then
 		'' Use the shared two-word runtime representation instead of relying on
-		'' native __int128 support. Its alignment also defines the by-value ABI.
-		hWriteLine( "typedef struct __attribute__((aligned(16))) { uint64 low; uint64 high; } FB_INT128;", TRUE )
+		'' native __int128 support. Match target layout, including the smaller
+		'' alignment required by Windows CE and classic m68k object formats.
+		hWriteLine( "typedef struct __attribute__((aligned(" + _
+		            str( typeCalcNaturalAlign( FB_DATATYPE_INTEGER128, NULL ) ) + _
+		            "))) { uint64 low; uint64 high; } FB_INT128;", TRUE )
 	end if
 	if( fbIs64bit( ) ) then
 		hWriteLine( "typedef struct { char *data; int64 len; int64 size; } FBSTRING;", TRUE )

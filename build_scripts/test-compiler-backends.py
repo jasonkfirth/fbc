@@ -56,6 +56,39 @@ def main() -> int:
                 print(f"GAS64/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print(f"GAS64/{target}: emission passed")
+        # GAS32 sees pointer-index operands without a backing symbol while
+        # compiling this module. TLS operand checks must accept those operands.
+        command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+                   "-gen", "gas", "-target", "win32", "-m", "fbc", "-e",
+                   "-i", str(root / "src/compiler"), "-i", str(root / "inc"),
+                   str(root / "src/compiler/backend/gas64/ir-gas64.bas"),
+                   "-o", str(working / "ir-gas64-win32.asm")]
+        emitted = subprocess.run(command, cwd=working, text=True,
+                                 capture_output=True, timeout=120, check=False)
+        if emitted.returncode:
+            print(f"GAS32/GAS64: emission failed\n{emitted.stdout}{emitted.stderr}")
+            return 1
+        print("GAS32/GAS64: emission passed")
+        # CE's PE object format cannot encode the 16-byte storage alignment
+        # used by desktop targets. Compile the language suite's real wide
+        # integer globals and layout checks through each CE C target.
+        for target in ("wince-arm", "wince-mips"):
+            output = working / ("integer128-" + target + ".c")
+            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+                       "-gen", "gcc", "-target", target,
+                       "-i", str(root / "inc/wince"), "-i", str(root / "inc"),
+                       "-i", str(root / "tests/fbcunit/inc"),
+                       str(root / "tests/numbers/integer128.bas"), "-o", str(output)]
+            emitted = subprocess.run(command, cwd=working, text=True,
+                                     capture_output=True, timeout=120, check=False)
+            if emitted.returncode:
+                print(f"Int128/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
+                return 1
+            generated = output.read_text(encoding="utf-8")
+            if not re.search(r"typedef struct __attribute__\(\(aligned\(8\)\)\).*FB_INT128;", generated):
+                print(f"Int128/{target}: incorrect storage alignment")
+                return 1
+            print(f"Int128/{target}: storage alignment passed")
         # Exercise every supported OS, including both common desktop widths
         # and CE architectures. Target overrides precede the shared CRT tree,
         # matching the installed compiler's include order.

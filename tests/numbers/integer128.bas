@@ -30,6 +30,15 @@ type Integer128Layout
 	suffix as ubyte
 end type
 
+#ifdef __FB_WINCE__
+	'' CE qualification can compile these tests without a licensed ROM.
+	'' Keep target layout checked even when the suite cannot execute there.
+	#assert offsetof( Integer128Layout, signedValue ) = 8
+	#assert offsetof( Integer128Layout, unsignedValue ) = 24
+	#assert offsetof( Integer128Layout, suffix ) = 40
+	#assert sizeof( Integer128Layout ) = 48
+#endif
+
 private function addUnsigned128 _
 	(byval leftValue as uinteger<128>, byval rightValue as uinteger<128>) as uinteger<128>
 	return leftValue + rightValue
@@ -60,6 +69,12 @@ SUITE( fbc_tests.numbers.integer128 )
 			CU_ASSERT_EQUAL( cuint( @layoutValue.unsignedValue ) - cuint( baseAddress ), 18 )
 			CU_ASSERT_EQUAL( cuint( @layoutValue.suffix ) - cuint( baseAddress ), 34 )
 			CU_ASSERT_EQUAL( sizeof( layoutValue ), 36 )
+		#elseif defined( __FB_WINCE__ )
+			CU_ASSERT_EQUAL( cuint( @layoutValue.signedValue ) - cuint( baseAddress ), 8 )
+			CU_ASSERT_EQUAL( cuint( @layoutValue.unsignedValue ) - cuint( baseAddress ), 24 )
+			CU_ASSERT_EQUAL( cuint( @layoutValue.suffix ) - cuint( baseAddress ), 40 )
+			CU_ASSERT_EQUAL( sizeof( layoutValue ), 48 )
+			CU_ASSERT_EQUAL( cuint( baseAddress ) and 7, 0 )
 		#else
 			CU_ASSERT_EQUAL( cuint( @layoutValue.signedValue ) - cuint( baseAddress ), 16 )
 			CU_ASSERT_EQUAL( cuint( @layoutValue.unsignedValue ) - cuint( baseAddress ), 32 )

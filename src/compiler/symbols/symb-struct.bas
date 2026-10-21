@@ -185,6 +185,15 @@ function typeCalcNaturalAlign _
 		end if
 	end if
 
+	'' Windows CE's PE object format supports at most 8-byte data alignment.
+	'' Wide integers still occupy 16 bytes, but their storage and aggregate
+	'' layout must respect that target limit.
+	if( env.clopt.target = FB_COMPTARGET_WINCE ) then
+		if( align > 8 ) then
+			align = 8
+		end if
+	end if
+
 	assert( (align >= 1) and (align <= 16) )
 
 	function = align

@@ -424,7 +424,10 @@ sub hPrepOperand _
 		dtype = vreg->dtype
 	end if
 
+	'' Indexed pointer operands may have no backing symbol. Only named
+	'' variables can carry the thread-local storage attribute.
 	if( (vreg->typ = IR_VREGTYPE_VAR) andalso _
+	    (vreg->sym <> NULL) andalso _
 	    symbIsThreadLocalC( vreg->sym ) andalso _
 	    (env.clopt.target = FB_COMPTARGET_LINUX) ) then
 		if( addprefix ) then
@@ -444,6 +447,7 @@ sub hPrepOperand _
 	end if
 
 	if( (vreg->typ = IR_VREGTYPE_IDX) andalso _
+	    (vreg->sym <> NULL) andalso _
 	    symbIsThreadLocalC( vreg->sym ) andalso _
 	    (env.clopt.target = FB_COMPTARGET_LINUX) ) then
 		dim as string tls_name
@@ -6438,6 +6442,7 @@ private sub _emitADDROF _
 	dim as string dst, src
 	dim as string ostr
 	if( (svreg->typ = IR_VREGTYPE_VAR) andalso _
+	    (svreg->sym <> NULL) andalso _
 	    symbIsThreadLocalC( svreg->sym ) andalso _
 	    (env.clopt.target = FB_COMPTARGET_LINUX) ) then
 		dim as string regname
