@@ -2815,6 +2815,10 @@ function symbCheckConstAssign _
 
 	dim ret as integer = any
 
+	'' Only function-pointer mismatches set a specific warning. All other
+	'' paths must clear the output, including recursive parameter checks.
+	wrnmsg = 0
+
 	''
 	'' Const-level compatibility is also used directly by overload
 	'' resolution, where function-pointer signatures are ranked separately.
