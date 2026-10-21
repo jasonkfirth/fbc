@@ -831,6 +831,9 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 end function
 
 function fbSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
+	'' Driver diagnostics can arrive after fbEnd() has freed parser symbols.
+	'' Bindings-only mode must honor the same module lifetime as full mode.
+	if( semantic_model_module_open = FALSE ) then return 0
 	if( (fbSemanticModelFullEnabled( ) = FALSE) and _
 		(semantic_model_bindings_only = FALSE) ) then return 0
 	return hSemanticModelSymbolId(sym)

@@ -26,8 +26,14 @@
 #include <stdlib.h>
 
 typedef struct FB_INT128_TEST_VALUE {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ && \
+    UINTPTR_MAX > UINT32_MAX
+	uint64_t high;
+	uint64_t low;
+#else
 	uint64_t low;
 	uint64_t high;
+#endif
 } FB_INT128_TEST_VALUE;
 
 enum {
@@ -150,6 +156,27 @@ int main(void)
 	if (!int128_equals(&result, 12, 0)) return 19;
 	fb_Int128FromDouble(&result, 13.5, 1);
 	if (!int128_equals(&result, 14, 0)) return 20;
+
+#if UINTPTR_MAX > UINT32_MAX && defined(__SIZEOF_INT128__)
+	/* Native C values provide an independent oracle for the helper's memory
+	 * layout. Struct-only tests cannot detect a reversed native word order. */
+	{
+		__int128 native_value = -8;
+		__int128 native_result = 0;
+		unsigned __int128 native_unsigned = (unsigned __int128)1 << 127;
+		fb_Int128Uop(&native_result, &native_value, FB_INT128_TEST_ABS, 1);
+		if (native_result != 8) return 21;
+		native_value = -((__int128)1 << 100);
+		fb_Int128Uop(&native_result, &native_value, FB_INT128_TEST_ABS, 1);
+		if (native_result != ((__int128)1 << 100)) return 22;
+		native_value = -((__int128)1 << 126);
+		native_value *= 2;
+		fb_Int128Uop(&native_result, &native_value, FB_INT128_TEST_SGN, 1);
+		if (native_result != -1) return 23;
+		fb_Int128Uop(&native_result, &native_unsigned, FB_INT128_TEST_SGN, 0);
+		if (native_result != 1) return 24;
+	}
+#endif
 
 	return 0;
 }

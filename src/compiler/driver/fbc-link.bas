@@ -710,8 +710,12 @@ private sub hAddGeneralLinkOptions _
 		end if
 	end if
 
+	'' Haiku already links PIC executables with -shared. Adding -pie makes
+	'' GNU ld relax native TLS accesses to local-exec offsets, which Haiku's
+	'' dynamic TLS loader does not initialize. Follow its native GCC linkage.
 	if( fbGetOption( FB_COMPOPT_PIC ) and _
-	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) ) then
+	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_XBOX) and _
+	    (fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_HAIKU) ) then
 		if( fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_EXECUTABLE ) then
 			ldcline += " -pie"
 		end if

@@ -27,9 +27,11 @@ Dim Shared fbcTestsThreadLocalMutex As Any Ptr
 Dim Shared fbcTestsThreadLocalReadyCount As Long
 Dim Shared fbcTestsThreadLocalStart As Long
 Dim Shared fbcTestsThreadLocalResults(0 To 1) As Long
+Dim Shared fbcTestsThreadLocalInitialValues(0 To 1) As Long
 
 Private Sub fbcTestsThreadLocalWorker(ByVal context As Any Ptr)
 	Dim As Long workerIndex = CInt(context)
+	fbcTestsThreadLocalInitialValues(workerIndex) = fbcTestsThreadLocalValue
 	fbcTestsThreadLocalValue = workerIndex + 10
 
 	MutexLock(fbcTestsThreadLocalMutex)
@@ -53,6 +55,7 @@ SUITE( fbc_tests.threads.thread_local )
 	TEST( independent_storage )
 		Dim As Any Ptr firstThread, secondThread
 		Dim As Long expectedWorkers, readyWorkers
+		CU_ASSERT_EQUAL( fbcTestsThreadLocalValue, 7 )
 
 		fbcTestsThreadLocalMutex = MutexCreate()
 		CU_ASSERT( fbcTestsThreadLocalMutex <> 0 )
@@ -86,6 +89,8 @@ SUITE( fbc_tests.threads.thread_local )
 
 		If firstThread <> 0 Then CU_ASSERT_EQUAL( fbcTestsThreadLocalResults(0), 10 )
 		If secondThread <> 0 Then CU_ASSERT_EQUAL( fbcTestsThreadLocalResults(1), 11 )
+		If firstThread <> 0 Then CU_ASSERT_EQUAL( fbcTestsThreadLocalInitialValues(0), 7 )
+		If secondThread <> 0 Then CU_ASSERT_EQUAL( fbcTestsThreadLocalInitialValues(1), 7 )
 		CU_ASSERT_EQUAL( fbcTestsThreadLocalValue, 7 )
 
 		MutexDestroy(fbcTestsThreadLocalMutex)

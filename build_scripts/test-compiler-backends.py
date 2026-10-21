@@ -845,7 +845,9 @@ def main() -> int:
             else:
                 print("gas64/win64 int128 call lowering passed")
 
-        if architecture == "x86_64":
+        # GAS64 emits ELF/COFF sections. Native Darwin's Mach-O fixtures use
+        # the C and LLVM backends above; cross-target emission remains tested.
+        if architecture == "x86_64" and system != "darwin":
             source = root / "tests/compiler-support/integer128-layout.bas"
             executable = working / "gas64-int128-layout"
             command = [str(options.fbc.resolve()), "-prefix", str(root),

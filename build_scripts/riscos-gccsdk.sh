@@ -25,7 +25,7 @@
 #     - serialize legacy install rules which race under parallel make
 #     - skip legacy GCC manuals rejected by current Texinfo releases
 #     - disable the optional PPL/CLooG optimizer whose upstream archive is gone
-#     - fetch and verify historical GNU archives from the canonical host
+#     - fetch and verify historical GNU archives with a fixed mirror fallback
 #     - build GCC's bundled ARM libffi for FreeBASIC THREADCALL support
 #     - run build-world and write a reusable environment file
 #
@@ -65,6 +65,7 @@ GCCSDK_GIT_URL="${RISCOS_GCCSDK_GIT_URL:-https://github.com/jhamby/riscos-gccsdk
 GCCSDK_GIT_REF="${RISCOS_GCCSDK_GIT_REF:-main}"
 GMP_ARCHIVE_NAME="gmp-5.0.1.tar.bz2"
 GMP_ARCHIVE_URL="https://ftp.gnu.org/gnu/gmp/$GMP_ARCHIVE_NAME"
+GMP_ARCHIVE_MIRROR_URL="https://mirrors.kernel.org/gnu/gmp/$GMP_ARCHIVE_NAME"
 GMP_ARCHIVE_SHA256="a2a610f01fd3298dc08c87bf30498c2402590e1bcb227fc40b15ee6d280939fb"
 
 ##############################################################################
@@ -123,6 +124,9 @@ download_verified_archive() {
     local archive="$2"
     local expected_sha256="$3"
     local temporary
+    local candidate_url
+    local downloaded=0
+    shift 3
 
     if archive_sha256_matches "$archive" "$expected_sha256"; then
         return 0
@@ -131,7 +135,17 @@ download_verified_archive() {
     mkdir -p "$(dirname "$archive")"
     temporary="$(mktemp "$archive.download.XXXXXX")"
 
-    if ! wget --timeout=30 --tries=3 -O "$temporary" "$url"; then
+    # Keep the pinned content identity independent of host availability. Use
+    # fixed HTTPS mirrors rather than the random ftpmirror redirect service.
+    for candidate_url in "$url" "$@"; do
+        if wget --timeout=30 --tries=3 -O "$temporary" "$candidate_url"; then
+            url="$candidate_url"
+            downloaded=1
+            break
+        fi
+    done
+
+    if [ "$downloaded" = 0 ]; then
         rm -f -- "$temporary"
         die "could not download $url"
     fi
@@ -286,8 +300,8 @@ fi
 
 # ftpmirror.gnu.org redirects each request to a randomly selected mirror.
 # One expired mirror certificate can therefore break an otherwise reproducible
-# toolchain build. The canonical HTTPS archive serves the same GNU release
-# files without delegating certificate trust to a third-party mirror.
+# toolchain build. Keep the SDK's own download URLs on the canonical host.
+# The separately pinned GMP prefetch can also use a fixed HTTPS mirror.
 if grep -Fq 'https://ftpmirror.gnu.org/' "$GCC4_DIR/Makefile"; then
     sed -i 's|https://ftpmirror.gnu.org/|https://ftp.gnu.org/gnu/|g' \
         "$GCC4_DIR/Makefile"
@@ -315,7 +329,8 @@ fi
 download_verified_archive \
     "$GMP_ARCHIVE_URL" \
     "$GCC4_DIR/srcdir.orig/$GMP_ARCHIVE_NAME" \
-    "$GMP_ARCHIVE_SHA256"
+    "$GMP_ARCHIVE_SHA256" \
+    "$GMP_ARCHIVE_MIRROR_URL"
 
 ##############################################################################
 # Host compatibility preparation

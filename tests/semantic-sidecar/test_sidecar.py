@@ -1729,6 +1729,15 @@ print value
             self.assertEqual(model.symbol_name(proc).lower(), "selectargument")
             self.assertEqual(model.types[int(row[3])][2], "TRACKED")
 
+    def test_missing_llvm_tool_after_bindings_reports_driver_error(self) -> None:
+        source = self.source("print 1\n")
+        environment = dict(os.environ, LLC=str(self.working / "missing-llc"))
+        result, _ = self.invoke([source], mode="bindings", backend="llvm", emit=False,
+                                success=False, extra=("-x", str(self.working / "missing-tool")),
+                                environment=environment)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Executable not found", result.stdout + result.stderr)
+
     def test_trivial_argument_constructor_receipts_preserve_runtime(self) -> None:
         source = self.source("dim shared constructorCalls as long\ntype TrivialArgument\nvalue as long\n"
                              "declare constructor(byval initial as long)\nend type\n"
@@ -1737,6 +1746,12 @@ print value
                              "sub consumeTrivial(byval item as TrivialArgument)\nprint item.value\nend sub\n"
                              "consumeTrivial(17)\nsub exercise()\nconsumeTrivial(23)\nend sub\nexercise()\nprint constructorCalls\n")
         for backend in self.backends:
+            # Most semantic checks stop at emitted IR. This case executes
+            # the result, so LLVM also needs its external code generator.
+            if backend == "llvm" and shutil.which(os.environ.get("LLC") or "llc") is None:
+                with self.subTest(backend=backend):
+                    self.skipTest("LLVM runtime execution requires llc")
+                continue
             outputs = []
             for mode in ("off", "full", "bindings"):
                 with self.subTest(backend=backend, mode=mode):
@@ -1756,6 +1771,7 @@ print value
                                     and source_range(row, 6) == span]
                             self.assertEqual(len(rows), 1, (backend, mode, value))
                             self.assertEqual(model.symbol_name(rows[0][3]).casefold(), "trivialargument")
+            self.assertEqual(len(outputs), 3)
             self.assertEqual(outputs[0], outputs[1])
             self.assertEqual(outputs[0], outputs[2])
 

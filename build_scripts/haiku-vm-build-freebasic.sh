@@ -1856,6 +1856,12 @@ run fbc_command -mt /Work/fbctests-source/tests/file/tcp.bas -x /Work/smoke/tcp
 echo "==> running TCP loopback smoke"
 timeout 60 /Work/smoke/tcp
 
+echo "==> compiling thread-local initialization smoke"
+run fbc_command -mt /Work/fbctests-source/tests/compiler-support/thread-local.bas -x /Work/smoke/thread-local
+
+echo "==> running thread-local initialization smoke"
+timeout 60 /Work/smoke/thread-local
+
 echo "==> compiling gfxlib truecolor smoke"
 run fbc_command /Work/smoke/gfx-truecolor.bas -x /Work/smoke/gfx-truecolor
 

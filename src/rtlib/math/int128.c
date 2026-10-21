@@ -25,8 +25,16 @@
 #include <string.h>
 
 typedef struct FB_INT128_VALUE {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ && \
+    UINTPTR_MAX > UINT32_MAX
+	/* Native 64-bit C/LLVM integers store the most significant word first
+	 * on big-endian targets. The 32-bit C fallback uses a low/high struct. */
+	uint64_t high;
+	uint64_t low;
+#else
 	uint64_t low;
 	uint64_t high;
+#endif
 } FB_INT128_VALUE;
 
 enum {

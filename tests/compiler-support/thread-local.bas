@@ -25,9 +25,11 @@ Thread Local Dim Shared threadLocalValue As Long = 7
 Dim Shared threadLocalMutex As Any Ptr
 Dim Shared threadLocalReadyCount As Long
 Dim Shared threadLocalResults(0 To 1) As Long
+Dim Shared threadLocalInitialValues(0 To 1) As Long
 
 Private Sub ThreadLocalWorker(ByVal context As Any Ptr)
 	Dim As Long workerIndex = CInt(context)
+	threadLocalInitialValues(workerIndex) = threadLocalValue
 	threadLocalValue = workerIndex + 10
 
 	MutexLock(threadLocalMutex)
@@ -46,6 +48,7 @@ Private Sub ThreadLocalWorker(ByVal context As Any Ptr)
 	threadLocalResults(workerIndex) = threadLocalValue
 End Sub
 
+If threadLocalValue <> 7 Then End 6
 threadLocalMutex = MutexCreate()
 If threadLocalMutex = 0 Then End 1
 
@@ -58,6 +61,8 @@ ThreadWait(secondThread)
 If threadLocalResults(0) <> 10 Then End 3
 If threadLocalResults(1) <> 11 Then End 4
 If threadLocalValue <> 7 Then End 5
+If threadLocalInitialValues(0) <> 7 Then End 7
+If threadLocalInitialValues(1) <> 7 Then End 8
 
 MutexDestroy(threadLocalMutex)
 Print "thread-local storage passed"
