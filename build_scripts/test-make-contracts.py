@@ -65,6 +65,13 @@ def require(condition: bool, message: str, result: subprocess.CompletedProcess[s
         raise AssertionError(message + details)
 
 
+def archive_members(listing: str) -> list[str]:
+    # Darwin ar exposes its symbol table in the member listing. Ignore only
+    # those reserved names; extra object members and their order still matter.
+    indexes = {"__.SYMDEF", "__.SYMDEF SORTED", "__.SYMDEF_64", "__.SYMDEF_64 SORTED"}
+    return [name for name in listing.splitlines() if name not in indexes]
+
+
 # -------------------------------------------------------------------------
 # Compiler links, distribution staging, and installation ownership
 # -------------------------------------------------------------------------
@@ -272,7 +279,7 @@ def test_archive_portable_arguments(root: Path, working: Path) -> None:
     require(result.returncode == 0, "archive exceeded portable tool arguments", result)
     result = subprocess.run(["ar", "t", "runtime/libfb.a"], cwd=working,
                             capture_output=True, text=True, timeout=10, check=False)
-    require(result.returncode == 0 and result.stdout.splitlines() == names,
+    require(result.returncode == 0 and archive_members(result.stdout) == names,
             "batched archive lost or reordered members", result)
     published = (working / "runtime/libfb.a").read_bytes()
     write(working / "fail-after-first")
@@ -565,7 +572,7 @@ def test_archive_membership(root: Path, working: Path) -> None:
     require(result.returncode == 0, "reduced archive selection failed", result)
     result = subprocess.run(["ar", "t", "runtime/libfb.a"], cwd=working,
                             capture_output=True, text=True, timeout=10, check=False)
-    require(result.returncode == 0 and result.stdout.splitlines() == ["first.o"],
+    require(result.returncode == 0 and archive_members(result.stdout) == ["first.o"],
             "removed source retained a stale archive member", result)
     stamp = (working / "runtime/libfb.a").stat().st_mtime_ns
     result = make(working, "RTLIB_OBJ=first.o")
@@ -888,6 +895,10 @@ def test_build_configuration(root: Path, working: Path) -> None:
     require(result.returncode == 0 and not (working / "lib/.build-config/libfb.a.pending").exists(),
             "reverted archive configuration did not clear its completed attempt", result)
     configuration_value(working, "lib/libfb.a", "fixture_value", 7)
+    # Recovery legitimately publishes a new archive. Native archivers may
+    # record different timestamps, so subsequent failures must preserve this
+    # successful image rather than the one from before the recovery build.
+    saved = {path: path.read_bytes() for path in saved}
     for _ in range(2):
         result = make(working, *flags, "ARFLAGS=rc", "RANLIB=false")
         require(result.returncode != 0 and all(path.read_bytes() == data for path, data in saved.items()),
