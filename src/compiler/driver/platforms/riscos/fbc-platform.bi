@@ -215,6 +215,14 @@ private sub fbcRiscosPlatformAddLinkerFrameworks( byref ldcline as string )
 	    (fbc.staticlink = FALSE) ) then
 		ldcline += " -static"
 	end if
+
+	'' GCCSDK's emulated TLS detects pthreads through a weak pthread_cancel
+	'' reference. Static UnixLib linking otherwise omits that archive member,
+	'' making __thread variables share the single-thread fallback storage.
+	'' Its pthread_once initializer is also weak and must be retained.
+	if( fbGetOption( FB_COMPOPT_MULTITHREADED ) ) then
+		ldcline += " -Wl,-u,pthread_cancel,-u,pthread_once"
+	end if
 end sub
 
 #endif
