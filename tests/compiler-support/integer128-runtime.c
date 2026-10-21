@@ -36,6 +36,17 @@ typedef struct FB_INT128_TEST_VALUE {
 #endif
 } FB_INT128_TEST_VALUE;
 
+/* Native LLVM i128 uses integer byte order at both pointer widths. */
+typedef struct FB_INT128_NATIVE_TEST_VALUE {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	uint64_t high;
+	uint64_t low;
+#else
+	uint64_t low;
+	uint64_t high;
+#endif
+} FB_INT128_NATIVE_TEST_VALUE;
+
 enum {
 	FB_INT128_TEST_ADD = 1,
 	FB_INT128_TEST_SUB,
@@ -68,6 +79,8 @@ extern void *fb_Int128FromU64(void *destination, uint64_t value, int sign_extend
 extern void *fb_Int128FromDouble(void *destination, double value, int is_signed);
 extern uint64_t fb_Int128ToU64(const void *source);
 extern double fb_Int128ToDouble(const void *source, int is_signed);
+extern void *fb_Int128FromDoubleNative(void *destination, double value, int is_signed);
+extern double fb_Int128ToDoubleNative(const void *source, int is_signed);
 extern void *fb_Int128Bop(void *destination, const void *left, const void *right,
 			  int operation, int is_signed, uint64_t shift_count);
 extern void *fb_Int128Uop(void *destination, const void *source,
@@ -90,6 +103,8 @@ int main(void)
 	FB_INT128_TEST_VALUE right;
 	FB_INT128_TEST_VALUE result;
 	intptr_t comparison = 0;
+	/* 2^127 is the unsigned value of the native sign bit. */
+	const double sign_bit_as_double = 170141183460469231731687303715884105728.0;
 
 	fb_Int128FromU64(&left, UINT64_MAX, 0);
 	fb_Int128FromU64(&right, 1, 0);
@@ -157,6 +172,24 @@ int main(void)
 	fb_Int128FromDouble(&result, 13.5, 1);
 	if (!int128_equals(&result, 14, 0)) return 20;
 
+	{
+		FB_INT128_NATIVE_TEST_VALUE native;
+		if (fb_Int128FromDoubleNative(&native, 3.5, 1) != &native) return 25;
+		if (native.low != 4 || native.high != 0) return 26;
+		fb_Int128FromDoubleNative(&native, -3.5, 1);
+		if (native.low != (uint64_t)-4 || native.high != UINT64_MAX) return 27;
+		if (fb_Int128ToDoubleNative(&native, 1) != -4.0) return 28;
+
+		/* 2^100 sets bit 36 of the high 64-bit word. */
+		fb_Int128FromDoubleNative(&native, 1267650600228229401496703205376.0, 0);
+		if (native.low != 0 || native.high != (UINT64_C(1) << 36)) return 29;
+		if (fb_Int128ToDoubleNative(&native, 0) != 1267650600228229401496703205376.0) return 30;
+		native.low = 0;
+		native.high = UINT64_C(0x8000000000000000);
+		if (fb_Int128ToDoubleNative(&native, 0) != sign_bit_as_double) return 31;
+		if (fb_Int128ToDoubleNative(&native, 1) != -sign_bit_as_double) return 32;
+	}
+
 #if UINTPTR_MAX > UINT32_MAX && defined(__SIZEOF_INT128__)
 	/* Native C values provide an independent oracle for the helper's memory
 	 * layout. Struct-only tests cannot detect a reversed native word order. */
@@ -175,6 +208,9 @@ int main(void)
 		if (native_result != -1) return 23;
 		fb_Int128Uop(&native_result, &native_unsigned, FB_INT128_TEST_SGN, 0);
 		if (native_result != 1) return 24;
+		fb_Int128FromDoubleNative(&native_result, 3.5, 1);
+		if (native_result != 4) return 33;
+		if (fb_Int128ToDoubleNative(&native_unsigned, 0) != sign_bit_as_double) return 34;
 	}
 #endif
 

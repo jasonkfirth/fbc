@@ -658,6 +658,18 @@ declare function    hThreadCall_cb      ( byval sym as FBSYMBOL ptr ) as integer
 				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
+		/' function fb_Int128FromDoubleNative( byval destination as any ptr, byval value as double, byval is_signed as long ) as any ptr '/ _
+		( _
+			@FB_RTL_INT128FROMDOUBLENATIVE, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			3, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_DOUBLE, FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
 		/' function fb_Int128ToU64( byval source as const any ptr ) as ulongint '/ _
 		( _
 			@FB_RTL_INT128TOU64, NULL, _
@@ -681,6 +693,17 @@ declare function    hThreadCall_cb      ( byval sym as FBSYMBOL ptr ) as integer
 		/' function fb_Int128ToDouble( byval source as const any ptr, byval is_signed as long ) as double '/ _
 		( _
 			@FB_RTL_INT128TODOUBLE, NULL, _
+			FB_DATATYPE_DOUBLE, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_REQUIRED, _
+			2, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
+		/' function fb_Int128ToDoubleNative( byval source as const any ptr, byval is_signed as long ) as double '/ _
+		( _
+			@FB_RTL_INT128TODOUBLENATIVE, NULL, _
 			FB_DATATYPE_DOUBLE, FB_FUNCMODE_CDECL, _
 			NULL, FB_RTL_OPT_REQUIRED, _
 			2, _

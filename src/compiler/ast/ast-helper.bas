@@ -222,7 +222,12 @@ end function
 
 function astBuildNativeInt128FromFloat( byval expr as ASTNODE ptr, byval dtype as integer ) as ASTNODE ptr
 	dim as FBSYMBOL ptr temp = symbAddTempVar( dtype )
-	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128FROMDOUBLE, FB_RTL_IDX_INT128FROMDOUBLE ) )
+	dim as ASTNODE ptr call_node
+	if( env.clopt.backend = FB_BACKEND_LLVM ) then
+		call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128FROMDOUBLENATIVE, FB_RTL_IDX_INT128FROMDOUBLENATIVE ) )
+	else
+		call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128FROMDOUBLE, FB_RTL_IDX_INT128FROMDOUBLE ) )
+	end if
 	var value = astNewCONV( FB_DATATYPE_DOUBLE, NULL, expr )
 	if( value = NULL ) then
 		astDelTREE( call_node )
@@ -253,7 +258,12 @@ function astBuildNativeInt128ToFloat( byval expr as ASTNODE ptr, byval dtype as 
 	dim as integer is_signed = typeIsSigned( astGetFullType( expr ) )
 	dim as ASTNODE ptr source_address = astBuildNativeInt128Address( expr )
 	if( source_address = NULL ) then return NULL
-	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128TODOUBLE, FB_RTL_IDX_INT128TODOUBLE ) )
+	dim as ASTNODE ptr call_node
+	if( env.clopt.backend = FB_BACKEND_LLVM ) then
+		call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128TODOUBLENATIVE, FB_RTL_IDX_INT128TODOUBLENATIVE ) )
+	else
+		call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128TODOUBLE, FB_RTL_IDX_INT128TODOUBLE ) )
+	end if
 	if( hNativeInt128Arg( call_node, source_address ) = FALSE ) then return NULL
 	if( hNativeInt128Arg( call_node, astNewCONSTi( is_signed, FB_DATATYPE_LONG ) ) = FALSE ) then return NULL
 	return astNewCONV( dtype, NULL, call_node )

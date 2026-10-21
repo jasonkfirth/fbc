@@ -559,6 +559,8 @@
 #define FB_RTL_INT128TOU64               "fb_Int128ToU64"
 #define FB_RTL_INT128TOBOOL              "fb_Int128ToBool"
 #define FB_RTL_INT128TODOUBLE            "fb_Int128ToDouble"
+#define FB_RTL_INT128FROMDOUBLENATIVE    "fb_Int128FromDoubleNative"
+#define FB_RTL_INT128TODOUBLENATIVE      "fb_Int128ToDoubleNative"
 
 enum FB_INT128_BOP
 	FB_INT128_BOP_ADD = 1
@@ -1142,6 +1144,9 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_DESERIALIZE
 	FB_RTL_IDX_SERIALIZEARRAY
 	FB_RTL_IDX_DESERIALIZEARRAY
+	'' Native LLVM memory layout for 32-bit floating conversions.
+	FB_RTL_IDX_INT128FROMDOUBLENATIVE
+	FB_RTL_IDX_INT128TODOUBLENATIVE
 	FB_RTL_INDEXES
 end enum
 

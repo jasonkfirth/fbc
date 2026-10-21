@@ -712,19 +712,23 @@ function astNewCONV _
 
 	doconv = hConvNeedsConversion( ldtype, to_dtype, ldclass )
 
-	if( astUsesInt128Helpers( ) ) then
+	var use_int128_helpers = astUsesInt128Helpers( )
+	'' 32-bit libgcc does not provide the native i128 floating conversion
+	'' routines. Keep LLVM integer arithmetic native, but use portable casts.
+	if( use_int128_helpers orElse _
+	    ((env.clopt.backend = FB_BACKEND_LLVM) andAlso (fbGetBits( ) = 32)) ) then
 		if( (typeIsInteger128Scalar( ldtype ) andalso _
 		     typeIsInteger128Scalar( to_dtype )) = FALSE ) then
 			if( typeIsInteger128Scalar( to_dtype ) ) then
 				if( ldclass = FB_DATACLASS_FPOINT ) then
 					return astBuildNativeInt128FromFloat( l, to_dtype )
-				else
+				elseif( use_int128_helpers ) then
 					return astBuildNativeInt128FromInteger( l, to_dtype )
 				end if
 			elseif( typeIsInteger128Scalar( ldtype ) ) then
 				if( typeGetClass( to_dtype ) = FB_DATACLASS_FPOINT ) then
 					return astBuildNativeInt128ToFloat( l, to_dtype )
-				else
+				elseif( use_int128_helpers ) then
 					return astBuildNativeInt128ToInteger( l, to_dtype )
 				end if
 			end if

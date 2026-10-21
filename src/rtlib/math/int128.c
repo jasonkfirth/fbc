@@ -285,6 +285,36 @@ double fb_Int128ToDouble(const void *source, int is_signed)
 	return (double)(negative ? -magnitude : magnitude);
 }
 
+/*
+ * LLVM's native i128 places the high word first on big-endian targets.
+ * The 32-bit C fallback instead uses a low/high structure. These entry points
+ * adapt that word order without changing the portable helper ABI.
+ */
+static FB_INT128_VALUE int128_native_word_order(FB_INT128_VALUE value)
+{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ && \
+    UINTPTR_MAX == UINT32_MAX
+	uint64_t low = value.low;
+	value.low = value.high;
+	value.high = low;
+#endif
+	return value;
+}
+
+void *fb_Int128FromDoubleNative(void *destination, double source, int is_signed)
+{
+	FB_INT128_VALUE value;
+	fb_Int128FromDouble(&value, source, is_signed);
+	int128_store(destination, int128_native_word_order(value));
+	return destination;
+}
+
+double fb_Int128ToDoubleNative(const void *source, int is_signed)
+{
+	FB_INT128_VALUE value = int128_native_word_order(int128_load(source));
+	return fb_Int128ToDouble(&value, is_signed);
+}
+
 void *fb_Int128Bop(void *destination, const void *left_address,
 		   const void *right_address, int operation,
 		   int is_signed, uint64_t shift_count)
