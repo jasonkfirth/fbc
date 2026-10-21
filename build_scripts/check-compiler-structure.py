@@ -12,11 +12,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 
 
-def source_graph(root: Path, host: str) -> dict[str, list[str]]:
+def source_graph(root: Path, host: str, make: str = "make") -> dict[str, list[str]]:
     """Use the actual make fragment so a second discovery implementation cannot drift."""
     with tempfile.TemporaryDirectory(prefix="fbc-source-graph-") as temporary:
         makefile = Path(temporary) / "GNUmakefile"
@@ -33,7 +34,7 @@ def source_graph(root: Path, host: str) -> dict[str, list[str]]:
         )
         # Included dependency rules can become make's default target. Always
         # select our reporting recipe instead of building a compiler object.
-        command = ["make", "--no-print-directory", "-s", "-f", str(makefile), "all"]
+        command = [make, "--no-print-directory", "-s", "-f", str(makefile), "all"]
         result = subprocess.run(command, text=True, capture_output=True, check=False)
         if result.returncode:
             raise ValueError(result.stderr.strip())
@@ -77,7 +78,7 @@ def handwritten_c_sources(compiler: Path) -> list[Path]:
     return sources
 
 
-def validate(root: Path) -> tuple[int, int]:
+def validate(root: Path, make: str = "make") -> tuple[int, int]:
     compiler = root / "src/compiler"
     files = compiler_files(root)
     if not files:
@@ -139,7 +140,7 @@ def validate(root: Path) -> tuple[int, int]:
     selected_sources: set[str] = set()
     selected_headers: set[str] = set()
     for host in sorted(hosts):
-        current = source_graph(root, host)
+        current = source_graph(root, host, make)
         sources = current["SOURCES"]
         selected_sources.update(sources)
         selected_headers.update(current["HEADERS"])
@@ -190,7 +191,7 @@ def validate(root: Path) -> tuple[int, int]:
         for group in ("core", "support"):
             (fixture / "src/compiler" / group / "collision.bas").write_text("end\n", encoding="utf-8")
         try:
-            source_graph(fixture, "linux")
+            source_graph(fixture, "linux", make)
         except ValueError as error:
             if "Duplicate compiler source basenames" not in str(error):
                 failures.append("Duplicate graph rejected for an unrelated reason: " + str(error))
@@ -205,9 +206,10 @@ def validate(root: Path) -> tuple[int, int]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--make", default=shutil.which("gmake") or shutil.which("make") or "make")
     options = parser.parse_args()
     try:
-        files, hosts = validate(options.root.resolve())
+        files, hosts = validate(options.root.resolve(), options.make)
     except (OSError, ValueError) as error:
         print(str(error))
         return 1

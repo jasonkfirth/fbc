@@ -1,0 +1,912 @@
+{
+  "project": "FreeBASIC",
+  "file": "build-consolidation-results.json",
+  "purpose": "Retain exact native qualification scope and final build-maintenance evidence",
+  "result": "BUILD_CONSOLIDATION_PASS",
+  "base_revision": "6016fb099cab5e1c37f6b8c74f30782e1af94bcd",
+  "qualified_input_files": 12637,
+  "final_manifest_sha256": "9b3e95e6bc385454bbf609170cd869746fd24f0973aeebee65e16b280a45e863",
+  "changed_input_sha256": {
+    ".gitignore": "df26937b3f89cb4ff09bb0770e06d49fe675631365792d9f116bfd8cabdec5fc",
+    "GNUmakefile": "5acdf0e98a0d137fe94a9ea600171bc35f20a8b5d808165512a2efeecccbfb65",
+    "build_scripts/check-compiler-structure.py": "044d7c8c3f9670dedba8452582fa6ce3e10f15758d37854554e2165109ed1564",
+    "build_scripts/check-source-artifacts.py": "deaae78398ec48ef466e53a4e94a8aafd5f2b25195a38f31ddaedce256a76723",
+    "build_scripts/test-compiler-test-harness.py": "bcebfdc34a63e2d7a3cc7a8203312b0f24d6ee073feed5aeeca67a15a8be06fd",
+    "build_scripts/test-make-contracts.py": "812ebc0e5bfc3b93e32117e849241a487e00831bca697865b20beb83dce22cfb",
+    "changelog.txt": "26e673f310d1797e95598eb5ffdfa4aeea577146b775afd7df6bda1b594b12a4",
+    "doc/manual/cache/DevBuildConfig.wakka": "1eea09e4dd01037ce42e48a1e431e86e40f9e10e4aa4bad82a1a7153a6b02708",
+    "doc/manual/cache/DevSourceTools.wakka": "f4c0fc8e1a85af75e79260a87837700a8383640c065415abf519f7cce387b309",
+    "docs/README.md": "8d33e5b4e6dfc23a99b16199bdab8b058706cb1d98ba2d2bb252e451f1f59093",
+    "docs/make-system-review.md": "e5fa98f2f8a42f4b503e19b9b516a9f4ea8e14941c4f38af813b970963eee0c4",
+    "docs/source-code/tools-and-tests.md": "1009b29ed1eb3d71a3b0190f5434b9ea38f42f07feac1a47ff0d6f1347abe4be",
+    "mk/File-Map.md": "c47653acc42d410eabf21d629bde99fce00e25785e7b0e808a499eae881155d9",
+    "mk/Porting-Guide.md": "de47cc478fa1f2f52f7d087ca00f6f2e0bb9d1e58252ae43860a5513b120d1c5",
+    "mk/README.md": "482576e2a2bca537457abd4f8b170b3da643a85ee9a8872c7b8ee0135fa70a38",
+    "mk/bootstrap/bootstrap-core.mk": "e08f5cca76f5b1b220151a5de2159e0f9952b95068cc515889c971ecbe8f15a4",
+    "mk/build/archive-rules.mk": "c8020df565b3bb033bb68073ba86a2210f30db39108613239aa95e890807c94b",
+    "mk/build/build-targets.mk": "adce417e00c611ebdcdaff078788c17cc2d4a26f64899e412a5e93e73527173e",
+    "mk/build/clean-rules.mk": "8dbaad122c48ef09b5a530dbc8e9dc69c6bda4b6c895c192995c89a62f859231",
+    "mk/build/compile-rules.mk": "fbfd6def676c86e416903c32aaa3409696363373f60ea441a62d1c7ce12c1453",
+    "mk/build/config-rules.mk": "5190a7102428220f0805617376db37ac8b640c193cf6d8ed8ff07a36c262cad5",
+    "mk/prereqs.mk": "1c459d0688afada336e4877bfff4eb1be8a9832c5bfe7efe7bf2c578d5834f41",
+    "mk/source-copy-excludes.rsync": "543bbd39a3052da7ce9d23892edfcd623787b344cc21c01976dbc97e17eea48a",
+    "mk/tests/build/structure.mk": "f982abaacc2a64153d25db6e300791f77a2889e222db6537a4b7c534ce2d4cab",
+    "mk/tests/compiler/structure.mk": "c87e4d9dcdc0f1dbc6abaf4a3c4c82776358d88dbd89b379db21bfd57f2eaf69",
+    "src/gfxlib2/input/gfx_getmouse.c.22176.dump": null,
+    "src/gfxlib2/input/gfx_inkey.c.22176.dump": null,
+    "tests/log-tests-obj-fb.lst": null,
+    "tests/warnings/test.sh": "a3a5d6d4660b3a443be7a0b354bcedc2f601475829bff80c51d50bbd02e12e99"
+  },
+  "deleted_inputs": [
+    "src/gfxlib2/input/gfx_getmouse.c.22176.dump",
+    "src/gfxlib2/input/gfx_inkey.c.22176.dump",
+    "tests/log-tests-obj-fb.lst"
+  ],
+  "scope": "Native product builds/language/examples from candidate; final metadata repair checked through full production-fragment contracts and nonmutating native graphs. Product implementation sources unchanged.",
+  "root_checkout_line_ending_only_files": 400,
+  "root_compiler_sha256": "17c0fe049c35ec18764f7a5bb3e40c33d3e763a90f686dcd79e088a00492be4c",
+  "native": {
+    "Windows": {
+      "result": "PASS",
+      "system": "Windows-11-10.0.26100-SP0",
+      "compiler": "FreeBASIC Compiler - Version 1.20.5-1 (2026-10-20), built for win64 (64bit)\nCopyright (C) 2004-2025 The FreeBASIC development team.",
+      "raw_worker_exit": 0,
+      "stage_exits": {
+        "build": 0,
+        "compiler-harness": 0,
+        "example-contracts": 0,
+        "examples": 0,
+        "fbctests": 0,
+        "inputs-after": 0,
+        "inputs-before": 0,
+        "maintenance-final": 0,
+        "make-contracts": 0,
+        "repeat-after": 0,
+        "repeat-before": 0,
+        "repeat-build": 0,
+        "source-structure": 0,
+        "worker": 0
+      },
+      "unit_tests": 2441,
+      "unit_assertions": 1621936,
+      "unit_failures": 0,
+      "make_contracts": 42,
+      "self_contained_examples": 654,
+      "self_contained_failures": 0,
+      "all_example_compile_passes": 1586,
+      "other_example_compile_failures_or_timeouts": 187,
+      "example_results_sha256": "3ec454f4b23ba9a9d7d60ff95c5f281cb499fb733826f63f38052b8a80faf911",
+      "input_files": 12637,
+      "normalized_warning_outputs": 0,
+      "warning_reference_files": 340,
+      "warnings_generated": 340,
+      "unchanged_outputs": 2212,
+      "final_native_graph": {
+        "exit": 0,
+        "command_lines": 3323,
+        "sha256": "383558c0fe2649e2b0ec7f3e94f804e8fb6d6af610d1416eb71ff28f80e2808d",
+        "prepare_commands": 12,
+        "result": "PASS"
+      },
+      "compiler_harness_limits": [],
+      "images": {
+        "bin/fbc.exe": {
+          "sha256": "1bc4c85f25ce52f86ce37fbbf3ff73d3084d87de6957c0316b27f008f41c3a6b",
+          "bytes": 3595660
+        },
+        "lib/freebasic/win64/.archive-members/libfb.a": {
+          "sha256": "d1ee011a8ec2cce7d39658c91651d23b798b02a19ffd79c9c518f32091bc3cec",
+          "bytes": 22840
+        },
+        "lib/freebasic/win64/.archive-members/libfbgfx.a": {
+          "sha256": "dbcfa0a4ee7aad7dd0e22d8375a33c73e9d229ae38b1502f8710abb0f88d69c5",
+          "bytes": 3495
+        },
+        "lib/freebasic/win64/.archive-members/libfbgfx3.a": {
+          "sha256": "862d7a10df24a78b42fa4334a176276c0e4e236ff46beada99bf466f76e3aca2",
+          "bytes": 2336
+        },
+        "lib/freebasic/win64/.archive-members/libfbgfx3mt.a": {
+          "sha256": "f22440fcf0f7829db4e5b89b35c4206061ff2ad87923b20736abf654faa59f5d",
+          "bytes": 2486
+        },
+        "lib/freebasic/win64/.archive-members/libfbgfxmt.a": {
+          "sha256": "094b30c343e612b57514dec0c610741131619df978ad11ea17c89d506593d286",
+          "bytes": 3738
+        },
+        "lib/freebasic/win64/.archive-members/libfbmt.a": {
+          "sha256": "162bc4e315fd9d2e1bdb08daa9bde4f893c0a168e839a7a788e01839b9d107cd",
+          "bytes": 24391
+        },
+        "lib/freebasic/win64/.archive-members/libsfx.a": {
+          "sha256": "b49f0c624deadc826472fbe7c867b30a69e0dd93739a5297a114f11021596697",
+          "bytes": 2823
+        },
+        "lib/freebasic/win64/.archive-members/libsfxmt.a": {
+          "sha256": "089f9c76313298657c90b10c70004f4a1e8337c24c17d4b9c15a649b364361f8",
+          "bytes": 3051
+        },
+        "lib/freebasic/win64/.build-config/fbrt0.o": {
+          "sha256": "c3590ee76fe7ab762f933af0ddade8dca8d4ed79930b2d0c916acb575955bfe0",
+          "bytes": 22
+        },
+        "lib/freebasic/win64/.build-config/fbrt1.o": {
+          "sha256": "c3590ee76fe7ab762f933af0ddade8dca8d4ed79930b2d0c916acb575955bfe0",
+          "bytes": 22
+        },
+        "lib/freebasic/win64/.build-config/fbrt2.o": {
+          "sha256": "c3590ee76fe7ab762f933af0ddade8dca8d4ed79930b2d0c916acb575955bfe0",
+          "bytes": 22
+        },
+        "lib/freebasic/win64/.build-config/libfb.a": {
+          "sha256": "106cd85214beb08b7b5fca7d69bada1213a3635aa7dba1a3df38ccfe6bb3f038",
+          "bytes": 28
+        },
+        "lib/freebasic/win64/.build-config/libfbgfx.a": {
+          "sha256": "bd52f56383464e906ad6ad17d19f55caccfe2dfe17b9988dac7b0c89904afdea",
+          "bytes": 28
+        },
+        "lib/freebasic/win64/.build-config/libfbgfx3.a": {
+          "sha256": "f3c9c85a7889d136f12510e212a6777efabdd55d1e25286c2eb7ba96cdaf620f",
+          "bytes": 28
+        },
+        "lib/freebasic/win64/.build-config/libfbgfx3mt.a": {
+          "sha256": "fd3334d27bcbcca0a89949485e9099f14c950d7e9bfd8f8054fc1cdf486666ce",
+          "bytes": 42
+        },
+        "lib/freebasic/win64/.build-config/libfbgfxmt.a": {
+          "sha256": "176c0f84754734f6be95b17d347b425bd7b61009f6126d87d914fae8e98359a2",
+          "bytes": 42
+        },
+        "lib/freebasic/win64/.build-config/libfbmt.a": {
+          "sha256": "b67b9021734af375144cc0aec5fb45790c8fc03a0f1b54c331aa00bc9de05787",
+          "bytes": 42
+        },
+        "lib/freebasic/win64/.build-config/libsfx.a": {
+          "sha256": "bd52f56383464e906ad6ad17d19f55caccfe2dfe17b9988dac7b0c89904afdea",
+          "bytes": 28
+        },
+        "lib/freebasic/win64/.build-config/libsfxmt.a": {
+          "sha256": "176c0f84754734f6be95b17d347b425bd7b61009f6126d87d914fae8e98359a2",
+          "bytes": 42
+        },
+        "lib/freebasic/win64/fbrt0.o": {
+          "sha256": "486d4cedeb00e5a09d0746d1630a8d44ac1d923bd0b51395fe01e29a2b907b58",
+          "bytes": 800
+        },
+        "lib/freebasic/win64/fbrt1.o": {
+          "sha256": "546dd1c690e76c083c0124d2be579977396b1ee268ae164230555e21cbeb9774",
+          "bytes": 917
+        },
+        "lib/freebasic/win64/fbrt2.o": {
+          "sha256": "223c39c0d60a21a228b9c70c040b294d2c3a300d62f82e7515b544495a3ed639",
+          "bytes": 929
+        },
+        "lib/freebasic/win64/libfb.a": {
+          "sha256": "74641e4c649c383897e42af41f0a014a1eaca9b70f48ad5d35567622dd219081",
+          "bytes": 845760
+        },
+        "lib/freebasic/win64/libfbgfx.a": {
+          "sha256": "83d5bc1a25107d207743aadbe6e2ff16b610414e7bb007798e8358967a1664a9",
+          "bytes": 312678
+        },
+        "lib/freebasic/win64/libfbgfx3.a": {
+          "sha256": "4e63584001ab6aff660ae7143bfc372f3b80e75159926d1bc77c437330342c8b",
+          "bytes": 827382
+        },
+        "lib/freebasic/win64/libfbgfx3mt.a": {
+          "sha256": "f97d1080b705baf0fafad6e7f5d2061fa455b3e556018758cf1cf983aa35296b",
+          "bytes": 831886
+        },
+        "lib/freebasic/win64/libfbgfxmt.a": {
+          "sha256": "a888637181203bf3860da50aa03ca0f3607ae0184d7418c929d5cb1ce4f56764",
+          "bytes": 319692
+        },
+        "lib/freebasic/win64/libfbmt.a": {
+          "sha256": "76f6cbd438ce4c3fb200aec5bb9f6d824471f92ecc2d21c3b8220879a393078f",
+          "bytes": 867916
+        },
+        "lib/freebasic/win64/libsfx.a": {
+          "sha256": "5c8c5217eec85a7a8451dd87347fed50d50ec3714a482cc038a9bf8114792c6e",
+          "bytes": 537112
+        },
+        "lib/freebasic/win64/libsfxmt.a": {
+          "sha256": "5c8c5217eec85a7a8451dd87347fed50d50ec3714a482cc038a9bf8114792c6e",
+          "bytes": 537112
+        }
+      },
+      "receipt_hashes": {
+        "build.log": "dfa56d8719568bc62026f4b6f0237f389eddba3151ec6e6ab69e0a47e51b7368",
+        "compiler-harness.log": "652eb8876831b4cc8659c9a33ed5536d13ffb2c4f77ba79cc118d8c404501de5",
+        "example-contracts.log": "d65da9e588851e2dbaec1c61c2f2e1e029926c705900d7b9b17df5d7fe5cffbe",
+        "examples.log": "cc87e0b9ec7f94b91b8d8459447e6181ec6d6d567a87e8ba1394d145ab88979d",
+        "fbctests.log": "807b0e7d30a9d3042341ba53e6c996f2fd64c7c910aea8a265b04859f6f9e54a",
+        "inputs-after.log": "fb23349cf4c86cbc08e0a667b981782f43b52aff3ab6143d1517f700b9bad9fb",
+        "inputs-before.log": "fb23349cf4c86cbc08e0a667b981782f43b52aff3ab6143d1517f700b9bad9fb",
+        "make-contracts-final.log": "5f70bd20a473081dfa19e580a7ab4522436f78d0c17cc11456a23a505a8ce146",
+        "make-contracts.log": "c802e3f3d40ee5fd93be355aa70db0ab8096912fd976de94a819ce04055844b0",
+        "native-graph-final.log": "d954d0341d5f30ac09174fad3156928fbcee929ed01a70e273c7ed0f56166238",
+        "repeat-after.log": "ed14e127f0c077bec4b38c9a0201ac97cd7052961b3f2652da6b153ed78716a5",
+        "repeat-before.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "repeat-build.log": "61ef9c5a6a8f2f7ccceea96ccc3b3dd1ae67cb3324370999e0596e8e1db8c692",
+        "source-audit-final.log": "9b8d2ed515db0689ce3e00ae8d33464cee13330236efd9a812625518f68517af",
+        "source-structure.log": "a25aad4fad23e385c88ef99cbbef7bc4a3928d97471083210e9cde6d6d52fb36",
+        "structure-final.log": "0543090d0ab7c11a15df78807c3b2f5c298b27e97f92d66900203094929419bc",
+        "warnings-final.log": "0a613c66e262e322320e2b184bf53d60b79b6a73c58380b335ab3ea6d7a13840"
+      },
+      "summary_sha256": "d04d02440302e0469558d93818ef18005023ce47b8fdc5489bfc77da983b7fb3"
+    },
+    "Debian CT133": {
+      "result": "PASS",
+      "system": "Linux-7.0.14-19-pve-x86_64-with-glibc2.41",
+      "compiler": "FreeBASIC Compiler - Version 1.20.5-1 (2026-10-20), built for linux-x86_64 (64bit)\nCopyright (C) 2004-2025 The FreeBASIC development team.",
+      "raw_worker_exit": 0,
+      "stage_exits": {
+        "build": 0,
+        "compiler-harness": 0,
+        "example-contracts": 0,
+        "examples": 0,
+        "fbctests": 0,
+        "inputs-after": 0,
+        "inputs-before": 0,
+        "maintenance-final": 0,
+        "make-contracts": 0,
+        "repeat-after": 0,
+        "repeat-before": 0,
+        "repeat-build": 0,
+        "source-structure": 0,
+        "worker": 0
+      },
+      "unit_tests": 2441,
+      "unit_assertions": 1622047,
+      "unit_failures": 0,
+      "make_contracts": 42,
+      "self_contained_examples": 654,
+      "self_contained_failures": 0,
+      "all_example_compile_passes": 1530,
+      "other_example_compile_failures_or_timeouts": 243,
+      "example_results_sha256": "56c3d10a4f106912f20777c65650172fd32f904544e8b164149ad5ed336b1b3b",
+      "input_files": 12637,
+      "normalized_warning_outputs": 0,
+      "warning_reference_files": 340,
+      "warnings_generated": 340,
+      "unchanged_outputs": 3690,
+      "final_native_graph": {
+        "exit": 0,
+        "command_lines": 6266,
+        "sha256": "881dc025dc28a71d13912d616b0610dd756aabb7501a56df8d27a033b579a954",
+        "prepare_commands": 23,
+        "result": "PASS"
+      },
+      "compiler_harness_limits": [
+        "Haiku grep: skipped (GNU awk unavailable)"
+      ],
+      "images": {
+        "bin/fbc": {
+          "sha256": "bbca73c04828430a1ab69d4038a4fb0e2e3a5b0439176c575334e62787fc385e",
+          "bytes": 3566312
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfb.a": {
+          "sha256": "d83cbd2adc00f5bfeb503205f9d3afc033f74d0102e5cca67d2757c1fc656232",
+          "bytes": 26186
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfx.a": {
+          "sha256": "f64b47112ea8c9033ab013fee46b5619d965af7129ba1d360f64d0f320a96c5e",
+          "bytes": 4116
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfx3.a": {
+          "sha256": "dd51d155bd05cd88d9bb2374673fd72d2953c828c6d4c9b3f118843e7734f840",
+          "bytes": 2822
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfx3mt.a": {
+          "sha256": "6fb49db1607e44b9ced1cf6a5f7dc550c2e0fdc96a95eb9de3af5b5950df4ede",
+          "bytes": 2978
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfx3mtpic.a": {
+          "sha256": "260ec86ae834d93bcf0c1e8dcaf6bdee59815b393bf6baf4d498cb7b00662f70",
+          "bytes": 3186
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfx3pic.a": {
+          "sha256": "68e622aec82f694e9b3056be3d713e9867ec7f66dd7216559cdaeaf0f1189ecc",
+          "bytes": 3030
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfxmt.a": {
+          "sha256": "2879cba05a7dd7d58f40f230f321f2b38eb235546bc73f99333c7dd6dd3ea674",
+          "bytes": 4362
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfxmtpic.a": {
+          "sha256": "ea5587c36bcb4f81df73adbb04c17f34adca6c5f8b25b620286738665ca6f25d",
+          "bytes": 4690
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbgfxpic.a": {
+          "sha256": "48597303d29e77bc24d07053b13070842c60b98f606bb82ef8b79d267a8129cb",
+          "bytes": 4444
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbmt.a": {
+          "sha256": "5d9913147a0305f69b9546ffb08f12e7fcdf557e0441014acda33b33cee89c5e",
+          "bytes": 27725
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbmtpic.a": {
+          "sha256": "0618b2554ee38fd8bf9914ab9434b417fd20a2ba2435c1ec23e7bf674c84f082",
+          "bytes": 29777
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libfbpic.a": {
+          "sha256": "e478ae096d1cd131ff07883c0e56bcf197025e0864cbe94bdab164084b31a957",
+          "bytes": 28238
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libsfx.a": {
+          "sha256": "d84bcb24486c667e6cff9039756ce4fb9d83d7b03abf42d92449829778baaabb",
+          "bytes": 3387
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libsfxmt.a": {
+          "sha256": "6170b3b8d9537426b1a485419f7c23124b4ae586cbf1faeb3789014462063c6b",
+          "bytes": 3618
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libsfxmtpic.a": {
+          "sha256": "c8d947d9c6e73ef394bc16058df62469b515f474a71a7a621bee1955350dac03",
+          "bytes": 3926
+        },
+        "lib/freebasic/linux-x86_64/.archive-members/libsfxpic.a": {
+          "sha256": "aa2daed438523bc96efac806c3747ca0d609e1125267c132529e82408b1d849f",
+          "bytes": 3695
+        },
+        "lib/freebasic/linux-x86_64/.build-config/fbrt0.o": {
+          "sha256": "1f435cb6fa6e05d13de084e6a9a9a041898dcee08d53c81823f6a90df3cdef0a",
+          "bytes": 22
+        },
+        "lib/freebasic/linux-x86_64/.build-config/fbrt0pic.o": {
+          "sha256": "75a42cf8e2e986c863d775e632074eeb8641f74faa638e5e64291e3fe651522c",
+          "bytes": 35
+        },
+        "lib/freebasic/linux-x86_64/.build-config/fbrt1.o": {
+          "sha256": "1f435cb6fa6e05d13de084e6a9a9a041898dcee08d53c81823f6a90df3cdef0a",
+          "bytes": 22
+        },
+        "lib/freebasic/linux-x86_64/.build-config/fbrt1pic.o": {
+          "sha256": "75a42cf8e2e986c863d775e632074eeb8641f74faa638e5e64291e3fe651522c",
+          "bytes": 35
+        },
+        "lib/freebasic/linux-x86_64/.build-config/fbrt2.o": {
+          "sha256": "1f435cb6fa6e05d13de084e6a9a9a041898dcee08d53c81823f6a90df3cdef0a",
+          "bytes": 22
+        },
+        "lib/freebasic/linux-x86_64/.build-config/fbrt2pic.o": {
+          "sha256": "75a42cf8e2e986c863d775e632074eeb8641f74faa638e5e64291e3fe651522c",
+          "bytes": 35
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfb.a": {
+          "sha256": "055691244b4c5e6b49aed665c19fe13f799a0097eee2c09952263cf5b2faf322",
+          "bytes": 28
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfx.a": {
+          "sha256": "8d2765fb68c46038d6b86fd1992965f0b31fa52c57b6eb7f9a9de764687cdb37",
+          "bytes": 28
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfx3.a": {
+          "sha256": "a72ae37305b7d78800b5476e33f16f8a2f89291edad3e6f532818f1e11c26efd",
+          "bytes": 27
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfx3mt.a": {
+          "sha256": "ed5018d208bdda3d6d01239fc7d02e5072037153c5d2e0ff316438ea76e935b5",
+          "bytes": 40
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfx3mtpic.a": {
+          "sha256": "0dd32971fecc927473e1e75dd1cb469049c5a86c83162d932075b5a926e9f0a2",
+          "bytes": 41
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfx3pic.a": {
+          "sha256": "7170a0eafc2a987a5ab4060b5cd795fe6fc45bef0633d90854d039c4fdaa9ab7",
+          "bytes": 40
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfxmt.a": {
+          "sha256": "e1da9942e070e0fba60fb3b79b80184bdd8b2f50b438d51df02464f434f41c4c",
+          "bytes": 41
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfxmtpic.a": {
+          "sha256": "c7aa45dd1006fc32afbf4b25e00b958434ac7d30fe8db92994f35030130cfcbc",
+          "bytes": 42
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbgfxpic.a": {
+          "sha256": "ac74dc19fa83db31dfa4846b78937e19eff500dc88da046fee17bfb7e9a09433",
+          "bytes": 41
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbmt.a": {
+          "sha256": "4527e7a24d29cd82253d263fc507ad794a0dbbed83f92955cc855d990b767f01",
+          "bytes": 41
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbmtpic.a": {
+          "sha256": "1ef442e850d104123fb01cf973c277e2377ea4e50d5ffd948e47a41b28d5f989",
+          "bytes": 42
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libfbpic.a": {
+          "sha256": "5bfd6abea1dd1c44dadb4f0d1072ef057e0609e2a57b002936cb56fcd3ceac3b",
+          "bytes": 41
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libsfx.a": {
+          "sha256": "8d2765fb68c46038d6b86fd1992965f0b31fa52c57b6eb7f9a9de764687cdb37",
+          "bytes": 28
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libsfxmt.a": {
+          "sha256": "e1da9942e070e0fba60fb3b79b80184bdd8b2f50b438d51df02464f434f41c4c",
+          "bytes": 41
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libsfxmtpic.a": {
+          "sha256": "c7aa45dd1006fc32afbf4b25e00b958434ac7d30fe8db92994f35030130cfcbc",
+          "bytes": 42
+        },
+        "lib/freebasic/linux-x86_64/.build-config/libsfxpic.a": {
+          "sha256": "ac74dc19fa83db31dfa4846b78937e19eff500dc88da046fee17bfb7e9a09433",
+          "bytes": 41
+        },
+        "lib/freebasic/linux-x86_64/fbrt0.o": {
+          "sha256": "7db2d4db7b7e964a33ea89d578336bbb97b264b3fb28c50f51bee9b0c19986a5",
+          "bytes": 1720
+        },
+        "lib/freebasic/linux-x86_64/fbrt0pic.o": {
+          "sha256": "7db2d4db7b7e964a33ea89d578336bbb97b264b3fb28c50f51bee9b0c19986a5",
+          "bytes": 1720
+        },
+        "lib/freebasic/linux-x86_64/fbrt1.o": {
+          "sha256": "7fef45c62708752e47911c79a75ecc829a058c7b11ff8bba6d3528faf473c353",
+          "bytes": 1872
+        },
+        "lib/freebasic/linux-x86_64/fbrt1pic.o": {
+          "sha256": "7fef45c62708752e47911c79a75ecc829a058c7b11ff8bba6d3528faf473c353",
+          "bytes": 1872
+        },
+        "lib/freebasic/linux-x86_64/fbrt2.o": {
+          "sha256": "314cde99255e4f2e54fb218828280cf75da64a66d5564127bf70433bc558ac09",
+          "bytes": 1888
+        },
+        "lib/freebasic/linux-x86_64/fbrt2pic.o": {
+          "sha256": "314cde99255e4f2e54fb218828280cf75da64a66d5564127bf70433bc558ac09",
+          "bytes": 1888
+        },
+        "lib/freebasic/linux-x86_64/libfb.a": {
+          "sha256": "bf885f63b802ce7dd525603308b21a0d7157ae2fd04412dd7d1812abfbc42ecb",
+          "bytes": 1307176
+        },
+        "lib/freebasic/linux-x86_64/libfbgfx.a": {
+          "sha256": "ae20c623d7b1cdc970bc3f18e4fa18276fddace1a5f68b8cfd75ec15fc8d3e68",
+          "bytes": 412364
+        },
+        "lib/freebasic/linux-x86_64/libfbgfx3.a": {
+          "sha256": "23079184f3f62776b0967e6fe548e9bf8d7f2949f9dd6c5eac4a41da6a06567d",
+          "bytes": 1080990
+        },
+        "lib/freebasic/linux-x86_64/libfbgfx3mt.a": {
+          "sha256": "efcd14f2cf10b8872efe5c4fabefdb9ed4fd5245876139d4f4cc258443dee832",
+          "bytes": 1089854
+        },
+        "lib/freebasic/linux-x86_64/libfbgfx3mtpic.a": {
+          "sha256": "bf59ca1b56e86d6812f1e02a45880c5fa70fc589941844a57c59bcb29ca6cb5d",
+          "bytes": 1086726
+        },
+        "lib/freebasic/linux-x86_64/libfbgfx3pic.a": {
+          "sha256": "3b1c8a124236c7188d8b37f4125187a394ca0bdb8b0410ade40bcd5ed3217365",
+          "bytes": 1077846
+        },
+        "lib/freebasic/linux-x86_64/libfbgfxmt.a": {
+          "sha256": "04ea6984ca0eb48ab8dbf36183bb8b2c5c24b823133f494a20d3f75306a41b02",
+          "bytes": 424164
+        },
+        "lib/freebasic/linux-x86_64/libfbgfxmtpic.a": {
+          "sha256": "e3ef9f1e1e94e718a1c7b1dcc9e778288c13eadec9b41a1d726fe2c0110da7d8",
+          "bytes": 404076
+        },
+        "lib/freebasic/linux-x86_64/libfbgfxpic.a": {
+          "sha256": "cd727d7e43e6ba415c7b4575fe5443b91d2f7b39b5bf2e47b71189457afd5cd5",
+          "bytes": 392980
+        },
+        "lib/freebasic/linux-x86_64/libfbmt.a": {
+          "sha256": "096c5ac9666c4848d7be8a2c954646b8a8235d1ba11ef8c49f2e272863535808",
+          "bytes": 1346064
+        },
+        "lib/freebasic/linux-x86_64/libfbmtpic.a": {
+          "sha256": "7e45ab673eb44f8d8be34a47a40e543c60834b5c9d5d293e5db73ae1dd958c4a",
+          "bytes": 1343624
+        },
+        "lib/freebasic/linux-x86_64/libfbpic.a": {
+          "sha256": "e95ae3f7d38ebff58cc1f65235d899370f0ee5a3fe3c46e44908a2990773b88b",
+          "bytes": 1304344
+        },
+        "lib/freebasic/linux-x86_64/libsfx.a": {
+          "sha256": "0bd2a16439d061d598137ecea9cef15daf0b60a570eca328e11d2cbdbbbc7983",
+          "bytes": 559184
+        },
+        "lib/freebasic/linux-x86_64/libsfxmt.a": {
+          "sha256": "0bd2a16439d061d598137ecea9cef15daf0b60a570eca328e11d2cbdbbbc7983",
+          "bytes": 559184
+        },
+        "lib/freebasic/linux-x86_64/libsfxmtpic.a": {
+          "sha256": "61a2b27e46710bcb1551207ce7110969dc6b85e38ea8215b819439efe31f9cca",
+          "bytes": 552920
+        },
+        "lib/freebasic/linux-x86_64/libsfxpic.a": {
+          "sha256": "61a2b27e46710bcb1551207ce7110969dc6b85e38ea8215b819439efe31f9cca",
+          "bytes": 552920
+        }
+      },
+      "receipt_hashes": {
+        "build.log": "e33ebd006387ad0aa6972ea176d2c885abdbf3f031d084ef58654462f49817cb",
+        "compiler-harness.log": "63758c4eb388cc78fd6ade1d0e863f6ec5f06bae00e533065e2f1d6f9a58fba3",
+        "example-contracts.log": "7b8c853e8a0ce61a09a6139f6fff6c96498c43b76202907d9bce59d5334ca013",
+        "examples.log": "0501908c2a52b97c91bab0274591660ff6e3fc2f5701befbdce58a4c3293e3d6",
+        "fbctests.log": "2f2801f9cc00f71bf79378a5792040255559ffec20782841c08234f69ea387de",
+        "inputs-after.log": "9261c71f333ccb0438236153b6d213ba41a12c766a2bb1aa4dc40991ff453566",
+        "inputs-before.log": "9261c71f333ccb0438236153b6d213ba41a12c766a2bb1aa4dc40991ff453566",
+        "make-contracts-final.log": "2681131a3c949c8daacd78be54884b6cfcfdfbbd48411f125a5c33cd946d6955",
+        "make-contracts.log": "f7ec761a5433701b48a156f8d5108569411b2d9bfdf9542f59660808bc6d09e2",
+        "native-graph-final.log": "d6977207e4e40f766c548144b47298b517617e20e7e49cd8faf5589083054b77",
+        "repeat-after.log": "25830006db72210d6b4ab8c5f2584fbad9b373db08e42867491cfb275dbde8b4",
+        "repeat-before.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "repeat-build.log": "61ef9c5a6a8f2f7ccceea96ccc3b3dd1ae67cb3324370999e0596e8e1db8c692",
+        "source-audit-final.log": "e48805a3b772a8d61d0314082de08782f0a871e3d020d3122616c1b7d21a172c",
+        "source-structure.log": "cfbff6a9e4d23792346b1fb1bca619934d09a6d6b9e9a77b60b30a7a509fd750",
+        "structure-final.log": "e541e0240f275b676ae7e8ff4b91233ba245656691a9c0ea67c341e55b950931",
+        "warnings-final.log": "0a613c66e262e322320e2b184bf53d60b79b6a73c58380b335ab3ea6d7a13840"
+      },
+      "summary_sha256": "b51796b1b886d48c54acad68959a5183b7515bf319f8519b06b9b705558ea23b"
+    },
+    "FreeBSD VM134": {
+      "result": "PASS",
+      "system": "FreeBSD-15.1-RELEASE-p4-amd64-64bit-ELF",
+      "compiler": "FreeBASIC Compiler - Version 1.20.5-1 (2026-10-20), built for freebsd-x86_64 (64bit)\nCopyright (C) 2004-2025 The FreeBASIC development team.",
+      "raw_worker_exit": 1,
+      "stage_exits": {
+        "build": 0,
+        "compiler-harness": 0,
+        "example-contracts": 0,
+        "examples": 0,
+        "fbctests": 0,
+        "inputs-after": 1,
+        "inputs-before": 0,
+        "maintenance-final": 0,
+        "make-contracts": 0,
+        "repeat-after": 0,
+        "repeat-before": 0,
+        "repeat-build": 0,
+        "source-structure": 0,
+        "warning-fix": 0,
+        "worker": 1
+      },
+      "unit_tests": 2441,
+      "unit_assertions": 1622044,
+      "unit_failures": 0,
+      "make_contracts": 42,
+      "self_contained_examples": 654,
+      "self_contained_failures": 0,
+      "all_example_compile_passes": 1583,
+      "other_example_compile_failures_or_timeouts": 190,
+      "example_results_sha256": "89c2878d7facb946eb8175584eab4c3f193d4d0440fdf1e7f2310f95b79dcc83",
+      "input_files": 12637,
+      "normalized_warning_outputs": 0,
+      "warning_reference_files": 340,
+      "warnings_generated": 340,
+      "unchanged_outputs": 3454,
+      "final_native_graph": {
+        "exit": 0,
+        "command_lines": 5803,
+        "sha256": "87a41ca265c0a3dc26a7f175d8d6cc72abde91a9abd0be38960e93a3d6493a18",
+        "prepare_commands": 19,
+        "result": "PASS"
+      },
+      "compiler_harness_limits": [
+        "Haiku grep: skipped (GNU awk unavailable)",
+        "compiler timeout: skipped (GNU timeout unavailable)"
+      ],
+      "images": {
+        "bin/fbc": {
+          "sha256": "acffaac87b5a20be920ddc3c55a423649d19005e387452280f47538cd2eacf44",
+          "bytes": 3650048
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfb.a": {
+          "sha256": "9afc9e35615b2f2460f3c26c22d0ef7e5ba1899ee7b2b227cd88e9b15bb068e4",
+          "bytes": 27166
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfbgfx.a": {
+          "sha256": "1913da9fa25f75129ebf83cd9a4aed6a931812976dd615adceec11ed54f4407d",
+          "bytes": 4218
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfbgfxmt.a": {
+          "sha256": "8e419a7dcf9c14ac89d150149e0991cdac4680c9b88663eedeb01d1877dbba65",
+          "bytes": 4461
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfbgfxmtpic.a": {
+          "sha256": "3c62605a227bd2a2ffa02cf2fae0e6e226abc65343dae256b609515b1d99d3a4",
+          "bytes": 4785
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfbgfxpic.a": {
+          "sha256": "e0a34a6dc869253a65e8295ae12340fbf55be3523f4143f053f4ce0aecfc5d50",
+          "bytes": 4542
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfbmt.a": {
+          "sha256": "07c0d5d4a9cf051d9fb07772a3594f46c7a362c972da5d99bfd8e8f8c705ea5a",
+          "bytes": 28702
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfbmtpic.a": {
+          "sha256": "a17849e1317e9790f63ee5ad57b94e8dea8a688835e4f156f8e8a10abfe85f57",
+          "bytes": 30750
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libfbpic.a": {
+          "sha256": "5dcea6cbfcfbf1e2d8762bee250117ec6deb2ce946764f71b2e86af887ed8200",
+          "bytes": 29214
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libsfx.a": {
+          "sha256": "845afa14c56cb8acd57e7d31c288e48987d3820ebfe63e6c56a91954f5151419",
+          "bytes": 3436
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libsfxmt.a": {
+          "sha256": "ffa20a7b73da908799b5f09368d3fcef15af44725bbb33f155cd65a791fe1603",
+          "bytes": 3661
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libsfxmtpic.a": {
+          "sha256": "fc7aee81eb1c3c987f752151749fd548aaea2a8b04e54a67803ec32e06265e05",
+          "bytes": 3961
+        },
+        "lib/freebasic/freebsd-x86_64/.archive-members/libsfxpic.a": {
+          "sha256": "f281d91df0fcb1f0b19d0b764095b26d00a7911375408db7cb97e87bc4660e0e",
+          "bytes": 3736
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/fbrt0.o": {
+          "sha256": "db612d3b40f1c5f8832de9501732b8ddf008144071cbcb8009f4fe0514a51be0",
+          "bytes": 22
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/fbrt0pic.o": {
+          "sha256": "b33ea381f9bf0e2e27ea625cae018952c132555891aa53f3177603eb585c396f",
+          "bytes": 35
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/fbrt1.o": {
+          "sha256": "db612d3b40f1c5f8832de9501732b8ddf008144071cbcb8009f4fe0514a51be0",
+          "bytes": 22
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/fbrt1pic.o": {
+          "sha256": "b33ea381f9bf0e2e27ea625cae018952c132555891aa53f3177603eb585c396f",
+          "bytes": 35
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/fbrt2.o": {
+          "sha256": "db612d3b40f1c5f8832de9501732b8ddf008144071cbcb8009f4fe0514a51be0",
+          "bytes": 22
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/fbrt2pic.o": {
+          "sha256": "b33ea381f9bf0e2e27ea625cae018952c132555891aa53f3177603eb585c396f",
+          "bytes": 35
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfb.a": {
+          "sha256": "3a66c0435456ee526184583e5290f7c3f75aff7afa72ab32bfc970b19ed044b5",
+          "bytes": 28
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfbgfx.a": {
+          "sha256": "fc76d826af76687703de2ecb0d9abe3bc3a2567c24c7b4329f4e939fc32231c2",
+          "bytes": 26
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfbgfxmt.a": {
+          "sha256": "3fc43f7a831c916809260f9f0190bcfdbf8359003fcb90f5f31ef9c8af0deffd",
+          "bytes": 39
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfbgfxmtpic.a": {
+          "sha256": "87c178757abb97a9d7991b6f9f726ba8d8e7e578099379db02e80589de424510",
+          "bytes": 40
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfbgfxpic.a": {
+          "sha256": "136efb41e92212ff0dd18a4f174a71ee3c5c0d36680c68978154d7095989a911",
+          "bytes": 39
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfbmt.a": {
+          "sha256": "8a8090b2a8f739d817f9c262d5276bb2994e15dd8862a83472495dedb6a3fdbe",
+          "bytes": 41
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfbmtpic.a": {
+          "sha256": "423bcf840cd6ce0d52df713eaba986270a777133cf2b3bdd4b396b31c846242f",
+          "bytes": 42
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libfbpic.a": {
+          "sha256": "574516a24ea684e6daefc89207b6ff342238797bae7c1f96b6ee2e4d6140f4bc",
+          "bytes": 41
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libsfx.a": {
+          "sha256": "fc76d826af76687703de2ecb0d9abe3bc3a2567c24c7b4329f4e939fc32231c2",
+          "bytes": 26
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libsfxmt.a": {
+          "sha256": "3fc43f7a831c916809260f9f0190bcfdbf8359003fcb90f5f31ef9c8af0deffd",
+          "bytes": 39
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libsfxmtpic.a": {
+          "sha256": "87c178757abb97a9d7991b6f9f726ba8d8e7e578099379db02e80589de424510",
+          "bytes": 40
+        },
+        "lib/freebasic/freebsd-x86_64/.build-config/libsfxpic.a": {
+          "sha256": "136efb41e92212ff0dd18a4f174a71ee3c5c0d36680c68978154d7095989a911",
+          "bytes": 39
+        },
+        "lib/freebasic/freebsd-x86_64/fbrt0.o": {
+          "sha256": "9eb1898486ab4bade8cc676faa5978cbd04edb588b8c505833551755a2f2a2a3",
+          "bytes": 1608
+        },
+        "lib/freebasic/freebsd-x86_64/fbrt0pic.o": {
+          "sha256": "9eb1898486ab4bade8cc676faa5978cbd04edb588b8c505833551755a2f2a2a3",
+          "bytes": 1608
+        },
+        "lib/freebasic/freebsd-x86_64/fbrt1.o": {
+          "sha256": "1279245d920f32074798d6e3bd140de22e20a0d9bb00228840902e5820a2cc74",
+          "bytes": 1752
+        },
+        "lib/freebasic/freebsd-x86_64/fbrt1pic.o": {
+          "sha256": "1279245d920f32074798d6e3bd140de22e20a0d9bb00228840902e5820a2cc74",
+          "bytes": 1752
+        },
+        "lib/freebasic/freebsd-x86_64/fbrt2.o": {
+          "sha256": "eb0746380ac8c282f0a3bd6734f84cb52f32abcc2b8f917b9b598f0b71e75511",
+          "bytes": 1768
+        },
+        "lib/freebasic/freebsd-x86_64/fbrt2pic.o": {
+          "sha256": "eb0746380ac8c282f0a3bd6734f84cb52f32abcc2b8f917b9b598f0b71e75511",
+          "bytes": 1768
+        },
+        "lib/freebasic/freebsd-x86_64/libfb.a": {
+          "sha256": "35f71ebded250f440620cdcd4b8c71e628270b70e29850df976f1f8fed021328",
+          "bytes": 1261302
+        },
+        "lib/freebasic/freebsd-x86_64/libfbgfx.a": {
+          "sha256": "0debe0bfa3a8cdd5484eca771db912454e72b52301b9de2374cfd0e4a79e1631",
+          "bytes": 382908
+        },
+        "lib/freebasic/freebsd-x86_64/libfbgfxmt.a": {
+          "sha256": "42889f340567e313aaf8b505d05c37445ce97717f6faea6a4b5096a933eae154",
+          "bytes": 395116
+        },
+        "lib/freebasic/freebsd-x86_64/libfbgfxmtpic.a": {
+          "sha256": "92bd33ebba532c1b7d2c58ce21a51b44a7af68c83bb5bcf3567ab439f46de6e5",
+          "bytes": 371876
+        },
+        "lib/freebasic/freebsd-x86_64/libfbgfxpic.a": {
+          "sha256": "a05261917a87056751449af9fe922f895780ccf48a5e2641676024b7393b2d71",
+          "bytes": 360044
+        },
+        "lib/freebasic/freebsd-x86_64/libfbmt.a": {
+          "sha256": "d7c8efe377c56eb052bcef62e7b8db005279ac14ad223697459bda069aaa3f18",
+          "bytes": 1299670
+        },
+        "lib/freebasic/freebsd-x86_64/libfbmtpic.a": {
+          "sha256": "c789f1d6aa183633b4af32505490f7a50b2ab7129e327c49c8a44b22d476f8a5",
+          "bytes": 1305078
+        },
+        "lib/freebasic/freebsd-x86_64/libfbpic.a": {
+          "sha256": "bfbdf33102b04935f59f9aeca788938a5a4a1bafd3f2740b081a52fe0ea1c7da",
+          "bytes": 1265990
+        },
+        "lib/freebasic/freebsd-x86_64/libsfx.a": {
+          "sha256": "b185f31319667fb449a26ae5073f72895317abbf2d9b9e6acd86108212380d8b",
+          "bytes": 532002
+        },
+        "lib/freebasic/freebsd-x86_64/libsfxmt.a": {
+          "sha256": "b185f31319667fb449a26ae5073f72895317abbf2d9b9e6acd86108212380d8b",
+          "bytes": 532002
+        },
+        "lib/freebasic/freebsd-x86_64/libsfxmtpic.a": {
+          "sha256": "7fd476f1ea65b18fd01c85f761e9baa9b5e4840f1b9c82fda1bf83fc4da93c54",
+          "bytes": 533458
+        },
+        "lib/freebasic/freebsd-x86_64/libsfxpic.a": {
+          "sha256": "7fd476f1ea65b18fd01c85f761e9baa9b5e4840f1b9c82fda1bf83fc4da93c54",
+          "bytes": 533458
+        }
+      },
+      "receipt_hashes": {
+        "build.log": "2faed7b3100ef59ecfbc3d170a31c91f3bd4286633ac405bed3f29c16dc9bb55",
+        "compiler-harness.log": "ac6e5fb0e344a0a29e0e1377e0ddbf541786cdd9bef42a6faf0c02cac91f9a3b",
+        "example-contracts.log": "a314ae15d0eead13dd9608ac672b9ff2434ad79246cf19b33da16e2f9d170a01",
+        "examples.log": "57fe9735cbb76febcf3de755fa0124b11da49e34b958c4c30b8221c4f4b0c956",
+        "fbctests.log": "756f5e40dfc51e81cfa1bdcba983fbc4eb0bac2b62d17a616dc49b213265f1d3",
+        "inputs-after.log": "7701485d47dd7a8aa4ab3b4537e14649c33bce3bbef03817420861c3d99cc707",
+        "inputs-before.log": "9261c71f333ccb0438236153b6d213ba41a12c766a2bb1aa4dc40991ff453566",
+        "make-contracts-final.log": "4ea58c8359ab0a729b6cd15a97dcacd0fa023625f03960ea0f505d035462824f",
+        "make-contracts.log": "3ccec139ae0f2c519e72e946a018f68db15f2ee1f4da8a3b7eddcd092a1f92fd",
+        "native-graph-final.log": "503d4ee0478ec1249cdd178b48aec16fb12a59dfd504922b9d9549b27d9d6b86",
+        "repeat-after.log": "006298d9a46ded9ffa440a971381fb8e372c5298f0c5d26eabd490465749146f",
+        "repeat-before.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "repeat-build.log": "7104393fb203bae92fe06ebd79cf87b5b551f2dea9ccbbcd25ec2a1bbc8b3298",
+        "source-audit-final.log": "e48805a3b772a8d61d0314082de08782f0a871e3d020d3122616c1b7d21a172c",
+        "source-structure.log": "ef3fa07e41bfb4a0475c8228b0a798a5e2935773d08ff018b819de918ef5bed0",
+        "structure-final.log": "348eeb962681d57fb483dba0931d95e0c99249716b418d3b6ec2b2c356845536",
+        "warnings-final.log": "0a613c66e262e322320e2b184bf53d60b79b6a73c58380b335ab3ea6d7a13840"
+      },
+      "summary_sha256": "b1dc5cee45cf957db6d05fd6b8aa5427950688bff58d549137b3ef838c608e0f"
+    }
+  },
+  "manual": {
+    "result": "MANUAL_SOURCE_GUIDES_PASS",
+    "native_links_checked": 46,
+    "rendered_guide_links_checked": 35,
+    "formats": {
+      "html": 1161,
+      "fbhelp": 1161,
+      "txt": 1161
+    },
+    "generator_sha256": "dbacc8ee8a63e0bc06c8c0cb9a9a83fa2ba38c56aa96452658616f910ad8f962",
+    "configuration_pages": [
+      "DevBuildConfig",
+      "DevSourceTools"
+    ],
+    "configuration_source_sha256": {
+      "DevBuildConfig": "1eea09e4dd01037ce42e48a1e431e86e40f9e10e4aa4bad82a1a7153a6b02708",
+      "DevSourceTools": "f4c0fc8e1a85af75e79260a87837700a8383640c065415abf519f7cce387b309"
+    }
+  },
+  "resources": {
+    "source_bundle_bytes": 46638327,
+    "native_workspaces": 3,
+    "build_jobs_per_host": 2,
+    "removed_tracked_generated_bytes": 146799597,
+    "example_scratch_logical_bytes_removed": 1051403594,
+    "cleanup": {
+      "Windows": {
+        "result": "PASS",
+        "removed": [
+          {
+            "path": "receipts/committed/examples/bin",
+            "files": 1586,
+            "logical_bytes": 422970335
+          },
+          {
+            "path": "receipts/committed/examples/work",
+            "files": 0,
+            "logical_bytes": 0
+          },
+          {
+            "path": "receipts/candidate/examples/bin",
+            "files": 1586,
+            "logical_bytes": 422970335
+          },
+          {
+            "path": "receipts/candidate/examples/work",
+            "files": 0,
+            "logical_bytes": 0
+          }
+        ],
+        "logical_bytes_removed": 845940670,
+        "free_bytes_after": 48767086592,
+        "retained": "Native objects/compiler/libraries, source payloads, CSV/reports/logs and compact receipts"
+      },
+      "Debian CT133": {
+        "result": "PASS",
+        "removed": [
+          {
+            "path": "receipts/candidate/examples/bin",
+            "files": 1530,
+            "logical_bytes": 109232462
+          },
+          {
+            "path": "receipts/candidate/examples/work",
+            "files": 0,
+            "logical_bytes": 0
+          }
+        ],
+        "logical_bytes_removed": 109232462,
+        "free_bytes_after": 90406154240,
+        "retained": "Native objects/compiler/libraries, source payloads, CSV/reports/logs and compact receipts"
+      },
+      "FreeBSD VM134": {
+        "result": "PASS",
+        "removed": [
+          {
+            "path": "receipts/candidate/examples/bin",
+            "files": 1583,
+            "logical_bytes": 96230462
+          },
+          {
+            "path": "receipts/candidate/examples/work",
+            "files": 0,
+            "logical_bytes": 0
+          }
+        ],
+        "logical_bytes_removed": 96230462,
+        "free_bytes_after": 82376470528,
+        "retained": "Native objects/compiler/libraries, source payloads, CSV/reports/logs and compact receipts"
+      }
+    }
+  },
+  "raw_evidence": "build/consolidation-20261020 locally and /srv/compile-testing/fbc-consolidation-20261020-01a158fe on the native guests",
+  "end_of": "build-consolidation-results.json"
+}

@@ -93,6 +93,7 @@ PR_COMMON_TOOLS := \
 	tar \
 	xz \
 	gzip \
+	cksum \
 	sed \
 	awk \
 	grep \
@@ -108,6 +109,7 @@ PR_COMMON_TOOLS := \
 	tar \
 	xz \
 	gzip \
+	cksum \
 	sed \
 	awk \
 	grep \

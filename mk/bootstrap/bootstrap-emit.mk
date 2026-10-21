@@ -14,8 +14,11 @@
 
 BOOTSTRAP_DIR := $(if $(strip $(FBTARGET_DIR_OVERRIDE)),$(FBTARGET_DIR_OVERRIDE),$(FBTARGET))
 
-BOOTSTRAP_OUT := bootstrap/$(BOOTSTRAP_DIR)
+BOOTSTRAP_OUT := $(BUILD_OUTPUT_PREFIX)bootstrap/$(BOOTSTRAP_DIR)
 BOOTSTRAP_SRC_RSP := $(BOOTSTRAP_OUT)/.compiler-sources.rsp
+BOOTSTRAP_INPUT_RSP := $(BOOTSTRAP_OUT)/.compiler-inputs.rsp
+BOOTSTRAP_EMIT_WORK := $(BOOTSTRAP_OUT)/.emit-work
+bootstrap_emit_source = $(BOOTSTRAP_EMIT_WORK)/$(patsubst $(srcdir)/compiler/%,%,$(1))
 BOOTFBCGEN ?= gcc
 
 ##############################################################################
@@ -187,7 +190,9 @@ endif
 # response files untouched when Make is only displaying its commands.
 bootstrap-emit-source-response: | $(BOOTSTRAP_OUT)
 	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(file >$(BOOTSTRAP_SRC_RSP)))
-	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(file >>$(BOOTSTRAP_SRC_RSP),-b $(call bootstrap_response_source,$(f)))))
+	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(file >$(BOOTSTRAP_INPUT_RSP)))
+	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(foreach f,$(BOOTSTRAP_COMPILER_SRC),$(file >>$(BOOTSTRAP_SRC_RSP),-b $(call bootstrap_response_source,$(abspath $(call bootstrap_emit_source,$(f)))))))
+	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(foreach f,$(BOOTSTRAP_COMPILER_SRC) $(filter $(srcdir)/compiler/%,$(FBC_BI)),$(file >>$(BOOTSTRAP_INPUT_RSP),-b $(f))))
 	@test -s "$(BOOTSTRAP_SRC_RSP)" || { \
 		echo "ERROR: no compiler sources found for bootstrap emission"; \
 		exit 1; \
@@ -208,18 +213,22 @@ bootstrap-emit: bootstrap-check
 	mkdir -p "$(BOOTSTRAP_OUT)"
 
 	@echo "==> Cleaning previous bootstrap output"
+	@touch "$(BOOTSTRAP_OUT)/.emit-config.pending"
 	rm -f "$(BOOTSTRAP_OUT)"/*.c "$(BOOTSTRAP_OUT)"/*.asm "$(BOOTSTRAP_OUT)"/*.ll "$(BOOTSTRAP_SRC_RSP)"
+	rm -rf "$(BOOTSTRAP_EMIT_WORK)"
 
 	@echo "==> Writing bootstrap source response file"
 	@$(MAKE) bootstrap-emit-source-response
 
-	@echo "==> Clearing temporary compiler emission"
+	@echo "==> Preparing isolated compiler emission"
 	@set -e; while IFS=' ' read -r flag source; do \
 		[ "$$flag" = "-b" ] || { echo "ERROR: invalid bootstrap source response entry"; exit 1; }; \
 		source=$${source%$$'\r'}; \
-		emitted=$${source%.bas}; \
-		rm -f "$$emitted.c" "$$emitted.asm" "$$emitted.ll"; \
-	done < "$(BOOTSTRAP_SRC_RSP)"
+		relative=$${source#$(srcdir)/compiler/}; \
+		destination="$(BOOTSTRAP_EMIT_WORK)/$$relative"; \
+		mkdir -p "$$(dirname "$$destination")"; \
+		cp "$$source" "$$destination"; \
+	done < "$(BOOTSTRAP_INPUT_RSP)"
 
 	@bootstrap_inc="$(BOOTSTRAP_INC_DIR)"; \
 	if [ "$(BOOTSTRAP_HOST_IS_MSYS)" = yes ]; then \
@@ -252,7 +261,10 @@ bootstrap-emit: bootstrap-check
 		exit 1; \
 	fi
 
-	rm -f "$(BOOTSTRAP_SRC_RSP)"
+	@printf '%s\n' '$(BUILD_CONFIG_EMIT)' >"$(BOOTSTRAP_OUT)/.emit-config.tmp"
+	@mv -f "$(BOOTSTRAP_OUT)/.emit-config.tmp" "$(BOOTSTRAP_OUT)/.emit-config"
+	rm -f "$(BOOTSTRAP_SRC_RSP)" "$(BOOTSTRAP_INPUT_RSP)" "$(BOOTSTRAP_OUT)/.emit-config.pending"
+	rm -rf "$(BOOTSTRAP_EMIT_WORK)"
 
 	@dos2unix "$(BOOTSTRAP_OUT)"/* >/dev/null 2>&1 || true
 

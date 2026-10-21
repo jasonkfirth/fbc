@@ -532,6 +532,16 @@ def fbc_package_path_entries(args: argparse.Namespace) -> list[str]:
     return result
 
 
+def cpp_runtime_library(target_os: str, compiler: str) -> str:
+    # FreeBSD and Darwin use libc++ with the native Clang driver. Explicit
+    # GCC drivers still need libstdc++, including target-prefixed g++ names.
+    name = Path(compiler).name.lower().removesuffix(".exe")
+    gcc_driver = re.search(r"(?:^|-)g\+\+(?:-?\d+(?:\.\d+)*)?$", name) is not None
+    if target_os in ("freebsd", "darwin") and not gcc_driver:
+        return "c++"
+    return "stdc++"
+
+
 def command_environment(args: argparse.Namespace, env: dict[str, str] | None = None) -> dict[str, str]:
     result = dict(env if env is not None else os.environ)
     path_entries = fbc_package_path_entries(args)
@@ -1150,8 +1160,10 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     if rel in LOCAL_CPP_LIBRARIES:
         name = LOCAL_CPP_LIBRARIES[rel]
         environment = command_environment(args, compile_env)
+        default_cxx = "c++" if args.target_os in ("freebsd", "darwin") else "g++"
+        cxx = environment.get("CXX", default_cxx)
         for index, dependency_command in enumerate((
-            [environment.get("CXX", "g++"), "-c", name + ".cxx", "-o", name + ".o"],
+            [cxx, "-c", name + ".cxx", "-o", name + ".o"],
             [environment.get("AR", "ar"), "rcs", "lib" + name + ".a", name + ".o"],
         )):
             dependency_log = compile_log.with_suffix(f".dependency{index}.log")
@@ -1168,7 +1180,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
                 break
         if dependency_status == "pass":
             preserve_remote_files = bool(args.remote_shell)
-        cmd.extend(["-l", "stdc++"])
+        cmd.extend(["-l", cpp_runtime_library(args.target_os, cxx)])
 
     if rel == "examples/manual/proguide/embed-access-data-in-executable.bas":
         # This is the same binary-object rule documented in examples/GNUmakefile.

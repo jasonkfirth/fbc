@@ -254,26 +254,32 @@ FBRT2_SOURCE := $(or $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/static/fbrt2.c)
 $(libdir)/fbrt0.o: $(FBRT0_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -c $< -o $@
+	$(call publish_build_config)
 
 $(libdir)/fbrt0pic.o: $(FBRT0_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -c $< -o $@
+	$(call publish_build_config)
 
 $(libdir)/fbrt1.o: $(FBRT1_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -c $< -o $@
+	$(call publish_build_config)
 
 $(libdir)/fbrt1pic.o: $(FBRT1_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -c $< -o $@
+	$(call publish_build_config)
 
 $(libdir)/fbrt2.o: $(FBRT2_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -c $< -o $@
+	$(call publish_build_config)
 
 $(libdir)/fbrt2pic.o: $(FBRT2_SOURCE) $(LIBFB_H) | $(libdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -c $< -o $@
+	$(call publish_build_config)
 
 ##############################################################################
 # fbrt (FreeBASIC runtime layer)

@@ -9,6 +9,10 @@
 *.zip
 *.log
 
+# Cppcheck analysis dumps are generated state, not implementation sources.
+*.dump
+*.ctu-info
+
 # Example compilation can retain intermediate assembler or C beside the source.
 # Those outputs must not become example source files in version control.
 /examples/**/*.asm
@@ -94,6 +98,7 @@
 /tests/**/*.dylib
 /tests/**/*.a
 /tests/**/*.lib
+/tests/log-tests-*.lst
 # Direct emission of the semantic binding fixture is generated test output.
 /tests/semantic-sidecar/bindings.c
 /tests/sfx/render-polyphony
@@ -124,4 +129,6 @@ obj
 winCE/
 !/src/rtlib/drivers/wince/
 !/src/rtlib/drivers/wince/**
+!/src/gfxlib2/drivers/wince/
+!/src/gfxlib2/drivers/wince/**
 win95/

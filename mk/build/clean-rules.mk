@@ -54,12 +54,12 @@ clean-compiler:
 ##############################################################################
 
 clean-all-objects:
-	@rm -rf src/compiler/obj
-	@rm -rf src/rtlib/obj
-	@rm -rf src/fbrt/obj
-	@rm -rf src/gfxlib2/obj
-	@rm -rf src/gfxlib3/obj
-	@rm -rf src/sfxlib/obj
+	@rm -rf $(BUILD_OUTPUT_PREFIX)src/compiler/obj
+	@rm -rf $(BUILD_OUTPUT_PREFIX)src/rtlib/obj
+	@rm -rf $(BUILD_OUTPUT_PREFIX)src/fbrt/obj
+	@rm -rf $(BUILD_OUTPUT_PREFIX)src/gfxlib2/obj
+	@rm -rf $(BUILD_OUTPUT_PREFIX)src/gfxlib3/obj
+	@rm -rf $(BUILD_OUTPUT_PREFIX)src/sfxlib/obj
 
 
 ##############################################################################
@@ -98,6 +98,9 @@ clean-libs:
 	@rm -f $(libdir)/libsfx*.a
 	@rm -f $(libdir)/.archive-members/*.a
 	@rmdir "$(libdir)/.archive-members" 2>/dev/null || true
+	@rm -f "$(libdir)/.build-config/"*.a "$(libdir)/.build-config/"*.o
+	@rm -f "$(libdir)/.build-config/"*.a.pending "$(libdir)/.build-config/"*.o.pending
+	@rmdir "$(libdir)/.build-config" 2>/dev/null || true
 	@rm -f $(libdir)/fbrt0.o
 	@rm -f $(libdir)/fbrt0pic.o
 	@rm -f $(libdir)/fbrt1.o
@@ -111,10 +114,10 @@ clean-libs:
 ##############################################################################
 
 clean-build:
-	@rm -rf bin
-	@rm -rf obj
-	@rm -rf stage
-	@rm -rf dist
+	@rm -rf $(BUILD_OUTPUT_PREFIX)bin
+	@rm -rf $(BUILD_OUTPUT_PREFIX)obj
+	@rm -rf $(BUILD_OUTPUT_PREFIX)stage
+	@rm -rf $(BUILD_OUTPUT_PREFIX)dist
 
 
 ##############################################################################
@@ -155,6 +158,10 @@ clean-example-artifacts:
 	done
 
 clean-tests:
+ifneq ($(strip $(BUILD_ROOT)),)
+	@echo "ERROR: test cleanup uses shared source paths; use a separate worktree"
+	@exit 1
+else
 	@rm -rf .maketests-tmp
 	@rm -rf maketests-log
 	@rm -rf test-run-log
@@ -164,6 +171,7 @@ clean-tests:
 	@cd tests && $(MAKE) --no-print-directory -f log-tests.mk FB_LANG=fblite clean
 	@cd tests && $(MAKE) --no-print-directory -f log-tests.mk FB_LANG=qb clean
 	@cd tests && $(MAKE) --no-print-directory -f log-tests.mk FB_LANG=deprecated clean
+endif
 
 
 ##############################################################################
@@ -171,10 +179,10 @@ clean-tests:
 ##############################################################################
 
 clean-dist:
-	@rm -f FreeBASIC-*.tar
-	@rm -f FreeBASIC-*.tar.*
-	@rm -f FreeBASIC-*.zip
-	@rm -f FreeBASIC-*.7z
+	@rm -f $(BUILD_OUTPUT_PREFIX)FreeBASIC-*.tar
+	@rm -f $(BUILD_OUTPUT_PREFIX)FreeBASIC-*.tar.*
+	@rm -f $(BUILD_OUTPUT_PREFIX)FreeBASIC-*.zip
+	@rm -f $(BUILD_OUTPUT_PREFIX)FreeBASIC-*.7z
 
 
 ##############################################################################
@@ -183,17 +191,21 @@ clean-dist:
 
 # Remove bootstrap compiler binaries and objects
 clean-bootstrap:
-	@rm -f bootstrap/fbc$(EXEEXT)
-	@rm -f bootstrap/*/*.o
+	@rm -f $(BOOTSTRAP_FBC)
+	@rm -rf $(BUILD_OUTPUT_PREFIX)bootstrap/obj
+	@rm -f $(BUILD_OUTPUT_PREFIX)bootstrap/*/*.o
 
 
 # Explicit removal of emitted bootstrap sources
 clean-bootstrap-sources: clean-bootstrap-src
 
 clean-bootstrap-src:
-	@rm -f bootstrap/*/*.c
-	@rm -f bootstrap/*/*.asm
-	@rm -f bootstrap/*/*.ll
+	@rm -f $(BUILD_OUTPUT_PREFIX)bootstrap/*/*.c
+	@rm -f $(BUILD_OUTPUT_PREFIX)bootstrap/*/*.asm
+	@rm -f $(BUILD_OUTPUT_PREFIX)bootstrap/*/*.ll
+	@rm -f $(BUILD_OUTPUT_PREFIX)bootstrap/*/.emit-config*
+	@rm -f $(BUILD_OUTPUT_PREFIX)bootstrap/*/.compiler-*.rsp
+	@rm -rf $(BUILD_OUTPUT_PREFIX)bootstrap/*/.emit-work
 
 
 ##############################################################################
@@ -203,8 +215,10 @@ clean-bootstrap-src:
 clean: \
   clean-compiler \
   clean-libs \
-  clean-build \
-  clean-tests
+  clean-build
+ifeq ($(strip $(BUILD_ROOT)),)
+clean: clean-tests
+endif
 
 
 ##############################################################################

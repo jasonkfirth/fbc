@@ -169,8 +169,11 @@ extern "C" {
 	#define FB_UNLOCK()    fb_Unlock()
 	#define FB_STRLOCK()   fb_StrLock()
 	#define FB_STRUNLOCK() fb_StrUnlock()
-	/* FIXME: consistent locking order of FB_LOCK and FB_GRAPHICS_LOCK is
-           required. See bug #885 */
+	/* When both are needed, acquire FB_LOCK before FB_GRAPHICS_LOCK.
+	   Runtime hooks dispatch into graphics while holding FB_LOCK. Mode changes
+	   and shutdown must follow the same order, including failure cleanup.
+	   Drawing-only paths need no FB_LOCK; they must not enter a runtime hook
+	   while holding only FB_GRAPHICS_LOCK. See docs/gfx-locking.md. */
 	#define FB_GRAPHICS_LOCK()   fb_GraphicsLock()
 	#define FB_GRAPHICS_UNLOCK() fb_GraphicsUnlock()
 	#define FB_MATH_LOCK()   fb_MathLock()

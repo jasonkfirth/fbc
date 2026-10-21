@@ -28,6 +28,7 @@ define DO_AR
 	mv -f "$@.tmp" "$@"; \
 	cp "$@.rsp" "$$members.tmp"; \
 	mv -f "$$members.tmp" "$$members"
+	$(call publish_build_config)
 endef
 
 # Make notices newer inputs, but removing an input does not make an archive

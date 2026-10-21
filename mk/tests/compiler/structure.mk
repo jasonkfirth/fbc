@@ -12,7 +12,7 @@ PYTHON ?= python3
 
 .PHONY: compiler-structure-test compiler-host-policy-test compiler-test-harness-test compiler-storage-test compiler-backends-test
 compiler-structure-test:
-	$(PYTHON) "$(rootdir)/build_scripts/check-compiler-structure.py" --root "$(rootdir)"
+	$(PYTHON) "$(rootdir)/build_scripts/check-compiler-structure.py" --root "$(rootdir)" --make "$(MAKE)"
 
 compiler-host-policy-test: | maybe-build-fbc $(RTL_LIBS)
 	$(if $(CAN_RUN),,$(call _mt_echo,Skipping host policy execution for a cross build))
@@ -21,7 +21,7 @@ ifneq ($(CAN_RUN),)
 endif
 
 compiler-test-harness-test: | maybe-build-fbc
-	$(FBC_TOOL_ENV) $(PYTHON) "$(rootdir)/build_scripts/test-compiler-test-harness.py" --root "$(rootdir)" --fbc "$(TEST_FBC)"
+	$(FBC_TOOL_ENV) $(PYTHON) "$(rootdir)/build_scripts/test-compiler-test-harness.py" --root "$(rootdir)" --fbc "$(TEST_FBC)" --make "$(MAKE)"
 
 compiler-storage-test: | maybe-build-fbc $(RTL_LIBS)
 	$(if $(CAN_RUN),,$(call _mt_echo,Skipping compiler storage execution for a cross build))

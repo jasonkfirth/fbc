@@ -84,6 +84,11 @@ include $(mkpath)/os-flags.mk
 include $(mkpath)/naming.mk
 include $(mkpath)/layout.mk
 include $(mkpath)/build-layout.mk
+ifneq ($(strip $(BUILD_ROOT)),)
+ifneq ($(filter quick-test full-test unit-tests log-tests tests-test install install-% uninstall uninstall-% dist dist-% bootstrap-dist% clean-tests clean-example-artifacts,$(MAKECMDGOALS)),)
+$(error This workflow uses shared source paths; use a separate worktree instead of BUILD_ROOT)
+endif
+endif
 include $(mkpath)/multilib.mk
 
 ##############################################################################
@@ -131,6 +136,10 @@ include $(mkpath)/dist.mk
 include $(mkpath)/tests.mk
 include $(mkpath)/maketests.mk
 include $(mkpath)/inst_uninst.mk
+
+# Effective commands are now complete. Configuration records belong to each
+# successfully published artifact, keeping failed and unbuilt variants retryable.
+include $(mkpath)/build/config-rules.mk
 
 ##############################################################################
 # Prerequisite gating

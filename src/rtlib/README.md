@@ -128,8 +128,9 @@ With MT enabled, `FB_LOCK` protects shared runtime/file state and `FB_STRLOCK`
 protects the temporary byte-string descriptor pool. When both are needed,
 acquire `FB_LOCK` first. A helper may rely on its caller holding a lock, so
 follow the complete call path before adding another lock or moving a callback.
-The existing graphics/global lock-order FIXME in `fb.h` remains a constraint;
-this reorganization does not establish a universal order for those locks.
+When both are needed, acquire `FB_LOCK` before `FB_GRAPHICS_LOCK`. The
+[runtime/graphics lock contract](../../docs/gfx-locking.md) traces input,
+allocation and mode teardown and explains driver/caller restrictions.
 Non-MT macros are empty and do not prove that code is safe in an MT archive.
 
 | Storage | Owner and release rule |

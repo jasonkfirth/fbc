@@ -131,50 +131,37 @@ endif
 # prerequisites so a runtime repair relinks an otherwise unchanged compiler.
 COMPILER_LINK_INPUTS := $(COMPILER_RT0) $(COMPILER_RTL)
 
-$(FBC_EXE): $(FBC_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
+# A failed link must not destroy the compiler developers were already using.
+# Keep the temporary executable's .exe suffix for MinGW's output-name policy.
+# Only the completed image is published; the trap owns this one temporary path.
+define LINK_COMPILER
 	@mkdir -p "$(dir $@)"
+	@set -e; \
+	temporary="$(if $(filter %.exe,$@),$(patsubst %.exe,%.tmp.exe,$@),$@.tmp)"; \
+	trap 'rm -f "$$temporary"' 0; \
+	rm -f "$$temporary"; \
+	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o "$$temporary" \
+		$(1) $(COMPILER_RT0) $(COMPILER_RTL) -lm \
+		$(THREAD_FLAGS) $(TERM_LIB) $(2); \
+	mv -f "$$temporary" "$@"
+	$(call publish_build_config)
+endef
+
+$(FBC_EXE): $(FBC_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
 	@echo "Linking compiler: $@"
-	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
-		$(FBC_OBJS) \
-		$(COMPILER_RT0) \
-		$(COMPILER_RTL) \
-		-lm \
-		$(THREAD_FLAGS) \
-		$(TERM_LIB) \
-		$(COMPILER_PLATFORM_LIBS)
+	$(call LINK_COMPILER,$(FBC_OBJS),$(COMPILER_PLATFORM_LIBS))
 
 $(FBC_JS_EXE): $(FBC_JS_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
-	@mkdir -p "$(dir $@)"
 	@echo "Linking JS-targeting compiler: $@"
-	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
-		$(FBC_JS_OBJS) \
-		$(COMPILER_RT0) \
-		$(COMPILER_RTL) \
-		-lm \
-		$(THREAD_FLAGS) \
-		$(TERM_LIB)
+	$(call LINK_COMPILER,$(FBC_JS_OBJS))
 
 $(FBC_ANDROID_EXE): $(FBC_ANDROID_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
-	@mkdir -p "$(dir $@)"
 	@echo "Linking Android-targeting compiler: $@"
-	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
-		$(FBC_ANDROID_OBJS) \
-		$(COMPILER_RT0) \
-		$(COMPILER_RTL) \
-		-lm \
-		$(THREAD_FLAGS) \
-		$(TERM_LIB)
+	$(call LINK_COMPILER,$(FBC_ANDROID_OBJS))
 
 $(FBC_WII_EXE): $(FBC_WII_OBJS) $(COMPILER_LINK_INPUTS) | rtlib
-	@mkdir -p "$(dir $@)"
 	@echo "Linking Wii-targeting compiler: $@"
-	$(RUN_CC) $(ALLLDFLAGS) $(FBC_PIE_LDFLAGS) -o $@ \
-		$(FBC_WII_OBJS) \
-		$(COMPILER_RT0) \
-		$(COMPILER_RTL) \
-		-lm \
-		$(THREAD_FLAGS) \
-		$(TERM_LIB)
+	$(call LINK_COMPILER,$(FBC_WII_OBJS))
 
 ##############################################################################
 # User-facing compiler target

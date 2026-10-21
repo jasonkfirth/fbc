@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-21",
+  "historical_passes": {
+    "sweep": {
+      "rows": 313,
+      "passes": 300
+    },
+    "legacy-retry": {
+      "rows": 13,
+      "passes": 9
+    },
+    "legacy-retry2": {
+      "rows": 4,
+      "passes": 4
+    }
+  },
+  "fresh_recheck": {
+    "status": "pass",
+    "sources": 313,
+    "compile_link_pass": 313,
+    "elf_64bit": 300,
+    "elf_32bit": 13,
+    "elapsed_seconds": 109.03,
+    "compiler": "FreeBASIC Compiler - Version 1.20.5-1 (2026-10-20), built for linux-x86_64 (64bit)\nCopyright (C) 2004-2025 The FreeBASIC development team.",
+    "compiler_sha256": "bbca73c04828430a1ab69d4038a4fb0e2e3a5b0439176c575334e62787fc385e",
+    "runtime_scope": "Compile and link only; every output verified as executable ELF before removal.",
+    "sdk_scope": "Existing matching SDKs, including legacy i386 SDKs and compatibility runtime.",
+    "generated_executable_bytes_released": 22412856
+  },
+  "receipt_root": "out/ea1205-fixes/linux-link-recheck/",
+  "receipt_archive_sha256": "cf42bc1a977df96a131a619c2b761bb787de4d0798d2cc7148fab724c27ed188",
+  "full_corpus_previous_compile_link_pass": 1656,
+  "full_corpus_sources": 1773,
+  "limits": "The 313 count covers external-library examples only. Matching private legacy SDKs and an x86 compatibility runtime are required for 13 examples; this is not a clean Debian optional-packages-only qualification. External runtime checks remain the separately recorded 31 checks."
+}

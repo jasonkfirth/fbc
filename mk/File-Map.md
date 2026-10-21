@@ -74,7 +74,9 @@ The `mk/build/` directory owns the core build rules.
 - `build/archive-rules.mk`: archives object sets into the final static
   libraries.
 - `build/build-targets.mk`: defines high-level build targets such as `compiler`
-  and `libs`.
+  and `libs`, and publishes compiler executables after successful linking.
+- `build/config-rules.mk`: tracks effective normal-build commands and records
+  each artifact's configuration only after successful publication.
 - `build/clean-rules.mk`: centralizes normal and deep clean behavior.
 
 ## Bootstrap Subtree

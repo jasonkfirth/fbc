@@ -2,7 +2,7 @@
 ""LibFFI"" is a foreign function interface library allowing programs to arbitrarily call native function without pointers and to bind function pointers to generic functions which take variable arguments via closures. It is used to bind native code in modern scripting languages.
 
 Website: https://sourceware.org/libffi/
-Platforms supported: Windows, Linux, FreeBSD
+Platforms supported: Windows, Linux, FreeBSD, Haiku
 Headers to include: ffi.bi
 Header version: 3.3 declarations with x86 closure layouts for libffi 3.4 and newer
 
@@ -10,6 +10,8 @@ Header version: 3.3 declarations with x86 closure layouts for libffi 3.4 and new
 	Match the call interface's type to the actual function prototype. A C unsigned 32-bit return uses FreeBASIC ##ULong##. ##ffi_call## widens small integer results into ##ffi_arg## storage; use that type for the output buffer. Closure callbacks must also write small integer results through an ##ffi_arg Ptr##.
 
 	Modern x86 libffi uses 16-byte trampolines on 32-bit targets and 32-byte trampolines on 64-bit targets. This changes the closure layout from libffi 3.3. Use the corresponding modern native SDK with this binding.
+
+	Haiku x86 uses the System V ABI. The x86-64 binding has been checked against the native libffi 3.4.6 headers for structure sizes, field offsets and ABI constants, followed by actual calls and closures through the original examples.
 
 	Allocate closures through ##ffi_closure_alloc## and release them with ##ffi_closure_free##. Use the executable code pointer returned by the allocator, which may differ from the writable closure pointer. Keep the call interface, argument types and application data valid until the closure is no longer callable. On Win32, FreeBASIC rounds the closure storage to 32 bytes while GCC's aligned C typedef reports 28 bytes; their field offsets and alignment agree, and the native allocator accepts the extra tail storage.
 

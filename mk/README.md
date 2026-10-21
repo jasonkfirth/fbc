@@ -89,6 +89,8 @@ The order is not arbitrary:
 10. `mk/build/*.mk` attach the concrete rules.
 11. `mk/bootstrap/*.mk`, `dist.mk`, `tests.mk`, `maketests.mk`, and
     `inst_uninst.mk` add specialized workflows on top.
+12. `mk/build/config-rules.mk` compares the resolved commands and attaches
+    rebuild dependencies after those workflows have defined their variables.
 
 Because the later layers depend on the earlier ones, debugging almost always
 starts by checking `make print-config` and confirming that target identity and
@@ -149,14 +151,65 @@ Missing inferred cross tools remain inspectable with `print-config`, but
 concrete builds fail prerequisite checks unless an equivalent SDK compiler
 was explicitly supplied.
 
-Source and header dependencies, embedded runtime changes, and archive-member
-selection are tracked incrementally. Arbitrary changes to compiler commands
-or feature/optimization flags still require rebuilding the affected objects:
+Source and header dependencies, embedded runtime changes, archive-member
+selection, and effective build commands are tracked incrementally. Changing
+compile flags rebuilds the affected normal compiler/runtime variants. Changing
+only archive or link flags republishes the affected outputs without recompiling
+their objects. The first build after adopting configuration tracking rebuilds
+each requested variant once.
+
+Each compiler variant owns a `.build-config` record in its object directory.
+Runtime archives and startup objects own records under
+`$(libdir)/.build-config`. These hidden files stay out of installed packages.
+A record describes the last successful output and is replaced only after the
+archive, startup object or compiler link succeeds. Failed builds retry the
+pending configuration; `make -n` and unchanged builds write no records.
+An artifact's `.pending` marker is created before recompilation and removed
+after publication. It also forces a rebuild when flags are reverted after a
+failed attempt, preventing reuse of partially reconfigured objects.
+Compiler links use a temporary executable, preserving the previous working
+compiler if linking fails. One build process must own a given output tree;
+configuration records do not provide interprocess locking.
+
+The fingerprints use POSIX `cksum` with effective commands, flags, target
+identity, included product Make rules and selected tool contents. Replacing a
+compiler, assembler, archive tool or visible command wrapper at the same path
+invalidates its affected outputs. These checks detect changes; they are not
+security identities. Private wrapper dependencies and changing SDK
+headers/libraries still need component cleanup when absent from the graph:
 
 ```sh
 make clean-compiler clean-libs
 make all
 ```
+
+The compiler built from bootstrap C/assembly has its own successful-output
+record and tracks compile, assembler and link options. Fresh bootstrap emission
+uses an owned temporary source tree, preserving intermediates beside maintained
+BASIC files. Its record rejects changed emission options and unfinished attempts
+before bootstrap compilation. Pre-generated source bundles without an emission
+record remain supported; their target comes from the bootstrap directory.
+
+Independent compiler/library builds can choose distinct output roots:
+
+```sh
+make -j2 compiler rtlib gfxlib2 BUILD_ROOT=build/debug CFLAGS='-O0 -g'
+make -j2 compiler rtlib gfxlib2 BUILD_ROOT=build/release CFLAGS=-O2
+```
+
+Each root must be below the checkout's `build/` directory and contain no spaces.
+Objects, libraries, binaries, bootstrap output and configuration records stay
+under that root. `make clean BUILD_ROOT=build/debug` affects those products.
+The built compiler uses that root's runtime libraries; pass `-i /source/inc`
+when a test needs maintained include files. Keep one Make owner per root.
+Language tests, full/quick workflows, installation and packaging use shared
+source paths and require separate worktrees.
+
+`make warning-tests` compares fresh reports without modifying references;
+`make warning-tests-update` explicitly accepts an intentional diagnostic change.
+`make source-docs-test` checks source-guide links and native navigation, and
+`make source-docs-render-test FBDOC=/path/to/fbdoc` checks fresh HTML, fbhelp
+and text. These small checks leave no retained output trees.
 
 Keep the same target configuration on both commands. These component clean
 targets preserve compiler executables and emitted bootstrap sources. Compiler
@@ -225,6 +278,7 @@ Useful high-level targets:
 
 - `make sanity`
 - `make make-contracts-test` (isolated graph, packaging, and ownership regressions)
+- `make source-artifacts-test` (reject generated analyzer data under `src/`)
 - `make quick-test`
 - `make full-test`
 - `make compiler-smoke`

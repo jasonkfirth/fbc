@@ -1,0 +1,307 @@
+{
+  "date": "2026-10-21",
+  "status": "pass",
+  "libraries_removed": 0,
+  "native": {
+    "linux": {
+      "abi_measurements": 17,
+      "abi_status": "pass",
+      "focused_examples": {
+        "target": "linux",
+        "status": "pass",
+        "examples_checked": 1,
+        "examples_compiled": 1
+      },
+      "extra_checks": {
+        "status": "pass",
+        "checks": [
+          {
+            "label": "closure-compile",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe/bin/fbc",
+              "-prefix",
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe",
+              "-i",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/inc",
+              "-i",
+              "/srv/compile-testing/fbc-extlibs-1205-20261021/inc",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures.bas",
+              "-x",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures"
+            ]
+          },
+          {
+            "label": "closure-run",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures"
+            ]
+          },
+          {
+            "label": "gettext-before-compile",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe/bin/fbc",
+              "-prefix",
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe",
+              "-i",
+              "/srv/compile-testing/fbc-extlibs-1205-20261021/inc",
+              "-include",
+              "/srv/compile-testing/fbc-extlibs-1205-20261021/inc/crt/long.bi",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/gettext-width.bas",
+              "-x",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/gettext-before"
+            ]
+          },
+          {
+            "label": "gettext-before-run",
+            "exit_code": 2,
+            "expected_exit": 2,
+            "command": [
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/gettext-before"
+            ]
+          },
+          {
+            "label": "gettext-after-compile",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe/bin/fbc",
+              "-prefix",
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe",
+              "-i",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/inc",
+              "-i",
+              "/srv/compile-testing/fbc-extlibs-1205-20261021/inc",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/gettext-width.bas",
+              "-x",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/gettext-after"
+            ]
+          },
+          {
+            "label": "gettext-after-run",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/gettext-after"
+            ]
+          }
+        ]
+      },
+      "tested_input_sha256": {
+        "inc/ffi.bi": "ed9b6010da39e4a093dc85bd3e05662d91bd2fe30c912dcac0a9d1587aa46e93",
+        "inc/libintl.bi": "2e696bbfd9f3c30b180fe849dc0d892067f0414cefc89b5eb991ef975c0d4760",
+        "build_scripts/exampleageddon-freebasic.py": "be827db590f57121140428d11fe3104fb6514449d63519981cb549af0046bc4e"
+      }
+    },
+    "freebsd": {
+      "abi_measurements": 17,
+      "abi_status": "pass",
+      "focused_examples": {
+        "target": "freebsd",
+        "status": "pass",
+        "examples_checked": 4,
+        "examples_compiled": 4
+      },
+      "extra_checks": {
+        "status": "pass",
+        "checks": [
+          {
+            "label": "closure-compile",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe/bin/fbc",
+              "-prefix",
+              "/srv/compile-testing/fbc-consolidation-20261020-01a158fe",
+              "-i",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/inc",
+              "-i",
+              "/srv/compile-testing/fbc-extlibs-1205-20261021/inc",
+              "-p",
+              "/usr/local/lib",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures.bas",
+              "-x",
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures"
+            ]
+          },
+          {
+            "label": "closure-run",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/srv/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures"
+            ]
+          }
+        ]
+      },
+      "tested_input_sha256": {
+        "inc/ffi.bi": "ed9b6010da39e4a093dc85bd3e05662d91bd2fe30c912dcac0a9d1587aa46e93",
+        "inc/libintl.bi": "2e696bbfd9f3c30b180fe849dc0d892067f0414cefc89b5eb991ef975c0d4760",
+        "build_scripts/exampleageddon-freebasic.py": "be827db590f57121140428d11fe3104fb6514449d63519981cb549af0046bc4e"
+      }
+    },
+    "haiku": {
+      "abi_measurements": 17,
+      "abi_status": "pass",
+      "focused_examples": {
+        "target": "haiku",
+        "status": "pass",
+        "examples_checked": 4,
+        "examples_compiled": 4
+      },
+      "extra_checks": {
+        "status": "pass",
+        "checks": [
+          {
+            "label": "closure-compile",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/boot/home/compile-testing/fbc-extlibs-1205-20261021/compiler/bin/fbc",
+              "-prefix",
+              "/boot/home/compile-testing/fbc-extlibs-1205-20261021/compiler",
+              "-i",
+              "/boot/home/compile-testing/fbc-extlibs-fixes-20261021/inc",
+              "-i",
+              "/boot/home/compile-testing/fbc-extlibs-1205-20261021/inc",
+              "/boot/home/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures.bas",
+              "-x",
+              "/boot/home/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures"
+            ]
+          },
+          {
+            "label": "closure-run",
+            "exit_code": 0,
+            "expected_exit": 0,
+            "command": [
+              "/boot/home/compile-testing/fbc-extlibs-fixes-20261021/extra-checks/closures"
+            ]
+          }
+        ]
+      },
+      "tested_input_sha256": {
+        "inc/ffi.bi": "ed9b6010da39e4a093dc85bd3e05662d91bd2fe30c912dcac0a9d1587aa46e93",
+        "inc/libintl.bi": "2e696bbfd9f3c30b180fe849dc0d892067f0414cefc89b5eb991ef975c0d4760",
+        "build_scripts/exampleageddon-freebasic.py": "be827db590f57121140428d11fe3104fb6514449d63519981cb549af0046bc4e"
+      }
+    },
+    "windows": {
+      "abi_measurements": 17,
+      "abi_status": "pass"
+    }
+  },
+  "quicklz": {
+    "freebsd": [
+      {
+        "backend": "gcc",
+        "abi_measurements": 12,
+        "file_checks": 24,
+        "binary_round_trips": 4,
+        "passed": true
+      },
+      {
+        "backend": "gas64",
+        "abi_measurements": 12,
+        "file_checks": 24,
+        "binary_round_trips": 4,
+        "passed": true
+      }
+    ],
+    "haiku": [
+      {
+        "backend": "gcc",
+        "abi_measurements": 12,
+        "file_checks": 24,
+        "binary_round_trips": 4,
+        "passed": true
+      },
+      {
+        "backend": "gas64",
+        "abi_measurements": 12,
+        "file_checks": 24,
+        "binary_round_trips": 4,
+        "passed": true
+      }
+    ]
+  },
+  "debian": {
+    "status": "pass",
+    "optional_current_packages": 126,
+    "newer_suggestions": [
+      "libraylib-dev",
+      "libsdl3-mixer-dev",
+      "libsdl3-net-dev"
+    ],
+    "apt_simulation_exit": 0,
+    "new_packages_planned": 90,
+    "removals_planned": 1,
+    "metadata_only_packages": [
+      {
+        "package": "freebasic-bindings",
+        "metadata_archive_bytes": 1466
+      },
+      {
+        "package": "freebasic-examples",
+        "metadata_archive_bytes": 1408
+      },
+      {
+        "package": "freebasic-full",
+        "metadata_archive_bytes": 1452
+      }
+    ],
+    "scope": "Dependency resolution and control/archive generation only; no installation or full compiler package build.",
+    "hook": {
+      "status": "pass",
+      "hook_exit": 0,
+      "missing_sdk_rejected": true,
+      "negative_exit": 1
+    },
+    "manifest": "debian/optional-dev-packages.json"
+  },
+  "lint": {
+    "profile": "strict",
+    "mode": "source-only, --honor-suppressions --no-semantic",
+    "targets": [
+      "windows",
+      "linux",
+      "bsd",
+      "haiku"
+    ],
+    "files": [
+      "inc/ffi.bi",
+      "inc/libintl.bi",
+      "tests/bindings/ffi-layout.bas",
+      "tests/bindings/gettext-width.bas"
+    ],
+    "errors": 0,
+    "warnings": 0
+  },
+  "exampleageddon_contracts": {
+    "tests": 7,
+    "status": "pass"
+  },
+  "manual_pages": [
+    {
+      "page": "ExtLibFfi",
+      "exit_code": 0,
+      "rendered_bytes": 27357
+    },
+    {
+      "page": "ExtLibgettext",
+      "exit_code": 0,
+      "rendered_bytes": 1042
+    },
+    {
+      "page": "ExtLibquicklz",
+      "exit_code": 0,
+      "rendered_bytes": 1734
+    }
+  ],
+  "receipt_root": "out/ea1205-fixes/",
+  "scope": "Focused native overlays and ABI/library checks after the original five complete sweeps; no full compiler rebuild or installed-package changes."
+}

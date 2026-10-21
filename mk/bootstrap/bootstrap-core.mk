@@ -9,7 +9,7 @@
 #   - construct minimal compiler using emitted sources
 ##############################################################################
 
-BOOTSTRAP_FBC := bootstrap/fbc$(EXEEXT)
+BOOTSTRAP_FBC := $(BUILD_OUTPUT_PREFIX)bootstrap/fbc$(EXEEXT)
 
 .PHONY: \
  bootstrap \
@@ -26,7 +26,8 @@ BOOTSTRAP_FBC := bootstrap/fbc$(EXEEXT)
 ##############################################################################
 
 BOOTSTRAP_DIR := $(if $(strip $(FBTARGET_DIR_OVERRIDE)),$(FBTARGET_DIR_OVERRIDE),$(FBTARGET))
-BOOTSTRAP_PATH := bootstrap/$(BOOTSTRAP_DIR)
+BOOTSTRAP_PATH := $(BUILD_OUTPUT_PREFIX)bootstrap/$(BOOTSTRAP_DIR)
+BOOTSTRAP_OBJDIR := $(BUILD_OUTPUT_PREFIX)bootstrap/obj/$(BOOTSTRAP_DIR)
 
 ##############################################################################
 # Bootstrap compiler selection
@@ -120,7 +121,16 @@ bootstrap-check:
 # Minimal bootstrap build
 ##############################################################################
 
-bootstrap-minimal:
+.PHONY: bootstrap-emission-ready
+bootstrap-emission-ready:
+	@test ! -f "$(BOOTSTRAP_PATH)/.emit-config.pending" || { \
+		echo "ERROR: unfinished bootstrap emission; run make bootstrap-emit"; exit 1; }
+	@if [ -f "$(BOOTSTRAP_PATH)/.emit-config" ] && \
+	    [ "$$(cat "$(BOOTSTRAP_PATH)/.emit-config")" != "$(BUILD_CONFIG_EMIT)" ]; then \
+		echo "ERROR: bootstrap emission configuration changed; run make bootstrap-emit"; exit 1; \
+	fi
+
+bootstrap-minimal: bootstrap-emission-ready
 
 	@echo "==> Checking bootstrap sources"
 
@@ -157,9 +167,10 @@ bootstrap-minimal:
 # be constructed with the smallest possible host dependency set.
 #
 # Those runtime objects are written to the normal target object/archive paths.
-# Since make does not track command-line feature-policy changes, leaving them
-# in place can cause a later full build to reuse objects compiled with
-# DISABLE_FFI, DISABLE_GFX, DISABLE_SFX, or similar bootstrap-only flags.
+# Normal builds track command-line feature-policy changes, but bootstrap
+# recovery also promises to leave no stripped-runtime artifacts behind.
+# Keep that explicit ownership boundary rather than leaving DISABLE_FFI,
+# DISABLE_GFX, DISABLE_SFX, or similar bootstrap-only output in normal paths.
 #
 # Remove the minimal runtime artifacts immediately after the bootstrap compiler
 # is installed.  The compiler remains available, and any later all/libs build
@@ -236,8 +247,13 @@ BOOTSTRAP_C_SRC  := $(wildcard $(BOOTSTRAP_PATH)/*.c)
 BOOTSTRAP_ASM_SRC := $(wildcard $(BOOTSTRAP_PATH)/*.asm)
 
 BOOTSTRAP_OBJ := \
-$(patsubst %.c,%.o,$(BOOTSTRAP_C_SRC)) \
-$(patsubst %.asm,%.o,$(BOOTSTRAP_ASM_SRC))
+$(patsubst $(BOOTSTRAP_PATH)/%.c,$(BOOTSTRAP_OBJDIR)/%.o,$(BOOTSTRAP_C_SRC)) \
+$(patsubst $(BOOTSTRAP_PATH)/%.asm,$(BOOTSTRAP_OBJDIR)/%.o,$(BOOTSTRAP_ASM_SRC))
+
+# A check on the final executable is a sibling of object compilation under
+# parallel Make. Hold the concrete objects back as well, so stale/partial
+# emission cannot change them before this check fails.
+$(BOOTSTRAP_OBJ): | bootstrap-emission-ready
 
 ##############################################################################
 # Bootstrap object compilation
@@ -282,10 +298,12 @@ endif
 endif
 
 # IMPORTANT: build bootstrap objects with PIC (required for PIE on OpenBSD)
-%.o: %.c
+$(BOOTSTRAP_OBJDIR)/%.o: $(BOOTSTRAP_PATH)/%.c
+	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(BOOTSTRAP_CFLAGS) $(BOOTSTRAP_WARN_SUPPRESS) $(BOOTSTRAP_ASM_SYNTAX_CFLAGS) $(PIC_CFLAGS) -c $< -o $@
 
-%.o: %.asm
+$(BOOTSTRAP_OBJDIR)/%.o: $(BOOTSTRAP_PATH)/%.asm
+	@mkdir -p "$(dir $@)"
 	$(AS) $(ASFLAGS) --strip-local-absolute $< -o $@
 
 ##############################################################################
@@ -326,14 +344,18 @@ BOOTSTRAP_PLATFORM_LIBS += $(DOS_WATT32_LIBS) -Wl,--allow-multiple-definition -l
 endif
 endif
 
-$(BOOTSTRAP_FBC): $(BOOTSTRAP_RT0) $(BOOTSTRAP_RTL) $(BOOTSTRAP_OBJ) $(BOOTSTRAP_PLATFORM_ARCHIVES) | $(BOOTSTRAP_PATH)
+$(BOOTSTRAP_FBC): $(BOOTSTRAP_RT0) $(BOOTSTRAP_RTL) $(BOOTSTRAP_OBJ) $(BOOTSTRAP_PLATFORM_ARCHIVES) | $(BOOTSTRAP_PATH) bootstrap-emission-ready
 
-	$(RUN_CC) $(ALLLDFLAGS) -o $@ \
+	@set -e; temporary="$(basename $@).tmp$(suffix $@)"; \
+	trap 'rm -f "$$temporary"' 0; \
+	$(RUN_CC) $(ALLLDFLAGS) -o "$$temporary" \
 	$(BOOTSTRAP_EARLY_LIBS) \
 	$(BOOTSTRAP_RT0) \
 	$(BOOTSTRAP_OBJ) \
 	$(BOOTSTRAP_RTL) \
-	-lm $(THREAD_FLAGS) $(BOOTSTRAP_TERM_LIB) $(BOOTSTRAP_PLATFORM_LIBS)
+	-lm $(THREAD_FLAGS) $(BOOTSTRAP_TERM_LIB) $(BOOTSTRAP_PLATFORM_LIBS); \
+	mv -f "$$temporary" "$@"
+	$(publish_build_config)
 
 ##############################################################################
 # End bootstrap-core.mk

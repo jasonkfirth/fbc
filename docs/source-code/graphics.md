@@ -104,4 +104,7 @@ the libraries. Read the [graphics maintenance guide](../gfx-maintenance.md)
 before changing a shared contract, and cover both library paths where the
 behavior is shared.
 
+The [runtime/graphics lock contract](../gfx-locking.md) traces input hooks,
+temporary allocation, mode replacement and shutdown, with a native regression.
+
 <!-- end of source-code/graphics.md -->

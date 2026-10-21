@@ -1,6 +1,9 @@
 #!/usr/bin/make -f
 # ======================================================================
 # debian/rules
+# Purpose: Build and stage the Debian FreeBASIC binary package families.
+# Responsibilities: Target selection, shared payloads and package metadata checks.
+# This file does not install third-party SDKs on the build host.
 # ======================================================================
 
 export DH_VERBOSE=1
@@ -731,6 +734,9 @@ endif
 
 override_dh_auto_test:
 	true
+
+execute_before_dh_gencontrol:
+	python3 build_scripts/check-debian-optional-packages.py
 
 override_dh_strip:
 

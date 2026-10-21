@@ -3026,6 +3026,29 @@ the capability is available. Missing metadata is not an implicit expression
 role. The compiler fails the transaction at its member-count limit; the
 observation retains no AST pointers and does not change program emission.
 
+## Native sequential reader interfaces
+
+The shared `inc/fbc-semantic-binary.bi` codec provides two sequential binary
+interfaces. `FbcSemNext` returns a reconstructed TSV record for existing text
+consumers. `FbcSemNextFields` fills a caller-owned, zero-based String array and
+returns its field count, including the record tag. Zero indicates EOF or
+failure; `reader.failure` distinguishes them. The logical header has three
+fields. Both interfaces retain the same raw record offsets and lengths for
+subsequent indexed reads.
+
+The field interface preserves encoded schema-27 wire spelling. It does not
+percent-decode values or validate semantic relationships. Consumers must check
+the record's expected arity and encoded-field rules before decoding and
+publishing a row. A failed read may leave partial array values, which are not
+an accepted record. Insufficient capacity and a nonzero array lower bound are
+refused. Each field owns its string storage; no value borrows the reader buffer.
+
+Framing, dictionary definitions, token bounds and expanded record-size limits
+are shared by the two interfaces. This API adds no transport version, record
+kind, capability or producer behavior. It permits indexed consumers to avoid
+constructing and splitting an intermediate TSV line for every binary record.
+Text exports continue through the existing text reader.
+
 <!-- end of compiler-semantic-model.md -->
 
 The independent FBCDIA diagnostic transport also advertises `unclosed-procedures`.

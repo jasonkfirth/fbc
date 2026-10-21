@@ -15,9 +15,14 @@ import re
 import shutil
 import shlex
 import subprocess
+import sys
 import tarfile
 import tempfile
 import zipfile
+
+# The parent may be gmake on hosts whose system make uses another grammar.
+# One runner process selects one executable for every disposable fixture.
+MAKE_COMMAND = "make"
 
 
 # -------------------------------------------------------------------------
@@ -43,7 +48,7 @@ def make(working: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
                  "CROSS_BUILD", "BUILD_PREFIX", "BUILD_FBC", "BOOT_FBC",
                  "BUILD_FBC_TARGET", "BUILD_FBC_BUILDPREFIX"):
         environment.pop(name, None)
-    return subprocess.run(["make", "--no-print-directory", "-s", *arguments],
+    return subprocess.run([MAKE_COMMAND, "--no-print-directory", "-s", *arguments],
                           cwd=working, env=environment, capture_output=True, text=True,
                           timeout=30, check=False)
 
@@ -775,11 +780,448 @@ def test_doc_target_guard(root: Path, working: Path) -> None:
 # Regression runner
 # -------------------------------------------------------------------------
 
+def test_compiler_link_failure(root: Path, working: Path) -> None:
+    test_relink(root, working)
+    write(working / "fail-link.sh", "#!/bin/sh\nset -eu\n"
+          "while [ \"$#\" -gt 0 ]; do\n"
+          "  if [ \"$1\" = -o ]; then shift; output=$1; fi\n"
+          "  shift\ndone\nprintf partial >\"$output\"\nexit 1\n")
+    for target, output in (("compiler", "native"), ("compiler-js", "js"),
+                           ("compiler-android", "android"), ("compiler-wii", "wii")):
+        image = working / output
+        image.write_bytes(b"previous working compiler\n")
+        result = make(working, "-B", target, "RUN_CC=sh fail-link.sh")
+        require(result.returncode != 0 and image.read_bytes() == b"previous working compiler\n",
+                target + " lost its previous image after a failed link", result)
+        require(not (working / (output + ".tmp")).exists(), "failed compiler link retained a temporary")
+
+
+def configuration_fixture(root: Path, working: Path) -> None:
+    write(working / "source/rtlib/fb.h", "")
+    write(working / "source/gfxlib2/fb_gfx.h", "")
+    write(working / "source/rtlib/value.c", "#ifndef BASE_VALUE\n#define BASE_VALUE 0\n#endif\n"
+          "#ifndef PIC_ONLY\n#define PIC_ONLY 0\n#endif\n"
+          "#ifndef FIXTURE_TEXT\n#define FIXTURE_TEXT \"\"\n#endif\n"
+          "int fixture_value(void) { return BASE_VALUE + PIC_ONLY; }\n"
+          "int fixture_text_length(void) { return sizeof(FIXTURE_TEXT) - 1; }\n")
+    write(working / "source/gfxlib2/value.cpp", "#ifndef BASE_VALUE\n#define BASE_VALUE 0\n#endif\n"
+          "#ifndef CXX_ONLY\n#define CXX_ONLY 0\n#endif\n"
+          "extern \"C\" int fixture_cpp_value(void) { return BASE_VALUE + CXX_ONLY; }\n")
+    for name, tool in (("cc", "gcc"), ("cxx", "g++")):
+        write(working / (name + ".sh"), "#!/bin/sh\nset -eu\n"
+              "printf '%s\\n' \"$*\" >>" + name + "-calls\nexec " + tool + " \"$@\"\n")
+    write(working / "GNUmakefile", ".DEFAULT_GOAL := all\nrootdir := .\nsrcdir := source\n"
+          "mkpath := " + (root / "mk").as_posix() + "\n"
+          "CC := sh cc.sh\nCXX := sh cxx.sh\nAR := ar\nARFLAGS := rcs\nRANLIB := ranlib\n"
+          "TARGET_OS := fixture\nUSE_RUNTIME_CXX := yes\nlibdir := lib\n"
+          "libfbobjdir := obj\nlibfbpicobjdir := obj/pic\nlibfbgfxobjdir := obj/gfx\n"
+          "RTLIB_OBJ := obj/value.o\nRTLIB_PIC_OBJ := obj/pic/value.o\nGFX_OBJ := obj/gfx/value.o\n"
+          "ALLCFLAGS := $(CFLAGS)\nALLCXXFLAGS := $(CXXFLAGS)\n"
+          + include(root, "build/compile-rules.mk")
+          + include(root, "build/archive-rules.mk")
+          + "\nlib obj obj/pic obj/gfx:\n\t@mkdir -p $@\n"
+          "all: lib/libfb.a lib/libfbpic.a lib/libfbgfx.a\n"
+          + include(root, "build/config-rules.mk"))
+
+
+def configuration_value(working: Path, archive: str, symbol: str, expected: int) -> None:
+    write(working / "read-value.c", "int " + symbol + "(void);\n"
+          "int main(void) { return " + symbol + "(); }\n")
+    executable = working / ("read-value.exe" if os.name == "nt" else "read-value")
+    result = subprocess.run(["gcc", "read-value.c", archive, "-o", str(executable)],
+                            cwd=working, capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0, "could not link the configured archive", result)
+    result = subprocess.run([str(executable)], cwd=working, capture_output=True,
+                            text=True, timeout=30, check=False)
+    require(result.returncode == expected, "archive contains code from another configuration", result)
+
+
+def test_build_configuration(root: Path, working: Path) -> None:
+    configuration_fixture(root, working)
+    flags = ["CPPFLAGS=-DBASE_VALUE=1 -DFIXTURE_TEXT='\"a  b\"'", "PIC_CFLAGS=-DPIC_ONLY=1"]
+    result = make(working, *flags)
+    require(result.returncode == 0, "initial configured archive build failed", result)
+    configuration_value(working, "lib/libfb.a", "fixture_value", 1)
+    configuration_value(working, "lib/libfbpic.a", "fixture_value", 2)
+    configuration_value(working, "lib/libfb.a", "fixture_text_length", 4)
+    # Put all old outputs at one future tick. Configuration changes must force
+    # the object and its archive without depending on timestamp granularity.
+    future = (working / "source/rtlib/value.c").stat().st_mtime + 120
+    for path in list((working / "obj").rglob("*.o")) + list((working / "lib").glob("*.a")):
+        os.utime(path, (future, future))
+    flags[0] = "CPPFLAGS=-DBASE_VALUE=7 -DFIXTURE_TEXT='\"a  b\"'"
+    result = make(working, *flags)
+    require(result.returncode == 0, "changed preprocessor flags did not rebuild", result)
+    configuration_value(working, "lib/libfb.a", "fixture_value", 7)
+    configuration_value(working, "lib/libfbpic.a", "fixture_value", 8)
+    flags[0] = "CPPFLAGS=-DBASE_VALUE=7 -DFIXTURE_TEXT='\"a b\"'"
+    result = make(working, *flags)
+    require(result.returncode == 0, "quoted flag whitespace could not be tracked", result)
+    configuration_value(working, "lib/libfb.a", "fixture_text_length", 3)
+    normal = working / "lib/libfb.a"
+    normal_time = normal.stat().st_mtime_ns
+    calls = (working / "cc-calls").read_text().splitlines()
+    flags[1] = "PIC_CFLAGS=-DPIC_ONLY=3"
+    result = make(working, *flags)
+    require(result.returncode == 0 and normal.stat().st_mtime_ns == normal_time
+            and len((working / "cc-calls").read_text().splitlines()) == len(calls) + 1,
+            "PIC configuration rebuilt an unrelated variant or retained old PIC code", result)
+    configuration_value(working, "lib/libfbpic.a", "fixture_value", 10)
+    calls = (working / "cc-calls").read_text()
+    result = make(working, *flags, "CXXFLAGS=-DCXX_ONLY=4")
+    require(result.returncode == 0 and (working / "cc-calls").read_text() == calls,
+            "C++ flags rebuilt unrelated C objects", result)
+    configuration_value(working, "lib/libfbgfx.a", "fixture_cpp_value", 11)
+    flags.append("CXXFLAGS=-DCXX_ONLY=4")
+    saved = {path: path.read_bytes() for path in (normal, working / "lib/.build-config/libfb.a")}
+    result = make(working, *flags, "CPPFLAGS=-DBASE_VALUE=11 -DFIXTURE_TEXT='\"a b\"'", "RANLIB=false")
+    require(result.returncode != 0 and all(path.read_bytes() == data for path, data in saved.items())
+            and (working / "lib/.build-config/libfb.a.pending").is_file(),
+            "failed compile configuration lost its previous archive or attempt marker", result)
+    result = make(working, *flags)
+    require(result.returncode == 0 and not (working / "lib/.build-config/libfb.a.pending").exists(),
+            "reverted archive configuration did not clear its completed attempt", result)
+    configuration_value(working, "lib/libfb.a", "fixture_value", 7)
+    for _ in range(2):
+        result = make(working, *flags, "ARFLAGS=rc", "RANLIB=false")
+        require(result.returncode != 0 and all(path.read_bytes() == data for path, data in saved.items()),
+                "failed archive configuration was committed or lost its previous image", result)
+    result = make(working, *flags, "ARFLAGS=rc")
+    require(result.returncode == 0, "configured archive could not recover after failure", result)
+    stable = {path: path.stat().st_mtime_ns for path in working.glob("lib/*") if path.is_file()}
+    calls = [(working / name).read_text() for name in ("cc-calls", "cxx-calls")]
+    result = make(working, *flags, "ARFLAGS=rc")
+    require(result.returncode == 0 and all(path.stat().st_mtime_ns == stamp for path, stamp in stable.items())
+            and calls == [(working / name).read_text() for name in ("cc-calls", "cxx-calls")],
+            "unchanged configuration rebuilt artifacts", result)
+    result = make(working, "-n", *flags[1:], "CPPFLAGS=-DBASE_VALUE=9", "ARFLAGS=rc")
+    require(result.returncode == 0 and all(path.stat().st_mtime_ns == stamp for path, stamp in stable.items())
+            and calls == [(working / name).read_text() for name in ("cc-calls", "cxx-calls")]
+            and not list(working.rglob("*.tmp")), "dry-run changed configured artifacts", result)
+
+
+def test_compiler_configuration(root: Path, working: Path) -> None:
+    write(working / "unit.bas", "end 0\n")
+    write(working / "basic.sh", "#!/bin/sh\nset -eu\narguments=$*\n"
+          "while [ \"$#\" -gt 0 ]; do\n"
+          "  if [ \"$1\" = -o ]; then shift; output=$1; fi\n"
+          "  shift\ndone\nprintf '%s\\n' \"$arguments\" >\"$output\"\n"
+          "printf '%s\\n' \"$arguments\" >>basic-calls\n")
+    write(working / "link.sh", "#!/bin/sh\nset -eu\nprintf '%s\\n' \"$*\" >>link-calls\n"
+          "while [ \"$#\" -gt 0 ]; do\n"
+          "  case \"$1\" in\n"
+          "    -o) shift; output=$1; printf linked >\"$output\" ;;\n"
+          "    *.o) cat \"$1\" >>\"$output\" ;;\n"
+          "  esac\n  shift\ndone\n[ \"${FAIL_LINK:-0}\" != 1 ]\n")
+    for name in ("lib/fbrt0.o", "lib/libfb.a"):
+        write(working / name)
+    write(working / "GNUmakefile", ".DEFAULT_GOAL := compiler\nrootdir := .\n"
+          "mkpath := " + (root / "mk").as_posix() + "\nTARGET_OS := fixture\n"
+          "libdir := lib\nRTL_LIBS := lib/fbrt0.o lib/libfb.a\n"
+          "FBC_EXE := native.exe\nFBC_JS_EXE := js.exe\n"
+          "FBC_ANDROID_EXE := android.exe\nFBC_WII_EXE := wii.exe\n"
+          "fbcobjdir := obj/native\nfbcjsobjdir := obj/js\n"
+          "fbcandroidobjdir := obj/android\nfbcwiiobjdir := obj/wii\n"
+          "FBC_OBJS := obj/native/unit.o\nFBC_JS_OBJS := obj/js/unit.o\n"
+          "FBC_ANDROID_OBJS := obj/android/unit.o\nFBC_WII_OBJS := obj/wii/unit.o\n"
+          "BUILD_FBC := sh basic.sh\nRUN_CC := FAIL_LINK=$(FAIL_LINK) sh link.sh\n"
+          "ALLFBCFLAGS := $(FBFLAGS)\nALLLDFLAGS := $(LDFLAGS)\n"
+          + include(root, "build/build-targets.mk")
+          + "\n$(FBC_OBJS) $(FBC_JS_OBJS) $(FBC_ANDROID_OBJS) $(FBC_WII_OBJS): unit.bas\n"
+          "\t@mkdir -p $(dir $@)\n\t@$(BUILD_FBC) $(ALLFBCFLAGS) -c $< -o $@\n"
+          "lib/fbrt0.o lib/libfb.a:\n\t$(call publish_build_config)\n"
+          + include(root, "build/config-rules.mk"))
+    result = make(working, "compiler", "compiler-js", "FBFLAGS=-d BUILD_FIXTURE=1")
+    require(result.returncode == 0, "initial compiler configuration failed", result)
+    result = make(working, "compiler", "FBFLAGS=-d BUILD_FIXTURE=2")
+    require(result.returncode == 0 and "BUILD_FIXTURE=2" in (working / "obj/native/unit.o").read_text()
+            and "BUILD_FIXTURE=1" in (working / "obj/js/unit.o").read_text(),
+            "native configuration committed an unbuilt compiler variant", result)
+    result = make(working, "compiler-js", "FBFLAGS=-d BUILD_FIXTURE=2")
+    require(result.returncode == 0 and "BUILD_FIXTURE=2" in (working / "js.exe").read_text(),
+            "unbuilt compiler variant retained its old configuration", result)
+    calls = (working / "basic-calls").read_text()
+    result = make(working, "compiler", "FBFLAGS=-d BUILD_FIXTURE=2", "LDFLAGS=-s")
+    require(result.returncode == 0 and (working / "basic-calls").read_text() == calls
+            and "-s" in (working / "link-calls").read_text().splitlines()[-1],
+            "link flags recompiled BASIC objects or failed to relink", result)
+    image = (working / "native.exe").read_bytes()
+    record = (working / "obj/native/.build-config").read_bytes()
+    result = make(working, "compiler", "FBFLAGS=-d BUILD_FIXTURE=3", "LDFLAGS=-s", "FAIL_LINK=1")
+    require(result.returncode != 0 and (working / "native.exe").read_bytes() == image
+            and (working / "obj/native/.build-config").read_bytes() == record
+            and (working / "obj/native/.build-config.pending").is_file()
+            and not (working / "native.tmp.exe").exists(),
+            "failed compiler link committed a configuration or destroyed its previous executable", result)
+    result = make(working, "compiler", "FBFLAGS=-d BUILD_FIXTURE=2", "LDFLAGS=-s")
+    require(result.returncode == 0 and "BUILD_FIXTURE=2" in (working / "native.exe").read_text()
+            and "BUILD_FIXTURE=3" not in (working / "native.exe").read_text()
+            and not (working / "obj/native/.build-config.pending").exists(),
+            "reverting flags reused objects from the failed compiler configuration", result)
+    result = make(working, "compiler", "FBFLAGS=-d BUILD_FIXTURE=3", "LDFLAGS=-s", "FAIL_LINK=1")
+    require(result.returncode != 0, "second pending compiler configuration did not fail", result)
+    calls = (working / "basic-calls").read_text().splitlines()
+    result = make(working, "compiler", "FBFLAGS=-d BUILD_FIXTURE=3", "LDFLAGS=-s")
+    require(result.returncode == 0 and len((working / "basic-calls").read_text().splitlines()) == len(calls) + 1
+            and "BUILD_FIXTURE=3" in (working / "native.exe").read_text(),
+            "compiler retry did not complete the failed configuration", result)
+    calls = [(working / name).read_bytes() for name in ("basic-calls", "link-calls")]
+    result = make(working, "compiler", "FBFLAGS=-d BUILD_FIXTURE=3", "LDFLAGS=-s")
+    require(result.returncode == 0 and calls == [(working / name).read_bytes()
+                                               for name in ("basic-calls", "link-calls")],
+            "unchanged compiler configuration rebuilt", result)
+
+
+def test_warning_normalization(root: Path, working: Path) -> None:
+    # Exercise the real runner, including its reference oracle. Checking must
+    # leave source/reference bytes intact, and a changed warning must fail.
+    write(working / "probe.bas", "end 0\n")
+    write(working / "fake-compiler.c", '#include <stdio.h>\n#include <stdlib.h>\nint main(void) {\n'
+          'puts("probe.bas(7) warning 25(1): expected source warning");\n'
+          'puts("include.bi(12) warning 3(2): expected include warning");\n'
+          'if (getenv("WARNING_FIXTURE_CHANGED")) puts("unexpected warning");\n'
+          'return 0; }\n')
+    compiler = working / "fake-fbc.exe"
+    result = subprocess.run(["gcc", "fake-compiler.c", "-o", str(compiler)],
+                            cwd=working, capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0, "warning runner fixture could not compile", result)
+    environment = dict(os.environ, FBC=compiler.as_posix(), FBC_FLAGS="", TEST_FILTER="probe.bas")
+    command = [sys.executable, str(root / "build_scripts/check-warning-reports.py"), "--source", str(working)]
+    result = subprocess.run(command + ["--update"],
+                            cwd=working, env=environment, capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0, "warning runner failed", result)
+    for target in ("dos", "linux-x86", "linux-x86_64", "win32", "win64"):
+        require((working / "r" / target / "probe.txt").read_text() ==
+                "\texpected source warning\n\texpected include warning\n",
+                "warning normalization retained locations or changed diagnostics for " + target, result)
+    references = {path: path.read_bytes() for path in (working / "r").rglob("*.txt")}
+    write(working / "probe.c", "preexisting intermediate\n")
+    result = subprocess.run(command, cwd=working, env=environment,
+                            capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0 and "WARNING_REPORTS_PASS reports=5" in result.stdout,
+            "matching warning reports did not pass", result)
+    environment["WARNING_FIXTURE_CHANGED"] = "1"
+    result = subprocess.run(command, cwd=working, env=environment,
+                            capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode != 0 and "WARNING_REPORT_DIFF" in result.stdout
+            and all(path.read_bytes() == data for path, data in references.items())
+            and (working / "probe.c").read_text() == "preexisting intermediate\n",
+            "changed warnings passed or checking modified maintained inputs", result)
+    result = subprocess.run(command + ["--update"], cwd=working, env=environment,
+                            capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0 and all("unexpected warning" in path.read_text() for path in references),
+            "explicit warning update failed", result)
+
+
+def test_source_artifact_guard(root: Path, working: Path) -> None:
+    artifact = working / "src/gfxlib2/input/probe.c.123.dump"
+    write(artifact, "generated analyzer state\n")
+    command = [sys.executable, str(root / "build_scripts/check-source-artifacts.py"),
+               "--root", str(working)]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode != 0 and artifact.name in result.stdout,
+            "source archive accepted a generated analysis dump", result)
+    artifact.unlink()
+    write(working / "src/gfxlib2/obj/target/probe.c.dump", "owned build output\n")
+    result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0 and "SOURCE_ARTIFACTS_PASS" in result.stdout,
+            "source guard rejected the separate object tree", result)
+    # Inject a real scandir error rather than chmod: administrators/root can
+    # still traverse unreadable fixtures, making a permission test unreliable.
+    write(working / "scan-error.py", "import os, runpy, sys\n"
+          "original = os.scandir\n"
+          "def scandir(path):\n"
+          "    if str(path).endswith('input'):\n"
+          "        raise PermissionError(13, 'fixture scan denied', str(path))\n"
+          "    return original(path)\n"
+          "os.scandir = scandir\n"
+          "sys.argv = sys.argv[1:]\n"
+          "runpy.run_path(sys.argv[0], run_name='__main__')\n")
+    result = subprocess.run([sys.executable, str(working / "scan-error.py"), *command[1:]],
+                            capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode != 0 and "scan was incomplete" in result.stdout
+            and "SOURCE_ARTIFACTS_PASS" not in result.stdout,
+            "an incomplete directory scan reported success", result)
+
+
+def test_tool_replacement(root: Path, working: Path) -> None:
+    configuration_fixture(root, working)
+    result = make(working)
+    require(result.returncode == 0, "initial tool fixture build failed", result)
+    configuration_value(working, "lib/libfb.a", "fixture_value", 0)
+    tool = working / "cc.sh"
+    tool.write_text(tool.read_text().replace('exec gcc "$@"', 'exec gcc -DBASE_VALUE=7 "$@"'),
+                    encoding="utf-8", newline="\n")
+    result = make(working)
+    require(result.returncode == 0, "same-path compiler replacement failed", result)
+    configuration_value(working, "lib/libfb.a", "fixture_value", 7)
+    before = (working / "cc-calls").read_bytes()
+    result = make(working)
+    require(result.returncode == 0 and (working / "cc-calls").read_bytes() == before,
+            "unchanged tool fingerprint rebuilt objects", result)
+
+
+def test_bootstrap_configuration(root: Path, working: Path) -> None:
+    write(working / "bootstrap/native/main.c", "#ifndef VALUE\n#define VALUE 0\n#endif\nint main(void) { return VALUE; }\n")
+    write(working / "GNUmakefile", ".DEFAULT_GOAL := bootstrap/fbc.exe\nrootdir := .\n"
+          "mkpath := " + (root / "mk").as_posix() + "\n"
+          "TARGET_OS := win32\nTARGET_ARCH := fixture\nFBTARGET := native\nEXEEXT := .exe\n"
+          "CC := gcc\nRUN_CC := gcc\nALLCFLAGS := $(CFLAGS)\nlibdir := lib\nAR := ar\nARFLAGS := rcs\n"
+          + include(root, "bootstrap/bootstrap-core.mk")
+          + "BOOTSTRAP_RT0 :=\nBOOTSTRAP_RTL :=\n"
+          "lib/fbrt0.o lib/libfb.a:\n\t@mkdir -p lib\n\t@touch $@\n\t$(publish_build_config)\n"
+          + include(root, "build/config-rules.mk"))
+    result = make(working)
+    require(result.returncode == 0, "initial bootstrap fixture failed", result)
+    executable = working / "bootstrap/fbc.exe"
+    stamp = executable.stat().st_mtime_ns
+    result = make(working)
+    require(result.returncode == 0 and executable.stat().st_mtime_ns == stamp,
+            "unchanged bootstrap compiler relinked", result)
+    result = make(working, "CFLAGS=-DVALUE=7")
+    require(result.returncode == 0, "bootstrap flag change did not rebuild", result)
+    require(subprocess.run([str(executable)], check=False).returncode == 7,
+            "bootstrap compiler retained code from old flags")
+    image = executable.read_bytes()
+    record = (working / "bootstrap/obj/native/.build-config").read_bytes()
+    result = make(working, "CFLAGS=-DVALUE=7", "ALLLDFLAGS=-Wl,--invalid-bootstrap-link-option")
+    require(result.returncode != 0 and executable.read_bytes() == image
+            and (working / "bootstrap/obj/native/.build-config").read_bytes() == record
+            and not (working / "bootstrap/fbc.tmp.exe").exists(),
+            "failed bootstrap publication lost the executable or committed its record", result)
+
+
+def test_bootstrap_emission_configuration(root: Path, working: Path) -> None:
+    write(working / "source/compiler/input.bas", "fixture\n")
+    write(working / "source/compiler/nested/header.bi", "fixture\n")
+    original = working / "source/compiler/input.c"
+    write(original, "unrelated intermediate\n")
+    write(working / "emitter.sh", "#!/bin/sh\nset -eu\n"
+          "for argument do\n case $argument in @*) response=${argument#@} ;; esac\ndone\n"
+          "while IFS=' ' read -r flag source; do\n"
+          " source=$(printf '%s' \"$source\" | tr -d '\\r')\n"
+          " test -f \"$(dirname \"$source\")/nested/header.bi\"\n"
+          " printf 'emitted\\n' >\"${source%.bas}.c\"\ndone <\"$response\"\n")
+    write(working / "compile-probe.sh", "#!/bin/sh\nprintf 'called\\n' >> compiler-calls\nexit 1\n")
+    write(working / "GNUmakefile", ".DEFAULT_GOAL := bootstrap-emit\nrootdir := $(CURDIR)\nsrcdir := $(CURDIR)/source\n"
+          "mkpath := " + (root / "mk").as_posix() + "\n"
+          "FBTARGET := native\nTARGET_ARCH := fixture\nTARGET_OS := win32\nCC := gcc\nRUN_CC := sh compile-probe.sh\n"
+          "AVAILABLE_FBC := sh emitter.sh\n"
+          "FBC_SRC := $(srcdir)/compiler/input.bas\nFBC_BI := $(srcdir)/compiler/nested/header.bi\n"
+          + include(root, "build-layout.mk") + include(root, "bootstrap/bootstrap-core.mk")
+          + include(root, "bootstrap/bootstrap-emit.mk") + include(root, "build/config-rules.mk"))
+    result = make(working, "-n", "BUILD_ROOT=build/emitter")
+    require(result.returncode == 0 and not (working / "build/emitter").exists(),
+            "bootstrap emission dry run changed its output tree", result)
+    result = make(working, "BUILD_ROOT=build/emitter")
+    output = working / "build/emitter/bootstrap/native"
+    require(result.returncode == 0 and (output / "input.c").is_file()
+            and not (output / ".emit-work").exists()
+            and original.read_text() == "unrelated intermediate\n",
+            "bootstrap emission touched shared intermediates or failed to collect output", result)
+    result = make(working, "bootstrap-emission-ready", "BUILD_ROOT=build/emitter", "BOOTFBCFLAGS=-changed")
+    require(result.returncode != 0 and "configuration changed" in result.stdout,
+            "stale bootstrap emission was accepted after option changes", result)
+    result = make(working, "BUILD_ROOT=build/emitter", "BOOT_FBC=false")
+    require(result.returncode != 0 and (output / ".emit-config.pending").exists(),
+            "failed bootstrap emission did not retain its incomplete marker", result)
+    result = make(working, "bootstrap-emission-ready", "BUILD_ROOT=build/emitter")
+    require(result.returncode != 0 and "unfinished bootstrap emission" in result.stdout,
+            "partial bootstrap sources were accepted", result)
+    write(output / "input.c", "int main(void) { return 0; }\n")
+    result = make(working, "-j2", "build/emitter/bootstrap/obj/native/input.o", "BUILD_ROOT=build/emitter")
+    require(result.returncode != 0 and "unfinished bootstrap emission" in result.stdout
+            and not (working / "compiler-calls").exists(),
+            "object compilation started before the emission guard", result)
+    result = make(working, "BUILD_ROOT=build/emitter")
+    require(result.returncode == 0 and not (output / ".emit-config.pending").exists(),
+            "bootstrap emission retry did not recover", result)
+
+
+def test_isolated_builds(root: Path, working: Path) -> None:
+    write(working / "source/rtlib/value.c", "int fixture_value(void) { return VALUE; }\n")
+    write(working / "source/rtlib/fb.h", "")
+    write(working / "GNUmakefile", ".DEFAULT_GOAL := all\nrootdir := $(CURDIR)\nsrcdir := $(CURDIR)/source\n"
+          "mkpath := " + (root / "mk").as_posix() + "\n"
+          "FBTARGET := native\nFBNAME := freebasic\nlibdirname := lib\nCC := gcc\nRUN_CC := gcc\n"
+          "AR := ar\nARFLAGS := rcs\nRANLIB := ranlib\nALLCFLAGS := $(CFLAGS)\n"
+          + include(root, "build-layout.mk")
+          + "RTLIB_OBJ := $(libfbobjdir)/value.o\n"
+          + include(root, "build/build-dirs.mk") + include(root, "build/compile-rules.mk")
+          + include(root, "build/archive-rules.mk") + include(root, "build/clean-rules.mk")
+          + "all: $(libdir)/libfb.a\n" + include(root, "build/config-rules.mk"))
+    processes = [subprocess.Popen([MAKE_COMMAND, "-s", "BUILD_ROOT=build/" + name, "CFLAGS=-DVALUE=" + str(value)],
+                                 cwd=working, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                 for name, value in (("one", 1), ("two", 2))]
+    try:
+        for process in processes:
+            output, error = process.communicate(timeout=30)
+            require(process.returncode == 0, "isolated native build failed\n" + output + error)
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+    for name, value in (("one", 1), ("two", 2)):
+        configuration_value(working, "build/" + name + "/lib/freebasic/native/libfb.a", "fixture_value", value)
+    write(working / "src/rtlib/obj/unrelated", "preserve\n")
+    result = make(working, "clean-all-objects", "BUILD_ROOT=build/one")
+    require(result.returncode == 0 and not (working / "build/one/src/rtlib/obj").exists()
+            and (working / "build/two/src/rtlib/obj/native/value.o").exists()
+            and (working / "src/rtlib/obj/unrelated").is_file(),
+            "isolated cleanup crossed output-tree ownership", result)
+    result = make(working, "BUILD_ROOT=../unsafe")
+    require(result.returncode != 0 and "BUILD_ROOT must" in result.stderr,
+            "an unsafe output-root spelling was accepted", result)
+
+
+def test_source_docs(root: Path, working: Path) -> None:
+    import runpy
+    checker = runpy.run_path(str(root / "build_scripts/check-source-docs.py"))
+    page = working / "guide.md"
+    write(page, "[source](source.c)\n")
+    write(working / "source.c")
+    require(checker["check_markdown"](page) == 1, "valid source link was rejected")
+    (working / "source.c").unlink()
+    try:
+        checker["check_markdown"](page)
+    except ValueError as error:
+        require("missing link" in str(error), "wrong Markdown failure")
+    else:
+        raise AssertionError("broken source link was accepted")
+    cache = working / "doc/manual/cache"
+    rendered = working / "rendered"
+    names = checker["PAGES"]
+    for name in names:
+        write(cache / (name + ".wakka"), '{{fbdoc item="title" value="' + name + '"}}\n')
+        token = checker["TREES"].get(name, ".pending" if name == "DevBuildConfig" else "source-artifacts-test")
+        html = '<html><body><pre>' + token + '</pre>' + name + ' .pending cksum<a href="DevToc.html">contents</a>'
+        html += '<a href="DevSourceCode.html">guide</a></body></html>'
+        write(rendered / "html" / (name + ".html"), html)
+        for mode in ("fbhelp", "txt"):
+            write(rendered / mode / (name + ".txt"), token + "rendered prose " * 50)
+    write(rendered / "html/fbdoc.hhp", "\n".join(name + ".html" for name in names))
+    for name in ("DocToc", "DevToc"):
+        write(rendered / "html" / (name + ".html"), " ".join(guide + ".html" for guide in checker["GUIDES"]))
+    checker["check_rendered"](working, rendered)
+    (rendered / "txt/DevSourceRuntime.txt").unlink()
+    try:
+        checker["check_rendered"](working, rendered)
+    except OSError:
+        pass
+    else:
+        raise AssertionError("missing rendered format was accepted")
+
+
 def main() -> int:
+    global MAKE_COMMAND
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--case", help="Run one named regression")
+    parser.add_argument("--make", default=shutil.which("gmake") or shutil.which("make") or "make",
+                        help="GNU Make executable used by the parent build")
     options = parser.parse_args()
+    MAKE_COMMAND = options.make
     tests = (test_relink, test_relink_pic, test_dist_headers, test_dist_order, test_dist_zip,
              test_dist_runtime_payload,
              test_uninstall_absent, test_uninstall_failure, test_install_ownership,
@@ -793,7 +1235,10 @@ def main() -> int:
              test_missing_cross_toolchain, test_multilib_identity, test_manual_source_dependencies,
              test_manual_removed_zip_member, test_example_helper_headers, test_example_cleanup_arguments,
              test_cross_host_identity, test_sound_member_collision, test_multi_module_fixtures,
-             test_doc_target_guard)
+             test_doc_target_guard, test_source_artifact_guard, test_compiler_link_failure,
+             test_build_configuration, test_compiler_configuration, test_warning_normalization,
+             test_tool_replacement, test_bootstrap_configuration, test_bootstrap_emission_configuration,
+             test_isolated_builds, test_source_docs)
     if options.case and options.case not in {test.__name__ for test in tests}:
         parser.error("unknown regression: " + options.case)
     failures = 0

@@ -67,9 +67,11 @@ extern "C"
 '' pointers instead of an inline x86 trampoline.  Keep that target separate so
 '' libffi does not write past the FreeBASIC structures supplied by callers.
 
-#if (not defined(__FB_64BIT__)) and (not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_NETBSD__))
+'' Haiku uses libffi's System V x86 ABI. Select its native enumeration and
+'' closure layout rather than falling through to the Windows defaults.
+#if (not defined(__FB_64BIT__)) and (not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))
 	#define X86
-#elseif defined(__FB_64BIT__) and (not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
+#elseif defined(__FB_64BIT__) and (not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))
 	#define X86_64
 #elseif (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 	#define ARM
@@ -90,7 +92,7 @@ extern "C"
 type ffi_arg as uinteger
 type ffi_sarg as integer
 
-#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
+#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__) or defined(__FB_HAIKU__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	#define X86_ANY
 #endif
 
@@ -99,7 +101,7 @@ type ffi_sarg as integer
 	const USE_BUILTIN_FFS = 0
 #endif
 
-#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
+#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__) or defined(__FB_HAIKU__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	#define FFI_TARGET_SPECIFIC_STACK_SPACE_ALLOCATION
 	#define FFI_TARGET_HAS_COMPLEX_TYPE
 #endif
@@ -121,7 +123,7 @@ enum
 	#endif
 
 	#ifndef __FB_64BIT__
-		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
+		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__)))
 			FFI_SYSV = 1
 		#endif
 
@@ -129,41 +131,41 @@ enum
 			FFI_STDCALL = 2
 		#endif
 
-		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
+		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__)))
 			FFI_THISCALL = 3
 			FFI_FASTCALL = 4
 		#endif
 
-		#if defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
+		#if defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__)))
 			FFI_STDCALL = 5
 		#elseif defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 			FFI_MS_CDECL = 5
 		#endif
 
-		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
+		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__)))
 			FFI_PASCAL = 6
 			FFI_REGISTER = 7
 		#endif
 	#endif
 
-	#if (not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
+	#if (not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))))
 		FFI_MS_CDECL = 8
-	#elseif defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
+	#elseif defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))))
 		FFI_FIRST_ABI = 1
 		FFI_UNIX64
 	#endif
 
 	#ifdef __FB_64BIT__
-		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
+		#if defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__)))
 			FFI_WIN64
 		#endif
 
-		#if defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
+		#if defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__)))
 			FFI_EFI64 = FFI_WIN64
 		#endif
 	#endif
 
-	#if defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
+	#if defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))))
 		FFI_GNUW64
 	#elseif defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 		FFI_SYSV
@@ -175,9 +177,9 @@ enum
 
 	FFI_LAST_ABI
 
-	#if ((not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))) or (defined(__FB_64BIT__) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
+	#if ((not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))))) or (defined(__FB_64BIT__) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))
 		FFI_DEFAULT_ABI = FFI_SYSV
-	#elseif defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
+	#elseif defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))))
 		FFI_DEFAULT_ABI = FFI_UNIX64
 	#elseif (not defined(__FB_64BIT__)) and defined(__FB_ARM__) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
 		FFI_DEFAULT_ABI = FFI_VFP
@@ -215,14 +217,14 @@ end enum
 	#define FFI_TARGET_HAS_COMPLEX_TYPE
 #endif
 
-#if (not defined(__FB_64BIT__)) or (defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__)))))
+#if (not defined(__FB_64BIT__)) or (defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__)))))
 	const FFI_CLOSURES = 1
 	#if not defined(__FB_DARWIN__)
 		const FFI_GO_CLOSURES = 1
 	#endif
 #endif
 
-#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
+#if ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_DARWIN__) or defined(__FB_HAIKU__))) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	#define FFI_TYPE_SMALL_STRUCT_1B (FFI_TYPE_LAST + 1)
 	#define FFI_TYPE_SMALL_STRUCT_2B (FFI_TYPE_LAST + 2)
 	#define FFI_TYPE_SMALL_STRUCT_4B (FFI_TYPE_LAST + 3)
@@ -239,9 +241,9 @@ end enum
 	#endif
 #endif
 
-#if (not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
+#if (not defined(__FB_64BIT__)) and (defined(__FB_DARWIN__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))))
 	const FFI_NATIVE_RAW_API = 1
-#elseif defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))))
+#elseif defined(__FB_64BIT__) and (defined(__FB_WIN32__) or defined(__FB_CYGWIN__) or ((not defined(__FB_ARM__)) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))))
 	'' Apple's system libffi does not use the larger CET trampoline layout.
 	#ifdef __FB_DARWIN__
 		const FFI_TRAMPOLINE_SIZE = 24
@@ -356,7 +358,7 @@ end type
 
 #ifndef __FB_64BIT__
 	const FFI_SIZEOF_ARG = 4
-#elseif defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__))
+#elseif defined(__FB_64BIT__) and (defined(__FB_DARWIN__) or defined(__FB_LINUX__) or defined(__FB_FREEBSD__) or defined(__FB_OPENBSD__) or defined(__FB_NETBSD__) or defined(__FB_HAIKU__))
 	const FFI_SIZEOF_ARG = 8
 #endif
 

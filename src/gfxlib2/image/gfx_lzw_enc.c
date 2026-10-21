@@ -40,8 +40,8 @@ FBCALL int fb_hEncode
 	unsigned char bit = 0;
 	ssize_t size;
 
-	/* Protecting the access to fb_lzw_entry */
-	FB_LOCK( );
+	/* Match the decoder's graphics lock for the shared codec table. */
+	FB_GRAPHICS_LOCK( );
 
 	size = 0;
 	fb_hMemSet(fb_lzw_entry, -1, sizeof(fb_lzw_entry));
@@ -69,7 +69,7 @@ FBCALL int fb_hEncode
 		size++;
 	*out_size = size;
 
-	FB_UNLOCK( );
+	FB_GRAPHICS_UNLOCK( );
 	return 0;
 }
 

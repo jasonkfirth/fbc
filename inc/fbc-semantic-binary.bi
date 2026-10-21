@@ -545,6 +545,34 @@ private function FbcSemReadValue(byref reader as FbcSemReader, byref position as
 	return -1
 end function
 
+'' Both sequential APIs share framing and dictionary decoding. The field API
+'' keeps schema-27 wire escapes intact, just like FbcSemNext, but does not join
+'' values into TSV only for the consumer to split them again. Semantic field
+'' validation and percent decoding remain the consumer's responsibility.
+private function FbcSemBeginBinaryRecord(byref reader as FbcSemReader, _
+	byref ending as long, byref count as integer) as integer
+	reader.row_start = 0
+	reader.row_length = 0
+	if reader.position = len(reader.bytes_text) then return 0
+	reader.failure = "invalid-binary-record"
+	if reader.position < 0 orelse len(reader.bytes_text) - reader.position < 4 then return 0
+	dim as ulong bytes
+	for index as integer = 0 to 3
+		bytes or= culng(reader.bytes_text[reader.position + index]) shl (index * 8)
+	next
+	reader.position += 4
+	if bytes < 2 orelse bytes > FBCSEM_BINARY_MAX_RECORD orelse _
+	   bytes > culng(len(reader.bytes_text) - reader.position) then return 0
+	ending = reader.position + bytes
+	dim as integer identity = reader.bytes_text[reader.position]
+	count = reader.bytes_text[reader.position + 1]
+	if len(reader.tags(identity)) = 0 orelse count + 1 <> reader.arities(identity) then return 0
+	reader.row_start = reader.position
+	reader.row_length = bytes
+	reader.position += 2
+	return -1
+end function
+
 private function FbcSemNext(byref reader as FbcSemReader, byref line_text as string) as integer
 	line_text = ""
 	reader.row_start = 0
@@ -563,24 +591,10 @@ private function FbcSemNext(byref reader as FbcSemReader, byref line_text as str
 		line_text = reader.header
 		return -1
 	end if
-	if reader.position = len(reader.bytes_text) then return 0
-	reader.failure = "invalid-binary-record"
-	if len(reader.bytes_text) - reader.position < 4 then return 0
-	dim as ulong bytes
-	for index as integer = 0 to 3
-		bytes or= culng(reader.bytes_text[reader.position + index]) shl (index * 8)
-	next
-	reader.position += 4
-	if bytes < 2 orelse bytes > FBCSEM_BINARY_MAX_RECORD orelse _
-	   bytes > culng(len(reader.bytes_text) - reader.position) then return 0
-	dim as long ending = reader.position + bytes
-	dim as integer identity = reader.bytes_text[reader.position]
-	dim as integer count = reader.bytes_text[reader.position + 1]
-	if len(reader.tags(identity)) = 0 orelse count + 1 <> reader.arities(identity) then return 0
-	reader.row_start = reader.position
-	reader.row_length = bytes
-	line_text = reader.tags(identity)
-	reader.position += 2
+	dim as long ending
+	dim as integer count
+	if FbcSemBeginBinaryRecord(reader, ending, count) = 0 then return 0
+	line_text = reader.tags(reader.bytes_text[reader.row_start])
 	for index as integer = 1 to count
 		dim as string value
 		if FbcSemReadValue(reader, reader.position, ending, value, -1) = 0 then return 0
@@ -590,6 +604,40 @@ private function FbcSemNext(byref reader as FbcSemReader, byref line_text as str
 	if reader.position <> ending then return 0
 	reader.failure = ""
 	return -1
+end function
+
+'' Return the number of encoded fields, including the tag, or zero for EOF or
+'' failure. This binary-only API requires a zero-based caller-owned array.
+'' Strings are copied into that array; no field borrows reader storage. A
+'' failure can leave partial fields, which must never be published as a row.
+private function FbcSemNextFields(byref reader as FbcSemReader, fields() as string) as integer
+	reader.row_start = 0
+	reader.row_length = 0
+	if reader.binary = 0 orelse lbound(fields) <> 0 orelse ubound(fields) < 2 then
+		reader.failure = "binary-field-reader-requires-zero-based-array"
+		return 0
+	end if
+	if reader.first then
+		reader.first = 0
+		for index as integer = 0 to 2
+			fields(index) = FbcSemPart(reader.header, index)
+		next
+		return 3
+	end if
+	dim as long ending
+	dim as integer count
+	if FbcSemBeginBinaryRecord(reader, ending, count) = 0 then return 0
+	if count > ubound(fields) then return 0
+	fields(0) = reader.tags(reader.bytes_text[reader.row_start])
+	dim as integer wire_length = len(fields(0))
+	for index as integer = 1 to count
+		if FbcSemReadValue(reader, reader.position, ending, fields(index), -1) = 0 then return 0
+		if wire_length > FBCSEM_BINARY_MAX_RECORD - len(fields(index)) - 1 then return 0
+		wire_length += len(fields(index)) + 1
+	next
+	if reader.position <> ending then return 0
+	reader.failure = ""
+	return count + 1
 end function
 
 private function FbcSemField(byref reader as FbcSemReader, byval start as long, _

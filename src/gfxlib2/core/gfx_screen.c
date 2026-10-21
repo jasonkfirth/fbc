@@ -199,8 +199,12 @@ static void release_gfx_mem(void)
 static void exit_proc(void)
 {
 #ifndef HOST_JS
+	FB_LOCK( );
+	FB_GRAPHICS_LOCK( );
 	if( __fb_gfx )
 		set_mode( 0, 0, 0, 0, 0, 1, 0, 0, 0, SCREEN_EXIT, 0.0, 0, 0 );
+	FB_GRAPHICS_UNLOCK( );
+	FB_UNLOCK( );
 #endif
 }
 
@@ -558,6 +562,11 @@ void fb_hClearCharCells( int x1, int y1, int x2, int y2,
     }
 }
 
+/* Caller holds FB_LOCK() before FB_GRAPHICS_LOCK(). Keep both across driver
+ * teardown, allocation and hook publication: input hooks must never observe
+ * a freed mode or a partially installed replacement. Driver workers may use
+ * their own/event locks, but may not call runtime hooks while being joined.
+ */
 static int set_mode
 	(
 		int mode,
@@ -823,7 +832,7 @@ static int set_mode
 	goto allocation_complete;
 
 allocation_failed:
-	release_gfx_mem();
+    release_gfx_mem();
 	FB_LOCK( );
 	memset(&__fb_ctx.hooks, 0, sizeof(__fb_ctx.hooks));
 	FB_UNLOCK( );
@@ -896,6 +905,7 @@ FBCALL int fb_GfxScreen
 	}
 #endif
 
+	FB_LOCK( );
 	FB_GRAPHICS_LOCK( );
 
 	int res = set_mode( mode,
@@ -913,17 +923,20 @@ FBCALL int fb_GfxScreen
 	}
 
 	FB_GRAPHICS_UNLOCK( );
+	FB_UNLOCK( );
 
 	return res;
 }
 
 FBCALL int fb_GfxScreenQB( int mode, int visible, int active )
 {
+	FB_LOCK( );
 	FB_GRAPHICS_LOCK( );
 
 	int res = fb_GfxScreen( mode, 0, 0, 0, 0 );
 	if( res != FB_RTERROR_OK ) {
 		FB_GRAPHICS_UNLOCK( );
+		FB_UNLOCK( );
 		return res;
 	}
 
@@ -933,6 +946,7 @@ FBCALL int fb_GfxScreenQB( int mode, int visible, int active )
 		res = fb_ErrorSetNum( FB_RTERROR_OK );
 
 	FB_GRAPHICS_UNLOCK( );
+	FB_UNLOCK( );
 	return res;
 }
 
@@ -974,6 +988,7 @@ FBCALL int fb_GfxScreenRes
 	}
 #endif
 
+	FB_LOCK( );
 	FB_GRAPHICS_LOCK( );
 
 	int res = set_mode( -1,
@@ -991,6 +1006,7 @@ FBCALL int fb_GfxScreenRes
 	}
 
 	FB_GRAPHICS_UNLOCK( );
+	FB_UNLOCK( );
 
 	return res;
 }

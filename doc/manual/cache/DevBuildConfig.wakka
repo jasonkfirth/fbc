@@ -37,6 +37,16 @@ make prereqs-fbc
 
 ##make print-config## shows the selected host, target, tools, feature policy, runtime layout, and install layout. ##make prereqs-fbc## checks whether the build has a usable compiler or bootstrap path.
 
+Normal compiler and runtime builds track effective commands and flags through ##mk/build/config-rules.mk##. Compile changes rebuild the affected variants; archive/link changes republish their outputs. Each variant records its configuration only after successful output, so a failed build retries the pending configuration. Unchanged builds and dry runs do not rewrite these records.
+
+An artifact's ##.pending## marker is created before recompilation and cleared after successful publication. Reverting flags after a failed attempt also forces recompilation, so partially changed objects cannot be mistaken for the previous successful configuration.
+
+Compiler records live in their object directories; runtime records live under ##lib/[target]/.build-config## and are excluded from installed packages. POSIX ##cksum## fingerprints selected tool contents as well as commands, so replacing an executable or visible wrapper at the same path invalidates affected output. Private wrapper dependencies and changing SDK headers/libraries still need explicit component cleanup when absent from the graph.
+
+Bootstrap compiler records track compile, assembler and link options. Fresh emission copies compiler sources into owned temporary storage, leaving maintained-source intermediates intact. Its successful configuration record rejects stale options and unfinished emission before compiling bootstrap sources. Pre-generated bundles without such a record remain supported.
+
+Independent compiler/library builds can use ##BUILD_ROOT=build/debug## and ##BUILD_ROOT=build/release##. Each root must be below the checkout's ##build/## directory and contain no spaces. Objects, binaries, libraries and bootstrap output stay inside that root, including component cleanup. Run one build process per output root. Tests, installation and packaging still require separate worktrees because they use shared source paths.
+
 Use verbose output when you need the exact compiler and linker command lines:
 
 %%make V=1
@@ -167,6 +177,7 @@ The compiler and runtime still contain low-level conditional code controlled by 
 Only pass raw ##-d...## or ##-D...## options directly when you are doing bring-up work and have checked the matching make policy. A compiler built with one idea of the layout or feature set can easily fail against runtime libraries built with another.
 
 {{fbdoc item="see"}}
+	- [[DevToc|Developer pages]]
 	- [[DevRebuildAfterUpdates|Getting source code updates and rebuilding FreeBASIC]]
 	- [[DevBuildOptions|FreeBASIC Build Options]]
 	- [[DevNormalVsStandalone|Normal vs. standalone builds]]

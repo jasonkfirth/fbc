@@ -17,6 +17,8 @@ language reference.
   ownership, locking, image contracts, backend modules and validation workflows.
 - [Graphics restructuring verification](gfx-restructure-verification.md)
   records native regression gates and their scope.
+- [Runtime and graphics locking](gfx-locking.md) explains input callbacks,
+  allocation and mode shutdown, with a native lock-order regression.
 - [Runtime maintenance guide](../src/rtlib/README.md) maps runtime subsystems,
   platform drivers, source selection, ABI contracts, ownership and regression workflows.
 - [Runtime restructuring verification](rtlib-restructure-verification.md)
@@ -72,11 +74,14 @@ beside the examples:
 
 - [Make system review](make-system-review.md) tracks the full build-system
   audit, confirmed defects, corrections, and remaining review coverage.
+- [Build consolidation](build-consolidation.md) records native integration,
+  configuration tracking, source hygiene and compiler publication checks.
 - [Compiler log tests and retries](compiler-test-harness.md) documents failure
   details, retry artifact ownership, and the focused harness regression.
 - [Compiler semantic model](../doc/compiler-semantic-model.md) defines the
   schema 27 sidecar, source and macro origins, bounded observations, and the
-  binary/text reader contract.
+  binary/text reader contract, including direct native field reads without an
+  intermediate TSV record.
 - [Cross-build matrix](../build_scripts/cross-build-matrix/README.md)
 - [Emulated native matrix](../build_scripts/emulated-native-matrix/README.md)
 - [gfxlib3 test plan](gfxlib3/test-plan.md)
@@ -84,6 +89,14 @@ beside the examples:
 
 The build records are evidence for maintainers. They are not a promise that
 every optional target or external dependency is available on every host.
+
+The [1.20.5 external library audit](external-library-qualification-1.20.5.md)
+records fresh Windows, DOS, Linux, Haiku and FreeBSD Exampleageddon results,
+focused library executions and the evidence for retaining the bindings.
+
+The [library repair follow-up](external-library-repairs-1.20.5.md) records
+native ABI fixes, QuickLZ qualification on FreeBSD and Haiku, and complete
+Debian optional SDK coverage with an automatic packaging guard.
 
 ## Building the generated manual
 

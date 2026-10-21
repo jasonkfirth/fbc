@@ -78,6 +78,15 @@ expected compiler rejection from abnormal failure or timeout. The
 [log-test guide](../compiler-test-harness.md) explains retry selections and
 artifact ownership.
 
+`make warning-tests` generates diagnostics in disposable storage and compares
+all five target profiles against `tests/warnings/r`. Differences fail the
+target without changing the references. Use `make warning-tests-update` only
+for an intentional diagnostic change, then review the reference diff.
+
+`make gfx-locking-test` checks the executable
+[runtime/graphics lock contract](../gfx-locking.md), including input callbacks,
+allocation failure and mode shutdown with native MT libraries.
+
 ## Build ownership and generated files
 
 The root [GNUmakefile](../../GNUmakefile) composes the layers under
@@ -97,12 +106,20 @@ Object trees, emitted bootstrap sources, linked libraries and test logs are
 generated inputs or outputs. Do not edit them to repair the maintained source.
 Quick/full build workflows include cleanup and bootstrap/package operations,
 so use one workflow per owned worktree. Follow the
-[Make guide](../../mk/README.md) for component cleanup when changing compiler
-commands or feature flags.
+[Make guide](../../mk/README.md) for automatic command/flag tracking, record
+ownership and selected-tool content fingerprints. Independent compiler/library
+builds can select different `BUILD_ROOT=build/name` output directories. Test
+and packaging workflows still need their own source worktrees.
+`make source-artifacts-test` rejects generated `.dump` and `.ctu-info` files
+under maintained source directories; analysis output belongs in build storage.
+An incomplete scan fails rather than accepting an unreadable directory.
 
 [doc](../../doc/) contains the generated manual's source cache and tools as
 well as API notes. [docs](../README.md) contains maintainer and platform guides.
 Keep language syntax documentation, implementation explanations and validation
 records linked to each other, with each retaining its own purpose.
+`make source-docs-test` checks source-guide links and native manual navigation.
+`make source-docs-render-test FBDOC=/path/to/fbdoc` also generates fresh HTML,
+fbhelp and text pages in disposable storage and checks their output.
 
 <!-- end of source-code/tools-and-tests.md -->

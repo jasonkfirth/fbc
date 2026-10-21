@@ -156,6 +156,8 @@ the broader same-architecture fallback available for manual recovery work.
 1. Run `make print-config TARGET_TRIPLET=<triplet>`.
 2. Confirm that target identity, runtime naming, and install layout are right.
 3. Run `make prereqs TARGET_TRIPLET=<triplet>` to validate host tools.
+   Normal build configuration tracking requires POSIX `cksum`. Use GNU Make
+   (`gmake` on BSD hosts); validators receive that same executable.
 4. Run `make prereqs-fbc TARGET_TRIPLET=<triplet>` to see which bootstrap state
    you are in.
 5. If bootstrap sources exist, run `make bootstrap-minimal TARGET_TRIPLET=<triplet>`.

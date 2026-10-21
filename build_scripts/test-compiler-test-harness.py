@@ -62,7 +62,7 @@ def test_haiku_grep(root: Path, working: Path) -> bool:
     return True
 
 
-def test_compiler_selection(root: Path, working: Path) -> bool:
+def test_compiler_selection(root: Path, working: Path, make: str) -> bool:
     """A compiler built by this invocation must replace the native fallback."""
     working.mkdir()
     (working / ".maketests-host").mkdir()
@@ -84,7 +84,7 @@ def test_compiler_selection(root: Path, working: Path) -> bool:
         ("compiler built by prerequisite", ["all"], "built"),
         ("cross build host compiler", ["all", "CROSS_BUILD=yes"], "preserved"),
     ):
-        result = subprocess.run(["make", "--no-print-directory", "-s", *arguments],
+        result = subprocess.run([make, "--no-print-directory", "-s", *arguments],
                                 cwd=working, text=True, capture_output=True,
                                 timeout=30, check=False)
         if result.returncode != 0 or result.stdout.strip() != expected:
@@ -94,14 +94,14 @@ def test_compiler_selection(root: Path, working: Path) -> bool:
     return True
 
 
-def test_log_recovery(root: Path, working: Path) -> bool:
+def test_log_recovery(root: Path, working: Path, make: str) -> bool:
     """Saved logs must identify failures and bound retry cleanup to those tests."""
     working.mkdir()
     (working / "cases").mkdir()
     for name in ("common.mk", "log-tests.mk", "bmk-make.mk"):
         shutil.copyfile(root / "tests" / name, working / name)
     (working / "dirlist.mk").write_text("DIRLIST_FB := cases\n", encoding="utf-8")
-    command = ["make", "--no-print-directory", "-s", "-f", "log-tests.mk",
+    command = [make, "--no-print-directory", "-s", "-f", "log-tests.mk",
                "FB_LANG=fb", "FBC=false", "rootdir=" + root.as_posix()]
 
     def run(*targets: str) -> subprocess.CompletedProcess[str]:
@@ -221,14 +221,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--fbc", type=Path, required=True)
+    parser.add_argument("--make", default=shutil.which("gmake") or shutil.which("make") or "make")
     options = parser.parse_args()
     root = options.root.resolve()
     with tempfile.TemporaryDirectory(prefix="fbc-log-harness-") as temporary:
         if not test_haiku_grep(root, Path(temporary) / "grep"):
             return 1
-        if not test_compiler_selection(root, Path(temporary) / "selection"):
+        if not test_compiler_selection(root, Path(temporary) / "selection", options.make):
             return 1
-        if not test_log_recovery(root, Path(temporary) / "recovery"):
+        if not test_log_recovery(root, Path(temporary) / "recovery", options.make):
             return 1
         working = Path(temporary) / "tests"
         (working / "cases").mkdir(parents=True)
@@ -244,7 +245,7 @@ def main() -> int:
         # Windows path separators; shell quoting also preserves spaces.
         fbc = shlex.join([options.fbc.resolve().as_posix(), "-prefix", root.as_posix(),
                           "-i", (root / "inc").as_posix()])
-        command = ["make", "--no-print-directory", "-s", "-f", "log-tests.mk",
+        command = [options.make, "--no-print-directory", "-s", "-f", "log-tests.mk",
                    "FB_LANG=fb", "FBC=" + fbc, "rootdir=" + root.as_posix()]
 
         def run(expected_success: bool, label: str, *targets: str) -> bool:

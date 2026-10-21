@@ -41,8 +41,11 @@ FBCALL int fb_hDecode
 	unsigned short new_code, old_code, next_code = 256;
 	unsigned char *limit, decode_stack[MAX_CODE], *string, byte, bit = 0;
 
-	/* Protecting the access to fb_lzw_entry */
-	FB_LOCK( );
+	/* The shared codec table belongs to graphics, including off-screen calls.
+	 * BLOAD may already hold the graphics lock; taking FB_LOCK here would
+	 * reverse the runtime-hook lock order.
+	 */
+	FB_GRAPHICS_LOCK( );
 
 	INPUT_CODE(old_code);
 	byte = old_code;
@@ -52,7 +55,7 @@ FBCALL int fb_hDecode
 	while (in_size > 0) {
 		INPUT_CODE(new_code);
 		if (new_code == MAX_CODE) {
-			FB_UNLOCK( );
+			FB_GRAPHICS_UNLOCK( );
 			return 0;
 		}
 		if (new_code >= next_code) {
@@ -62,13 +65,13 @@ FBCALL int fb_hDecode
 			string = decode_string(decode_stack, new_code);
 		}
 		if (!string) {
-			FB_UNLOCK( );
+			FB_GRAPHICS_UNLOCK( );
 			return -1;
 		}
 		byte = *string;
 		while (string >= decode_stack) {
 			if (out_buffer >= limit) {
-				FB_UNLOCK( );
+				FB_GRAPHICS_UNLOCK( );
 				return -1;
 			}
 			*out_buffer++ = *string--;
@@ -82,7 +85,7 @@ FBCALL int fb_hDecode
 		old_code = new_code;
 	}
 
-	FB_UNLOCK( );
+	FB_GRAPHICS_UNLOCK( );
 	return -1;
 }
 

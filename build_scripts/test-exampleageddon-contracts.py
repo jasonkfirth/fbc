@@ -24,6 +24,21 @@ spec.loader.exec_module(runner)
 
 
 class ResultContracts(unittest.TestCase):
+    def test_cpp_runtime_matches_native_and_explicit_drivers(self):
+        for target, compiler, library in (
+            ("freebsd", "c++", "c++"),
+            ("freebsd", "/usr/bin/clang++", "c++"),
+            ("freebsd", "/usr/local/bin/g++", "stdc++"),
+            ("freebsd", "/usr/local/bin/g++14", "stdc++"),
+            ("freebsd", "g++-14", "stdc++"),
+            ("darwin", "c++", "c++"),
+            ("darwin", "aarch64-apple-darwin-g++", "stdc++"),
+            ("linux", "clang++", "stdc++"),
+            ("windows", "g++.exe", "stdc++"),
+        ):
+            with self.subTest(target=target, compiler=compiler):
+                self.assertEqual(runner.cpp_runtime_library(target, compiler), library)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="fbc-example-contract-")
         self.addCleanup(self.temporary.cleanup)

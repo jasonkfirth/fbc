@@ -38,15 +38,19 @@ The main compiler/runtime suite is ##tests##, with the harness described in ##te
 
 ##tests/log-tests.mk## handles compile-only, compile-and-run and multi-module expectations. Its saved records distinguish expected compiler rejection from abnormal failure or timeout. The log-test guide (##docs/compiler-test-harness.md##) explains retry selections and artifact ownership.
 
+##make warning-tests## generates reports in disposable storage and compares all five target profiles with ##tests/warnings/r##. Differences fail without changing reference files. Use ##make warning-tests-update## only for an intentional diagnostic change, then review the reference diff. ##make gfx-locking-test## checks input callbacks, temporary allocation, allocation failure and repeated shutdown with native MT libraries; the contract is explained in ##docs/gfx-locking.md##.
+
 {{fbdoc item="section" value="Build ownership and generated files"}}
 
 The root ##GNUmakefile## composes the layers under ##mk##. Platform identity and feature policy precede source selection; compile and archive rules consume the resulting lists. Installation and distribution consume completed artifacts. The Make file map (##mk/File-Map.md##) identifies the owner of each decision.
 
 Use ##make print-config## to inspect the effective configuration. Structural entry points include ##make compiler-structure-test##, ##make gfx-structure-test##, and ##make make-contracts-test##. The runtime structure checker is ##build_scripts/check-rtlib-structure.py##. These checks validate ownership and build contracts; behavioral changes still need the corresponding executable regression.
 
-Object trees, emitted bootstrap sources, linked libraries and test logs are generated inputs or outputs. Do not edit them to repair the maintained source. Quick/full build workflows include cleanup and bootstrap/package operations, so use one workflow per owned worktree. Follow the Make guide (##mk/README.md##) for component cleanup when changing compiler commands or feature flags.
+Object trees, emitted bootstrap sources, linked libraries and test logs are generated inputs or outputs. Do not edit them to repair the maintained source. Quick/full build workflows include cleanup and bootstrap/package operations, so use one workflow per owned worktree. Normal and bootstrap compiler builds track effective commands, flags and selected tool contents. Independent compiler/library builds can use separate ##BUILD_ROOT=build/name## output roots. Follow the Make guide (##mk/README.md##) for record ownership. ##make source-artifacts-test## rejects generated ##.dump## and ##.ctu-info## files under maintained source directories and fails if a directory cannot be scanned; put analysis output in build storage.
 
 ##doc## contains the generated manual's source cache and tools as well as API notes. docs (##docs/README.md##) contains maintainer and platform guides. Keep language syntax documentation, implementation explanations and validation records linked to each other, with each retaining its own purpose.
+
+##make source-docs-test## checks source-guide links and native navigation. ##make source-docs-render-test FBDOC=/path/to/fbdoc## also generates fresh HTML, fbhelp and text in disposable storage and checks the resulting pages.
 
 
 {{fbdoc item="see"}}

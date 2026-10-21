@@ -10,6 +10,11 @@ This file intentionally does NOT claim native qualification for every target.
 
 Date: 2026-10-20. Source review and focused verification complete.
 
+The subsequent [consolidation record](build-consolidation.md) covers native
+integration, generated-source hygiene, configuration tracking and failed-link
+publication. The inventory and receipts below remain the original review
+snapshot; later fixes do not retroactively change that evidence.
+
 The review covers the root `GNUmakefile`, all 53 `mk/**/*.mk` fragments,
 the 13 test-suite makefiles, nine documentation makefiles, four example
 makefiles, three runtime driver makefiles, the Win32 import-library Makefile,
@@ -101,10 +106,11 @@ compiler log harness runs the actual `bin/fbc.exe`.
 
 ## Remaining constraints and improvements
 
-Arbitrary compiler-command or feature/optimization flag changes still require
-cleaning the affected objects; automatic configuration fingerprints are a
-separate improvement. The documented component-clean workflow preserves
-compiler executables and emitted bootstrap sources. Compiler BI dependencies
+At this review snapshot, arbitrary compiler-command or feature/optimization
+flag changes required cleaning the affected objects. The subsequent
+[consolidation](build-consolidation.md) adds automatic configuration tracking
+for normal builds. The component-clean workflow still handles tools replaced
+in place and preserves compiler executables and emitted bootstrap sources. Compiler BI dependencies
 remain conservative, so an interface edit can rebuild more modules than a
 minimal include graph would require.
 

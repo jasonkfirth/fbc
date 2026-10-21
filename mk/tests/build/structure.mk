@@ -10,15 +10,31 @@
 
 PYTHON ?= python3
 
+.PHONY: source-docs-test source-docs-render-test
+source-docs-test:
+	$(PYTHON) "$(rootdir)/build_scripts/check-source-docs.py" --root "$(rootdir)"
+
+# The converter is a native developer tool. A source-only gate needs no SDK;
+# rendering explicitly requires a built fbdoc and never publishes packages.
+FBDOC ?= $(rootdir)/doc/fbdoc/fbdoc$(EXEEXT)
+source-docs-render-test:
+	$(PYTHON) "$(rootdir)/build_scripts/check-source-docs.py" --root "$(rootdir)" --fbdoc "$(FBDOC)"
+
+quick-test full-test: source-docs-test
+
 .PHONY: make-contracts-test
 make-contracts-test:
-	$(PYTHON) "$(rootdir)/build_scripts/test-make-contracts.py" --root "$(rootdir)"
+	$(PYTHON) "$(rootdir)/build_scripts/test-make-contracts.py" --root "$(rootdir)" --make "$(MAKE)"
+
+.PHONY: source-artifacts-test
+source-artifacts-test:
+	@$(PYTHON) "$(rootdir)/build_scripts/check-source-artifacts.py" --root "$(rootdir)"
 
 .PHONY: mk-structure-test gfx-structure-test
 gfx-structure-test:
 	@$(PYTHON) "$(rootdir)/build_scripts/check-gfx-source-graph.py" --root "$(rootdir)" --make "$(MAKE)"
 
-mk-structure-test: gfx-structure-test
+mk-structure-test: source-artifacts-test gfx-structure-test
 	$(call _mt_echo,Verifying $(mkpath)/ structure)
 
 	@test -f $(rootdir)/GNUmakefile || { echo "ERROR: missing $(rootdir)/GNUmakefile"; exit 1; }

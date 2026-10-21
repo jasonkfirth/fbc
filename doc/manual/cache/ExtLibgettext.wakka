@@ -2,8 +2,10 @@
 An internationalization library/toolchain
 
 Website: http://www.gnu.org/software/gettext/gettext.html
-Platforms supported: ""Win32"", Linux
+Platforms supported: Windows, Linux, FreeBSD, Haiku
 Headers to include: libintl.bi, gettext-po.bi
 Header version: from 2010, 0.17
+
+FreeBSD and Haiku provide the translation functions in a separate libintl library; the binding selects it automatically. On glibc Linux these functions are supplied by the C library. Plural counts use C unsigned long, which is 64 bits on Unix x86-64 and 32 bits on Windows. Passing a large count through a fixed 32-bit declaration can incorrectly select the singular form.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

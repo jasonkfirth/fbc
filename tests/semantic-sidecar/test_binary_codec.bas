@@ -17,6 +17,8 @@ dim as string modelPath = command(1)
 requireCodec(len(modelPath) > 0, "output path")
 dim as FbcSemDictionary dictionary
 dim as FbcSemReader reader
+dim as FbcSemReader fieldReader
+dim as string fields(0 to 18)
 dim as string values(0 to 19) = { _
 	"", "0", "-1", "1", "01", "-0", "+1", _
 	"2305843009213693951", "-2305843009213693951", _
@@ -47,12 +49,24 @@ requireCodec(open(modelPath for binary access write as #fileNumber) = 0, "create
 requireCodec(put(#fileNumber, , encoded) = 0, "write model")
 requireCodec(close(fileNumber) = 0, "close model")
 requireCodec(FbcSemLoad(reader, modelPath), "load model")
+requireCodec(FbcSemLoad(fieldReader, modelPath), "load field reader")
 dim as string row
 requireCodec(FbcSemNext(reader, row), "logical header")
 requireCodec(row = "FBCSEM" + chr(9) + "27" + chr(9) + producer, "header value")
+requireCodec(FbcSemNextFields(fieldReader, fields()) = 3, "logical field header")
+requireCodec(fields(0) = "FBCSEM" andalso fields(1) = "27" andalso fields(2) = producer, "header fields")
 for index as integer = 0 to ubound(lines)
 	requireCodec(FbcSemNext(reader, row), "read record")
 	requireCodec(row = lines(index), "exact value")
+	requireCodec(FbcSemNextFields(fieldReader, fields()) = 5, "field record arity")
+	requireCodec(fields(0) = "K" andalso fields(1) = "module" andalso fields(2) = "1", "field identities")
+	if index <= ubound(values) then
+		requireCodec(fields(3) = "codec:" + ltrim(str(index)) andalso fields(4) = values(index), "exact field value")
+	else
+		requireCodec(fields(3) = "discarded:key" andalso fields(4) = "discarded-value", "field dictionary rollback")
+	end if
+	requireCodec(fieldReader.row_start = reader.row_start andalso _
+		fieldReader.row_length = reader.row_length, "identical indexed frame bounds")
 	for fieldIndex as integer = 0 to 4
 		dim as string fieldValue
 		requireCodec(FbcSemField(reader, reader.row_start, reader.row_length, fieldIndex, fieldValue), "indexed read")
@@ -60,6 +74,16 @@ for index as integer = 0 to ubound(lines)
 	next
 next
 requireCodec(FbcSemNext(reader, row) = 0 andalso len(reader.failure) = 0, "end of records")
+requireCodec(FbcSemNextFields(fieldReader, fields()) = 0 andalso len(fieldReader.failure) = 0, "end of field records")
+
+'' The API must refuse incompatible caller storage before indexing a field.
+'' Runtime array checks remain enabled for these negative controls.
+dim as string smallFields(0 to 3), shiftedFields(1 to 19)
+requireCodec(FbcSemLoad(fieldReader, modelPath), "reload bounded field reader")
+requireCodec(FbcSemNextFields(fieldReader, smallFields()) = 3, "small array header")
+requireCodec(FbcSemNextFields(fieldReader, smallFields()) = 0 andalso len(fieldReader.failure) > 0, "small array refusal")
+requireCodec(FbcSemLoad(fieldReader, modelPath), "reload shifted field reader")
+requireCodec(FbcSemNextFields(fieldReader, shiftedFields()) = 0 andalso len(fieldReader.failure) > 0, "array origin refusal")
 
 '' Once either dictionary ceiling is reached, new strings remain literal.
 '' Existing bucket links still refer only to real, allocated entries.

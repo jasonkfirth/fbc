@@ -77,8 +77,8 @@ libdir := $(build_libdir)
 # Object directory layout
 #
 # IMPORTANT:
-# These paths MUST match the expectations inside the original build rules.
-# Do NOT move these outside src/.../obj/ without rewriting all pattern rules.
+# Object rules and dependency lists use these variables. Keep each variant's
+# relative layout stable when adding an isolated build prefix below.
 ##############################################################################
 
 # Compiler objects
@@ -117,6 +117,34 @@ libsfxobjdir       := src/sfxlib/obj/$(objsubdir)
 libsfxpicobjdir    := src/sfxlib/obj/$(objsubdir)/pic
 libsfxmtobjdir     := src/sfxlib/obj/$(objsubdir)/mt
 libsfxmtpicobjdir  := src/sfxlib/obj/$(objsubdir)/mt/pic
+
+##############################################################################
+# Optional isolated output tree
+##############################################################################
+
+# Independent Make processes must use distinct roots. Keeping every product
+# under build/<name> lets them share maintained sources without sharing objects,
+# archives, executable publication or configuration records. Spaces in Make
+# target names are not supported by the existing object graph.
+BUILD_OUTPUT_PREFIX :=
+ifneq ($(strip $(BUILD_ROOT)),)
+build_root_absolute := $(abspath $(BUILD_ROOT))
+ifeq ($(filter $(rootdir)/build/%,$(build_root_absolute)),)
+$(error BUILD_ROOT must name a directory below $(rootdir)/build)
+endif
+ifneq ($(words $(build_root_absolute)),1)
+$(error BUILD_ROOT must not contain whitespace)
+endif
+BUILD_OUTPUT_PREFIX := $(patsubst $(rootdir)/%,%,$(build_root_absolute))/
+$(foreach variable,build_bindir build_libdir libdir FBC_EXE FBCNEW_EXE FBC_JS_EXE FBC_ANDROID_EXE FBC_WII_EXE \
+fbcobjdir fbcjsobjdir fbcandroidobjdir fbcwiiobjdir \
+libfbobjdir libfbpicobjdir libfbmtobjdir libfbmtpicobjdir \
+libfbrtobjdir libfbrtpicobjdir libfbrtmtobjdir libfbrtmtpicobjdir \
+libfbgfxobjdir libfbgfxpicobjdir libfbgfxmtobjdir libfbgfxmtpicobjdir \
+libfbgfx3objdir libfbgfx3picobjdir libfbgfx3mtobjdir libfbgfx3mtpicobjdir \
+libsfxobjdir libsfxpicobjdir libsfxmtobjdir libsfxmtpicobjdir,\
+$(eval $(variable) := $(BUILD_OUTPUT_PREFIX)$($(variable))))
+endif
 
 
 ##############################################################################

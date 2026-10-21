@@ -64,11 +64,11 @@ log-tests: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
 # Warning tests
 ##############################################################################
 
-warning-tests: | maybe-build-fbc $(TESTS_RUNTIME_LIBS)
+.PHONY: warning-tests warning-tests-update
+warning-tests warning-tests-update: | maybe-build-fbc
 	@test -n "$(TESTS_FBC)" || { echo "ERROR: no usable fbc found"; exit 1; }
-	@chmod +x tests/warnings/test.sh 2>/dev/null || true
-	cd tests/warnings && \
-		$(TESTS_FBC_ENV) FBC="$(TESTS_FBC)" bash ./test.sh
+	$(TESTS_FBC_ENV) $(PYTHON) "$(rootdir)/build_scripts/check-warning-reports.py" \
+		--fbc "$(TESTS_FBC)" $(if $(filter warning-tests-update,$@),--update)
 
 ##############################################################################
 # USTRING needs the compiler and runtime built from the same source tree.
@@ -112,6 +112,10 @@ exampleageddon-contract-test:
 .PHONY: rtlib-structure-test
 rtlib-structure-test:
 	$(PYTHON) "$(rootdir)/build_scripts/check-rtlib-structure.py" --root "$(rootdir)" --make "$(MAKE)"
+
+.PHONY: gfx-locking-test
+gfx-locking-test: $(libdir)/libfbgfxmt.a $(libdir)/libfbmt.a
+	$(PYTHON) "$(rootdir)/build_scripts/test-gfx-locking.py" --root "$(rootdir)" --libdir "$(libdir)" --cc "$(CC)"
 
 ##############################################################################
 # END tests.mk

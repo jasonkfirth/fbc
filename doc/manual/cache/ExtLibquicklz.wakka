@@ -2,11 +2,13 @@
 Cross-platform fast compression library
 
 Website: https://www.quicklz.com
-Platforms supported: ""Win32"", Linux, DOS
+Platforms supported: Windows, Linux, DOS, FreeBSD, Haiku
 Headers to include: quicklz.bi
 Header version: 1.5.0
 Example: ""examples/compression/QuickLZ.bas""
 
 The file example reads one independent QuickLZ 1.5.0 packet. It accepts nonempty input up to 16 MiB uncompressed and requires a new or empty output file. Before decompression it validates the header, byte counts, compression level and allocation limit. The decoder must have been compiled with ##QLZ_MEMORY_SAFE##; defining the macro only in FreeBASIC does not change checks in an existing C library. A corrupt packet can still decode to incorrect data, so applications needing integrity must supply their own checksum or authenticated transport.
+
+FreeBSD and Haiku can use a native static build of the matching QuickLZ 1.5.0 C source. Compile quicklz.c with ##-DQLZ_MEMORY_SAFE##, compression level 1 and streaming buffer 0, then place the resulting libquicklz.a on the compiler library search path with ##-p##. The file example has completed binary compression/decompression round trips on both targets. Debian does not currently provide a matching development package, so installing the optional package set does not supply this SDK.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}
