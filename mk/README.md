@@ -186,8 +186,10 @@ make all
 The compiler built from bootstrap C/assembly has its own successful-output
 record and tracks compile, assembler and link options. Fresh bootstrap emission
 uses an owned temporary source tree, preserving intermediates beside maintained
-BASIC files. Its record rejects changed emission options and unfinished attempts
-before bootstrap compilation. Pre-generated source bundles without an emission
+BASIC files. Its record identifies the producing configuration; consumers may
+use different host tools and paths. Unfinished attempts are rejected before
+bootstrap compilation. Run `make bootstrap-emit` to regenerate sources after
+changing emission options. Pre-generated source bundles without an emission
 record remain supported; their target comes from the bootstrap directory.
 
 Independent compiler/library builds can choose distinct output roots:

@@ -18,7 +18,11 @@ for entry do
             cksum "$command"
         else
             for word in $command; do
-                case "$word" in -*|*=*) continue ;; esac
+                # Older /bin/sh parsers need the opening pattern parenthesis
+                # inside a command substitution to pair the closing one.
+                case "$word" in
+                    (-*|*=*) continue ;;
+                esac
                 path=$(command -v "$word" 2>/dev/null || true)
                 if [ -n "$path" ] && [ -f "$path" ]; then
                     cksum "$path"

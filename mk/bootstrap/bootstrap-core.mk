@@ -122,13 +122,13 @@ bootstrap-check:
 ##############################################################################
 
 .PHONY: bootstrap-emission-ready
+# Emission records describe the producing compiler and its host tools. Native
+# bootstrap consumers may run on another OS, with different paths and tools,
+# so only an unfinished emission prevents consumption. Explicit bootstrap-emit
+# always regenerates sources; its saved signature still invalidates objects.
 bootstrap-emission-ready:
 	@test ! -f "$(BOOTSTRAP_PATH)/.emit-config.pending" || { \
 		echo "ERROR: unfinished bootstrap emission; run make bootstrap-emit"; exit 1; }
-	@if [ -f "$(BOOTSTRAP_PATH)/.emit-config" ] && \
-	    [ "$$(cat "$(BOOTSTRAP_PATH)/.emit-config")" != "$(BUILD_CONFIG_EMIT)" ]; then \
-		echo "ERROR: bootstrap emission configuration changed; run make bootstrap-emit"; exit 1; \
-	fi
 
 bootstrap-minimal: bootstrap-emission-ready
 

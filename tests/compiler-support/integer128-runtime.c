@@ -136,6 +136,21 @@ int main(void)
 	if (fb_Int128ToU64(&result) != 13) return 13;
 	if (fb_Int128ToDouble(&result, 1) != 13.0) return 14;
 
+	/* Adjacent double values straddle the two-word boundary at 2^64.
+	 * These casts must stay defined even when long double equals double. */
+	fb_Int128FromDouble(&result, 18446744073709549568.0, 0);
+	if (!int128_equals(&result, UINT64_MAX - 2047, 0)) return 15;
+	fb_Int128FromDouble(&result, 18446744073709551616.0, 0);
+	if (!int128_equals(&result, 0, 1)) return 16;
+	fb_Int128FromDouble(&result, 18446744073709555712.0, 0);
+	if (!int128_equals(&result, 4096, 1)) return 17;
+	fb_Int128FromDouble(&result, -18446744073709551616.0, 1);
+	if (!int128_equals(&result, 0, UINT64_MAX)) return 18;
+	fb_Int128FromDouble(&result, 12.5, 1);
+	if (!int128_equals(&result, 12, 0)) return 19;
+	fb_Int128FromDouble(&result, 13.5, 1);
+	if (!int128_equals(&result, 14, 0)) return 20;
+
 	return 0;
 }
 

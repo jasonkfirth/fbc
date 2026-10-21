@@ -227,6 +227,9 @@ void *fb_Int128FromDouble(void *destination, double source, int is_signed)
 		long double fraction;
 		int round_up;
 
+		/* The strict 2^64 bound above excludes overflow. Cppcheck treats
+		 * the upper bound as inclusive when it tracks this floating value. */
+		/* cppcheck-suppress floatConversionOverflow */
 		result.low = (uint64_t)magnitude;
 		fraction = magnitude - (long double)result.low;
 		round_up = (fraction > 0.5L) ||

@@ -24,6 +24,12 @@ import zipfile
 # One runner process selects one executable for every disposable fixture.
 MAKE_COMMAND = "make"
 
+# These fixtures build and execute host programs. Windows ARM64 ships Clang
+# without GCC, so choose an available native driver independently of CI's
+# exported cross-compilation commands.
+FIXTURE_CC = next((name for name in ("gcc", "clang", "cc") if shutil.which(name)), "cc")
+FIXTURE_CXX = next((name for name in ("g++", "clang++", "c++") if shutil.which(name)), "c++")
+
 
 # -------------------------------------------------------------------------
 # Disposable fixture helpers
@@ -807,7 +813,7 @@ def configuration_fixture(root: Path, working: Path) -> None:
     write(working / "source/gfxlib2/value.cpp", "#ifndef BASE_VALUE\n#define BASE_VALUE 0\n#endif\n"
           "#ifndef CXX_ONLY\n#define CXX_ONLY 0\n#endif\n"
           "extern \"C\" int fixture_cpp_value(void) { return BASE_VALUE + CXX_ONLY; }\n")
-    for name, tool in (("cc", "gcc"), ("cxx", "g++")):
+    for name, tool in (("cc", FIXTURE_CC), ("cxx", FIXTURE_CXX)):
         write(working / (name + ".sh"), "#!/bin/sh\nset -eu\n"
               "printf '%s\\n' \"$*\" >>" + name + "-calls\nexec " + tool + " \"$@\"\n")
     write(working / "GNUmakefile", ".DEFAULT_GOAL := all\nrootdir := .\nsrcdir := source\n"
@@ -828,7 +834,7 @@ def configuration_value(working: Path, archive: str, symbol: str, expected: int)
     write(working / "read-value.c", "int " + symbol + "(void);\n"
           "int main(void) { return " + symbol + "(); }\n")
     executable = working / ("read-value.exe" if os.name == "nt" else "read-value")
-    result = subprocess.run(["gcc", "read-value.c", archive, "-o", str(executable)],
+    result = subprocess.run([FIXTURE_CC, "read-value.c", archive, "-o", str(executable)],
                             cwd=working, capture_output=True, text=True, timeout=30, check=False)
     require(result.returncode == 0, "could not link the configured archive", result)
     result = subprocess.run([str(executable)], cwd=working, capture_output=True,
@@ -898,6 +904,27 @@ def test_build_configuration(root: Path, working: Path) -> None:
     require(result.returncode == 0 and all(path.stat().st_mtime_ns == stamp for path, stamp in stable.items())
             and calls == [(working / name).read_text() for name in ("cc-calls", "cxx-calls")]
             and not list(working.rglob("*.tmp")), "dry-run changed configured artifacts", result)
+
+
+def test_build_rule_dependencies(root: Path, working: Path) -> None:
+    configuration_fixture(root, working)
+    dependency = working / ("source-dependencies-" + "x" * 96 + ".d")
+    makefile = working / "GNUmakefile"
+    content = makefile.read_text()
+    # A populated runtime tree includes thousands of dependency files. Reuse
+    # one long path to exceed shell limits without creating thousands of files.
+    includes = "-include " + " ".join([dependency.as_posix()] * 1600) + "\n"
+    content = content.replace(include(root, "build/config-rules.mk"),
+                              includes + include(root, "build/config-rules.mk"))
+    makefile.write_text(content, encoding="utf-8", newline="\n")
+    result = make(working)
+    require(result.returncode == 0, "build with absent dependency files failed", result)
+    calls = (working / "cc-calls").read_bytes()
+    for content in ("# generated dependency\n", "# updated dependency\n"):
+        write(dependency, content)
+        result = make(working)
+        require(result.returncode == 0 and (working / "cc-calls").read_bytes() == calls,
+                "generated dependencies changed build commands or exceeded shell limits", result)
 
 
 def test_compiler_configuration(root: Path, working: Path) -> None:
@@ -982,7 +1009,7 @@ def test_warning_normalization(root: Path, working: Path) -> None:
           'if (getenv("WARNING_FIXTURE_CHANGED")) puts("unexpected warning");\n'
           'return 0; }\n')
     compiler = working / "fake-fbc.exe"
-    result = subprocess.run(["gcc", "fake-compiler.c", "-o", str(compiler)],
+    result = subprocess.run([FIXTURE_CC, "fake-compiler.c", "-o", str(compiler)],
                             cwd=working, capture_output=True, text=True, timeout=30, check=False)
     require(result.returncode == 0, "warning runner fixture could not compile", result)
     environment = dict(os.environ, FBC=compiler.as_posix(), FBC_FLAGS="", TEST_FILTER="probe.bas")
@@ -1050,7 +1077,8 @@ def test_tool_replacement(root: Path, working: Path) -> None:
     require(result.returncode == 0, "initial tool fixture build failed", result)
     configuration_value(working, "lib/libfb.a", "fixture_value", 0)
     tool = working / "cc.sh"
-    tool.write_text(tool.read_text().replace('exec gcc "$@"', 'exec gcc -DBASE_VALUE=7 "$@"'),
+    tool.write_text(tool.read_text().replace('exec ' + FIXTURE_CC + ' "$@"',
+                                            'exec ' + FIXTURE_CC + ' -DBASE_VALUE=7 "$@"'),
                     encoding="utf-8", newline="\n")
     result = make(working)
     require(result.returncode == 0, "same-path compiler replacement failed", result)
@@ -1066,7 +1094,8 @@ def test_bootstrap_configuration(root: Path, working: Path) -> None:
     write(working / "GNUmakefile", ".DEFAULT_GOAL := bootstrap/fbc.exe\nrootdir := .\n"
           "mkpath := " + (root / "mk").as_posix() + "\n"
           "TARGET_OS := win32\nTARGET_ARCH := fixture\nFBTARGET := native\nEXEEXT := .exe\n"
-          "CC := gcc\nRUN_CC := gcc\nALLCFLAGS := $(CFLAGS)\nlibdir := lib\nAR := ar\nARFLAGS := rcs\n"
+          "CC := " + FIXTURE_CC + "\nRUN_CC := " + FIXTURE_CC + "\n"
+          "ALLCFLAGS := $(CFLAGS)\nlibdir := lib\nAR := ar\nARFLAGS := rcs\n"
           + include(root, "bootstrap/bootstrap-core.mk")
           + "BOOTSTRAP_RT0 :=\nBOOTSTRAP_RTL :=\n"
           "lib/fbrt0.o lib/libfb.a:\n\t@mkdir -p lib\n\t@touch $@\n\t$(publish_build_config)\n"
@@ -1119,9 +1148,14 @@ def test_bootstrap_emission_configuration(root: Path, working: Path) -> None:
             and not (output / ".emit-work").exists()
             and original.read_text() == "unrelated intermediate\n",
             "bootstrap emission touched shared intermediates or failed to collect output", result)
-    result = make(working, "bootstrap-emission-ready", "BUILD_ROOT=build/emitter", "BOOTFBCFLAGS=-changed")
-    require(result.returncode != 0 and "configuration changed" in result.stdout,
-            "stale bootstrap emission was accepted after option changes", result)
+    record = (output / ".emit-config").read_bytes()
+    result = make(working, "bootstrap-emission-ready", "BUILD_ROOT=build/emitter",
+                  "BOOT_FBC=unavailable-producer", "BOOTFBCFLAGS=-changed", "CC=another-host-cc")
+    require(result.returncode == 0 and (output / ".emit-config").read_bytes() == record,
+            "bootstrap consumer required the producing host configuration", result)
+    result = make(working, "BUILD_ROOT=build/emitter", "BOOTFBCFLAGS=-changed")
+    require(result.returncode == 0 and (output / ".emit-config").read_bytes() != record,
+            "explicit emission did not record changed options", result)
     result = make(working, "BUILD_ROOT=build/emitter", "BOOT_FBC=false")
     require(result.returncode != 0 and (output / ".emit-config.pending").exists(),
             "failed bootstrap emission did not retain its incomplete marker", result)
@@ -1143,7 +1177,8 @@ def test_isolated_builds(root: Path, working: Path) -> None:
     write(working / "source/rtlib/fb.h", "")
     write(working / "GNUmakefile", ".DEFAULT_GOAL := all\nrootdir := $(CURDIR)\nsrcdir := $(CURDIR)/source\n"
           "mkpath := " + (root / "mk").as_posix() + "\n"
-          "FBTARGET := native\nFBNAME := freebasic\nlibdirname := lib\nCC := gcc\nRUN_CC := gcc\n"
+          "FBTARGET := native\nFBNAME := freebasic\nlibdirname := lib\n"
+          "CC := " + FIXTURE_CC + "\nRUN_CC := " + FIXTURE_CC + "\n"
           "AR := ar\nARFLAGS := rcs\nRANLIB := ranlib\nALLCFLAGS := $(CFLAGS)\n"
           + include(root, "build-layout.mk")
           + "RTLIB_OBJ := $(libfbobjdir)/value.o\n"
@@ -1236,7 +1271,8 @@ def main() -> int:
              test_manual_removed_zip_member, test_example_helper_headers, test_example_cleanup_arguments,
              test_cross_host_identity, test_sound_member_collision, test_multi_module_fixtures,
              test_doc_target_guard, test_source_artifact_guard, test_compiler_link_failure,
-             test_build_configuration, test_compiler_configuration, test_warning_normalization,
+             test_build_configuration, test_build_rule_dependencies, test_compiler_configuration,
+             test_warning_normalization,
              test_tool_replacement, test_bootstrap_configuration, test_bootstrap_emission_configuration,
              test_isolated_builds, test_source_docs)
     if options.case and options.case not in {test.__name__ for test in tests}:

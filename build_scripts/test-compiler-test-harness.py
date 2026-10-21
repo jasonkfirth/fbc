@@ -122,6 +122,11 @@ def test_log_recovery(root: Path, working: Path, make: str) -> bool:
             + str(source.relative_to(working).as_posix()) + " : RESULT=" + result + "\n",
             encoding="utf-8",
         )
+        # Native Windows Make can round file times differently from Python.
+        # Saved logs must remain newer than their placeholder sources, even
+        # when the fixture replaces several files within one clock tick.
+        stamp = (working / ("cases/" + stem + ".log")).stat().st_mtime - 4
+        os.utime(source, (stamp, stamp))
 
     selected = working / "log-tests-fb.inc"
     selected.write_text("SRCLIST_COMPILE_ONLY_OK += cases/single.bas\n", encoding="utf-8")

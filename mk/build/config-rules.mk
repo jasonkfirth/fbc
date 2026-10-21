@@ -31,7 +31,10 @@ build_config_hash = $(or $(subst $(build_config_space),:,$(strip $(shell printf 
 # Test/package recipes do not affect product compilation. Changes to the
 # remaining included Make rules are conservative compile dependencies, since
 # an edited per-file command can change code without changing a source file.
+# Generated .d files describe source dependencies, not build commands. Including
+# them would change the signature after compilation and overflow shell limits.
 BUILD_CONFIG_RULE_FILES := $(filter-out \
+%.d \
 $(mkpath)/tests/% $(mkpath)/tests.mk $(mkpath)/maketests.mk \
 $(mkpath)/dist.mk $(mkpath)/inst_uninst.mk $(mkpath)/bootstrap/%, \
 $(MAKEFILE_LIST))
