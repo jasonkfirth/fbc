@@ -35,10 +35,14 @@ def check_inputs(test):
         if mode == 'macro-compact':
             _, reduced_path = test.invoke([source], extra=(*extra, '-semantic-model-compact'))
             reduced = Model.read(reduced_path)
+            reduced.validate_physical_locations()
+            test.assertEqual(reduced.capabilities[1][FEATURE], 'available')
+            test.assertEqual(sum(row[3].startswith(INPUT) for row in reduced.records['K']), 13)
+            test.assertFalse(any(row[4].startswith(INPUT) for row in reduced.records['MR']))
         else:
             reduced = test.compile(source, mode=mode, extra=extra)
-        test.assertEqual(reduced.capabilities[1][FEATURE], 'unavailable')
-        test.assertFalse(any(row[3].startswith((INPUT, COUNT)) for row in reduced.records['K']))
+            test.assertEqual(reduced.capabilities[1][FEATURE], 'unavailable')
+            test.assertFalse(any(row[3].startswith((INPUT, COUNT)) for row in reduced.records['K']))
         test.assertEqual(output.read_bytes(), plain)
     first = test.source('#lang "fb"\nDim first_value As Long\n', 'primitive-first.bas')
     second = test.source('#lang "fb"\nDim second_value As Double\n', 'primitive-second.bas')

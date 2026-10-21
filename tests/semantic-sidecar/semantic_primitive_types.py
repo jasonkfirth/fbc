@@ -102,7 +102,8 @@ def validate_primitive_types(model, number, subject_modules):
         # An unverified LOC still owns the physical opening, but carries no
         # editable byte range. Legacy or malformed source bytes must not
         # erase an otherwise accepted type observation.
-        elif location is None:
+        elif (location is None
+              and model.capabilities.get(module, {}).get('macro-reference-origins') == 'available'):
             raise ValueError('Primitive type lacks a physical or macro opening')
         observed[module] = ordinal
     for module in model.capabilities:
