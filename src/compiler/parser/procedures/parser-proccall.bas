@@ -38,6 +38,8 @@ declare sub fbSemanticModelExportImplicitCall _
 		byref source as LEX_LOCATION _
 	)
 
+declare sub fbSemanticModelObserveIdentifierResult _
+    (byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION)
 declare sub hCtorChain( )
 declare sub fbSemanticModelAcceptResultInput _
 	( byval expression as longint, byval variable as FBSYMBOL ptr, _
@@ -542,6 +544,8 @@ private function hProcSymbol _
 		hSkipStmt( )
 		return TRUE
 	end if
+
+	fbSemanticModelObserveIdentifierResult(parser.currproc, semantic_site)
 
 	'' skip the '='
 	lexSkipToken( )

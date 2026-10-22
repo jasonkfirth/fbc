@@ -25,6 +25,14 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+
+declare function fbSemanticModelNativeListBegin(byval owner as FBSYMBOL ptr, _
+    byref kind as const string, byref source as LEX_LOCATION) as longint
+declare sub fbSemanticModelNativeListInput(byval identity as longint, byval owner as FBSYMBOL ptr, _
+    byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
+    byval is_declaration as integer, byref source as LEX_LOCATION)
+declare sub fbSemanticModelNativeListEnd(byval identity as longint, byval owner as FBSYMBOL ptr, byval count as integer)
+
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-diagnostics.bi"
@@ -1703,6 +1711,12 @@ function cVarDecl _
 	dim as longint semantic_group, semantic_owner
 	dim as integer semantic_ordinal
 	if( is_fordecl = FALSE ) then semantic_group = fbSemanticModelDeclarationGroup(token, semantic_owner)
+	dim as longint semantic_native_list
+	dim as integer semantic_native_ordinal
+	if( is_fordecl = FALSE ) then
+		dim as LEX_LOCATION list_anchor = lexGetCurrentLocation( )
+		semantic_native_list = fbSemanticModelNativeListBegin(parser.currproc, iif(token = FB_TK_REDIM, "redim", "storage"), list_anchor)
+	end if
 
 	function = NULL
 
@@ -2080,6 +2094,11 @@ function cVarDecl _
 		    have_bounds, varexpr, exprTB(), dopreserve, semantic_site, semantic_initializer ) = FALSE ) then
 			exit function
 		end if
+		if( (semantic_native_list <> 0) and (sym <> NULL) ) then
+			semantic_native_ordinal += 1
+			fbSemanticModelNativeListInput(semantic_native_list, parser.currproc, semantic_native_ordinal, _
+				sym, semantic_written_type, iif(token = FB_TK_REDIM, semantic_new_symbol, is_redim = FALSE), semantic_site)
+		end if
 		'' Rejected declarations have no symbol. Count only accepted inputs,
 		'' as the VAR path does, so diagnostics do not invalidate the sidecar.
 		if( (semantic_group <> 0) and (sym <> NULL) ) then
@@ -2100,6 +2119,7 @@ function cVarDecl _
 		lexSkipToken( )
 	loop
 
+	fbSemanticModelNativeListEnd(semantic_native_list, parser.currproc, semantic_native_ordinal)
 	fbSemanticModelDeclarationGroupEnd(semantic_group, semantic_owner, semantic_ordinal)
 
 	'' result unused, except by FOR loops, but that's RETURN'ed above

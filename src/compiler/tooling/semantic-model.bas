@@ -58,12 +58,14 @@
 #include once "symbols/symb.bi"
 #include once "crt/mem.bi"
 #include once "tooling/semantic-private.bi"
+#include once "tooling/semantic-extra-facts.bi"
 #include once "tooling/semantic-preprocessor.bi"
 #include once "tooling/semantic-macros.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-access.bi"
+declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval symbolid as longint)
 #include once "tooling/semantic-output.bi"
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-diagnostics.bi"
@@ -236,6 +238,8 @@ dim shared as longint semantic_model_module_detail_count
 dim shared as longint semantic_model_module_member_selection_count
 '' Non-field members have their own closure; keep capability 115 field-only.
 dim shared as longint semantic_model_module_nonfield_member_selection_count
+'' Module-local observation count, never used by compiler decisions.
+dim shared as longint semantic_model_module_keyword_count
 
 declare function hSemanticModelRangeFitsCurrentSourceLine _
 	( _
@@ -515,6 +519,45 @@ function fbSemanticModelEscape(byref value as const string) as string
 	return hSemanticModelEscape(value)
 end function
 
+'' The lexer supplies actual consumed tokens. Raw input coordinates avoid
+'' #LINE remapping, and replacement text has no invented physical spacing.
+'' One million receipts is a finite per-module bound in addition to the
+'' exporter's existing transactional byte/detail limits.
+sub fbSemanticModelConsumedKeyword(byval token as FBTOKEN ptr)
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_KEYWORDS) = FALSE ) then exit sub
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( (semantic_model_module_open = FALSE) or semantic_model_module_failed ) then exit sub
+	select case token->class
+	case FB_TKCLASS_KEYWORD, FB_TKCLASS_QUIRKWD, FB_TKCLASS_OPERATOR
+	case else: exit sub
+	end select
+	if( (token->source.raw_valid = FALSE) or (token->source.source_context < 1) or _
+		(token->source.macro_identity <> 0) ) then exit sub
+	dim as integer firstchar = asc(token->text)
+	if( ((firstchar < 65) or (firstchar > 90)) and _
+		((firstchar < 97) or (firstchar > 122)) and (firstchar <> 95) ) then exit sub
+	if( semantic_model_module_keyword_count >= 1000000 ) then
+		fbSemanticModelFailAt("consumed keyword observation limit exceeded")
+		exit sub
+	end if
+	semantic_model_module_keyword_count += 1
+	dim as string payload = fbSemanticModelNumber(token->source.source_context) + ":" + _
+		fbSemanticModelNumber(token->source.raw_start_line) + ":" + _
+		fbSemanticModelNumber(token->source.raw_start_column) + ":" + _
+		fbSemanticModelNumber(token->source.raw_end_line) + ":" + _
+		fbSemanticModelNumber(token->source.raw_end_column) + ":" + _
+		fbSemanticModelNumber(token->class) + ":" + fbSemanticModelNumber(token->id) + ":" + token->text
+	dim as string row = "K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+		TABCHAR + "consumed-keyword:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + ":" + _
+		fbSemanticModelNumber(semantic_model_module_keyword_count) + TABCHAR + fbSemanticModelEscape(payload)
+	fbSemanticModelAppendDetail(row)
+	fbSemanticModelExportCoordinates("source-context", token->source.source_context, _
+		"consumed-keyword:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + ":" + _
+		fbSemanticModelNumber(semantic_model_module_keyword_count), token->source, token->source)
+end sub
+
+''
 sub fbSemanticModelAppendDetail(byref value as string)
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	fbSemanticModelAppendProvenance(value)
@@ -821,7 +864,7 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 
 	hSemanticModelAppendLine("S" + TABCHAR + hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelEscape(symbolname) + TABCHAR + hSemanticModelNumber(sym->class) + TABCHAR + _
-		hSemanticModelNumber(culng(sym->typ)) + TABCHAR + hSemanticModelNumber(subtypeid) + TABCHAR + _
+		fbSemanticModelTypeNumber(culng(sym->typ)) + TABCHAR + hSemanticModelNumber(subtypeid) + TABCHAR + _
 		hSemanticModelNumber(sym->scope) + TABCHAR + hSemanticModelNumber(sym->attrib) + TABCHAR + _
 		hSemanticModelNumber(sym->pattrib) + TABCHAR + hSemanticModelNumber(sym->lgt) + TABCHAR + _
 		hSemanticModelNumber(sym->ofs) + TABCHAR + hSemanticModelNumber(parentid))
@@ -977,6 +1020,111 @@ end function
 '' -------------------------------------------------------------------------
 '' Original declaration grammar choices
 '' -------------------------------------------------------------------------
+
+'' Native source declaration lists are independent from the older scalar
+'' declaration-type groups. Field lists and REDIM targets have distinct
+'' grammar and cannot be reconstructed from symbol order or source commas.
+private dim shared as longint semantic_native_list_count
+private dim shared as longint semantic_source_signature_count
+
+function fbSemanticModelNativeListBegin(byval owner as FBSYMBOL ptr, _
+	byref kind as const string, byref source as LEX_LOCATION) as longint
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_DECLARATORS) = FALSE ) then return 0
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	if( owner = NULL ) then owner = @symbGetGlobalNamespc( )
+	dim as longint statement = fbSemanticModelCurrentStatement( )
+	if( (statement <= 0) or ((kind <> "field") and (kind <> "redim") and (kind <> "storage")) ) then
+		fbSemanticModelFailAt("native declarator list ownership")
+		return 0
+	end if
+	dim as longint identity = fbSemanticModelNextDetailIdentity( )
+	dim as longint ownerid = fbSemanticModelSymbolId(owner)
+	dim as string role = "native-list:" + fbSemanticModelNumber(identity)
+	dim as string payload = fbSemanticModelNumber(statement) + TABCHAR + kind + _
+		TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( ))
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(ownerid) + _
+		TABCHAR + role + TABCHAR + fbSemanticModelEscape(payload))
+	fbSemanticModelExportCoordinates("source-context", fbSemanticModelCurrentSource( ), role, source, source)
+	fbSemanticModelMacroOrigin("symbol", ownerid, source.macro_identity, role)
+	semantic_native_list_count += 1
+	return identity
+end function
+
+sub fbSemanticModelNativeListInput(byval identity as longint, byval owner as FBSYMBOL ptr, _
+	byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
+	byval is_declaration as integer, byref source as LEX_LOCATION)
+	if( identity = 0 ) then exit sub
+	if( owner = NULL ) then owner = @symbGetGlobalNamespc( )
+	if( (ordinal < 1) or (sym = NULL) ) then
+		fbSemanticModelFailAt("native declarator list input")
+		exit sub
+	end if
+	dim as longint ownerid = fbSemanticModelSymbolId(owner)
+	dim as string role = "native-list-input:" + fbSemanticModelNumber(identity) + ":" + fbSemanticModelNumber(ordinal)
+	dim as string payload = fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + TABCHAR + written_type + _
+		TABCHAR + iif(is_declaration, "1", "0") + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( ))
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(ownerid) + _
+		TABCHAR + role + TABCHAR + fbSemanticModelEscape(payload))
+	'' A resize expression can have no identifier token (for example p->a).
+	'' Only an actual declaration promises a written-name origin here.
+	if( is_declaration ) then
+		fbSemanticModelExportCoordinates("source-context", fbSemanticModelCurrentSource( ), role, source, source)
+		fbSemanticModelMacroOrigin("symbol", ownerid, source.macro_identity, role)
+	end if
+end sub
+
+sub fbSemanticModelNativeListEnd(byval identity as longint, byval owner as FBSYMBOL ptr, byval count as integer)
+	if( identity = 0 ) then exit sub
+	if( owner = NULL ) then owner = @symbGetGlobalNamespc( )
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(owner)) + _
+		TABCHAR + "native-list-end:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(count))
+end sub
+
+function fbSemanticModelSourceSignatureBegin(byval proc as FBSYMBOL ptr) as longint
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_DECLARATORS) = FALSE ) then return 0
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	if( (proc = NULL) or (fbSemanticModelCurrentStatement( ) <= 0) ) then
+		fbSemanticModelFailAt("source signature ownership")
+		return 0
+	end if
+	dim as longint identity = fbSemanticModelNextDetailIdentity( )
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+		TABCHAR + "source-signature:" + fbSemanticModelNumber(identity) + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelCurrentStatement( )))
+	semantic_source_signature_count += 1
+	return identity
+end function
+
+sub fbSemanticModelSourceSignatureInput(byval identity as longint, byval proc as FBSYMBOL ptr, _
+	byval ordinal as integer, byval param as FBSYMBOL ptr)
+	if( identity = 0 ) then exit sub
+	if( (proc = NULL) or (param = NULL) or (ordinal < 1) ) then
+		fbSemanticModelFailAt("source signature formal input")
+		exit sub
+	end if
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+		TABCHAR + "source-signature-input:" + fbSemanticModelNumber(identity) + ":" + fbSemanticModelNumber(ordinal) + _
+		TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(param)))
+end sub
+
+sub fbSemanticModelSourceSignatureEnd(byval identity as longint, byval proc as FBSYMBOL ptr, byval count as integer)
+	if( identity = 0 ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+		TABCHAR + "source-signature-end:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(count))
+end sub
+
+private sub hSemanticModelFinishNativeLists( )
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_DECLARATORS) = FALSE ) then exit sub
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	dim as string prefix = "K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "native-list-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + fbSemanticModelNumber(semantic_native_list_count))
+	fbSemanticModelAppendDetail(prefix + "source-signature-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + fbSemanticModelNumber(semantic_source_signature_count))
+end sub
+
+'' end of native declarator observations
 
 function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
 	owner = 0
@@ -1545,6 +1693,147 @@ private sub hSemanticModelMemberSelection _
 	end if
 end sub
 
+'' -------------------------------------------------------------------------
+'' Original identifier suffixes are lexical facts, not canonical symbol types
+'' -------------------------------------------------------------------------
+type SEMANTIC_HINT_TOKEN
+    key as string
+    spelling as string
+    suffix as integer
+    next_token as integer
+    token_identity as longint
+end type
+const SEMANTIC_HINT_BUCKET_COUNT = 4096
+const SEMANTIC_HINT_LIMIT = 262144
+dim shared as SEMANTIC_HINT_TOKEN semantic_hint_tokens( )
+dim shared as integer semantic_hint_buckets(0 to SEMANTIC_HINT_BUCKET_COUNT - 1)
+dim shared as integer semantic_hint_token_count
+dim shared as longint semantic_hint_input_count
+
+private function hHintKey(byref source as LEX_LOCATION) as string
+    dim as longint contextid = source.source_context
+    if( contextid = 0 ) then contextid = fbSemanticModelCurrentSource( )
+    dim as string key = fbSemanticModelNumber(contextid) + ":" + fbSemanticModelNumber(source.macro_identity)
+    if( source.macro_identity and source.macro_unit_valid ) then
+        return key + ":m:" + fbSemanticModelNumber(source.macro_start_unit)
+    end if
+    if( source.raw_valid ) then
+        return key + ":r:" + fbSemanticModelNumber(source.raw_start_line) + ":" + fbSemanticModelNumber(source.raw_start_column)
+    end if
+    return key + ":l:" + source.source_file + ":" + fbSemanticModelNumber(source.start_line) + ":" + fbSemanticModelNumber(source.start_column)
+end function
+
+private function hHintBucket(byref key as const string) as integer
+    dim as uinteger value = 0
+    for index as integer = 0 to len(key) - 1
+        value = (value * 33 + key[index]) and (SEMANTIC_HINT_BUCKET_COUNT - 1)
+    next
+    return value
+end function
+
+private sub hResetHintTokens( )
+    erase semantic_hint_tokens
+    semantic_hint_token_count = 0
+    semantic_hint_input_count = 0
+    for bucket as integer = 0 to SEMANTIC_HINT_BUCKET_COUNT - 1
+        semantic_hint_buckets(bucket) = 0
+    next
+end sub
+
+sub fbSemanticModelCaptureIdentifierHint(byval token as FBTOKEN ptr)
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_HINTS) = FALSE ) then exit sub
+    if( (fbSemanticModelFullEnabled( ) = FALSE) or (semantic_model_module_open = FALSE) or (token = NULL) ) then exit sub
+    select case token->class
+    case FB_TKCLASS_IDENTIFIER, FB_TKCLASS_QUIRKWD, FB_TKCLASS_KEYWORD
+    case else: exit sub
+    end select
+    dim as string key = hHintKey(token->source)
+    dim as integer bucket = hHintBucket(key), slot = semantic_hint_buckets(bucket)
+    while( slot <> 0 )
+        if( semantic_hint_tokens(slot).key = key ) then exit sub
+        slot = semantic_hint_tokens(slot).next_token
+    wend
+    if( semantic_hint_token_count >= SEMANTIC_HINT_LIMIT ) then
+        fbSemanticModelFailAt("identifier suffix observation limit")
+        exit sub
+    end if
+    if( semantic_hint_token_count = 0 ) then redim semantic_hint_tokens(0 to 127)
+    semantic_hint_token_count += 1
+    if( semantic_hint_token_count > ubound(semantic_hint_tokens) ) then
+        redim preserve semantic_hint_tokens(0 to (ubound(semantic_hint_tokens) + 1) * 2 - 1)
+    end if
+    with semantic_hint_tokens(semantic_hint_token_count)
+        .key = key: .spelling = token->text: .suffix = token->suffixchar
+        .next_token = semantic_hint_buckets(bucket)
+    end with
+    semantic_hint_buckets(bucket) = semantic_hint_token_count
+end sub
+
+private function hIdentifierHintInput(byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION, _
+    byval is_declaration as integer) as longint
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_HINTS) = FALSE ) then return 0
+    if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+    dim as string key = hHintKey(source)
+    dim as integer slot = semantic_hint_buckets(hHintBucket(key))
+    while( slot <> 0 )
+        if( semantic_hint_tokens(slot).key = key ) then exit while
+        slot = semantic_hint_tokens(slot).next_token
+    wend
+    dim as integer suffix = -1
+    dim as string spelling
+    if( slot <> 0 ) then
+        suffix = semantic_hint_tokens(slot).suffix
+        spelling = semantic_hint_tokens(slot).spelling
+    end if
+    dim as longint identity = fbSemanticModelNextDetailIdentity( )
+    dim as longint token_identity = identity
+    if( slot <> 0 ) then
+        if( semantic_hint_tokens(slot).token_identity = 0 ) then semantic_hint_tokens(slot).token_identity = identity
+        token_identity = semantic_hint_tokens(slot).token_identity
+    end if
+    dim as string role = "identifier-type-hint:" + fbSemanticModelNumber(identity)
+    dim as string payload = iif(is_declaration, "declaration", "reference") + TABCHAR + _
+        fbSemanticModelNumber(suffix) + TABCHAR + spelling + TABCHAR + _
+        fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+        TABCHAR + fbSemanticModelNumber(token_identity)
+    fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + _
+        TABCHAR + role + TABCHAR + fbSemanticModelEscape(payload))
+    fbSemanticModelExportCoordinates("source-context", fbSemanticModelCurrentSource( ), role, source, source)
+    fbSemanticModelMacroOrigin("symbol", fbSemanticModelSymbolId(sym), source.macro_identity, role)
+    semantic_hint_input_count += 1
+    return identity
+end function
+
+private sub hIdentifierHintLink(byval sym as FBSYMBOL ptr, byval identity as longint, _
+    byref kind as const string, byval subject as longint)
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_HINTS) = FALSE ) then exit sub
+    if( identity = 0 ) then exit sub
+    fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + _
+        TABCHAR + "identifier-hint-" + kind + ":" + fbSemanticModelNumber(subject) + TABCHAR + fbSemanticModelNumber(identity))
+end sub
+
+sub fbSemanticModelObserveIdentifierResult(byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION)
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_HINTS) = FALSE ) then exit sub
+    if( (fbSemanticModelFullEnabled( ) = FALSE) or (sym = NULL) ) then exit sub
+    '' A result-name assignment is not a call or ordinary procedure reference.
+    '' Retain its token without changing B/reference-count contracts used by
+    '' existing unused-function and discarded-return consumers.
+    dim as longint identity = hIdentifierHintInput(sym, source, FALSE)
+    fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + _
+        TABCHAR + "identifier-hint-result:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentStatement( )))
+end sub
+
+private sub hFinishIdentifierHints( )
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_HINTS) = FALSE ) then exit sub
+    if( fbSemanticModelFullEnabled( ) ) then
+        fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+            fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+            "identifier-hint-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + fbSemanticModelNumber(semantic_hint_input_count))
+    end if
+end sub
+
+'' end of identifier-hint-observer.bas.txt
+
 '' Export one compiler-resolved identifier occurrence with its exact lexer span.
 '' Physical-origin status lets editor consumers refuse macro-expanded ranges.
 private function hSemanticModelExportBinding _
@@ -1566,11 +1855,20 @@ private function hSemanticModelExportBinding _
 		exit function
 	end if
 
+	dim as longint hint_identity
+
 	if( (source.start_line < 1) or (source.start_column < 0) or _
 		(source.end_line < source.start_line) or (source.end_column < 0) or _
 		((source.end_line = source.start_line) and _
 		 (source.end_column <= source.start_column)) or _
 		(len(source.source_file) = 0) ) then
+		'' Synthetic unnamed parameters have neither a source token nor a B
+		'' binding. Only a real macro origin can own a hint without a range.
+		'' Publishing any other input here would leave an orphan in the counted
+		'' hint closure, even though no source diagnostic could use it.
+		if( source.macro_identity > 0 ) then
+			hint_identity = hIdentifierHintInput(sym, source, is_declaration)
+		end if
 		'' Generated declaration names can have a logical point rather than a
 		'' source extent. Preserve their selected symbol and expansion without
 		'' fabricating a binding range which the editor could project.
@@ -1587,11 +1885,17 @@ private function hSemanticModelExportBinding _
 			dim as longint reference = fbSemanticModelNextDetailIdentity( )
 			fbSemanticModelMacroOrigin("symbol", fbSemanticModelSymbolId(sym), source.macro_identity, _
 				"reference-" + fbSemanticModelNumber(reference))
+			hIdentifierHintLink(sym, hint_identity, "reference", reference)
 			hSemanticModelMemberSelection(sym, member_receiver, member_role, 0, reference, source.macro_identity)
+			if( (sym->class = FB_SYMBCLASS_VAR) or (sym->class = FB_SYMBCLASS_FIELD) ) then
+				fbSemanticModelCaptureMacroAccess(reference, fbSemanticModelSymbolId(sym))
+			end if
 			if( fbSemanticModelMacroProvenanceEnabled( ) ) then return -reference
 		end if
 		exit function
 	end if
+
+	hint_identity = hIdentifierHintInput(sym, source, is_declaration)
 
 	if( semantic_model_binding_count + _
 		semantic_model_module_binding_count >= _
@@ -1618,6 +1922,7 @@ private function hSemanticModelExportBinding _
 		TABCHAR + hSemanticModelNumber(source.end_column))
 	if( semantic_model_module_failed = FALSE ) then
 		semantic_model_module_binding_count += 1
+		hIdentifierHintLink(sym, hint_identity, "binding", semantic_model_binding_count + semantic_model_module_binding_count)
 		if( is_declaration = FALSE ) then
 			hSemanticModelMemberSelection(sym, member_receiver, member_role, _
 				semantic_model_binding_count + semantic_model_module_binding_count, 0, source.macro_identity)
@@ -1738,7 +2043,7 @@ private function hSemanticModelCallSignature _
 			signature_part = "|" + mode_name + "|" + _
 				hSemanticModelNumber(param_optional) + "|" + _
 				hSemanticModelNumber(param_dimensions) + "|" + _
-				hSemanticModelNumber(culng(symbGetFullType(param))) + "|" + _
+				fbSemanticModelTypeNumber(culng(symbGetFullType(param))) + "|" + _
 				hSemanticModelNumber(param_subtype_id)
 			if( len(signature) > _
 				SEMANTIC_MODEL_MAX_CALL_SIGNATURE_BYTES - len(signature_part) ) then
@@ -3229,7 +3534,7 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
 		hSemanticModelEscape(operator_code) + _
 		TABCHAR + hSemanticModelEscape(operator_kind) + TABCHAR + _
-		hSemanticModelNumber(culng(astGetFullType(expr))) + TABCHAR + _
+		fbSemanticModelTypeNumber(culng(astGetFullType(expr))) + TABCHAR + _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelNumber(subtypeid) + TABCHAR + _
 		hSemanticModelEscape(type_name)
@@ -3242,7 +3547,7 @@ sub fbSemanticModelExportExpression _
 		hSemanticModelNumber(observed_end.end_column) + TABCHAR + _
 		hSemanticModelNumber(expr->class) + TABCHAR + _
 		hSemanticModelNumber(hSemanticModelNodeOperator(expr)) + TABCHAR + _
-		hSemanticModelNumber(culng(astGetFullType(expr))) + TABCHAR + _
+		fbSemanticModelTypeNumber(culng(astGetFullType(expr))) + TABCHAR + _
 		hSemanticModelNumber(symbolid) + TABCHAR + _
 		hSemanticModelNumber(subtypeid) + TABCHAR + _
 		hSemanticModelEscape(type_name)
@@ -3470,7 +3775,7 @@ function fbSemanticModelExportTree _
 			hSemanticModelNumber(hSemanticModelNodeOperator(current.node)) + TABCHAR + _
 			hSemanticModelEscape(operator_code) + TABCHAR + _
 			hSemanticModelEscape(operator_kind) + TABCHAR + _
-			hSemanticModelNumber(culng(current.node->dtype)) + TABCHAR + hSemanticModelNumber(symbolid) + _
+			fbSemanticModelTypeNumber(culng(current.node->dtype)) + TABCHAR + hSemanticModelNumber(symbolid) + _
 			TABCHAR + hSemanticModelNumber(subtypeid) + TABCHAR + _
 			hSemanticModelNumber(source_line) + _
 			TABCHAR + hSemanticModelEscape(sourcefile))
@@ -3680,6 +3985,9 @@ sub fbSemanticModelExportCurrentExpressionPrefixNonPhysical(byval expr as ASTNOD
 end sub
 
 sub fbSemanticModelBeginModule(byref filename as string)
+	hResetHintTokens( )
+	semantic_native_list_count = 0
+	semantic_source_signature_count = 0
 	fbSemanticLinkModule(filename)
 	semantic_callback_count = 0
 	fbSemanticDiagnosticsModule(filename)
@@ -3734,6 +4042,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_detail_count = 0
 	semantic_model_module_member_selection_count = 0
 	semantic_model_module_nonfield_member_selection_count = 0
+	semantic_model_module_keyword_count = 0
 	semantic_model_module_open = TRUE
 	semantic_model_module_source = filename
 	fbSemanticModelBeginSource(filename, 0)
@@ -3872,6 +4181,32 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
 			TABCHAR + feature + TABCHAR + coverage)
 	next
+	'' Extra source observations are available only when requested by the client.
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "extended-integer-type-abi" + TABCHAR + "available")
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "stable-primitive-type-abi-v1" + TABCHAR + iif(fbSemanticTypeAbiStable( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "for-step-style-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "external-variable-linkage" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "identifier-type-hints" + TABCHAR + iif(fbSemanticModelFullEnabled( ) and _
+		fbSemanticExtraFactsEnabled(FB_SEMEXTRA_HINTS), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "consumed-lexical-keywords" + TABCHAR + iif(fbSemanticModelFullEnabled( ) and _
+		fbSemanticExtraFactsEnabled(FB_SEMEXTRA_KEYWORDS), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "macro-source-access-roles" + TABCHAR + _
+		iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ) and _
+		fbSemanticExtraFactsEnabled(FB_SEMEXTRA_MACRO_ACCESS), "available", "unavailable"))
+	'' Declaration lists retain independent closure, alongside the older groups.
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "native-declarator-lists" + TABCHAR + iif(fbSemanticModelFullEnabled( ) and _
+		fbSemanticExtraFactsEnabled(FB_SEMEXTRA_DECLARATORS), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "source-formal-list-closure" + TABCHAR + iif(fbSemanticModelFullEnabled( ) and _
+		fbSemanticExtraFactsEnabled(FB_SEMEXTRA_DECLARATORS), "available", "unavailable"))
 end sub
 
 sub fbSemanticModelFinishModule(byval commit as integer)
@@ -3885,8 +4220,17 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	if( commit ) then fbSemanticModelExportAccess( )
 	if( commit ) then fbSemanticModelExportStringInitializerCopies( )
 	if( commit ) then fbSemanticModelFinishComments( )
+	if( commit and fbSemanticModelFullEnabled( ) and fbSemanticExtraFactsEnabled(FB_SEMEXTRA_KEYWORDS) ) then
+		dim as string keyword_count_row = "K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + _
+			TABCHAR + "consumed-keyword-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+			TABCHAR + fbSemanticModelNumber(semantic_model_module_keyword_count)
+		fbSemanticModelAppendDetail(keyword_count_row)
+	end if
 	if( commit ) then fbSemanticModelFinishVariableNames( )
 	if( commit ) then fbSemanticModelFinishPrimitiveTypes( )
+	if( commit ) then hFinishIdentifierHints( )
+	if( commit ) then hSemanticModelFinishNativeLists( )
 	if( commit ) then fbSemanticModelFinishMemberNames( )
 	if( (commit <> FALSE) and (len(semantic_model_pending_expression_value) > 0) ) then
 		dim as string pending_value = semantic_model_pending_expression_value
@@ -4027,7 +4371,7 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 
 	hSemanticModelAppendLine("P" + TABCHAR + hSemanticModelNumber(procid) + TABCHAR + _
 		hSemanticModelEscape(procname) + TABCHAR + hSemanticModelNumber(proc->class) + TABCHAR + _
-		hSemanticModelNumber(culng(proc->typ)) + TABCHAR + _
+		fbSemanticModelTypeNumber(culng(proc->typ)) + TABCHAR + _
 		hSemanticModelNumber(hSemanticModelSymbolId(proc->subtype)) + _
 		TABCHAR + hSemanticModelNumber(proc_start_line) + TABCHAR + _
 		hSemanticModelNumber(proc_end_line) + TABCHAR + hSemanticModelEscape(filename))

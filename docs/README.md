@@ -81,7 +81,9 @@ beside the examples:
 - [Compiler semantic model](../doc/compiler-semantic-model.md) defines the
   schema 27 sidecar, source and macro origins, bounded observations, and the
   binary/text reader contract, including direct native field reads without an
-  intermediate TSV record.
+  intermediate TSV record. It also documents requested source-observation
+  groups, native/stable datatype IDs and the dedicated semantic-build default. Generated
+  unnamed parameters without source ownership are excluded from hint closure.
 - [Cross-build matrix](../build_scripts/cross-build-matrix/README.md)
 - [Emulated native matrix](../build_scripts/emulated-native-matrix/README.md)
 - [gfxlib3 test plan](gfxlib3/test-plan.md)

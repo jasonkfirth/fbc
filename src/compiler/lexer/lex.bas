@@ -48,6 +48,8 @@ declare sub         hMultiLineComment       ( )
 declare sub hSkipChar( )
 declare function fbSemanticModelFullEnabled( ) as integer
 declare sub fbSemanticModelFailAt(byref reason as const string)
+declare sub fbSemanticModelCaptureIdentifierHint(byval token as FBTOKEN ptr)
+declare sub fbSemanticModelConsumedKeyword(byval token as FBTOKEN ptr)
 
 const UINVALID as uinteger = cuint( INVALID )
 
@@ -575,6 +577,7 @@ sub lexEatChar( )
 end sub
 
 function lexGetCurrentLocation( ) as LEX_LOCATION
+	fbSemanticModelCaptureIdentifierHint(lex.ctx->head)
 	function = lex.ctx->head->source
 end function
 
@@ -2883,6 +2886,12 @@ end sub
 sub lexSkipToken( byval flags as LEXCHECK )
 
 	lexCheckToken( flags )
+
+	'' Observe committed parser consumption, not lookahead or PP scanning.
+	'' The exporter keeps the lexical class; it does not reinterpret names.
+	if( (lex.ctx->reclevel = 0) and (lex.ctx->semantic_probe = FALSE) and (pp.skipping = FALSE) ) then
+		fbSemanticModelConsumedKeyword(lex.ctx->head)
+	end if
 
 	'' don't preserve any flags that were for warn / error checks only
 	flags and= not LEXCHECK_POST_MASK

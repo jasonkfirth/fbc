@@ -34,6 +34,18 @@ class SidecarTests(unittest.TestCase):
     backends: list[str]
     native_windows: bool
 
+    def test_requested_source_observations_are_independent(self) -> None:
+        from semantic_type_abi import check_requests
+        check_requests(self)
+
+    def test_semantic_datatype_abi_preserves_bits(self) -> None:
+        from semantic_type_abi import check_type_bits
+        check_type_bits(self)
+
+    def test_identifier_hints_have_source_binding_owners(self) -> None:
+        from semantic_type_abi import check_hint_owners
+        check_hint_owners(self)
+
     def test_macro_call_inputs(self) -> None:
         from macro_call_inputs import check_inputs
         check_inputs(self)

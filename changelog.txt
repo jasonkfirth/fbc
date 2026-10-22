@@ -1,6 +1,8 @@
 Version 1.20.5
 
 [changed]
+- compiler/semantic tooling: keep generated unnamed parameters without a source range or macro origin outside identifier-hint inputs; retain complete binding ownership for real source and macro hints, with a function-pointer regression in the normal semantic-sidecar runner.
+- compiler/semantic tooling: add requested hint, declarator-list, consumed-keyword and macro-access observations without enabling their collection by default; retain complete FOR-step headers, external-object linkage, distinct declaration macro origins and PUBLIC UNION identity; provide an explicit stable datatype export ABI and withhold integer values wider than the existing 64-bit value carrier.
 - compiler/128-bit integers: add Integer<128> and UInteger<128> scalar types with arithmetic, comparisons, bit operations, conversions, calls and FOR counters; use native C/LLVM operations where supported and portable two-word runtime lowering elsewhere, document target-specific C interoperability, and add layout, argument/return ABI and boundary regressions.
 - compiler/thread-local storage: add THREAD LOCAL declarations with separate values and constant initialization per thread, runtime-managed storage for native GAS definitions, and C TLS interoperability; restrict native GAS C imports to Linux executables, reject managed types and dynamic initializers, retain thread-local semantic facts, and add manual examples and worker-isolation tests.
 - compiler/EXTERN: allow forward-declared object types in external scalar declarations and preserve address-taking and BYREF calls before the type is complete; reject value access, assignment, indexing, member access and incomplete array elements with a diagnostic, with cross-language backend regressions.

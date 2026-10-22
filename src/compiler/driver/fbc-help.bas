@@ -65,6 +65,12 @@ sub fbcDriverPrintOptions( byval verbose as integer )
 	print "  -semantic-model-bindings <file>  Write bindings and selected implicit calls"
 	print "  -semantic-model-compact  Omit verbose macro-expansion provenance from the semantic model"
 	print "  -semantic-model-text     Write diagnostic TSV instead of the default binary model"
+	print "  -semantic-extra-facts <list>  Request hints,declarators,keywords,macro-access (or all/none)"
+#ifdef FBC_SEMANTIC_STABLE_TYPE_ABI
+	print "  -semantic-type-abi <name>    Export stable-v1 (default) or native raw datatype IDs"
+#else
+	print "  -semantic-type-abi <name>    Export native (default) or stable-v1 raw datatype IDs"
+#endif
 	print "  -semantic-model-expressions <file>  Write only typed expression ranges"
 	print "  -semantic-diagnostics <file>  Write structured diagnostics, including rejected modules"
 	if( verbose ) then

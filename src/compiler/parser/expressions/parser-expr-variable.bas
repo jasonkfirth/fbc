@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+declare function fbSemanticModelMacroAccessBinding( ) as longint
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-variable-names.bi"
@@ -401,9 +402,11 @@ function cUdtMember _
 		dim as LEX_LOCATION semantic_member_site = lexGetCurrentLocation( )
 		dim as longint semantic_member_nonphysical = lexGetNonphysicalTokenCount( )
 		dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
+	dim as longint semantic_macro_before = fbSemanticModelMacroAccessBinding( )
 		dim as FBSYMBOL ptr fld = hMemberId( subtype, FALSE )
 		dim as longint semantic_binding = fbSemanticModelBindingCount( )
 		if( semantic_binding = semantic_binding_before ) then semantic_binding = 0
+	if( fbSemanticModelMacroAccessBinding( ) <> semantic_macro_before ) then semantic_binding = fbSemanticModelMacroAccessBinding( )
 		if( fld = NULL ) then
 			return NULL
 		end if
@@ -1254,6 +1257,7 @@ function cVariableEx overload _
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
 	dim as longint semantic_array_nonphysical = lexGetNonphysicalTokenCount( )
 	dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
+	dim as longint semantic_macro_before = fbSemanticModelMacroAccessBinding( )
 	if( semantic_receiver <> NULL ) then
 		fbSemanticModelExportMemberBinding(sym, semantic_receiver, semantic_site, FALSE)
 	else
@@ -1261,6 +1265,7 @@ function cVariableEx overload _
 	end if
 	dim as longint semantic_binding = fbSemanticModelBindingCount( )
 	if( semantic_binding = semantic_binding_before ) then semantic_binding = 0
+	if( fbSemanticModelMacroAccessBinding( ) <> semantic_macro_before ) then semantic_binding = fbSemanticModelMacroAccessBinding( )
 
 	'' Check visibility of the variable
 	if( symbCheckAccess( sym ) = FALSE ) then

@@ -24,6 +24,12 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+
+declare function fbSemanticModelSourceSignatureBegin(byval proc as FBSYMBOL ptr) as longint
+declare sub fbSemanticModelSourceSignatureInput(byval identity as longint, byval proc as FBSYMBOL ptr, _
+    byval ordinal as integer, byval param as FBSYMBOL ptr)
+declare sub fbSemanticModelSourceSignatureEnd(byval identity as longint, byval proc as FBSYMBOL ptr, byval count as integer)
+
 #include once "tooling/semantic-hooks.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-expressions.bi"
@@ -77,6 +83,8 @@ sub cParameters _
 	dim as longint length = any
 
 	length = 0
+	dim as longint semantic_signature = fbSemanticModelSourceSignatureBegin(proc)
+	dim as integer semantic_count
 
 	'' method? add the instance pointer (must be done here
 	'' to check for dups)
@@ -87,6 +95,7 @@ sub cParameters _
 
 	'' '('?
 	if( lexGetToken( ) <> CHAR_LPRNT ) then
+		fbSemanticModelSourceSignatureEnd(semantic_signature, proc, semantic_count)
 		return
 	end if
 
@@ -95,6 +104,7 @@ sub cParameters _
 	'' ')'?
 	if( lexGetToken( ) = CHAR_RPRNT ) then
 		lexSkipToken( )
+		fbSemanticModelSourceSignatureEnd(semantic_signature, proc, semantic_count)
 		return
 	end if
 
@@ -114,6 +124,8 @@ sub cParameters _
 			(formal_first.source_context = formal_last.source_context) and _
 			(formal_nonphysical = lexGetNonphysicalTokenCount( ))
 		fbSemanticModelExportParameterRange(param, declaration_occurrence, formal_first, formal_last, formal_physical)
+		semantic_count += 1
+		fbSemanticModelSourceSignatureInput(semantic_signature, proc, semantic_count, param)
 
 		length += symbGetSizeOf( param )
 
@@ -143,6 +155,8 @@ sub cParameters _
 	if( length > (env.pointersize * 64) ) then
 		errReportWarn( FB_WARNINGMSG_PARAMLISTSIZETOOBIG, symbGetName( proc ) )
 	end if
+	fbSemanticModelSourceSignatureEnd(semantic_signature, proc, semantic_count)
+
 end sub
 
 '':::::

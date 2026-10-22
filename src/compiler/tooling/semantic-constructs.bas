@@ -28,6 +28,9 @@ type SEMANTIC_SOURCE_STATEMENT
 	compound as longint
 	source as LEX_LOCATION
 	token as integer
+	'' Original ST opening and actual aggregate syntax are different facts:
+	'' PUBLIC UNION must retain PUBLIC while constructing a UNION body.
+	aggregate_token as integer
 	counter_observed as integer
 	counter_source as LEX_LOCATION
 	step_observed as integer
@@ -270,6 +273,7 @@ function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval toke
 		.compound = compound
 		.source = source
 		.token = token
+		.aggregate_token = 0
 		.owner = owner
 		.assignment_count = 0
 		.array_dimension_count = 0
@@ -464,6 +468,15 @@ sub fbSemanticModelRecordLetInputs _
 	end with
 end sub
 
+sub fbSemanticModelAggregateDeclarationToken(byval token as integer)
+	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
+	if( (semantic_statement_depth = 0) or ((token <> FB_TK_TYPE) and (token <> FB_TK_UNION)) ) then
+		fbSemanticModelFailAt("unavailable aggregate declaration token")
+		exit sub
+	end if
+	semantic_statements[semantic_statement_depth - 1].aggregate_token = token
+end sub
+
 function fbSemanticModelConstructBegin( byval token as integer ) as longint
 	if( fbSemanticModelEnabled( ) = FALSE ) then return 0
 	if( hGrow(semantic_compounds, semantic_compound_capacity, semantic_compound_depth, sizeof(SEMANTIC_SOURCE_COMPOUND)) = FALSE ) then return 0
@@ -473,7 +486,13 @@ function fbSemanticModelConstructBegin( byval token as integer ) as longint
 	if( semantic_statement_depth > 0 ) then source = semantic_statements[semantic_statement_depth - 1].source
 	dim as string kind = hCompoundKind(token)
 	if( (token = FB_TK_TYPE) and (semantic_statement_depth > 0) ) then
-		if( semantic_statements[semantic_statement_depth - 1].token = FB_TK_UNION ) then kind = "union"
+		with semantic_statements[semantic_statement_depth - 1]
+			if( .aggregate_token <> 0 ) then
+				kind = hCompoundKind(.aggregate_token)
+			elseif( .token = FB_TK_UNION ) then
+				kind = "union"
+			end if
+		end with
 	end if
 	dim as longint identity = fbSemanticModelNextDetailIdentity( )
 	with semantic_compounds[semantic_compound_depth]
@@ -1046,6 +1065,27 @@ end sub
 '' An unsigned counter still accepts a signed negative step. Consumers need
 '' its original expression, rather than guessing a direction from counter type.
 '' UDT iteration operators and pointer counters have separate grammar contracts.
+'' Every accepted FOR owns one explicitness observation, including UDT counters
+'' with constructor argument lists. Numeric STEP 1 need not be equivalent to
+'' omitted STEP for an overloaded iterator, so this fact makes no such claim.
+sub fbSemanticModelForStepStyle(byval counter as FBSYMBOL ptr, byval explicit_step as integer)
+    if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+    if( (counter = NULL) or (semantic_statement_depth = 0) ) then
+        fbSemanticModelFailAt("FOR step-style header has no counter or statement")
+        exit sub
+    end if
+    dim as longint statement = fbSemanticModelCurrentStatement( )
+    if( (statement <= 0) or _
+        (semantic_statements[semantic_statement_depth - 1].token <> FB_TK_FOR) ) then
+        fbSemanticModelFailAt("FOR step-style header ownership")
+        exit sub
+    end if
+    fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + _
+        fbSemanticModelNumber(fbSemanticModelSymbolId(counter)) + TABCHAR + _
+        "for-header-step-explicit:" + fbSemanticModelNumber(statement) + TABCHAR + _
+        iif(explicit_step, "1", "0"))
+end sub
+
 sub fbSemanticModelScalarForStep _
 	( byval counter as FBSYMBOL ptr, byval expr as ASTNODE ptr, byval explicit_step as integer )
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
@@ -1090,6 +1130,31 @@ sub fbSemanticModelScalarForStepSelection _
 	( byval counter as FBSYMBOL ptr, byval expr as ASTNODE ptr, byval dtype as integer )
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( counter = NULL ) then exit sub
+    if( typeIsPtr(symbGetType(counter)) ) then
+        dim as longint statement = fbSemanticModelCurrentStatement( )
+        if( (statement <= 0) or (semantic_statement_depth = 0) ) then
+            fbSemanticModelFailAt("pointer FOR step-style selection ownership")
+            exit sub
+        end if
+        if( semantic_statements[semantic_statement_depth - 1].token <> FB_TK_FOR ) then
+            fbSemanticModelFailAt("pointer FOR step-style selection outside FOR")
+            exit sub
+        end if
+        '' Observe the actual converted constant before pointer iteration scales
+        '' it by pointee size. Unknown dynamic values are not assumed to be one.
+        dim as string unit_step = "unknown"
+        if( expr <> NULL ) then
+            if( (expr->class <> AST_NODECLASS_CONST) or (astGetFullType(expr) <> dtype) ) then
+                fbSemanticModelFailAt("pointer FOR step-style selected constant")
+                exit sub
+            end if
+            unit_step = iif(astConstGetVal(expr)->i = 1, "1", "0")
+        end if
+        fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + _
+            fbSemanticModelNumber(fbSemanticModelSymbolId(counter)) + TABCHAR + _
+            "for-pointer-step-unit:" + fbSemanticModelNumber(statement) + TABCHAR + unit_step)
+        exit sub
+    end if
 	select case symbGetType(counter)
 	case FB_DATATYPE_BYTE, FB_DATATYPE_UBYTE, FB_DATATYPE_SHORT, FB_DATATYPE_USHORT, _
 	     FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, FB_DATATYPE_LONG, FB_DATATYPE_ULONG, _
@@ -1125,7 +1190,7 @@ sub fbSemanticModelScalarForStepSelection _
 	end if
 	dim as string prefix = "K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(counter)) + TABCHAR
 	dim as string statement_text = fbSemanticModelNumber(statement)
-	fbSemanticModelAppendProvenance(prefix + "for-step-selected-dtype:" + statement_text + TABCHAR + fbSemanticModelNumber(culng(dtype)))
+	fbSemanticModelAppendProvenance(prefix + "for-step-selected-dtype:" + statement_text + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)))
 	fbSemanticModelAppendProvenance(prefix + "for-step-selected-expression:" + statement_text + TABCHAR + fbSemanticModelNumber(expression_id))
 end sub
 
@@ -1206,7 +1271,7 @@ sub fbSemanticModelSelectConstant _
 		fbSemanticModelFailAt("invalid selected case constant")
 		exit sub
 	end if
-	dim as string value = fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelNumber(culng(dtype)) + _
+	dim as string value = fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)) + _
 		TABCHAR + ltrim(str(first_value)) + TABCHAR + ltrim(str(last_value)) + TABCHAR + ltrim(str(bias))
 	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->select_owner) + _
 		TABCHAR + "select-case-constant:" + fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + ":" + _
@@ -1225,7 +1290,7 @@ sub fbSemanticModelSelectTable _
 		fbSemanticModelFailAt("invalid selected case table")
 		exit sub
 	end if
-	dim as string value = fbSemanticModelNumber(culng(dtype)) + TABCHAR + fbSemanticModelNumber(culng(symbGetFullType(storage))) + _
+	dim as string value = fbSemanticModelTypeNumber(culng(dtype)) + TABCHAR + fbSemanticModelTypeNumber(culng(symbGetFullType(storage))) + _
 		TABCHAR + ltrim(str(bias)) + TABCHAR + ltrim(str(span)) + TABCHAR + fbSemanticModelNumber(count)
 	fbSemanticModelAppendProvenance("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(observed->select_owner) + _
 		TABCHAR + "select-case-table:" + fbSemanticModelNumber(construct) + TABCHAR + fbSemanticModelEscape(value))

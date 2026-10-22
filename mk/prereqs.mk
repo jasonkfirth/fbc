@@ -184,12 +184,16 @@ prereqs-tools:
 # Metadata queries may inspect an unavailable target without building it.
 # Concrete builds must not silently use a host compiler in its place. An
 # explicitly supplied SDK compiler is allowed to replace the inferred prefix.
+# Source bootstrap workflows run the host fbc with -r; no target C compiler
+# executes until the emitted sources are built in their native environment.
+ifeq ($(strip $(BOOTSTRAP_EMIT_GOAL)),)
 ifneq ($(strip $(MISSING_CROSS_CC)),)
 ifeq ($(filter command% environment%,$(origin CC)),)
 	@$(call pr_error_block,Missing requested cross compiler: $(MISSING_CROSS_CC). Set CC explicitly for an equivalent SDK)
 endif
 endif
 	@$(call pr_check_cmd,$(PR_CC))
+endif
 	@$(foreach t,$(PR_COMMON_TOOLS),$(call pr_check_cmd,$(t));)
 
 ##############################################################################

@@ -132,7 +132,7 @@ sub fbSemanticModelNumericLiteral( byval token as FBTOKEN ptr )
 	dim as string value = fbSemanticModelNumber(token->source.source_context) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentContext( )) + TABCHAR + _
 		fbSemanticModelNumber(token->source.macro_identity) + TABCHAR + _
-		fbSemanticModelNumber(culng(token->dtype)) + TABCHAR + token->numeric_suffix
+		fbSemanticModelTypeNumber(culng(token->dtype)) + TABCHAR + token->numeric_suffix
 	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
 		TABCHAR + property_name + TABCHAR + fbSemanticModelEscape(value))
 	fbSemanticModelExportCoordinates("source-context", token->source.source_context, property_name, token->source, token->source)
@@ -829,8 +829,8 @@ function fbSemanticModelSelectOperandSnapshot(byval generation as longint) as st
 	'' An overloaded or recursively coerced UDT comparison does not reach the
 	'' built-in selection hook. Its explicit unclassified receipt is complete,
 	'' but does not claim the types or meaning of a built-in comparison.
-	dim as string value = select_operands.kind + TABCHAR + fbSemanticModelNumber(culng(select_operands.left_dtype)) + _
-		TABCHAR + fbSemanticModelNumber(culng(select_operands.right_dtype)) + TABCHAR + _
+	dim as string value = select_operands.kind + TABCHAR + fbSemanticModelTypeNumber(culng(select_operands.left_dtype)) + _
+		TABCHAR + fbSemanticModelTypeNumber(culng(select_operands.right_dtype)) + TABCHAR + _
 		fbSemanticModelNumber(select_operands.left_expression) + TABCHAR + fbSemanticModelNumber(select_operands.right_expression)
 	select_operands.generation = 0
 	return value
@@ -901,9 +901,9 @@ sub fbSemanticModelExportOperands(byval node as ASTNODE ptr, byval identity as l
 		fbSemanticModelStatementOperandExport( )
 		if( .selected_numeric ) then
 			fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
-				TABCHAR + "numeric-selected-left-dtype" + TABCHAR + fbSemanticModelNumber(culng(.selected_left_dtype)))
+				TABCHAR + "numeric-selected-left-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(.selected_left_dtype)))
 			fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
-				TABCHAR + "numeric-selected-right-dtype" + TABCHAR + fbSemanticModelNumber(culng(.selected_right_dtype)))
+				TABCHAR + "numeric-selected-right-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(.selected_right_dtype)))
 			fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
 				TABCHAR + "numeric-selected-left-expression" + TABCHAR + fbSemanticModelNumber(.selected_left_expression))
 			fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
@@ -1049,7 +1049,7 @@ private function hAssignmentTree _
 		'' its storage snapshot must retain that same selected declaration.
 		observed_symbol = node->call.semantic_target
 	end if
-	dim as string payload = fbSemanticModelNumber(node->class) + TABCHAR + fbSemanticModelNumber(culng(node->dtype)) + _
+	dim as string payload = fbSemanticModelNumber(node->class) + TABCHAR + fbSemanticModelTypeNumber(culng(node->dtype)) + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(node->subtype)) + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(observed_symbol)) + TABCHAR + code + _
 		TABCHAR + fbSemanticModelNumber(options) + TABCHAR + fbSemanticModelNumber(offset) + TABCHAR + fbSemanticModelNumber(scale) + _
@@ -1203,7 +1203,7 @@ sub fbSemanticModelAssignmentTarget _
 	'' must support expression properties, rather than overwrite the RHS type
 	'' with its destination. Y supplies the target-selected storage widths.
 	fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + _
-		TABCHAR + "assignment-target-dtype" + TABCHAR + fbSemanticModelNumber(culng(dtype)))
+		TABCHAR + "assignment-target-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)))
 	fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + _
 		TABCHAR + "assignment-kind" + TABCHAR + assignment_kind)
 end sub
@@ -1311,7 +1311,7 @@ sub fbSemanticModelStringInitializer _
 	if( target_id = 0 ) then exit sub
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + TABCHAR
 	fbSemanticModelAppendDetail(prefix + "string-initializer-symbol" + TABCHAR + fbSemanticModelNumber(target_id))
-	fbSemanticModelAppendDetail(prefix + "string-initializer-dtype" + TABCHAR + fbSemanticModelNumber(culng(dtype)))
+	fbSemanticModelAppendDetail(prefix + "string-initializer-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)))
 	fbSemanticModelAppendDetail(prefix + "string-initializer-bytes" + TABCHAR + fbSemanticModelNumber(target->lgt))
 	fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(target_id) + _
 		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + TABCHAR + "string-initializer" + TABCHAR + "0")
@@ -1372,7 +1372,7 @@ sub fbSemanticModelSizeQuery _
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + _
 		fbSemanticModelNumber(expression_id) + TABCHAR
 	fbSemanticModelAppendDetail(prefix + "size-query-kind" + TABCHAR + query_kind)
-	fbSemanticModelAppendDetail(prefix + "size-query-dtype" + TABCHAR + fbSemanticModelNumber(culng(dtype)))
+	fbSemanticModelAppendDetail(prefix + "size-query-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)))
 	fbSemanticModelAppendDetail(prefix + "size-query-subtype" + TABCHAR + fbSemanticModelNumber(subtype_id))
 	fbSemanticModelAppendDetail(prefix + "size-query-operand" + TABCHAR + fbSemanticModelNumber(operand_id))
 	fbSemanticModelAppendDetail(prefix + "size-query-input" + TABCHAR + input_kind)
@@ -1476,7 +1476,7 @@ sub fbSemanticModelPointerAddress _
 	if( subtype <> NULL ) then fbSemanticModelExportSymbolDetails(subtype)
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
 	fbSemanticModelAppendDetail(prefix + "pointer-address-kind" + TABCHAR + address_kind)
-	fbSemanticModelAppendDetail(prefix + "pointer-address-dtype" + TABCHAR + fbSemanticModelNumber(culng(dtype)))
+	fbSemanticModelAppendDetail(prefix + "pointer-address-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)))
 	fbSemanticModelAppendDetail(prefix + "pointer-address-subtype" + TABCHAR + fbSemanticModelNumber(subtype_id))
 	fbSemanticModelAppendDetail(prefix + "pointer-address-operand" + TABCHAR + fbSemanticModelNumber(operand_id))
 	fbSemanticModelAppendDetail(prefix + "pointer-address-temporary" + TABCHAR + fbSemanticModelNumber(abs(temporary_input <> FALSE)))
@@ -1777,7 +1777,7 @@ sub fbSemanticModelNewStorage _
 	end if
 	dim as string prefix = "K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
 	fbSemanticModelAppendDetail(prefix + "memory-new-kind" + TABCHAR + iif(is_array, "array", "scalar"))
-	fbSemanticModelAppendDetail(prefix + "memory-new-dtype" + TABCHAR + fbSemanticModelNumber(culng(dtype)))
+	fbSemanticModelAppendDetail(prefix + "memory-new-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)))
 	fbSemanticModelAppendDetail(prefix + "memory-new-subtype" + TABCHAR + fbSemanticModelNumber(subtype_id))
 	fbSemanticModelAppendDetail(prefix + "memory-new-elements" + TABCHAR + count_text)
 	fbSemanticModelAppendDetail(prefix + "memory-new-clear" + TABCHAR + fbSemanticModelNumber(abs(do_clear <> FALSE)))
@@ -1863,7 +1863,7 @@ function fbSemanticModelOriginalExpression _
 			fbSemanticModelNumber(abs(source_start.is_physical <> FALSE)) + "/" + _
 			fbSemanticModelNumber(abs(source_end.is_physical <> FALSE)) + " ast=" + _
 			fbSemanticModelNumber(operand->class) + " dtype=" + _
-			fbSemanticModelNumber(culng(astGetFullType(operand)))
+			fbSemanticModelTypeNumber(culng(astGetFullType(operand)))
 		fbSemanticModelFailAt(failure_reason)
 	end if
 	return operand->semantic_expression

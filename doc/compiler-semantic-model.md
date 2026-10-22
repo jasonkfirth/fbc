@@ -14,6 +14,55 @@ source observation without enabling language debug options or changing
 predefined configuration values such as `__FB_ERR__`. Consumers can compile to
 a temporary object, or use normal emission-only compilation with `-r`.
 
+`-semantic-type-abi native|stable-v1` selects the numeric datatype encoding in
+the sidecar, including builtin-mangling subtype bits. Ordinary compiler builds
+default to `native`, whose `Y` table describes the compiler's current enum.
+The dedicated semantic build can select stable IDs by default with
+`BUILD_FBCFLAGS=-d FBC_SEMANTIC_STABLE_TYPE_ABI`. An explicit command-line
+selection overrides either default. The ABI setting belongs to the serial
+compiler invocation and persists across its input modules.
+
+Stable-v1 retains the original schema-27 primitive slots 0 through 26 and puts
+`integer128` and `uinteger128` at 27 and 28. This prevents inserting an internal
+compiler type from shifting existing client identities. For example, stable
+Single, Double and String remain 15, 16 and 17; the current native enum places
+the two wide integers at 15/16 and those three types at 17/18/19. Conversion
+changes only the independent five-bit base and builtin-mangling fields, leaving
+pointer depth, const qualifiers, ByRef flags and sentinel bits intact.
+
+`CAP ... stable-primitive-type-abi-v1 available` identifies stable-v1 output.
+`CAP ... extended-integer-type-abi available` identifies the complete 29-slot
+table. Consumers must validate the complete table and its names, rather than
+accepting a contiguous prefix or assuming that an unavailable stable capability
+means the native table has only 27 slots. Existing signed/unsigned `C` value
+kinds carry at most 64 integer bits. Wider constants are not published through
+those carriers; a missing value does not establish a narrowed constant.
+
+`-semantic-extra-facts <list>` requests additional full-model source
+observations. The comma-separated names are `hints`, `declarators`, `keywords`
+and `macro-access`; `all` requests all four. Repeated options accumulate requests.
+The complete request `none` clears them. Names are case-insensitive, surrounding
+spaces are ignored, and unknown names or empty list fields are rejected before
+the request is changed. No extra group is enabled by default.
+
+The groups publish identifier type-hint inputs and completion counts; native
+declarator membership and formal-list closure; parser-consumed keyword origins;
+and macro source read/write/address roles. Their named capabilities are
+`identifier-type-hints`, `native-declarator-lists`, `source-formal-list-closure`,
+`consumed-lexical-keywords` and `macro-source-access-roles`. A capability remains
+unavailable when its group was not requested or the selected model mode omits
+the required facts. Macro-access observations additionally need macro
+provenance. Request configuration persists across modules while each module's
+observations and completion counts reset. These are compiler facts, not rule
+selection or permission to reconstruct missing syntax from text.
+
+Identifier-hint inputs retain an independent source binding or macro owner.
+Compiler-generated unnamed parameters can exist for ABI checking without any
+physical identifier token. They do not publish hint inputs when they have neither
+a source range nor a macro origin. This preserves the completion count without
+adding artificial runtime reads or changing existing binding records. The normal
+semantic-sidecar runner checks this boundary with function-pointer formals.
+
 `-semantic-bundle <prefix>` publishes the complete model as
 `<prefix>.fbcsem` and the matching structured diagnostics as
 `<prefix>.fbcdia` from one compiler invocation. The two files retain their

@@ -25,6 +25,15 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+declare sub fbSemanticModelAggregateDeclarationToken(byval token as integer)
+
+declare function fbSemanticModelNativeListBegin(byval owner as FBSYMBOL ptr, _
+    byref kind as const string, byref source as LEX_LOCATION) as longint
+declare sub fbSemanticModelNativeListInput(byval identity as longint, byval owner as FBSYMBOL ptr, _
+    byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
+    byval is_declaration as integer, byref source as LEX_LOCATION)
+declare sub fbSemanticModelNativeListEnd(byval identity as longint, byval owner as FBSYMBOL ptr, byval count as integer)
+
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "ast/ast.bi"
@@ -464,7 +473,9 @@ private function hAddAndInitField _
 		byval lgt as longint, _
 		byval bits as integer, _
 		byval attrib as FB_SYMBATTRIB, _
-		byref semantic_site as LEX_LOCATION _
+		byref semantic_site as LEX_LOCATION, _
+		byval semantic_group as longint = 0, _
+		byval semantic_ordinal as integer = 0 _
 	) as integer
 
 	dim as FBSYMBOL ptr sym = any, dtor = any
@@ -509,6 +520,7 @@ private function hAddAndInitField _
 	end if
 	fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 	fbSemanticModelMemberDeclarationSpelling(sym, id, semantic_site)
+	fbSemanticModelNativeListInput(semantic_group, parent, semantic_ordinal, sym, "as", TRUE, semantic_site)
 	if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then
 		dtor = symbGetCompDtor1(symbGetSubtype(sym))
 		if( dtor <> NULL ) then
@@ -581,7 +593,8 @@ private sub hTypeMultElementDecl _
 	( _
 		byval token as integer, _
 		byval parent as FBSYMBOL ptr, _
-		byval attrib as FB_SYMBATTRIB _
+		byval attrib as FB_SYMBATTRIB, _
+		byval semantic_header as LEX_LOCATION ptr = NULL _
 	)
 
 	static as FBARRAYDIM dTB(0 to FB_MAXARRAYDIMS-1)
@@ -591,6 +604,10 @@ private sub hTypeMultElementDecl _
 	dim as longint lgt = any
 	dim as ASTNODE ptr boundstypeini = any
 	dim as LEX_LOCATION semantic_site = any
+	dim as LEX_LOCATION list_anchor = lexGetCurrentLocation( )
+	if( semantic_header <> NULL ) then list_anchor = *semantic_header
+	dim as longint semantic_group = fbSemanticModelNativeListBegin(parent, "field", list_anchor)
+	dim as integer semantic_ordinal
 
 	'' AS SymbolType
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
@@ -607,10 +624,13 @@ private sub hTypeMultElementDecl _
 
 		'' symbAddField()
 		'' ['=' InitializerExpression]
-		hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, fieldattrib, semantic_site )
+		semantic_ordinal += 1
+		hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, fieldattrib, semantic_site, semantic_group, semantic_ordinal )
 
 		'' ','?
 	loop while( hMatch( CHAR_COMMA ) )
+
+	fbSemanticModelNativeListEnd(semantic_group, parent, semantic_ordinal)
 
 end sub
 
@@ -622,7 +642,8 @@ private sub hTypeElementDecl _
 	( _
 		byval token as integer, _
 		byval parent as FBSYMBOL ptr, _
-		byval attrib as FB_SYMBATTRIB _
+		byval attrib as FB_SYMBATTRIB, _
+		byval semantic_header as LEX_LOCATION ptr = NULL _
 	)
 
 	static as FBARRAYDIM dTB(0 to FB_MAXARRAYDIMS-1)
@@ -632,6 +653,10 @@ private sub hTypeElementDecl _
 	dim as longint lgt = any
 	dim as ASTNODE ptr boundstypeini = any
 	dim as LEX_LOCATION semantic_site = any
+	dim as LEX_LOCATION list_anchor = lexGetCurrentLocation( )
+	if( semantic_header <> NULL ) then list_anchor = *semantic_header
+	dim as longint semantic_group = fbSemanticModelNativeListBegin(parent, "field", list_anchor)
+	dim as integer semantic_ordinal
 
 	'' Identifier
 	id = hFieldId( parent, semantic_site )
@@ -649,7 +674,10 @@ private sub hTypeElementDecl _
 
 	'' symbAddField()
 	'' ['=' InitializerExpression]
-	hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, attrib, semantic_site )
+	semantic_ordinal += 1
+	hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, attrib, semantic_site, semantic_group, semantic_ordinal )
+	fbSemanticModelNativeListEnd(semantic_group, parent, semantic_ordinal)
+
 end sub
 
 private sub hFieldDeclWithExplicitDim _
@@ -660,13 +688,14 @@ private sub hFieldDeclWithExplicitDim _
 	)
 
 	'' DIM|REDIM
+	dim as LEX_LOCATION list_header = lexGetCurrentLocation( )
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	'' multi-decl?
 	if( lexGetToken( ) = FB_TK_AS ) then
-		hTypeMultElementDecl( token, s, attrib )
+		hTypeMultElementDecl( token, s, attrib, @list_header )
 	else
-		hTypeElementDecl( token, s, attrib )
+		hTypeElementDecl( token, s, attrib, @list_header )
 	end if
 
 end sub
@@ -1229,6 +1258,11 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 
 	'' [FIELD '=' ConstExpression]
 	dim as integer align = cFieldAlignmentAttribute( )
+
+	'' Parser stack IDs deliberately use TYPE for both aggregate kinds. The
+	'' observer must retain the actual declaration token independently of a
+	'' preceding PUBLIC/PRIVATE statement-opening token.
+	fbSemanticModelAggregateDeclarationToken(iif(isunion, FB_TK_UNION, FB_TK_TYPE))
 
 	'' start a new compound, or any EXTERN..END EXTERN used around this struct
 	'' would turn-off function mangling depending on the mode passed

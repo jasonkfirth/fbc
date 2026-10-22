@@ -70,7 +70,7 @@ sub fbSemanticModelPrimitiveType _
 	dim as longint detail = fbSemanticModelNextDetailIdentity( )
 	dim as string role = "primitive-type-input:" + fbSemanticModelNumber(detail)
 	dim as string payload = fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(sourceid) + _
-		TABCHAR + fbSemanticModelNumber(token) + TABCHAR + fbSemanticModelNumber(dtype) + _
+		TABCHAR + fbSemanticModelNumber(token) + TABCHAR + fbSemanticModelTypeNumber(dtype) + _
 		TABCHAR + fbSemanticModelNumber(accepted_primitive_type_count)
 	dim as string row = "K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
 		TABCHAR + role + TABCHAR + fbSemanticModelEscape(payload)

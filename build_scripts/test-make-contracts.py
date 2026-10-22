@@ -44,7 +44,7 @@ def include(root: Path, name: str) -> str:
     return "include " + (root / "mk" / name).as_posix().replace(" ", "\\ ") + "\n"
 
 
-def make(working: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def make(working: Path, *arguments: str, timeout: int = 30) -> subprocess.CompletedProcess[str]:
     # Each fixture owns its target and tool selection. Parent make overrides
     # and CI's exported cross tools must not redefine that miniature build.
     environment = os.environ.copy()
@@ -56,7 +56,7 @@ def make(working: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
         environment.pop(name, None)
     return subprocess.run([MAKE_COMMAND, "--no-print-directory", "-s", *arguments],
                           cwd=working, env=environment, capture_output=True, text=True,
-                          timeout=30, check=False)
+                          timeout=timeout, check=False)
 
 
 def require(condition: bool, message: str, result: subprocess.CompletedProcess[str] | None = None) -> None:
@@ -609,6 +609,34 @@ def test_missing_cross_toolchain(root: Path, working: Path) -> None:
     write(working / "cross.sh", "#!/bin/sh\nprintf '%s\\n' aarch64-fixture-linux-gnu\n")
     result = make(working, "prereqs-tools", "CC=sh cross.sh")
     require(result.returncode == 0, "explicit cross compiler override was rejected", result)
+    # Source bootstrap archives are emitted by the host compiler. The target
+    # C driver is installed later, inside the native package-build container.
+    emission_goals = ("bootstrap-dist-target", "bootstrap-dist", "bootstrap-dist-arm",
+                      "bootstrap-dist-all", "bootstrap-emit", "bootstrap-emit-matrix",
+                      "bootstrap-emit-source-response")
+    with (working / "GNUmakefile").open("a", encoding="utf-8") as stream:
+        stream.write("\n" + " ".join(emission_goals) + ": prereqs-tools\n")
+    for goal in emission_goals:
+        result = make(working, goal)
+        require(result.returncode == 0 and "Requested cross toolchain" not in result.stderr,
+                goal + " required a target compiler for source-only emission", result)
+    result = make(working, "bootstrap-dist-target", "prereqs-tools")
+    require(result.returncode != 0 and "Missing requested cross compiler" in result.stdout,
+            "source emission disabled SDK checks for an additional build goal", result)
+    # Keep the top-level prerequisite wiring, replacing only source emission
+    # and archiving so this regression never copies or builds the working tree.
+    # Its policy probes need more time on native Windows than small fragments.
+    write(working / "GNUmakefile", "include "
+          + (root / "GNUmakefile").as_posix().replace(" ", "\\ ") + "\n"
+          "bootstrap-check:\n\t@true\n"
+          "bootstrap-emit:\n\t@printf source > emitted-source\n"
+          "bootstrap-dist-target:\n\t@test -s emitted-source\n")
+    result = make(working, "bootstrap-dist-target", "HOST_CC=sh host.sh",
+                  "TARGET_TRIPLET=aarch64-fixture-linux-gnu", "FBC_TARGET=linux-aarch64",
+                  "PR_COMMON_TOOLS=make tar", "ENABLE_REPRODUCIBLE=", "ENABLE_CET=",
+                  "ENABLE_NO_PLT=", "ENABLE_AUTO_VAR_INIT=", timeout=120)
+    require(result.returncode == 0 and (working / "emitted-source").is_file(),
+            "package bootstrap target still required the target SDK", result)
 
 
 def test_multilib_identity(root: Path, working: Path) -> None:

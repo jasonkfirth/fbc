@@ -19,6 +19,8 @@
 ''
 
 #include once "driver/fbc-private.bi"
+#include once "tooling/semantic-extra-facts.bi"
+#include once "tooling/semantic-type-abi.bi"
 
 declare sub fbSemanticModelTextFormat( )
 
@@ -452,6 +454,8 @@ enum
 	OPT_S
 	OPT_SEMANTIC_BUNDLE
 	OPT_SEMANTIC_MODEL
+	OPT_SEMANTIC_EXTRA_FACTS
+	OPT_SEMANTIC_TYPE_ABI
 	OPT_SEMANTIC_BINDINGS
 	OPT_SEMANTIC_COMPACT
 	OPT_SEMANTIC_TEXT
@@ -549,6 +553,8 @@ dim shared as FBC_CMDLINE_OPTION cmdlineOptionTB(0 to (OPT__COUNT - 1)) = _
 	( TRUE , TRUE , FALSE, FALSE ), _ '' OPT_S            affects link
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_BUNDLE paired model and diagnostic outputs
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_MODEL compiler-owned semantic model output
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_EXTRA_FACTS requested source captures
+	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_TYPE_ABI raw datatype identity contract
 	( TRUE , FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_BINDINGS compiler-owned bindings and implicit calls
 	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_COMPACT omit verbose macro-expansion provenance
 	( FALSE, FALSE, FALSE, FALSE ), _ '' OPT_SEMANTIC_TEXT diagnostic text transport
@@ -692,6 +698,16 @@ private sub hHandleOptCompileSetup _
 		fbc.semanticmodel_bindings = FALSE
 		'' The parser emits AST line markers independently of debug-info mode.
 		'' Keep this tooling option from changing source-visible __FB_ERR__.
+
+	case OPT_SEMANTIC_TYPE_ABI
+		if( fbSemanticTypeAbiConfigure(arg) = FALSE ) then
+			hFatalInvalidOption( arg, is_source )
+		end if
+
+	case OPT_SEMANTIC_EXTRA_FACTS
+		if( fbSemanticExtraFactsConfigure(arg) = FALSE ) then
+			hFatalInvalidOption( arg, is_source )
+		end if
 
 	case OPT_SEMANTIC_BINDINGS
 		fbc.semanticmodel = arg
@@ -1168,7 +1184,7 @@ private sub handleOpt _
 	)
 
 	select case as const optid
-	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_BUNDLE, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_TEXT, OPT_SEMANTIC_EXPRESSIONS, OPT_SEMANTIC_DIAGNOSTICS, OPT_SEMANTIC_LINK_DIAGNOSTICS
+	case OPT_A to OPT_FPU, OPT_GFX3, OPT_SEMANTIC_BUNDLE, OPT_SEMANTIC_MODEL, OPT_SEMANTIC_EXTRA_FACTS, OPT_SEMANTIC_TYPE_ABI, OPT_SEMANTIC_BINDINGS, OPT_SEMANTIC_COMPACT, OPT_SEMANTIC_TEXT, OPT_SEMANTIC_EXPRESSIONS, OPT_SEMANTIC_DIAGNOSTICS, OPT_SEMANTIC_LINK_DIAGNOSTICS
 		hHandleOptCompileSetup( optid, arg, is_source )
 
 	case OPT_G, OPT_GEN to OPT_O
@@ -1301,6 +1317,8 @@ private function parseOption(byval opt as zstring ptr) as integer
 		ONECHAR(OPT_S)
 		CHECK("semantic-bundle", OPT_SEMANTIC_BUNDLE)
 		CHECK("semantic-model", OPT_SEMANTIC_MODEL)
+		CHECK("semantic-extra-facts", OPT_SEMANTIC_EXTRA_FACTS)
+		CHECK("semantic-type-abi", OPT_SEMANTIC_TYPE_ABI)
 		CHECK("semantic-model-bindings", OPT_SEMANTIC_BINDINGS)
 		CHECK("semantic-model-compact", OPT_SEMANTIC_COMPACT)
 		CHECK("semantic-model-text", OPT_SEMANTIC_TEXT)

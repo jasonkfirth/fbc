@@ -276,8 +276,12 @@ endif
 # Verify cross compiler exists
 ##############################################################################
 
-BOOTSTRAP_EMIT_GOALS := bootstrap-emit bootstrap-emit-matrix bootstrap-emit-source-response
-BOOTSTRAP_EMIT_GOAL  := $(filter $(BOOTSTRAP_EMIT_GOALS),$(MAKECMDGOALS))
+# These workflows only emit or archive sources with a runnable host compiler.
+# A target SDK is needed when those sources are compiled in the target guest.
+# Keep SDK checks enabled if the invocation also requests any concrete build.
+BOOTSTRAP_EMIT_GOALS := bootstrap-emit bootstrap-emit-matrix bootstrap-emit-source-response \
+bootstrap-dist-target bootstrap-dist bootstrap-dist-arm bootstrap-dist-all
+BOOTSTRAP_EMIT_GOAL := $(if $(strip $(MAKECMDGOALS)),$(if $(filter-out $(BOOTSTRAP_EMIT_GOALS),$(MAKECMDGOALS)),,$(MAKECMDGOALS)))
 MISSING_CROSS_CC :=
 
 ifneq ($(strip $(BUILD_PREFIX)),)

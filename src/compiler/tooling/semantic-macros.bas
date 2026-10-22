@@ -805,7 +805,10 @@ end sub
 sub fbSemanticModelMacroOrigin _
 	( byref domain as const string, byval subject as longint, byval expansion as longint, byref role as const string )
 	if( (expansion = 0) or (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) ) then exit sub
-	if( (domain = "symbol") and (left(role, 12) = "declaration-") ) then
+    '' Generic binding exports can repeat for one symbol/expansion. Distinct
+    '' declaration-type-input roles describe separate accepted declarators;
+    '' deduplicating by their shared owner would erase later macro origins.
+    if( (domain = "symbol") and (role = "declaration-" + fbSemanticModelNumber(expansion)) ) then
 		dim as integer bucket = hHash(culngint(subject) xor (culngint(expansion) shl 1)) and (SEMANTIC_MACRO_ORIGIN_BUCKETS - 1)
 		dim as integer origin = macro_origin_buckets(bucket)
 		while( origin <> 0 )

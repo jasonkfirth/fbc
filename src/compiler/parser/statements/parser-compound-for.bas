@@ -30,6 +30,10 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-diagnostics.bi"
 
+'' The header observation covers numeric, pointer and overloaded counters.
+'' It records syntax selected by this parser, not a replacement grammar.
+declare sub fbSemanticModelForStepStyle(byval counter as FBSYMBOL ptr, byval explicit_step as integer)
+
 enum FOR_FLAGS
 	FOR_ISUDT           = &h0001
 	FOR_HASCTOR         = &h0002
@@ -608,6 +612,8 @@ private sub hForStep _
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 		stk->for.explicit_step = TRUE
 	end if
+
+	fbSemanticModelForStepStyle(stk->for.cnt.sym, stk->for.explicit_step)
 
 	dim as integer iscomplex = FALSE
 

@@ -113,15 +113,15 @@ function fbSemanticModelCurrentContext( ) as longint
 	hOption("language-default", "dynamic", env.opt.dynamic)
 	hOption("language-default", "gosub", env.opt.gosub)
 	hOption("language-policy", "opt", env.lang.opt)
-	hOption("language-policy", "integerkeyworddtype", env.lang.integerkeyworddtype)
+	hOption("language-policy", "integerkeyworddtype", fbSemanticModelTypeCode(env.lang.integerkeyworddtype))
 	hOption("language-policy", "remkeyword-active", abs(semantic_context_remkeyword_active <> FALSE))
-	hOption("language-policy", "int15literaldtype", env.lang.int15literaldtype)
-	hOption("language-policy", "int16literaldtype", env.lang.int16literaldtype)
-	hOption("language-policy", "int31literaldtype", env.lang.int31literaldtype)
-	hOption("language-policy", "int32literaldtype", env.lang.int32literaldtype)
-	hOption("language-policy", "int63literaldtype", env.lang.int63literaldtype)
-	hOption("language-policy", "int64literaldtype", env.lang.int64literaldtype)
-	hOption("language-policy", "floatliteraldtype", env.lang.floatliteraldtype)
+	hOption("language-policy", "int15literaldtype", fbSemanticModelTypeCode(env.lang.int15literaldtype))
+	hOption("language-policy", "int16literaldtype", fbSemanticModelTypeCode(env.lang.int16literaldtype))
+	hOption("language-policy", "int31literaldtype", fbSemanticModelTypeCode(env.lang.int31literaldtype))
+	hOption("language-policy", "int32literaldtype", fbSemanticModelTypeCode(env.lang.int32literaldtype))
+	hOption("language-policy", "int63literaldtype", fbSemanticModelTypeCode(env.lang.int63literaldtype))
+	hOption("language-policy", "int64literaldtype", fbSemanticModelTypeCode(env.lang.int64literaldtype))
+	hOption("language-policy", "floatliteraldtype", fbSemanticModelTypeCode(env.lang.floatliteraldtype))
 	return semantic_context_id
 end function
 

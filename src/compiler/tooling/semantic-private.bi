@@ -5,6 +5,7 @@
 '' This file intentionally does NOT contain: parser or backend interfaces.
 
 #include once "core/fbint.bi"
+#include once "tooling/semantic-type-abi.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "lexer/lex.bi"

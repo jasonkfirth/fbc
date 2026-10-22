@@ -151,6 +151,10 @@ Missing inferred cross tools remain inspectable with `print-config`, but
 concrete builds fail prerequisite checks unless an equivalent SDK compiler
 was explicitly supplied.
 
+Source-only `bootstrap-emit*` and `bootstrap-dist*` workflows use a runnable
+host compiler to emit or archive sources without a target C compiler. SDK
+checks still apply when the same invocation also requests a concrete build.
+
 Source and header dependencies, embedded runtime changes, archive-member
 selection, and effective build commands are tracked incrementally. Changing
 compile flags rebuilds the affected normal compiler/runtime variants. Changing
