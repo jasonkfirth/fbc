@@ -626,17 +626,29 @@ def test_missing_cross_toolchain(root: Path, working: Path) -> None:
     # Keep the top-level prerequisite wiring, replacing only source emission
     # and archiving so this regression never copies or builds the working tree.
     # Its policy probes need more time on native Windows than small fragments.
+    # A clean runner has no system fbc. Supply the host compiler explicitly,
+    # and clear compiler discovery so an installed SDK cannot hide that input.
+    host_fbc = working / "host-fbc.sh"
+    write(host_fbc, "#!/bin/sh\nexit 0\n")
+    host_fbc.chmod(0o755)
     write(working / "GNUmakefile", "include "
           + (root / "GNUmakefile").as_posix().replace(" ", "\\ ") + "\n"
           "bootstrap-check:\n\t@true\n"
           "bootstrap-emit:\n\t@printf source > emitted-source\n"
           "bootstrap-dist-target:\n\t@test -s emitted-source\n")
-    result = make(working, "bootstrap-dist-target", "HOST_CC=sh host.sh",
-                  "TARGET_TRIPLET=aarch64-fixture-linux-gnu", "FBC_TARGET=linux-aarch64",
-                  "PR_COMMON_TOOLS=make tar", "ENABLE_REPRODUCIBLE=", "ENABLE_CET=",
-                  "ENABLE_NO_PLT=", "ENABLE_AUTO_VAR_INIT=", timeout=120)
+    arguments = ("bootstrap-dist-target", "HOST_CC=sh host.sh",
+                 "TARGET_TRIPLET=aarch64-fixture-linux-gnu", "FBC_TARGET=linux-aarch64",
+                 "LOCAL_FBC=", "SYSTEM_FBC=", "PR_COMMON_TOOLS=make tar",
+                 "ENABLE_REPRODUCIBLE=", "ENABLE_CET=", "ENABLE_NO_PLT=",
+                 "ENABLE_AUTO_VAR_INIT=")
+    result = make(working, *arguments, "BUILD_FBC=" + host_fbc.as_posix(), timeout=120)
     require(result.returncode == 0 and (working / "emitted-source").is_file(),
             "package bootstrap target still required the target SDK", result)
+    (working / "emitted-source").unlink()
+    result = make(working, *arguments, "BUILD_FBC=missing-host-fbc", timeout=120)
+    require(result.returncode != 0 and "no usable FreeBASIC compiler" in result.stdout
+            and not (working / "emitted-source").exists(),
+            "source bootstrap target accepted a missing host compiler", result)
 
 
 def test_multilib_identity(root: Path, working: Path) -> None:
