@@ -35,6 +35,11 @@ The search does not mutate symbols. Failed searches leave the expression tree
 untouched. Successful searches release the replaced cast/arithmetic wrappers
 and retain the typed base once, preserving qualifiers and side effects.
 
+BASIC constant records use writable C storage during runtime initialization.
+After the frontend has checked a store, the member view permits that store
+without removing qualifiers from pointer-valued fields. Read and address
+views retain the record's const qualification.
+
 The member expression owns its path string. Its second child stores displacement
 metadata for the existing alignment checks and is released with the tree; that
 child is never evaluated in the emitted C. The existing EXPRNODE layout is kept.

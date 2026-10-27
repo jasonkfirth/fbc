@@ -180,6 +180,7 @@ end enum
 
 const C_MEMBER_VIEW_VALUE = 1
 const C_MEMBER_VIEW_STORAGE = 2
+const C_MEMBER_VIEW_WRITE = 3
 
 type EXPRNODE
 	class       as integer  '' EXPRCLASS_*
@@ -3560,7 +3561,11 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			var viewname = hCAlignmentViewName(viewdtype, n->l->subtype)
 			assert(len(viewname) > 0)
 			ctx.exprtext += "("
-			if( typeIsConstAt(viewdtype, 0) ) then ctx.exprtext += "const "
+			'' BASIC CONST storage is emitted as writable C storage so its
+			'' runtime initializer can assign individual members. The frontend
+			'' has already checked whether a store is permitted; retain const
+			'' on read and address views, but not on that checked store view.
+			if( typeIsConstAt(viewdtype, 0) andalso n->member_view <> C_MEMBER_VIEW_WRITE ) then ctx.exprtext += "const "
 			ctx.exprtext += viewname + "*)("
 			hExprFlush(n->l, FALSE)
 			ctx.exprtext += ")"
@@ -4039,7 +4044,7 @@ private function exprNewVREG _
 				'' recursion
 				l = exprNewVREG( vreg->vidx )
 				var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
-					FALSE, (is_lvalue = FALSE))
+					FALSE, (is_lvalue = FALSE), is_lvalue)
 				if( member <> NULL ) then
 					l = member
 					exit select
@@ -4117,7 +4122,7 @@ private function exprNewVREG _
 		if( (is_c_array = FALSE) andalso (vreg->vidx = NULL) andalso _
 		    ((typeIsPtr(l->dtype) = FALSE) or (vreg->typ = IR_VREGTYPE_PTR)) ) then
 			var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
-				FALSE, (is_lvalue = FALSE))
+				FALSE, (is_lvalue = FALSE), is_lvalue)
 			if( member <> NULL ) then
 				l = member
 				exit select
@@ -4652,9 +4657,14 @@ end sub
 '' v1 = cast( <v1's dtype>, v2 )
 private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	var r = exprNewVREG( v2 )
+	'' A read through a pointer can carry const qualification even when the
+	'' value being converted is a Boolean. Ignore qualifiers here, while
+	'' retaining pointer levels so a Boolean pointer is never treated as one.
+	var result_is_boolean = (typeGetDtAndPtrOnly(v1->dtype) = FB_DATATYPE_BOOLEAN)
+	var input_is_boolean = (typeGetDtAndPtrOnly(r->dtype) = FB_DATATYPE_BOOLEAN)
 
 	'' float/int := bool?
-	if( (v1->dtype <> FB_DATATYPE_BOOLEAN) and (r->dtype = FB_DATATYPE_BOOLEAN) ) then
+	if( (result_is_boolean = FALSE) and input_is_boolean ) then
 		'' 0/-1 := 0/1
 		if( r->class = EXPRCLASS_IMM ) then
 			r->val.i = (r->val.i <> 0)
@@ -4664,7 +4674,7 @@ private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 		end if
 
 	'' bool := float/int?
-	elseif( (v1->dtype = FB_DATATYPE_BOOLEAN) and (r->dtype <> FB_DATATYPE_BOOLEAN) ) then
+	elseif( result_is_boolean and (input_is_boolean = FALSE) ) then
 		'' 0/1 := zero/non-zero
 		if( r->class = EXPRCLASS_IMM ) then
 			'' (FB's <> 0 produces 0/-1 so we have to negate to get 0/1)
