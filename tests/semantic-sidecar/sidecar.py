@@ -31,6 +31,7 @@ from semantic_layout import validate_layout
 from semantic_frontend_abi import validate_frontend_abi
 from semantic_backend_abi import validate_backend_abi
 from semantic_call_abi import validate_call_abi
+from semantic_object_model import validate_object_model
 from semantic_datatypes import (NATIVE_PRIMITIVE_NAMES as PRIMITIVE_NAMES, STABLE_PRIMITIVE_NAMES,
                                 NUMERIC_NAMES, BOOLEAN_NUMERIC_NAMES, FLOAT_NAMES, primitive_name)
 from semantic_array_storage import validate_array_storage_inputs
@@ -1532,6 +1533,7 @@ class Model:
         validate_frontend_abi(self, number, subject_modules)
         validate_backend_abi(self, number, subject_modules)
         validate_call_abi(self, number, subject_modules)
+        validate_object_model(self, number, subject_modules)
         validate_parser_observations(self, number, unescape, subject_modules, parser_property_modules, len(NODE_KINDS))
         validate_comments(self, number, subject_modules)
         validate_variable_names(self, number, subject_modules)

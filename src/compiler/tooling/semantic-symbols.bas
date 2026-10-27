@@ -5,6 +5,7 @@
 '' This file intentionally does NOT contain: name resolution or source parsing.
 
 #include once "tooling/semantic-private.bi"
+#include once "tooling/semantic-object-model.bi"
 #include once "tooling/semantic-access.bi"
 #include once "tooling/semantic-flags.bi"
 #include once "tooling/semantic-layout.bi"
@@ -780,6 +781,7 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 		if( symbIsStruct(sym) ) then
 			fbSemanticModelAggregateFlags(sym, symbolid)
 			fbSemanticModelLayoutSnapshot(sym, symbolid)
+			fbSemanticModelObjectSnapshot(sym, symbolid)
 		end if
 		if( symbIsStruct(sym) andalso symbGetUDTIsAnon(sym) ) then
 			'' anonparent is initialized only for anonymous aggregate members.

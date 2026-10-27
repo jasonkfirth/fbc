@@ -24,6 +24,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-object-model.bi"
 
 declare function symbGetCompCopyCtor( byval sym as FBSYMBOL ptr ) as FBSYMBOL ptr
 
@@ -120,7 +121,7 @@ private sub hSetMinimumVtableSize( byval udt as FBSYMBOL ptr )
 	end if
 end sub
 
-private sub hReBuildRtti( byval udt as FBSYMBOL ptr )
+private sub hReBuildRtti( byval udt as FBSYMBOL ptr, byref semantic_state as const string )
 	dim as ASTNODE ptr initree = any, rttibase = any
 	dim as FBSYMBOL ptr rtti = any, fld = any
 	if udt then
@@ -157,6 +158,7 @@ private sub hReBuildRtti( byval udt as FBSYMBOL ptr )
 			astTypeIniEnd( initree, TRUE )
 
 			symbSetTypeIniTree( rtti, initree )
+			fbSemanticModelObjectRtti(udt, rtti, semantic_state, initree)
 		endif
 	endif
 end sub
@@ -182,9 +184,10 @@ private function hBuildRtti( byval udt as FBSYMBOL ptr ) as Integer
 		' the specific initialization code will be regenerated.
 		symbSetIsUnusedVtable( rtti )
 		symbSetTypeIniTree( rtti, astNewNOP() )
+		fbSemanticModelObjectRtti(udt, rtti, "deferred", symbGetTypeIniTree(rtti))
 		return FALSE
 	else ' Not a pure abstract function type
-		hReBuildRtti( udt )
+		hReBuildRtti( udt, "initialized" )
 		baseudt = udt
 		do while baseudt->udt.base <> NULL
 			baseudt = baseudt->udt.base->subtype
@@ -203,7 +206,7 @@ private function hBuildRtti( byval udt as FBSYMBOL ptr ) as Integer
 						astDelNode( initree )
 						symbSetTypeIniTree( rtti, NULL )
 					end if
-					hReBuildRtti( baseudt )
+					hReBuildRtti( baseudt, "activated" )
 
 					default.defctor = baseudt->udt.ext->defctor
 					default.copyctor = baseudt->udt.ext->copyctor
@@ -224,6 +227,7 @@ private sub hBuildVtable( byval udt as FBSYMBOL ptr )
 	dim as ASTNODE ptr initree = any, basevtableinitree = any
 	dim as FBSYMBOL ptr member = any, rtti = any, vtable = any
 	dim as integer i = any, basevtableelements = any
+	dim as integer semantic_copied_elements = 0
 
 	'' The vtable is an array of pointers:
 	''    0. null pointer (why? just following GCC...)
@@ -293,6 +297,7 @@ private sub hBuildVtable( byval udt as FBSYMBOL ptr )
 		'' except the first 2 (they are set above already)
 		astTypeIniCopyElements( initree, basevtableinitree, 2 )
 		assert( basevtableelements > 2 )
+		semantic_copied_elements = basevtableelements - 2
 		i += (basevtableelements - 2)
 	end if
 
@@ -338,6 +343,7 @@ private sub hBuildVtable( byval udt as FBSYMBOL ptr )
 	wend
 
 	udt->udt.ext->vtable = vtable
+	fbSemanticModelObjectVtable(udt, vtable, basevtableelements, semantic_copied_elements, initree)
 end sub
 
 private sub hProcBegin( byval udt as FBSYMBOL ptr, byval proc as FBSYMBOL ptr )

@@ -80,6 +80,7 @@ declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval 
 #include once "tooling/semantic-abi.bi"
 #include once "tooling/semantic-backend-abi.bi"
 #include once "tooling/semantic-call-abi.bi"
+#include once "tooling/semantic-object-model.bi"
 #include once "tooling/semantic-source-file.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-link.bi"
@@ -4653,6 +4654,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelResetAbi( )
 	fbSemanticModelResetBackendAbi( )
 	fbSemanticModelResetCallAbi( )
+	fbSemanticModelResetObjectModel( )
 	fbSemanticModelResetEmissionNames( )
 	fbSemanticModelResetMemberNames( )
 	fbSemanticModelResetConstructs( )
@@ -4709,7 +4711,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 146
+	for capability as integer = 0 to 147
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -4851,6 +4853,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 			(env.clopt.backend = FB_BACKEND_LLVM)), "available", "unavailable")
 		case 146: feature = "llvm-builtin-call-lowering": coverage = iif(fbSemanticModelFullEnabled( ) and _
 			(env.clopt.backend = FB_BACKEND_LLVM), "available", "unavailable")
+		case 147: feature = "native-object-model": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 121: feature = "string-subscript-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 122: feature = "selected-type-alias-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 123: feature = "type-alias-declaration-sites": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
@@ -5066,6 +5069,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	fbSemanticModelFinishAbi(commit)
 	fbSemanticModelFinishBackendAbi(commit)
 	fbSemanticModelFinishCallAbi(commit)
+	fbSemanticModelFinishObjectModel(commit)
 	if( (commit <> FALSE) and (semantic_model_module_failed = FALSE) ) then
 		if( semantic_model_module_buffer_len > 0 ) then
 			if( fbSemanticOutputWrite(semantic_model_output, semantic_model_module_buffer, _
