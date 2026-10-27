@@ -79,8 +79,13 @@ def build_program(args, prefix, env, key):
     source = oma / directory
     binary = args.output / 'bin' / key
     resources = args.output / 'assets' / key
+    # Only Duel creates BASIC threads. Native graphics and sound also provide
+    # ordinary runtime variants; their internal workers do not require -mt.
+    options = ['-mt'] if key == 'duel999' else []
+    if args.checked:
+        options += ['-exx', '-e']
     command = [str(prefix / 'bin/fbc'), '-prefix', str(prefix), '-target', 'amiga-m68k',
-               '-mt', '-O', '2', '-exx', '-e', '-i', str(prefix / 'inc'),
+               '-O', '2', *options, '-i', str(prefix / 'inc'),
                '-i', str(prefix / 'inc/amiga'), '-i', str((source / modules[0]).parent),
                *[str(source / module) for module in modules], '-x', str(binary)]
     code = amiga.run_command(command, args.output / 'logs' / (key + '.compile.log'),
@@ -89,7 +94,8 @@ def build_program(args, prefix, env, key):
         stage_assets(key, source, resources, assets, oma)
     record = {'key': key, 'sources': [directory + '/' + module for module in modules],
               'compile_status': 'pass' if code == 0 else f'fail({code})',
-              'binary': str(binary), 'resources': str(resources), 'gameplay_status': 'not-run'}
+              'binary': str(binary), 'resources': str(resources), 'gameplay_status': 'not-run',
+              'command': command, 'checked': args.checked, 'multithreaded': key == 'duel999'}
     print(key + ': ' + record['compile_status'], flush=True)
     return record
 
@@ -102,6 +108,8 @@ def main():
     parser.add_argument('--games', default='')
     parser.add_argument('--jobs', type=int, default=4)
     parser.add_argument('--compile-timeout', type=int, default=600)
+    parser.add_argument('--checked', action='store_true',
+                        help='Enable runtime error and array-bounds checks')
     args = parser.parse_args()
     if args.jobs <= 0 or args.compile_timeout <= 0:
         parser.error('Counts and timeouts must be positive')

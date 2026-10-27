@@ -29,6 +29,7 @@
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-call-abi.bi"
 
 sub astCallInit
 	listInit( @ast.call.tmpstrlist, 32, len( AST_TMPSTRLIST_ITEM ), LIST_FLAGS_NOCLEAR )
@@ -404,11 +405,18 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 			next
 		next
 
+		'' Copy only carried identities after recursive argument/target loading.
+		'' The backend consumes them during this immediate dispatch. Profiling
+		'' and deferred string copyback calls must not inherit this source call.
+		dim as FBSYMBOL ptr semantic_caller = NULL
+		if( astGetProc( ) <> NULL ) then semantic_caller = astGetProc( )->sym
+		fbSemanticModelCallAbiContext(n, semantic_caller)
 		if( is_indirect ) then
 			irEmitCALLPTR( proc, call_target, vr, bytestopop, reclevel )
 		else
 			irEmitCALLFUNCT( proc, bytestopop, vr, reclevel )
 		end if
+		fbSemanticModelCallAbiContext(NULL, NULL)
 
 		if( symbProcReturnsOnStack( proc ) andalso _
 		    typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then

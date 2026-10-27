@@ -1524,12 +1524,14 @@ declare function rtlDataRestore _
 	( _
 		byval label as FBSYMBOL ptr, _
 		byval afternode as ASTNODE ptr = NULL, _
-		byval canprofile as integer = TRUE _
+		byval canprofile as integer = TRUE, _
+		byval semantic_statement as longint = 0 _
 	) as integer
 
 declare function rtlDataRead _
 	( _
-		byval varexpr as ASTNODE ptr _
+		byval varexpr as ASTNODE ptr, _
+		byval semantic_read as longint = 0 _
 	) as integer
 
 declare function rtlMathPow _

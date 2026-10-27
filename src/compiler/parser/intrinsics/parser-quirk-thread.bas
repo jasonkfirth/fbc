@@ -29,7 +29,7 @@
 #include once "runtime/rtl.bi"
 
 declare function fbSemanticModelEnabled( ) as integer
-declare sub fbSemanticModelExportExpression _
+declare sub fbSemanticModelExportParserExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
@@ -116,7 +116,7 @@ function cThreadCallFunc() as ASTNODE ptr
 	function = threadcall_expr
 	if( export_semantics andalso (threadcall_expr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(threadcall_expr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(threadcall_expr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 end function

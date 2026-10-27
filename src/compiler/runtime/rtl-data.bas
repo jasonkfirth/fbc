@@ -27,6 +27,7 @@
 #include once "core/fbint.bi"
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-data.bi"
 
 '' globals
 	dim shared as FB_RTL_PROCDEF funcdata( 0 to ... ) = _
@@ -202,7 +203,8 @@ end sub
 '':::::
 function rtlDataRead _
 	( _
-		byval varexpr as ASTNODE ptr _
+		byval varexpr as ASTNODE ptr, _
+		byval semantic_read as longint _
 	) as integer
 
 	dim as ASTNODE ptr proc = any
@@ -295,6 +297,7 @@ function rtlDataRead _
 
 	''
 	astAdd( rtlUStrFinishWrite( before, proc, after ) )
+	fbSemanticModelDataReadRuntime(semantic_read, f)
 
 	function = TRUE
 
@@ -304,7 +307,8 @@ function rtlDataRestore _
 	( _
 		byval label as FBSYMBOL ptr, _
 		byval afternode as ASTNODE ptr, _
-		byval canprofile as integer = TRUE _
+		byval canprofile as integer = TRUE, _
+		byval semantic_statement as longint = 0 _
 	) as integer
 
 	dim as ASTNODE ptr proc = any, expr = any
@@ -341,6 +345,7 @@ function rtlDataRestore _
 	else
 		astAddAfter( proc, afternode )
 	end if
+	fbSemanticModelDataRestore(semantic_statement, label, sym)
 
 	function = TRUE
 end function

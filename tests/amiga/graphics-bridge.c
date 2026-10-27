@@ -29,7 +29,10 @@ unsigned long amiga_test_display_pixel(int x, int y)
     if (fb_amiga_gfx.window != NULL && fb_amiga_gfx.screen != NULL &&
         x >= 0 && x < fb_amiga_gfx.width && y >= 0 && y < fb_amiga_gfx.height) {
         fb_amigaGfxPresent();
-        pen = ReadPixel(fb_amiga_gfx.window->RPort, x, y);
+        /* Coordinates supplied by BASIC refer to its client framebuffer. */
+        pen = ReadPixel(fb_amiga_gfx.window->RPort,
+            x + fb_amiga_gfx.window->BorderLeft,
+            y + fb_amiga_gfx.window->BorderTop);
         if (pen >= 0) {
             GetRGB32(fb_amiga_gfx.screen->ViewPort.ColorMap, (ULONG)pen, 1, colours);
             result = ((colours[0] >> 24) << 16) |
@@ -158,6 +161,7 @@ int amiga_test_present_cache(int x, int y)
     unsigned char *cache, *valid;
     LONG original, damaged;
     int result = -1;
+    int window_x, window_y;
 
     if (reply == NULL) return -1;
     memset(&message, 0, sizeof(message));
@@ -167,25 +171,27 @@ int amiga_test_present_cache(int x, int y)
     if (fb_amiga_gfx.present_cache == NULL || fb_amiga_gfx.window == NULL ||
         x < 0 || x >= fb_amiga_gfx.width || y < 0 || y >= fb_amiga_gfx.height)
         goto done;
+    window_x = x + fb_amiga_gfx.window->BorderLeft;
+    window_y = y + fb_amiga_gfx.window->BorderTop;
     fb_amigaGfxPresent();
     if (!fb_amiga_gfx.present_cache_valid[y]) goto done;
 
-    original = ReadPixel(fb_amiga_gfx.window->RPort, x, y);
+    original = ReadPixel(fb_amiga_gfx.window->RPort, window_x, window_y);
     if (original < 0) goto done;
     damaged = original ^ 1;
     SetAPen(fb_amiga_gfx.window->RPort, (ULONG)damaged);
-    WritePixel(fb_amiga_gfx.window->RPort, x, y);
+    WritePixel(fb_amiga_gfx.window->RPort, window_x, window_y);
     __fb_gfx->dirty[y] = TRUE;
     fb_amigaGfxPresent();
     /* A software row which has not changed must use the cache. A real
        refresh event, rather than that identical row, repairs window damage. */
-    if (ReadPixel(fb_amiga_gfx.window->RPort, x, y) != damaged) goto done;
+    if ((LONG)ReadPixel(fb_amiga_gfx.window->RPort, window_x, window_y) != damaged) goto done;
     message.Class = IDCMP_REFRESHWINDOW;
     message.IDCMPWindow = fb_amiga_gfx.window;
     PutMsg(fb_amiga_gfx.window->UserPort, &message.ExecMessage);
     fb_amigaGfxPollEvents();
     if (GetMsg(reply) != &message.ExecMessage) goto done;
-    if (ReadPixel(fb_amiga_gfx.window->RPort, x, y) != original) goto done;
+    if ((LONG)ReadPixel(fb_amiga_gfx.window->RPort, window_x, window_y) != original) goto done;
 
     /* Exercise the allocation-failure path without exhausting guest RAM.
        Temporarily withhold the optional cache and require an actual upload. */
@@ -194,10 +200,10 @@ int amiga_test_present_cache(int x, int y)
     fb_amiga_gfx.present_cache = NULL;
     fb_amiga_gfx.present_cache_valid = NULL;
     SetAPen(fb_amiga_gfx.window->RPort, (ULONG)damaged);
-    WritePixel(fb_amiga_gfx.window->RPort, x, y);
+    WritePixel(fb_amiga_gfx.window->RPort, window_x, window_y);
     __fb_gfx->dirty[y] = TRUE;
     fb_amigaGfxPresent();
-    if (ReadPixel(fb_amiga_gfx.window->RPort, x, y) == original) result = 0;
+    if ((LONG)ReadPixel(fb_amiga_gfx.window->RPort, window_x, window_y) == original) result = 0;
     fb_amiga_gfx.present_cache = cache;
     fb_amiga_gfx.present_cache_valid = valid;
 
@@ -230,6 +236,30 @@ int amiga_test_display_mode(int *width, int *height, ULONG *mode_id)
             result = 0;
         }
     }
+    fb_GfxUnlock(0, 0);
+    return result;
+}
+
+/* Window decorations and private palette ownership are independent.
+   These observations must describe the entire requested BASIC client area. */
+int amiga_test_window_layout(int borderless)
+{
+    struct Window *window;
+    int result = -1;
+
+    fb_GfxLock();
+    window = fb_amiga_gfx.window;
+    if (window != NULL && fb_amiga_gfx.screen != NULL &&
+        !!(window->Flags & WFLG_BORDERLESS) == !!borderless &&
+        !!(window->Flags & WFLG_CLOSEGADGET) == !borderless &&
+        window->Width - window->BorderLeft - window->BorderRight >= fb_amiga_gfx.width &&
+        window->Height - window->BorderTop - window->BorderBottom >= fb_amiga_gfx.height &&
+        window->LeftEdge >= 0 && window->TopEdge >= 0 &&
+        window->LeftEdge + window->Width <= fb_amiga_gfx.screen->Width &&
+        window->TopEdge + window->Height <= fb_amiga_gfx.screen->Height &&
+        (!borderless || (window->BorderLeft == 0 && window->BorderTop == 0 &&
+            window->BorderRight == 0 && window->BorderBottom == 0)))
+        result = 0;
     fb_GfxUnlock(0, 0);
     return result;
 }

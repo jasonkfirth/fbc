@@ -14,6 +14,9 @@ declare function fbSemanticSourceOpen _
 	( byval stream as any ptr, byval digest as zstring ptr, _
 	  byval bytes as ulongint ptr, byval status as long ptr ) as any ptr
 declare function fbSemanticSourceClose( byval revision as any ptr ) as long
+'' Hash the canonical kind and value without exposing literal payloads in
+'' expression-only parser receipts. No stream is opened or owned here.
+declare function fbSemanticValueDigest( byref kind as const string, byref value as const string ) as string
 
 #endif
 

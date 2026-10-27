@@ -5,6 +5,8 @@ Responsibilities: Positive observations, deliberate omissions and corrupt groups
 This file intentionally does NOT resolve linker inputs or parse BASIC syntax.
 """
 
+import subprocess
+
 from semantic_driver import FEATURE
 from sidecar import DETAIL_TAGS, Model
 
@@ -138,5 +140,85 @@ def check_rejection(test):
                 (row[0] == "K" and row[3].startswith(("driver-", "producer-"))
                  or row[:3] == ["CAP", "1", FEATURE])]
     Model(text_rows(old_rows))
+
+def check_generated(test):
+    source = test.source('#inclib "MetadataLibrary"\nsub LibraryEntry()\nend sub\n')
+    archive = test.working / "example.a"
+    _, artifact = test.invoke([source], emit=False, extra=("-lib", "-x", str(archive)))
+    model = Model.read(artifact)
+    test.assertEqual([receipt["properties"]["driver-role"] for receipt in model.driver_inputs.values()],
+                     ["secondary", "archive-metadata"])
+    generated = model.driver_inputs[2]["properties"]
+    test.assertEqual(generated["driver-ordinal"], "-1")
+    icon = test.source('/* XPM */\nstatic char * icon[] = {\n"1 1 1 1",\n"a c #ffffff",\n"a"\n};\n', "icon.xpm")
+    for mode in ("full", "bindings", "expressions"):
+        with test.subTest(mode=mode):
+            observed = test.compile(icon, mode=mode)
+            if mode == "full":
+                test.assertEqual(observed.driver_inputs[1]["properties"]["driver-role"], "resource")
+                test.assertIn(("resource-input", test.compiler_path(icon)), observed.driver_inputs[1]["inputs"])
+            test.assertTrue(observed.records["B"] or observed.records["E"])
+            test.assertTrue(all(row[3] == "0" for row in observed.records["B"]))
+            test.assertTrue(all(row[2] == "0" for row in observed.records["E"]))
+    before = icon.read_bytes()
+    command = [str(test.compiler), "-prefix", str(test.toolchain_prefix), "-i", str(test.root / "inc"),
+               "-r", "-semantic-model", str(icon), str(icon)]
+    result = subprocess.run(command, cwd=test.working, text=True, capture_output=True, timeout=60)
+    test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+    test.assertEqual(icon.read_bytes(), before)
+    test.assertIn("could not write semantic model", result.stdout + result.stderr)
+
+
+def check_transport(test):
+    source = test.source('dim value as long = 7\nprint value\n', 'driver%facts.bas')
+    decoded = []
+    for transport in ("binary", "text"):
+        artifact = test.working / (transport + ".model")
+        command = [str(test.compiler), "-prefix", str(test.toolchain_prefix), "-i", str(test.root / "inc"),
+                   "-r", "-semantic-model", str(artifact), "-d", 'DriverText="literal%09text"']
+        if transport == "text":
+            command.append("-semantic-model-text")
+        command.append(str(source))
+        result = subprocess.run(command, cwd=test.working, capture_output=True, text=True, timeout=60)
+        test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        model = Model.read(artifact)
+        test.assertIn(("predefine", 'DriverText="literal%09text"'), model.driver_inputs[1]["inputs"])
+        decoded.append(model.rows)
+    test.assertEqual(decoded[0], decoded[1])
+
+
+def check_enum_promotions(test):
+    source = test.source('enum Flags\nAlpha = 1\nBeta = 2\nend enum\n'
+                         'dim value as Flags = Alpha\ndim result_value as integer\n'
+                         'result_value = Alpha or Beta\nresult_value = value and Beta\n')
+    for backend in test.backends:
+        with test.subTest(backend=backend):
+            model = test.compile(source, backend=backend)
+            enums = model.named("Flags", "enum")
+            test.assertEqual(len(enums), 1)
+            enum_id = enums[0]
+            expressions = {int(row[1]): row for row in model.records["E"]}
+            selected = []
+            for identity, operands in model.expression_operands.items():
+                properties = model.properties["expression", identity]
+                if "numeric-selected-left-dtype" not in properties:
+                    continue
+                original = [expressions[int(child)] for child in operands[4:6]]
+                if not any(int(row[14]) == enum_id for row in original):
+                    continue
+                selected.append(identity)
+                for side in ("left", "right"):
+                    converted = expressions[int(properties[f"numeric-selected-{side}-expression"])]
+                    test.assertEqual(converted[14], "0")
+                    test.assertNotEqual(int(converted[12]) & 31, 10)
+            test.assertGreaterEqual(len(selected), 2)
+            original = next(expressions[int(model.expression_operands[identity][4])]
+                            for identity in selected if int(expressions[int(model.expression_operands[identity][4])][14]) == enum_id)
+            rows = [row.copy() for row in model.rows]
+            changed = next(row for row in rows if row[:2] == ["E", original[1]])
+            changed[14] = str(next(identity for identity, row in model.symbols.items() if row[3] == "3"))
+            with test.assertRaisesRegex(ValueError, "nominal enum identity"):
+                Model(text_rows(rows))
+
 
 # end of driver_inputs.py

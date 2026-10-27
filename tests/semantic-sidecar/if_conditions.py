@@ -110,7 +110,7 @@ def check_inputs(test):
             test.assertTrue(enum_inputs)
             rows = [line.split('\t') for line in artifact.read_text().splitlines()]
             next(row for row in rows if row[:3] == ['CAP', '1', 'enum-selected-numeric-operands'])[3] = 'unavailable'
-            with test.assertRaisesRegex(ValueError, 'Numeric selection has no original primitive or enum operand'):
+            with test.assertRaisesRegex(ValueError, 'Numeric enum operand lacks its nominal enum identity or available coverage'):
                 Model('\n'.join('\t'.join(row) for row in rows) + '\n')
             receipts = [(owner, key, value) for (domain, owner), properties in model.properties.items()
                         if domain == 'symbol' for key, value in properties.items() if key.startswith(PREFIX)]

@@ -485,19 +485,7 @@ sub fbSemanticModelMacroNumericRestore( byref token as FBTOKEN )
 	wend
 end sub
 
-function fbSemanticModelMacroExpressionLocation _
-	( byref first as LEX_LOCATION, byref last as LEX_LOCATION, byval first_counter as longint, _
-	  byval last_counter as longint, byref invocation as LEX_LOCATION ) as integer
-	if( fbSemanticModelFullEnabled( ) = FALSE ) then return FALSE
-	dim as longint identity = first.macro_identity
-	if( identity = 0 ) then identity = last.macro_identity
-	if( identity = 0 ) then
-		dim as integer token = lex.ctx->semantic_last_macro_token
-		if( (token >= 0) and (token < semantic_macro_token_count) ) then
-			if( (semantic_macro_tokens[token].counter > first_counter) and _
-				(semantic_macro_tokens[token].counter <= last_counter) ) then identity = semantic_macro_tokens[token].expansion
-		end if
-	end if
+private function hInvocationLocation( byval identity as longint, byref invocation as LEX_LOCATION ) as integer
 	for depth as integer = 0 to 63
 		dim as integer index = hInvocationIndex(identity)
 		if( index < 0 ) then return FALSE
@@ -527,13 +515,49 @@ function fbSemanticModelMacroExpressionLocation _
 	return FALSE
 end function
 
+function fbSemanticModelMacroExpressionLocation _
+	( byref first as LEX_LOCATION, byref last as LEX_LOCATION, byval first_counter as longint, _
+	  byval last_counter as longint, byref invocation as LEX_LOCATION ) as integer
+	if( fbSemanticModelEnabled( ) = FALSE ) then return FALSE
+	dim as LEX_LOCATION first_site = first, last_site = last
+	dim as integer generated = FALSE
+	if( first.macro_identity <> 0 ) then
+		if( hInvocationLocation(first.macro_identity, first_site) = FALSE ) then return FALSE
+		generated = TRUE
+	end if
+	if( last.macro_identity <> 0 ) then
+		if( hInvocationLocation(last.macro_identity, last_site) = FALSE ) then return FALSE
+		generated = TRUE
+	end if
+	if( generated = FALSE ) then
+		dim as integer token = lex.ctx->semantic_last_macro_token
+		if( (token >= 0) and (token < semantic_macro_token_count) ) then
+			generated = (semantic_macro_tokens[token].counter > first_counter) and _
+				(semantic_macro_tokens[token].counter <= last_counter)
+		end if
+	end if
+	if( generated = FALSE ) then return FALSE
+	'' A generated endpoint uses its written invocation's boundary. The other
+	'' endpoint can be an ordinary operand beyond that invocation. Preserve
+	'' both boundaries; an interior expansion must not replace the whole span.
+	if( first_site.source_file <> last_site.source_file ) then return FALSE
+	if( (first_site.start_line > last_site.end_line) or _
+	    ((first_site.start_line = last_site.end_line) and (first_site.start_column >= last_site.end_column)) ) then return FALSE
+	invocation = first_site
+	invocation.end_line = last_site.end_line
+	invocation.end_column = last_site.end_column
+	invocation.raw_end_line = last_site.raw_end_line
+	invocation.raw_end_column = last_site.raw_end_column
+	invocation.raw_valid and= last_site.raw_valid and (first_site.source_context = last_site.source_context)
+	invocation.is_physical = FALSE
+	return TRUE
+end function
+
 function fbSemanticModelMacroBegin( byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION ) as longint
 	if( fbSemanticModelEnabled( ) = FALSE ) then return 0
 	'' Compact models still need the invocation chain to give generated typed
 	'' expressions a truthful source anchor. Keep that small internal map even
 	'' when the serialized expansion graph is disabled.
-	if( (fbSemanticModelMacroProvenanceEnabled( ) = FALSE) and _
-		(fbSemanticModelFullEnabled( ) = FALSE) ) then return 0
 	if( lex.ctx->semantic_probe ) then return 0
 	dim as longint definition = 0
 	if( fbSemanticModelMacroProvenanceEnabled( ) ) then definition = hDefinition(sym)
@@ -545,7 +569,7 @@ function fbSemanticModelMacroBegin( byval sym as FBSYMBOL ptr, byref source as L
 		parent = semantic_macro_loader
 		relation = semantic_macro_phase
 	end if
-	if( fbSemanticModelFullEnabled( ) ) then
+	if( fbSemanticModelEnabled( ) ) then
 		if( semantic_macro_invocation_count >= SEMANTIC_MACRO_MAX_DEFINITIONS ) then
 			fbSemanticModelFailAt("semantic-macros.bas:283")
 			return 0

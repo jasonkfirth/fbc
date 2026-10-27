@@ -90,6 +90,17 @@ declare sub fbSemanticModelPopExpressionRange _
 		byval previous_nonphysical_tokens as longint _
 	)
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
+declare sub fbSemanticModelExportParserExpression _
+	( _
+		byval expr as ASTNODE ptr, _
+		byref source_start as LEX_LOCATION, _
+		byref source_end as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byval nonphysical_tokens_at_end as longint, _
+		byval semantic_operator_override as integer = -1, _
+		byval force_nonphysical_range as integer = FALSE _
+	)
+
 declare sub fbSemanticModelExportExpression _
 	( _
 		byval expr as ASTNODE ptr, _
@@ -110,7 +121,7 @@ private sub hSemanticModelExportCurrentExpression _
 	)
 	if( expr = NULL ) then exit sub
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )
-	fbSemanticModelExportExpression(expr, source_start, source_end, _
+	fbSemanticModelExportParserExpression(expr, source_start, source_end, _
 		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 		semantic_operator_override)
 end sub
@@ -657,6 +668,8 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 
 	if( fbSemanticModelFullEnabled( ) and (semantic_type_alias <> NULL) ) then
 		dim as LEX_LOCATION semantic_end = lexGetLastLocation( )
+		'' This full-only alias receipt is an extra snapshot; the enclosing
+		'' highest-precedence callback records the common parser result.
 		fbSemanticModelExportExpression(expr, source, semantic_end, semantic_nonphysical, lexGetNonphysicalTokenCount( ))
 		fbSemanticModelTypeAliasExpression(expr, semantic_type_alias)
 	end if

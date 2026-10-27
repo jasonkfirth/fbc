@@ -26,6 +26,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-namespace-visibility.bi"
 #include once "parser/parser.bi"
 
 declare sub symbCompAddToImportList _
@@ -254,6 +255,7 @@ function symbNamespaceImportEx _
 
 		'' add to the export list of the src ns
 		symbCompAddToExportList( imp_ )
+		fbSemanticModelNamespaceImportAdded(imp_)
 
 		'' recurse into the imported ns, importing its imports too
 		imp_ = symbGetCompImportHead( ns )
@@ -288,6 +290,7 @@ sub symbNamespaceRemove _
 	)
 
 	if( symbGetImportNamespc( imp_ ) <> NULL ) then
+		fbSemanticModelNamespaceImportRemoved(imp_, hashonly)
 		'' Removing an import clears its target before the containing scope is
 		'' exported. Retain the compiler's USING relationship while it is live.
 		fbSemanticModelExportSymbolDetails(imp_)
@@ -310,6 +313,7 @@ sub symbNamespaceReImport _
 	( _
 		byval ns as FBSYMBOL ptr _
 	)
+	fbSemanticModelNamespaceRefresh(ns, TRUE)
 
 	'' currently at the import hash tb?
 	if( symbGetCompExt( ns )->impsym_head <> NULL ) then
@@ -339,6 +343,7 @@ sub symbNamespaceReImport _
 		loop
 		exp_ = symbGetExportNext( exp_ )
 	loop
+	fbSemanticModelNamespaceRefresh(ns, FALSE)
 
 end sub
 

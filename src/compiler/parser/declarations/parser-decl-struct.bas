@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-type-shapes.bi"
+#include once "tooling/semantic-layout.bi"
 #include once "parser/parser.bi"
 declare sub fbSemanticModelAggregateDeclarationToken(byval token as integer)
 
@@ -755,6 +756,7 @@ private function hTypeAdd _
 		byval id_alias as zstring ptr, _
 		byval isunion as integer, _
 		byval align as integer, _
+		byref semantic_packing as FB_SEMANTIC_PACKING_INPUT, _
 		byval baseDType as integer = 0, _
 		byval baseSubtype as FBSYMBOL ptr = NULL, _
 		byval baseStringType as integer = 0 _
@@ -768,6 +770,7 @@ private function hTypeAdd _
 		'' error recovery: create a fake symbol
 		s = symbStructBegin( NULL, NULL, parent, symbUniqueLabel( ), NULL, isunion, align, (baseSubtype <> NULL), 0, 0 )
 	end if
+	fbSemanticModelPackingInput(s, parent, semantic_packing, align)
 
 	select case baseStringType
 	case FB_DATATYPE_CHAR
@@ -819,7 +822,8 @@ private function hTypeAdd _
 end function
 
 '' [FIELD '=' ConstExpression]
-private function cFieldAlignmentAttribute( ) as integer
+private function cFieldAlignmentAttribute( byref semantic_packing as FB_SEMANTIC_PACKING_INPUT ) as integer
+	fbSemanticModelCapturePacking(semantic_packing, lexGetToken( ) = FB_TK_FIELD)
 	'' FIELD
 	if( lexGetToken( ) <> FB_TK_FIELD ) then
 		return 0
@@ -850,7 +854,9 @@ private function cFieldAlignmentAttribute( ) as integer
 	'' follow the GCC 3.x ABI
 	const GCC3_ALIGN_FIXUP_FROM = 3
 	const GCC3_ALIGN_FIXUP_TO = 2
+	if( semantic_packing.sourceid > 0 ) then semantic_packing.expressionid = expr->semantic_expression
 	var align = astConstFlushToInt( expr )
+	semantic_packing.requested = align
 	if( align < 0 ) then
 		align = 0
 	elseif( align > env.pointersize ) then
@@ -858,6 +864,7 @@ private function cFieldAlignmentAttribute( ) as integer
 	elseif( align = GCC3_ALIGN_FIXUP_FROM ) then
 		align = GCC3_ALIGN_FIXUP_TO
 	end if
+	semantic_packing.selected = align
 
 	function = align
 end function
@@ -999,14 +1006,15 @@ private sub hTypeBody( byval s as FBSYMBOL ptr )
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 				'' [FIELD '=' ConstExpression]
-				dim as integer align = cFieldAlignmentAttribute( )
+				dim as FB_SEMANTIC_PACKING_INPUT semantic_packing
+				dim as integer align = cFieldAlignmentAttribute( semantic_packing )
 				if( align = 0 ) then
 					align = symbGetUDTAlign( s )
 				end if
 
 				'' create a "temp" one
 				dim as longint anonymous_construct = fbSemanticModelConstructBegin(iif(isunion, FB_TK_UNION, FB_TK_TYPE))
-				inner = hTypeAdd( s, symbUniqueId( ), NULL, isunion, align )
+				inner = hTypeAdd( s, symbUniqueId( ), NULL, isunion, align, semantic_packing )
 				dim as LEX_LOCATION anonymous_ending = lexGetLastLocation( )
 				fbSemanticModelConstructEnd(anonymous_construct, anonymous_ending)
 
@@ -1268,7 +1276,8 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	hParseTypeExtends( baseDType, baseSubtype, stringType )
 
 	'' [FIELD '=' ConstExpression]
-	dim as integer align = cFieldAlignmentAttribute( )
+	dim as FB_SEMANTIC_PACKING_INPUT semantic_packing
+	dim as integer align = cFieldAlignmentAttribute( semantic_packing )
 
 	'' Parser stack IDs deliberately use TYPE for both aggregate kinds. The
 	'' observer must retain the actual declaration token independently of a
@@ -1290,7 +1299,7 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	dim as FBSYMBOL ptr currblocksym = parser.currblock
 	dim as integer scope_depth = parser.scope
 
-	sym = hTypeAdd( NULL, id, palias, isunion, align, baseDType, baseSubtype, stringType )
+	sym = hTypeAdd( NULL, id, palias, isunion, align, semantic_packing, baseDType, baseSubtype, stringType )
 	if( checkid ) then
 		fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 		fbSemanticModelTypeDeclarationSpelling(sym, @id, iif(isunion, "union", "type"), semantic_site)

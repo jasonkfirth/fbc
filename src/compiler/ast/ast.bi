@@ -1222,7 +1222,7 @@ declare function astDataStmtStore _
 		byval expr as ASTNODE ptr _
 	) as ASTNODE ptr
 
-declare sub astDataStmtEnd( byval tree as ASTNODE ptr )
+declare sub astDataStmtEnd( byval tree as ASTNODE ptr, byval semantic_group as longint = 0 )
 
 declare function astDataStmtAdd _
 	( _

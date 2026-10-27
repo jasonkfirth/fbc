@@ -20,6 +20,17 @@ import sys
 from semantic_binary import decode as decode_binary
 from semantic_flow import validate_flow, validate_sequence_branches
 from semantic_driver import validate_driver_inputs
+from semantic_parser_observations import is_parser_property, validate_parser_observations
+from semantic_receiver_context import validate_receiver_contexts
+from semantic_data import validate_data
+from semantic_emission_names import validate_emission_names
+from semantic_namespace_visibility import validate_namespace_visibility, validate_binding_scope_contexts
+from semantic_flags import validate_flags
+from semantic_normalized_types import validate_normalized_types
+from semantic_layout import validate_layout
+from semantic_frontend_abi import validate_frontend_abi
+from semantic_backend_abi import validate_backend_abi
+from semantic_call_abi import validate_call_abi
 from semantic_array_storage import validate_array_storage_inputs
 from semantic_literals import validate_wide_literals
 from semantic_queries import validate_query_inputs
@@ -243,31 +254,42 @@ def filesystem_path(value: str | Path) -> Path:
     return Path(text)
 
 
+_ESCAPED_BYTES = {f"{byte:02X}": bytes((byte,)) for byte in range(256)}
+_INTEGER_FIELD = re.compile(r"-?(?:0|[1-9][0-9]*)")
+
+
 def unescape(field: str) -> str:
     # Compiler strings contain bytes, including accepted legacy source bytes
     # and filesystem names. Decode valid UTF-8 normally and retain every other
     # byte with Python's reversible filesystem convention. No second unescape
     # pass is allowed: a literal "%E9" is serialized as "%25E9".
+    if "%" not in field:
+        # Most fields are decimal integers, stable labels, or ordinary paths.
+        # Validate them in the string implementation without bytewise copying.
+        if field and (not field.isascii() or not field.isprintable()):
+            raise ValueError("Unescaped byte in sidecar field")
+        return field
     value = bytearray()
     offset = 0
     while offset < len(field):
-        character = field[offset]
-        if character == "%":
-            code = field[offset + 1:offset + 3]
-            if len(code) != 2 or re.fullmatch(r"[0-9A-F]{2}", code) is None:
-                raise ValueError("Truncated or malformed percent escape")
-            value.append(int(code, 16))
-            offset += 3
-        else:
-            if ord(character) < 32 or ord(character) >= 127:
-                raise ValueError("Unescaped byte in sidecar field")
-            value.append(ord(character))
-            offset += 1
+        marker = field.find("%", offset)
+        ending = marker if marker >= 0 else len(field)
+        plain = field[offset:ending]
+        if plain and (not plain.isascii() or not plain.isprintable()):
+            raise ValueError("Unescaped byte in sidecar field")
+        value.extend(plain.encode("ascii"))
+        if marker < 0:
+            break
+        byte = _ESCAPED_BYTES.get(field[marker + 1:marker + 3])
+        if byte is None:
+            raise ValueError("Truncated or malformed percent escape")
+        value.extend(byte)
+        offset = marker + 3
     return value.decode("utf-8", errors="surrogateescape")
 
 
 def number(value: str, minimum: int | None = None) -> int:
-    if re.fullmatch(r"-?(?:0|[1-9][0-9]*)", value) is None:
+    if _INTEGER_FIELD.fullmatch(value) is None:
         raise ValueError("Invalid integer: " + repr(value))
     result = int(value)
     if minimum is not None and result < minimum:
@@ -385,6 +407,7 @@ class Model:
         child_edges: set[tuple[int, str]] = set()
         dependencies: set[str] = set()
         references: list[tuple[str, int]] = []
+        parser_property_modules: dict[tuple[int, str], int] = {}
         subject_modules: dict[tuple[str, int], int] = {}
         expression_property_modules: dict[tuple[int, str], int] = {}
         storage_property_modules: dict[tuple[str, int, str], int] = {}
@@ -436,7 +459,8 @@ class Model:
                 continue
             if tag == "FBCSEM":
                 raise ValueError("Repeated header")
-            if expressions_only and tag not in ("M", "D", "E", "R", "END", "RECOVERY") and tag not in PROVENANCE_TAGS:
+            parser_receipt = tag == "K" and row[1] == "expression" and is_parser_property(row[3])
+            if expressions_only and tag not in ("M", "D", "E", "R", "END", "RECOVERY") and tag not in PROVENANCE_TAGS and not parser_receipt:
                 raise ValueError("Full-model fact in expression-only output")
             if bindings_only and tag not in ("M", "D", "S", "B", "I", "END") and tag not in PROVENANCE_TAGS:
                 raise ValueError("Non-binding fact in bindings-only output")
@@ -674,6 +698,16 @@ class Model:
                         raise ValueError("Unknown constant value kind")
                     self.constants[key] = row[3], row[4]
                 elif tag == "K":
+                    if row[3] in ("member-receiver-input", "member-receiver-context", "preprocessor-expression"):
+                        if row[1] != "expression" or row[3] in self.properties[key]:
+                            raise ValueError("Repeated or foreign receiver/expression context")
+                        if row[3] == "preprocessor-expression" and row[4] != "1":
+                            raise ValueError("Invalid native preprocessor expression context")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
+                    if is_parser_property(row[3]):
+                        if row[1] != "expression" or row[3] in self.properties[key]:
+                            raise ValueError("Repeated or foreign parser observation property")
+                        parser_property_modules[int(row[2]), row[3]] = counts["M"]
                     if row[3].startswith(("driver-", "producer-")):
                         if row[1] != "symbol" or row[3] in self.properties[key]:
                             raise ValueError("Repeated or foreign driver input property")
@@ -1494,6 +1528,17 @@ class Model:
             raise ValueError("Node identity sequence has gaps")
         self.validate_source_ownership(subject_modules)
         validate_driver_inputs(self, number, subject_modules)
+        validate_data(self, number, unescape, subject_modules)
+        validate_emission_names(self, number, unescape, subject_modules)
+        validate_namespace_visibility(self, number, subject_modules)
+        validate_binding_scope_contexts(self, number, subject_modules)
+        validate_flags(self, number, subject_modules)
+        validate_normalized_types(self, number, subject_modules)
+        validate_layout(self, number, subject_modules)
+        validate_frontend_abi(self, number, subject_modules)
+        validate_backend_abi(self, number, subject_modules)
+        validate_call_abi(self, number, subject_modules)
+        validate_parser_observations(self, number, unescape, subject_modules, parser_property_modules, len(NODE_KINDS))
         validate_comments(self, number, subject_modules)
         validate_variable_names(self, number, subject_modules)
         validate_logical_storage(self, number, subject_modules, len(NODE_KINDS))
@@ -1510,6 +1555,7 @@ class Model:
             self.validate_procedure_exits(subject_modules)
             validate_sequence_branches(self, number, subject_modules)
             self.validate_metadata()
+            validate_receiver_contexts(self, number, subject_modules)
             self.validate_formal_spans()
             for (identity, _), module in expression_property_modules.items():
                 if subject_modules.get(("expression", identity)) != module:
@@ -1728,6 +1774,16 @@ class Model:
     def validate_array_subscripts(self, subject_modules: dict[tuple[str, int], int], array_modules: dict[int, int]) -> None:
         """Resolved arrays retain each original input before offset arithmetic."""
         ranks = {int(row[1]): int(row[2]) for row in self.records["A"]}
+        # S is an immutable first observation. Forward references can resolve
+        # afterwards, and T can change again later in the module. The producer
+        # snapshots the live array immediately before each subscript receipt;
+        # compare that native type at the use, including intermediate aliases.
+        live_types, subscript_types = {}, {}
+        for row in self.rows:
+            if row[0] == "T":
+                live_types[int(row[1])] = (row[6], row[7])
+            elif row[0] == "K" and row[1] == "expression" and row[3] == "array-subscript-symbol":
+                subscript_types[int(row[2])] = live_types.get(int(row[4]))
         marked = set()
         for row in self.relations("array-subscript"):
             if row[1] != "symbol" or row[3] != "expression" or row[6] != "0":
@@ -1755,7 +1811,9 @@ class Model:
                 raise ValueError("Array subscript selects another array or rank")
             if self.capabilities[module].get("array-subscript-inputs") != "available" or result is None:
                 raise ValueError("Array subscript capability unavailable")
-            if int(result[12]) & ~512 != int(target[4]) & ~512 or result[14] != target[5]:
+            selected_type = subscript_types.get(identity)
+            if (selected_type is None or int(result[12]) & ~512 != int(selected_type[0]) & ~512
+                    or result[14] != selected_type[1]):
                 raise ValueError("Array subscript selects another element type")
             statement = self.statement_owners.get((domain, identity))
             if statement is None or self.statement_endings[statement][3] != "parsed":
@@ -2165,18 +2223,19 @@ class Model:
             module = subject_modules[domain, identity]
             for operand_id in operands[4:6]:
                 operand = expressions.get(int(operand_id))
-                if operand is None:
+                if operand is None or int(operand[12]) & 0x1e0:
+                    raise ValueError("Numeric selection has no original numeric operand")
+                primitive = int(operand[12]) & 31
+                nominal = int(operand[14])
+                if primitive == 10:
+                    # Enum inputs retain their nominal type before astNewBOP
+                    # selects the ordinary primitive arithmetic operands.
+                    enum = self.symbols.get(nominal)
+                    if (enum is None or enum[3] != "9" or subject_modules.get(("symbol", nominal)) != module
+                            or self.capabilities[module].get("enum-selected-numeric-operands") == "unavailable"):
+                        raise ValueError("Numeric enum operand lacks its nominal enum identity or available coverage")
+                elif nominal or primitive not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18):
                     raise ValueError("Numeric selection has no original primitive operand")
-                dtype, subtype = int(operand[12]), int(operand[14])
-                primitive = not subtype and not dtype & 0x1e0 and dtype & 31 in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)
-                # Enum inputs are converted to primitive selected operands by
-                # the compiler; their original source type remains an enum.
-                enum = (not dtype & 0x1e0 and dtype & 31 == 10 and subtype > 0 and
-                        self.capabilities[module].get("enum-selected-numeric-operands") == "available" and
-                        self.symbols.get(subtype, [None] * 4)[3] == "9" and
-                        subject_modules.get(("symbol", subtype)) == module)
-                if not primitive and not enum:
-                    raise ValueError("Numeric selection has no original primitive or enum operand")
             for side in ("left", "right"):
                 if self.capabilities[module].get("selected-numeric-operands") == "unavailable":
                     raise ValueError("Numeric selections contradict unavailable coverage")
@@ -2994,7 +3053,11 @@ class Model:
                 if name not in names or names[name][4] != str(pointer_bytes):
                     raise ValueError("Primitive storage disagrees with the target pointer width")
             for name in ("string", "ustring"):
-                if name not in names or names[name][4:6] != [str(pointer_bytes * 3), str(pointer_bytes)]:
+                # Descriptor fields follow pointer alignment, which can be
+                # smaller than pointer storage on targets such as m68k.
+                pointer_alignment = names["pointer"][5]
+                if (not pointer_alignment or name not in names
+                        or names[name][4:6] != [str(pointer_bytes * 3), pointer_alignment]):
                     raise ValueError("Dynamic string descriptor storage is incomplete")
 
     @classmethod

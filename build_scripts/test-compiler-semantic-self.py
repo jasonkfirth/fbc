@@ -57,9 +57,12 @@ def make_configuration(inputs: Path, output: Path, timeout: int, target_triplet:
     if any(character.isspace() or character in "$#" for character in str(inputs)):
         raise ValueError("The compiler audit output path must not contain whitespace, '$', or '#'")
     makefile = output / "configuration.mk"
+    # print-* targets are Make's metadata queries. They deliberately avoid
+    # build command fingerprinting, which requires unfrozen SDK helpers.
+    query = "print-semantic-audit-configuration"
     makefile.write_text("include " + str(inputs / "GNUmakefile") + "\n"
-                        ".PHONY: semantic-audit-configuration\n"
-                        "semantic-audit-configuration:\n" + "".join(
+                        ".PHONY: " + query + "\n"
+                        + query + ":\n" + "".join(
                             "\t$(info AUDIT_" + name + "=$(" + name + "))\n"
                             for name in variables) + "\t@:\n")
     environment = dict(os.environ)
@@ -67,7 +70,7 @@ def make_configuration(inputs: Path, output: Path, timeout: int, target_triplet:
     # frozen graph must instead describe its own selected configuration.
     for name in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL"):
         environment.pop(name, None)
-    command = ["make", "--no-print-directory", "-f", str(makefile), "semantic-audit-configuration"]
+    command = ["make", "--no-print-directory", "-f", str(makefile), query]
     if target_triplet is not None:
         command.append("TARGET_TRIPLET=" + target_triplet)
     result = subprocess.run(command, cwd=inputs, env=environment, stdin=subprocess.DEVNULL,

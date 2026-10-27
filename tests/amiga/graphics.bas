@@ -8,6 +8,7 @@
 #include once "fbgfx.bi"
 
 extern "C"
+	declare function amiga_test_window_layout(byval borderless as long) as long
 	declare function amiga_test_display_pixel(byval x as long, byval y as long) as ulong
 	declare function amiga_test_input(byval kind as long, byval code as long, _
 		byval x as long, byval y as long) as long
@@ -36,6 +37,7 @@ dim depths(0 to 2) as integer => {8, 16, 32}
 screencontrol fb.SET_DRIVER_NAME, "AMIGA"
 for mode as integer = 0 to 2
 	if screenres(319, 200, depths(mode), 2) <> 0 then end 1
+	if amiga_test_window_layout(0) <> 0 then end 55
 	if amiga_test_pointer_hidden() <> 0 then end 14
 	setmouse , , 0
 	if amiga_test_pointer_hidden() <> 1 then end 15
@@ -177,6 +179,7 @@ next
 '' A1200 ROM modes expose 1280x512 on PAL and 1280x400 on NTSC. A taller
 '' canvas must retain that resolution instead of choosing a tiny viewport.
 if screenres(1280, 600, 32) <> 0 then end 22
+if amiga_test_window_layout(0) <> 0 then end 56
 dim nominal_width as long, nominal_height as long
 dim mode_id as ulong
 if amiga_test_display_mode(nominal_width, nominal_height, mode_id) <> 0 then end 23
@@ -190,6 +193,18 @@ if amiga_test_display_pixel(0, 0) <> &hff0000 then end 25
 if amiga_test_display_pixel(1279, expected_height - 1) <> &h0000ff then end 26
 screen 0
 print "Native oversized canvas uses "; nominal_width; "x"; nominal_height; " display"
+for mode as integer = 0 to 2
+	for form as integer = 0 to 1
+		dim flags as integer = iif(form = 0, fb.GFX_FULLSCREEN, fb.GFX_NO_FRAME)
+		if screenres(319, 200, depths(mode), 2, flags) <> 0 then end 57
+		if amiga_test_window_layout(1) <> 0 then end 58
+		pset (0, 0), iif(depths(mode) = 8, 15, rgb(255, 255, 255))
+		if amiga_test_display_pixel(0, 0) <> &hffffff then end 59
+		screen 0
+	next
+next
+print "Native windowed/fullscreen/borderless client layouts passed"
+
 end 0
 
 '' end of graphics.bas

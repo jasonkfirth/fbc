@@ -28,6 +28,8 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-data.bi"
+#include once "tooling/semantic-constructs.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -77,14 +79,17 @@ function cDataStmt  _
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 		end select
 
-		function = rtlDataRestore( sym )
+		function = rtlDataRestore( sym, NULL, TRUE, fbSemanticModelCurrentStatement( ) )
 
 	'' READ Variable{int|flt|str} (',' Variable{int|flt|str})*
 	case FB_TK_READ
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		dim as ASTNODE ptr expr = NULL
+		dim as integer semantic_ordinal = 0
 		do
+			dim as LEX_LOCATION semantic_first = lexGetCurrentLocation( )
+			dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 			expr = cVarOrDeref( )
 			if( expr = NULL ) then
 				errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
@@ -93,10 +98,14 @@ function cDataStmt  _
 				'' READ's destination is a language-level write even though
 				'' the runtime receives its address as a BYREF argument.
 				fbSemanticModelSetAccess( expr, "write" )
-				if( rtlDataRead( expr ) = FALSE ) then
+				dim as LEX_LOCATION semantic_last = lexGetLastLocation( )
+				dim as longint semantic_read = fbSemanticModelDataRead(expr, semantic_ordinal, _
+					semantic_first, semantic_last, semantic_nonphysical, lexGetNonphysicalTokenCount( ))
+				if( rtlDataRead( expr, semantic_read ) = FALSE ) then
 					exit function
 				end if
 			end if
+			semantic_ordinal += 1
 		loop while( hMatch( CHAR_COMMA ) )
 
 		function = TRUE
@@ -132,6 +141,7 @@ function cDataStmt  _
 		end if
 
 		dim as ASTNODE ptr tree = astDataStmtBegin( )
+		dim as longint semantic_group = fbSemanticModelDataBegin( )
 
 		dim as ASTNODE ptr expr = NULL
 
@@ -140,6 +150,8 @@ function cDataStmt  _
 			lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 			do
+				dim as LEX_LOCATION semantic_first = lexGetCurrentLocation( )
+				dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 				hMatchExpressionEx( expr, FB_DATATYPE_INTEGER )
 
 				'' not a constant?
@@ -160,9 +172,13 @@ function cDataStmt  _
 					errReport( FB_ERRMSG_EXPECTEDCONST )
 					astDelTree( expr )
 				else
-					if( astDataStmtStore( tree, expr ) = NULL ) then
+					dim as ASTNODE ptr item = astDataStmtStore( tree, expr )
+					if( item = NULL ) then
 						exit function
 					end if
+					dim as LEX_LOCATION semantic_last = lexGetLastLocation( )
+					fbSemanticModelDataItem(semantic_group, tree->data.elmts - 1, item, FALSE, _
+						semantic_first, semantic_last, semantic_nonphysical, lexGetNonphysicalTokenCount( ))
 				end if
 			loop while( hMatch( CHAR_COMMA ) )
 
@@ -182,6 +198,11 @@ function cDataStmt  _
 
 			do
 				'' read until a ',' or EOL is found
+				dim as LEX_LOCATION semantic_first = lexGetCurrentLocation( )
+				dim as LEX_LOCATION semantic_last = semantic_first
+				semantic_last.end_line = semantic_first.start_line
+				semantic_last.end_column = semantic_first.start_column
+				dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 				dim as integer tokens = 0
 				text = ""
 				do
@@ -200,6 +221,7 @@ function cDataStmt  _
 					end select
 
 					text += *lexGetText( )
+					semantic_last = lexGetCurrentLocation( )
 					lexSkipToken( LEX_FLAGS )
 					tokens += 1
 				loop
@@ -218,13 +240,20 @@ function cDataStmt  _
 					end if
 				end if
 
-				if( astDataStmtStore( tree, astNewCONSTstr( text ) ) = NULL ) then
+				dim as ASTNODE ptr item = astDataStmtStore( tree, astNewCONSTstr( text ) )
+				if( item = NULL ) then
 					exit function
 				end if
+				if( tokens = 0 ) then
+					semantic_last.end_line = semantic_first.start_line
+					semantic_last.end_column = semantic_first.start_column
+				end if
+				fbSemanticModelDataItem(semantic_group, tree->data.elmts - 1, item, TRUE, _
+					semantic_first, semantic_last, semantic_nonphysical, lexGetNonphysicalTokenCount( ))
 			loop until( do_exit )
 		end if
 
-		astDataStmtEnd( tree )
+		astDataStmtEnd( tree, semantic_group )
 
 		'' node is unused, the tree will become an initialized static array
 		astDelNode( tree )

@@ -223,12 +223,26 @@ static ULONG amiga_select_mode(int width, int height, int depth)
     return candidate != (ULONG)INVALID_ID ? candidate : mode;
 }
 
+/* Palette ownership does not imply a borderless window. Intuition needs
+   space for decorations around a requested client area on a private screen. */
+static struct Screen *amiga_open_private_screen(ULONG mode_id, int width,
+    int height, const char *title, ULONG *screen_error)
+{
+    return OpenScreenTags(NULL,
+        SA_DisplayID, mode_id, SA_ErrorCode, (ULONG)screen_error,
+        SA_Width, (ULONG)width, SA_Height, (ULONG)height,
+        SA_Depth, (ULONG)fb_amiga_gfx.screen_depth,
+        SA_Title, (ULONG)(title != NULL ? title : "FreeBASIC"),
+        SA_ShowTitle, FALSE, SA_Quiet, TRUE, TAG_DONE);
+}
+
 int fb_amigaGfxDisplayInit(const char *title, int width, int height,
     int refresh_rate, int flags)
 {
     struct Screen *desktop;
     int maximum_depth;
-    ULONG mode_id, screen_error = 0;
+    int borderless = (flags & (DRIVER_FULLSCREEN | DRIVER_NO_FRAME)) != 0;
+    ULONG mode_id = (ULONG)INVALID_ID, screen_error = 0;
 
     (void)refresh_rate;
     fb_amigaGfxDebug("opening %dx%d depth=%d", width, height, __fb_gfx != NULL ? __fb_gfx->depth : 0);
@@ -261,31 +275,60 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
         mode_id = amiga_select_mode(width, height, fb_amiga_gfx.screen_depth);
         fb_amigaGfxDebug("selected mode=%lx", mode_id);
         if (mode_id == (ULONG)INVALID_ID) goto fail;
-        fb_amiga_gfx.screen = OpenScreenTags(NULL,
-            SA_DisplayID, mode_id, SA_ErrorCode, (ULONG)&screen_error,
-            SA_Width, (ULONG)width, SA_Height, (ULONG)height,
-            SA_Depth, (ULONG)fb_amiga_gfx.screen_depth,
-            SA_Title, (ULONG)(title != NULL ? title : "FreeBASIC"),
-            SA_ShowTitle, FALSE, SA_Quiet, TRUE, TAG_DONE);
+        fb_amiga_gfx.screen = amiga_open_private_screen(mode_id, width,
+            height, title, &screen_error);
         fb_amigaGfxDebug("mode=%lx screen error=%lu", mode_id, screen_error);
         fb_amiga_gfx.private_screen = TRUE;
     }
     if (fb_amiga_gfx.screen == NULL) goto fail;
     fb_amigaGfxDebug("screen opened");
 
+    if (fb_amiga_gfx.private_screen && !borderless) {
+        struct Screen *screen = fb_amiga_gfx.screen;
+        int border_width, border_height;
+
+        /* screens.h defines a window title's height as WBorTop plus the
+           screen font height plus one. Use the opened screen's actual
+           metrics, then reopen the same mode with a larger virtual bitmap.
+           Keeping the mode preserves its font and border geometry. */
+        if (screen->WBorLeft < 0 || screen->WBorRight < 0 ||
+            screen->WBorTop < 0 || screen->WBorBottom < 0 ||
+            screen->RastPort.TxHeight <= 0)
+            goto fail;
+        border_width = screen->WBorLeft + screen->WBorRight;
+        border_height = screen->WBorTop + screen->RastPort.TxHeight + 1 +
+            screen->WBorBottom;
+        /* Intuition stores screen and window dimensions in signed WORDs. */
+        if (width > SHRT_MAX - border_width ||
+            height > SHRT_MAX - border_height)
+            goto fail;
+        if (!CloseScreen(screen)) goto fail;
+        fb_amiga_gfx.screen = amiga_open_private_screen(mode_id,
+            width + border_width, height + border_height, title, &screen_error);
+        if (fb_amiga_gfx.screen == NULL) goto fail;
+    }
+
     fb_amiga_gfx.window = OpenWindowTags(NULL,
         WA_CustomScreen, (ULONG)fb_amiga_gfx.screen,
         WA_InnerWidth, (ULONG)width, WA_InnerHeight, (ULONG)height,
-        WA_Title, (ULONG)(title != NULL ? title : "FreeBASIC"),
-        WA_Borderless, (ULONG)fb_amiga_gfx.private_screen,
-        WA_DragBar, (ULONG)!fb_amiga_gfx.private_screen,
-        WA_DepthGadget, (ULONG)!fb_amiga_gfx.private_screen,
-        WA_CloseGadget, (ULONG)!fb_amiga_gfx.private_screen,
+        /* A title alone reserves a top border even with WA_Borderless.
+           Omit it for borderless modes so their input and pixel origins agree. */
+        WA_Title, (ULONG)(borderless ? NULL : (title != NULL ? title : "FreeBASIC")),
+        WA_Borderless, (ULONG)borderless,
+        WA_DragBar, (ULONG)!borderless,
+        WA_DepthGadget, (ULONG)!borderless,
+        WA_CloseGadget, (ULONG)!borderless,
         WA_Activate, TRUE, WA_RMBTrap, TRUE, WA_ReportMouse, TRUE,
         WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_RAWKEY | IDCMP_MOUSEBUTTONS |
             IDCMP_MOUSEMOVE | IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW |
             IDCMP_REFRESHWINDOW, TAG_DONE);
     if (fb_amiga_gfx.window == NULL) goto fail;
+    /* Auto-adjusted windows must not silently clip the BASIC client area. */
+    if (fb_amiga_gfx.window->Width - fb_amiga_gfx.window->BorderLeft -
+            fb_amiga_gfx.window->BorderRight < width ||
+        fb_amiga_gfx.window->Height - fb_amiga_gfx.window->BorderTop -
+            fb_amiga_gfx.window->BorderBottom < height)
+        goto fail;
     fb_amigaGfxDebug("window opened");
 
     /* One transparent sprite row needs two control words, two image words,
@@ -416,7 +459,9 @@ void fb_amigaGfxPresent(void)
                 (UWORD)(fb_amiga_gfx.window->BorderTop + row),
                 (UWORD)fb_amiga_gfx.width, 1, RECTFMT_ARGB);
         else {
-            LONG written = WritePixelLine8(fb_amiga_gfx.window->RPort, 0, (ULONG)row,
+            LONG written = WritePixelLine8(fb_amiga_gfx.window->RPort,
+                (ULONG)fb_amiga_gfx.window->BorderLeft,
+                (ULONG)(fb_amiga_gfx.window->BorderTop + row),
                 (ULONG)fb_amiga_gfx.width, fb_amiga_gfx.present_buffer,
                 &fb_amiga_gfx.line_rastport);
             /* An incomplete native transfer must remain dirty for retry. */

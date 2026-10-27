@@ -65,6 +65,8 @@ sub fbcDriverSemanticModule( byval module as FBCIOFILE ptr, byval is_main as int
 	fbSemanticModelDriverInput("subsystem", fbc.subsystem)
 #ifndef ENABLE_STANDALONE
 	fbSemanticModelDriverInput("target-prefix", fbc.targetprefix)
+#else
+	fbSemanticModelDriverInput("target-prefix", "")
 #endif
 	fbSemanticModelDriverInput("no-default-libraries", str(abs(fbc.nodeflibs <> FALSE)))
 	fbSemanticModelDriverInput("no-runtime-startup", str(abs(fbc.nofbrt0 <> FALSE)))

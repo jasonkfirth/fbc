@@ -25,6 +25,7 @@
 #include once "core/fbint.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-data.bi"
 
 declare sub hCreateDataDesc( )
 
@@ -113,7 +114,7 @@ function astDataStmtStore _
 
 end function
 
-sub astDataStmtEnd( byval tree as ASTNODE ptr )
+sub astDataStmtEnd( byval tree as ASTNODE ptr, byval semantic_group as longint )
 
 	dim as FBSYMBOL ptr array = any, elm = any
 	dim as integer i = any, id = any
@@ -125,7 +126,11 @@ sub astDataStmtEnd( byval tree as ASTNODE ptr )
 
 	'' create/lookup the datadesc array symbol for the last symbol
 
+	dim as FBSYMBOL ptr previous_label = ast.data.lastlbl
 	array = astDataStmtAdd( NULL, tree->data.elmts )
+	dim as FBSYMBOL ptr selected_label = NULL
+	if( ast.data.lastlbl <> previous_label ) then selected_label = ast.data.lastlbl
+	fbSemanticModelDataDescriptor(semantic_group, array, ast.data.lastsym, selected_label, tree->data.elmts)
 
 	'' initialize it
 	initree = astTypeIniBegin( FB_DATATYPE_STRUCT, ast.data.desc, TRUE )
@@ -137,6 +142,7 @@ sub astDataStmtEnd( byval tree as ASTNODE ptr )
 	for i = 0 to tree->data.elmts - 1
 		id = n->data.id
 		expr = n->l
+		littext = ""
 
 		astTypeIniScopeBegin( initree, array, FALSE )
 
@@ -159,6 +165,10 @@ sub astDataStmtEnd( byval tree as ASTNODE ptr )
 			expr = astNewCONSTi( 0 )
 
 		end select
+		'' The final LINK cell is descriptor plumbing, not a written DATA item.
+		if( n->data.id <> FB_DATASTMT_ID_LINK ) then
+			fbSemanticModelDataPayload(semantic_group, i, id, littext)
+		end if
 
 		'' .id = id
 		elm = symbGetUDTSymbTbHead( ast.data.desc )

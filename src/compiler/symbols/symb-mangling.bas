@@ -27,6 +27,7 @@
 #include once "support/containers/flist.bi"
 #include once "support/containers/hash.bi"
 #include once "backend/ir.bi"
+#include once "tooling/semantic-emission-names.bi"
 
 type FB_MANGLEABBR
 	idx             as integer
@@ -237,8 +238,37 @@ private sub hMangleUdtId( byref mangled as string, byval sym as FBSYMBOL ptr )
 	end if
 end sub
 
+private sub hObserveAsmName( byval sym as FBSYMBOL ptr )
+	if( (env.clopt.backend <> FB_BACKEND_GAS) and (env.clopt.backend <> FB_BACKEND_GAS64) ) then exit sub
+	if( sym->id.mangled = NULL ) then exit sub
+	if( fbSemanticModelObjectNameNeeded(sym) = FALSE ) then exit sub
+	var identifier = *sym->id.mangled
+	fbSemanticModelEmissionName(sym, iif(env.clopt.backend = FB_BACKEND_GAS, "gas", "gas64"), identifier)
+	if( sym->class = FB_SYMBCLASS_VAR ) then
+		if( symbIsLocal(sym) and (symbIsStatic(sym) = FALSE) ) then
+			fbSemanticModelEmissionName(sym, "object", "", "none", "automatic-storage")
+			exit sub
+		end if
+		if( symbIsThreadLocal(sym) ) then
+			fbSemanticModelEmissionName(sym, "object", "", "unavailable", "backend-tls")
+			exit sub
+		end if
+	end if
+	'' The x86 assembler quotes fastcall names containing @. Those outer
+	'' quotes are syntax; escaped or otherwise quoted aliases remain unknown.
+	if( (left(identifier, 1) = chr(34)) and (right(identifier, 1) = chr(34)) and (len(identifier) > 1) ) then
+		identifier = mid(identifier, 2, len(identifier) - 2)
+	end if
+	if( (instr(identifier, chr(34)) > 0) or (instr(identifier, chr(92)) > 0) ) then
+		fbSemanticModelEmissionName(sym, "object", "", "unavailable", "assembler-quoted")
+	else
+		fbSemanticModelEmissionName(sym, "object", identifier)
+	end if
+end sub
+
 function symbGetMangledName( byval sym as FBSYMBOL ptr ) as zstring ptr
 	if( sym->id.mangled ) then
+		hObserveAsmName(sym)
 		return sym->id.mangled
 	end if
 
@@ -272,6 +302,9 @@ function symbGetMangledName( byval sym as FBSYMBOL ptr ) as zstring ptr
 		end if
 	end select
 
+	'' Observe the completed backend spelling, after native period replacement.
+	'' The observer never requests a name for an otherwise unused declaration.
+	hObserveAsmName(sym)
 	function = sym->id.mangled
 end function
 
@@ -693,9 +726,11 @@ sub symbMangleParam( byref mangled as string, byval param as FBSYMBOL ptr )
 end sub
 
 private function hAddUnderscore( ) as integer
-	'' C backend? don't add underscores; gcc will already do it.
+	'' C compilers and LLVM apply the target's ordinary object prefix. LLVM
+	'' procedures with an explicit Windows name use its byte-one escape and
+	'' supply their complete decoration in hMangleProc instead.
 	select case env.clopt.backend
-	case FB_BACKEND_GCC, FB_BACKEND_CLANG
+	case FB_BACKEND_GCC, FB_BACKEND_CLANG, FB_BACKEND_LLVM
 		function = FALSE
 	case else
 		'' For ASM, add underscores if the target requires it
@@ -1387,6 +1422,13 @@ private sub hMangleProc( byval sym as FBSYMBOL ptr )
 	                     (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) and _
 	                     ((env.clopt.backend <> FB_BACKEND_GCC) and _
 	                     (env.clopt.backend <> FB_BACKEND_CLANG))
+	select case env.clopt.target
+	case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN, FB_COMPTARGET_XBOX
+	case else
+		'' ELF and Mach-O use the ordinary name for stdcall too. Their C
+		'' calling-convention attribute does not add a Windows @N suffix.
+		add_stdcall_suffix = FALSE
+	end select
 
 	'' LLVM: @ prefix for global symbols
 	if( env.clopt.backend = FB_BACKEND_LLVM ) then
@@ -1415,7 +1457,7 @@ private sub hMangleProc( byval sym as FBSYMBOL ptr )
 	end if
 
 	'' Win32 underscore prefix
-	if( hAddUnderscore( ) ) then
+	if( hAddUnderscore( ) or (escape_mangled_name and env.underscoreprefix) ) then
 		if( sym->proc.mode = FB_FUNCMODE_FASTCALL ) then
 			select case( env.clopt.target )
 			case FB_COMPTARGET_WIN32, FB_COMPTARGET_CYGWIN, FB_COMPTARGET_XBOX

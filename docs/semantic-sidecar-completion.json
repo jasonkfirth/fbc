@@ -1,18 +1,33 @@
 {
   "objective": "Complete the semantic model using the compiler-wide gap audit, including additional defects discovered during implementation.",
-  "schema": "25",
+  "schema": "27",
   "goal_status": "active",
-  "compiler": "/home/jkfirth/fbc/out/semantic-basic-correction/fbc",
-  "compiler_sha256": "887677078a36d4f8e529b1c75ab2a43b56a0ae5c116045342d18458fed3ae18d",
+  "compiler": "/home/jkfirth/fbc/out/semantic-goal-20261027/fbc-call-abi-v36",
+  "compiler_sha256": "6bf76ca04674452d7c625dd57adda6b4b19a713ea3beb4a63ec7abd44ad924f0",
   "verified_checks": [
-    "101 schema 25 sidecar contract methods passed with GCC/LLVM/Clang emission checks; log: out/semantic-basic-correction/contracts-final.log.",
-    "174 Make-selected native BASIC compiler modules passed all 522 GCC/LLVM/Clang cases, validating full/expressions artifacts and identical emitted code against export-disabled controls; evidence: out/semantic-basic-correction/compiler-self/results.json.",
-    "All six BASIC output/source safety methods passed, including source/include/preinclude/hardlink/symlink aliases, output collisions, successful replacement, injected write/flush/close/replace failures, SHA-256 padding/read boundaries and open-stream position/change detection; log: out/semantic-basic-correction/file-contracts.log.",
-    "Six source construct methods passed: all 14 compound kinds, every accepted dispatch route, colon/continuation/inline nesting, aggregate/enum/assembly bodies, shared NEXT closure, repeated include/module contexts, generated/inactive omissions, recovery, legacy numeric labels and corrupted ownership/closure; log: out/semantic-basic-correction/construct-contracts.log.",
-    "Source/AST and binding links, access roles, optional argument origin, selected file-operation ownership and explicit partial/unavailable capabilities passed in the schema 25 suite.",
-    "Make semantic smoke passed with all schema 24/25 record families recognized; log: out/semantic-basic-correction/smoke.log.",
-    "Structure validation checked 245 documented compiler BASIC/header files and 21 host graphs; rejects untracked handwritten C helpers and orphan C, permits compiler-generated C paired with BASIC.",
-    "Prior schema 23 source-coordinate checkpoint: 171 Make-selected modules passed 513 GCC/LLVM/Clang cases; all 20062 exported lexer locations independently validated. Evidence remains in out/semantic-coordinate-self-all and out/semantic-coordinate-verification."
+    "The v27 affected-layout source audit completed with all 15 cases passing: five changed modules across GCC/LLVM/Clang, full and expression exports, exact disabled/enabled code and parser-observation equality. Evidence: self-layout-v27/results.json and self-layout-v27.log. Current v28 frontend ABI implementation passes six combined families plus the production-observer guard executable, architecture checks and 19 corrected-total ABI corruptions. It distinguishes value/implicit-reference/reference/descriptor/variadic formals, actual slot widths, instance ordinals and frontend result kinds across high-level and native assembler backends. Evidence: frontend-abi-families-v28-complete.log, frontend-abi-final-guards-v28.log. Descriptor flags now name native VAR, FIELD and STRUCT descriptor roles. The v28 ABI source audit is running with one worker; no complete source acceptance is claimed yet.",
+    "Nine existing namespace, array/forward-type, declaration, pool-lifetime and aggregate membership/access families pass on v27 (layout-regressions-v27.log). Four additional architecture controls pass for Amiga/m68k, RISC OS/ARM, Windows CE/ARM and Linux/AArch64, with a diagnostic/no-complete-model control for this driver's unsupported JS target (layout-architectures-v27-complete.log). The cross-target run found and repaired a reader assumption that descriptor alignment equalled pointer storage: m68k pointers are four bytes with two-byte alignment. The current source audit has eight saved passing cases of fifteen; it remains incomplete.",
+    "v27 BASIC layout observers and independent reader pass seven focused families together, including 12 backend/target packing partitions, storage decisions, native runtime behavior, stateful macro callbacks, repeated includes, QB defaults, transport/reset, parser restart, diagnostic equality and rollback. Twenty-seven additional corruption cases reject invented or missing layout facts, including deleted logical fields and omitted/duplicate relocations with adjusted counts. Evidence: layout-families-v27-complete.log, layout-corruption-v27.log. Native descriptor attributes are now correctly named on FIELD as well as VAR symbols. Compiler structure checks 299 documented files / 21 host graphs; binary contract matches. The affected-source audit is running with one worker and is not claimed complete.",
+    "The current forward/alias array corruption control passes all three backends after retaining a coherent native T/NT pair. It therefore still exercises the higher-level array element selection guard instead of failing early at NT integrity. Evidence: array-type-closure-v25-complete.log. The frozen v24 suite retains the older assertion fixture and is not claimed wholly passing.",
+    "v25 native BASIC implementation passes eight current families together: 100 class-aware flag definitions; all 32 bits, zero/all masks and invalid mapper bounds/classes/groups; live common/aggregate/procedure snapshots; exact return classifiers; nine const positions and address temporaries; aliases versus nominal identity; enum/procedure-pointer/vararg types; C mangling meanings; target ranks/WCHAR remaps; fixed-string VAR/IDX/FIELD widths; pointer/unit/storage distinctions; full/reduced emission equality, binary/text parity, reset and corrected-total corruption. Evidence: named-flags-v25-complete.log and type-storage-classes-v25.log. All 15 changed-source v22 cases, three final mapper v23 cases, three type-closure v24 cases and three final dictionary v25 cases pass. The initial stronger NT checker also accepts all 15 saved v22 full models (normalized-replay-v24.json). Final v25 native smoke passes, compiler structure checks 297 files / 21 host graphs, and the binary contract matches. This is focused qualification, not overall completion.",
+    "Namespace/USING and binding-context observations pass five focused families plus the expanded nested/anonymous/scoped-enum/out-of-line context control. Exact C/LLVM/Clang emissions, native no-op results, source order, transitive and reopened imports, scoped removal/shadowing, repeated includes, expanded/inactive omissions, transport parity, module resets and recount-corrected corruptions are checked. All nine affected compiler-source cases pass with exact off/full/expression emissions and parser observations; native smoke passes. Logs: namespace-visibility-v20-complete.log, binding-scope-kinds-v20.log, self-namespace-v20.log, smoke-namespace-v20.log. Structure: 293 files / 21 host graphs; binary contract matches.",
+    "Frozen v14 complete contract suite finished with exit zero: 301 methods, four explicitly Windows-only skips on this Linux host. Evidence: verification-v14/contracts-status.json and contracts.log. This baseline predates shared-tree integration and the namespace additions; the new expanded run remains a distinct acceptance check.",
+    "Integration with shared commit 82f88cc90 builds as v17. The v16 integration run passed 24 of 25 families; its sole failed family was preprocessor receiver retention, repaired by replacing the earlier skip workaround with the explicit native PP context. Five v17 receiver/parser/enum/include families and native semantic smoke pass. Logs: integration-checks-v16.log, integration-final-v17.log, smoke-integration-v17.log. Merge review removed duplicate library closure emission, duplicate test definitions and a duplicate capability case. The shared coordinate cache and newer backend/TLS changes are retained.",
+    "v14 assembler and target name controls pass GAS64/GAS (emission-asm-v14.log); additional C/Clang/LLVM TLS uncertainty, transport, native object and corruption controls pass (emission-tls-v14.log). All three saved compiler models previously rejected for forward array element types now validate with the repaired reader; array-source-models-revalidated-v14.json. The old source audit was superseded after 257 cases, 253 passes, three known forward-type reader failures and one explicit native compile timeout; no complete old-graph success is claimed.",
+    "Fourteen current families pass together on v14: selected backend/object names, C++ and ordinary aliases, Clang/LLVM libc mappings, explicit intrinsic/private/static/TLS uncertainty, native object byte parity and nm checks, Windows x86/Darwin/ELF decoration with real COFF/Mach-O objects, forward/alias array types at each use, DATA/READ/RESTORE, statement-only Cva parser observations, noneditable macro include anchors and corrupted receipts. Log: out/semantic-goal-20261027/qualified-families-v14-verified.log. Native semantic smoke passes; log: smoke-v14.log. Structure checks 291 files on 21 host graphs; binary contract matches.",
+    "Five DATA/READ/RESTORE families pass with BASIC-only v10: original numeric/narrow/wide/NUL/address values, native forward descriptor links, source versus synthetic groups, 16 selected primitive READ routines, forward/blank RESTORE, QB raw/empty fields, module resets, binary/text parity, common parser phase equality, reduced omissions, exact GCC/Clang/LLVM emissions and native off/full execution. Twenty-one recount-corrected corruptions are rejected. Log: out/semantic-goal-20261027/data-streams-v10-verified.log. Compiler structure checks 289 files on 21 host graphs and the binary contract matches.",
+    "Receiver preprocessing/language contexts, typedef-cast parser phase separation and original enum promotions passed GCC/Clang/LLVM; log: out/semantic-goal-20261027/parser-receiver-v7.log. The native semantic smoke also passed after replacing its truncated macro range expectation with the complete mixed expression span; log: smoke-v6-verified.log.",
+    "Byte-safe reader optimization preserved acceptance/error/value results on 10528 differential cases, including all 256 raw bytes and escapes. The printable-field benchmark improved from 0.3314 s to 0.0162 s; wire and corruption regression methods passed. Log: out/semantic-goal-20261027/reader-fast-path-tests.log.",
+    "Six malformed/legacy/Unicode coordinate regressions passed with the v5 projector, preserving valid later lines while refusing all mappings on malformed lines. Log: out/semantic-goal-20261027/coordinate-repairs-v5.log.",
+    "Four previous-failure methods passed: array/macro access exact transport comparisons with identical output requests, native datatype ABI bit preservation, and hidden-provenance capability handling. Log: out/semantic-goal-20261027/previous-failures-v4.log.",
+    "Native parser observation phase: exact full/expression sequences, independent SHA-256 value fingerprints, corruption refusal, reduced-value omission, macro endpoint boundaries, binary/text parity and seven callback/recovery/import integration methods passed. Logs: out/semantic-goal-20261027/parser-observations-v4.log and parser-integrations-v4.log.",
+    "Both affected driver modules passed all six GCC/LLVM/Clang cases with exact ordered native parser observations, identical emitted code and matching dependencies. Evidence: out/semantic-goal-20261027/self-parser-phase-v4/results.json.",
+    "Four focused driver input methods passed on the isolated compiler: ordered inputs, reduced-mode omissions, actual main/secondary roles, parser restarts, corrected-total corruption and older producer compatibility, generated archive/XPM modules, noneditable generated ranges and preserved XPM input under output alias rejection. Log: out/semantic-goal-20261027/driver-isolated-tests.log.",
+    "Binary/text driver input parity, complete frozen reader import closure, and original enum operand promotion regressions passed on the isolated compiler; logs: out/semantic-goal-20261027/driver-transport-tests.log and enum-promotions.log.",
+    "Compiler structure checked 287 documented files and 21 host source graphs in the isolated worktree. Newly merged source header/footer violations were corrected without changing implementation.",
+    "Semantic binary element generation matches the existing schema-27 contract; no record layout changed.",
+    "The historical schema-25 checkpoint passed 101 contract methods and 522 compiler source/backend cases. It does not prove the current schema-27 implementation.",
+    "Selected backend ABI checkpoint v32: 303 BASIC compiler source/header contracts and 21 host graphs pass; no handwritten compiler C files; binary contract matches schema 27."
   ],
   "limitations": "No gap is claimed fully complete by this implementation checkpoint; evidence is partial until its full acceptance scope is verified.",
   "items": [
@@ -20,7 +35,7 @@
       "id": "G01",
       "title": "Reject output aliases of compiler inputs and emissions",
       "status": "in-progress",
-      "evidence": "Staged publication protects source/include/preinclude, link aliases, emissions and executable/preprocessed outputs; dedicated regressions pass. Remaining resource/input cases and target validation must be audited.",
+      "evidence": "Staged publication protects source/include/preinclude, link aliases, emissions and executable/preprocessed outputs; dedicated regressions pass. Remaining resource/input cases and target validation must be audited. XPM conversion now protects the original consumed resource before its driver filename changes; an actual output-alias regression proves it remains byte-identical.",
       "required_positive": "Distinct output paths preserve input bytes and publish the expected nonempty module.",
       "required_negative": "Same path, relative alias, symlink, hardlink, include alias, and emitted-code alias cannot overwrite another artifact or report success."
     },
@@ -36,7 +51,7 @@
       "id": "G03",
       "title": "Identify source revisions, encoding, and coordinate systems",
       "status": "in-progress",
-      "evidence": "FILE revisions retain actual opened-stream hash/encoding. LOC resolves original physical UTF-16 boundaries and absolute BOM-inclusive byte offsets through live source handles, preserving position and original revisions. Six source formats, three line endings and non-BMP text pass independent exact-span tests. All 513 compiler-source cases and 20062 compiler lexer locations validate. Compiler build/invocation identity, complete decoder malformed-state capability and all native host combinations remain.",
+      "evidence": "FILE revisions retain actual opened-stream hash/encoding. LOC resolves original physical UTF-16 boundaries and absolute BOM-inclusive byte offsets through live source handles, preserving position and original revisions. Six source formats, three line endings and non-BMP text pass independent exact-span tests. All 513 compiler-source cases and 20062 compiler lexer locations validate. Compiler build/invocation identity, complete decoder malformed-state capability and all native host combinations remain. The projector now validates a whole physical line before any mapping, caching line validity. Legacy/UTF-16/UTF-32 malformed lines remain unmapped while later valid lines preserve verified coordinates; six regressions pass.",
       "required_positive": "UTF-8, UTF-16, UTF-32, legacy bytes, BOMs, CRLF, and non-BMP characters map to the captured revision and documented columns.",
       "required_negative": "A changed file cannot be silently treated as the revision that supplied an editable semantic fact; malformed encodings remain noneditable."
     },
@@ -75,8 +90,8 @@
     {
       "id": "G08",
       "title": "Describe invocation, module role, and link inputs",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "Native driver snapshots now retain actual main/secondary/resource/archive roles, input ordinals, producer build strings, ordered search paths, predefines/preincludes, explicit versus planned objects, archive/library/resource requests, tool options and module library closure. Four focused methods pass. Source-less invocations, complete final default-library/link-input selection and full invocation history remain acceptance requirements.",
       "required_positive": "Multiple translation units, main selection, library attributes, #INCLIB/#LIBPATH, predefines, preincludes, and output modes retain their actual choices.",
       "required_negative": "Do not claim runtime-loaded libraries, linker-resolved addresses, or unavailable semantic bodies for prebuilt objects."
     },
@@ -92,7 +107,7 @@
       "id": "G10",
       "title": "Capture source statements, compounds, and complete construct ranges",
       "status": "in-progress",
-      "evidence": "ST/STE parser observations, BLK/BEND syntax nesting and OWN creation-time associations now retain source/configuration/module/procedure ownership and physical LOC extents. All 14 compound kinds and all accepted routes, inline/colon/continuation/member/enum/assembly/legacy label forms, multiple NEXT closures, includes/remaps, generated/inactive exclusions and provisional recovery pass independent tests and off/full/bindings/expression emission parity. Complete declaration/synthesized-body and branch structural roles still require acceptance review; no complete G10 claim.",
+      "evidence": "ST/STE parser observations, BLK/BEND syntax nesting and OWN creation-time associations now retain source/configuration/module/procedure ownership and physical LOC extents. All 14 compound kinds and all accepted routes, inline/colon/continuation/member/enum/assembly/legacy label forms, multiple NEXT closures, includes/remaps, generated/inactive exclusions and provisional recovery pass independent tests and off/full/bindings/expression emission parity. Complete declaration/synthesized-body and branch structural roles still require acceptance review; no complete G10 claim. Generated resource/archive BASIC root ranges are noneditable in every export mode; user preinclude contexts retain ordinary eligibility.",
       "required_positive": "All declaration, compound, legacy single-line, colon-separated, continuation, include, and synthesized-body cases have documented source ownership.",
       "required_negative": "Enabling export cannot force -g or change emissions; generated statements cannot inherit false editable ranges from the nearest debug marker."
     },
@@ -100,7 +115,7 @@
       "id": "G11",
       "title": "Link typed source expressions and their lowered representations",
       "status": "in-progress",
-      "evidence": "Immutable source-expression associations survive AST cloning and are exported as compiler-observed H links, with absent/erased nodes explicitly not inferred. Source calls erased by constant short-circuit lowering remain typed E facts without invented retained calls. Source parent/operand/result graphs and complete transformation lineage remain pending.",
+      "evidence": "Immutable source-expression associations survive AST cloning and are exported as compiler-observed H links, with absent/erased nodes explicitly not inferred. Source calls erased by constant short-circuit lowering remain typed E facts without invented retained calls. Source parent/operand/result graphs and complete transformation lineage remain pending. Mixed macro/ordinary endpoints now retain both written expression boundaries in full, expression and hidden-provenance modes. Ordered native parser receipts have exact phase comparison without conflating additional snapshots.",
       "required_positive": "Nested expressions, folded expressions, operator calls, pointers, arrays, properties, conditional expressions, and cloned initializers retain source graph and lowering links.",
       "required_negative": "Do not infer expression parenthood from overlapping ranges, reuse pool addresses as IDs, or invent source AST operations for already-folded nodes."
     },
@@ -139,16 +154,16 @@
     {
       "id": "G16",
       "title": "Model source scope occurrences and ordered import visibility",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "Existing source BLK/namespace occurrence IDs now combine with actual USING operand order, native return/effect counts, transitive import creation, refresh propagation and lexical relationship removal. Each source binding retains creation-time lexical table, current namespace/hash owners, statement/source/construct IDs independently of its selected symbol owner. Scope shadowing, reopening, nested/anonymous aggregates, scoped/unscoped enums, repeated include contexts, expanded/inactive inputs and out-of-line methods pass five new families; nineteen import corruptions and nine binding-context corruptions are rejected. Nine affected compiler-source cases and smoke pass. Exhaustive inherited/native lookup explanation, phase/target interactions and final gap acceptance remain; no complete G16 claim.",
       "required_positive": "Shadowing, reopened namespaces, nested/anonymous types, scoped enums, imported namespaces, include instances, and out-of-line method bodies retain the actual lookup context.",
       "required_negative": "Do not conflate lexical ownership with lookup namespace or infer a new visible import outside its source context."
     },
     {
       "id": "G17",
       "title": "Provide a stable normalized type and flag contract",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "NT now preserves known fixed-string widths from variables, array elements and fields. Full-only normalized-type-closure pairs each valid live T/N/E with its exact NT and rejects lost or contradictory type identities, qualifiers, widths and mangling fields. Self-describing dictionaries expose all 100 current boolean symbol/aggregate/procedure flags with class-specific reused bits, explicit unmapped bits, return classifiers and the five actual C mangling meanings. Primitive policy retains native promotion ranks, remaps, storage categories and QB suppression. Tests cover all native bit/class combinations, aliases, distinct nominal types, enum/procedure-pointer/variadic types, Z/W/FIXSTR storage, every const position, 32/64-bit Linux/Windows metadata, all three high-level backends, omissions, transport, reset and corruption. All eight final focused families and affected-source audits pass. Complete end-to-end stable-v1 raw-ABI consumer coverage and the remaining target/phase interactions still require acceptance; this entry is not claimed complete. A current end-to-end stable-v1 probe confirms the compiler succeeds but the supplied Model reader rejects the correctly reordered primitive vocabulary. This is an explicit remaining consumer failure, not a passing qualification.",
       "required_positive": "Pointers with qualifiers at every level, aliases, strings, enums, UDTs, procedure pointers, varargs types, mangle modifiers, and integer promotion policy normalize consistently.",
       "required_negative": "Do not treat distinct nominal types as identical based on spelling or erase fixed-string length/qualifiers; do not claim raw information already exported is absent."
     },
@@ -156,7 +171,7 @@
       "id": "G18",
       "title": "Separate natural alignment, packing request, and effective layout",
       "status": "in-progress",
-      "evidence": "Natural and packing alignments are separate, with finalized return classifier guarded. Target/packing partitions and final layout closure remain to verify.",
+      "evidence": "Original FIELD presence, native folded request, coercion, inherited passed alignment and initialized packing are distinct. Native creation, allocation/shared-bitfield/dynamic-alias decisions, managed descriptor alignment, applied versus computed padding, hidden base storage, anonymous relocation and tail padding have bounded capture-time records. Every U has an initialized snapshot companion, with exact per-subject and module closure and no retained native pointers. Twelve GCC/Clang/LLVM 32/64-bit Linux/Windows metadata partitions and native execution pass; explicit zero, FIELD=3, out-of-range/non-power-of-two requests, QB defaults, stateful macros, repeated includes, forward types, incomplete self queries, module reset/restart and failure rollback are covered. Corrupt or recount-corrected missing fields/relocations are rejected. Remaining affected-source acceptance and additional architecture/phase policy partitions remain open. Additional architecture controls now pass for m68k, RISC OS, Windows CE and AArch64. Pointer/descriptor alignment is validated independently of pointer storage width. Dedicated JS-variant acceptance and remaining source/phase cases are still open. The affected compiler-source audit now passes all 15 cases. Dedicated JS-variant and remaining policy/phase acceptance remain separate open requirements.",
       "required_positive": "Packed/unpacked structs, unions, inherited and anonymous members, bitfields, arrays, and target-specific rules retain all distinct alignment values.",
       "required_negative": "Do not overwrite natural alignment with packing or assign layout to incomplete/forward types as if finalized."
     },
@@ -164,7 +179,7 @@
       "id": "G19",
       "title": "Complete compiler-known parameter and aggregate ABI classifications",
       "status": "in-progress",
-      "evidence": "Formal descriptor types/register category and finalized aggregate return classification are exported. Complete normalized ABI parameter/return decomposition and effective convention remain.",
+      "evidence": "New full-only frontend ABI snapshots close every F/G with source modes, live lowered types, by-value indirection, descriptor pointers, variadic markers, frontend slot/register ordinals and explicit result policy. Incomplete by-value types and unavailable data remain marked rather than invoking unsafe classifiers. A native executable links the production observer to checked boundaries and proves pending layout/type/descriptor, unavailable and variadic cases bypass the guarded helpers; explicit Byref remains available for incomplete pointees. Target widths, modes, method THIS, C/LLVM versus native-assembler result policy, transport, reset, reduced omissions and corruption pass. Frontend slot size is not final stack usage, and value return does not rule out later hidden backend storage. Complete backend ABI decomposition, remaining convention/target phases and final source acceptance remain open. The frontend observer source audit passes all nine cases. Selected C/Clang/LLVM header observations now preserve actual result/convention spellings, emitted formal order, hidden results, i386 integer128 low/high components, LLVM memory-byval attributes and va_list decay, C argv/libc callback/type adaptations, nested procedure-pointer types and exact header closure. Twelve backend/target partitions, unused-prototype omissions, reduced/native-assembler omissions, transport/reset and 16 corruption controls pass. A standalone executable links the production collector and real hash/list/allocation modules to test malformed inputs, nested identities, rollback and inactive hooks. All eight final v32 focused/regression methods pass. The 12-case frozen signature source audit passes. Call-site decomposition, remaining target/convention phases and machine allocation correspondence remain open. Selected C/Clang/LLVM call-site observations now retain actual input/selected argument types, promoted variadic values, formal and emitted order, split low/high values, memory-byval/sret attributes, result demand, selected values/text and copied caller/expression/statement/source/static-target identities. Indirect targets remain procedure types; nonvirtual static targets and invented indirect dispatch are rejected. LLVM builtin lowering has independent receipts. Seven focused families, four-mode native execution and 11 regressions pass; 15 affected-source cases are running. This does not complete remaining native-assembler/machine allocation and target/phase scope.",
       "required_positive": "32/64-bit source conventions, byref/bydesc/variadic/THIS, aggregate returns, register passing, wchar descriptors, and target FP options retain the actual selected classifications.",
       "required_negative": "Do not expose stale local pointers after flush or claim final stack/register locations before backend allocation."
     },
@@ -179,8 +194,8 @@
     {
       "id": "G21",
       "title": "Expose source mangling mode and emitted external identity",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "BASIC observers retain native selected C/LLVM/assembler identifiers and separate object identities, with counted module closure. Existing declaration linkage now covers all variables. Explicit states distinguish automatic storage, toolchain-managed private/static/TLS symbols, intrinsic rewriting and assembler quoting; unused prototypes remain unobserved and procedure-pointer types have no object identity. Five families pass with C++/ordinary aliases, builtin mappings, native object equality/nm evidence, target prefixes/Windows stdcall/fastcall and COFF/Mach-O object checks. Discovery repaired duplicate LLVM platform prefixes and non-Windows stdcall decoration. Complete phase/target interaction and shared-tree integration remain; no complete G21 claim.",
       "required_positive": "C/C++/Windows/rtlib aliases, namespace overloads, data exports, proc addresses, and builtin mappings identify the correct compiler-selected link symbol.",
       "required_negative": "Do not force code emission/mangling side effects during observation or invent linker addresses/resolutions for external declarations."
     },
@@ -235,8 +250,8 @@
     {
       "id": "G28",
       "title": "Preserve source DATA items and RESTORE ownership",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "Source DATA groups/items now retain original values, types, ranges and macro-linked expressions before lowering consumes them. Native descriptor construction order, real forward links, source versus empty descriptors, READ destinations/selected runtime procedures and explicit RESTORE descriptor/label selections are count-closed and independently validated. Five focused test families pass including 16 READ types, QB raw/empty fields, NUL/wide/address payloads, forward/blank restores, native execution, three-backend emission parity and 21 corruption cases. Full compiler/corpus acceptance, target combinations and interaction review remain; no complete G28 claim.",
       "required_positive": "Numeric/string/wide/NUL/address data, multiple groups, forward labels, READ targets, and RESTORE starting points retain source and runtime sequence meaning.",
       "required_negative": "Do not call the internal reverse C-emission list source execution order or manufacture a DATA AST node that no longer exists."
     },
@@ -260,7 +275,7 @@
       "id": "G31",
       "title": "Model call-site arguments, defaults, conversions, and dispatch roles",
       "status": "in-progress",
-      "evidence": "Actual argument nodes distinguish omitted default initializers from explicit values equal to the default, independent of the passing-mode default. Full source argument/call graphs and remaining argument/dispatch relationships remain required.",
+      "evidence": "Actual argument nodes distinguish omitted default initializers from explicit values equal to the default, independent of the passing-mode default. Full source argument/call graphs and remaining argument/dispatch relationships remain required. Selected backend call observations now link copied caller/statement/source context and available typed expressions, actual promoted arguments and procedure-type versus virtual static-target roles. Four-mode execution, builtin/ordinary route separation, closure, reset and negative dispatch controls pass. Complete source argument graphs and remaining nonordinary operation routes stay open.",
       "required_positive": "Optional/variadic/instance/byref/bydesc arguments, overloaded operators/properties, virtual calls, proc addresses, THREADCALL, and temporary construction link to selected facts.",
       "required_negative": "Rejected overloads and unknown dynamic targets stay absent; do not equate ARG.mode=default with an omitted optional argument."
     },
@@ -340,7 +355,7 @@
       "id": "G41",
       "title": "Make snapshot phases, identity lifetimes, and cross-module ownership explicit",
       "status": "in-progress",
-      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains.",
+      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains. Observation allocation IDs now remain unique independently of serialized record totals. A validated native parser phase separates successful grammar callbacks from full-only original/selected snapshots.",
       "required_positive": "Multiple modules, prototype-to-body updates, forward patches, interned procptr formals, recycled symbols, and delayed/generated procedures preserve identity and phase ownership.",
       "required_negative": "Do not reuse a retired allocation identity, consume stale local pointers, conflate same-named external declarations across modules without linkage evidence, or promise stable IDs across different builds."
     },
@@ -388,7 +403,7 @@
       "id": "G47",
       "title": "Validate semantic payload integrity beyond record totals",
       "status": "in-progress",
-      "evidence": "Reader now rejects class-kind disagreement, missing mandatory node payloads, invalid numeric/boolean values, malformed ASM order, missing copyback relations, dangling config uses. Remaining per-family semantic closure remains.",
+      "evidence": "Reader now rejects class-kind disagreement, missing mandatory node payloads, invalid numeric/boolean values, malformed ASM order, missing copyback relations, dangling config uses. Remaining per-family semantic closure remains. The compiler graph exposed array element checks using immutable first-S types after forward resolution. The reader now selects the T snapshot preceding each actual subscript receipt. Nominal/alias transitions before and after resolution pass on GCC/LLVM/Clang, and a forged same-module nominal snapshot is rejected.",
       "required_positive": "All legitimate producer records, repeated snapshots, canonical replacements, zero/unknown optional states, and extensible capabilities validate under the documented schema rules.",
       "required_negative": "Unknown/impossible kind, bad numeric payload, missing required property, class/type contradiction, invalid relation, omitted action, duplicate/conflicting snapshot, and corrected-total corruption are rejected as appropriate."
     },
@@ -425,12 +440,152 @@
       "required_negative": "Do not silently replace invalid bytes, interpret arbitrary compiler bytes as UTF-8, truncate embedded control data, double-unescape fields, or publish a complete model the declared consumer cannot read."
     }
   ],
-  "next_required_scope": "Finish the complete statement/construct/declaration/branch and typed source operand/result/transformation graphs (G10/G11), then all remaining type/ABI/action/control-flow/effect/diagnostic/capability/resolver/emission scopes from the original 51-item catalog.",
+  "next_required_scope": "Complete the running 15-case call ABI source audit, repair the reproduced stable-v1 reader vocabulary and all dependent raw-type assumptions, qualify the complete consumer contract, and continue every original 51-gap scope.",
   "active_verification": {
+    "expanded_contracts_v24": {
+      "pid": 2192068,
+      "start_ticks": "2252630",
+      "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v24/contracts.log",
+      "terminal_status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v24/contracts-status.json",
+      "methods": 312
+    },
+    "expanded_contracts_scope": "312 frozen tests before the five final mangling dictionary properties and expanded type fixture; use final v25 focused checks for those additions.",
+    "source_v14_interruption": {
+      "state": "interrupted",
+      "exit_status": null,
+      "observed_utc": "2026-10-27T20:06:21.769913+00:00",
+      "previous_process": {
+        "pid": 1615072,
+        "start_ticks": "1614119",
+        "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v14/source.log",
+        "terminal_status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v14/source-status.json"
+      },
+      "completed_cases": 458,
+      "all_completed_passed": true,
+      "evidence": "Original wrapper and all processes with prior audit arguments are absent; no source-status.json was written. The source log ends after 458 passes and a Python resource-tracker shutdown warning. Cause and prior exit code are unknown."
+    },
+    "source_v14_resume": {
+      "pid": 2292043,
+      "start_ticks": "2324950",
+      "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v14/source-resume-clang.log",
+      "terminal_status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v14/source-combined-status.json",
+      "retained": 458,
+      "remaining": 121
+    },
+    "expanded_contracts_v24_interruption": {
+      "state": "interrupted",
+      "exit_status": null,
+      "observed_utc": "2026-10-27T20:12:07.744207+00:00",
+      "previous_process": {
+        "pid": 2192068,
+        "start_ticks": "2252630",
+        "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v24/contracts.log",
+        "terminal_status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v24/contracts-status.json",
+        "methods": 312
+      },
+      "retained_methods": 127,
+      "evidence": "Original wrapper and child command arguments are absent. No terminal status was written; cause and exit code are unknown."
+    },
+    "expanded_contracts_v24_resume": {
+      "pid": 2336163,
+      "start_ticks": "2359446",
+      "retained": 127,
+      "remaining": 185,
+      "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v24/contracts-resume.log",
+      "terminal_status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v24/contracts-combined-status.json",
+      "tool_session_id": 65493
+    },
+    "expanded_contracts_v24_known_failure": {
+      "method": "test_array_subscripts_use_live_forward_and_alias_types",
+      "backend_subtests": 6,
+      "reason": "The older fixture corrupts T without its NT pair, so the new NT integrity guard rejects before the test's expected array-specific message.",
+      "current_control": "Repaired fixture keeps T/NT consistent; all current v25 backend cases pass."
+    },
+    "reboot_recovery": {
+      "observed_utc": "2026-10-27T21:03:43.828169+00:00",
+      "boot_id": "b28fbdca-3f2f-4cda-a44d-8170a9e1bb83",
+      "state": "interrupted-by-reboot",
+      "source_saved_cases": 507,
+      "source_saved_passed": 507,
+      "source_remaining": 72,
+      "contract_success_or_skip_methods": 150,
+      "contract_remaining_or_failed": 162,
+      "scope": "Frozen v14 source audit and frozen v24 contract audit remain incomplete. Prior process IDs and tool sessions are invalid after the reboot. Retain saved results; do not run duplicate full builds while the compiler/corpus goal resumes."
+    },
+    "layout_source_audit": {
+      "state": "passed",
+      "cases": 15,
+      "results": "/home/jkfirth/fbc/out/semantic-goal-20261027/self-layout-v27/results.json"
+    },
+    "frontend_abi_source_audit": {
+      "state": "passed",
+      "cases": 9,
+      "results": "/home/jkfirth/fbc/out/semantic-goal-20261027/self-frontend-abi-v28/results.json",
+      "compiler_sha256": "2144927c49d6a0ae209180901753773c9af1416bc28586b913cd11d3493bd239"
+    },
+    "backend_abi_source_audit": {
+      "state": "passed",
+      "cases": 12,
+      "results": "/home/jkfirth/fbc/out/semantic-goal-20261027/self-backend-abi-v31/results.json",
+      "compiler_sha256": "39f293ce0b85860096e3afcf12c9c3a68c451c8b8943cc273dc8b4d28c12cc4f",
+      "scope": "Frozen signature observer v31. Later v32 guard strengthening passed a separate production-observer executable and all eight focused/regression methods."
+    },
+    "call_abi_source_audit": {
+      "state": "running",
+      "expected_cases": 15,
+      "jobs": 1,
+      "output": "/home/jkfirth/fbc/out/semantic-goal-20261027/self-call-abi-v36",
+      "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/self-call-abi-v36.log",
+      "tool_session_id": 87069,
+      "compiler_sha256": "6bf76ca04674452d7c625dd57adda6b4b19a713ea3beb4a63ec7abd44ad924f0",
+      "pid": 589235,
+      "start_ticks": "856237",
+      "boot_id": "b28fbdca-3f2f-4cda-a44d-8170a9e1bb83"
+    }
+  },
+  "working_tree": "/home/jkfirth/fbc",
+  "integration_status": "Integrated into the shared working tree; unrelated pending changes and the later locale-test commit are preserved. Source changes are not committed on the shared master branch.",
+  "previous_verification": {
+    "state": "terminated",
+    "exit_status": 143,
+    "root": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v5",
+    "complete": false,
+    "latest_source_completed_cases": 57,
+    "known_failure": "backend/x86/emit.bas full-only typedef snapshot; v7 fix passed all three affected backend source cases."
+  },
+  "contract_verification_v10": {
+    "state": "completed-with-failures",
+    "methods": 295,
+    "passed_methods": 289,
+    "skipped_methods": 4,
+    "failed_families": [
+      "test_cva_list_source_operations_are_complete_and_self_consistent",
+      "test_macro_expanded_include_directives_do_not_claim_physical_ranges"
+    ],
+    "repaired_focus": "Both families plus stricter corruption controls pass in qualified-families-v14-verified.log. Original result remains failed.",
+    "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v10/contracts-resumed.log",
+    "terminal_status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v10/contracts-resumed-status.json"
+  },
+  "implementation_base": "be5a9091a9c74defd01b4c9c40bb6388605d5ba6",
+  "implementation_branch": "semantic-sidecar-completion-20261027",
+  "integration_branch": "semantic-sidecar-integration-20261027",
+  "integration_root": "/dev/shm/fbc-semantic-integration-20261027",
+  "integration_commit": "4fa0e2b5da250637219704538f443603f40a4ad8",
+  "contract_verification_v14": {
     "state": "passed",
-    "purpose": "Schema 25 native BASIC compiler source audit after removing compiler C helpers",
-    "cases": 522,
-    "artifacts": "out/semantic-basic-correction/compiler-self",
-    "log": "out/semantic-basic-correction/compiler-self.log"
+    "methods": 301,
+    "skipped": 4,
+    "scope": "Before shared-tree integration and namespace additions",
+    "status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v14/contracts-status.json",
+    "log": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v14/contracts.log"
+  },
+  "contract_verification_v20": {
+    "state": "completed-with-test-assertion-failure",
+    "methods": 306,
+    "skipped": 4,
+    "failed_method": "test_original_if_conditions",
+    "failed_backend_subtests": 3,
+    "reason": "Expected error text was stale; malformed enum coverage was rejected. Current v25 focused rerun passes.",
+    "status": "/home/jkfirth/fbc/out/semantic-goal-20261027/verification-v20/contracts-status.json"
   }
 }
