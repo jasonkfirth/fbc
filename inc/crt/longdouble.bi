@@ -18,8 +18,8 @@
 		declare operator cast( ) as double
 	end type
 	#assert sizeof( clongdouble ) = 16
-#elseif defined( __FB_ARM__ )
-	'' GCC arm: sizeof(long double) = 8
+#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
+	'' GCC ARM and MIPS o32: sizeof(long double) = 8
 	type clongdouble
 		__(0 to 8-1) as ubyte
 		declare operator cast( ) as byte

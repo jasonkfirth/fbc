@@ -31,6 +31,7 @@ SUITE( fbc_tests.datetime.c_format )
 		dim current_time as string = time$
 		CU_ASSERT_EQUAL( len(current_date), 10 )
 		CU_ASSERT_EQUAL( len(current_time), 8 )
+		if not isdate(current_date) then print "unrecognized DATE$: "; current_date
 		CU_ASSERT( isdate(current_date) )
 		CU_ASSERT( valint(left(current_time, 2)) >= 0 )
 		CU_ASSERT( valint(left(current_time, 2)) <= 23 )

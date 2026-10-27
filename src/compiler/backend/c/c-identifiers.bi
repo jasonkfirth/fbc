@@ -71,15 +71,16 @@ private function hEncodeCName( byval rawname as const zstring ptr, byref prefix 
 	return result
 end function
 
-private function hCUsePETlsName( byval sym as FBSYMBOL ptr, byval rawname as const zstring ptr ) as integer
+private function hCUseEmulatedTlsName( byval sym as FBSYMBOL ptr, byval rawname as const zstring ptr ) as integer
 	if( (env.clopt.target <> FB_COMPTARGET_WINCE) and _
-	    (env.clopt.target <> FB_COMPTARGET_WIN32) ) then return FALSE
+	    (env.clopt.target <> FB_COMPTARGET_WIN32) and _
+	    (env.clopt.target <> FB_COMPTARGET_OPENBSD) ) then return FALSE
 	if( (sym = NULL) or (rawname = NULL) ) then return FALSE
 	if( sym->class <> FB_SYMBCLASS_VAR ) then return FALSE
 	if( symbIsThreadLocal(sym) = FALSE ) then return FALSE
 	if( left(*rawname, 5) = "fb_c_" or left(*rawname, 8) = "fb_type_" or _
 	    left(*rawname, 5) = "__FB_" ) then return FALSE
-	'' MinGW and CeGCC emulated TLS prefix an explicit asm label with an
+	'' MinGW, CeGCC and OpenBSD emulated TLS prefix an explicit asm label with an
 	'' internal '*' marker, producing invalid assembler names. GCC accepts '$'
 	'' in C identifiers, so retain these ordinary mangled names directly. This
 	'' keeps exported TLS descriptor names compatible across object files.
@@ -102,7 +103,7 @@ end function
 private function hGetCId( byval sym as FBSYMBOL ptr ) as string
 	var rawname = symbGetMangledName( sym )
 	if( rawname = NULL ) then return ""
-	if( hCUsePETlsName(sym, rawname) ) then return *rawname
+	if( hCUseEmulatedTlsName(sym, rawname) ) then return *rawname
 	if( hCNameNeedsEncoding(rawname) = FALSE ) then return *rawname
 	return hEncodeCName( rawname, "fb_c_sym_" )
 end function

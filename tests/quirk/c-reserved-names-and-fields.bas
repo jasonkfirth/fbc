@@ -23,7 +23,10 @@ private sub _shutdown_second( ) destructor 202
 end sub
 
 private sub _shutdown_first( ) destructor 201
-	if( main_completed <> 1 or lifetime_order <> 12345 ) then end 16
+	if( main_completed <> 1 or lifetime_order <> 12345 ) then
+		print "unexpected shutdown state: "; main_completed; lifetime_order
+		end 16
+	end if
 	print "c-reserved-names-and-fields-dtor-ok"
 end sub
 

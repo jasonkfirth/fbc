@@ -1543,7 +1543,7 @@ private sub hEmitVarDecl _
 	ln += hEmitArrayDecl( sym )
 	if( sym->class = FB_SYMBCLASS_VAR andalso symbIsLocal(sym) = FALSE ) then
 		if( hCNameNeedsEncoding(symbGetMangledName(sym)) andalso _
-		    (hCUsePETlsName(sym, symbGetMangledName(sym)) = FALSE) ) then
+		    (hCUseEmulatedTlsName(sym, symbGetMangledName(sym)) = FALSE) ) then
 			'' Global C tokens may differ; retain the original object identity.
 			var object_name = hGetMangledNameForASM( sym, TRUE )
 			hAppendCObjectAlias( ln, object_name )
