@@ -178,4 +178,4 @@ double fb_LongDoubleToDouble(const void *source,
 	return (double)longdouble_load(source, storage_size);
 }
 
-/* end of longdouble_ops.c */
+/* end of math/longdouble_ops.c */

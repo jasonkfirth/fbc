@@ -160,6 +160,7 @@ static int owner_handler( void *opaque )
 static int worker_call( OWNER *owner )
 {
 	WORKER automatic_worker;
+	WORKER *heap_worker = NULL;
 	WORKER *worker = &automatic_worker;
 	FB_ERROR_FRAME_CLEANUP cleanup = cleanup_worker;
 	int current_marker = 0, next_marker = 0;
@@ -167,9 +168,10 @@ static int worker_call( OWNER *owner )
 	int status;
 
 	if( owner->mode == MODE_TRANSFER_HEAP ) {
-		worker = (WORKER *)calloc( 1, sizeof( *worker ) );
-		if( worker == NULL )
+		heap_worker = (WORKER *)calloc( 1, sizeof( *heap_worker ) );
+		if( heap_worker == NULL )
 			return 24;
+		worker = heap_worker;
 		cleanup = cleanup_heap_worker;
 	}
 	worker->owner = owner;
@@ -177,15 +179,13 @@ static int worker_call( OWNER *owner )
 	worker->guard = 303;
 	worker->attempts = 0;
 	if( worker->resource == NULL ) {
-		if( owner->mode == MODE_TRANSFER_HEAP )
-			free( worker );
+		free( heap_worker );
 		return 10;
 	}
 	status = fb_ErrorFrameEnter( &worker->frame, worker, cleanup );
 	if( status != FB_RTERROR_OK ) {
 		free( worker->resource );
-		if( owner->mode == MODE_TRANSFER_HEAP )
-			free( worker );
+		free( heap_worker );
 		return 11;
 	}
 	owner->current = worker;
