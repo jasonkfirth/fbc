@@ -1401,11 +1401,15 @@ private sub hEmitUDT( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 
 		end if
 
-		'' Switching from a parent to a child scope isn't allowed,
-		'' the UDT declaration will be forced to be emitted in the
-		'' parent scope anyways, since apparently that's where we
-		'' need it. (used by _procAllocStaticVars())
-		if( section > ctx.section ) then
+		'' BASIC scope numbers predate the separate C declaration and body
+		'' sections. Map the old scope to its declaration section so a local
+		'' record is complete before its hoisted variables. Clamp to the
+		'' current scope when static locals need a child type in their parent.
+		if( ctx.section >= 2 ) then
+			var current_scope_section = (ctx.section \ 2) + 1
+			if( section > current_scope_section ) then section = current_scope_section
+			if( section >= 2 ) then section = (section - 1) * 2
+		elseif( section > ctx.section ) then
 			section = ctx.section
 		end if
 	else
@@ -1538,7 +1542,8 @@ private sub hEmitVarDecl _
 	ln += " " + hGetCId( sym )
 	ln += hEmitArrayDecl( sym )
 	if( sym->class = FB_SYMBCLASS_VAR andalso symbIsLocal(sym) = FALSE ) then
-		if( hCNameNeedsEncoding(symbGetMangledName(sym)) ) then
+		if( hCNameNeedsEncoding(symbGetMangledName(sym)) andalso _
+		    (hCUseWinceTlsName(sym, symbGetMangledName(sym)) = FALSE) ) then
 			'' Global C tokens may differ; retain the original object identity.
 			var object_name = hGetMangledNameForASM( sym, TRUE )
 			hAppendCObjectAlias( ln, object_name )

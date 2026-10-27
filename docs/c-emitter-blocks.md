@@ -15,6 +15,11 @@ and automatic initialized declarations keep their body positions. Closing a
 scope joins its sections without changing its C
 braces or the BASIC scope that owns its variables.
 
+Local type definitions are emitted into the declaration section of their
+owning scope before variables that use them. BASIC scope numbers predate the
+header/body section pairs, so the emitter maps them to the corresponding
+declaration section and keeps sibling scope types separate.
+
 This distinction also applies to call-result temporaries. Storage can precede
 statements, but evaluating the call must remain at its original position.
 Builtin `va_list` arrays retain their initializer because C cannot assign an

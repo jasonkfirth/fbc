@@ -31,6 +31,12 @@ variables do not receive global assembler aliases. Functions retain the previous
 alias policy and target decoration, including Win32 fastcall hidden results.
 The symbol cache is never renamed. The existing C type-name encoder is retained.
 
+Windows CE uses CeGCC's emulated TLS. Its compiler mishandles explicit asm
+labels on TLS variables by inserting an internal `*` marker into the generated
+descriptor name. For otherwise valid GNU identifiers containing `$`, the C
+backend keeps the original TLS name directly. This preserves the descriptor
+name used by separately compiled modules without relying on an asm label.
+
 ## Qualification
 
 The receipts are in `build/c-emitter-audit-20261022/c-identifiers-v45/`.

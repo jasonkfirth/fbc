@@ -71,9 +71,37 @@ private function hEncodeCName( byval rawname as const zstring ptr, byref prefix 
 	return result
 end function
 
+private function hCUseWinceTlsName( byval sym as FBSYMBOL ptr, byval rawname as const zstring ptr ) as integer
+	if( env.clopt.target <> FB_COMPTARGET_WINCE ) then return FALSE
+	if( (sym = NULL) or (rawname = NULL) ) then return FALSE
+	if( sym->class <> FB_SYMBCLASS_VAR ) then return FALSE
+	if( symbIsThreadLocal(sym) = FALSE ) then return FALSE
+	if( left(*rawname, 5) = "fb_c_" or left(*rawname, 8) = "fb_type_" or _
+	    left(*rawname, 5) = "__FB_" ) then return FALSE
+	'' CeGCC's emulated TLS prefixes an explicit asm label with an internal
+	'' '*' marker, producing invalid assembler names. GCC accepts '$' in C
+	'' identifiers, so retain these ordinary mangled names directly. This also
+	'' keeps exported TLS descriptor names compatible across object files.
+	dim as integer has_dollar = FALSE
+	for i as integer = 0 to len(*rawname) - 1
+		select case (*rawname)[i]
+		case asc("A") to asc("Z"), asc("a") to asc("z"), asc("_")
+		case asc("0") to asc("9")
+			if( i = 0 ) then return FALSE
+		case asc("$")
+			if( i = 0 ) then return FALSE
+			has_dollar = TRUE
+		case else
+			return FALSE
+		end select
+	next
+	return has_dollar
+end function
+
 private function hGetCId( byval sym as FBSYMBOL ptr ) as string
 	var rawname = symbGetMangledName( sym )
 	if( rawname = NULL ) then return ""
+	if( hCUseWinceTlsName(sym, rawname) ) then return *rawname
 	if( hCNameNeedsEncoding(rawname) = FALSE ) then return *rawname
 	return hEncodeCName( rawname, "fb_c_sym_" )
 end function

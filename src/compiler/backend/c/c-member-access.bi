@@ -93,7 +93,12 @@ private function hFindCMemberPath _
 				var localoffset = offset - symbGetOfs(fld)
 				var extent = symbGetRealSize(fld)
 				if( localoffset >= 0 andalso localoffset < extent ) then
-					var fielddtype = symbGetFullType(fld)
+					'' Match the type actually used in the emitted C record. Field
+					'' declarations drop mangling modifiers and top-level const;
+					'' using the full BASIC type here can instead spell a va_list
+					'' array pointer where the C field holds a record pointer.
+					var fielddtype = symbGetType(fld) or typeGetConstMask(symbGetFullType(fld))
+					fielddtype = typeUnsetIsConst(fielddtype)
 					var fieldsubtype = symbGetSubtype(fld)
 					var elementsize = symbGetSizeOf(fld)
 					var element = 0ll
