@@ -863,6 +863,10 @@ private sub hAppendCtorAttrib _
 
 	dim as integer priority = any
 
+	'' NetBSD finalizers are emitted as ordered array entries after the body.
+	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
+	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then exit sub
+
 	if( proc->stats and (FB_SYMBSTATS_GLOBALCTOR or FB_SYMBSTATS_GLOBALDTOR) ) then
 		if( in_front = FALSE ) then
 			ln += " "
@@ -6215,6 +6219,20 @@ private sub _emitProcEnd _
 	hWriteLine( "}" )
 
 	sectionEnd( )
+	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
+	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then
+		'' NetBSD walks .fini_array forwards, including in shared libraries.
+		'' Reverse the BASIC priority in the section name so destructors run
+		'' in the opposite order to constructors. The default priority is
+		'' the highest value, as it is for the C compiler's destructor.
+		const maximum_priority = 65535
+		dim as integer priority = symbGetProcPriority( proc )
+		if( priority = 0 ) then priority = maximum_priority
+		dim as string section_priority = right( "00000" + str( maximum_priority - priority ), 5 )
+		dim as string proc_name = hGetCId( proc )
+		hWriteLine( "static void (*fb_c_fini_" + proc_name + ")(void) " + _
+			"__attribute__((section("".fini_array." + section_priority + """), used)) = " + proc_name + ";", TRUE )
+	end if
 
 	'' Forget any left-over expression nodes (unused function results)
 	do

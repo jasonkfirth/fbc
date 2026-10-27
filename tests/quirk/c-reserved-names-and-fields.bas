@@ -18,12 +18,16 @@ private sub _startup_second( ) constructor 202
 end sub
 
 '' Destructors run in reverse priority order, after the main body completes.
+private sub _shutdown_default( ) destructor
+	lifetime_order = lifetime_order * 10 + 6
+end sub
+
 private sub _shutdown_second( ) destructor 202
 	lifetime_order = lifetime_order * 10 + 5
 end sub
 
 private sub _shutdown_first( ) destructor 201
-	if( main_completed <> 1 or lifetime_order <> 12345 ) then
+	if( main_completed <> 1 or lifetime_order <> 123465 ) then
 		print "unexpected shutdown state: "; main_completed; lifetime_order
 		end 16
 	end if
