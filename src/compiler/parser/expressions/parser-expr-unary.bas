@@ -46,7 +46,13 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-extra-facts.bi"
 #include once "parser/parser.bi"
+
+declare function parserGetLastTypeAlias( ) as FBSYMBOL ptr
+declare sub fbSemanticModelTypeAliasExpression(byval subject as ASTNODE ptr, byval alias_symbol as FBSYMBOL ptr)
+declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, byval alias_symbol as FBSYMBOL ptr)
+
 #include once "ast/ast.bi"
 #include once "preprocessor/pp.bi"
 #include once "tooling/semantic-hooks.bi"
@@ -58,6 +64,7 @@
 declare function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATION ) as ASTNODE ptr
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
 declare function fbSemanticModelFullEnabled( ) as integer
+declare sub fbSemanticModelBuiltinFunctionUse(byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION)
 declare sub fbSemanticModelSetExpressionOperatorOverride _
 	( _
 		byref source_start as LEX_LOCATION, _
@@ -403,6 +410,24 @@ function cHighestPrecExpr _
 			previous_nonphysical_tokens)
 	end if
 
+	'' These named function forms bypass cQuirkFunction. Capture only
+	'' branches selected by this grammar; '@', '*' and NEW are operators.
+	dim as FBSYMBOL ptr semantic_builtin = NULL
+	dim as integer semantic_builtin_expected = FALSE
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_BUILTINS) and _
+		fbSemanticModelFullEnabled( ) and (lex.ctx->semantic_probe = FALSE) ) then
+		select case lexGetToken( )
+		case FB_TK_VARPTR, FB_TK_PROCPTR, FB_TK_SADD, FB_TK_STRPTR, FB_TK_CAST, FB_TK_CPTR
+			semantic_builtin_expected = TRUE
+		case FB_TK_TYPEOF, FB_TK_DEFINED
+			semantic_builtin_expected = fbGetIsPP( )
+		end select
+		if( semantic_builtin_expected ) then
+			dim as FBSYMCHAIN ptr builtin_chain = lexGetSymChain( )
+			if( builtin_chain <> NULL ) then semantic_builtin = builtin_chain->sym
+		end if
+	end if
+
 	select case lexGetToken( )
 	'' AddrOfExpression
 	case FB_TK_ADDROFCHAR
@@ -445,6 +470,7 @@ function cHighestPrecExpr _
 		'' AddrOfExpression
 		case FB_TK_VARPTR, FB_TK_PROCPTR, FB_TK_SADD, FB_TK_STRPTR
 			expr = cAddrOfExpression( )
+			if( semantic_builtin_expected and (expr <> NULL) ) then fbSemanticModelBuiltinFunctionUse(semantic_builtin, source_start)
 			return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
 				source_start, nonphysical_tokens_at_start, previous_source_start, _
 				previous_nonphysical_tokens)
@@ -475,6 +501,7 @@ function cHighestPrecExpr _
 				'' TYPEOF '(' Expression ')'
 				case FB_TK_TYPEOF
 					expr = astNewCONSTstr( ppTypeOf( ) )
+					if( semantic_builtin_expected and (expr <> NULL) ) then fbSemanticModelBuiltinFunctionUse(semantic_builtin, source_start)
 					return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
 						source_start, nonphysical_tokens_at_start, previous_source_start, _
 						previous_nonphysical_tokens)
@@ -482,6 +509,7 @@ function cHighestPrecExpr _
 				'' DEFINED '(' Identifier ')'
 				case FB_TK_DEFINED
 					expr = hPPDefinedExpr( )
+					if( semantic_builtin_expected and (expr <> NULL) ) then fbSemanticModelBuiltinFunctionUse(semantic_builtin, source_start)
 					return hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
 						source_start, nonphysical_tokens_at_start, previous_source_start, _
 						previous_nonphysical_tokens)
@@ -506,6 +534,7 @@ function cHighestPrecExpr _
 	end select
 
 	expr = cStrIdxOrMemberDeref( expr )
+	if( semantic_builtin_expected and (expr <> NULL) ) then fbSemanticModelBuiltinFunctionUse(semantic_builtin, source_start)
 	function = hSemanticModelFinishHighestPrecExpr(expr, export_semantics, _
 		source_start, nonphysical_tokens_at_start, previous_source_start, _
 		previous_nonphysical_tokens)
@@ -540,6 +569,9 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 		end if
 		subtype = NULL
 	end if
+
+	dim as FBSYMBOL ptr semantic_type_alias = parserGetLastTypeAlias( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	'' check for invalid types
 	select case as const( typeGet( dtype ) )
@@ -623,6 +655,11 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 		lexSkipToken( )
 	end if
 
+	if( fbSemanticModelFullEnabled( ) and (semantic_type_alias <> NULL) ) then
+		dim as LEX_LOCATION semantic_end = lexGetLastLocation( )
+		fbSemanticModelExportExpression(expr, source, semantic_end, semantic_nonphysical, lexGetNonphysicalTokenCount( ))
+		fbSemanticModelTypeAliasExpression(expr, semantic_type_alias)
+	end if
 	function = expr
 end function
 

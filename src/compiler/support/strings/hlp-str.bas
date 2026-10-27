@@ -256,9 +256,9 @@ end function
 '':::::
 function hReplace _
 	( _
-		byval orgtext as zstring ptr, _
-		byval oldtext as zstring ptr, _
-		byval newtext as zstring ptr _
+		byval orgtext as const zstring ptr, _
+		byval oldtext as const zstring ptr, _
+		byval newtext as const zstring ptr _
 	) as string static
 
 	dim as integer oldlen, newlen, p

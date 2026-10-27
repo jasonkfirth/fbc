@@ -8,6 +8,23 @@ language reference.
 
 ## Start here
 
+- [C emitter diagnostic audit](c-emitter-audit.md) describes unsuppressed GCC
+  and Clang checks, structural analysis, reproducible receipts, emitter repairs,
+  DATA/READ checks, termination contracts, public prototypes, label targets,
+  temporary storage, private C type names and
+  control-flow regressions. The [ranked findings](c-emitter-findings.md) identify the open
+  contracts and scoped verification results; warning cleanup remains active.
+- [C error-frame lowering](c-error-frame-lowering.md) preserves the global-handler
+  failure, frame-ownership prototype and next compiler/runtime implementation boundary.
+- [Static C aggregate initializers](c-emitter-initializers.md) explains named members,
+  typed zero defaults, descriptor dimension tables and 128-bit constant separators.
+- [C block declarations and packed copies](c-emitter-blocks.md) records declaration
+  staging, evaluation order, lexical scope and named addresses for byte copies.
+- [Semantic numeric conversion inputs](semantic-numeric-conversions.md) explains
+  compiler-owned conversion snapshots, stream closure, internal carriers and
+  constant-value safety.
+- [Boolean and loop semantic inputs](semantic-boolean-loop-inputs.md) describes
+  CONST destinations, original enum inputs and proved coordinate prefixes.
 - [Source code guide](source-code/README.md) explains the source trees,
   compiler phases, runtime libraries, graphics, sound, target tools and tests.
   The manual's matching pages start at
@@ -79,11 +96,39 @@ beside the examples:
 - [Compiler log tests and retries](compiler-test-harness.md) documents failure
   details, retry artifact ownership, and the focused harness regression.
 - [Compiler semantic model](../doc/compiler-semantic-model.md) defines the
-  schema 27 sidecar, source and macro origins, bounded observations, and the
+  schema 27 sidecar, source and macro origins, physical written-type root
+  anchors, bounded observations, and the
   binary/text reader contract, including direct native field reads without an
   intermediate TSV record. It also documents requested source-observation
-  groups, native/stable datatype IDs and the dedicated semantic-build default. Generated
-  unnamed parameters without source ownership are excluded from hint closure.
+  groups, exact macro variable/member node links with counted closure,
+  direct ERASE/REDIM target observations, native/stable datatype IDs and the
+  dedicated semantic-build default. Generated
+  unnamed parameters without source ownership are excluded from hint closure. The eleven
+  optional groups also cover include requests/scopes, accepted builtin uses,
+  original literal adjacency, preprocessor event counts and independently requested
+  array-element closure. Written declaration types and native byte conversions
+  are independently requested through `type-shapes` and `native-bytes`; unrelated
+  exports omit those families. Windows byte paths
+  are converted only when opening files; wire identities and source hashes remain
+  intact. Declaration initializer inputs belong to source variables; nested NEW
+  temporaries retain their original expression capture without being exported as
+  source declarations. DIM, VAR and ordinary assignment cases are checked by the
+  semantic-sidecar initializer regression.
+  Full models also expose the compiler-selected automatic cleanup decision for
+  variables. Original storage forests retain grouped built-in power while keeping
+  arbitrary source calls opaque; focused branch-observation tests compare native
+  output with observation enabled and disabled.
+  Declaration observations retain selected typedefs, alias declaration sites,
+  original string indices and actual record receivers before lowering. The
+  maintained declaration regression covers inherited fields, implicit writes,
+  member-valued defaults, generic casts, wide integer initializers, native/stable
+  datatype encoding and emission parity.
+  Written type observations retain callback nesting, named alias boundaries,
+  explicit conventions and actual array ownership. Native byte observations
+  retain selected numeric pack/unpack operations, including folded decoders.
+  Both have counted closure; the compiler contains no complexity score or
+  byte-order policy. CVI/MKI width validation rejects unsupported helpers before
+  lowering, while preserving the documented 16/32/64-bit forms.
 - [Cross-build matrix](../build_scripts/cross-build-matrix/README.md)
 - [Emulated native matrix](../build_scripts/emulated-native-matrix/README.md)
 - [gfxlib3 test plan](gfxlib3/test-plan.md)

@@ -83,7 +83,10 @@ int fb_hArrayAlloc
 	if( (doclear == 32) && (ctor == NULL) )
 	{ 
 		array->ptr = malloc( size );
-		memset( array->ptr, 32, size );  
+		/* Fixed-length strings start as spaces. Leave allocation failures to
+		   the common error path below before touching the new storage. */
+		if( array->ptr != NULL )
+			memset( array->ptr, 32, size );
 	}
 	else if( doclear && (ctor == NULL) )
 		array->ptr = calloc( size, 1 );

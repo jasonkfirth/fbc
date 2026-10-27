@@ -64,10 +64,19 @@ static void hFreeTlsContext( void *ctx )
 	}
 }
 
+/* Error hooks also run for legacy handlers, including signal handlers. Looking
+ * up optional frame metadata must not create a context on that path. */
+FBCALL void *fb_TlsGetCtxExisting( int index )
+{
+	if( index < 0 || index >= FB_TLSKEYS )
+		return NULL;
+	return (void *)FB_TLSGET( __fb_tls_ctxtb[index] );
+}
+
 /* Retrieve or create new TLS context for given key */
 FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn )
 {
-	void *ctx = (void *)FB_TLSGET( __fb_tls_ctxtb[index] );
+	void *ctx = fb_TlsGetCtxExisting( index );
 
 	if( ctx == NULL ) {
 		FB_TLS_CTX_HEADER *ctxHeader = (FB_TLS_CTX_HEADER *)calloc( 1, len + sizeof(FB_TLS_CTX_HEADER) );

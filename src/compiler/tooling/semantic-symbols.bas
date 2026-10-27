@@ -141,10 +141,10 @@ sub fbSemanticModelExportContext(byref filename as string)
 		fbSemanticModelNumber(fbGetTargetWcharSize( )) + TABCHAR + _
 		fbSemanticModelTypeNumber(culng(env.lang.integerkeyworddtype)))
 	for dtype as integer = 0 to FB_DATATYPES - 1
-		dim as string type_name = *symb_dtypeTB(dtype).name
+		dim as string type_name = *symbGetDatatypeInfo(dtype).name
 		if( dtype = FB_DATATYPE_FIXSTR ) then type_name = "fixed-string"
 		dim as string type_class, size_text, alignment_text
-		select case symb_dtypeTB(dtype).class
+		select case symbGetDatatypeInfo(dtype).class
 		case FB_DATACLASS_INTEGER: type_class = "integer"
 		case FB_DATACLASS_FPOINT: type_class = "float"
 		case FB_DATACLASS_STRING: type_class = "string"
@@ -152,12 +152,12 @@ sub fbSemanticModelExportContext(byref filename as string)
 		case FB_DATACLASS_PROC: type_class = "procedure"
 		case else: type_class = "unknown"
 		end select
-		if( symb_dtypeTB(dtype).size >= 0 ) then size_text = fbSemanticModelNumber(symb_dtypeTB(dtype).size)
-		if( (symb_dtypeTB(dtype).size > 0) and _
+		if( symbGetDatatypeInfo(dtype).size >= 0 ) then size_text = fbSemanticModelNumber(symbGetDatatypeInfo(dtype).size)
+		if( (symbGetDatatypeInfo(dtype).size > 0) and _
 			(dtype <> FB_DATATYPE_XMMWORD) and _
-			(symb_dtypeTB(dtype).class <> FB_DATACLASS_UDT) and _
-			(symb_dtypeTB(dtype).class <> FB_DATACLASS_PROC) and _
-			(symb_dtypeTB(dtype).class <> FB_DATACLASS_UNKNOWN) ) then
+			(symbGetDatatypeInfo(dtype).class <> FB_DATACLASS_UDT) and _
+			(symbGetDatatypeInfo(dtype).class <> FB_DATACLASS_PROC) and _
+			(symbGetDatatypeInfo(dtype).class <> FB_DATACLASS_UNKNOWN) ) then
 			'' XMMWORD is an internal register type. The scalar layout helper
 			'' accepts source types aligned to at most eight bytes, not XMMWORD.
 			alignment_text = fbSemanticModelNumber(typeCalcNaturalAlign(dtype, NULL))
@@ -165,7 +165,7 @@ sub fbSemanticModelExportContext(byref filename as string)
 		fbSemanticModelAppendDetail("Y" + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)) + _
 			TABCHAR + fbSemanticModelEscape(type_name) + TABCHAR + type_class + _
 			TABCHAR + size_text + TABCHAR + alignment_text + TABCHAR + _
-			fbSemanticModelNumber(abs(symb_dtypeTB(dtype).signed <> FALSE)))
+			fbSemanticModelNumber(abs(symbGetDatatypeInfo(dtype).signed <> FALSE)))
 	next
 end sub
 
@@ -656,6 +656,12 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 	select case sym->class
 	case FB_SYMBCLASS_VAR, FB_SYMBCLASS_FIELD
 		if( sym->class = FB_SYMBCLASS_VAR ) then hSymbolNumber(symbolid, "direct-source-write", fbSemanticModelDirectSourceWrite(symbolid))
+		'' Use the same decision as automatic scope cleanup. Type spelling alone
+		'' cannot distinguish managed strings, fixed buffers, dynamic arrays,
+		'' POD aggregates and variables with selected destructors.
+		if( sym->class = FB_SYMBCLASS_VAR ) then
+			hSymbolNumber(symbolid, "automatic-cleanup", abs(symbGetVarHasDtor(sym) <> FALSE))
+		end if
 		'' An alias is not an object symbol under C++ mangling. Retain the
 		'' selected variable linkage independently of its spelling and storage.
 		if( (sym->class = FB_SYMBCLASS_VAR) andalso symbIsExtern(sym) ) then

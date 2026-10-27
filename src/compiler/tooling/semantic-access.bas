@@ -125,7 +125,7 @@ dim shared as integer access_capacity
 dim shared as longint access_base, access_last
 '' Counts surviving CALL-to-MR associations, including cloned call nodes.
 '' Reset with the module; MR identities themselves belong to the exporter.
-dim shared as longint macro_call_count
+dim shared as longint macro_call_count, macro_access_node_count
 '' Direct writes are separate from final ACC roles. Runtime lowering may use
 '' BYREF and generated tokens may have no binding, but neither is a negative
 '' observation about a parser-selected assignment to a parameter variable.
@@ -135,6 +135,7 @@ dim shared as integer direct_capacity
 sub fbSemanticModelResetAccess( )
 	hMacroAccessReset( )
 	macro_call_count = 0
+	macro_access_node_count = 0
 	deallocate(access_roles)
 	deallocate(direct_writes)
 	direct_writes = NULL
@@ -266,6 +267,13 @@ end sub
 
 sub fbSemanticModelExportAccess( )
 	hMacroAccessExport( )
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_MACRO_ACCESS) and _
+		fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ) ) then
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+			"macro-source-access-node-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + _
+			fbSemanticModelNumber(macro_access_node_count))
+	end if
 	fbSemanticModelExportMacroCallCount(macro_call_count)
 	for binding as longint = access_base + 1 to access_last
 		dim as string role
@@ -289,7 +297,18 @@ sub fbSemanticModelExportBindingLink(byval node as ASTNODE ptr, byval identity a
 	if( node->semantic_binding < 0 ) then
 		dim as longint reference = -node->semantic_binding
 		if( reference < macro_access_capacity ) then
-			if( macro_access_roles[reference] <> 0 ) then exit sub
+			if( macro_access_roles[reference] <> 0 ) then
+				'' Preserve the parser's exact occurrence through surviving AST
+				'' copies. Cleanup nodes have no source tag and acquire no link.
+				if( macro_access_node_count >= SEMANTIC_ACCESS_MAX_BINDINGS ) then
+					fbSemanticModelFailAt("macro source access node limit exceeded")
+					exit sub
+				end if
+				fbSemanticModelAppendDetail("K" + TABCHAR + "node" + TABCHAR + fbSemanticModelNumber(identity) + _
+					TABCHAR + "macro-source-access-reference" + TABCHAR + fbSemanticModelNumber(reference))
+				macro_access_node_count += 1
+				exit sub
+			end if
 		end if
 	end if
 	if( node->semantic_binding < 0 ) then

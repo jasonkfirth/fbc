@@ -811,6 +811,9 @@ function rtlPrint _
 				else
 					f = PROCLOOKUP( PRINTULONGINT )
 				end if
+			case else
+				'' Do not construct a call without a matching runtime overload.
+				exit function
 			end select
 
 		case FB_DATATYPE_SINGLE
@@ -966,6 +969,9 @@ function rtlWrite _
 			case FB_SIZETYPE_UINT32 : f = PROCLOOKUP( WRITEUINT )
 			case FB_SIZETYPE_INT64  : f = PROCLOOKUP( WRITELONGINT )
 			case FB_SIZETYPE_UINT64 : f = PROCLOOKUP( WRITEULONGINT )
+			case else
+				 '' Leave the expression with the caller, as for other rejected types.
+				exit function
 			end select
 
 		case FB_DATATYPE_SINGLE

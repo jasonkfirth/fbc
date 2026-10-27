@@ -36,6 +36,6 @@ declare sub objinfoReadLib( byref libname as string, byval libpaths as TLIST ptr
 declare function objinfoReadNext( byref dat as string ) as integer
 declare function objinfoGetFilename( ) as zstring ptr
 declare sub objinfoReadEnd( )
-declare function objinfoEncode( byval entry as integer ) as zstring ptr
+declare function objinfoEncode( byval entry as integer ) as const zstring ptr
 
 '' end of driver/objinfo.bi

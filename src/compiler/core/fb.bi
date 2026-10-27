@@ -741,8 +741,8 @@ declare function fbGetHostId( ) as string
 declare function fbIdentifyOs( byref osid as string ) as integer
 declare function fbIdentifyCpuFamily( byref cpufamilyid as string ) as integer
 declare function fbDefaultCpuTypeFromCpuFamilyId( byval os as integer, byref cpufamilyid as string ) as integer
-declare function fbGetGccArch( ) as zstring ptr
-declare function fbGetFbcArch( ) as zstring ptr
+declare function fbGetGccArch( ) as const zstring ptr
+declare function fbGetFbcArch( ) as const zstring ptr
 declare function fbIs64Bit( ) as integer
 declare function fbGetBits( ) as integer
 declare function fbGetHostBits( ) as integer

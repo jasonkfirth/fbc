@@ -210,6 +210,13 @@ private sub hAddAsmKeyword( byref info as AsmKeywordsInfo, byval id as const zst
 	hashAdd( @info.hash, *s, cast( any ptr, INVALID ), INVALID )
 end sub
 
+function parserIsInlineAsmKeyword( byval id as const zstring ptr ) as integer
+	'' Keep backend-local label rewriting consistent with reserved mnemonics,
+	'' register names and words added by #pragma reserve(asm).
+	var text = lcase( *id )
+	return hIsInlineAsmKeyword( strptr(text) )
+end function
+
 function parserInlineAsmAddKeyword( byval id as const zstring ptr ) as integer
 	static as zstring * FB_MAXLITLEN+1 text
 	text = lcase( *id )

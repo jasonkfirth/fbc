@@ -370,7 +370,7 @@ function hMangleBuiltInType _
 	( _
 		byval dtype as integer, _
 		byref add_abbrev as integer _
-	) as zstring ptr
+	) as const zstring ptr
 
 	assert( dtype = (typeGetDtOnly( dtype ) or (dtype and FB_DT_MANGLEMASK)) )
 
@@ -455,7 +455,7 @@ function hMangleBuiltInType _
 	'' dtype should be a FB_DATATYPE by now
 	assert( dtype = typeGetDtOnly( dtype ) )
 
-	static as zstring ptr typecodes(0 to FB_DATATYPES-1) => _
+	static as const zstring ptr typecodes(0 to FB_DATATYPES-1) => _
 	{ _
 		@"v", _ '' void
 		@"b", _ '' boolean

@@ -16,7 +16,7 @@ function fbSemanticExtraFactsEnabled(byval wanted as uinteger) as integer
 end function
 
 function fbSemanticExtraFactsConfigure(byref request as const string) as integer
-	'' There are four short names. Bound even rejected command-line input and
+	'' There are twelve short names. Bound even rejected command-line input and
 	'' commit only after validating the complete list, including empty fields.
 	if( (len(request) = 0) or (len(request) > 256) ) then return FALSE
 	dim as string text = lcase(trim(request))
@@ -35,6 +35,14 @@ function fbSemanticExtraFactsConfigure(byref request as const string) as integer
 		case "declarators": pending or= FB_SEMEXTRA_DECLARATORS
 		case "keywords": pending or= FB_SEMEXTRA_KEYWORDS
 		case "macro-access": pending or= FB_SEMEXTRA_MACRO_ACCESS
+		case "includes": pending or= FB_SEMEXTRA_INCLUDES
+		case "builtins": pending or= FB_SEMEXTRA_BUILTINS
+		case "literal-groups": pending or= FB_SEMEXTRA_LITERAL_GROUPS
+		case "preprocessor": pending or= FB_SEMEXTRA_PREPROCESSOR
+		case "initializers": pending or= FB_SEMEXTRA_INITIALIZERS
+		case "type-shapes": pending or= FB_SEMEXTRA_TYPE_SHAPES
+		case "native-bytes": pending or= FB_SEMEXTRA_NATIVE_BYTES
+		case "numeric-conversions": pending or= FB_SEMEXTRA_NUMERIC_CONVERSIONS
 		case "all": pending or= FB_SEMEXTRA_ALL
 		case else: return FALSE
 		end select

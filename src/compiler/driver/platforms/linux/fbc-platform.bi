@@ -134,7 +134,7 @@ function fbcLinuxPlatformGetArmLlvmTargetTriple _
 	return TRUE
 end function
 
-private function fbcLinuxPlatformHasLibrary( byval libname as zstring ptr ) as integer
+private function fbcLinuxPlatformHasLibrary( byval libname as const zstring ptr ) as integer
 	dim as string filename, found
 
 	filename = "lib" + *libname + ".a"
@@ -148,7 +148,7 @@ private function fbcLinuxPlatformHasLibrary( byval libname as zstring ptr ) as i
 	function = (len( found ) > 0)
 end function
 
-private sub fbcLinuxPlatformAddLibraryIfPresent( byval libname as zstring ptr )
+private sub fbcLinuxPlatformAddLibraryIfPresent( byval libname as const zstring ptr )
 	if( fbcLinuxPlatformHasLibrary( libname ) ) then
 		fbcAddDefLib( libname )
 	end if

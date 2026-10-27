@@ -165,7 +165,7 @@ enum
 end enum
 
 type BUILTIN
-	decl as zstring ptr
+	decl as const zstring ptr
 	used as integer
 end type
 
@@ -1571,7 +1571,8 @@ private sub _emitEnd( )
 
 	for i as integer = 0 to BUILTIN__COUNT-1
 		if( builtins(i).used ) then
-			hWriteLine( *builtins(i).decl )
+			dim as string builtin_decl = *builtins(i).decl
+			hWriteLine( builtin_decl )
 		end if
 	next
 
@@ -2196,7 +2197,7 @@ private function hGetBopCode _
 	( _
 		byval op as integer, _
 		byval dtype as integer _
-	) as zstring ptr
+	) as const zstring ptr
 
 	select case as const( op )
 	case AST_OP_ADD
@@ -2220,17 +2221,17 @@ private function hGetBopCode _
 	case AST_OP_DIV
 		function = @"fdiv"
 	case AST_OP_INTDIV
-		function = iif( typeIsSigned( dtype ), @"sdiv", @"udiv" )
+		function = iif( typeIsSigned( dtype ), cptr(const zstring ptr, @"sdiv"), cptr(const zstring ptr, @"udiv") )
 	case AST_OP_MOD
 		if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
 			function = @"frem"
 		else
-			function = iif( typeIsSigned( dtype ), @"srem", @"urem" )
+			function = iif( typeIsSigned( dtype ), cptr(const zstring ptr, @"srem"), cptr(const zstring ptr, @"urem") )
 		end if
 	case AST_OP_SHL
 		function = @"shl"
 	case AST_OP_SHR
-		function = iif( typeIsSigned( dtype ), @"ashr", @"lshr" )
+		function = iif( typeIsSigned( dtype ), cptr(const zstring ptr, @"ashr"), cptr(const zstring ptr, @"lshr") )
 	case AST_OP_AND
 		function = @"and"
 	case AST_OP_OR
@@ -2256,25 +2257,25 @@ private function hGetBopCode _
 		if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
 			function = @"fcmp ogt"
 		else
-			function = iif( typeIsSigned( dtype ), @"icmp sgt", @"icmp ugt" )
+			function = iif( typeIsSigned( dtype ), cptr(const zstring ptr, @"icmp sgt"), cptr(const zstring ptr, @"icmp ugt") )
 		end if
 	case AST_OP_LT
 		if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
 			function = @"fcmp olt"
 		else
-			function = iif( typeIsSigned( dtype ), @"icmp slt", @"icmp ult" )
+			function = iif( typeIsSigned( dtype ), cptr(const zstring ptr, @"icmp slt"), cptr(const zstring ptr, @"icmp ult") )
 		end if
 	case AST_OP_GE
 		if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
 			function = @"fcmp oge"
 		else
-			function = iif( typeIsSigned( dtype ), @"icmp sge", @"icmp uge" )
+			function = iif( typeIsSigned( dtype ), cptr(const zstring ptr, @"icmp sge"), cptr(const zstring ptr, @"icmp uge") )
 		end if
 	case AST_OP_LE
 		if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
 			function = @"fcmp ole"
 		else
-			function = iif( typeIsSigned( dtype ), @"icmp sle", @"icmp ule" )
+			function = iif( typeIsSigned( dtype ), cptr(const zstring ptr, @"icmp sle"), cptr(const zstring ptr, @"icmp ule") )
 		end if
 	case AST_OP_EQV, AST_OP_IMP
 		'' hEmitBop() lowers these operations to XOR/OR instructions before
@@ -2612,7 +2613,7 @@ private sub _emitUop _
 
 end sub
 
-private function hGetConvOpCode( byval ldtype as integer, byval rdtype as integer ) as zstring ptr
+private function hGetConvOpCode( byval ldtype as integer, byval rdtype as integer ) as const zstring ptr
 	if( typeGetClass( ldtype ) = FB_DATACLASS_FPOINT ) then
 		if( typeGetClass( rdtype ) = FB_DATACLASS_FPOINT ) then
 
@@ -2622,16 +2623,16 @@ private function hGetConvOpCode( byval ldtype as integer, byval rdtype as intege
 			end if
 
 			'' float to float (i.e. single <-> double)
-			return iif( typeGetSize( ldtype ) < typeGetSize( rdtype ), @"fptrunc", @"fpext" )
+			return iif( typeGetSize( ldtype ) < typeGetSize( rdtype ), cptr(const zstring ptr, @"fptrunc"), cptr(const zstring ptr, @"fpext") )
 		end if
 
 		'' int to float
-		return iif( typeIsSigned( rdtype ), @"sitofp", @"uitofp" )
+		return iif( typeIsSigned( rdtype ), cptr(const zstring ptr, @"sitofp"), cptr(const zstring ptr, @"uitofp") )
 	end if
 
 	if( typeGetClass( rdtype ) = FB_DATACLASS_FPOINT ) then
 		'' float to int (rounding was taken care of above)
-		return iif( typeIsSigned( ldtype ), @"fptosi", @"fptoui" )
+		return iif( typeIsSigned( ldtype ), cptr(const zstring ptr, @"fptosi"), cptr(const zstring ptr, @"fptoui") )
 	end if
 
 	'' int to int
@@ -2662,7 +2663,7 @@ private function hGetConvOpCode( byval ldtype as integer, byval rdtype as intege
 		return @"trunc"
 	end if
 
-	return iif( typeIsSigned( rdtype ), @"sext", @"zext" )
+	return iif( typeIsSigned( rdtype ), cptr(const zstring ptr, @"sext"), cptr(const zstring ptr, @"zext") )
 end function
 
 private sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
@@ -2975,7 +2976,7 @@ private sub hDoCall _
 
 	dim as string ln
 	dim as IRCALLARG ptr arg = any, prev = any
-	dim as IRVREG ptr varg = any, v0 = any
+	dim as IRVREG ptr varg = any, v0 = vr
 	dim as DZSTRING args
 	dim as integer i386_int128_result = any
 	DZstrZero( args )

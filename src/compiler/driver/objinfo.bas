@@ -991,7 +991,7 @@ end sub
 '' objinfo parsing interface
 
 type ENTRYINFO
-	text       as zstring ptr
+	text       as const zstring ptr
 	has_param  as integer
 end type
 
@@ -1204,7 +1204,7 @@ sub objinfoReadEnd( )
 	hResetBuffers( )
 end sub
 
-function objinfoEncode( byval entry as integer ) as zstring ptr
+function objinfoEncode( byval entry as integer ) as const zstring ptr
 	function = entries(entry).text
 end function
 

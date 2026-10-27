@@ -24,8 +24,15 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-extra-facts.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-hooks.bi"
+
+declare sub fbSemanticModelBuiltinFunctionUse(byval sym as FBSYMBOL ptr, byref source as LEX_LOCATION)
+declare function fbSemanticModelFullEnabled() as integer
+declare function fbSemanticModelMacroProvenanceEnabled() as integer
+
 
 #macro CHECK_CODEMASK( )
 	if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_CODE ) = FALSE ) then
@@ -196,6 +203,15 @@ function cQuirkFunction(byval sym as FBSYMBOL ptr) as ASTNODE ptr
 		end if
 	end if
 
+
+	'' Keep the accepted keyword's own lexer range before parsing operands.
+	'' PP literal-name handling above deliberately returns without an invocation.
+	dim as LEX_LOCATION semantic_site
+	dim as integer semantic_observe = fbSemanticExtraFactsEnabled(FB_SEMEXTRA_BUILTINS) and _
+		fbSemanticModelFullEnabled( ) and _
+		fbSemanticModelMacroProvenanceEnabled( ) and (lex.ctx->semantic_probe = FALSE)
+	if( semantic_observe ) then semantic_site = lexGetCurrentLocation( )
+
 	select case as const tk
 	case FB_TK_SERIALIZE, FB_TK_DESERIALIZE
 		funcexpr = cSerializationFunct( tk )
@@ -235,7 +251,8 @@ function cQuirkFunction(byval sym as FBSYMBOL ptr) as ASTNODE ptr
 		funcexpr = cErrorFunct()
 
 	case FB_TK_IIF
-		return cStrIdxOrMemberDeref( cIIFFunct( ) )
+		funcexpr = cStrIdxOrMemberDeref( cIIFFunct( ) )
+		goto quirk_function_accepted
 
 	case FB_TK_VA_FIRST
 		funcexpr = cVAFunct()
@@ -246,10 +263,12 @@ function cQuirkFunction(byval sym as FBSYMBOL ptr) as ASTNODE ptr
 	case FB_TK_CBYTE, FB_TK_CSHORT, FB_TK_CINT, FB_TK_CLNG, FB_TK_CLNGINT, _
 	     FB_TK_CUBYTE, FB_TK_CUSHORT, FB_TK_CUINT, FB_TK_CULNG, FB_TK_CULNGINT, _
 	     FB_TK_CSNG, FB_TK_CDBL, FB_TK_CSIGN, FB_TK_CUNSG, FB_TK_CBOOL
-		return cTypeConvExpr( tk )
+		funcexpr = cTypeConvExpr( tk )
+		goto quirk_function_accepted
 
 	case FB_TK_TYPE
-		return cStrIdxOrMemberDeref( cAnonType( ) )
+		funcexpr = cStrIdxOrMemberDeref( cAnonType( ) )
+		goto quirk_function_accepted
 
 	case FB_TK_VIEW
 		funcexpr = cViewStmt(TRUE)
@@ -279,6 +298,8 @@ function cQuirkFunction(byval sym as FBSYMBOL ptr) as ASTNODE ptr
 		funcexpr = cGfxFunct( tk )
 	end if
 
+quirk_function_accepted:
+	if( semantic_observe and (funcexpr <> NULL) ) then fbSemanticModelBuiltinFunctionUse(sym, semantic_site)
 	function = funcexpr
 end function
 

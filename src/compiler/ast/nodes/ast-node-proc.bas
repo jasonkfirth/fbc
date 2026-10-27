@@ -126,6 +126,212 @@ private sub hDelProcNode( byval n as ASTNODE ptr )
 	astDelNode( n )
 end sub
 
+private function hMarkCLabelReference( byval label as FBSYMBOL ptr ) as integer
+	if( label = NULL ) then return FALSE
+	if( symbIsLabel( label ) = FALSE ) then return FALSE
+	if( symbGetIsAccessed( label ) ) then return FALSE
+	symbSetIsAccessed( label )
+	function = TRUE
+end function
+
+private function hMarkCLabelReferences _
+	( _
+		byval n as ASTNODE ptr, _
+		byval branches as integer _
+	) as integer
+	if( n = NULL ) then return FALSE
+	dim as integer changed = FALSE
+
+	'' Label definitions are not references. Record direct branches, address
+	'' expressions and assembler operands before consuming any AST nodes.
+	'' A branch can add a target only when its statement is reachable.
+	select case( n->class )
+	case AST_NODECLASS_BOP, AST_NODECLASS_UOP, AST_NODECLASS_BRANCH
+		if( branches ) then changed or= hMarkCLabelReference( n->op.ex )
+	case AST_NODECLASS_JMPTB
+		if( branches ) then
+			for i as integer = 0 to n->jmptb.labelcount - 1
+				changed or= hMarkCLabelReference( n->jmptb.labels[i] )
+			next
+			changed or= hMarkCLabelReference( n->jmptb.deflabel )
+		end if
+	case AST_NODECLASS_ASM
+		var token = n->asm.tokhead
+		while( token <> NULL )
+			if( token->type = AST_ASMTOK_SYMB ) then
+				changed or= hMarkCLabelReference( token->sym )
+			end if
+			token = token->next
+		wend
+	case AST_NODECLASS_LABEL
+		'' The definition alone cannot make code following END reachable.
+	case else
+		changed or= hMarkCLabelReference( n->sym )
+	end select
+
+	changed or= hMarkCLabelReferences( n->l, branches )
+	changed or= hMarkCLabelReferences( n->r, branches )
+	function = changed
+end function
+
+private sub hResetCLabelReferences( byval n as ASTNODE ptr )
+	if( n = NULL ) then exit sub
+	if( n->class = AST_NODECLASS_LABEL ) then
+		n->sym->stats and= not FB_SYMBSTATS_ACCESSED
+	end if
+	hResetCLabelReferences( n->l )
+	hResetCLabelReferences( n->r )
+end sub
+
+private function hCStatementEndsFlow( byval n as ASTNODE ptr ) as integer
+	function = FALSE
+	select case( n->class )
+	case AST_NODECLASS_CALL
+		if( n->l = NULL ) then
+			if( symbGetProcIsNoReturn( n->sym ) ) then
+				return TRUE
+			elseif( symbGetIsRTL( n->sym ) ) then
+				function = (*symbGetMangledName( n->sym ) = FB_RTL_END)
+			end if
+		end if
+	case AST_NODECLASS_BRANCH
+		select case( n->op.op )
+		case AST_OP_JMP, AST_OP_JUMPPTR, AST_OP_RET
+			function = TRUE
+		end select
+	case AST_NODECLASS_JMPTB
+		function = TRUE
+	case AST_NODECLASS_LOAD
+		function = n->lod.isres
+	end select
+end function
+
+private sub hCheckCLabelReferences _
+	( _
+		byval n as ASTNODE ptr, _
+		byref fallthrough as integer, _
+		byref changed as integer _
+	)
+	if( n = NULL ) then exit sub
+	if( n->class = AST_NODECLASS_LINK ) then
+		hCheckCLabelReferences( n->l, fallthrough, changed )
+		hCheckCLabelReferences( n->r, fallthrough, changed )
+		exit sub
+	end if
+	if( n->class = AST_NODECLASS_LABEL ) then
+		if( symbGetIsAccessed( n->sym ) ) then fallthrough = TRUE
+	end if
+	if( fallthrough = FALSE ) then exit sub
+	changed or= hMarkCLabelReferences( n, TRUE )
+	if( hCStatementEndsFlow( n ) ) then fallthrough = FALSE
+end sub
+
+private sub hCheckCReturn _
+	( _
+		byval n as ASTNODE ptr, _
+		byref fallthrough as integer, _
+		byref returns as integer _
+	)
+	if( n = NULL ) then exit sub
+	if( n->class = AST_NODECLASS_LINK ) then
+		hCheckCReturn( n->l, fallthrough, returns )
+		hCheckCReturn( n->r, fallthrough, returns )
+		exit sub
+	end if
+	if( n->class = AST_NODECLASS_LABEL ) then
+		if( symbGetIsAccessed( n->sym ) ) then fallthrough = TRUE
+	end if
+	if( fallthrough = FALSE ) then exit sub
+	if( n->class = AST_NODECLASS_LOAD ) then
+		if( n->lod.isres ) then returns = TRUE
+	elseif( n->class = AST_NODECLASS_BRANCH ) then
+		if( n->op.op = AST_OP_RET ) then returns = TRUE
+	end if
+	if( hCStatementEndsFlow( n ) ) then fallthrough = FALSE
+end sub
+
+function astProcMayReturn( byval proc as ASTNODE ptr ) as integer
+	assert( proc->class = AST_NODECLASS_PROC )
+
+	'' Address-taken and assembler targets may be entered indirectly. Keep
+	'' them as roots, then follow branches from reachable statements. Repeat
+	'' for backwards edges, without allowing dead branch cycles to introduce
+	'' their own entries. The growing set is bounded by this procedure's labels.
+	var n = proc->l
+	while( n <> NULL )
+		hResetCLabelReferences( n )
+		n = n->next
+	wend
+	n = proc->l
+	while( n <> NULL )
+		hMarkCLabelReferences( n, FALSE )
+		n = n->next
+	wend
+	dim as integer changed, live
+	do
+		changed = FALSE
+		live = TRUE
+		n = proc->l
+		while( n <> NULL )
+			hCheckCLabelReferences( n, live, changed )
+			n = n->next
+		wend
+	loop while( changed )
+	dim as integer fallthrough = TRUE, returns = FALSE
+	n = proc->l
+	while( n <> NULL )
+		hCheckCReturn( n, fallthrough, returns )
+		n = n->next
+	wend
+	function = returns or fallthrough
+end function
+
+private sub hFlushCStatement( byval n as ASTNODE ptr, byref fallthrough as integer )
+	if( n = NULL ) then exit sub
+
+	'' A statement LINK has no observed result at the procedure boundary.
+	'' Visit both sides separately so labels and temporary destruction keep
+	'' their order even when an earlier statement terminates the application.
+	if( n->class = AST_NODECLASS_LINK ) then
+		hFlushCStatement( n->l, fallthrough )
+		hFlushCStatement( n->r, fallthrough )
+		astDelNode( n )
+		exit sub
+	end if
+
+	select case( n->class )
+	case AST_NODECLASS_LABEL
+		if( symbGetIsAccessed( n->sym ) ) then
+			fallthrough = TRUE
+		elseif( n->sym <> astGetProc( )->block.initlabel ) then
+			'' Unreferenced AST labels need no C basic block. Keep the procedure
+			'' entry: an indirect jump may still need its address while lowering.
+			astDelNode( n )
+			exit sub
+		end if
+	case AST_NODECLASS_DECL
+		'' Keep the lexical declaration: a later branch may still refer to
+		'' this variable. Its default initialization is executable code.
+		if( fallthrough = FALSE ) then
+			astDelTree( n->l )
+			n->l = NULL
+		end if
+	case AST_NODECLASS_SCOPEBEGIN, AST_NODECLASS_SCOPEEND, _
+	     AST_NODECLASS_DBG, AST_NODECLASS_LIT, AST_NODECLASS_NOP
+		'' Preserve balanced scopes and source annotations for the live code.
+	case else
+		if( fallthrough = FALSE ) then
+			astDelTree( n )
+			exit sub
+		end if
+	end select
+
+	var terminates = hCStatementEndsFlow( n )
+	astLoad( n )
+	astDelNode( n )
+	if( terminates ) then fallthrough = FALSE
+end sub
+
 ''::::
 private sub hProcFlush _
 	( _
@@ -171,12 +377,22 @@ private sub hProcFlush _
 		fbSemanticModelExportProc(sym, p, doemit)
 	end if
 
+	dim as integer c_fallthrough = doemit and (not symbIsNaked( sym )) and _
+		((env.clopt.backend = FB_BACKEND_GCC) or (env.clopt.backend = FB_BACKEND_CLANG))
+
 	'' flush nodes
+	dim as integer fallthrough = TRUE
 	n = p->l
 	do while( n <> NULL )
 		nxt = n->next
-		astLoad( n )
-		astDelNode( n )
+		if( c_fallthrough ) then
+			'' Only a referenced label can resume execution after fb_End().
+			'' This also removes the dead implicit main epilogue and result load.
+			hFlushCStatement( n, fallthrough )
+		else
+			astLoad( n )
+			astDelNode( n )
+		end if
 		n = nxt
 	loop
 
@@ -211,6 +427,28 @@ private sub hProcFlushAll _
 	dim as FBSYMBOL ptr sym = any
 
 	'' procs should be sorted by include file
+
+	if( (env.clopt.backend = FB_BACKEND_GCC) or (env.clopt.backend = FB_BACKEND_CLANG) ) then
+		'' C prototypes can expose a non-returning callee to earlier callers.
+		'' Settle these contracts before flushing any body, so its dead tail
+		'' is removed using the same knowledge as the eventual C declaration.
+		dim as integer changed = TRUE
+		while( changed )
+			changed = FALSE
+			n = ast.proc.head
+			while( n <> NULL )
+				sym = n->sym
+				if( symbGetIsParsed( sym ) and (not symbIsNaked( sym )) and _
+				    (not symbGetProcIsNoReturn( sym )) ) then
+					if( astProcMayReturn( n ) = FALSE ) then
+						symbSetProcIsNoReturn( sym )
+						changed = TRUE
+					end if
+				end if
+				n = n->next
+			wend
+		wend
+	end if
 
 	'' gen the global ctors/dtors, if any (done before emitting main()
 	'' because the ctors/dtors could be private and not called yet)
@@ -509,6 +747,7 @@ sub astProcBegin( byval sym as FBSYMBOL ptr, byval ismain as integer )
 		.lasthnd = NULL
 		.lastmod = NULL
 		.lastfun = NULL
+		.hndsaved = NULL
 	end with
 
 	sym->proc.ext->stmtnum = parser.stmt.cnt
@@ -583,8 +822,24 @@ private function hCheckErrHnd _
 		end if
 
 		if( .lasthnd <> NULL ) then
+			'' ON LOCAL ERROR may be bypassed by an early exit or branch.
+			'' Initialize at procedure entry, then restore only if one of
+			'' those statements actually saved the previous handler.
+			symbSetIsDeclared( .lasthnd )
+			symbSetIsDeclared( .hndsaved )
+			head_node = astAddAfter( astNewDECL( .lasthnd, FALSE ), head_node )
+			head_node = astAddAfter( astNewDECL( .hndsaved, FALSE ), head_node )
+			head_node = astAddAfter( astNewASSIGN( astNewVAR( .lasthnd ), _
+				astNewCONSTi( NULL, typeAddrOf( FB_DATATYPE_VOID ) ) ), head_node )
+			head_node = astAddAfter( astNewASSIGN( astNewVAR( .hndsaved ), _
+				astNewCONSTi( FALSE ) ), head_node )
+			dim as FBSYMBOL ptr skiprestore = symbAddLabel( NULL )
+			astAdd( astNewBOP( AST_OP_EQ, astNewVAR( .hndsaved ), _
+				astNewCONSTi( FALSE ), skiprestore, AST_OPOPT_NONE ) )
 			rtlErrorSetHandler( astNewVAR( .lasthnd ), FALSE )
+			astAdd( astNewLABEL( skiprestore ) )
 			.lasthnd = NULL
+			.hndsaved = NULL
 		end if
 	end with
 
@@ -778,16 +1033,18 @@ function astProcEnd( byval callrtexit as integer ) as integer
 		if( rec_cnt = 1 ) then
 			if( n->block.proc.ismain = FALSE ) then
 				''
-				'' Emit public (non-private) procedures immediately.
+				'' Assembly/LLVM can emit public procedures immediately.
 				''
 				'' Emitting of private ones is delayed until hProcFlushAll(),
 				'' so that they're only emitted if actually used.
 				''
-				'' When using the C/LLVM backends, emitting of procedures containing forward
-				'' references in their signature must be delayed aswell, otherwise the C/LLVM
-				'' backends would try emitting them with incomplete type.
+				'' C bodies wait for translation-unit non-returning contracts.
+				'' LLVM still delays signatures containing forward references,
+				'' because they cannot be emitted with incomplete types.
 				''
-				if( (not symbIsPrivate( sym )) and _
+				if( (env.clopt.backend <> FB_BACKEND_GCC) and _
+				    (env.clopt.backend <> FB_BACKEND_CLANG) and _
+				    (not symbIsPrivate( sym )) and _
 				    ((not symbProcHasFwdRefInSignature( sym )) or _
 				     (env.clopt.backend = FB_BACKEND_GAS)) ) then
 					do_flush = TRUE

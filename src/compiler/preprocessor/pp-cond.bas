@@ -227,8 +227,9 @@ sub ppAssert( )
 	dim as integer valid = any
 
 	'' ASSERT Expression
-
+	dim as longint semantic_assert = fbSemanticModelPPAssertBegin( )
 	istrue = ppExpression( valid )
+	fbSemanticModelPPAssertEnd(semantic_assert)
 
 	if( istrue = FALSE ) then
 		errReport( FB_ERRMSG_PPASSERT_FAILED )

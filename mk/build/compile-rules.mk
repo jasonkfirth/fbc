@@ -192,6 +192,16 @@ ifeq ($(TARGET_OS),win32)
   endif
 endif
 
+# Win64 longjmp walks the native frames between the throw and its owner.
+# The default runtime flags omit unwind tables, so the error entry points and
+# frame dispatcher need the same exception as GOSUB. BASIC resource cleanup
+# runs first; native unwind metadata is still required for the machine jump.
+RTLIB_ERROR_CFLAGS := $(RTLIB_GOSUB_CFLAGS)
+ifneq ($(RTLIB_ERROR_CFLAGS),)
+RTLIB_ERROR_UNWIND_OBJ := $(foreach directory,$(libfbobjdir) $(libfbpicobjdir) $(libfbmtobjdir) $(libfbmtpicobjdir),$(directory)/errors/error.o $(directory)/errors/error_frame.o)
+$(sort $(RTLIB_ERROR_UNWIND_OBJ)): override ALLCFLAGS += $(RTLIB_ERROR_CFLAGS)
+endif
+
 $(libfbobjdir)/%.o: $(srcdir)/rtlib/%.c $(LIBFB_H) | $(libfbobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@

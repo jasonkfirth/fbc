@@ -362,7 +362,7 @@ dim shared as FBTARGET targetinfo(0 to FB_COMPTARGETS-1) = _
 '' makes the callee discard the hidden pointer used for aggregate returns.
 
 type FBCPUFAMILYINFO
-	id as zstring ptr
+	id as const zstring ptr
 	defaultcputype as integer
 end type
 
@@ -388,8 +388,8 @@ dim shared as FBCPUFAMILYINFO cpufamilyinfo(0 to FB_CPUFAMILY__COUNT-1) = _
 }
 
 type FBCPUTYPEINFO
-	gccarch     as zstring ptr  '' gcc -march argument (used for -gen gcc), or NULL if same as fbcarch
-	fbcarch     as zstring ptr  '' fbc -arch argument
+	gccarch     as const zstring ptr  '' gcc -march argument (used for -gen gcc), or NULL if same as fbcarch
+	fbcarch     as const zstring ptr  '' fbc -arch argument
 	family      as integer      '' enum FB_CPUFAMILY
 	bits        as integer      '' 32 or 64
 	bigendian   as integer      '' endianness - TRUE=big endian, FALSE=little endian
@@ -1200,8 +1200,8 @@ function fbDefaultCpuTypeFromCpuFamilyId( byval os as integer, byref cpufamilyid
 	function = -1
 end function
 
-function fbGetGccArch( ) as zstring ptr
-	dim as zstring ptr gccarch = any
+function fbGetGccArch( ) as const zstring ptr
+	dim as const zstring ptr gccarch = any
 	gccarch = cputypeinfo(env.clopt.cputype).gccarch
 	if( gccarch = NULL ) then
 		gccarch = cputypeinfo(env.clopt.cputype).fbcarch
@@ -1209,7 +1209,7 @@ function fbGetGccArch( ) as zstring ptr
 	function = gccarch
 end function
 
-function fbGetFbcArch( ) as zstring ptr
+function fbGetFbcArch( ) as const zstring ptr
 	function = cputypeinfo(env.clopt.cputype).fbcarch
 end function
 

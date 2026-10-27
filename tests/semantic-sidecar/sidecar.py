@@ -217,8 +217,13 @@ SOURCE_OPERATORS = {
 
 
 def filesystem_path(value: str | Path) -> Path:
-    """Translate native compiler paths only for Cygwin/MSYS filesystem access."""
+    """Translate native compiler paths only at the host filesystem boundary."""
     text = str(value)
+    if sys.platform == "win32" and any(0xDC80 <= ord(char) <= 0xDCFF for char in text):
+        # The Windows runtime accepts strict UTF-8, then the active ANSI code
+        # page. unescape() retains legacy bytes; convert only at the I/O edge.
+        # Wire identities, expected sizes and source digests stay unchanged.
+        text = text.encode("utf-8", errors="surrogateescape").decode("mbcs", errors="strict")
     if sys.platform == "cygwin" and PureWindowsPath(text).is_absolute():
         # MSYS can stat a Windows path directly, but POSIX pathlib.resolve()
         # does not understand its drive or backslash separators. cygpath uses

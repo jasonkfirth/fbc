@@ -47,6 +47,8 @@ enum {
 	FB_TLSKEY_FBTHREAD,
 	FB_TLSKEY_PROFILE,
 	FB_TLSKEY_USERVAR,
+	/* Append keys so old objects keep their existing TLS indices. */
+	FB_TLSKEY_ERRORFRAME,
 	FB_TLSKEYS
 };
 
@@ -59,6 +61,7 @@ typedef struct _FB_TLS_CTX_HEADER {
 } FB_TLS_CTX_HEADER;
 
 FBCALL void             *fb_TlsGetCtx        ( int index, size_t len, FB_TLS_DESTRUCTOR destructor );
+FBCALL void             *fb_TlsGetCtxExisting( int index );
 FBCALL void             *fb_TlsGetVar        ( const char *name, unsigned int len, unsigned int align, uintptr_t initial );
 FBCALL void              fb_TlsDelCtx        ( int index );
 FBCALL void              fb_TlsFreeCtxTb     ( void );

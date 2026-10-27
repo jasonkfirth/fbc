@@ -113,6 +113,7 @@ private function hDoAssign _
 		case FB_DATATYPE_BOOLEAN, FB_DATATYPE_BYTE, FB_DATATYPE_UBYTE, _
 			FB_DATATYPE_SHORT, FB_DATATYPE_USHORT, FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, _
 			FB_DATATYPE_LONG, FB_DATATYPE_ULONG, FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT, _
+			FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128, _
 			FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_STRING
 			scalar_copy = TRUE
 		end select
@@ -153,7 +154,12 @@ private function hDoAssign _
 	end if
 
 	var semantic_initializer = astTypeIniAddAssign( ctx.tree, expr, ctx.sym, ctx.dtype, ctx.subtype, check_upcast )
-	if( (semantic_initializer <> NULL) and (len(semantic_inputs) > 0) ) then
+	'' NEW also uses this parser with a compiler-created temporary pointer.
+	'' Keep its original expression capture above, because lowering consumes
+	'' those operands. Only source variables commit declaration assignment
+	'' observations; the enclosing source assignment owns a NEW result.
+	if( (semantic_initializer <> NULL) and (len(semantic_inputs) > 0) and _
+	    (symbIsTemp(ctx.sym) = FALSE) ) then
 		fbSemanticModelRecordAssignmentInputs(semantic_inputs, "initializer", "assign", "builtin", 0, _
 			semantic_destination, @semantic_destination)
 	end if

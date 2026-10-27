@@ -140,9 +140,9 @@ declare function hHasEscapeW _
 
 declare function hReplace _
 	( _
-		byval text as zstring ptr, _
-		byval oldtext as zstring ptr, _
-		byval newtext as zstring ptr _
+		byval text as const zstring ptr, _
+		byval oldtext as const zstring ptr, _
+		byval newtext as const zstring ptr _
 	) as string
 
 declare function hReplaceW _

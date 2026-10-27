@@ -261,7 +261,7 @@ end sub
 			dt = FB_DATATYPE_UINT
 		end if
 
-		dc = symb_dtypeTB(dt).class
+		dc = symbGetDatatypeInfo(dt).class
 
 	else
 		t  = INVALID

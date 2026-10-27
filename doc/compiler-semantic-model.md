@@ -39,8 +39,9 @@ kinds carry at most 64 integer bits. Wider constants are not published through
 those carriers; a missing value does not establish a narrowed constant.
 
 `-semantic-extra-facts <list>` requests additional full-model source
-observations. The comma-separated names are `hints`, `declarators`, `keywords`
-and `macro-access`; `all` requests all four. Repeated options accumulate requests.
+observations. The comma-separated names are `hints`, `declarators`, `keywords`,
+`macro-access`, `includes`, `builtins`, `literal-groups`, `preprocessor`,
+`initializers`, `type-shapes` and `native-bytes`; `all` requests all eleven. Repeated options accumulate requests.
 The complete request `none` clears them. Names are case-insensitive, surrounding
 spaces are ignored, and unknown names or empty list fields are rejected before
 the request is changed. No extra group is enabled by default.
@@ -55,6 +56,59 @@ the required facts. Macro-access observations additionally need macro
 provenance. Request configuration persists across modules while each module's
 observations and completion counts reset. These are compiler facts, not rule
 selection or permission to reconstruct missing syntax from text.
+
+The same `macro-access` request publishes `macro-source-access-node-bindings`.
+A surviving tagged node has `K node <node-id> macro-source-access-reference
+<reference-id>`. Its reference selects the exact variable/member `MR` occurrence
+and the matching `macro-source-access:<reference-id>` role. These are not B
+ordinals. A transparent ByRef/array wrapper may retain the tag; clients must
+follow its native value edge rather than substitute a source-location match.
+Each available module has one global-namespace-owned
+`macro-source-access-node-count:<module-id>` closure, including zero. It counts
+surviving associations, which can include AST copies of one occurrence. Source
+occurrence counts remain independent: lowering can replace or remove a tagged
+node. Generated cleanup has no original access tag and acquires no association.
+Reduced models, compact macro provenance and unrequested captures omit these
+observations and mark their capability unavailable. The facts do not establish
+callee purity, hidden aliases or the lifetime of a proposed reference.
+
+The `includes` group publishes `counted-include-requests` and
+`include-request-scopes`. Per-source request closure includes repeated once-only
+requests, distinguishes written directives from compiler preincludes, and links
+each request to its native procedure, block, namespace and compound owners.
+These observations describe accepted preprocessing and scope, including quiet
+requests; inactive source text does not establish a request.
+
+The `builtins` group publishes `counted-builtin-function-uses`. It links accepted
+grammar intrinsics and original runtime-library calls to their physical or macro
+binding owners. Lowered helper calls do not become additional source calls. This
+group needs full-model macro provenance, as does `preprocessor`.
+
+The `literal-groups` group publishes `string-literal-adjacency-inputs`. Original
+implicit string joins retain the two child expression identities before folding
+releases their AST nodes. Module completion counts close the observation stream;
+explicit concatenation and final folded values remain separate facts.
+
+The `preprocessor` group publishes `counted-preprocessor-events`. Its module
+closure `preprocessor-event-counts:<module>` stores five tab-separated counts,
+in order: `PPB`, `PPD`, `PPE`, `PPT`, `ML`. Counters advance only after successful
+record publication and reset at each module boundary. This permits a consumer to
+check complete guard evidence without reconstructing directives from source.
+
+The `initializers` group publishes `array-initializer-input-closure`. Existing
+original array-element facts remain available independently. When requested in
+a full model, each accepted element also has an `array-initializer-target` edge
+from its original expression to its array symbol; the edge rank is the one-based
+innermost dimension. One `original-array-initializer-count` property on the
+module's global namespace symbol closes the stream, including zero elements.
+The counter resets between modules. Scalar initializers, defaults and implicit
+runtime helper arguments do not acquire array-element roles.
+
+The reference reader converts Windows filename bytes only at its filesystem
+boundary: strict UTF-8 takes precedence, followed by the host ANSI code page for
+legacy bytes. Serialized identities remain unchanged. Current size and digest
+checks still reopen the actual file on every operation; a same-size edit is stale.
+The normal semantic-sidecar runner covers both compiler-observed path spellings.
 
 Identifier-hint inputs retain an independent source binding or macro owner.
 Compiler-generated unnamed parameters can exist for ABI checking without any
@@ -102,6 +156,28 @@ Each artifact describes one compilation context. Tooling can retain that
 context incrementally when the compiler, arguments, source hashes and include
 resolution still match. It remains responsible for project state and process
 lifetime.
+
+### Direct array variable mutations
+
+Full models with macro provenance publish
+`native-array-variable-mutation-inputs`. The focused
+`tooling/semantic-array-mutations.bas` observer records direct variable targets of
+source ERASE, REDIM and REDIM PRESERVE before runtime lowering consumes their AST.
+DIM allocation is not a source REDIM operation. Field and indirect places keep
+their ordinary source uses but are outside this direct-variable family.
+
+Each `K symbol <array-id> native-array-mutation:<ordinal>` payload contains the
+operation kind, statement ID, source-context ID, `variable` or `expanded` place,
+and macro identity. Its matching H self-relation identifies the selected array;
+LOC/MR records preserve the original operand location or macro origin. Ordinals
+start at one per module. A global-namespace-owned
+`native-array-mutation-count:<module-id>` closes the sequence, including zero.
+The compiler resets the count for each source module in a multi-root invocation.
+
+Reduced or compact macro models mark the feature unavailable and omit its
+observations. This is a small ordinary full-model input, independent of the
+optional token observation groups. It does not establish alias effects, prove
+that an array is useful or change allocation, construction or cleanup behavior.
 
 ## Completion and transactions
 
@@ -3146,6 +3222,150 @@ Z/W/STRING types retain their complete accepted width, not just a character's
 width. These public facts avoid requiring editor consumers to decode dtype
 bit fields. They do not change parsing, symbol selection or emitted code.
 
+## Selected typedefs, string indices and member receivers
+
+Full models advertise `selected-type-alias-inputs` and
+`string-subscript-inputs`. These observations retain accepted parser choices
+before native lowering removes their spelling or operand shape. They do not
+classify a typedef as numeric, textual, mutable or safe for a particular API.
+
+The declaration parser snapshots the typedef selected by `cSymbolType` before
+parsing a nested initializer or default. Its result slot belongs to the existing
+single-threaded parser; consumers retain immutable symbol/expression IDs instead
+of borrowing that slot or holding AST pointers. Each selection has a
+`type-alias-input:<ordinal>` property on its symbol or explicit cast expression,
+plus an independent `H` edge named `type-alias-input` to the typedef symbol.
+Ordinals are consecutive within each module. A `type-alias-count:<module>`
+property closes the stream, including modules with no selected aliases.
+
+`type-alias-declaration-sites` additionally requires full macro provenance.
+Eligible value declarations have a `type-alias-declaration-site:<ordinal>`
+property with three tab-separated fields: source kind, occurrence identity and
+native array rank. The kind identifies a declaration binding, formal occurrence,
+formal source context or macro declaration. Bindings are cached per native
+symbol, so a repeated EXTERN declaration or nested parse cannot borrow an
+unrelated last occurrence. Unnamed formals retain their actual first token.
+
+String subscripts retain `string-index-operand` and `string-index-index`
+properties on the result expression. The `string-index-input` edge independently
+joins the original string operand and original index. `string-index-count:<module>`
+closes this stream. Dynamic strings, fixed strings, UString, ZString and WString
+use the original index before conversion, address construction or UTF lowering.
+
+`member-receiver-inputs` describes accepted field prefixes with an active source
+expression range. Its `member-receiver-input` property contains four tab-separated
+fields: receiver datatype, actual receiver type ID, selected field ID and owning
+statement ID. The datatype passes through the selected native/stable semantic
+ABI, just like E/T facts. A `member-receiver-type` edge independently joins the
+expression to its receiver type and selected field. The receiver can differ from
+the field's declaring base type. Implicit member writes without an active range
+keep the ordinary expression exporter's omission behavior; adding this observer
+must not make those valid modules fail. Reduced exports withhold these families.
+
+`declaration_observations_probe.bas` and `declaration_observations.py` preserve
+these relationships in the normal semantic-sidecar runner. They compare enabled
+and disabled generated code on each requested backend, verify native/stable
+receiver datatype encoding, and include inherited fields, implicit writes and a
+member-valued optional default. The fixture is not executed because it includes
+an intentionally negative string index.
+
+Generic native `CONV` nodes have conceptual operation `cast` and kind `builtin`.
+Their raw AST operator remains `-1`: the CAST union contains conversion flags,
+not an operator field. A GAS64 wide conversion can already be a dereferenced
+helper result when exported; E describes that actual tree while EX retains the
+accepted source cast. Original scalar initializer inputs include `Integer<128>`
+and `UInteger<128>` in both DIM and VAR paths. These are type and operand facts;
+they do not extend the existing 64-bit semantic value carrier.
+
+## Written declaration types and native numeric bytes
+
+`written-type-shapes` is available with full models, macro provenance and an
+explicit `-semantic-extra-facts type-shapes` request. Without that request,
+written type frames and rows, including closure counts, are omitted and both
+`written-type-shapes` and `written-type-root-origins` are unavailable.
+It describes the type syntax selected by the declaration grammar, rather than
+expanding a resolved alias graph. Native callback parameters/results are children;
+named aliases and `TypeOf` remain leaves. Array wrappers follow the actual
+declarator or formal that owns them. An omitted or suffixed legacy declaration
+cannot attach its array to a preceding callback type.
+
+The serial parser tracks `cSymbolType` frames even in ignored expression and
+alias-definition contexts, preventing their nested callback types from leaking
+into declaration roots. No parser AST pointer is retained. Frames are bounded
+at 64 levels and accepted nodes at one million per module. Module reset clears
+all frame, count and last-root state.
+
+Each `K symbol` opening `type-shape-open:<id>` reserves its detail identity
+before recursively parsing children. The matching `type-shape-input:<id>` has
+twelve tab-separated fields:
+
+1. Root identity.
+2. Parent identity, or zero for a root.
+3. Statement identity.
+4. Source-context identity.
+5. Written kind: primitive, named, typeof or callback.
+6. Explicit pointer levels.
+7. Formal array flag.
+8. Explicit calling-convention flag.
+9. Foreign-language callback context flag.
+10. Direct child count.
+11. Generated-source flag.
+12. Accepted module ordinal.
+
+`LOC source-context` retains the exact written range. A separate
+`type-shape-array:<id>` links a declaration root to its actual array rank.
+`accepted-type-shape-count:<module>` and
+`accepted-type-shape-array-count:<module>` close both families, including empty
+ones. Readers reject duplicate openings, inputs and closures. Complexity weights,
+thresholds and recommendations belong to the consumer.
+
+`native-byte-conversion-inputs` is available in full models with an explicit
+`-semantic-extra-facts native-bytes` request. Without it, the operation family
+and its count are omitted and the capability is unavailable. Generic original
+operand expressions remain available to other consumers. It preserves the
+selected MKD/MKS/MKI/MKL/MKSHORT/MKLONGINT and string CV operations. Numeric CV
+reinterpretation overloads do not consume a byte sequence and are excluded.
+Integer string decoders can fold to constants, so the observer keeps a distinct
+result occurrence and its original operand before lowering.
+
+An `H expression` edge with role `native-byte-input` links the result to the
+original operand. Five result properties record `native-byte-kind` (pack or
+unpack), `native-byte-width`, `native-byte-token`, `native-byte-operand` and
+`native-byte-callee`. Folded decoders have callee zero; runtime forms retain the
+selected procedure even through an INTEGER conversion wrapper. Independent
+operator LOC/MR facts retain source attribution. `native-byte-count:<module>`
+closes the family. Byte-order intent and portable-format advice are not compiler
+facts.
+
+CVI/MKI explicit widths are restricted to 16, 32 and 64 bits, matching the
+implemented runtime helpers. The general integer type parser also supports 128
+bits; that does not provide a 128-bit byte-conversion helper. Unsupported widths
+produce an ordinary invalid-size diagnostic before runtime-call selection.
+Ordinary Integer<128>/UInteger<128> behavior and runtime libraries are unchanged.
+
+The canonical Python `Model` checker uses the native datatype vocabulary, so
+tests using it request the native ABI explicitly. The observer regression also
+checks stable-v1 wire slots and the new ID-based observations independently.
+GCC, Clang and gas64 controls compare emission with observations off/full and
+verify unavailable contracts in bindings mode. Neither observer changes the
+semantic schema or inserts a private capability-number reservation range.
+
+### Physical written-type roots
+
+Capability `written-type-root-origins` accompanies full written-type capture.
+The generated flag in a type-shape payload includes generated descendants. It
+does not by itself say that the root was supplied by a macro. The root role's
+own `MR` record identifies that distinction.
+
+A physical root retains its ordinary `LOC` range when both endpoints are
+physical. If a generated child supplies the final token, its root `LOC` covers
+the first physical keyword instead. That keyword is a diagnostic anchor, not
+an editable range through expanded text. A wholly generated root retains its
+own macro origin without an invented contiguous physical type range. Reduced
+exports mark this capability unavailable. The regression covers inline roots,
+generated parameters, wholly generated roots and generated result endpoints in
+native/stable models across GCC, Clang and gas64 without changing emission.
+
 <!-- end of compiler-semantic-model.md -->
 
 The independent FBCDIA diagnostic transport also advertises `unclosed-procedures`.
@@ -3356,5 +3576,51 @@ cover GCC/Clang/LLVM emission parity, binary/text parity, queries, inherited and
 implicit receivers, mixed-role macros, enum scopes, keyword overload selection,
 reduced modes, empty families and 42 independently damaged controls. The private
 producer is retained separately from the installed compiler.
+
+## Counted preprocessing assertion scopes
+
+Full models advertise `counted-preprocessor-assertions`. Assertion expressions
+are consumed by the actual `ppAssert()` parser, including TYPEOF strings and
+macro-expanded inputs. They do not open conditional branches. An enclosing
+language statement can remain active, so ST absence or inherited OWN does not
+establish assertion ownership.
+
+The producer writes these additive K observations in native record order:
+
+```text
+K  symbol  namespace-id  pp-assert-input:module:ordinal  preceding-E-count
+... records emitted while parsing and consuming this assertion ...
+K  symbol  namespace-id  pp-assert-end:module:ordinal    preceding-E-count
+K  symbol  namespace-id  pp-assert-count:module          assertion-count
+```
+
+Tabs separate fields. The last count is emitted once at module completion,
+including zero when no assertion was observed. The owner is the module's real
+global namespace, not a procedure, alias or invented statement. Ordinals start
+at one and are dense within each module. A checkpoint counts all preceding E
+records in the whole model; it is not an expression identity. Opaque identity
+remapping therefore does not alter a checkpoint.
+
+Readers validate canonical nonnegative checkpoint/count values, input order,
+matching LIFO endings, namespace/module ownership and complete module counts.
+Each checkpoint must equal the number of earlier E records at its actual
+position. A missing count, missing boundary, wrong owner, reordered boundary or
+unavailable advertised capability is an incomplete model. Nested scopes are
+permitted and reader storage grows only with observed nesting.
+
+The validated interval marks its E records as preprocessing inputs. Literal
+policies use that positive ownership before applying runtime literal-origin
+requirements; they continue checking every other original string expression.
+They do not identify TYPEOF by spelling, recognize generated string values, or
+exempt a root merely because it lacks statements. Older models without this
+optional capability supply no assertion mask and retain the existing origin
+checks. Reduced export modes do not emit assertion observations.
+
+The text wire format, binary row order and stable-v1 datatype ABI are unchanged.
+Focused native and independent-reader controls cover both targets and both
+transports, real runtime adjacency, callback assertions, ordinary numeric
+assertions, assertions inside conditional branches and malformed boundaries.
+This family describes parser ownership, not runtime execution or assertion
+truth after a failed compilation.
 
 <!-- end of compiler-semantic-model.md -->

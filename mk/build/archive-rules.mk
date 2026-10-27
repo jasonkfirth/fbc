@@ -17,12 +17,16 @@
 # short-option word so --no-print-directory does not count as the n flag.
 # Publish only a fully indexed replacement, retaining the previous archive
 # if either tool fails. The trap owns only this archive's temporary files.
+# Native Windows Make writes CRLF lists. POSIX xargs treats the CR as part of
+# the last object name, so normalize the list before archiving or recording it.
 define DO_AR
 	$(if $(findstring n,$(filter-out --%,$(firstword $(MAKEFLAGS)))),,$(file >$@.rsp,$(filter %.o,$^)))
 	@set -e; \
 	members="$(ARCHIVE_MEMBERS_DIR)/$(notdir $@)"; \
-	trap 'rm -f "$@.tmp" "$@.rsp" "$$members.tmp"' 0; \
+	trap 'rm -f "$@.tmp" "$@.rsp" "$@.rsp.tmp" "$$members.tmp"' 0; \
 	rm -f "$@.tmp"; \
+	tr -d '\r' < "$@.rsp" > "$@.rsp.tmp"; \
+	mv -f "$@.rsp.tmp" "$@.rsp"; \
 	xargs -s 16384 $(AR) $(ARFLAGS) "$@.tmp" < "$@.rsp"; \
 	$(RANLIB) "$@.tmp"; \
 	mv -f "$@.tmp" "$@"; \

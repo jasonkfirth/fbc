@@ -24,6 +24,30 @@ UNARY_CODES = frozenset(('negate', 'unary-plus', 'not', 'logical-not', 'length',
     'exponential', 'floor', 'truncate', 'fractional-part'))
 
 
+def root_symbol_matches(model, expression, fields, forest):
+    if fields[3] == expression[13]:
+        return True
+    # An overloaded [] expression binds the selected operator on its DEREF.
+    # Native storage keeps that binding on the opaque BYREF CALL child.
+    # Accept only this shape; the call still carries no purity guarantee.
+    if (expression[8] != '20' or expression[10:12] != ['index', 'overloaded']
+            or expression[13] == '0' or fields[3] != '0' or fields[6] != '0'
+            or fields[14:16] != ['0', 'complete']):
+        return False
+    child = forest.get(int(fields[13]))
+    if (child is None or child[0] != '9' or child[3] != expression[13]
+            or child[4:7] != ['', '0', '0'] or child[15] != 'opaque'):
+        return False
+    selected = int(expression[13])
+    signature = model.signatures.get(selected)
+    declared = model.types.get(selected)
+    return (signature is not None and declared is not None
+            and signature[2] == 'operator' and signature[6] == '1'
+            and signature[10] == 'index' and declared[3] == 'procedure'
+            and declared[6:8] == [expression[12], expression[14]]
+            and signature[7:9] == child[1:3])
+
+
 def validate_assignment_storage(model, number, subject_modules, node_kind_count):
     groups, trees, properties, markers, origins = {}, {}, {}, set(), set()
     inputs = {}
@@ -167,7 +191,8 @@ def validate_assignment_storage(model, number, subject_modules, node_kind_count)
         expression_ids = [int(field) for field in entry[4].split('\t')[:2]]
         for root, expression in zip((left, right), expression_ids):
             value = expressions[expression]
-            if forest[root][:4] != [value[8], value[12], value[14], value[13]]:
+            if (forest[root][:3] != [value[8], value[12], value[14]]
+                    or not root_symbol_matches(model, value, forest[root], forest)):
                 raise ValueError('Assignment storage root differs from its original typed expression')
         parents = {left: 0, right: 0}
         pending = [(left, 0), (right, 0)]

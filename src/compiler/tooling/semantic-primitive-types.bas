@@ -93,7 +93,7 @@ sub fbSemanticModelPrimitiveType _
 	dim as longint display_length = length
 	if( pointers > 0 ) then
 		'' The formatter's length describes string elements, not pointer bytes.
-		display_length = symb_dtypeTB(typeGetDtOnly(dtype)).size
+		display_length = symbGetDatatypeInfo(typeGetDtOnly(dtype)).size
 	end if
 	dim as string type_name = symbTypeToStr(dtype, NULL, display_length, is_fixlenstr)
 	dim as string layout = type_name + TABCHAR + storage_kind + TABCHAR + _

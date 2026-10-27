@@ -1679,9 +1679,10 @@ sub symbAddProcInstanceParam _
 	select case symbGetClass( parent )
 	case FB_SYMBCLASS_STRUCT
 		dtype = FB_DATATYPE_STRUCT
-	case FB_SYMBCLASS_CLASS
-		'dtype = FB_DATATYPE_CLASS
-		exit select
+	case else
+		'' Instance parameters currently belong to supported UDT methods only.
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		exit sub
 	end select
 
 	if( symbIsConstant( proc ) ) then

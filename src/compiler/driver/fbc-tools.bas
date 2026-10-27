@@ -220,7 +220,7 @@ end function
 '' normal: Will check lib/ and query gcc if not found. Querying gcc may fail,
 ''         because of that an empty string may be returned.
 ''
-private function fbcFindFreeBsdSystemLib( byval file as zstring ptr ) as string
+private function fbcFindFreeBsdSystemLib( byval file as const zstring ptr ) as string
 	if( fbGetOption( FB_COMPOPT_TARGET ) <> FB_COMPTARGET_FREEBSD ) then
 		exit function
 	end if
@@ -246,7 +246,7 @@ private function fbcFindFreeBsdSystemLib( byval file as zstring ptr ) as string
 	end if
 end function
 
-function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
+function fbcBuildPathToLibFile( byval file as const zstring ptr ) as string
 	dim as string found
 
 	''
@@ -321,7 +321,7 @@ function fbcFindSysroot( ) as string
 end function
 
 '' Retrieve the path to a library file, or an empty string if it can't be found.
-function fbcFindLibFile( byval file as zstring ptr ) as string
+function fbcFindLibFile( byval file as const zstring ptr ) as string
 	dim as string found
 	found = fbcBuildPathToLibFile( file )
 	if( len( found ) > 0 ) then
@@ -481,7 +481,7 @@ end function
 
 function fbcRunBin _
 	( _
-		byval action as zstring ptr, _
+		byval action as const zstring ptr, _
 		byval tool as integer, _
 		byref ln as string _
 	) as integer

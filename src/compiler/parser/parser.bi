@@ -286,6 +286,7 @@ end enum
 declare sub parserAsmInit( )
 declare sub parserAsmEnd( )
 
+declare function parserIsInlineAsmKeyword( byval id as const zstring ptr ) as integer
 declare function parserInlineAsmAddKeyword( byval id as const zstring ptr ) as integer
 
 declare function parserGlobalAsmAddKeyword( byval id as const zstring ptr ) as integer

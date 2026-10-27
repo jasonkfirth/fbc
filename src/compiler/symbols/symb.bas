@@ -1617,37 +1617,23 @@ function symbFindByClass _
 	) as FBSYMBOL ptr
 
 	dim as FBSYMBOL ptr sym = any
-	dim as integer match = FALSE
 
-	'' lookup a symbol with the same class
+	'' Return on the matching path so a missing chain never leaves an
+	'' unassigned candidate for the access check.
 	do while( chain_ <> NULL )
 		sym = chain_->sym
 		do
 			if( sym->class = class_ ) then
-				match = TRUE
-				exit do, do
+				if( symbIsVar( sym ) ) then
+					if( symbVarCheckAccess( sym ) = FALSE ) then return NULL
+				end if
+				return sym
 			end if
-
 			sym = sym->hash.next
 		loop while( sym <> NULL )
-
 		chain_ = chain_->next
 	loop
-
-	if( match = FALSE ) then
-		return NULL
-	end if
-
-	'' check if symbol isn't a non-shared module level one
-	if( symbIsVar( sym ) ) then
-		if( symbVarCheckAccess( sym ) ) then
-			return sym
-		else
-			return NULL
-		end if
-	end if
-
-	function = sym
+	return NULL
 
 end function
 
@@ -2235,8 +2221,8 @@ function symbTypeToStr _
 		s += *symbGetName( subtype )
 
 	case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR, FB_DATATYPE_FIXSTR
-		s += *symb_dtypeTB(dtypeonly).name
-		if( is_fixlenstr or (length <> symb_dtypeTB(dtypeonly).size) ) then
+		s += *symbGetDatatypeInfo(dtypeonly).name
+		if( is_fixlenstr or (length <> symbGetDatatypeInfo(dtypeonly).size) ) then
 			select case( dtypeonly )
 			case FB_DATATYPE_WCHAR
 				'' Convert bytes back to chars
@@ -2280,7 +2266,7 @@ function symbTypeToStr _
 		s += "uinteger<128>"
 
 	case else
-		s += *symb_dtypeTB(dtypeonly).name
+		s += *symbGetDatatypeInfo(dtypeonly).name
 	end select
 
 	for i as integer = ptrcount-1 to 0 step -1
@@ -2905,7 +2891,7 @@ private function hGetNamespacePrefix( byval sym as FBSYMBOL ptr ) as string
 end function
 
 #if (__FB_DEBUG__ <> 0) orelse defined(__GAS64_DEBUG__)
-static shared as zstring ptr classnames(FB_SYMBCLASS_VAR to FB_SYMBCLASS_NSIMPORT) = _
+static shared as const zstring ptr classnames(FB_SYMBCLASS_VAR to FB_SYMBCLASS_NSIMPORT) = _
 { _
 	@"var"      , _
 	@"const"    , _
@@ -2966,7 +2952,7 @@ function typeDumpToStr _
 			dump += "fixstr"
 		case else
 			if( (dtypeonly >= 0) and (dtypeonly < FB_DATATYPES) ) then
-				dump += *symb_dtypeTB(dtypeonly).name
+				dump += *symbGetDatatypeInfo(dtypeonly).name
 			else
 				dump += "<invalid dtype " & dtypeonly & ">"
 			end if
@@ -3484,7 +3470,7 @@ sub symbDumpLookup( byval id as zstring ptr )
 end sub
 #endif '' __FB_DEBUG__
 
-dim shared as zstring ptr classnamesPretty(FB_SYMBCLASS_VAR to FB_SYMBCLASS_NSIMPORT) = _
+dim shared as const zstring ptr classnamesPretty(FB_SYMBCLASS_VAR to FB_SYMBCLASS_NSIMPORT) = _
 { _
 	@"variable", _
 	@"constant", _

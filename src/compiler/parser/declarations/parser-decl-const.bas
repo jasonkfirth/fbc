@@ -24,7 +24,12 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-type-shapes.bi"
 #include once "parser/parser.bi"
+
+declare function parserGetLastTypeAlias( ) as FBSYMBOL ptr
+declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, byval alias_symbol as FBSYMBOL ptr)
+
 #include once "ast/ast.bi"
 #include once "tooling/semantic-expressions.bi"
 
@@ -49,6 +54,7 @@ private sub hGetType( byref dtype as integer, byref subtype as FBSYMBOL ptr )
 	if( lexGetToken( ) = FB_TK_AS ) then
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
+		fbSemanticModelTypeShapeDeclaration()
 		if( cSymbolType( dtype, subtype ) = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 			dtype = FB_DATATYPE_INTEGER
@@ -78,7 +84,8 @@ private sub cConstAssign _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval attrib as FB_SYMBATTRIB, _
-		byval semantic_group as longint, byval semantic_owner as longint, byval semantic_ordinal as integer _
+		byval semantic_group as longint, byval semantic_owner as longint, byval semantic_ordinal as integer, _
+		byval semantic_type_alias as FBSYMBOL ptr _
 	)
 
 	static as zstring * FB_MAXNAMELEN+1 id
@@ -152,6 +159,7 @@ private sub cConstAssign _
 	if( dtype = FB_DATATYPE_INVALID ) then
 		'' (AS SymbolType)?
 		hGetType( dtype, subtype )
+		if( dtype <> FB_DATATYPE_INVALID ) then semantic_type_alias = parserGetLastTypeAlias( )
 	end if
 
 	'' Save the grammar choice before expression typing overwrites dtype.
@@ -193,6 +201,9 @@ private sub cConstAssign _
 		expr = astNewCONSTz( dtype, subtype )
 	end if
 
+	'' Keep the observation identity, not an AST pointer that conversion can free.
+	dim as longint semantic_initializer = expr->semantic_expression
+
 	'' check if it's an string
 	dim as integer exprdtype = astGetDataType( expr )
 	litsym = NULL
@@ -219,6 +230,7 @@ private sub cConstAssign _
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		else
 			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
+			fbSemanticModelTypeAliasDeclaration(symbol, semantic_type_alias)
 			fbSemanticModelMemberDeclarationSpelling(symbol, @id, semantic_site)
 			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, symbol, _
 				semantic_written_type, 2, semantic_site)
@@ -256,6 +268,15 @@ private sub cConstAssign _
 					expr = astNewCONSTi( 0 )
 					dtype = FB_DATATYPE_INTEGER
 					subtype = NULL
+				elseif( astIsCONST( expr ) = FALSE ) then
+					'' Some native conversions lower to a runtime call or CONV
+					'' node. Such a node has no compile-time FBVALUE payload.
+					'' Reading its union as a constant can silently invent a value.
+					errReportEx( FB_ERRMSG_EXPECTEDCONST, id )
+					astDelTree( expr )
+					expr = astNewCONSTi( 0 )
+					dtype = FB_DATATYPE_INTEGER
+					subtype = NULL
 				end if
 			end if
 		else
@@ -271,10 +292,18 @@ private sub cConstAssign _
 			errReportEx( symbGetIllegalRedefErr( redefinition ), id )
 		else
 			fbSemanticModelExportBinding(symbol, semantic_site, TRUE)
+			fbSemanticModelTypeAliasDeclaration(symbol, semantic_type_alias)
 			fbSemanticModelMemberDeclarationSpelling(symbol, @id, semantic_site)
 			fbSemanticModelDeclarationType(semantic_group, semantic_owner, semantic_ordinal, symbol, _
 				semantic_written_type, 2, semantic_site)
 		end if
+	end if
+
+	'' A constant's selected destination is just as important as a variable's.
+	'' Publish only after successful symbol creation, using the original RHS.
+	if( (symbol <> NULL) and (doskip = FALSE) ) then
+		fbSemanticModelAssignmentTarget(semantic_initializer, symbol, symbGetFullType(symbol), _
+			symbGetSubtype(symbol), "initializer")
 	end if
 
 	fbSemanticModelEndLiteralInitializer(semantic_literal_scope, symbol)
@@ -305,11 +334,13 @@ sub cConstDecl( byval attrib as FB_SYMBATTRIB )
 
 	'' (AS SymbolType)?
 	hGetType( dtype, subtype )
+	dim as FBSYMBOL ptr semantic_type_alias = NULL
+	if( dtype <> FB_DATATYPE_INVALID ) then semantic_type_alias = parserGetLastTypeAlias( )
 
 	do
 		'' ConstAssign
 		semantic_ordinal += 1
-		cConstAssign( dtype, subtype, attrib, semantic_group, semantic_owner, semantic_ordinal )
+		cConstAssign( dtype, subtype, attrib, semantic_group, semantic_owner, semantic_ordinal, semantic_type_alias )
 
 		'' ','?
 		if( lexGetToken( ) <> FB_TK_DECLSEPCHAR ) then

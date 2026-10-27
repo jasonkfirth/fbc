@@ -31,6 +31,7 @@
 #include once "ast/ast.bi"
 #include once "support/numeric/fp-policy.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-numeric-conversions.bi"
 
 '':::::
 private function hStrLiteralConcat _
@@ -697,7 +698,7 @@ private function hDoPointerArith _
 
 			'' convert to int or BOP will complain..
 			p = astNewCONV( FB_DATATYPE_INTEGER, NULL, p )
-			e = astNewCONV( FB_DATATYPE_INTEGER, NULL, e )
+			e = astNewCONV( FB_DATATYPE_INTEGER, NULL, e, AST_CONVOPT_SEMANTIC_TRANSPORT )
 
 			'' subtract..
 			e = astNewBOP( AST_OP_SUB, p, e )
@@ -709,9 +710,12 @@ private function hDoPointerArith _
 		exit function
 	end if
 
+	'' Address arithmetic uses a signed native carrier for modular offsets.
+	'' This representation conversion belongs to the pointer operation; it
+	'' does not produce a scalar numeric result for narrowing advice.
 	'' not integer? convert
 	if( edtype <> FB_DATATYPE_INTEGER ) then
-		e = astNewCONV( FB_DATATYPE_INTEGER, NULL, e )
+		e = astNewCONV( FB_DATATYPE_INTEGER, NULL, e, AST_CONVOPT_SEMANTIC_TRANSPORT )
 	end if
 
 	'' any op but +|-?
@@ -896,6 +900,10 @@ private sub hConvOperand _
 	)
 
 	dtype = typeJoin( dtype, newdtype )
+	'' A conversion must use the destination's C spelling. Retaining a CLONG
+	'' alias while promoting to INTEGER can leave 32bit C long storage behind
+	'' an expression that the optimizer correctly treats as 64bit on Win64.
+	dtype = typeSetMangleDt( dtype, typeGetMangleDt( newdtype ) )
 	dclass = typeGetClass( newdtype )
 	n = astNewCONV( dtype, NULL, n )
 
@@ -1324,6 +1332,14 @@ private function hCoerceBopOperandTypes _
 		byref subtype as FBSYMBOL ptr _
 	) as integer
 
+	'' ANDALSO/ORELSE already observed each source truth operand. Their
+	'' common numeric type is only a carrier for zero comparisons; integral
+	'' precision changes there do not change whether the operand is nonzero.
+	dim as AST_CONVOPT conversion_options = 0
+	if( (op = AST_OP_ANDALSO) or (op = AST_OP_ORELSE) ) then
+		conversion_options = AST_CONVOPT_SEMANTIC_TRANSPORT
+	end if
+
 	if( (ldtype <> rdtype) or (l->subtype <> r->subtype) ) then
 		'' Pointer arithmetic (but not handled above by hDoPointerArith())?
 		'' (assuming hCheckPtr() checks were already done)
@@ -1345,7 +1361,7 @@ private function hCoerceBopOperandTypes _
 
 			if( (typeGetDtAndPtrOnly( dtype ) <> typeGetDtAndPtrOnly( ldtype )) or _
 			    (subtype <> l->subtype) ) then
-				l = astNewCONV( dtype, subtype, l )
+				l = astNewCONV( dtype, subtype, l, conversion_options )
 				if( l = NULL ) then return FALSE
 				ldtype = dtype
 				ldclass = typeGetClass( dtype )
@@ -1358,7 +1374,7 @@ private function hCoerceBopOperandTypes _
 				case AST_OP_SHL, AST_OP_SHR
 					exit select
 				case else
-					r = astNewCONV( dtype, subtype, r )
+					r = astNewCONV( dtype, subtype, r, conversion_options )
 					if( r = NULL ) then return FALSE
 
 					rdtype = dtype
@@ -1866,6 +1882,18 @@ private function hNewBOP _
 	''   any enum operand is already converted to integer above anyways,
 	''   so enums never arrive here.
 	''
+
+	'' Logical operands normalize truth independently. Observe them before
+	'' numeric carrier promotion, which can turn an integer operand into a
+	'' floating value even though its source truth test loses no information.
+	if( (op = AST_OP_ANDALSO) or (op = AST_OP_ORELSE) ) then
+		if( ldclass = FB_DATACLASS_FPOINT ) then
+			fbSemanticModelNumericConversion(l, FB_DATATYPE_BOOLEAN, NULL, 0)
+		end if
+		if( rdclass = FB_DATACLASS_FPOINT ) then
+			fbSemanticModelNumericConversion(r, FB_DATATYPE_BOOLEAN, NULL, 0)
+		end if
+	end if
 
 	ldtype0 = ldtype
 	rdtype0 = rdtype

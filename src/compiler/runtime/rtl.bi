@@ -462,6 +462,14 @@
 #define FB_RTL_ERRORTHROW               "fb_ErrorThrowAt"
 #define FB_RTL_ERRORTHROWEX             "fb_ErrorThrowEx"
 #define FB_RTL_ERRORSETHANDLER          "fb_ErrorSetHandler"
+#define FB_RTL_ERRORFRAMEENTER          "fb_ErrorFrameEnter"
+#define FB_RTL_ERRORFRAMEBUFFER         "fb_ErrorFrameBuffer"
+#define FB_RTL_ERRORFRAMEREADY          "fb_ErrorFrameReady"
+#define FB_RTL_ERRORFRAMESETHANDLER     "fb_ErrorFrameSetHandler"
+#define FB_RTL_ERRORFRAMERESTORE        "fb_ErrorFrameRestore"
+#define FB_RTL_ERRORFRAMESETTARGET      "fb_ErrorFrameSetTarget"
+#define FB_RTL_ERRORFRAMEGETTARGET      "fb_ErrorFrameGetTarget"
+#define FB_RTL_ERRORFRAMELEAVE          "fb_ErrorFrameLeave"
 #define FB_RTL_ERRORGETNUM              "fb_ErrorGetNum"
 #define FB_RTL_ERRORSETNUM              "fb_ErrorSetNum"
 #define FB_RTL_ERRORRESUME              "fb_ErrorResume"
@@ -1147,6 +1155,15 @@ enum FB_RTL_IDX
 	'' Native LLVM memory layout for 32-bit floating conversions.
 	FB_RTL_IDX_INT128FROMDOUBLENATIVE
 	FB_RTL_IDX_INT128TODOUBLENATIVE
+	'' Append entries so existing intrinsic indices keep their identities.
+	FB_RTL_IDX_ERRORFRAMEENTER
+	FB_RTL_IDX_ERRORFRAMEBUFFER
+	FB_RTL_IDX_ERRORFRAMEREADY
+	FB_RTL_IDX_ERRORFRAMESETHANDLER
+	FB_RTL_IDX_ERRORFRAMERESTORE
+	FB_RTL_IDX_ERRORFRAMESETTARGET
+	FB_RTL_IDX_ERRORFRAMEGETTARGET
+	FB_RTL_IDX_ERRORFRAMELEAVE
 	FB_RTL_INDEXES
 end enum
 
@@ -1170,6 +1187,7 @@ enum FB_RTL_OPT
 	FB_RTL_OPT_32BIT          = &h00008000  '' 32bit only
 	FB_RTL_OPT_64BIT          = &h00010000  '' 64bit only
 	FB_RTL_OPT_UTF8ARGS       = &h00020000  '' text arguments use a UTF-8 descriptor bridge
+	FB_RTL_OPT_CDECLCALLBACK  = &h00040000  '' nested function-pointer signatures use CDECL
 end enum
 
 '' Intrinsic registration metadata

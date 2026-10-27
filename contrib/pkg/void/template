@@ -1,7 +1,7 @@
 # Template file for 'freebasic'
 pkgname=freebasic
 version=1.20.5
-revision=1
+revision=2
 build_style=gnu-makefile
 short_desc="FreeBASIC compiler"
 maintainer="FreeBASIC packagers <packagers@example.invalid>"

@@ -221,6 +221,15 @@ private function hCurrentCompound( ) as longint
 	return semantic_compounds[semantic_compound_depth - 1].identity
 end function
 
+'' Source directives can be read while TYPE/ENUM owns the parser even when
+'' symb.namespc still names the surrounding module. Return the observer's
+'' native construct identity without changing or traversing the parser stack.
+function fbSemanticModelCurrentCompound( ) as longint
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return 0
+	return hCurrentCompound( )
+end function
+
+
 private function hLocation( byref source as LEX_LOCATION ) as string
 	dim as integer physical = fbSemanticModelLocationIsPhysical(source)
 	'' Recovery can finish without consuming a token. Keep that observed point

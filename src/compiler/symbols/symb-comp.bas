@@ -423,7 +423,15 @@ private sub hAssignDynamicArray _
 	'' src   = rhs.arraydesc.ptr
 	'' limit = src + rhs.arraydesc.size
 	astAdd( astBuildVarAssign( dst, astBuildDerefAddrOf( astBuildVarField( this_, fld ), symb.fbarray_ptr, dtype, fld->subtype ), AST_OPOPT_ISINI ) )
+
+	'' Keep REDIMTO's allocation error, but do not access missing storage
+	'' when runtime error checking is disabled or execution has resumed.
+	astAdd( astBuildBranch( astNewBOP( AST_OP_EQ, astNewVAR( dst ), _
+		astNewCONSTi( 0, dtype, fld->subtype ) ), exitlabel, TRUE ) )
+
 	astAdd( astBuildVarAssign( src, astBuildDerefAddrOf( astBuildVarField( rhs  , fld ), symb.fbarray_ptr, dtype, fld->subtype ), AST_OPOPT_ISINI ) )
+	astAdd( astBuildBranch( astNewBOP( AST_OP_EQ, astNewVAR( src ), _
+		astNewCONSTi( 0, dtype, fld->subtype ) ), exitlabel, TRUE ) )
 	astAdd( astBuildVarAssign( _
 		limit, _
 		astNewBOP( AST_OP_ADD, _
@@ -462,13 +470,27 @@ private sub hAssignList _
 	) static
 
 	dim as FBSYMBOL ptr cnt, label, dst, src, subtype
+	dim as integer srcdtype, const_source
 
 	subtype = symbGetSubtype( fld )
 
 	cnt = symbAddTempVar( FB_DATATYPE_INTEGER )
 	label = symbAddLabel( NULL )
-	dst = symbAddTempVar( typeAddrOf( symbGetType( fld ) ), subtype )
-	src = symbAddTempVar( typeAddrOf( symbGetType( fld ) ), subtype )
+	dst = symbAddTempVar( typeAddrOf( typeUnsetIsConst( symbGetFullType( fld ) ) ), subtype )
+	'' Ordinary copies read the source elements. A mutable LET overload
+	'' needs the existing mutable view so overload selection stays unchanged.
+	srcdtype = symbGetFullType( fld )
+	const_source = typeIsConst( symbGetFullType( rhs ) )
+	if( typeGetDtAndPtrOnly( srcdtype ) = FB_DATATYPE_STRUCT ) then
+		if( subtype->udt.ext <> NULL ) then
+			if( subtype->udt.ext->copyletop <> NULL ) then
+				const_source = FALSE
+				srcdtype = typeUnsetIsConst( srcdtype )
+			end if
+		end if
+	end if
+	if( const_source ) then srcdtype = typeSetIsConst( srcdtype )
+	src = symbAddTempVar( typeAddrOf( srcdtype ), subtype )
 
 	'' dst = @this.arrayfield(0)
 	astAdd( astBuildVarAssign( dst, astNewADDROF( astBuildVarField( this_, fld ) ), AST_OPOPT_ISINI ) )

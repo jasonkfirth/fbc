@@ -145,10 +145,24 @@ function astNewASM( byval asmtokhead as ASTASMTOK ptr ) as ASTNODE ptr
 	function = n
 end function
 
+private function hAsmHasBasicLabel( byval token as ASTASMTOK ptr ) as integer
+	while( token )
+		if( token->type = AST_ASMTOK_SYMB andalso token->sym <> NULL ) then
+			if( token->sym->class = FB_SYMBCLASS_LABEL ) then return TRUE
+		end if
+		token = token->next
+	wend
+	return FALSE
+end function
+
 function astLoadASM( byval n as ASTNODE ptr ) as IRVREG ptr
-	if( ast.doemit andalso (env.clopt.backend = FB_BACKEND_LLVM) andalso _
-	    (n->asm.tokhead <> NULL) ) then
-		'' LLVM allocates constraint operands around an entire asm call.
+	dim as integer c_asm = ((env.clopt.backend = FB_BACKEND_GCC) orelse _
+		(env.clopt.backend = FB_BACKEND_CLANG)) andalso _
+		(env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL)
+	dim as integer join_asm = (env.clopt.backend = FB_BACKEND_LLVM) orelse c_asm
+	if( c_asm andalso hAsmHasBasicLabel(n->asm.tokhead) ) then join_asm = FALSE
+	if( ast.doemit andalso n->asm.tokhead <> NULL andalso join_asm ) then
+		'' C and LLVM allocate constraint operands around an entire asm call.
 		'' Keep consecutive instructions together so preparing a later line's
 		'' operands cannot overwrite the user's registers or unbalance a push.
 		'' Transfer token ownership; later AST nodes still get deleted normally.
@@ -160,6 +174,10 @@ function astLoadASM( byval n as ASTNODE ptr ) as IRVREG ptr
 		while( following <> NULL )
 			select case( following->class )
 			case AST_NODECLASS_ASM
+				'' Keep a branch to BASIC in its existing asm-goto statement.
+				'' Combining earlier writes into its input-only constraint list
+				'' would hide those writes from older C compiler interfaces.
+				if( c_asm andalso hAsmHasBasicLabel(following->asm.tokhead) ) then exit while
 				if( following->asm.tokhead <> NULL ) then
 					tail = astAsmAppendText( tail, NEWLINE )
 					tail->next = following->asm.tokhead

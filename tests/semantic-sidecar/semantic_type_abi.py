@@ -14,6 +14,7 @@ from sidecar import Model
 
 
 def check_requests(test) -> None:
+    test.fixture("requested-source-facts.bi")
     source = test.fixture("requested-source-facts.bas")
     code = test.emission_path(source.stem, "gcc")
     expected_code = None
@@ -23,7 +24,21 @@ def check_requests(test) -> None:
          ("native-list", "source-signature")),
         ("keywords", ("consumed-lexical-keywords",), ("consumed-keyword",)),
         ("macro-access", ("macro-source-access-roles",), ("macro-source-access",)),
+        ("includes", ("counted-include-requests", "include-request-scopes"),
+         ("include-request-count:", "include-request-scope:")),
+        ("builtins", ("counted-builtin-function-uses",), ("builtin-function-use:",)),
+        ("literal-groups", ("string-literal-adjacency-inputs",),
+         ("string-literal-adjacency-input",)),
+        ("preprocessor", ("counted-preprocessor-events",),
+         ("preprocessor-event-counts:",)),
+        ("initializers", ("array-initializer-input-closure",),
+         ("original-array-initializer-count",)),
+        ("type-shapes", ("written-type-shapes", "written-type-root-origins"),
+         ("type-shape-", "accepted-type-shape-")),
+        ("native-bytes", ("native-byte-conversion-inputs",), ("native-byte-",)),
     ]
+
+    group_bits = {name: 1 << bit for bit, (name, _, _) in enumerate(groups)}
 
     def request(options: tuple[str, ...], wanted: int, mode: str = "full") -> None:
         nonlocal expected_code
@@ -40,6 +55,16 @@ def check_requests(test) -> None:
                                 for feature in features), (options, mode, features))
             count = sum(row[3].startswith(prefixes) for row in rows)
             test.assertEqual(count > 0, enabled, (options, mode, prefixes, count))
+        initializer_enabled = bool(wanted & group_bits["initializers"]) and mode == "full"
+        counts = [int(row[4]) for row in rows if row[3] == "original-array-initializer-count"]
+        edges = [row for row in model.records.get("H", []) if row[5] == "array-initializer-target"]
+        test.assertEqual(counts, [1] if initializer_enabled else [])
+        test.assertEqual(len(edges), 1 if initializer_enabled else 0)
+        byte_enabled = bool(wanted & group_bits["native-bytes"]) and mode == "full"
+        byte_counts = [int(row[4]) for row in rows if row[3] == "native-byte-count:1"]
+        byte_edges = [row for row in model.records.get("H", []) if row[5] == "native-byte-input"]
+        test.assertEqual(byte_counts, [1] if byte_enabled else [])
+        test.assertEqual(len(byte_edges), 1 if byte_enabled else 0)
         emitted = hashlib.sha256(code.read_bytes()).hexdigest()
         if expected_code is None:
             expected_code = emitted
@@ -47,10 +72,25 @@ def check_requests(test) -> None:
         path.unlink()
 
     request((), 0)
-    for wanted in range(1, 16):
+    all_groups = (1 << len(groups)) - 1
+    # Keep complete subset coverage for the original small request surface.
+    # Larger surfaces use every singleton, every pair, each all-but-one set
+    # and all groups together. This covers activation and interference without
+    # doubling compiler launches whenever another independent group is added.
+    if len(groups) <= 8:
+        masks = range(1, all_groups + 1)
+    else:
+        masks = {all_groups}
+        for first in range(len(groups)):
+            masks.add(1 << first)
+            masks.add(all_groups ^ (1 << first))
+            for second in range(first + 1, len(groups)):
+                masks.add((1 << first) | (1 << second))
+        masks = sorted(masks)
+    for wanted in masks:
         names = ",".join(name for bit, (name, _, _) in enumerate(groups) if wanted & (1 << bit))
         request(("-semantic-extra-facts", names), wanted)
-    request(("-semantic-extra-facts", "all"), 15)
+    request(("-semantic-extra-facts", "all"), all_groups)
     request(("-semantic-extra-facts", "all", "-semantic-extra-facts", "none"), 0)
     request(("-semantic-extra-facts", "hints", "-semantic-extra-facts", "keywords"), 5)
     request(("-semantic-extra-facts", " HINTS , Keywords "), 5)

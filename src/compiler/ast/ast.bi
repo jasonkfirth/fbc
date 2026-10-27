@@ -549,6 +549,7 @@ declare function astIsConstant( byval expr as ASTNODE ptr ) as integer
 
 declare sub astProcBegin( byval proc as FBSYMBOL ptr, byval ismain as integer )
 declare function astProcEnd( byval callrtexit as integer ) as integer
+declare function astProcMayReturn( byval proc as ASTNODE ptr ) as integer
 
 declare sub astProcVectorize _
 	( _
@@ -647,6 +648,7 @@ enum AST_CONVOPT
 	AST_CONVOPT_DONTWARNFUNCPTR = &h20
 	AST_CONVOPT_EXACT_CAST      = &h40
 	AST_CONVOPT_NOCONVTOBASE    = &h80
+	AST_CONVOPT_SEMANTIC_TRANSPORT = &h100  '' Internal carrier conversion, not source numeric intent
 end enum
 
 declare function astTryOvlStringCONV( byref expr as ASTNODE ptr ) as integer

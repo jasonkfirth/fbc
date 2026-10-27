@@ -127,6 +127,11 @@ FB_ERRHANDLER fb_ErrorThrowMsg
 	FB_ERRORCTX *ctx = FB_TLSGETCTX( ERROR );
 
 	if( ctx->handler ) {
+		FB_ERRHANDLER target;
+		int fatal_error;
+		int dispatched;
+
+		fb_ErrorFrameSaveState( ctx );
 		ctx->err_num = err_num;
 		ctx->line_num = line_num;
 		if( mod_name != NULL ) {
@@ -134,6 +139,11 @@ FB_ERRHANDLER fb_ErrorThrowMsg
 		}
 		ctx->res_lbl = res_label;
 		ctx->resnxt_lbl = resnext_label;
+		dispatched = fb_ErrorFrameDispatch( ctx, &target, &fatal_error );
+		if( dispatched > 0 )
+			return target;
+		if( dispatched < 0 )
+			fb_Die( fatal_error, line_num, ctx->mod_name, ctx->fun_name, msg );
 
 		return ctx->handler;
 	}
@@ -199,6 +209,7 @@ void *fb_ErrorResume( void )
 	ctx->res_lbl = NULL;
 	ctx->resnxt_lbl = NULL;
 	ctx->err_num = FB_RTERROR_OK;
+	fb_ErrorFrameRestoreState( ctx );
 
 	return label;
 }
@@ -217,6 +228,7 @@ void *fb_ErrorResumeNext( void )
 	ctx->res_lbl = NULL;
 	ctx->resnxt_lbl = NULL;
 	ctx->err_num = FB_RTERROR_OK;
+	fb_ErrorFrameRestoreState( ctx );
 
 	return label;
 }

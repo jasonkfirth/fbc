@@ -46,7 +46,7 @@ declare function fbcGetEntry() as string
 
 type SYMBDEF
 	name            as const zstring ptr
-	value           as zstring ptr
+	value           as const zstring ptr
 	flags           as integer  '' FB_DEFINE_FLAGS_*
 	proc            as FBS_DEFINE_PROCZ
 end type
@@ -180,7 +180,7 @@ private function hDefVerbose_cb() as string
 end function
 
 private function hDefArch_cb() as string
-	dim as zstring ptr arch = fbGetFbcArch()
+	dim as const zstring ptr arch = fbGetFbcArch()
 	if( arch = NULL ) then
 		function = ""
 	else
@@ -1834,7 +1834,7 @@ end sub
 function symbAddDefine _
 	( _
 		byval symbol as const zstring ptr, _
-		byval text as zstring ptr, _
+		byval text as const zstring ptr, _
 		byval lgt as integer, _
 		byval isargless as integer, _
 		byval proc as FBS_DEFINE_PROCZ, _

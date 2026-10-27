@@ -15,6 +15,9 @@
 #include once "tooling/semantic-macros.bi"
 #include once "tooling/semantic-preprocessor.bi"
 #include once "symbols/symb.bi"
+#include once "tooling/semantic-extra-facts.bi"
+#include once "tooling/semantic-numeric-conversions.bi"
+#include once "tooling/semantic-array-initializer-closure-export.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportCurrentExpressionPrefixNonPhysical(byval expr as ASTNODE ptr)
@@ -315,6 +318,7 @@ type SEMANTIC_EXPRESSION_OPERANDS
 	left as longint
 	right as longint
 	result as longint
+	group_input_operands as longint
 	kind as zstring * 24
 	code as zstring * 64
 	source as LEX_LOCATION
@@ -390,7 +394,65 @@ dim shared as longint expression_transfer_work_left
 dim shared as ubyte ptr string_initializer_copies
 dim shared as integer string_initializer_copy_capacity
 
+'' Module-local count is reset with every full/off/bindings compilation unit.
+'' This compiler is single-threaded; no parser AST or source buffer is retained.
+private dim shared as longint semantic_string_index_count
+
+function fbSemanticModelStringIndexCount( ) as longint
+	return semantic_string_index_count
+end function
+
+'' Native byte receipts own IDs, not parser AST pointers. They describe
+'' the selected grammar operation even if CV folds to an integer constant.
+private dim shared as longint semantic_native_byte_count
+
+function fbSemanticModelNativeByteCount( ) as longint
+	return semantic_native_byte_count
+end function
+
+sub fbSemanticModelNativeByteInput _
+	( byval result as ASTNODE ptr, byval operand_id as longint, _
+	  byval token_id as integer, byval byte_width as integer, _
+	  byref kind as const string, byref source_start as LEX_LOCATION, _
+	  byval nonphysical_start as longint )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_NATIVE_BYTES) = FALSE ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	dim as LEX_LOCATION source_end = lexGetLastLocation( )
+	fbSemanticModelExportExpressionDistinct(result, source_start, source_end, _
+		nonphysical_start, lexGetNonphysicalTokenCount( ))
+	dim as longint identity = result->semantic_expression
+	if( (operand_id <= 0) or (identity <= operand_id) or _
+		((byte_width <> 2) and (byte_width <> 4) and (byte_width <> 8)) ) then
+		fbSemanticModelFailAt("native byte conversion inputs")
+		exit sub
+	end if
+	'' Preserve the chosen keyword independently of a generated operand range.
+	fbSemanticModelExportCoordinates("expression", identity, "operator", source_start, source_start)
+	fbSemanticModelMacroOrigin("expression", identity, source_start.macro_identity, "operator")
+	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "native-byte-kind" + TABCHAR + kind)
+	fbSemanticModelAppendDetail(prefix + "native-byte-width" + TABCHAR + fbSemanticModelNumber(byte_width))
+	fbSemanticModelAppendDetail(prefix + "native-byte-token" + TABCHAR + fbSemanticModelNumber(token_id))
+	fbSemanticModelAppendDetail(prefix + "native-byte-operand" + TABCHAR + fbSemanticModelNumber(operand_id))
+	'' CVI may wrap fb_CVL/fb_CVLONGINT in a native INTEGER conversion.
+	'' Preserve the selected procedure before that wrapper is lowered away.
+	dim as ASTNODE ptr selected_call = result
+	if( selected_call->class = AST_NODECLASS_CONV ) then selected_call = selected_call->l
+	dim as longint callee_id
+	if( selected_call <> NULL ) then
+		if( selected_call->class = AST_NODECLASS_CALL ) then callee_id = fbSemanticModelSymbolId(selected_call->sym)
+	end if
+	fbSemanticModelAppendDetail(prefix + "native-byte-callee" + TABCHAR + fbSemanticModelNumber(callee_id))
+	fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(operand_id) + _
+		TABCHAR + "native-byte-input" + TABCHAR + fbSemanticModelNumber(token_id))
+	semantic_native_byte_count += 1
+end sub
+
 sub fbSemanticModelResetExpressions( )
+	semantic_native_byte_count = 0
+	semantic_string_index_count = 0
 	expression_transfer_work_left = SEMANTIC_EXPRESSION_TRANSFER_WORK
 
 	deallocate(literal_links)
@@ -619,6 +681,17 @@ private function hPrimitiveNumeric(byval dtype as integer, byval subtype as FBSY
 	return FALSE
 end function
 
+private function hSelectedNumericSource(byval dtype as integer, byval subtype as FBSYMBOL ptr) as integer
+	'' An enum is a source domain, not a selected arithmetic representation.
+	'' Permit its original typed input here; the selected-operand observer still
+	'' requires primitive converted types after the builder chooses coercions.
+	if( (typeGetPtrCnt(dtype) = 0) and (typeGetDtOnly(dtype) = FB_DATATYPE_ENUM) ) then
+		if( subtype <> NULL ) then return (subtype->class = FB_SYMBCLASS_ENUM)
+		return FALSE
+	end if
+	return hPrimitiveNumeric(dtype, subtype)
+end function
+
 function fbSemanticModelCaptureOperands _
 	( byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, byref kind as const string, _
 	  byval op as integer, byref source as LEX_LOCATION ) as longint
@@ -674,6 +747,13 @@ function fbSemanticModelCaptureOperands _
 		.left = left_id
 		.right = right_id
 		.result = 0
+		'' Parentheses reuse the exact AST allocation, but replace its current
+		'' parser receipt. Retain that allocation's earlier operation separately;
+		'' arbitrary provenance links cannot establish value equivalence.
+		.group_input_operands = 0
+		if( (kind = "group") andalso (left_expr <> NULL) ) then
+			.group_input_operands = left_expr->semantic_operands
+		end if
 		.kind = kind
 		.code = code
 		.source = source
@@ -713,8 +793,8 @@ function fbSemanticModelCaptureOperands _
 			end if
 		end if
 		if( (left_expr <> NULL) and (right_expr <> NULL) and (.left > 0) and (.right > 0) ) then
-			.numeric_inputs = hPrimitiveNumeric(astGetFullType(left_expr), astGetSubType(left_expr)) and _
-				hPrimitiveNumeric(astGetFullType(right_expr), astGetSubType(right_expr))
+			.numeric_inputs = hSelectedNumericSource(astGetFullType(left_expr), astGetSubType(left_expr)) and _
+				hSelectedNumericSource(astGetFullType(right_expr), astGetSubType(right_expr))
 		end if
 	end with
 	expression_operand_count += 1
@@ -967,6 +1047,22 @@ end function
 const SEMANTIC_ASSIGNMENT_TREE_DEPTH = 64
 const SEMANTIC_ASSIGNMENT_TREE_NODES = 65536
 
+'' Only parentheses preserve this allocation and operation without conversion.
+'' Receipts are allocated before enclosing groups, so strictly older links
+'' bound the walk and cannot cycle. Other rewrites keep an opaque CALL leaf.
+private function hAssignmentValueOperands(byval node as ASTNODE ptr) as longint
+	dim as longint identity = node->semantic_operands
+	for depth as integer = 0 to SEMANTIC_ASSIGNMENT_TREE_DEPTH
+		if( (identity < 1) or (identity > expression_operand_count) ) then return 0
+		with expression_operands[identity - 1]
+			if( .kind <> "group" ) then return identity
+			if( (.group_input_operands < 1) or (.group_input_operands >= identity) ) then return 0
+			identity = .group_input_operands
+		end with
+	next
+	return 0
+end function
+
 private function hAssignmentTree _
 	( byval node as ASTNODE ptr, byref count as integer, byref records as string, byval depth as integer = 0 ) as integer
 	if( node = NULL ) then return 0
@@ -1017,9 +1113,9 @@ private function hAssignmentTree _
 		'' Numeric exponentiation can lower directly to a runtime call. Its
 		'' parser operand receipt identifies that selected built-in operation;
 		'' an arbitrary call, even with the same name, has no such contract.
-		if( node->call.isrtl and (node->call.args = 2) and _
-		    (node->semantic_operands > 0) and (node->semantic_operands <= expression_operand_count) ) then
-			with expression_operands[node->semantic_operands - 1]
+		dim as longint value_operands = hAssignmentValueOperands(node)
+		if( node->call.isrtl and (node->call.args = 2) and (value_operands > 0) ) then
+			with expression_operands[value_operands - 1]
 				if( (.kind = "binary") and (.code = "power") and .selected_numeric ) then
 					dim as ASTNODE ptr first_arg = node->r, second_arg
 					if( first_arg <> NULL ) then second_arg = first_arg->r
@@ -1245,6 +1341,12 @@ sub fbSemanticModelArrayInitializer _
 	'' Dimensions use the same one-based convention as array subscript inputs.
 	fbSemanticModelAppendDetail(prefix + "array-initializer-dimension" + TABCHAR + fbSemanticModelNumber(dimension + 1))
 	fbSemanticModelAppendDetail(prefix + "array-initializer-kind" + TABCHAR + input_kind)
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_INITIALIZERS) ) then
+		semantic_array_initializer_input_count += 1
+		fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(expression_id) + _
+			TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(target_id) + TABCHAR + _
+			"array-initializer-target" + TABCHAR + fbSemanticModelNumber(dimension + 1))
+	end if
 end sub
 
 '' Optional-argument lowering clones or converts its AST before later export.
@@ -1529,6 +1631,27 @@ function fbSemanticModelPointerIndexPrefix _
 	end if
 	return expr->semantic_expression
 end function
+
+'' String storage has its own contract, independent of pointer-index facts.
+'' Each original operand and index has a stable earlier E identity and the
+'' result owns the group, including unevaluated LEN/SIZEOF access contexts.
+sub fbSemanticModelStringIndex _
+	( byval result as ASTNODE ptr, byval operand_id as longint, byval index_id as longint )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	dim as longint identity = result->semantic_expression
+	if( (identity <= 0) or (operand_id <= 0) or (index_id <= 0) ) then
+		fbSemanticModelFailAt("string subscript original inputs")
+		exit sub
+	end if
+	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	fbSemanticModelAppendDetail(prefix + "string-index-operand" + TABCHAR + fbSemanticModelNumber(operand_id))
+	fbSemanticModelAppendDetail(prefix + "string-index-index" + TABCHAR + fbSemanticModelNumber(index_id))
+	fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(operand_id) + _
+		TABCHAR + "string-index-input" + TABCHAR + fbSemanticModelNumber(index_id))
+	semantic_string_index_count += 1
+end sub
 
 sub fbSemanticModelPointerIndex _
 	( byval result as ASTNODE ptr, byval operand_id as longint, byval index_id as longint )
@@ -1946,6 +2069,92 @@ sub fbSemanticModelIifInputs _
 		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + "parsed-iif" + TABCHAR + "0")
 	fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
 		TABCHAR + "original-iif-inputs" + TABCHAR + fbSemanticModelEscape(payload))
+end sub
+
+'' -------------------------------------------------------------------------
+'' Shared source numeric conversion inputs
+'' -------------------------------------------------------------------------
+
+
+'' The compiler exports modules synchronously. This counter belongs to one
+'' module, is reset even for disabled capture, and never owns AST storage.
+private dim shared as longint semantic_numeric_conversion_count
+
+sub fbSemanticModelNumericConversion _
+	( byval expr as ASTNODE ptr, byval target_dtype as integer, _
+	byval target_subtype as FBSYMBOL ptr, byval options as AST_CONVOPT )
+	if( (fbSemanticModelFullEnabled( ) = FALSE) or (expr = NULL) ) then exit sub
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_NUMERIC_CONVERSIONS) = FALSE ) then exit sub
+	if( lex.ctx->semantic_probe ) then exit sub
+	if( (options and AST_CONVOPT_SEMANTIC_TRANSPORT) <> 0 ) then exit sub
+	if( (expr->semantic_expression <= 0) or (fbSemanticModelCurrentStatement( ) <= 0) ) then exit sub
+	if( hPrimitiveNumeric(astGetFullType(expr), expr->subtype) = FALSE ) then exit sub
+	if( hPrimitiveNumeric(target_dtype, target_subtype) = FALSE ) then exit sub
+
+	'' Parser identities survive some implicit casts. Snapshot the actual
+	'' AST input now, rather than treating its old source type/value as the
+	'' current value. The original identity owns the eventual diagnostic site.
+	'' These are metadata observations, never another executable AST root.
+	dim as longint original = expr->semantic_expression
+	dim as longint saved_links = expr->semantic_expressions
+	dim as longint saved_operands = expr->semantic_operands
+	dim as longint saved_source = expr->semantic_source
+	dim as longint saved_binding = expr->semantic_binding
+	dim as LEX_LOCATION anchor = fbSemanticModelStatementSite( )
+	anchor.is_physical = FALSE
+	expr->semantic_operands = 0
+	expr->semantic_binding = 0
+	fbSemanticModelExportSelectedExpression(expr, anchor)
+	dim as longint selected = expr->semantic_expression
+	expr->semantic_expression = original
+	expr->semantic_expressions = saved_links
+	expr->semantic_operands = saved_operands
+	expr->semantic_source = saved_source
+	expr->semantic_binding = saved_binding
+	if( selected <= original ) then
+		fbSemanticModelFailAt("numeric conversion snapshot identity")
+		exit sub
+	end if
+
+	semantic_numeric_conversion_count += 1
+
+	'' A separate occurrence edge makes a removed input property observable.
+	'' The payload is original expression, selected target dtype, explicit bit.
+	dim as string payload = fbSemanticModelNumber(original) + TABCHAR + _
+		fbSemanticModelTypeNumber(culng(target_dtype)) + TABCHAR + _
+		fbSemanticModelNumber(abs((options and AST_CONVOPT_EXACT_CAST) <> 0))
+	fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(selected) + _
+		TABCHAR + "numeric-conversion-input" + TABCHAR + fbSemanticModelEscape(payload))
+	fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(original) + _
+		TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(selected) + _
+		TABCHAR + "parsed-numeric-conversion" + TABCHAR + "0")
+end sub
+
+sub fbSemanticModelResetNumericConversions( )
+	semantic_numeric_conversion_count = 0
+end sub
+
+sub fbSemanticModelFinishNumericConversions( )
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_NUMERIC_CONVERSIONS) = FALSE ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+		"numeric-conversion-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + _
+		fbSemanticModelNumber(semantic_numeric_conversion_count))
+end sub
+
+sub fbSemanticModelNumericConversionSource _
+	( byval expr as ASTNODE ptr, byval target_dtype as integer, _
+	  byval target_subtype as FBSYMBOL ptr, byval options as AST_CONVOPT, _
+	  byval original_expression as longint )
+	if( (expr = NULL) or (original_expression <= 0) ) then exit sub
+	'' A generated scalar cast can borrow its written operand's provenance.
+	'' The actual snapshot still supplies type/value. Restore the call's own
+	'' identity before any later AST export observes executable associations.
+	dim as longint saved_expression = expr->semantic_expression
+	expr->semantic_expression = original_expression
+	fbSemanticModelNumericConversion(expr, target_dtype, target_subtype, options)
+	expr->semantic_expression = saved_expression
 end sub
 
 '' end of tooling/semantic-expressions.bas

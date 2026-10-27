@@ -87,6 +87,21 @@ declare function closestType _
 		byval dtype2 as FB_DATATYPE _
 	) as FB_DATATYPE
 
+'' Borrow the current row; target initialization may still update the table.
+function symbGetDatatypeInfo( byval dtype as integer ) byref as const SYMB_DATATYPE
+
+	if( (dtype < FB_DATATYPE_VOID) or (dtype >= FB_DATATYPES) ) then
+		'' symbInit() precedes errInit(), which resets the error count. A
+		'' fallback row could therefore turn this invariant failure into success.
+		'' Force the diagnostic and stop without returning an invalid reference.
+		errPreInit( )
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__, -1 )
+		end 1
+	end if
+
+	return symb_dtypeTB(dtype)
+end function
+
 sub symbDataInit( )
 	'' FBSTRING contains a data pointer, a length, and an allocation size.
 	const STRING_DESCRIPTOR_POINTER_FIELDS = 3
@@ -137,12 +152,12 @@ sub symbDataInit( )
 	'' Remap wchar to target-specific type
 	'' (all fields except the name, so symbTypeToStr() returns WSTRING
 	'' instead of USHORT/ULONG...)
-	symb_dtypeTB(FB_DATATYPE_WCHAR).class     = symb_dtypeTB(env.target.wchar).class
-	symb_dtypeTB(FB_DATATYPE_WCHAR).size      = symb_dtypeTB(env.target.wchar).size
-	symb_dtypeTB(FB_DATATYPE_WCHAR).signed    = symb_dtypeTB(env.target.wchar).signed
-	symb_dtypeTB(FB_DATATYPE_WCHAR).intrank   = symb_dtypeTB(env.target.wchar).intrank
-	symb_dtypeTB(FB_DATATYPE_WCHAR).remaptype = symb_dtypeTB(env.target.wchar).remaptype
-	symb_dtypeTB(FB_DATATYPE_WCHAR).sizetype  = symb_dtypeTB(env.target.wchar).sizetype
+	symb_dtypeTB(FB_DATATYPE_WCHAR).class     = symbGetDatatypeInfo(env.target.wchar).class
+	symb_dtypeTB(FB_DATATYPE_WCHAR).size      = symbGetDatatypeInfo(env.target.wchar).size
+	symb_dtypeTB(FB_DATATYPE_WCHAR).signed    = symbGetDatatypeInfo(env.target.wchar).signed
+	symb_dtypeTB(FB_DATATYPE_WCHAR).intrank   = symbGetDatatypeInfo(env.target.wchar).intrank
+	symb_dtypeTB(FB_DATATYPE_WCHAR).remaptype = symbGetDatatypeInfo(env.target.wchar).remaptype
+	symb_dtypeTB(FB_DATATYPE_WCHAR).sizetype  = symbGetDatatypeInfo(env.target.wchar).sizetype
 
 	symb_dtypeTB(FB_DATATYPE_INTEGER128).intrank = INTEGER_128BIT_INTRANK
 	symb_dtypeTB(FB_DATATYPE_UINTEGER128).intrank = UINT_128BIT_INTRANK
@@ -201,8 +216,8 @@ sub typeMax _
 		exit sub
 	end if
 
-	dtype1 = symb_dtypeTB(typeGet( ldtype )).remaptype
-	dtype2 = symb_dtypeTB(typeGet( rdtype )).remaptype
+	dtype1 = symbGetDatatypeInfo(typeGet( ldtype )).remaptype
+	dtype2 = symbGetDatatypeInfo(typeGet( rdtype )).remaptype
 
 	if( dtype1 = dtype2 ) then
 		'' Different types, but they remapped to the same,
@@ -248,7 +263,7 @@ function typeToSigned _
 	dim as integer dt = typeGet( dtype )
 	dim as integer nd = any
 
-	if( symb_dtypeTB(dt).class <> FB_DATACLASS_INTEGER ) then
+	if( symbGetDatatypeInfo(dt).class <> FB_DATACLASS_INTEGER ) then
 		return dtype
 	end if
 
@@ -298,7 +313,7 @@ function typeToUnsigned _
 	dim as integer dt = typeGet( dtype )
 	dim as integer nd = any
 
-	if( symb_dtypeTB(dt).class <> FB_DATACLASS_INTEGER ) then
+	if( symbGetDatatypeInfo(dt).class <> FB_DATACLASS_INTEGER ) then
 		return dtype
 	end if
 

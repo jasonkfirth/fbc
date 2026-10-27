@@ -209,7 +209,7 @@ function astBuildNativeInt128FromInteger( byval expr as ASTNODE ptr, byval dtype
 	dim as FBSYMBOL ptr temp = symbAddTempVar( dtype )
 	dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_INT128FROMU64, FB_RTL_IDX_INT128FROMU64 ) )
 	dim as integer sign_extend = iif( typeIsSigned( astGetFullType( expr ) ), 1, 0 )
-	var value = astNewCONV( FB_DATATYPE_ULONGINT, NULL, astCloneTree( expr ) )
+	var value = astNewCONV( FB_DATATYPE_ULONGINT, NULL, astCloneTree( expr ), AST_CONVOPT_SEMANTIC_TRANSPORT )
 	if( value = NULL ) then
 		astDelTREE( call_node )
 		return NULL
@@ -336,7 +336,7 @@ function astBuildNativeInt128Bop _
 		if( astIsCONST( rhs ) ) then
 			shift_count = astNewCONSTi( astConstGetAsInt64( rhs ), FB_DATATYPE_ULONGINT )
 		else
-			shift_count = astNewCONV( FB_DATATYPE_ULONGINT, NULL, rhs )
+			shift_count = astNewCONV( FB_DATATYPE_ULONGINT, NULL, rhs, AST_CONVOPT_SEMANTIC_TRANSPORT )
 		end if
 		if( shift_count = NULL ) then
 			astDelTREE( left_address )

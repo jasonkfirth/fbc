@@ -30,6 +30,20 @@ producer/consumer transport and incremental-cache checks with:
 python3 tests/semantic-sidecar/test_binary_transport.py --fbc ./bin/fbc --linter /path/to/fb_linter
 ```
 
+`array_mutation_inputs.py` checks direct ERASE/REDIM identities and counted
+module closure. It covers fixed/dynamic variables, preservation, expanded uses,
+excluded fields, zero and multiple modules. GCC, Clang and LLVM emission remains
+byte-identical with capture off, full text, binary and reduced/compact modes.
+These tests do not classify collection usefulness or execute their subjects.
+
+`macro_access_inputs.py` checks surviving variable/member access tags under
+`macro-source-access-node-bindings`. It preserves exact selected MR identities,
+separate source/node counts and unlinked generated cleanup. Its GCC, Clang and
+LLVM controls compare unchanged emitted code, exact decoded text/binary rows,
+and omitted observations in none, reduced and compact captures. Reduced-capture
+controls inspect this family's emitted rows; they do not certify unrelated
+compact assignment-location contracts.
+
 `macro_call_inputs.py` checks `source-call-macro-references` (capability 118).
 Full models with macro provenance retain the exact original `MR` reference
 identity on surviving direct, virtual and source-selected runtime CALL nodes.
@@ -84,6 +98,18 @@ source array, its one-based innermost dimension, and the accepted assignment or
 constructor path. Rejection tests cover incomplete groups, invalid targets and
 dimensions and unavailable capabilities. Backend output and diagnostics remain
 identical when the model is disabled.
+
+The optional `initializers` request adds counted closure over those original
+elements without changing the existing facts. Request controls cover each of
+the eleven groups alone, every pair, all-but-one sets and all groups together;
+default, repeated, reset, invalid and reduced-mode requests remain separate
+checks. This bounds compiler launches as the optional surface grows. Every
+successful request must preserve generated C, and the initializer witness must
+retain its exact element count and target edge. The `type-shapes` and
+`native-bytes` groups independently request written type roots and selected
+pack/unpack operations. The request fixture has a native MKL call; checks require
+its exact count and edge only when requested. The maintained type observation
+regression requests both groups explicitly and retains reduced-mode exclusions.
 
 `sidecar.py` independently validates schema 27. `test_sidecar.py` checks the
 compiler's records against source locations and known types, layouts, values,

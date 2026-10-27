@@ -26,6 +26,10 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 
+declare function parserGetLastTypeAlias( ) as FBSYMBOL ptr
+declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, byval alias_symbol as FBSYMBOL ptr)
+
+
 declare sub fbSemanticModelDeclarationRepeat(byval sym as FBSYMBOL ptr, byref kind as const string, _
 	byval repeated as integer, byref source as LEX_LOCATION)
 
@@ -218,7 +222,8 @@ private sub hAddTypedef _
 		byval attrib as FB_SYMBATTRIB, _
 		byref semantic_site as LEX_LOCATION, _
 		byval has_site as integer, _
-		byref forward_site as LEX_LOCATION _
+		byref forward_site as LEX_LOCATION, _
+		byval semantic_type_alias as FBSYMBOL ptr _
 	)
 
 	'' Forward ref? Note: may update dtype & co
@@ -234,6 +239,7 @@ private sub hAddTypedef _
 
 	dim as FBSYMBOL ptr typedef = symbAddTypedef( pid, dtype, subtype, lgt )
 	if( typedef ) then
+		fbSemanticModelTypeAliasDeclaration(typedef, semantic_type_alias)
 		if( is_fixlenstr ) then
 			symbSetIsFixLenStr( typedef )
 		end if
@@ -331,6 +337,7 @@ sub cTypedefMultDecl( byval attrib as FB_SYMBATTRIB )
 	dim as FBSYMBOL ptr subtype
 	dim as LEX_LOCATION forward_site
 	var pfwdname = hReadType( dtype, subtype, lgt, is_fixlenstr, forward_site )
+	dim as FBSYMBOL ptr semantic_type_alias = parserGetLastTypeAlias( )
 
 	do
 		'' Parse the ID
@@ -339,7 +346,7 @@ sub cTypedefMultDecl( byval attrib as FB_SYMBATTRIB )
 		var pid = hReadId( semantic_site, has_site )
 
 		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib, _
-		             semantic_site, has_site, forward_site )
+		             semantic_site, has_site, forward_site, semantic_type_alias )
 
 		'' ','?
 	loop while( hMatch( CHAR_COMMA ) )
@@ -372,9 +379,10 @@ sub cTypedefSingleDecl _
 		dim as FBSYMBOL ptr subtype
 		dim as LEX_LOCATION forward_site
 		var pfwdname = hReadType( dtype, subtype, lgt, is_fixlenstr, forward_site )
+	dim as FBSYMBOL ptr semantic_type_alias = parserGetLastTypeAlias( )
 
 		hAddTypedef( pid, pfwdname, dtype, subtype, lgt, is_fixlenstr, attrib, _
-		             semantic_site, has_site, forward_site )
+		             semantic_site, has_site, forward_site, semantic_type_alias )
 
 		'' ','?
 		if( hMatch( CHAR_COMMA ) = FALSE ) then

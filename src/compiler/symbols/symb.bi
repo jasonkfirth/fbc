@@ -181,6 +181,7 @@ enum FB_SYMBSTATS
 	FB_SYMBSTATS_BEINGEMITTED = &h08000000  '' ditto, for circular dependencies with structs
 	FB_SYMBSTATS_UNUSEDVTABLE = &h10000000
 	FB_SYMBSTATS_UTF8ARGS     = &h20000000  '' procedures: text STRING arguments accept Unicode through UTF-8
+	FB_SYMBSTATS_NORETURN     = &h40000000  '' procedures: all C paths terminate or transfer control
 
 	'' reuse - take care
 	FB_SYMBSTATS_PROCEMITTED  = FB_SYMBSTATS_UNIONFIELD  '' procs only
@@ -643,6 +644,7 @@ type FB_PROCERR
 	lasthnd         as FBSYMBOL_ ptr            '' last error handler
 	lastmod         as FBSYMBOL_ ptr            '' last module name
 	lastfun         as FBSYMBOL_ ptr            '' last function name
+	hndsaved        as FBSYMBOL_ ptr            '' runtime flag: a local handler saved lasthnd
 end type
 
 type FB_PROCOPOVL
@@ -1200,7 +1202,7 @@ declare function symbGetIllegalRedefErr( byval sym as FBSYMBOL ptr ) as FB_ERRMS
 declare function symbAddDefine _
 	( _
 		byval symbol as const zstring ptr, _
-		byval text as zstring ptr, _
+		byval text as const zstring ptr, _
 		byval lgt as integer, _
 		byval isargless as integer = FALSE, _
 		byval proc as FBS_DEFINE_PROCZ = NULL, _
@@ -1381,7 +1383,7 @@ declare function typeCalcNaturalAlign _
 declare function symbAddField _
 	( _
 		byval parent as FBSYMBOL ptr, _
-		byval id as zstring ptr, _
+		byval id as const zstring ptr, _
 		byval dimensions as integer, _
 		dTB() as FBARRAYDIM, _
 		byval dtype as integer, _
@@ -1944,7 +1946,7 @@ declare function hMangleBuiltInType _
 	( _
 		byval dtype as integer, _
 		byref add_abbrev as integer = FALSE _
-	) as zstring ptr
+	) as const zstring ptr
 declare sub symbMangleType _
 	( _
 		byref mangled as string, _
@@ -2208,6 +2210,8 @@ declare function symbCloneSimpleStruct( byval sym as FBSYMBOL ptr ) as FBSYMBOL 
 #define symbSetIsImplicit( s ) (s)->stats or= FB_SYMBSTATS_IMPLICIT
 
 #define symbGetIsRTL(s) (((s)->stats and FB_SYMBSTATS_RTL) <> 0)
+#define symbGetProcIsNoReturn(s) (((s)->stats and FB_SYMBSTATS_NORETURN) <> 0)
+#define symbSetProcIsNoReturn(s) s->stats or= FB_SYMBSTATS_NORETURN
 
 #define symbGetIsThrowable(s) (((s)->stats and FB_SYMBSTATS_THROWABLE) <> 0)
 #define symbSetIsThrowable(s) s->stats or= FB_SYMBSTATS_THROWABLE
@@ -2709,15 +2713,18 @@ declare sub symbProcRecalcRealType( byval proc as FBSYMBOL ptr )
 
 '' datatype accessors
 
-#define typeGetClass( dt ) symb_dtypeTB(typeGet( dt )).class
-#define typeGetSize( dt ) symb_dtypeTB(typeGet( dt )).size
-#define typeGetBits( dt ) (typeGetSize( dt ) * 8)
-#define typeIsSigned( dt ) symb_dtypeTB(typeGet( dt )).signed
-#define typeGetIntRank( dt ) symb_dtypeTB(typeGet( dt )).intrank
-#define typeGetRemapType( dt ) symb_dtypeTB(typeGet( dt )).remaptype
-#define typeGetSizeType( dt ) symb_dtypeTB(typeGet( dt )).sizetype
+declare function symbGetDatatypeInfo _
+	( byval dtype as integer ) byref as const SYMB_DATATYPE
 
-#define typeRemap( dtype ) typeJoin( dtype, symb_dtypeTB(dtype).remaptype )
+#define typeGetClass( dt ) symbGetDatatypeInfo(typeGet( dt )).class
+#define typeGetSize( dt ) symbGetDatatypeInfo(typeGet( dt )).size
+#define typeGetBits( dt ) (typeGetSize( dt ) * 8)
+#define typeIsSigned( dt ) symbGetDatatypeInfo(typeGet( dt )).signed
+#define typeGetIntRank( dt ) symbGetDatatypeInfo(typeGet( dt )).intrank
+#define typeGetRemapType( dt ) symbGetDatatypeInfo(typeGet( dt )).remaptype
+#define typeGetSizeType( dt ) symbGetDatatypeInfo(typeGet( dt )).sizetype
+
+#define typeRemap( dtype ) typeJoin( dtype, symbGetDatatypeInfo(dtype).remaptype )
 
 #define typeGet( dt ) iif( dt and FB_DT_PTRMASK, FB_DATATYPE_POINTER, dt and FB_DT_TYPEMASK )
 '' STRING and USTRING share the descriptor ABI, but have distinct text semantics.

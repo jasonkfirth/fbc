@@ -28,6 +28,7 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "support/numeric/fp-policy.bi"
+#include once "tooling/semantic-numeric-conversions.bi"
 
 private sub hConstConv( byval todtype as integer, byval l as ASTNODE ptr )
 	dim as integer ldtype = any
@@ -545,6 +546,7 @@ function astNewCONV _
 	end if
 
 	ldtype = astGetFullType( l )
+	fbSemanticModelNumericConversion(l, to_dtype, to_subtype, options)
 	if( typeIsInteger128Scalar( to_dtype ) andalso _
 	    typeIsInteger128Scalar( ldtype ) ) then
 		'' Signed and unsigned 128-bit values have the same representation.

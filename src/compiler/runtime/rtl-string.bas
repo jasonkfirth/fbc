@@ -2931,6 +2931,9 @@ function rtlStrAllocTempDesc _
 			exit function
 		end if
 
+	case else
+		 '' This helper only constructs descriptors for raw string storage.
+		exit function
 	end select
 
 	''
@@ -3453,6 +3456,9 @@ function rtlStrToVal _
 			f = PROCLOOKUP( STR2INT )
 		case FB_SIZETYPE_UINT8, FB_SIZETYPE_UINT16, FB_SIZETYPE_UINT32
 			f = PROCLOOKUP( STR2UINT )
+		case else
+			'' Unsupported integer widths have no string-conversion overload.
+			exit function
 		end select
 
 	'' UDT's, classes: try cast(to_dtype) op overloading

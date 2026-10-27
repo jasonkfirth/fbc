@@ -582,6 +582,11 @@ function lexGetCurrentLocation( ) as LEX_LOCATION
 end function
 
 function lexGetLastLocation( ) as LEX_LOCATION
+	'' Early driver diagnostics have no token context or source location.
+	if( lex.ctx = NULL ) then
+		dim as LEX_LOCATION no_location
+		return no_location
+	end if
 	function = lex.ctx->last_source
 end function
 
@@ -2118,7 +2123,8 @@ private sub hCheckPeriods _
 
 end sub
 
-private function readId( byref t as FBTOKEN, byval flags as LEXCHECK ) as integer
+private function readId( byref t as FBTOKEN, byval flags as LEXCHECK, _
+	byref preserve_ending as integer ) as integer
 	'' Capture the currmacro status for ppDefineLoad() (in case this is a macro),
 	'' before we skip the identifier's chars, because that could reset the currmacro
 	'' if we leave the current expansion text in the process.
@@ -2179,12 +2185,18 @@ private function readId( byref t as FBTOKEN, byval flags as LEXCHECK ) as intege
 				'' Ignore the ID and read expanded text
 				return FALSE
 			end if
+			'' A function-like define can consume whitespace while finding no
+			'' opening parenthesis. Keep the identifier end saved above; the
+			'' scanner remains at its existing position for the next token.
+			preserve_ending = TRUE
 		end if
 	end if
 
 	if( fbLangOptIsSet( FB_LANG_OPT_PERIODS ) ) then
 		if( (flags and LEXCHECK_NOPERIOD) = 0 ) then
 			hCheckPeriods( @t, flags, t.sym_chain )
+			'' A QB identifier that absorbed periods owns the additional text.
+			if( t.prdpos <> 0 ) then preserve_ending = FALSE
 		end if
 	end if
 
@@ -2303,7 +2315,7 @@ sub lexNextToken _
 	)
 
 	dim as uinteger char = any
-	dim as integer reread = any, readchar = any
+	dim as integer reread = any, readchar = any, preserve_ending = any
 
 	t->after_space = lex.ctx->after_space
 	lex.ctx->after_space = FALSE
@@ -2311,6 +2323,7 @@ sub lexNextToken _
 	do
 		reread = FALSE
 		readchar = FALSE
+		preserve_ending = FALSE
 	t->text[0] = 0                                  '' t.text = ""
 	t->len = 0
 	t->sym_chain = NULL
@@ -2388,7 +2401,7 @@ sub lexNextToken _
 
 	'' A-Z, a-z, _
 	case CHAR_AUPP to CHAR_ZUPP, CHAR_ALOW to CHAR_ZLOW, CHAR_UNDER
-		if( not readId( *t, flags ) ) then
+		if( not readId( *t, flags, preserve_ending ) ) then
 			reread = TRUE
 		end if
 
@@ -2587,10 +2600,12 @@ sub lexNextToken _
 
 	loop while( reread )
 
-	t->source.end_line = lex.ctx->linenum
-	t->source.end_column = lex.ctx->column
-	t->source.raw_end_line = lex.ctx->raw_linenum
-	t->source.raw_end_column = lex.ctx->column
+	if( preserve_ending = FALSE ) then
+		t->source.end_line = lex.ctx->linenum
+		t->source.end_column = lex.ctx->column
+		t->source.raw_end_line = lex.ctx->raw_linenum
+		t->source.raw_end_column = lex.ctx->column
+	end if
 
 end sub
 
@@ -2768,6 +2783,9 @@ private function lexGetStrLitText( byval tk as integer ) as string
 	case FB_TK_STRLIT_NOESC
 		DZstrConcatAssignC( s, asc( "$" ) )
 		is_escaped = FALSE
+	case else
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		return ""
 	end select
 
 	DZstrConcatAssignC( s, asc( """" ) )

@@ -41,7 +41,7 @@
 const GENERATED_HEADER_FIXED_RESERVE = 1024
 
 private sub appendCCCode( _
-	byref output as string, _
+	byref output_buffer as string, _
 	byref output_position as integer, _
 	byref output_fits as integer, _
 	byval append_value as string _
@@ -50,12 +50,12 @@ private sub appendCCCode( _
 	if( (output_fits = FALSE) orelse (text_size = 0) ) then exit sub
 
 	if( (output_position < 1) orelse _
-	    (text_size > (len(output) - output_position + 1)) ) then
+	    (text_size > (len(output_buffer) - output_position + 1)) ) then
 		output_fits = FALSE
 		exit sub
 	end if
 
-	mid(output, output_position, text_size) = append_value
+	mid(output_buffer, output_position, text_size) = append_value
 	output_position += text_size
 end sub
 

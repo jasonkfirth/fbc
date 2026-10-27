@@ -4186,7 +4186,7 @@ private sub prepare_idx(byval v1 as IRVREG ptr, byref op1 as string, byref op3 a
 	asm_error("prepare_IDX case not handled 01")
 	if op1="" then op1="X X" '''to avoid crashes
 end sub
-private function hgetbopcode(byval op as Integer) as zstring ptr
+private function hgetbopcode(byval op as Integer) as const zstring ptr
 
 	select case as const( op )
 		case AST_OP_ADD
@@ -4270,7 +4270,7 @@ private sub hGetFloatRelRecipe _
 		byref lname1 as string, _
 		byref lname2 as string, _
 		byref parity as string, _
-		byref jmpcode as zstring ptr, _
+		byref jmpcode as const zstring ptr, _
 		byref swapregs as integer, _
 		byref swapinit as integer _
 	)
@@ -4406,7 +4406,7 @@ private sub hEmitFloatRelational _
 	)
 
 	dim as string lname1,lname2,parity
-	dim as zstring ptr jmpcode
+	dim as const zstring ptr jmpcode
 	dim as integer swapregs,swapinit
 
 	hGetFloatRelRecipe( op, label, options, lname1, lname2, parity, _
@@ -7566,7 +7566,7 @@ private sub hCallEmitWindowsStackSlot _
 	if dtype=FB_DATATYPE_STRUCT then
 		lgt=v2->subtype->lgt
 	else
-		lgt=symb_dtypeTB(dtype).size
+		lgt=symbGetDatatypeInfo(dtype).size
 	end if
 
 	if v2->typ=IR_VREGTYPE_REG then

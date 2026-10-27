@@ -382,7 +382,7 @@ end function
 function symbAddField _
 	( _
 		byval parent as FBSYMBOL ptr, _
-		byval id as zstring ptr, _
+		byval id as const zstring ptr, _
 		byval dimensions as integer, _
 		dTB() as FBARRAYDIM, _
 		byval dtype as integer, _

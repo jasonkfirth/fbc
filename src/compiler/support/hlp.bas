@@ -415,7 +415,7 @@ private function hCygwinDrivePrefix( ) as string
 end function
 #endif
 
-function pathNormalizeHost( byref path as string ) as string
+function pathNormalizeHost( byref path as const string ) as string
 #if defined( __FB_CYGWIN__ )
 	dim as string normalized
 	const WINDOWS_DRIVE_PATH_PREFIX_LENGTH = 2

@@ -1,19 +1,45 @@
 {{fbdoc item="title" value="SDL, the Simple DirectMedia Layer"}}----
-Cross-platform mulitmedia library
+Cross-platform multimedia library and rendering API.
+
+This repository contains bindings for three SDL API generations. Their C
+interfaces reuse many names, so use one generation per source module.
 
 Website: http://www.libsdl.org
-Platforms supported: ""Win32"", Linux, FreeBSD, Haiku (SDL 1.2)
-Headers to include: SDL/SDL.bi or SDL2/SDL.bi
-Header version: SDL 1.2.15, SDL2 2.0.3
-Examples: yes, in examples/graphics/SDL1/, examples/graphics/SDL2/, and examples/graphics/SDL3/
+Platforms supported: Win32, Linux, FreeBSD (selected examples), Haiku (SDL 1.2)
 
-FreeBSD runtime checks passed for SDL 3 core, image, TrueType and network
-examples, plus the SDL 1.2 video-info example under Xvfb. SDL 2 runtime, audio
-devices and physical display behavior remain unqualified.
+Core headers and examples:
 
-Haiku R1 beta 6 amd64: `examples/graphics/SDL1/core/video_info.bas` compiled and
+* SDL 1.2.15: inc/SDL/SDL.bi and examples/graphics/SDL1/
+* SDL 2.0.14: inc/SDL2/SDL.bi and examples/graphics/SDL2/
+* SDL 3.4.18: inc/SDL3/SDL.bi and examples/graphics/SDL3/
+
+Companion bindings and examples:
+
+* SDL 1.2: SDL_image, SDL_gfx, SDL_mixer, SDL_net, SDL_Pango, SDL_rtf,
+  SDL_sound, SDL_ttf, SDL_gpu, and SDL_FontCache.
+* SDL 2: SDL2_image, SDL2_gfx, SDL2_mixer, SDL2_net, SDL2_rtf,
+  SDL2_sound, SDL2_ttf, SDL2_gpu, SDL2_bgi, and SDL2_FontCache.
+* SDL 3: SDL3_image, SDL3_mixer, SDL3_net, SDL3_sound, and SDL3_ttf.
+  The core binding also covers GPU, Vulkan, SDL_test, and the TTF text engine.
+  Additional bindings and examples cover SDL3_gfx, SDL3_bgi, SDL3_rtf, and
+  SDL3_shadercross.
+
+The pinned SDL 3 companion releases are SDL3_image 3.4.8, SDL3_mixer 3.2.4,
+SDL3_net 3.2.0, SDL3_sound 3.2.0, and SDL3_ttf 3.2.2. SDL3_sound decodes
+audio files; SDL3_mixer provides mixing and playback tracks.
+
+Haiku R1 beta 6 amd64: examples/graphics/SDL1/core/video_info.bas compiled and
 ran with FreeBASIC 1.20.4-3 against HaikuPorts SDL 1.2.15. This headless check
 covered SDL initialization and video-info queries; it did not open a window or
 test rendering. SDL 2 and SDL 3 remain unqualified on Haiku.
+
+FreeBSD runtime checks passed for the SDL 1.2 video-info example under Xvfb
+and for SDL 3 core, image, TrueType, and network examples under Xvfb or the
+local resolver. The SDL 1.2 driver name was blank in the headless run.
+SDL 2 runtime examples did not complete in the qualification harness. Runtime
+support for the other companion examples, audio devices, and physical displays
+has not been established. Several optional libraries also lacked matching
+linkable packages in the checked FreeBSD package set; see
+doc/freebsd-example-qualification.md for the exact scope.
 
 {{fbdoc item="back" value="ExtLibTOC|External Library Table of Contents"}}

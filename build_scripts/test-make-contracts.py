@@ -957,6 +957,61 @@ def test_build_configuration(root: Path, working: Path) -> None:
             and not list(working.rglob("*.tmp")), "dry-run changed configured artifacts", result)
 
 
+def test_error_unwind_configuration(root: Path, working: Path) -> None:
+    # A Win64 longjmp needs native unwind records in both error entry points.
+    # Check every archive variant, including builds with command-line C flags,
+    # and ensure that unrelated runtime objects keep their selected policy.
+    variants = ("", "pic", "mt", "mtpic")
+    for os_name, architecture, override in (("win32", "x86_64", False),
+                                            ("win32", "x86_64", True),
+                                            ("win32", "x86", False),
+                                            ("linux", "x86_64", False)):
+        lane = working / (os_name + "-" + architecture + ("-override" if override else ""))
+        lane.mkdir()
+        write(lane / "cc.sh", "#!/bin/sh\nset -eu\n"
+              "arguments=$*\nwhile [ \"$#\" -gt 0 ]; do\n"
+              "  if [ \"$1\" = -o ]; then shift; output=$1; fi\n"
+              "  shift\ndone\nprintf '%s\\n' \"$arguments\" >\"$output\"\n")
+        targets = []
+        assignments = ""
+        for variant in variants:
+            directory = "obj/" + (variant or "ordinary")
+            assignments += "libfb" + variant + "objdir := " + directory + "\n"
+            for name in ("error", "error_frame"):
+                targets.append(directory + "/errors/" + name + ".o")
+        unrelated = "obj/ordinary/strings/unrelated.o"
+        targets.append(unrelated)
+        for source in ("errors/error.c", "errors/error_frame.c", "strings/unrelated.c"):
+            write(lane / "source/rtlib" / source, "")
+        for target in targets:
+            (lane / target).parent.mkdir(parents=True, exist_ok=True)
+        write(lane / "GNUmakefile", ".DEFAULT_GOAL := all\nrootdir := .\n"
+              "srcdir := source\nmkpath := " + (root / "mk").as_posix() + "\n"
+              "TARGET_OS := " + os_name + "\nTARGET_ARCH := " + architecture + "\n"
+              "CC := sh cc.sh\nlibdir := lib\n"
+              "ALLCFLAGS := -O2 -fno-unwind-tables -fno-asynchronous-unwind-tables\n"
+              + assignments + include(root, "build/compile-rules.mk")
+              + "all: " + " ".join(targets) + "\n"
+              + include(root, "build/config-rules.mk")
+              + "\n$(file >signature,$(BUILD_CONFIG_RTL))\n.PHONY: signature\nsignature:\n")
+        arguments = ["ALLCFLAGS=-O0 -fno-unwind-tables -fno-asynchronous-unwind-tables"] if override else []
+        result = make(lane, *arguments)
+        require(result.returncode == 0, "error unwind command selection failed", result)
+        required = os_name == "win32" and architecture == "x86_64"
+        for target in targets:
+            flags = (lane / target).read_text().split()
+            enabled = required and target != unrelated
+            require(("-funwind-tables" in flags) == enabled,
+                    "incorrect unwind policy for " + str(lane / target))
+            if enabled:
+                require(flags.index("-funwind-tables") > flags.index("-fno-unwind-tables"),
+                        "runtime unwind requirement lost to command-line flags")
+        signature = (lane / "signature").read_bytes()
+        result = make(lane, "signature", *arguments, "RTLIB_ERROR_CFLAGS=")
+        require(result.returncode == 0 and ((lane / "signature").read_bytes() != signature) == required,
+                "runtime cache identity does not follow the error unwind policy", result)
+
+
 def test_build_rule_dependencies(root: Path, working: Path) -> None:
     configuration_fixture(root, working)
     dependency = working / ("source-dependencies-" + "x" * 96 + ".d")
@@ -1322,7 +1377,8 @@ def main() -> int:
              test_manual_removed_zip_member, test_example_helper_headers, test_example_cleanup_arguments,
              test_cross_host_identity, test_sound_member_collision, test_multi_module_fixtures,
              test_doc_target_guard, test_source_artifact_guard, test_compiler_link_failure,
-             test_build_configuration, test_build_rule_dependencies, test_compiler_configuration,
+             test_build_configuration, test_error_unwind_configuration,
+             test_build_rule_dependencies, test_compiler_configuration,
              test_warning_normalization,
              test_tool_replacement, test_bootstrap_configuration, test_bootstrap_emission_configuration,
              test_isolated_builds, test_source_docs)

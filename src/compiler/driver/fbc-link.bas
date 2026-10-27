@@ -114,7 +114,7 @@ end function
 
 '' Find a library file and wrap it into ""'s for passing it on the ld command
 '' line. Or if it couldn't be found, show an error.
-private function hFindLib( byval file as zstring ptr ) as string
+private function hFindLib( byval file as const zstring ptr ) as string
 	dim as string found = fbcBuildPathToLibFile( file )
 	if( len( found ) > 0 ) then
 		function = " """ + found + """"
@@ -1441,8 +1441,9 @@ sub fbcDriverSetDefaultLibPaths( )
 #endif
 end sub
 
-sub fbcAddDefLib(byval libname as zstring ptr)
-	strsetAdd(@fbc.finallibs, *libname, TRUE)
+sub fbcAddDefLib(byval libname as const zstring ptr)
+	dim as string libname_copy = *libname
+	strsetAdd(@fbc.finallibs, libname_copy, TRUE)
 end sub
 
 private function hGetFbLibNameSuffix( ) as string

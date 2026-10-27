@@ -216,12 +216,15 @@ private function hResolveColumn _
 		return FALSE
 	end if
 	dim as integer index = 0
-	dim as integer decoded = 0, canonical = 0, selected = -1, selected_column = -1
+	dim as integer decoded = 0, canonical = 0
 	dim as integer unit_width = hUnitWidth( )
 	while( index < len(coordinate_text) )
 		if( decoded = decoder_column ) then
-			selected = index
-			selected_column = canonical
+			'' The requested boundary is proved by its prefix. Later bytes can
+			'' use an unknown encoding without invalidating this earlier token.
+			column = canonical
+			offset = coordinate_offset + index
+			return TRUE
 		end if
 		dim as ulong codepoint = hCodeUnit(coordinate_text, index)
 		dim as integer units = unit_width
@@ -272,13 +275,9 @@ private function hResolveColumn _
 		canonical += columns
 		index += units
 	wend
-	if( decoded = decoder_column ) then
-		selected = index
-		selected_column = canonical
-	end if
-	if( selected < 0 ) then return FALSE
-	column = selected_column
-	offset = coordinate_offset + selected
+	if( decoded <> decoder_column ) then return FALSE
+	column = canonical
+	offset = coordinate_offset + index
 	return TRUE
 end function
 

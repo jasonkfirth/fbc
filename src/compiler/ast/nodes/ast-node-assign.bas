@@ -27,6 +27,7 @@
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-numeric-conversions.bi"
 
 private function hCheckStringOps _
 	( _
@@ -842,6 +843,11 @@ function astNewASSIGN _
 				if( r = NULL ) then
 					exit function
 				end if
+			elseif( astGetFullType( r ) <> ldfull ) then
+				'' The x87 can convert while storing without a CONV node.
+				'' Observe the same numeric boundary before that backend shortcut.
+				'' A preceding constant conversion already has its own observation.
+				fbSemanticModelNumericConversion(r, ldfull, l->subtype, 0)
 			end if
 		end if
 	end if

@@ -260,11 +260,11 @@ declare function fbcUseLldLinker( ) as integer
 
 declare function fbcQueryCC( byref options as string ) as string
 
-declare function fbcBuildPathToLibFile( byval file as zstring ptr ) as string
+declare function fbcBuildPathToLibFile( byval file as const zstring ptr ) as string
 
 declare function fbcFindSysroot( ) as string
 
-declare function fbcFindLibFile( byval file as zstring ptr ) as string
+declare function fbcFindLibFile( byval file as const zstring ptr ) as string
 
 declare sub fbcAddDefLibPath(byref path as string)
 
@@ -278,7 +278,7 @@ declare sub fbcFindBin _
 
 declare function fbcRunBin _
 	( _
-		byval action as zstring ptr, _
+		byval action as const zstring ptr, _
 		byval tool as integer, _
 		byref ln as string _
 	) as integer
@@ -293,7 +293,7 @@ declare sub fbcDriverCollectObjinfo( )
 
 declare sub fbcDriverSetDefaultLibPaths( )
 
-declare sub fbcAddDefLib(byval libname as zstring ptr)
+declare sub fbcAddDefLib(byval libname as const zstring ptr)
 
 declare sub fbcDriverAddDefaultLibs( )
 

@@ -46,6 +46,18 @@ class SidecarTests(unittest.TestCase):
         from semantic_type_abi import check_hint_owners
         check_hint_owners(self)
 
+    def test_windows_source_paths_match_native_byte_contract(self) -> None:
+        from semantic_source_paths import check_windows_source_paths
+        check_windows_source_paths(self)
+
+    def test_array_mutation_native_inputs(self) -> None:
+        from array_mutation_inputs import check_inputs
+        check_inputs(self)
+
+    def test_macro_access_native_inputs(self) -> None:
+        from macro_access_inputs import check_inputs
+        check_inputs(self)
+
     def test_macro_call_inputs(self) -> None:
         from macro_call_inputs import check_inputs
         check_inputs(self)
@@ -152,6 +164,18 @@ class SidecarTests(unittest.TestCase):
     def test_original_assignment_storage_reject_invalid_forests(self) -> None:
         from assignment_storage import check_rejection
         check_rejection(self)
+
+    def test_native_branch_policy_observations(self) -> None:
+        from branch_observations import check_observations
+        check_observations(self)
+
+    def test_native_declaration_policy_observations(self) -> None:
+        from declaration_observations import check_observations
+        check_observations(self)
+
+    def test_native_type_policy_observations(self) -> None:
+        from type_observations import check_observations
+        check_observations(self)
 
     def test_original_assignment_inputs(self) -> None:
         from assignment_inputs import check_inputs

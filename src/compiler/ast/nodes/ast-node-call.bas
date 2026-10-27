@@ -270,7 +270,6 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 
 		'' flush the arg expression
 		v1 = astLoad( l )
-		astDelNode( l )
 
 		if( ast.doemit ) then
 			if( arg->sym->param.regnum <> 0 ) then
@@ -297,6 +296,8 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 				irEmitPUSHARG( arg->sym, v1, arg->arg.lgt, reclevel, NULL )
 			end if
 		end if
+		'' Register arguments still need the expression's type above.
+		astDelNode( l )
 		totalstackbytes += argbytes
 
 		astDelNode( arg )
@@ -377,8 +378,10 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	'' Evaluate a function-pointer expression before loading register
 	'' arguments because it may contain a call of its own.
 	l = n->l
-	if( l ) then
-		v1 = astLoad( l )
+	var is_indirect = (l <> NULL)
+	dim as IRVREG ptr call_target = NULL
+	if( is_indirect ) then
+		call_target = astLoad( l )
 		astDelNode( l )
 	end if
 
@@ -401,8 +404,8 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 			next
 		next
 
-		if( l ) then
-			irEmitCALLPTR( proc, v1, vr, bytestopop, reclevel )
+		if( is_indirect ) then
+			irEmitCALLPTR( proc, call_target, vr, bytestopop, reclevel )
 		else
 			irEmitCALLFUNCT( proc, bytestopop, vr, reclevel )
 		end if

@@ -104,6 +104,7 @@ def check_storage(test):
                 compact = test.compile(source, mode=mode, backend=backend)
                 test.assertEqual(compact.capabilities[1][FEATURE], 'unavailable')
                 test.assertFalse(any(row[3].startswith(('assignment-storage:', 'assignment-tree:')) for row in compact.records['K']))
+    check_index_binding(test)
 
 
 def check_rejection(test):
@@ -113,5 +114,57 @@ def check_rejection(test):
         for mutation in MUTATIONS:
             with test.subTest(backend=backend, mutation=mutation), test.assertRaises(ValueError):
                 Model('\n'.join('\t'.join(row) for row in malformed_rows(rows, mutation)) + '\n')
+
+
+def check_index_binding(test):
+    source = test.source('''\
+' Project: FreeBASIC semantic sidecar tests
+' File: overloaded-index.bas
+' Purpose: Preserve the selected BYREF operator in original storage snapshots.
+' Responsibilities: Opaque accessors and matching declared/native return types.
+' This file intentionally does NOT assume that repeated access is side-effect free.
+Type IndexedValue
+    Values(0 To 0) As Integer
+    Declare Operator [](ByVal Item As Integer) ByRef As Integer
+    Declare Operator Cast() As Integer
+End Type
+Operator IndexedValue.[](ByVal Item As Integer) ByRef As Integer
+    Return Values(Item)
+End Operator
+Operator IndexedValue.Cast() As Integer
+    Return Values(0)
+End Operator
+Sub CopyIndexed(ByRef Value As IndexedValue)
+    Value[0] = Value[0]
+End Sub
+' end of overloaded-index.bas
+''', 'overloaded-index.bas')
+    for backend in test.backends:
+        with test.subTest(backend=backend, case='overloaded-index'):
+            _, artifact = test.invoke([source], backend=backend)
+            model = Model.read(artifact)
+            expression = next(row for row in model.records['E'] if row[10:12] == ['index', 'overloaded'])
+            selected = expression[13]
+            signature = model.signatures[int(selected)]
+            test.assertEqual(signature[6], '1')
+            rows = [line.split('\t') for line in artifact.read_text().splitlines()]
+            call = next(row for row in rows if row[0] == 'K' and row[3].startswith('assignment-tree:')
+                        and unescape(row[4]).split('\t')[0] == '9'
+                        and unescape(row[4]).split('\t')[3] == selected)
+            test.assertEqual(unescape(call[4]).split('\t')[15], 'opaque')
+            other = next(row for row in rows if row[0] == 'F' and row[10] == 'cast')
+            for fault in ('wrong-call', 'wrong-operator', 'non-reference-return', 'wrong-native-return', 'transparent-call'):
+                damaged = [row[:] for row in rows]
+                for row in damaged:
+                    if row == call and fault in ('wrong-call', 'transparent-call'):
+                        fields = unescape(row[4]).split('\t')
+                        fields[3 if fault == 'wrong-call' else 15] = other[1] if fault == 'wrong-call' else 'complete'
+                        row[4] = '\t'.join(fields).replace('%', '%25').replace('\t', '%09')
+                    if row[0:2] == ['F', selected]:
+                        if fault == 'wrong-operator': row[10] = 'cast'
+                        if fault == 'non-reference-return': row[6] = '0'
+                        if fault == 'wrong-native-return': row[7] = expression[12]
+                with test.subTest(fault=fault), test.assertRaises(ValueError):
+                    Model('\n'.join('\t'.join(row) for row in damaged) + '\n')
 
 # end of assignment_storage.py

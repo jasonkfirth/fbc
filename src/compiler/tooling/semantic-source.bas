@@ -5,6 +5,7 @@
 '' This file intentionally does NOT contain: path search, decoding, or parsing.
 
 #include once "tooling/semantic-private.bi"
+#include once "tooling/semantic-extra-facts.bi"
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-source-file.bi"
 #include once "tooling/semantic-link.bi"
@@ -28,6 +29,9 @@ dim shared as any ptr semantic_source_revisions(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_handles(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_formats(0 to FB_MAXINCRECLEVEL)
 dim shared as integer semantic_source_regular(0 to FB_MAXINCRECLEVEL)
+'' Serial source occurrences own their counts, including include-once outcomes.
+'' Counts do not affect the compiler's search, cache or preprocessing decisions.
+dim shared as longint semantic_source_include_requests(0 to FB_MAXINCRECLEVEL)
 '' Policy counts belong to one source occurrence, not a pathname. Reopening a
 '' file gets a fresh receipt even when the preprocessor skips its guarded body.
 dim shared as integer semantic_source_once(0 to FB_MAXINCRECLEVEL)
@@ -122,6 +126,7 @@ sub fbSemanticModelOpenSource(byref filename as const string, byval depth as int
 	semantic_source_once(depth) = FALSE
 	semantic_source_libraries(depth) = 0
 	semantic_source_imports(depth) = 0
+	semantic_source_include_requests(depth) = 0
 	fbSemanticModelAppendProvenance("SRC" + TABCHAR + fbSemanticModelNumber(semantic_source_ids(depth)) + _
 		TABCHAR + fbSemanticModelNumber(parentid) + TABCHAR + fbSemanticModelNumber(fileid) + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + kind + _
@@ -139,6 +144,12 @@ sub fbSemanticModelCloseSource(byval depth as integer)
 	dim as long status = fbSemanticSourceClose(semantic_source_revisions(depth))
 	semantic_source_revisions(depth) = NULL
 	if( fbSemanticModelFullEnabled( ) ) then
+		if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_INCLUDES) ) then
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+			"include-request-count:" + fbSemanticModelNumber(semantic_source_ids(depth)) + TABCHAR + _
+			fbSemanticModelNumber(semantic_source_include_requests(depth)))
+		end if
 		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
 			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
 			"header-policy:" + fbSemanticModelNumber(semantic_source_ids(depth)) + TABCHAR + _
@@ -214,6 +225,28 @@ sub fbSemanticModelIncludeOutcome(byref requested as const string, byref resolve
 	if( (parentid = 0) and (env.includerec > 0) and (env.includerec <= FB_MAXINCRECLEVEL) ) then
 		parentid = semantic_source_ids(env.includerec - 1)
 	end if
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_INCLUDES) and fbSemanticModelFullEnabled( ) ) then
+		dim as integer parent_depth = -1
+		for depth as integer = 0 to FB_MAXINCRECLEVEL
+			if( (parentid <> 0) and (semantic_source_ids(depth) = parentid) ) then
+				parent_depth = depth
+				exit for
+			end if
+		next
+		'' Match the actual live parent occurrence; reopening an include is a
+		'' different source even when its pathname is identical. Keep a finite
+		'' one-million-request bound independently of the detail buffer limit.
+		if( parent_depth < 0 ) then
+			fbSemanticModelFailAt("include request has no active source occurrence")
+			exit sub
+		end if
+		if( semantic_source_include_requests(parent_depth) >= 1000000 ) then
+			fbSemanticModelFailAt("include request observation limit exceeded")
+			exit sub
+		end if
+		semantic_source_include_requests(parent_depth) += 1
+	end if
+
 	dim as longint identity = fbSemanticModelNextDetailIdentity( )
 	dim as LEX_LOCATION invocation
 	dim as LEX_LOCATION ptr observation = directive
@@ -232,6 +265,29 @@ sub fbSemanticModelIncludeOutcome(byref requested as const string, byref resolve
 		TABCHAR + fbSemanticModelNumber(parentid) + TABCHAR + _
 		fbSemanticModelEscape(requested) + TABCHAR + fbSemanticModelEscape(resolved) + TABCHAR + outcome + _
 		TABCHAR + hDirective(observation, require_physical))
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_INCLUDES) and fbSemanticModelFullEnabled( ) ) then
+		dim as string origin_row = "K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+			"include-request-origin:" + fbSemanticModelNumber(identity) + TABCHAR + _
+			iif(directive = NULL, "compiler", "source")
+		fbSemanticModelAppendDetail(origin_row)
+		'' Observe parser ownership before the requested file is parsed. Source
+		'' identity alone cannot distinguish a procedure-local textual include.
+		'' The compiler preinclude path may precede parser initialization; its
+		'' explicit compiler origin, not zero owners, excludes it from policy.
+		dim as string scope_payload = fbSemanticModelNumber(fbSemanticModelSymbolId(parser.currproc)) + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(parser.currblock)) + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(symbGetCurrentNamespc( ))) + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelCurrentCompound( ))
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+			"include-request-scope:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelEscape(scope_payload))
+	end if
+	if( fbSemanticExtraFactsEnabled(FB_SEMEXTRA_INCLUDES) and (observation <> directive) ) then
+		'' The parser's replacement token is not editable. The expansion
+		'' observer already proved the actual physical invocation independently.
+		fbSemanticModelExportCoordinates("include", identity, "invocation", *observation, *observation)
+	end if
 	if( directive <> NULL ) then fbSemanticModelExportCoordinates("include", identity, "directive", *directive, *directive)
 end sub
 

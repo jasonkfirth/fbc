@@ -312,8 +312,11 @@ private sub hCreateDataDesc( )
 	              FB_DATATYPE_SHORT, NULL, 0, 0, 0 )
 
 	'' node as FB_DATASTMT_NODE (no need to create an UNION, all fields are pointers)
+	'' The runtime reads text, links and address values through this payload.
+	'' Pointee constness preserves literal qualifiers in C initializers; READ
+	'' still returns an address-valued item's original pointer value.
 	symbAddField( ast.data.desc, "node", 0, dTB(), _
-	              typeAddrOf( FB_DATATYPE_VOID ), NULL, 0, 0, 0 )
+	              typeAddrOf( typeSetIsConst( FB_DATATYPE_VOID ) ), NULL, 0, 0, 0 )
 
 	symbStructEnd( ast.data.desc )
 end sub

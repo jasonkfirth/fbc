@@ -95,12 +95,12 @@ end sub
 '' -------------------------------------------------------------------------
 
 type FBGNUOSINFO
-	gnuid       as zstring ptr  '' Part of GNU triplet identifying a certain OS
+	gnuid       as const zstring ptr  '' Part of GNU triplet identifying a certain OS
 	os          as integer      '' Corresponding FB_COMPTARGET_*
 end type
 
 type FBGNUARCHINFO
-	gnuid       as zstring ptr  '' Part of GNU triplet identifying a certain architecture
+	gnuid       as const zstring ptr  '' Part of GNU triplet identifying a certain architecture
 	cputype     as integer      '' Corresponding FB_CPUTYPE_*
 end type
 
@@ -233,7 +233,7 @@ function fbCpuTypeFromGNUArchInfo( byref arch as string ) as integer
 end function
 
 type FBOSARCHINFO
-	targetid    as zstring ptr  '' -target option argument
+	targetid    as const zstring ptr  '' -target option argument
 	os          as integer      '' FB_COMPTARGET_*
 	cputype     as integer      '' FB_CPUTYPE_*
 end type
@@ -1409,6 +1409,7 @@ private sub handleArg _
 		if (optid < 0) then
 			'' Unrecognized command line option
 			hFatalInvalidOption( arg, is_source )
+			return
 		end if
 
 		'' Are we in source and option not allowed in source?

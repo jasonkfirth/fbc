@@ -26,6 +26,10 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+
+declare sub fbSemanticModelStringIndex(byval result as ASTNODE ptr, _
+	byval operand_id as longint, byval index_id as longint)
+
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 declare function fbSemanticModelMacroAccessBinding( ) as longint
@@ -34,6 +38,9 @@ declare function fbSemanticModelMacroAccessBinding( ) as longint
 #include once "tooling/semantic-variable-names.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
+declare sub fbSemanticModelExportCurrentMemberPrefix _
+    (byval expr as ASTNODE ptr, byval fld as FBSYMBOL ptr, _
+     byval receiver_dtype as integer, byval receiver_subtype as FBSYMBOL ptr)
 declare sub fbSemanticModelExportMemberBinding _
 	( byval sym as FBSYMBOL ptr, byval receiver as FBSYMBOL ptr, _
 	  byref source as LEX_LOCATION, byval is_type as integer )
@@ -403,6 +410,10 @@ function cUdtMember _
 		dim as longint semantic_member_nonphysical = lexGetNonphysicalTokenCount( )
 		dim as longint semantic_binding_before = fbSemanticModelBindingCount( )
 	dim as longint semantic_macro_before = fbSemanticModelMacroAccessBinding( )
+        '' Field lookup can select an inherited declaration. Keep the
+        '' actual record type before dtype/subtype become the selected field.
+        dim as integer semantic_receiver_dtype = dtype
+        dim as FBSYMBOL ptr semantic_receiver_subtype = subtype
 		dim as FBSYMBOL ptr fld = hMemberId( subtype, FALSE )
 		dim as longint semantic_binding = fbSemanticModelBindingCount( )
 		if( semantic_binding = semantic_binding_before ) then semantic_binding = 0
@@ -451,7 +462,7 @@ function cUdtMember _
 			varexpr = hFieldAccess( varexpr, fld, dtype, subtype, check_array )
 			if( varexpr <> NULL ) then varexpr->semantic_binding = semantic_binding
 			if( export_semantics ) then
-				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
+				fbSemanticModelExportCurrentMemberPrefix(varexpr, fld, semantic_receiver_dtype, semantic_receiver_subtype)
 			end if
 
 			'' Only continue if the field was an UDT and there's a '.' following
@@ -779,7 +790,12 @@ function cMemberDeref _
 
 		'' '['
 		case CHAR_LBRACKET
-			if( export_semantics and typeIsPtr( dtype ) ) then
+			if( export_semantics and (typeIsPtr( dtype ) or _
+				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_STRING) or _
+				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_USTRING) or _
+				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_FIXSTR) or _
+				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_CHAR) or _
+				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_WCHAR)) ) then
 				semantic_pointer = fbSemanticModelPointerIndexPrefix(varexpr, _
 					semantic_index_start, semantic_index_nonphysical)
 			end if
@@ -805,7 +821,20 @@ function cMemberDeref _
 			'' string, fixstr, w|zstring? In that case '[]' means string indexing, not MemberDeref.
 			case FB_DATATYPE_STRING, FB_DATATYPE_USTRING, FB_DATATYPE_FIXSTR, _
 			     FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
+				'' Capture the typed written index before hCheckIntegerIndex
+				'' and hStrIndexing consume it. String indexing is a separate
+				'' family from pointer arithmetic, despite its lowered address.
+				if( export_semantics ) then
+					semantic_index = fbSemanticModelOriginalExpression _
+						(idxexpr, semantic_index_value_start, semantic_index_value_nonphysical_start, _
+						 semantic_index_value_end, semantic_index_value_nonphysical_end)
+				end if
 				varexpr = hStrIndexing( dtype, varexpr, hCheckIntegerIndex( idxexpr ) )
+				if( export_semantics ) then
+					fbSemanticModelPointerIndexPrefix(varexpr, semantic_index_start, semantic_index_nonphysical)
+					fbSemanticModelStringIndex(varexpr, semantic_pointer, semantic_index)
+				end if
+				semantic_pointer = 0: semantic_index = 0
 				idxexpr = NULL
 
 				dtype = astGetFullType( varexpr )
@@ -1688,8 +1717,9 @@ function cVarOrDeref _
 
 	dim as integer last_isexpr = any, previous_check_array = any
 
+	'' Capture parser state before entering nested expression parsing.
+	last_isexpr = fbGetIsExpression( )
 	if( options and FB_VAREXPROPT_ISEXPR ) then
-		last_isexpr = fbGetIsExpression( )
 		fbSetIsExpression( TRUE )
 	end if
 	previous_check_array = fbGetCheckArray( )

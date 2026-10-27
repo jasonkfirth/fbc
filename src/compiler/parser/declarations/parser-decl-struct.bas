@@ -24,6 +24,7 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-type-shapes.bi"
 #include once "parser/parser.bi"
 declare sub fbSemanticModelAggregateDeclarationToken(byval token as integer)
 
@@ -33,6 +34,9 @@ declare sub fbSemanticModelNativeListInput(byval identity as longint, byval owne
     byval ordinal as integer, byval sym as FBSYMBOL ptr, byref written_type as const string, _
     byval is_declaration as integer, byref source as LEX_LOCATION)
 declare sub fbSemanticModelNativeListEnd(byval identity as longint, byval owner as FBSYMBOL ptr, byval count as integer)
+
+declare function parserGetLastTypeAlias( ) as FBSYMBOL ptr
+declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, byval alias_symbol as FBSYMBOL ptr)
 
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-hooks.bi"
@@ -327,6 +331,7 @@ private sub hFieldType _
 	)
 
 	'' SymbolType
+	fbSemanticModelTypeShapeDeclaration()
 	hSymbolType( dtype, subtype, lgt )
 
 	'' check that field type is not a parent struct namespace
@@ -475,10 +480,13 @@ private function hAddAndInitField _
 		byval attrib as FB_SYMBATTRIB, _
 		byref semantic_site as LEX_LOCATION, _
 		byval semantic_group as longint = 0, _
-		byval semantic_ordinal as integer = 0 _
+		byval semantic_ordinal as integer = 0, _
+		byval semantic_type_alias as FBSYMBOL ptr _
 	) as integer
 
 	dim as FBSYMBOL ptr sym = any, dtor = any
+
+	fbSemanticModelTypeShapeArray(dims)
 
 	function = FALSE
 
@@ -519,6 +527,7 @@ private function hAddAndInitField _
 		exit function
 	end if
 	fbSemanticModelExportBinding(sym, semantic_site, TRUE)
+	fbSemanticModelTypeAliasDeclaration(sym, semantic_type_alias)
 	fbSemanticModelMemberDeclarationSpelling(sym, id, semantic_site)
 	fbSemanticModelNativeListInput(semantic_group, parent, semantic_ordinal, sym, "as", TRUE, semantic_site)
 	if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then
@@ -612,6 +621,7 @@ private sub hTypeMultElementDecl _
 	'' AS SymbolType
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 	hFieldType( dtype, subtype, lgt )
+	dim as FBSYMBOL ptr semantic_type_alias = parserGetLastTypeAlias( )
 
 	do
 		fieldattrib = attrib
@@ -625,7 +635,7 @@ private sub hTypeMultElementDecl _
 		'' symbAddField()
 		'' ['=' InitializerExpression]
 		semantic_ordinal += 1
-		hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, fieldattrib, semantic_site, semantic_group, semantic_ordinal )
+		hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, fieldattrib, semantic_site, semantic_group, semantic_ordinal, semantic_type_alias )
 
 		'' ','?
 	loop while( hMatch( CHAR_COMMA ) )
@@ -671,11 +681,12 @@ private sub hTypeElementDecl _
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 	end if
 	hFieldType( dtype, subtype, lgt )
+	dim as FBSYMBOL ptr semantic_type_alias = parserGetLastTypeAlias( )
 
 	'' symbAddField()
 	'' ['=' InitializerExpression]
 	semantic_ordinal += 1
-	hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, attrib, semantic_site, semantic_group, semantic_ordinal )
+	hAddAndInitField( parent, id, dims, dTB(), boundstypeini, dtype, subtype, lgt, bits, attrib, semantic_site, semantic_group, semantic_ordinal, semantic_type_alias )
 	fbSemanticModelNativeListEnd(semantic_group, parent, semantic_ordinal)
 
 end sub

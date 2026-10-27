@@ -123,6 +123,7 @@
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
 #include once "lexer/lex.bi"
+#include once "parser/parser.bi"
 #include once "backend/ir-private.bi"
 #include once "crt/string.bi"
 #include once "backend/c/ir-hlc-platform.bi"
@@ -143,15 +144,16 @@
 '' and is appended to "toplevel". At that point we're done emitting
 '' anyways and don't need to add stuff to toplevel's header anymore.
 ''
-'' This kind of container/body pair is not currently needed for procs/scopes,
-'' because there we emit declarations "in line" instead of moving all to the
-'' top of the scope. For the toplevel emitting all at once makes sense because
+'' Procedures and scopes also use a header/body pair. Pure storage declarations
+'' belong before statements; runtime initialization and calls stay in their original body
+'' position. This preserves evaluation order and lexical variable lifetimes.
+'' For the toplevel emitting all at once makes sense because
 '' it is more efficient to check the symbol tables for called procedures only
 '' once during _emitEnd() instead of once during every _emitProcBegin().
 '' Note that _emitBegin() is called before parsing has even started,
 '' so the global declarations can't be emitted from there already.
 
-const MAX_SECTIONS = FB_MAXSCOPEDEPTH + 1
+const MAX_SECTIONS = FB_MAXSCOPEDEPTH * 2 + 1
 const SECTION_BUFFER_INITIAL_CAPACITY = 8192
 const SECTION_TAB_BUFFER_LENGTH = 64
 
@@ -171,7 +173,13 @@ enum
 	EXPRCLASS_UOP
 	EXPRCLASS_BOP
 	EXPRCLASS_MACRO
+	EXPRCLASS_MEMBER
+	EXPRCLASS_INDEX
+	EXPRCLASS_ARRAYADDR
 end enum
+
+const C_MEMBER_VIEW_VALUE = 1
+const C_MEMBER_VIEW_STORAGE = 2
 
 type EXPRNODE
 	class       as integer  '' EXPRCLASS_*
@@ -182,6 +190,7 @@ type EXPRNODE
 
 	l           as EXPRNODE ptr  '' CAST/UOP/BOP
 	r           as EXPRNODE ptr  '' BOP
+	member_view as integer      '' MEMBER uses an alignment-one record view; an empty path dereferences it.
 
 	union
 		text    as zstring ptr  '' TEXT
@@ -202,6 +211,29 @@ type EXPRCACHENODE
 	'' expression results right when emitting the next expression/statement.
 	vregid      as integer
 	expr        as EXPRNODE ptr
+end type
+
+type CALIGNVIEW
+	dtype      as integer
+	subtype    as FBSYMBOL ptr
+	section    as integer
+	emitted    as integer
+end type
+
+type CARRAYCALLBACK
+	target_name as DZSTRING
+	target_type as DZSTRING
+	identifier  as uinteger
+end type
+
+'' Initializer nodes borrow their symbols. Only the stack allocation belongs
+'' to the emitter; closing a child aggregate counts as one parent element.
+type CVARINISCOPE
+	previous as CVARINISCOPE ptr
+	sym as FBSYMBOL ptr
+	udt as FBSYMBOL ptr
+	is_array as integer
+	emitted_elements as longint
 end type
 
 enum
@@ -231,6 +263,8 @@ type IRHLCCTX
 
 	varini                  as string
 	variniscopelevel        as integer
+	variniscopes            as CVARINISCOPE ptr
+	varinifailed            as integer
 
 	fbctinf                 as string
 	exports                 as string
@@ -238,8 +272,17 @@ type IRHLCCTX
 	exprnodes               as TLIST   '' EXPRNODE
 	exprtext                as string  '' buffer used by exprFlush() to build the final text
 	exprcache               as TLIST   '' EXPRCACHENODE
+	alignmentviews          as TLIST   '' CALIGNVIEW, owned until backend shutdown.
+	arraycallbacks          as TLIST   '' CARRAYCALLBACK, owns C names for one emission unit.
+	arraycallbackid         as uinteger
+	unalignedid             as uinteger '' Per-emission byte-copy temporary names, reset by _emitBegin().
 
 	globalvarpass           as integer  '' Global var emitting is done in 2 passes; this allows the callbacks to identify the current pass.
+	computedgotoaddress     as integer  '' A real label address or required entry reference has been emitted.
+	procentrylabel          as FBSYMBOL ptr  '' Borrowed from the procedure AST while emitting its body.
+	procentrysection        as integer
+	procentryoffset         as uinteger
+	procentrybytes          as uinteger
 end type
 
 declare function hEmitType _
@@ -259,13 +302,32 @@ declare sub _emitDBG _
 		ByVal filename As zstring ptr = 0 _
 	)
 
+declare function hCUnalignedTempName() as string
+
+declare sub hCRememberViewType( byval dtype as integer, byval subtype as FBSYMBOL ptr )
+
 declare sub exprFreeNode( byval n as EXPRNODE ptr )
+declare function hIsArrayCallbackParam( byval proc as FBSYMBOL ptr, byval param_index as integer ) as integer
+declare sub hEmitArrayCallbackDefinitions( )
+declare sub hClearArrayCallbacks( )
 #if __FB_DEBUG__
 declare sub exprDump( byval n as EXPRNODE ptr )
 #endif
 
 '' globals
 dim shared as IRHLCCTX ctx
+#include once "backend/c/asm-names.bi"
+#include once "backend/c/c-identifiers.bi"
+
+declare sub hBuildStrLit( byref ln as string, byval z as zstring ptr, _
+	byval length as longint, byval paddedlength as longint )
+
+private sub hAppendCObjectAlias( byref ln as string, byref object_name as string )
+	ln += " __asm__("
+	hBuildStrLit( ln, strptr(object_name), len(object_name) + 1, 0 )
+	ln += ")"
+end sub
+
 
 '' same order as FB_DATATYPE
 dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
@@ -306,6 +368,8 @@ private sub _init( )
 	listInit( @ctx.anonstack, 8, sizeof( FBSYMBOL ptr ), LIST_FLAGS_NOCLEAR )
 	listInit( @ctx.exprnodes, 32, sizeof( EXPRNODE ), LIST_FLAGS_CLEAR )
 	listInit( @ctx.exprcache, 8, sizeof( EXPRCACHENODE ), LIST_FLAGS_NOCLEAR )
+	listInit( @ctx.alignmentviews, 8, sizeof(CALIGNVIEW), LIST_FLAGS_CLEAR )
+	listInit( @ctx.arraycallbacks, 8, sizeof(CARRAYCALLBACK), LIST_FLAGS_CLEAR )
 	irSetOption( IR_OPT_FPUIMMEDIATES or IR_OPT_MISSINGOPS )
 
 	if( fbIs64bit( ) ) then
@@ -335,6 +399,9 @@ private sub _end( )
 		end with
 	next
 
+	hClearArrayCallbacks( )
+	listEnd( @ctx.arraycallbacks )
+	listEnd( @ctx.alignmentviews )
 	listEnd( @ctx.exprcache )
 	listEnd( @ctx.exprnodes )
 	listEnd( @ctx.anonstack )
@@ -519,6 +586,18 @@ private sub hWriteLine( byref s as string, byval noline as integer = FALSE )
 	sectionWriteLine( s )
 end sub
 
+private sub hWriteDeclaration( byref s as string )
+	'' The preceding section is this block's declaration header. Moving only
+	'' storage declarations leaves calls and runtime initialization in order.
+	if( ctx.section >= 3 ) then
+		var section = sectionGosub( ctx.section - 1 )
+		hWriteLine( s )
+		sectionReturn( section )
+	else
+		hWriteLine( s )
+	end if
+end sub
+
 private sub hUpdateCurrentFileName( byval filename as zstring ptr )
 	ctx.escapedinputfilename = hReplace( filename, "\", $"\\" )
 end sub
@@ -533,17 +612,17 @@ private sub hWriteStaticAssert( byref expr as string )
 		'' and above the 1st use (can't be emitted from _emitEnd() because
 		'' then it could appear behind struct declarations...)
 		section = sectionGosub( 0 )
-		hWriteLine( "#define __FB_STATIC_ASSERT( expr ) extern int __$fb_structsizecheck[(expr) ? 1 : -1]", TRUE )
+		hWriteLine( "#define fb_c_static_assert_check( expr ) extern int fb_c_static_assert[(expr) ? 1 : -1]", TRUE )
 		sectionReturn( section )
 	end if
 
-	hWriteLine( "__FB_STATIC_ASSERT( " + expr + " );" )
+	hWriteLine( "fb_c_static_assert_check( " + expr + " );" )
 end sub
 
 private sub hAppendClobber _
 	( _
 		byref ln as string, _
-		byval regname as zstring ptr _
+		byval regname as const zstring ptr _
 	)
 	ln += ", """
 	ln += *regname
@@ -848,7 +927,7 @@ private function hGetMangledNameForASM _
 	function = mangled
 end function
 
-private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
+private function hNeedAbiAlias( byval proc as FBSYMBOL ptr ) as integer
 	function = FALSE
 
 	if( irUsesClangCCompiler() ) then
@@ -901,6 +980,10 @@ private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
 	case else
 		'' Other conventions do not need a separately emitted alias.
 	end select
+end function
+
+private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
+	return hNeedAbiAlias(proc) orelse hCNameNeedsEncoding(symbGetMangledName(proc))
 end function
 
 private function hEmitMutableLibcPtrParam _
@@ -960,6 +1043,27 @@ private function hGetLibcSizeDtype( ) as integer
 	function = dtype
 end function
 
+private sub hAdjustLibcParamType _
+	( _
+		byref mangled as string, _
+		byval param_index as integer, _
+		byref dtype as integer, _
+		byref subtype as FBSYMBOL ptr _
+	)
+
+	'' Prototypes and argument casts must use the same C library type.
+	'' In particular, FB accepts const pointers for DEALLOCATE/REALLOCATE,
+	'' while their C entry points require a mutable void pointer.
+	if( hEmitMutableLibcPtrParam( mangled, param_index ) ) then
+		dtype = typeAddrOf( FB_DATATYPE_VOID )
+		subtype = NULL
+	elseif( hEmitLibcSizeParam( mangled, param_index ) ) then
+		dtype = hGetLibcSizeDtype( )
+		subtype = NULL
+	end if
+
+end sub
+
 private function hEmitLibcProcPtrParam _
 	( _
 		byref mangled as string, _
@@ -987,10 +1091,13 @@ end function
 '' the emitted C formals, including our explicit hidden-result pointer and
 '' pointer lowering of non-trivial BYVAL records. The native FBC stdcall
 '' suffix calculator deliberately follows a different ABI contract there.
-private sub hObserveProcObjectName( byval proc as FBSYMBOL ptr, byref identifier as const string )
-	if( fbSemanticLinkProcedureObjectNeeded(proc) = FALSE ) then exit sub
+private function hGetProcObjectName _
+	( _
+		byval proc as FBSYMBOL ptr, _
+		byref identifier as const string _
+	) as string
 	dim as string object_name
-	if( hNeedAlias(proc) ) then
+	if( hNeedAbiAlias(proc) ) then
 		object_name = hGetMangledNameForASM(proc, TRUE)
 	else
 		object_name = identifier
@@ -1010,7 +1117,7 @@ private sub hObserveProcObjectName( byval proc as FBSYMBOL ptr, byref identifier
 				count += 1
 				if( count > symbGetProcParams(proc) ) then
 					fbSemanticLinkFail( )
-					exit sub
+					return ""
 				end if
 				if( symbGetParamMode(param) = FB_PARAMMODE_VARARG ) then
 					'' The C compiler ignores fastcall on a variadic signature.
@@ -1021,7 +1128,7 @@ private sub hObserveProcObjectName( byval proc as FBSYMBOL ptr, byref identifier
 				dim as longint length = symbCalcLen(dtype, subtype)
 				if( (length <= 0) or (length > &h7fffffff) ) then
 					fbSemanticLinkFail( )
-					exit sub
+					return ""
 				end if
 				'' Win32 C argument slots are rounded up to four bytes.
 				bytes += ((length + 3) \ 4) * 4
@@ -1034,8 +1141,23 @@ private sub hObserveProcObjectName( byval proc as FBSYMBOL ptr, byref identifier
 			object_name = "_" + object_name
 		end if
 	end if
-	fbSemanticLinkProcedureObject(proc, object_name)
+	return object_name
+end function
+
+private sub hObserveProcObjectName( byval proc as FBSYMBOL ptr, byref identifier as const string )
+	if( fbSemanticLinkProcedureObjectNeeded(proc) = FALSE ) then exit sub
+	var object_name = hGetProcObjectName( proc, identifier )
+	fbSemanticLinkProcedureObject( proc, object_name )
 end sub
+
+private function hProcDoesNotReturn( byval proc as FBSYMBOL ptr ) as integer
+	if( symbGetProcIsNoReturn( proc ) ) then return TRUE
+	if( symbGetIsRTL( proc ) andalso (*symbGetMangledName( proc ) = FB_RTL_END) ) then
+		'' END, SYSTEM and STOP share the runtime's terminating exit() path.
+		return TRUE
+	end if
+	return FALSE
+end function
 
 private function hEmitProcHeader _
 	( _
@@ -1092,6 +1214,9 @@ private function hEmitProcHeader _
 		end select
 	end if
 
+	if( (options and EMITPROC_ISPROCPTR) = 0 ) then
+		if( hProcDoesNotReturn( proc ) ) then ln += " __attribute__((noreturn))"
+	end if
 	ln += " "
 
 	mangled = *symbGetMangledName( proc )
@@ -1099,10 +1224,10 @@ private function hEmitProcHeader _
 	'' Identifier
 	if( options and EMITPROC_ISPROCPTR ) then
 		ln += "(*"
-		ln += mangled
+		ln += hGetCId( proc )
 		ln += ")"
 	else
-		ln += mangled
+		ln += hGetCId( proc )
 	end if
 
 	'' Parameter list
@@ -1117,7 +1242,7 @@ private function hEmitProcHeader _
 		else
 			hidden = proc->proc.ext->res
 			ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), symbGetSubtype( hidden ) )
-			ln += " " + *symbGetMangledName( hidden )
+			ln += " " + hGetCId( hidden )
 		end if
 
 		if( symbGetProcParams( proc ) > 0 ) then
@@ -1146,6 +1271,9 @@ private function hEmitProcHeader _
 				symbGetRealParamDtype( param, dtype, subtype )
 				if( (options and EMITPROC_ISPROTO) <> 0 ) then
 					dim as string libc_procptr = hEmitLibcProcPtrParam( mangled, param_index )
+					if( hIsArrayCallbackParam( proc, param_index ) ) then
+						libc_procptr = "void (*)( void* )"
+					end if
 					if( len( libc_procptr ) > 0 ) then
 						DZstrConcatAssign( params, libc_procptr )
 						param = symbGetProcPrevParam( proc, param )
@@ -1154,19 +1282,14 @@ private function hEmitProcHeader _
 							DZstrConcatAssign( params, ", " )
 						end if
 						continue while
-					elseif( hEmitMutableLibcPtrParam( mangled, param_index ) ) then
-						dtype = typeAddrOf( FB_DATATYPE_VOID )
-						subtype = NULL
-					elseif( hEmitLibcSizeParam( mangled, param_index ) ) then
-						dtype = hGetLibcSizeDtype( )
-						subtype = NULL
 					end if
+					hAdjustLibcParamType( mangled, param_index, dtype, subtype )
 				end if
 				DZstrConcatAssign( params, hEmitType( dtype, subtype, TRUE ) )
 			end if
 
 			if( (options and EMITPROC_ISPROTO) = 0 ) then
-				DZstrConcatAssign( params, " " + *symbGetMangledName( symbGetParamVar( param ) ) )
+				DZstrConcatAssign( params, " " + hGetCId( symbGetParamVar( param ) ) )
 			end if
 		end if
 
@@ -1190,10 +1313,12 @@ private function hEmitProcHeader _
 		'' Add asm("mangledname") alias if needed.
 		'' asm() can only be be used on prototypes.
 		if( hNeedAlias( proc ) ) then
-			ln += " asm(""" + hGetMangledNameForASM( proc, TRUE ) + """)"
+			var object_name = hGetProcObjectName( proc, mangled )
+			hAppendCObjectAlias( ln, object_name )
 		end if
 
-		'' ctor/dtor flags on prototypes
+		'' MinGW GCC takes constructor priorities from the first declaration.
+		'' Alias prototypes must retain them before the attributed definition.
 		hAppendCtorAttrib( ln, proc, FALSE )
 	end if
 
@@ -1211,6 +1336,8 @@ private function hGetUdtTag( byval sym as FBSYMBOL ptr ) as string
 end function
 
 private function hGetUdtId( byval sym as FBSYMBOL ptr ) as string
+	dim as string id
+	dim as zstring ptr mangled
 
 	if( typeGetMangleDt( symbGetFullType( sym ) ) = FB_DATATYPE_VA_LIST ) then
 		'' gcc's __builtin_va_list needs an exact name
@@ -1223,9 +1350,22 @@ private function hGetUdtId( byval sym as FBSYMBOL ptr ) as string
 		end select
 	end if
 
-	'' Prefixing the mangled name with a $ because it may start with a
-	'' number which isn't allowed in C.
-	function = "$" + *symbGetMangledName( sym )
+	'' The mangled name may start with a number. Use a C identifier prefix
+	'' for these private type names, leaving linker/RTTI names unchanged.
+	'' Internal names can also contain $. Encode every non-alphanumeric byte,
+	'' including the escape marker _, so distinct mangled names stay distinct.
+	id = "fb_type_"
+	mangled = symbGetMangledName( sym )
+	for i as integer = 0 to len( *mangled ) - 1
+		dim as ubyte ch = cubyte( (*mangled)[i] )
+		select case ch
+		case asc( "A" ) to asc( "Z" ), asc( "a" ) to asc( "z" ), asc( "0" ) to asc( "9" )
+			id += chr( ch )
+		case else
+			id += "_" + hex( ch, 2 )
+		end select
+	next
+	function = id
 end function
 
 private function hGetUdtName( byval sym as FBSYMBOL ptr ) as string
@@ -1369,11 +1509,13 @@ private sub hEmitVarDecl _
 	)
 
 	dim as string ln
+	dim as integer static_storage = FALSE
 
 	if( use_extern ) then
 		ln += "extern "
 	elseif( symbIsStatic( sym ) and ((symbGetAttrib( sym ) and (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) = 0) ) then
 		ln += "static "
+		static_storage = TRUE
 	end if
 	if( symbIsThreadLocal( sym ) ) then ln += "__thread "
 
@@ -1392,8 +1534,15 @@ private sub hEmitVarDecl _
 		'' top-level const on the BASIC variable itself is not emitted here.
 		ln += hEmitType( typeUnsetIsConst( dtype ), sym->subtype, TRUE )
 	end if
-	ln += " " + *symbGetMangledName( sym )
+	ln += " " + hGetCId( sym )
 	ln += hEmitArrayDecl( sym )
+	if( sym->class = FB_SYMBCLASS_VAR andalso symbIsLocal(sym) = FALSE ) then
+		if( hCNameNeedsEncoding(symbGetMangledName(sym)) ) then
+			'' Global C tokens may differ; retain the original object identity.
+			var object_name = hGetMangledNameForASM( sym, TRUE )
+			hAppendCObjectAlias( ln, object_name )
+		end if
+	end if
 
 	'' dllimport's are handled manually, emitted as pointers and deref'ed
 	'' where needed, as with the ASM backend, as opposed to using
@@ -1416,7 +1565,13 @@ private sub hEmitVarDecl _
 	end if
 
 	ln += ";"
-	hWriteLine( ln )
+	'' C static initializers are constant data. Their declaration can precede
+	'' statements; BASIC runtime initialization remains in the emitted body.
+	if( (varini = NULL) orelse static_storage ) then
+		hWriteDeclaration( ln )
+	else
+		hWriteLine( ln )
+	end if
 end sub
 
 private sub hMarkReferencedStaticLocalInTree( byval n as ASTNODE ptr )
@@ -1540,7 +1695,18 @@ end sub
 private sub hMaybeEmitProcProto( byval s as FBSYMBOL ptr )
 	dim as integer section = any
 
-	if( symbGetIsFuncPtr( s ) or (not symbGetIsAccessed( s )) ) then
+	'' Empty module bodies are discarded before the final prototype pass.
+	'' Their constructor status records startup intent, not an emitted body.
+	if( symbIsPrivate( s ) andalso symbGetIsParsed( s ) andalso _
+	    symbGetIsModLevelProc( s ) andalso _
+	    (symbGetProcIsEmitted( s ) = FALSE) ) then
+		exit sub
+	end if
+
+	'' Public definitions may only be called from another module. Declare each
+	'' emitted body without adding unused extern declarations to the header.
+	if( symbGetIsFuncPtr( s ) or _
+	    ((not symbGetIsAccessed( s )) and (not symbGetProcIsEmitted( s ))) ) then
 		exit sub
 	end if
 
@@ -1691,10 +1857,13 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 		skip = symbIsDynamic( fld )
 
 		if( skip = FALSE ) then
-			dtype = symbGetType( fld )
+			'' Preserve pointee qualifiers while leaving the field itself writable
+			'' for BASIC initialization and constructor assignments.
+			dtype = symbGetType( fld ) or typeGetConstMask( symbGetFullType( fld ) )
+			dtype = typeUnsetIsConst( dtype )
 			subtype = symbGetSubtype( fld )
-			DZstrAssign( ln, hEmitType( dtype, subtype ) )
-			DZstrConcatAssign( ln, " " + *symbGetName( fld ) )
+			DZstrAssign( ln, hEmitType( dtype, subtype, TRUE ) )
+			DZstrConcatAssign( ln, " " + hGetCFieldId( fld ) )
 			DZstrConcatAssign( ln, hEmitArrayDecl( fld ) )
 
 			'' Field alignment (FIELD = N)?
@@ -1855,6 +2024,7 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 	end if
 
 	symbResetIsBeingEmitted( s )
+	hCRememberViewType(FB_DATATYPE_STRUCT, s)
 
 	'' Static assertion to ensure the struct has been emitted correctly,
 	'' at least with the correct sizeof(), because if it'd be too small,
@@ -2034,10 +2204,17 @@ private function _emitBegin( ) as integer
 		return FALSE
 	end if
 
+	'' Declaration metadata belongs to one C output; retain only list capacity.
+	do while( listGetHead(@ctx.alignmentviews) <> NULL )
+		listDelNode(@ctx.alignmentviews, listGetHead(@ctx.alignmentviews))
+	loop
+	hClearArrayCallbacks( )
+	ctx.arraycallbackid = 0
 	ctx.section = -1
 	ctx.sectiongosublevel = 0
 	ctx.linenum = 0
 	ctx.usedbuiltins = 0
+	ctx.unalignedid = 0
 	ctx.globalvarpass = 0
 	hUpdateCurrentFileName( env.inf.name )
 
@@ -2069,6 +2246,7 @@ private function _emitBegin( ) as integer
 	else
 		hWriteLine( "typedef struct { char *data; int32 len; int32 size; } FBSTRING;", TRUE )
 	end if
+	hCRememberViewType(FB_DATATYPE_STRING, NULL)
 	hWriteLine( "typedef int8 boolean;", TRUE )
 
 	'' body
@@ -2078,6 +2256,7 @@ private function _emitBegin( ) as integer
 end function
 
 private sub _emitEnd( )
+	hAsmEndNames( )
 	dim as integer section = any
 	dim as integer output_error = FALSE
 
@@ -2112,6 +2291,8 @@ private sub _emitEnd( )
 	'' Emit procedure prototypes first (because of function pointer
 	'' initializers taking the address of procedures)
 	symbForEachGlobal( FB_SYMBCLASS_PROC, @hMaybeEmitProcProto )
+	'' Callback bodies follow the original typed procedure prototypes.
+	hEmitArrayCallbackDefinitions( )
 
 	''
 	'' Emit global vars based on the order they were added to the global
@@ -2361,7 +2542,7 @@ private function hEmitType _
 		assert( ptrcount > 0 )
 		ptrcount -= 1
 		hEmitUDT( subtype, (ptrcount > 0) )
-		s = *symbGetMangledName( subtype )
+		s = hGetCId( subtype )
 
 	case FB_DATATYPE_WCHAR
 		'' Emit ubyte/ushort/uinteger instead of wchar_t
@@ -2407,6 +2588,8 @@ private function hEmitType _
 	function = s
 end function
 
+#include once "backend/c/c-alignment-views.bi"
+
 private function exprNew _
 	( _
 		byval class_ as integer, _
@@ -2425,7 +2608,7 @@ private function exprNew _
 end function
 
 private sub exprFreeNode( byval n as EXPRNODE ptr )
-	if( n->class = EXPRCLASS_TEXT ) then
+	if( (n->class = EXPRCLASS_TEXT) or (n->class = EXPRCLASS_MEMBER) ) then
 		ZstrFree( n->text )
 	end if
 	listDelNode( @ctx.exprnodes, n )
@@ -2615,7 +2798,7 @@ private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 		n = exprNew( EXPRCLASS_SYM, FB_DATATYPE_INVALID, NULL )
 		n->sym = sym
 
-		n = exprNewCAST( typeAddrOf( symbGetType( sym ) ), symbGetSubtype( sym ), n )
+		n = exprNewCAST( typeAddrOf( symbGetFullType( sym ) ), symbGetSubtype( sym ), n )
 
 	'' main()'s argv? It's emitted as int8** (char**), not as uint8** (zstring ptr ptr),
 	'' so specify the type manually instead of deriving it from the FB symbol.
@@ -2634,6 +2817,9 @@ private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 
 	function = n
 end function
+
+#include once "backend/c/c-pointer-arithmetic.bi"
+#include once "backend/c/c-member-access.bi"
 
 private function typeCBop _
 	( _
@@ -2775,6 +2961,21 @@ private function exprNewUOP _
 	function = n
 end function
 
+private function exprIsNullPointerConstant( byval n as EXPRNODE ptr ) as integer
+
+	if( n->class <> EXPRCLASS_CAST ) then
+		return FALSE
+	end if
+	if( typeIsPtr( n->dtype ) = FALSE ) then
+		return FALSE
+	end if
+
+	var literal = n->l
+	return (literal->class = EXPRCLASS_IMM) andalso _
+	       (typeGetClass( literal->dtype ) = FB_DATACLASS_INTEGER) andalso _
+	       (literal->val.i = 0)
+end function
+
 private function exprNewBOP _
 	( _
 		byval op as integer, _
@@ -2784,13 +2985,47 @@ private function exprNewBOP _
 
 	dim as EXPRNODE ptr n = any
 	dim as integer dtype = any
+	dim as FBSYMBOL ptr subtype = NULL
 
 	'' To find out the BOPs result type, apply C type promotion rules
 	dtype = typeCBop( op, l->dtype, r->dtype )
+	'' C pointer arithmetic does not use the usual numeric promotions. Keep
+	'' its actual result type so the vreg conversion can insert any required
+	'' integer-address cast, and a later dereference retains its record type.
+	select case as const( op )
+	case AST_OP_ADD, AST_OP_SUB
+		if( typeIsPtr(l->dtype) ) then
+			if( typeIsPtr(r->dtype) ) then
+				if( op = AST_OP_SUB ) then dtype = FB_DATATYPE_INTEGER
+			elseif( typeGetClass(r->dtype) = FB_DATACLASS_INTEGER ) then
+				dtype = l->dtype
+				subtype = l->subtype
+			end if
+		elseif( op = AST_OP_ADD andalso typeIsPtr(r->dtype) ) then
+			if( typeGetClass(l->dtype) = FB_DATACLASS_INTEGER ) then
+				dtype = r->dtype
+				subtype = r->subtype
+			end if
+		end if
+	end select
 
-	'' BOPs should only be done on simple int/float types,
-	'' and on pointers only after casting to ubyte* first,
-	'' so no subtype needs to be preserved here.
+	'' Integer zero is a C null pointer constant in equality comparisons. The
+	'' IR can erase pointer qualifiers here, so retaining its typed zero cast
+	'' can make nested const pointers appear incompatible. Argument casts keep
+	'' their pointer type and width because they do not pass through this path.
+	if( (op = AST_OP_EQ) or (op = AST_OP_NE) ) then
+		if( typeIsPtr( l->dtype ) andalso exprIsNullPointerConstant( r ) ) then
+			var ptrcast = r
+			r = r->l
+			r->dtype = FB_DATATYPE_LONG
+			exprFreeNode( ptrcast )
+		elseif( typeIsPtr( r->dtype ) andalso exprIsNullPointerConstant( l ) ) then
+			var ptrcast = l
+			l = l->l
+			l->dtype = FB_DATATYPE_LONG
+			exprFreeNode( ptrcast )
+		end if
+	end if
 
 	'' if both are pointers, and either has a mangle modifier, then
 	'' cast both sides to ubyte*, otherwise, gcc may warn about comparing
@@ -2802,19 +3037,34 @@ private function exprNewBOP _
 		if( typeIsPtr( l->dtype ) and typeIsPtr( r->dtype ) ) then
 			if( (typeGetMangleDt( l->dtype ) = FB_DATATYPE_VA_LIST) or _
 				(typeGetMangleDt( r->dtype ) = FB_DATATYPE_VA_LIST) ) then
-				l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
-				r = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, r )
+				l = exprNewCAST( hCBytePointerType(l->dtype), NULL, l )
+				r = exprNewCAST( hCBytePointerType(r->dtype), NULL, r )
 			end if
 		end if
 	end select
 
-	n = exprNew( EXPRCLASS_BOP, dtype, NULL )
+	if( op = AST_OP_ADD ) then
+		var address = hCByteOffsetChain( l, r )
+		if( address ) then
+			'' Correct the native signed offset before taking one pointer step.
+			'' A separate pointer step can leave the object even when the final
+			'' address is valid. The C backend's -fwrapv contract preserves the
+			'' native integer arithmetic; neither operand is evaluated twice.
+			r->dtype = FB_DATATYPE_INTEGER
+			address->r = exprNewBOP( AST_OP_ADD, address->r, r )
+			return l
+		end if
+	end if
+
+	n = exprNew( EXPRCLASS_BOP, dtype, subtype )
 	n->l = l
 	n->r = r
 	n->op = op
 
 	function = n
 end function
+
+#include once "backend/c/c-array-index.bi"
 
 '' Add expression root node to cache list, with the corresponding vreg id,
 '' allowing it to be looked up later (when the AST accesses that vreg).
@@ -3078,7 +3328,7 @@ private sub hBuildWstrLit _
 	dim as uinteger ch = any
 	dim as integer wcharsize = any
 	dim as wstring ptr src = any, src_end = any
-	dim as zstring ptr strstart = any
+	dim as const zstring ptr strstart = any
 	dim as DZSTRING buffer
 
 	'' (ditto)
@@ -3152,7 +3402,7 @@ private sub hBuildWstrLit _
 	DZstrAllocate( buffer, 0 )
 end sub
 
-private function hBopToStr( byval op as integer ) as zstring ptr
+private function hBopToStr( byval op as integer ) as const zstring ptr
 	select case as const( op )
 	case AST_OP_ADD : function = @" + "
 	case AST_OP_SUB : function = @" - "
@@ -3177,7 +3427,7 @@ private function hBopToStr( byval op as integer ) as zstring ptr
 	end select
 end function
 
-private function hFloatUopToStr( byval op as integer, byval dtype as integer ) as zstring ptr
+private function hFloatUopToStr( byval op as integer, byval dtype as integer ) as const zstring ptr
 	function = @""
 
 	'' Ignore any const qualifier.
@@ -3218,7 +3468,7 @@ private function hUopToStr _
 		byval op as integer, _
 		byval dtype as integer, _
 		byref is_builtin as integer _
-	) as zstring ptr
+	) as const zstring ptr
 
 	is_builtin = FALSE
 
@@ -3277,7 +3527,7 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr )
 		elseif( symbIsProc( sym ) ) then
 			s += "&"
 		end if
-		s += *symbGetMangledName( sym )
+		s += hGetCId( sym )
 	end if
 end sub
 
@@ -3289,15 +3539,72 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 	case EXPRCLASS_TEXT
 		ctx.exprtext += *n->text
 
+	case EXPRCLASS_MEMBER
+		if( n->member_view = C_MEMBER_VIEW_VALUE andalso hCMemberViewIsAggregate(n) ) then
+			var tempname = hCUnalignedTempName()
+			ctx.exprtext += "__extension__ ({ " + hEmitType(typeUnsetIsConst(n->dtype), n->subtype) + _
+			                " " + tempname + "; __builtin_memcpy( &" + tempname + ", (void const*) &("
+			'' Emit this owned storage as an address, not as another value copy.
+			n->member_view = C_MEMBER_VIEW_STORAGE
+			hExprFlush(n, FALSE)
+			n->member_view = C_MEMBER_VIEW_VALUE
+			ctx.exprtext += "), sizeof(" + tempname + ") ); " + tempname + "; })"
+			exit sub
+		end if
+		'' A whole-record value uses the same view as a field path. This keeps
+		'' BYVAL argument loads from promising the original natural alignment.
+		if( n->member_view andalso len(*n->text) = 0 ) then ctx.exprtext += "*"
+		ctx.exprtext += "("
+		if( n->member_view ) then
+			var viewdtype = typeDeref(n->l->dtype)
+			var viewname = hCAlignmentViewName(viewdtype, n->l->subtype)
+			assert(len(viewname) > 0)
+			ctx.exprtext += "("
+			if( typeIsConstAt(viewdtype, 0) ) then ctx.exprtext += "const "
+			ctx.exprtext += viewname + "*)("
+			hExprFlush(n->l, FALSE)
+			ctx.exprtext += ")"
+		else
+			hExprFlush( n->l, FALSE )
+		end if
+		ctx.exprtext += ")" + *n->text
+
+	case EXPRCLASS_INDEX
+		ctx.exprtext += "("
+		hExprFlush(n->l, FALSE)
+		ctx.exprtext += ")["
+		hExprFlush(n->r, FALSE)
+		ctx.exprtext += "]"
+
+	case EXPRCLASS_ARRAYADDR
+		dim as longint offset
+		var origin = hCArrayStorageOrigin(n->l, offset)
+		assert(origin <> NULL)
+		ctx.exprtext += "(" + hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE) + ")((" + _
+		                hEmitType(FB_DATATYPE_UINT, NULL) + ")"
+		hExprFlush(origin->l, TRUE)
+		ctx.exprtext += " + ("
+		hExprFlush(origin->r, FALSE)
+		ctx.exprtext += ") * " + hEmitInt(FB_DATATYPE_UINT, symbGetSizeOf(origin->l->sym))
+		if( offset <> 0 ) then ctx.exprtext += " + " + hEmitInt(FB_DATATYPE_UINT, offset)
+		ctx.exprtext += ")"
+
 	case EXPRCLASS_IMM
 		hImm2Text( ctx.exprtext, n )
 
 	case EXPRCLASS_SYM
+		'' The symbol formatter also serves expression dumps. Only an address
+		'' flushed into C satisfies Clang's computed-goto requirement.
+		if( symbIsLabel( n->sym ) and sectionInsideProc( ) ) then
+			ctx.computedgotoaddress = TRUE
+		end if
 		hSym2Text( ctx.exprtext, n->sym )
 
 	case EXPRCLASS_CAST
-		'' (type)l
-		ctx.exprtext += "(" + hEmitType( n->dtype, n->subtype ) + ")"
+		'' Keep pointee qualifiers, including nested pointer constness, so
+		'' argument casts agree with the emitted C prototype. Top-level const
+		'' does not qualify the converted value and is unnecessary in a cast.
+		ctx.exprtext += "(" + hEmitType( typeUnsetIsConst( n->dtype ), n->subtype, TRUE ) + ")"
 		hExprFlush( n->l, TRUE )
 
 	case EXPRCLASS_MACRO
@@ -3420,7 +3727,10 @@ private sub exprDump( byval n as EXPRNODE ptr )
 		@"CAST", _ '' EXPRCLASS_CAST
 		@"UOP" , _ '' EXPRCLASS_UOP
 		@"BOP" , _ '' EXPRCLASS_BOP
-		@"MACRO" _ '' EXPRCLASS_MACRO
+		@"MACRO", _ '' EXPRCLASS_MACRO
+		@"MEMBER", _ '' EXPRCLASS_MEMBER
+		@"INDEX", _ '' EXPRCLASS_INDEX
+		@"ARRAYADDR" _ '' EXPRCLASS_ARRAYADDR
 	}
 
 	s += *names(n->class)
@@ -3428,7 +3738,7 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	s += " "
 
 	select case as const( n->class )
-	case EXPRCLASS_TEXT
+	case EXPRCLASS_TEXT, EXPRCLASS_MEMBER
 		s += *n->text
 
 	case EXPRCLASS_IMM
@@ -3463,9 +3773,9 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	print s
 
 	select case( n->class )
-	case EXPRCLASS_CAST, EXPRCLASS_UOP
+	case EXPRCLASS_CAST, EXPRCLASS_UOP, EXPRCLASS_MEMBER, EXPRCLASS_ARRAYADDR
 		exprDump( n->l )
-	case EXPRCLASS_BOP
+	case EXPRCLASS_BOP, EXPRCLASS_INDEX
 		exprDump( n->l )
 		exprDump( n->r )
 	case EXPRCLASS_MACRO
@@ -3480,23 +3790,38 @@ end sub
 private function exprNewOFFSET _
 	( _
 		byval sym as FBSYMBOL ptr, _
-		byval ofs as longint _
+		byval ofs as longint, _
+		byval memberdtype as integer = FB_DATATYPE_INVALID, _
+		byval membersubtype as FBSYMBOL ptr = NULL _
 	) as EXPRNODE ptr
 
 	dim as EXPRNODE ptr l = any
 
 	l = exprNewSYM( sym )
+	if( memberdtype <> FB_DATATYPE_INVALID andalso symbIsCArray(sym) ) then
+		dim as EXPRNODE ptr byte_index = NULL
+		var indexed = exprTryCArrayIndex(sym, byte_index, ofs, memberdtype, membersubtype, TRUE)
+		if( indexed <> NULL ) then
+			exprFreeTree(l)
+			return exprNewCAddress( indexed)
+		end if
+	end if
+	if( (memberdtype <> FB_DATATYPE_INVALID) andalso _
+	    (typeIsPtr(l->dtype) = FALSE) andalso (symbIsCArray(sym) = FALSE) ) then
+		var member = exprTryCMember(l, ofs, memberdtype, membersubtype)
+		if( member <> NULL ) then return exprNewCAddress( member)
+	end if
 
 	'' Add '&' for things that aren't pointers already
 	if( (symbIsImport( sym ) or symbIsCArray( sym ) or _
 	     symbIsProc( sym ) or symbIsLabel( sym )) = FALSE ) then
-		l = exprNewUOP( AST_OP_ADDROF, l )
+		l = exprNewCAddress( l )
 	end if
 
 	'' Add on the byte offset, if any
 	if( ofs <> 0 ) then
 		'' Cast to ubyte ptr to work around C's pointer arithmetic
-		l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+		l = exprNewCAST( hCBytePointerType(l->dtype), NULL, l )
 		l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi( ofs ) )
 	end if
 
@@ -3533,31 +3858,7 @@ private function hNormalizeOffsetMod _
 	function = n
 end function
 
-private function hExprConstOffsetMod _
-	( _
-		byval n as EXPRNODE ptr, _
-		byval align as integer _
-	) as integer
-
-	select case as const( n->class )
-	case EXPRCLASS_IMM
-		function = hNormalizeOffsetMod( n->val.i, align )
-
-	case EXPRCLASS_CAST, EXPRCLASS_UOP
-		function = hExprConstOffsetMod( n->l, align )
-
-	case EXPRCLASS_BOP
-		select case as const( n->op )
-		case AST_OP_ADD
-			function = hNormalizeOffsetMod( hExprConstOffsetMod( n->l, align ) + _
-			                                hExprConstOffsetMod( n->r, align ), align )
-			exit select
-		case AST_OP_SUB
-			function = hNormalizeOffsetMod( hExprConstOffsetMod( n->l, align ) - _
-			                                hExprConstOffsetMod( n->r, align ), align )
-		end select
-	end select
-end function
+#include once "backend/c/c-alignment.bi"
 
 private function hSymBaseMayBeUnaligned _
 	( _
@@ -3636,7 +3937,7 @@ private function hExprBaseMayBeUnaligned _
 	case EXPRCLASS_SYM
 		function = hSymBaseMayBeUnaligned( n->sym )
 
-	case EXPRCLASS_CAST, EXPRCLASS_UOP
+	case EXPRCLASS_CAST, EXPRCLASS_UOP, EXPRCLASS_MEMBER, EXPRCLASS_INDEX, EXPRCLASS_ARRAYADDR
 		function = hExprBaseMayBeUnaligned( n->l )
 
 	case EXPRCLASS_BOP
@@ -3685,18 +3986,21 @@ private function exprNewUnalignedLoad _
 	dim as string addrtext
 	dim as string s
 
-	typename = hEmitType( typeUnsetIsConst( dtype ), subtype )
-	addrtext = exprFlush( addr )
+	typename = hEmitType( typeUnsetIsConst( dtype ), subtype, TRUE )
+	var tempname = hCUnalignedTempName()
+	var member = exprTryCMember( addr, 0, dtype, subtype, TRUE )
+	if( member <> NULL ) then addr = exprNewCAddress( member )
+	addrtext = exprFlush( hCUnalignedAddress(addr) )
 
 	'' Packed fields can be reached through byte offsets that are not aligned
 	'' for their declared type.  memcpy lets the C compiler choose an access
 	'' sequence that is valid on targets where unaligned scalar loads fault.
 	s = "__extension__ ({ "
-	s += typename + " __fb_unaligned; "
-	s += "__builtin_memcpy( &__fb_unaligned, (void const*)("
+	s += typename + " " + tempname + "; "
+	s += "__builtin_memcpy( &" + tempname + ", (void const*)("
 	s += addrtext
-	s += "), sizeof( __fb_unaligned ) ); "
-	s += "__fb_unaligned; })"
+	s += "), sizeof( " + tempname + " ) ); "
+	s += tempname + "; })"
 
 	function = exprNewTEXT( dtype, subtype, s )
 
@@ -3710,6 +4014,14 @@ private function exprNewVREG _
 
 	dim as EXPRNODE ptr l = any
 	dim as integer dtype = any, have_offset = any
+	dim as EXPRNODE ptr byte_index = NULL
+	dim as integer accessdtype = vreg->dtype
+	if( is_lvalue ) then
+		'' The AST has already checked writes, including initialization of
+		'' CONST variables. Their C storage is mutable during initialization;
+		'' remove only the stored value's const, keeping pointee qualifiers.
+		accessdtype = typeUnsetIsConst( accessdtype )
+	end if
 
 	select case as const( vreg->typ )
 	case IR_VREGTYPE_VAR, IR_VREGTYPE_IDX, IR_VREGTYPE_PTR
@@ -3726,10 +4038,16 @@ private function exprNewVREG _
 			if( vreg->vidx ) then
 				'' recursion
 				l = exprNewVREG( vreg->vidx )
+				var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
+					FALSE, (is_lvalue = FALSE))
+				if( member <> NULL ) then
+					l = member
+					exit select
+				end if
 
 				if( vreg->ofs <> 0 ) then
 					'' Cast to ubyte ptr to work around C's pointer arithmetic
-					l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+					l = exprNewCAST( hCBytePointerType(l->dtype), NULL, l )
 					l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi( vreg->ofs ) )
 				end if
 			else
@@ -3740,7 +4058,7 @@ private function exprNewVREG _
 			    hAddrNeedsUnalignedAccess( vreg->dtype, vreg->subtype, l, hVregBaseMayBeUnaligned( vreg ) ) ) then
 				l = exprNewUnalignedLoad( vreg->dtype, vreg->subtype, l )
 			else
-				l = exprNewCAST( typeAddrOf( vreg->dtype ), vreg->subtype, l )
+				l = exprNewCAST( hCAccessPointerType(accessdtype, is_lvalue), vreg->subtype, l )
 				l = exprNewUOP( AST_OP_DEREF, l )
 			end if
 			exit select
@@ -3786,6 +4104,25 @@ private function exprNewVREG _
 		var do_deref = have_offset or is_c_array
 
 		l = exprNewSYM( vreg->sym )
+		if( is_c_array ) then
+			if( vreg->vidx <> NULL ) then byte_index = exprNewVREG(vreg->vidx)
+			var indexed = exprTryCArrayIndex(vreg->sym, byte_index, vreg->ofs, accessdtype, _
+				vreg->subtype, FALSE, (is_lvalue = FALSE))
+			if( indexed <> NULL ) then
+				exprFreeTree(l)
+				l = indexed
+				exit select
+			end if
+		end if
+		if( (is_c_array = FALSE) andalso (vreg->vidx = NULL) andalso _
+		    ((typeIsPtr(l->dtype) = FALSE) or (vreg->typ = IR_VREGTYPE_PTR)) ) then
+			var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
+				FALSE, (is_lvalue = FALSE))
+			if( member <> NULL ) then
+				l = member
+				exit select
+			end if
+		end if
 
 		dim as integer symdtype = l->dtype
 		dim as FBSYMBOL ptr symsubtype = l->subtype
@@ -3825,7 +4162,7 @@ private function exprNewVREG _
 
 		'' Add '&' if symbol isn't emitted as pointer already
 		if( is_c_array = FALSE ) then
-			l = exprNewUOP( AST_OP_ADDROF, l )
+			l = exprNewCAddress( l )
 		end if
 		if( have_offset ) then
 			if( is_c_array ) then
@@ -3850,10 +4187,11 @@ private function exprNewVREG _
 				l = exprNewCAST( FB_DATATYPE_UINT, NULL, l )
 			else
 				'' Cast to ubyte ptr to work around C's pointer arithmetic
-				l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+				l = exprNewCAST( hCBytePointerType(l->dtype), NULL, l )
 			end if
 			if( vreg->vidx <> NULL ) then
-				l = exprNewBOP( AST_OP_ADD, l, exprNewVREG( vreg->vidx ) )
+				if( byte_index = NULL ) then byte_index = exprNewVREG(vreg->vidx)
+				l = exprNewBOP( AST_OP_ADD, l, byte_index )
 			end if
 			if( vreg->ofs <> 0 ) then
 				l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi( vreg->ofs ) )
@@ -3865,7 +4203,7 @@ private function exprNewVREG _
 			l = exprNewUnalignedLoad( vreg->dtype, vreg->subtype, l )
 		else
 			'' cast to vregdtype*
-			l = exprNewCAST( typeAddrOf( vreg->dtype ), vreg->subtype, l )
+			l = exprNewCAST( hCAccessPointerType(accessdtype, is_lvalue), vreg->subtype, l )
 
 			'' deref to get vregdtype
 			l = exprNewUOP( AST_OP_DEREF, l )
@@ -3874,7 +4212,11 @@ private function exprNewVREG _
 	case IR_VREGTYPE_OFS
 		'' Accessing a global, including string literals and function
 		'' symbols (used when taking address of functions).
-		l = exprNewOFFSET( vreg->sym, vreg->ofs )
+		if( typeIsPtr(vreg->dtype) ) then
+			l = exprNewOFFSET( vreg->sym, vreg->ofs, typeDeref(vreg->dtype), vreg->subtype )
+		else
+			l = exprNewOFFSET( vreg->sym, vreg->ofs )
+		end if
 
 	case IR_VREGTYPE_IMM
 		'' An immediate -- a constant value
@@ -3904,8 +4246,13 @@ private function exprNewVREG _
 			'' reusing the function result vreg. Since the vreg is
 			'' a call result, the C backend will have emitted a
 			'' temp var, allowing this reuse to work.
-			l = exprNewTEXT( vreg->dtype, vreg->subtype, "vr$" + str( vreg->reg ) )
+			l = exprNewTEXT( vreg->dtype, vreg->subtype, "fb_c_vreg_" + str( vreg->reg ) )
 		end if
+
+	case else
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		'' Keep error recovery traversable after rejecting an unknown IR kind.
+		return exprNewIMMi( 0 )
 
 	end select
 
@@ -3922,15 +4269,18 @@ private function exprNewVREGAddr _
 	) as EXPRNODE ptr
 
 	dim as EXPRNODE ptr l = any
+	dim as EXPRNODE ptr byte_index = NULL
 
 	select case as const( vreg->typ )
 	case IR_VREGTYPE_VAR, IR_VREGTYPE_IDX, IR_VREGTYPE_PTR
 		if( vreg->sym = NULL ) then
 			if( vreg->vidx ) then
 				l = exprNewVREG( vreg->vidx )
+				var member = exprTryCMember(l, vreg->ofs, vreg->dtype, vreg->subtype)
+				if( member <> NULL ) then return exprNewCAddress( member)
 
 				if( vreg->ofs <> 0 ) then
-					l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+					l = exprNewCAST( hCBytePointerType(l->dtype), NULL, l )
 					l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi( vreg->ofs ) )
 				end if
 			else
@@ -3945,19 +4295,33 @@ private function exprNewVREGAddr _
 		var have_offset = ((vreg->ofs <> 0) or (vreg->vidx <> NULL))
 
 		l = exprNewSYM( vreg->sym )
+		if( is_c_array ) then
+			if( vreg->vidx <> NULL ) then byte_index = exprNewVREG(vreg->vidx)
+			var indexed = exprTryCArrayIndex(vreg->sym, byte_index, vreg->ofs, vreg->dtype, vreg->subtype, TRUE)
+			if( indexed <> NULL ) then
+				exprFreeTree(l)
+				return exprNewCAddress( indexed)
+			end if
+		end if
+		if( (is_c_array = FALSE) andalso (vreg->vidx = NULL) andalso _
+		    ((typeIsPtr(l->dtype) = FALSE) or (vreg->typ = IR_VREGTYPE_PTR)) ) then
+			var member = exprTryCMember(l, vreg->ofs, vreg->dtype, vreg->subtype)
+			if( member <> NULL ) then return exprNewCAddress( member)
+		end if
 
 		if( is_c_array = FALSE ) then
-			l = exprNewUOP( AST_OP_ADDROF, l )
+			l = exprNewCAddress( l )
 		end if
 
 		if( have_offset ) then
 			if( is_c_array ) then
 				l = exprNewCAST( FB_DATATYPE_UINT, NULL, l )
 			else
-				l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+				l = exprNewCAST( hCBytePointerType(l->dtype), NULL, l )
 			end if
 			if( vreg->vidx <> NULL ) then
-				l = exprNewBOP( AST_OP_ADD, l, exprNewVREG( vreg->vidx ) )
+				if( byte_index = NULL ) then byte_index = exprNewVREG(vreg->vidx)
+				l = exprNewBOP( AST_OP_ADD, l, byte_index )
 			end if
 			if( vreg->ofs <> 0 ) then
 				l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi( vreg->ofs ) )
@@ -3985,6 +4349,11 @@ private function hGetUnalignedLvalueAddr _
 		return NULL
 	end if
 
+	if( hCMemberViewIsAggregate(lvalue) ) then
+		lvalue->member_view = C_MEMBER_VIEW_STORAGE
+		return exprNewUOP(AST_OP_ADDROF, lvalue)
+	end if
+
 	if( lvalue->class <> EXPRCLASS_UOP ) then
 		return NULL
 	end if
@@ -3994,7 +4363,11 @@ private function hGetUnalignedLvalueAddr _
 	end if
 
 	if( hAddrNeedsUnalignedAccess( vreg->dtype, vreg->subtype, lvalue->l, hVregBaseMayBeUnaligned( vreg ) ) ) then
-		function = lvalue->l
+		'' Transfer the owned address to the store; the dereference wrapper
+		'' is no longer part of the emitted expression.
+		var addr = lvalue->l
+		exprFreeNode(lvalue)
+		function = addr
 	else
 		function = NULL
 	end if
@@ -4012,16 +4385,21 @@ private sub hEmitUnalignedStore _
 	dim as string valuetext
 	dim as string s
 
-	typename = hEmitType( typeUnsetIsConst( vreg->dtype ), vreg->subtype )
-	addrtext = exprFlush( addr )
+	'' The temporary binding is writable, but pointer-target qualifiers are
+	'' part of its value type and must agree with the converted initializer.
+	typename = hEmitType( typeUnsetIsConst( vreg->dtype ), vreg->subtype, TRUE )
+	var tempname = hCUnalignedTempName()
+	var member = exprTryCMember( addr, 0, vreg->dtype, vreg->subtype, TRUE )
+	if( member <> NULL ) then addr = exprNewCAddress( member )
+	addrtext = exprFlush( hCUnalignedAddress(addr) )
 	valuetext = exprFlush( r )
 
 	s = "__extension__ ({ "
-	s += typename + " __fb_unaligned = "
+	s += typename + " " + tempname + " = "
 	s += valuetext
 	s += "; __builtin_memcpy( (void*)("
 	s += addrtext
-	s += "), &__fb_unaligned, sizeof( __fb_unaligned ) ); });"
+	s += "), &" + tempname + ", sizeof( " + tempname + " ) ); });"
 
 	hWriteLine( s )
 end sub
@@ -4030,7 +4408,14 @@ private sub _emitLabel( byval label as FBSYMBOL ptr )
 	'' Only when inside normal procedures
 	'' (NAKED procedures don't increase the indentation)
 	if( sectionInsideProc( ) ) then
-		hWriteLine( *symbGetMangledName( label ) + ":;" )
+		var labeltext = hGetCId( label ) + ":;"
+		hWriteLine( labeltext )
+		if( label = ctx.procentrylabel ) then
+			'' Keep any preceding #line directive; only the label is optional.
+			ctx.procentrysection = ctx.section
+			ctx.procentrybytes = ctx.sections(ctx.section).indent + len( labeltext ) + len( NEWLINE )
+			ctx.procentryoffset = ctx.sections(ctx.section).bufferlen - ctx.procentrybytes
+		end if
 	end if
 end sub
 
@@ -4063,10 +4448,23 @@ private sub exprSTORE _
 			'' expression, instead of the original expr itself:
 			''    type tempvar = expr;
 			'' (no cast needed, the assignment has the same effect)
-			tempvar = "vr$" + str( vr->reg )
+			tempvar = "fb_c_vreg_" + str( vr->reg )
 
 			ln = hEmitType( typeUnsetIsConst( vr->dtype ), vr->subtype, TRUE )
-			ln += " " + tempvar + " = "
+			ln += " " + tempvar
+			if( typeIsPtr( vr->dtype ) orelse _
+			    (symbIsValistStructArray( vr->dtype, vr->subtype ) = FALSE) ) then
+				'' These temporaries hold a value only after this call executes.
+				'' Separate storage from evaluation so a branch past the call
+				'' does not jump over a C initializer. hEmitStructWithFields()
+				'' makes field bindings writable, so aggregate assignment is
+				'' valid too, without discarding pointed-to const qualifiers.
+				'' Keep initializers for builtin va_list array types, which C
+				'' does not allow us to assign. Skipped calls invent no value.
+				hWriteDeclaration( ln + ";" )
+				ln = tempvar
+			end if
+			ln += " = "
 			ln += exprFlush( r )
 			ln += ";"
 
@@ -4140,7 +4538,7 @@ private sub _emitBop _
 			s += ")"
 		end if
 		s += ") goto "
-		s += *symbGetMangledName( label )
+		s += hGetCId( label )
 		s += ";"
 		hWriteLine( s )
 		exit sub
@@ -4165,12 +4563,18 @@ private sub _emitBop _
 		end if
 
 	case AST_OP_ADD, AST_OP_SUB
-		'' Cast to byte ptr to work around C's pointer arithmetic
+		if( typeIsPtr(v1->dtype) andalso (typeIsPtr(v2->dtype) = FALSE) ) then
+			if( hCScalePointerOffset(l->dtype, l->subtype, r) ) then
+				l = exprNewBOP(op, l, r)
+				exit select
+			end if
+		end if
+		'' Other byte displacements keep their original scale and qualifiers.
 		if( typeIsPtr( v1->dtype ) ) then
-			l = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, l )
+			l = exprNewCAST( hCBytePointerType(l->dtype), NULL, l )
 		end if
 		if( typeIsPtr( v2->dtype ) ) then
-			r = exprNewCAST( typeAddrOf( FB_DATATYPE_UBYTE ), NULL, r )
+			r = exprNewCAST( hCBytePointerType(r->dtype), NULL, r )
 		end if
 		l = exprNewBOP( op, l, r )
 
@@ -4377,7 +4781,7 @@ private sub _emitAddr _
 			end if
 		end if
 
-		l = exprNewUOP( AST_OP_ADDROF, exprNewVREG( v1, TRUE /' lvalue '/ ) )
+		l = exprNewCAddress( exprNewVREG( v1, TRUE /' lvalue '/ ) )
 
 	case AST_OP_DEREF
 		'' Note: The deref is already done in the vreg itself; as in
@@ -4388,6 +4792,8 @@ private sub _emitAddr _
 
 	exprSTORE( vr, l )
 end sub
+
+#include once "backend/c/c-array-callbacks.bi"
 
 private sub hDoCall _
 	( _
@@ -4400,6 +4806,7 @@ private sub hDoCall _
 	dim as IRCALLARG ptr arg = any
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
+	dim as integer param_index = 0
 	dim as DZSTRING args
 	DZstrZero( args )
 
@@ -4419,8 +4826,19 @@ private sub hDoCall _
 			'' BYREF AS ANY params, where the exact type will only
 			'' be known later, or never)
 			symbGetRealParamDtype( arg->param, dtype, subtype )
-			expr = exprNewCAST( dtype, subtype, expr )
+			var proc = symbGetParent( arg->param )
+			if( hIsArrayCallbackParam( proc, param_index ) ) then
+				expr = hArrayCallbackArgument( expr )
+			else
+				if( proc <> NULL ) then
+					var mangled = *symbGetMangledName( proc )
+					hAdjustLibcParamType( mangled, param_index, dtype, subtype )
+				end if
+				expr = exprNewCAST( dtype, subtype, expr )
+			end if
 		end if
+		'' A hidden result argument is absent from the declared parameter list.
+		if( arg->param <> NULL ) then param_index += 1
 
 		DZstrConcatAssign( args, exprFlush( expr ) )
 
@@ -4459,7 +4877,7 @@ private sub _emitCall _
 
 	static as string s
 
-	s = *symbGetMangledName( proc )
+	s = hGetCId( proc )
 	hDoCall( s, bytestopop, vr, level )
 
 end sub
@@ -4480,13 +4898,42 @@ private sub _emitCallPtr _
 
 end sub
 
+private sub hEmitComputedGotoAddress( )
+	if( ctx.computedgotoaddress or (not sectionInsideProc( )) ) then
+		exit sub
+	end if
+
+	if( ((env.clopt.backend = FB_BACKEND_CLANG) or _
+	     (env.clopt.backend = FB_BACKEND_GCC) or _
+	     (env.clopt.target = FB_COMPTARGET_DARWIN)) and _
+	    (env.clopt.target <> FB_COMPTARGET_JS) ) then
+		'' Clang requires an address-of-label expression in a function with
+		'' a computed goto, including ordinary ERROR statements. If no real
+		'' address has been emitted, refer to the existing procedure entry
+		'' label. An artificial label here would let
+		'' Clang's control-flow analysis jump past a temporary's initialization
+		'' into its use by the following indirect jump.
+		'' Casting the address to void needs no unused temporary variable.
+		'' See https://bugs.llvm.org/show_bug.cgi?id=18658
+		''
+		'' Emscripten cannot lower blockaddress expressions, so the JavaScript
+		'' target must continue to omit this workaround.
+		assert( ctx.procentrylabel <> NULL )
+		symbSetIsAccessed( ctx.procentrylabel )
+		hWriteLine( "(void)&&" + hGetCId( ctx.procentrylabel ) + ";" )
+		ctx.computedgotoaddress = TRUE
+	end if
+end sub
+
 private sub _emitJumpPtr( byval v1 as IRVREG ptr )
-	hWriteLine( "goto *" + exprFlush( exprNewVREG( v1 ), TRUE ) + ";" )
+	var jumptarget = exprFlush( exprNewVREG( v1 ), TRUE )
+	hEmitComputedGotoAddress( )
+	hWriteLine( "goto *" + jumptarget + ";" )
 end sub
 
 private sub _emitBranch( byval op as integer, byval label as FBSYMBOL ptr )
 	assert( op = AST_OP_JMP )
-	hWriteLine( "goto " + *symbGetMangledName( label ) + ";" )
+	hWriteLine( "goto " + hGetCId( label ) + ";" )
 end sub
 
 private sub _emitJmpTb _
@@ -4501,7 +4948,7 @@ private sub _emitJmpTb _
 		byval span as ulongint _
 	)
 
-	dim as string tb, temp
+	dim as string temp
 	dim as EXPRNODE ptr l = any
 
 	var dtype = v1->dtype
@@ -4512,56 +4959,42 @@ private sub _emitJmpTb _
 	temp = exprFlush( exprNewVREG( v1 ) )
 
 	if( labelcount <= 0 ) then
-		'' Empty jump table, just jump directly to the ELSE block or END SELECT
-		hWriteLine( "goto " + *symbGetMangledName( deflabel ) + ";", TRUE )
-
-		'' Silence gcc warning about the unused temp var
+		'' The selector is already evaluated. Consume its temporary before
+		'' branching; a use after the unconditional jump would be dead code.
 		hWriteLine( "(void)" + temp + ";", TRUE )
+		hWriteLine( "goto " + hGetCId( deflabel ) + ";", TRUE )
 		exit sub
 	end if
 
-	tb = *symbUniqueId( )
+	'' Preserve the unique-ID allocation used by the old table declaration.
+	'' Later source/model names must not depend on the C dispatch spelling.
+	symbUniqueId( )
 
-	l = exprNewIMMi( span + 1 )
-	hWriteLine( "static const void* " + tb + "[" + exprFlush( l ) + "] = {", TRUE )
-	sectionIndent( )
-
-	var i = 0
-	var value = 0
-	do
-		assert( i < labelcount )
-
-		dim as FBSYMBOL ptr label
-		if( value = values[i] ) then
-			label = labels[i]
-			i += 1
-		else
-			label = deflabel
-		end if
-		hWriteLine( "&&" + *symbGetMangledName( label ) + ",", TRUE )
-
-		if( value = span ) then
-			exit do
-		end if
-		value += 1
-	loop
-
-	sectionUnindent( )
-	hWriteLine( "};", TRUE )
-
-	'' if( (temp-bias) > span ) then goto deflabel
+	'' Give the C compiler explicit destinations. A computed goto admits
+	'' every address-taken label in the procedure to its control-flow graph,
+	'' including labels beyond BASIC initializations in other SELECT blocks.
+	'' SWITCH retains unsigned bias wrapping and lets the target compiler
+	'' choose a jump table or comparisons without exporting label addresses.
 	l = exprNewTEXT( dtype, NULL, temp )
 	if( bias <> 0 ) then
 		l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( bias, dtype ) )
 	end if
+	var selector = exprFlush( l )
+
+	'' Retain the original out-of-span branch before dispatching valid keys.
+	l = exprNewTEXT( dtype, NULL, selector )
 	l = exprNewBOP( AST_OP_GT, l, exprNewIMMi( span, dtype ) )
-	hWriteLine( "if( " + exprFlush( l ) + " ) goto " + *symbGetMangledName( deflabel ) + ";", TRUE )
-
-	'' l = jumptable[l - bias]
-	l = exprNewTEXT( dtype, NULL, temp )
-	l = exprNewBOP( AST_OP_SUB, l, exprNewIMMi( bias, dtype ) )
-	hWriteLine( "goto *" + tb + "[" + exprFlush( l ) + "];", TRUE )
-
+	hWriteLine( "if( " + exprFlush( l ) + " ) goto " + hGetCId( deflabel ) + ";", TRUE )
+	hWriteLine( "switch( " + selector + " ) {", TRUE )
+	sectionIndent( )
+	for i as integer = 0 to labelcount - 1
+		assert( values[i] <= span )
+		l = exprNewIMMi( values[i], dtype )
+		hWriteLine( "case " + exprFlush( l ) + ": goto " + hGetCId( labels[i] ) + ";", TRUE )
+	next
+	hWriteLine( "default: goto " + hGetCId( deflabel ) + ";", TRUE )
+	sectionUnindent( )
+	hWriteLine( "}", TRUE )
 end sub
 
 private sub _emitMem _
@@ -4573,11 +5006,20 @@ private sub _emitMem _
 		byval fillchar as integer _
 	)
 
+	'' These operations promise byte access, not alignment of the pointed-to
+	'' BASIC type. Clang otherwise checks/assumes record alignment even for
+	'' a builtin memcpy destination. Preserve pointee constness in byte views.
+	var destination = exprNewVREG(v1)
+	destination = exprNewCAST(hCBytePointerType(destination->dtype), NULL, destination)
 	select case op
 	case AST_OP_MEMFILL
-		hWriteLine("__builtin_memset( " + exprFlush( exprNewVREG( v1 ) ) + ", " + str(fillchar) + ", " + exprFlush( exprNewVREG( v2 ) ) + " );" )
+		hWriteLine("__builtin_memset( " + exprFlush(destination) + ", " + str(fillchar) + ", " + exprFlush( exprNewVREG( v2 ) ) + " );" )
 	case AST_OP_MEMMOVE
-		hWriteLine("__builtin_memcpy( " + exprFlush( exprNewVREG( v1 ) ) + ", " + exprFlush( exprNewVREG( v2 ) ) + ", " + str( cunsg( bytes ) ) + " );" )
+		var source = exprNewVREG(v2)
+		'' memcpy never writes its source. A recovered member can expose
+		'' constness that was absent from the intermediate IR pointer type.
+		source = exprNewCAST(hCBytePointerType(source->dtype, TRUE), NULL, source)
+		hWriteLine("__builtin_memcpy( " + exprFlush(destination) + ", " + exprFlush(source) + ", " + str( cunsg( bytes ) ) + " );" )
 	end select
 
 end sub
@@ -4594,22 +5036,22 @@ private sub _emitMacro _
 
 	select case op
 	case AST_OP_VA_START
-		l = exprNewVREG( v1 )
+		l = exprNewVREG( v1, TRUE /' mutable va_list '/ )
 		r = exprNewVREG( v2 )
 		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, r ) ) + ";" )
 
 	case AST_OP_VA_END
-		l = exprNewVREG( v1 )
+		l = exprNewVREG( v1, TRUE /' mutable va_list '/ )
 		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, NULL ) ) + ";" )
 
 	case AST_OP_VA_ARG
-		l = exprNewVREG( v1 )
+		l = exprNewVREG( v1, TRUE /' mutable va_list '/ )
 		l = exprNewMACRO( op, vr->dtype, vr->sym, l, NULL )
 		exprSTORE( vr, l )
 
 	case AST_OP_VA_COPY
-		l = exprNewVREG( v1 )
-		r = exprNewVREG( v2 )
+		l = exprNewVREG( v1, TRUE /' destination va_list '/ )
+		r = exprNewVREG( v2, TRUE /' source va_list object '/ )
 		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, r ) ) + ";" )
 
 	end select
@@ -4737,7 +5179,7 @@ end sub
 '' -asm att: FB asm blocks are expected to be in the GCC format already,
 ''           i.e. quoted and including constraints if needed.
 ''
-private function hFindLabelInSeenList( _
+private function hFindAsmSymbolInSeenList( _
 	byref labellist as TLIST, _
 	byval labelsym as FBSYMBOL ptr _
 ) as long
@@ -4755,6 +5197,79 @@ private function hFindLabelInSeenList( _
 	return index
 end function
 
+private sub hCopyQuotedAsmText _
+	( _
+		byref result as DZSTRING, _
+		byref asmcode as string, _
+		byref i as integer _
+	)
+	dim as integer quotemark = asmcode[i - 1]
+	dim as integer length = len( asmcode )
+	DZstrConcatAssignC( result, quotemark )
+	i += 1
+	while( i <= length )
+		dim as integer ch = asmcode[i - 1]
+		DZstrConcatAssignC( result, ch )
+		i += 1
+		if( (ch = asc( "\" )) andalso (i <= length) ) then
+			DZstrConcatAssignC( result, asmcode[i - 1] )
+			i += 1
+		elseif( ch = quotemark ) then
+			exit while
+		end if
+	wend
+end sub
+
+private function hMoveAsmSegmentPrefixes( byref asmcode as string ) as string
+	dim as DZSTRING result
+	dim as integer i = 1
+	dim as integer length = len( asmcode )
+	DZstrZero( result )
+
+	'' Clang needs segment prefixes outside address brackets, as in gs:[address].
+	'' Keep quoted assembler data intact, including escaped quotes in .ascii strings.
+	while( i <= length )
+		dim as integer ch = asmcode[i - 1]
+		if( (ch = asc( QUOTE )) or (ch = asc( "'" )) ) then
+			hCopyQuotedAsmText( result, asmcode, i )
+			continue while
+		elseif( ch = asc( "[" ) ) then
+			dim as integer j = i + 1
+			'' Intel operands permit spaces and ASCII horizontal tabs (9).
+			while( (j <= length) andalso _
+			       ((asmcode[j - 1] = asc( " " )) orelse (asmcode[j - 1] = 9)) )
+				j += 1
+			wend
+			if( j + 1 <= length ) then
+				dim as string segment_name = lcase( mid( asmcode, j, 2 ) )
+				select case( segment_name )
+				case "cs", "ds", "es", "fs", "gs", "ss"
+					dim as integer k = j + 2
+					while( (k <= length) andalso _
+					       ((asmcode[k - 1] = asc( " " )) orelse (asmcode[k - 1] = 9)) )
+						k += 1
+					wend
+					if( (k <= length) andalso (asmcode[k - 1] = asc( ":" )) ) then
+						DZstrConcatAssign( result, mid( asmcode, j, 2 ) + ":[" )
+						i = k + 1
+						continue while
+					end if
+				end select
+			end if
+		end if
+
+		DZstrConcatAssignC( result, ch )
+		i += 1
+	wend
+
+	if( result.data <> NULL ) then
+		function = *result.data
+	else
+		function = ""
+	end if
+	DZstrAllocate( result, 0 )
+end function
+
 private function hStripSimpleAsmPlaceholderBrackets( byref asmcode as string ) as string
 	dim as DZSTRING result
 	dim as integer i = 1
@@ -4763,22 +5278,43 @@ private function hStripSimpleAsmPlaceholderBrackets( byref asmcode as string ) a
 
 	while( i <= length )
 		dim as integer matched = FALSE
+		dim as integer ch = asmcode[i - 1]
+		if( (ch = asc( QUOTE )) or (ch = asc( "'" )) ) then
+			hCopyQuotedAsmText( result, asmcode, i )
+			continue while
+		end if
 
-		if( (i + 3 <= length) andalso (mid( asmcode, i, 2 ) = "[%") ) then
-			dim as integer j = i + 2
-
-			while( j <= length )
-				dim as integer ch = asmcode[j - 1]
-				if( (ch < asc( "0" )) orelse (ch > asc( "9" )) ) then
-					exit while
-				end if
+		if( ch = asc( "[" ) ) then
+			dim as integer j = i + 1
+			'' Spaces and ASCII horizontal tabs (9) do not change a %N operand.
+			while( (j <= length) andalso _
+			       ((asmcode[j - 1] = asc( " " )) orelse (asmcode[j - 1] = 9)) )
 				j += 1
 			wend
+			if( (j <= length) andalso (asmcode[j - 1] = asc( "%" )) ) then
+				dim as integer first = j
+				j += 1
+				dim as integer digits = j
 
-			if( (j > i + 2) andalso (j <= length) andalso (asmcode[j - 1] = asc( "]" )) ) then
-				DZstrConcatAssign( result, mid( asmcode, i + 1, j - i - 1 ) )
-				i = j + 1
-				matched = TRUE
+				while( j <= length )
+					ch = asmcode[j - 1]
+					if( (ch < asc( "0" )) orelse (ch > asc( "9" )) ) then
+						exit while
+					end if
+					j += 1
+				wend
+				if( j > digits ) then
+					dim as integer afterdigits = j
+					while( (j <= length) andalso _
+					       ((asmcode[j - 1] = asc( " " )) orelse (asmcode[j - 1] = 9)) )
+						j += 1
+					wend
+					if( (j <= length) andalso (asmcode[j - 1] = asc( "]" )) ) then
+						DZstrConcatAssign( result, mid( asmcode, first, afterdigits - first ) )
+						i = j + 1
+						matched = TRUE
+					end if
+				end if
 			end if
 		end if
 
@@ -4799,8 +5335,9 @@ end function
 private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	'' 1st pass to count some stats (no emitting yet)
 	dim as integer uses_label, labelindex, labelindexbase
-	dim as TLIST seenlabellist
+	dim as TLIST seenlabellist, seenvarlist
 	listInit( @seenlabellist, 8, sizeof( FBSYMBOL ptr ) )
+	listInit( @seenvarlist, 8, sizeof( FBSYMBOL ptr ) )
 	var n = asmtokenhead
 	while( n )
 		if( n->type = AST_ASMTOK_SYMB ) then
@@ -4812,13 +5349,18 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 				'' Find first valid index into the label list;
 				'' it starts behind the constraints.
 				'' We'll emit 1 input operand per variable (and no outputs).
-				labelindex += 1
+				if( hFindAsmSymbolInSeenList(seenvarlist, n->sym) < 0 ) then
+					*cptr(FBSYMBOL ptr ptr, listNewNode(@seenvarlist)) = n->sym
+					labelindex += 1
+				end if
 			end select
 		end if
 		n = n->next
 	wend
 
 	labelindexbase = labelindex
+	listEnd( @seenvarlist )
+	listInit( @seenvarlist, 8, sizeof(FBSYMBOL ptr) )
 	dim as string ln = "__asm__"
 
 	'' Only when inside normal procedures
@@ -4842,13 +5384,8 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 
 	'' 2nd pass - emitting
 	dim as integer operandindex
-	dim as integer clang_lea = FALSE
-	if( irUsesClangCCompiler() and _
-	    (env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL) ) then
-		if( asmtokenhead->type = AST_ASMTOK_TEXT ) then
-			clang_lea = (lcase( *asmtokenhead->text ) = "lea")
-		end if
-	end if
+	dim as integer clang_lea = FALSE, asmlinebegin = TRUE
+
 	dim as string outputconstraints, inputconstraints, labellist
 	n = asmtokenhead
 	while( n )
@@ -4856,6 +5393,12 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 		select case( n->type )
 		case AST_ASMTOK_TEXT
 			dim as string asmtext = *n->text
+			if( asmtext = NEWLINE ) then
+				asmlinebegin = TRUE
+			elseif( len(trim(asmtext)) > 0 andalso asmlinebegin ) then
+				clang_lea = (lcase(asmtext) = "lea")
+				asmlinebegin = FALSE
+			end if
 			if( irUsesClangCCompiler() and _
 			    (env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL) ) then
 				'' LLVM accepts lower or upper case operand qualifiers, but not
@@ -4877,6 +5420,11 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 			'' -asm att: String literals containing the ASM, tokens for the constraints lists, etc.
 			'' Symbol references in the asm strings for -asm att must use the ASM name already,
 			'' since we don't parse the string literal content.
+			if( sectionInsideProc( ) and env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+				'' Raw Intel text has no C operands. Escape literal percent signs
+				'' before adding the generated %N and %= placeholders separately.
+				asmtext = hReplace( asmtext, "%", "%%" )
+			end if
 			DZstrConcatAssign( asmbuffer, asmtext )
 
 		case AST_ASMTOK_SYMB
@@ -4887,6 +5435,13 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 						'' Referencing a variable: insert %N place-holder...
 						'' (N refers to N'th operand written in the whole
 						'' asm [goto]([outputs...] inputs... [labels...]) statement)
+						var seenindex = hFindAsmSymbolInSeenList( seenvarlist, n->sym )
+						if( seenindex >= 0 ) then
+							DZstrConcatAssign( asmbuffer, "%" & seenindex )
+							n = n->next
+							continue while
+						end if
+						*cptr(FBSYMBOL ptr ptr, listNewNode(@seenvarlist)) = n->sym
 						DZstrConcatAssign( asmbuffer, "%" & operandindex )
 						operandindex += 1
 
@@ -4899,13 +5454,13 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 							if( inputbuffer.len > 0 ) then
 								DZstrConcatAssign( inputbuffer, ", " )
 							end if
-							DZstrConcatAssign( inputbuffer, """m"" (" + *symbGetMangledName( n->sym ) + ")" )
+							DZstrConcatAssign( inputbuffer, """m"" (" + hGetCId( n->sym ) + ")" )
 						else
 							'' read+write output operand constraint: "+m" (symbol)
 							if( outputbuffer.len > 0 ) then
 								DZstrConcatAssign( outputbuffer, ", " )
 							end if
-							DZstrConcatAssign( outputbuffer, """+m"" (" + *symbGetMangledName( n->sym ) + ")" )
+							DZstrConcatAssign( outputbuffer, """+m"" (" + hGetCId( n->sym ) + ")" )
 						end if
 
 					case FB_SYMBCLASS_LABEL
@@ -4919,7 +5474,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 						'' and subsequent access use the previous index
 						dim as integer labelnum = any
 						dim as FBSYMBOL ptr labelsym = n->sym
-						dim as long seenlabelindex = hFindLabelInSeenList( seenlabellist, labelsym )
+						dim as long seenlabelindex = hFindAsmSymbolInSeenList( seenlabellist, labelsym )
 						if seenlabelindex <> -1 then
 							labelnum = seenlabelindex + labelindexbase
 						else
@@ -4929,7 +5484,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 							if( labelbuffer.len > 0 ) then
 								DZstrConcatAssign( labelbuffer, ", " )
 							end if
-							DZstrConcatAssign( labelbuffer, symbGetMangledName( labelsym ) )
+							DZstrConcatAssign( labelbuffer, hGetCId( labelsym ) )
 						end if
 
 						DZstrConcatAssign( asmbuffer, "%l" & labelnum )
@@ -4948,7 +5503,7 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 				if( sectionInsideProc( ) ) then
 					'' Normal AT&T inline asm uses C expressions in its
 					'' constraints, so these references need C names.
-					DZstrConcatAssign( asmbuffer, symbGetMangledName( n->sym ) )
+					DZstrConcatAssign( asmbuffer, hGetCId( n->sym ) )
 				else
 					'' NAKED procedures are emitted as file-scope asm strings.
 					'' Direct references there need the platform assembler
@@ -4973,9 +5528,14 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	DZstrAllocate( inputbuffer, 0 )
 	DZstrAllocate( labelbuffer, 0 )
 	listEnd( @seenlabellist )
+	listEnd( @seenvarlist )
 
 	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+		if( sectionInsideProc( ) ) then asmcode = hAsmLocalizeNames( asmcode )
 		if( irUsesClangCCompiler() ) then
+			'' Normalize the segment first: a C memory operand in gs:[%0]
+			'' already supplies its own brackets and becomes gs:%0 below.
+			asmcode = hMoveAsmSegmentPrefixes( asmcode )
 			asmcode = hStripSimpleAsmPlaceholderBrackets( asmcode )
 		end if
 
@@ -5043,24 +5603,72 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	hWriteLine( ln )
 end sub
 
-private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )
-	ctx.varini = ""
+private sub hVarIniDiscardScopes( )
+	while( ctx.variniscopes <> NULL )
+		var initializer_scope = ctx.variniscopes
+		ctx.variniscopes = initializer_scope->previous
+		deallocate( initializer_scope )
+	wend
 	ctx.variniscopelevel = 0
 end sub
 
+private sub hVarIniFail( byval reason as const zstring ptr )
+	if( ctx.varinifailed = FALSE andalso errGetCount( ) = 0 ) then
+		errReportEx( FB_ERRMSG_INTERNAL, reason )
+	end if
+	ctx.varinifailed = TRUE
+end sub
+
+private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )
+	hVarIniDiscardScopes( )
+	ctx.varini = ""
+	ctx.varinifailed = FALSE
+end sub
+
 private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
-	hEmitVarDecl( FALSE, sym, ctx.varini )
+	if( ctx.variniscopes <> NULL ) then
+		'' Parser recovery can abandon an initializer after a source error.
+		if( errGetCount( ) = 0 ) then
+			hVarIniFail( "unclosed C aggregate initializer" )
+		else
+			ctx.varinifailed = TRUE
+		end if
+	end if
+	if( ctx.varinifailed = FALSE ) then hEmitVarDecl( FALSE, sym, ctx.varini )
+	hVarIniDiscardScopes( )
 	ctx.varini = ""
 end sub
 
+private function hVarIniFieldPrefix( ) as string
+	var initializer_scope = ctx.variniscopes
+	if( initializer_scope = NULL ) then return ""
+	if( initializer_scope->is_array or initializer_scope->udt = NULL ) then return ""
+
+	'' C promotes anonymous members, but positional values still need the
+	'' anonymous aggregate's braces. Name the BASIC member directly instead.
+	var fld = symbUdtGetFirstField( initializer_scope->udt )
+	var emitted = initializer_scope->emitted_elements
+	while( fld <> NULL )
+		if( symbIsDynamic( fld ) = FALSE ) then
+			if( emitted = 0 ) then return "." + hGetCFieldId( fld ) + " = "
+			emitted -= 1
+		end if
+		fld = symbUdtGetNextInitableField( fld )
+	wend
+	hVarIniFail( "too many C aggregate initializer fields" )
+	return ""
+end function
+
 private sub hVarIniSeparator( )
-	if( ctx.variniscopelevel > 0 ) then
+	if( ctx.variniscopes <> NULL ) then
 		ctx.varini += ", "
+		ctx.variniscopes->emitted_elements += 1
 	end if
 end sub
 
 private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
-	var dtype = symbGetType( sym )
+	'' Typed null initializers must agree with their pointer declarations.
+	var dtype = symbGetType( sym ) or typeGetConstMask( symbGetFullType( sym ) )
 
 	'' AST stores boolean true as -1, but we emit it as 1 for gcc compatibility
 	if( (dtype = FB_DATATYPE_BOOLEAN) and (value <> 0) ) then
@@ -5073,7 +5681,7 @@ private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
 	end if
 	l = exprNewCAST( dtype, sym->subtype, l )
 
-	ctx.varini += exprFlush( l )
+	ctx.varini += hVarIniFieldPrefix( ) + exprFlush( l )
 	hVarIniSeparator( )
 end sub
 
@@ -5093,8 +5701,8 @@ private sub _emitVarIni128( byval sym as FBSYMBOL ptr, byval low as longint, byv
 			"ull << 64) | (unsigned __int128)0x" + hEmitInt128Word( low ) + "ull"
 		if( typeIsSigned( symbGetType( sym ) ) ) then value = "((__int128)(" + value + "))"
 	end if
+	ctx.varini += hVarIniFieldPrefix( ) + value
 	hVarIniSeparator( )
-	ctx.varini += value
 end sub
 
 private sub _emitVarIniF( byval sym as FBSYMBOL ptr, byval value as double )
@@ -5104,7 +5712,7 @@ private sub _emitVarIniF( byval sym as FBSYMBOL ptr, byval value as double )
 		dtype = typeAddrOf( dtype )
 	end if
 	l = exprNewCAST( dtype, sym->subtype, l )
-	ctx.varini += exprFlush( l )
+	ctx.varini += hVarIniFieldPrefix( ) + exprFlush( l )
 	hVarIniSeparator( )
 end sub
 
@@ -5119,13 +5727,13 @@ private sub _emitVarIniOfs _
 
 	l = exprNewOFFSET( rhs, ofs )
 
-	var dtype = symbGetType( sym )
+	var dtype = symbGetType( sym ) or typeGetConstMask( symbGetFullType( sym ) )
 	if( symbIsRef( sym ) ) then
 		dtype = typeAddrOf( dtype )
 	end if
 	l = exprNewCAST( dtype, sym->subtype, l )
 
-	ctx.varini += exprFlush( l )
+	ctx.varini += hVarIniFieldPrefix( ) + exprFlush( l )
 	hVarIniSeparator( )
 end sub
 
@@ -5139,6 +5747,7 @@ private sub _emitVarIniStr _
 
 	'' Simple fixed-length string initialized from string literal
 	'' "..."
+	ctx.varini += hVarIniFieldPrefix( )
 
 	'' String literal too long? (GCC would show a warning)
 	if( litlength > varlength ) then
@@ -5199,6 +5808,7 @@ private sub _emitVarIniWstr _
 	dim as DZSTRING initializer
 
 	DZstrZero( initializer )
+	ctx.varini += hVarIniFieldPrefix( )
 	DZstrAssign( initializer, strptr( ctx.varini ) )
 
 	'' In Linux GCC, wchar_t and thus L"..." expressions use signed int,
@@ -5260,13 +5870,163 @@ private sub _emitVarIniPad( byval bytes as longint, byval fillchar as integer )
 end sub
 
 private sub _emitVarIniScopeBegin( byval sym as FBSYMBOL ptr, byval is_array as integer )
+	if( ctx.varinifailed ) then exit sub
+	var prefix = hVarIniFieldPrefix( )
+	if( ctx.varinifailed ) then exit sub
+
+	'' TYPEINI can mark the outer array scope as a record. Each dimension
+	'' must be entered before a later scope initializes the element's fields.
+	if( sym <> NULL andalso (symbIsVar( sym ) or symbIsField( sym )) ) then
+		if( is_array = FALSE andalso symbGetArrayDimensions( sym ) > 0 ) then
+			var dimensions = 0
+			var parent = ctx.variniscopes
+			while( parent <> NULL )
+				if( parent->is_array andalso parent->sym = sym ) then dimensions += 1
+				parent = parent->previous
+			wend
+			if( dimensions < symbGetArrayDimensions( sym ) ) then is_array = TRUE
+		end if
+	end if
+
+	dim as CVARINISCOPE ptr initializer_scope = callocate( sizeof( CVARINISCOPE ) )
+	if( initializer_scope = NULL ) then
+		hVarIniFail( "out of memory generating C aggregate initializer" )
+		exit sub
+	end if
+	initializer_scope->previous = ctx.variniscopes
+	initializer_scope->sym = sym
+	initializer_scope->is_array = is_array
+	if( is_array = FALSE andalso sym <> NULL ) then
+		if( symbIsStruct( sym ) ) then
+			initializer_scope->udt = sym
+		elseif( symbGetType( sym ) = FB_DATATYPE_STRUCT ) then
+			initializer_scope->udt = symbGetSubtype( sym )
+		end if
+	end if
+	ctx.variniscopes = initializer_scope
 	ctx.variniscopelevel += 1
 
-	ctx.varini += "{ "
+	ctx.varini += prefix + "{ "
 
 end sub
 
+private function hVarIniArrayDimensions( byval sym as FBSYMBOL ptr ) as integer
+	'' The C declarator includes fixed strings' extra character-array dimension.
+	var dimensions = hEmitArrayDecl( sym )
+	var count = 0
+	var position = instr( dimensions, "[" )
+	while( position > 0 )
+		count += 1
+		position = instr( position + 1, dimensions, "[" )
+	wend
+	return count
+end function
+
+private function hVarIniZeroField _
+	( _
+		byval fld as FBSYMBOL ptr, _
+		byval array_element as integer = FALSE _
+	) as string
+
+	'' An array of pointers still needs array braces. Include fixed strings'
+	'' extra C dimension, then initialize one complete element at each level.
+	if( array_element = FALSE ) then
+		var dimensions = hVarIniArrayDimensions( fld )
+		if( dimensions > 0 ) then
+			var value = hVarIniZeroField( fld, TRUE )
+			for i as integer = 1 to dimensions
+				value = "{ " + value + " }"
+			next
+			return value
+		end if
+	end if
+
+	var dtype = symbGetType( fld )
+	if( symbIsRef( fld ) or typeIsPtr( dtype ) ) then return "0"
+	if( symbIsBuiltinVaListType( dtype, symbGetSubtype( fld ) ) ) then
+		select case symbGetValistType( dtype, symbGetSubtype( fld ) )
+		case FB_CVA_LIST_BUILTIN_POINTER, FB_CVA_LIST_BUILTIN_VOID_POINTER
+			return "0"
+		case else
+			return "{ 0 }"
+		end select
+	end if
+	select case dtype
+	case FB_DATATYPE_STRUCT
+		var udt = symbGetSubtype( fld )
+		if( udt = NULL ) then
+			hVarIniFail( "missing C aggregate member type" )
+			return "0"
+		end if
+		var value = ""
+		var member = symbUdtGetFirstField( udt )
+		while( member <> NULL )
+			if( symbIsDynamic( member ) = FALSE ) then
+				if( len( value ) > 0 ) then value += ", "
+				'' Designators also name promoted anonymous struct/union fields.
+				value += "." + hGetCFieldId( member ) + " = " + hVarIniZeroField( member )
+			end if
+			member = symbUdtGetNextInitableField( member )
+		wend
+		if( len( value ) = 0 ) then value = "0"
+		return "{ " + value + " }"
+	case FB_DATATYPE_STRING
+		'' The C string descriptor contains data, length and allocated size.
+		return "{ 0, 0, 0 }"
+	case FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128
+		'' The 32-bit C representation stores low and high 64-bit words.
+		if( fbGetBits( ) = 32 ) then return "{ 0, 0 }"
+	end select
+	return "0"
+end function
+
 private sub _emitVarIniScopeEnd( )
+	if( ctx.varinifailed ) then exit sub
+	var initializer_scope = ctx.variniscopes
+	if( initializer_scope = NULL ) then
+		hVarIniFail( "unmatched C aggregate initializer end" )
+		exit sub
+	end if
+
+	'' BASIC leaves omitted members zeroed. Spell those defaults explicitly
+	'' instead of relying on a partial positional C initializer. Layout padding
+	'' remains the C compiler's responsibility; it is not an extra member.
+	if( initializer_scope->udt <> NULL ) then
+		var fld = symbUdtGetFirstField( initializer_scope->udt )
+		var emitted = initializer_scope->emitted_elements
+		while( fld <> NULL )
+			if( symbIsDynamic( fld ) = FALSE ) then
+				if( emitted > 0 ) then
+					emitted -= 1
+				else
+					ctx.varini += "." + hGetCFieldId( fld ) + " = " + hVarIniZeroField( fld )
+					hVarIniSeparator( )
+				end if
+			end if
+			fld = symbUdtGetNextInitableField( fld )
+		wend
+	elseif( initializer_scope->emitted_elements = 0 ) then
+		'' Synthesized descriptors can contain an empty array of dimension
+		'' records. Initialize one complete element, with any dimensions that
+		'' have not yet been entered, rather than eliding its record braces.
+		var value = "0"
+		if( initializer_scope->sym <> NULL ) then
+			value = hVarIniZeroField( initializer_scope->sym, TRUE )
+			var dimensions = hVarIniArrayDimensions( initializer_scope->sym )
+			var parent = initializer_scope
+			while( parent <> NULL )
+				if( parent->is_array andalso parent->sym = initializer_scope->sym ) then dimensions -= 1
+				parent = parent->previous
+			wend
+			if( initializer_scope->is_array = FALSE ) then dimensions -= 1
+			for i as integer = 1 to dimensions
+				value = "{ " + value + " }"
+			next
+		end if
+		ctx.varini += value
+		hVarIniSeparator( )
+	end if
+
 	'' Trim separator at the end, to make the output look a bit more clean
 	'' (this isn't needed though, since the extra comma is allowed in C)
 	if( right( ctx.varini, 2 ) = ", " ) then
@@ -5281,6 +6041,8 @@ private sub _emitVarIniScopeEnd( )
 	end if
 
 	ctx.varini += " }"
+	ctx.variniscopes = initializer_scope->previous
+	deallocate( initializer_scope )
 	ctx.variniscopelevel -= 1
 	hVarIniSeparator( )
 end sub
@@ -5301,7 +6063,11 @@ private sub _emitFbctinfBegin( )
 	else
 		ctx.fbctinf += "__attribute__((used, section(""." + FB_INFOSEC_NAME + """))) "
 	end if
-	ctx.fbctinf += "__fbctinf[] = """
+	ctx.fbctinf += "fb_c_metadata[]"
+	var object_name = "__fbctinf"
+	if( env.underscoreprefix ) then object_name = "_" + object_name
+	hAppendCObjectAlias( ctx.fbctinf, object_name )
+	ctx.fbctinf += " = """
 end sub
 
 private sub _emitFbctinfString( byval s as const zstring ptr )
@@ -5325,6 +6091,17 @@ private sub _emitProcBegin _
 	)
 
 	hMarkReferencedStaticLocals( astGetProc()->l )
+	hAsmBeginNames( proc )
+	if( not symbIsNaked( proc ) ) then
+		if( astProcMayReturn( astGetProc( ) ) = FALSE ) then
+			symbSetProcIsNoReturn( proc )
+		end if
+	end if
+	ctx.computedgotoaddress = FALSE
+	ctx.procentrylabel = initlabel
+	ctx.procentrysection = -1
+	ctx.procentryoffset = 0
+	ctx.procentrybytes = 0
 
 	hUpdateCurrentFileName( symbGetProcIncFile( proc ) )
 
@@ -5364,24 +6141,32 @@ private sub _emitProcBegin _
 
 	hWriteLine( "{" )
 	sectionIndent( )
+	sectionBegin( )
 
-	if( ((env.clopt.backend = FB_BACKEND_CLANG) or _
-	     (env.clopt.backend = FB_BACKEND_GCC) or _
-	     (env.clopt.target = FB_COMPTARGET_DARWIN)) and _
-	    (env.clopt.target <> FB_COMPTARGET_JS) ) then
-		'' Work around an error clang throws if a function contains a
-		'' computed goto but no address-of-label operator.  Darwin uses
-		'' Apple's clang even when the driver command is named gcc, and
-		'' gcc-backend C can be compiled by clang too.  Ordinary ERROR
-		'' statements can emit computed gotos.
-		'' See https://bugs.llvm.org/show_bug.cgi?id=18658
-		''
-		'' Emscripten's WebAssembly backend does not implement address-of-label
-		'' expressions.  The JavaScript target must therefore leave this
-		'' workaround out; a harmless label address is still a WebAssembly
-		'' blockaddress and fails even when the program has no computed goto.
-		hWriteLine( "_unusedlabel: ; void *_llvmbug18658 = &&_unusedlabel;" )
+end sub
+
+private sub hDropUnusedProcEntry( byval label as FBSYMBOL ptr )
+	if( ctx.procentrybytes = 0 ) then exit sub
+	if( symbGetIsAccessed( label ) ) then exit sub
+
+	'' Keep the original entry position until all indirect jumps are lowered.
+	'' An unused entry can then be removed in place, before this procedure's
+	'' section is appended to its parent, without another buffer allocation.
+	dim as SECTIONENTRY ptr e = @ctx.sections(ctx.section)
+	if( (ctx.procentrysection <> ctx.section) orelse e->old orelse _
+	    (ctx.procentryoffset > e->bufferlen) orelse _
+	    (ctx.procentrybytes > e->bufferlen - ctx.procentryoffset) ) then
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		exit sub
 	end if
+
+	var tailbytes = e->bufferlen - ctx.procentryoffset - ctx.procentrybytes
+	if( tailbytes > 0 ) then
+		memmove( e->buffer + ctx.procentryoffset, _
+		         e->buffer + ctx.procentryoffset + ctx.procentrybytes, tailbytes )
+	end if
+	e->bufferlen -= ctx.procentrybytes
+	ctx.procentrybytes = 0
 end sub
 
 private sub _emitProcEnd _
@@ -5391,8 +6176,11 @@ private sub _emitProcEnd _
 		byval exitlabel as FBSYMBOL ptr _
 	)
 
+	hAsmEndNames( )
 	dim as string mangled
 	dim as EXPRCACHENODE ptr cachenode = any
+
+	ctx.procentrylabel = NULL
 
 	'' NAKED procedure? Use inline asm, since gcc doesn't support
 	'' __attribute__((naked)) on x86
@@ -5404,6 +6192,9 @@ private sub _emitProcEnd _
 		end if
 		exit sub
 	end if
+
+	hDropUnusedProcEntry( initlabel )
+	sectionEnd( )
 
 	sectionUnindent( )
 	hWriteLine( "}" )
@@ -5430,9 +6221,11 @@ private sub _emitScopeBegin( byval s as FBSYMBOL ptr )
 	sectionBegin( )
 	hWriteLine( "{", TRUE )
 	sectionIndent( )
+	sectionBegin( )
 end sub
 
 private sub _emitScopeEnd( byval s as FBSYMBOL ptr )
+	sectionEnd( )
 	sectionUnindent( )
 	hWriteLine( "}", TRUE )
 	sectionEnd( )

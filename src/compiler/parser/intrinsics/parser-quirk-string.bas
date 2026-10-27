@@ -31,6 +31,13 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
 
+declare function fbSemanticModelFullEnabled( ) as integer
+declare sub fbSemanticModelNativeByteInput _
+	( byval result as ASTNODE ptr, byval operand_id as longint, _
+	  byval token_id as integer, byval byte_width as integer, _
+	  byref kind as const string, byref source_start as LEX_LOCATION, _
+	  byval nonphysical_start as longint )
+
 private function hCVIntConst _
 	( _
 		byval text as zstring ptr, _
@@ -459,6 +466,8 @@ end function
 ''              |   CVLONGINT '(' Expression{str} ')'
 ''
 function cCVXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
+	dim as LEX_LOCATION semantic_start = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 	'' CVD | CVS | CVI | CVL | CVSHORT | CVLONGINT
 	lexSkipToken( LEXCHECK_POST_SUFFIX )
 
@@ -470,8 +479,14 @@ function cCVXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		'' expr
 		var lgt = cConstIntExpr( cGtInParensOnlyExpr( ) )
 
-		 '' disallow BYTEs here (would need to use ASC)
-		if( lgt = 8 ) then lgt = 0
+		'' Byte conversions use ASC; native numeric byte helpers only
+		'' implement 16, 32 and 64 bits. The general type parser also accepts
+		'' 128, which must not select a missing or narrower runtime helper.
+		select case lgt
+		case 16, 32, 64
+		case else
+			lgt = 0
+		end select
 
 		dtype = hIntegerTypeFromBitSize( lgt, FALSE )
 
@@ -486,7 +501,15 @@ function cCVXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 
 	'' string expression
 	dim as ASTNODE ptr expr1 = any
+	dim as LEX_LOCATION semantic_operand_start = lexGetCurrentLocation( )
+	dim as longint semantic_operand_nonphysical = lexGetNonphysicalTokenCount( )
 	hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
+	dim as longint semantic_operand
+	if( fbSemanticModelFullEnabled( ) ) then
+		dim as LEX_LOCATION semantic_operand_end = lexGetLastLocation( )
+		semantic_operand = fbSemanticModelOriginalExpression(expr1, semantic_operand_start, _
+			semantic_operand_nonphysical, semantic_operand_end, lexGetNonphysicalTokenCount( ))
+	end if
 
 	'' ')'
 	hMatchRPRNT( )
@@ -613,6 +636,11 @@ function cCVXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 	end if
 
+	'' Numeric-only CV overloads reinterpret bits without a byte sequence.
+	if( is_str or (functype = FB_DATATYPE_SHORT) ) then
+		fbSemanticModelNativeByteInput(funcexpr, semantic_operand, tk, typeGetSize(functype), _
+			"unpack", semantic_start, semantic_nonphysical)
+	end if
 	function = funcexpr
 end function
 
@@ -625,6 +653,8 @@ end function
 ''              |   MKLONGINT '(' Expression{longint} ')'
 ''
 function cMKXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
+	dim as LEX_LOCATION semantic_start = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 	'' MKD | MKS | MKI | MKL | MKSHORT | MKLONGINT
 	lexSkipToken( LEXCHECK_POST_STRING_SUFFIX )
 
@@ -636,8 +666,14 @@ function cMKXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		'' expr
 		var lgt = cConstIntExpr( cGtInParensOnlyExpr( ) )
 
-		 '' disallow BYTEs here (would need to use CHR)
-		if( lgt = 8 ) then lgt = 0
+		'' Byte conversions use CHR; native numeric byte helpers only
+		'' implement 16, 32 and 64 bits. The general type parser also accepts
+		'' 128, which must not select a missing or narrower runtime helper.
+		select case lgt
+		case 16, 32, 64
+		case else
+			lgt = 0
+		end select
 
 		dtype = hIntegerTypeFromBitSize( lgt, FALSE )
 
@@ -651,11 +687,20 @@ function cMKXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 	hMatchLPRNT( )
 
 	dim as ASTNODE ptr expr1 = any
+	dim as LEX_LOCATION semantic_operand_start = lexGetCurrentLocation( )
+	dim as longint semantic_operand_nonphysical = lexGetNonphysicalTokenCount( )
 	hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
+	dim as longint semantic_operand
+	if( fbSemanticModelFullEnabled( ) ) then
+		dim as LEX_LOCATION semantic_operand_end = lexGetLastLocation( )
+		semantic_operand = fbSemanticModelOriginalExpression(expr1, semantic_operand_start, _
+			semantic_operand_nonphysical, semantic_operand_end, lexGetNonphysicalTokenCount( ))
+	end if
 
 	hMatchRPRNT( )
 
 	dim as ASTNODE ptr funcexpr = NULL
+	dim as integer semantic_width
 
 	#macro doMKX( token )
 		select case as const astGetDataType( expr1 )
@@ -699,13 +744,16 @@ function cMKXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		select case as const tk
 		case FB_TK_MKD
 			funcexpr = astNewCALL( PROCLOOKUP( MKD ) )
+			semantic_width = 8
 		case FB_TK_MKS
 			funcexpr = astNewCALL( PROCLOOKUP( MKS ) )
+			semantic_width = 4
 		case FB_TK_MKI
 			if( dtype = FB_DATATYPE_INVALID ) then
 				dtype = env.lang.integerkeyworddtype
 			end if
 
+			semantic_width = typeGetSize(dtype)
 			if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_INTEGER ) then
 				'' fb_MKI() is for INTEGERs, both on 32bit and on 64bit
 				funcexpr = astNewCALL( PROCLOOKUP( MKI ) )
@@ -722,11 +770,14 @@ function cMKXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 
 		case FB_TK_MKL
 			funcexpr = astNewCALL( PROCLOOKUP( MKL ) )
+			semantic_width = 4
 		case FB_TK_MKSHORT
 			funcexpr = astNewCALL( PROCLOOKUP( MKSHORT ) )
+			semantic_width = 2
 		case else
 			assert(tk = FB_TK_MKLONGINT)
 			funcexpr = astNewCALL( PROCLOOKUP( MKLONGINT ) )
+			semantic_width = 8
 		end select
 
 		'' byval expr as {type}
@@ -740,6 +791,8 @@ function cMKXFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 	end if
 
+	fbSemanticModelNativeByteInput(funcexpr, semantic_operand, tk, semantic_width, _
+		"pack", semantic_start, semantic_nonphysical)
 	function = funcexpr
 end function
 

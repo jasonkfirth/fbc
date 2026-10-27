@@ -584,7 +584,7 @@ end sub
 '':::::
 private sub outEx _
 	( _
-		byval s as zstring ptr, _
+		byval s as const zstring ptr, _
 		byval bytes as integer = 0 _
 	) static
 
@@ -601,7 +601,7 @@ end sub
 '':::::
 sub outp _
 	( _
-		byval s as zstring ptr _
+		byval s as const zstring ptr _
 	)
 
 	static as string ostr
@@ -622,8 +622,8 @@ end sub
 '':::::
 sub hBRANCH _
 	( _
-		byval mnemonic as zstring ptr, _
-		byval label as zstring ptr _
+		byval mnemonic as const zstring ptr, _
+		byval label as const zstring ptr _
 	) static
 
 	dim ostr as string
@@ -638,7 +638,7 @@ end sub
 '':::::
 sub hPUSH _
 	( _
-		byval rname as zstring ptr _
+		byval rname as const zstring ptr _
 	) static
 
 	dim ostr as string
@@ -652,7 +652,7 @@ end sub
 '':::::
 sub hPOP _
 	( _
-		byval rname as zstring ptr _
+		byval rname as const zstring ptr _
 	) static
 
 	dim ostr as string
@@ -666,8 +666,8 @@ end sub
 '':::::
 sub hMOV _
 	( _
-		byval dname as zstring ptr, _
-		byval sname as zstring ptr _
+		byval dname as const zstring ptr, _
+		byval sname as const zstring ptr _
 	) static
 
 	dim ostr as string
@@ -683,8 +683,8 @@ end sub
 '':::::
 private sub hXCHG _
 	( _
-		byval dname as zstring ptr, _
-		byval sname as zstring ptr _
+		byval dname as const zstring ptr, _
+		byval sname as const zstring ptr _
 	) static
 
 	dim ostr as string
@@ -4368,9 +4368,9 @@ private sub hCMPL _
 	( _
 		byval rvreg as IRVREG ptr, _
 		byval label as FBSYMBOL ptr, _
-		byval mnemonic as zstring ptr, _
-		byval rev_mnemonic as zstring ptr, _
-		byval usg_mnemonic as zstring ptr, _
+		byval mnemonic as const zstring ptr, _
+		byval rev_mnemonic as const zstring ptr, _
+		byval usg_mnemonic as const zstring ptr, _
 		byval dvreg as IRVREG ptr, _
 		byval svreg as IRVREG ptr, _
 		byval isinverse as integer = FALSE _
@@ -4434,7 +4434,7 @@ private sub hCMPI _
 	( _
 		byval rvreg as IRVREG ptr, _
 		byval label as FBSYMBOL ptr, _
-		byval mnemonic as zstring ptr, _
+		byval mnemonic as const zstring ptr, _
 		byval dvreg as IRVREG ptr, _
 		byval svreg as IRVREG ptr _
 	) static
@@ -4540,7 +4540,7 @@ end sub
 private function hCMPF_get_high_byte_name _
 	( _
 		byval reg as integer _
-	) as zstring ptr
+	) as const zstring ptr
 
 	select case reg
 	case EMIT_REG_EAX
@@ -4558,8 +4558,8 @@ end function
 
 private function hCMPF_swap_mnemonic _
 	( _
-		byval mnemonic as zstring ptr _
-	) as zstring ptr
+		byval mnemonic as const zstring ptr _
+	) as const zstring ptr
 
 	select case *mnemonic
 	case "e"
@@ -4689,7 +4689,7 @@ sub hCMPF_set _
 		use_aux_reg = FALSE
 
 		if( recipe->parity_true or recipe->parity_false ) then
-			dim as zstring ptr high_byte
+			dim as const zstring ptr high_byte
 			high_byte = hCMPF_get_high_byte_name( rvreg->reg )
 			if( high_byte <> NULL ) then
 				rname8hi = *high_byte
@@ -4747,7 +4747,7 @@ sub hCMPF_set _
 	'' set boolean using conditional jump
 	else
 		dim as integer initialize_true
-		dim as zstring ptr branch_mnemonic
+		dim as const zstring ptr branch_mnemonic
 		initialize_true = (recipe->swapinit = FALSE)
 		branch_mnemonic = recipe->mnemonic
 
@@ -5822,7 +5822,7 @@ private sub _emitEXP _
 	outp "fstp st(1)"
 end sub
 
-private sub hFpuChangeRC( byref regname as string, byval mode as zstring ptr )
+private sub hFpuChangeRC( byref regname as string, byval mode as const zstring ptr )
 	outp( "sub esp, 4" )
 	outp( "fnstcw [esp]" )
 	hMOV( regname, "[esp]" )
@@ -7654,10 +7654,10 @@ end sub
 '' functions table
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-#define EMIT_CBENTRY(op) @_emit##op##
+#define EMIT_CBENTRY(op) cast( EMIT_OPCB, @_emit##op## )
 
 	'' same order as EMIT_NODEOP
-	dim shared _opFnTB(0 to EMIT_MAXOPS-1) as any ptr => _
+	dim shared _opFnTB(0 to EMIT_MAXOPS-1) as EMIT_OPCB => _
 	{ _
 		EMIT_CBENTRY(NOP), _
 		_

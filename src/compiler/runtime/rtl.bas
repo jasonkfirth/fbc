@@ -232,11 +232,13 @@ sub rtlAddIntrinsicProcs _
 							i += 1
 							with procdef->paramTb(i)
 								'' add it
-								'' Note: using FBCALL for the function pointer.
-								'' Must match the function's declaration in the
-								'' rtlib. Currently only fb_ThreadCreate() is
-								'' affected.
-								subtype = symbAddProcPtr( inner_proc, .dtype, NULL, 0, 0, env.target.fbcall )
+								'' Thread callbacks retain FBCALL. C error callbacks
+								'' use CDECL even when the entry point is stdcall.
+								dim as FB_FUNCMODE callbackmode = env.target.fbcall
+								if( procdef->options and FB_RTL_OPT_CDECLCALLBACK ) then
+									callbackmode = FB_FUNCMODE_CDECL
+								end if
+								subtype = symbAddProcPtr( inner_proc, .dtype, NULL, 0, 0, callbackmode )
 							end with
 
 							param_optval = NULL

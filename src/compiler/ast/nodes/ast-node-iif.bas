@@ -25,6 +25,7 @@
 #include once "core/fbint.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-numeric-conversions.bi"
 #include once "runtime/rtl.bi"
 
 declare sub fbSemanticModelAssociateTemporaryDestructorsForRange _
@@ -235,6 +236,12 @@ private function hFoldConstIif _
 
 	if( astIsCONST( condexpr ) = FALSE ) then
 		return FALSE
+	end if
+
+	'' Constant IIf conditions never reach astBuildBranch. Keep the same
+	'' source truth observation before discarding the condition allocation.
+	if( astGetDataClass( condexpr ) = FB_DATACLASS_FPOINT ) then
+		fbSemanticModelNumericConversion(condexpr, FB_DATATYPE_BOOLEAN, NULL, 0)
 	end if
 
 	if( astConstEqZero( condexpr ) ) then

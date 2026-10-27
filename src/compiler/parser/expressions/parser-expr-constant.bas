@@ -26,8 +26,11 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-extra-facts.bi"
+#include once "tooling/semantic-literal-adjacency-api.bi"
 
 declare sub fbSemanticModelStringLiteralInput( byval expr as ASTNODE ptr, byval token as FBTOKEN ptr )
+declare function fbSemanticModelFullEnabled( ) as integer
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -67,6 +70,14 @@ function cStrLiteral( byval skiptoken as integer ) as ASTNODE ptr
 	dim as FB_WARNINGMSG wrnmsg = 0
 
 	dim as ASTNODE ptr expr = NULL
+	dim as integer semantic_join_observe = fbSemanticExtraFactsEnabled(FB_SEMEXTRA_LITERAL_GROUPS) and _
+		fbSemanticModelFullEnabled( )
+	dim as LEX_LOCATION semantic_first
+	dim as longint semantic_first_nonphysical
+	if( semantic_join_observe ) then
+		semantic_first = lexGetCurrentLocation( )
+		semantic_first_nonphysical = lexGetNonphysicalTokenCount( )
+	end if
 
 	do
 		lgt = lexGetTextLen( )
@@ -136,7 +147,20 @@ function cStrLiteral( byval skiptoken as integer ) as ASTNODE ptr
 		if( expr = NULL ) then
 			expr = semantic_literal
 		else
+			'' Folding may free both children. Keep IDs, never borrowed nodes.
+			'' Unrequested exports avoid the source-location string copies.
+			dim as longint semantic_left, semantic_right
+			dim as LEX_LOCATION semantic_last
+			if( semantic_join_observe ) then
+				semantic_left = expr->semantic_expression
+				semantic_right = semantic_literal->semantic_expression
+				semantic_last = lex.ctx->head->source
+			end if
 			expr = astNewBOP( AST_OP_ADD, expr, semantic_literal )
+			if( semantic_join_observe ) then
+				fbSemanticModelStringLiteralJoin(expr, semantic_left, semantic_right, semantic_first, semantic_last, _
+					semantic_first_nonphysical, lexGetNonphysicalTokenCount( ))
+			end if
 		end if
 
 		if( skiptoken ) then

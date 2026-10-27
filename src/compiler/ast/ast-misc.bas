@@ -27,6 +27,7 @@
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-numeric-conversions.bi"
 #include once "support/hlp.bi"
 
 declare sub astReplaceSymbolOnCALL _
@@ -829,8 +830,15 @@ private function hPrepareBranchExpr _
 			end if
 		end if
 
+		dim as longint original_expression = expr->semantic_expression
 		expr = astBuildCall( ovlProc, expr )
 		dtype = astGetFullType( expr )
+		'' The selected scalar call has no parser occurrence of its own.
+		'' Preserve the written object's site only for this truth observation;
+		'' do not make it another executable expression association on the call.
+		if( (typeGetClass( dtype ) = FB_DATACLASS_FPOINT) andalso (expr->semantic_expression = 0) ) then
+			fbSemanticModelNumericConversionSource(expr, FB_DATATYPE_BOOLEAN, NULL, 0, original_expression)
+		end if
 	end select
 
 	return TRUE
@@ -844,7 +852,7 @@ private sub hPrepareFloatBranchExpr _
 
 	if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
 		if( env.clopt.fpmode = FB_FPMODE_PRECISE ) then
-			expr = astNewCONV( FB_DATATYPE_BOOLEAN, NULL, expr )
+			expr = astNewCONV( FB_DATATYPE_BOOLEAN, NULL, expr, AST_CONVOPT_SEMANTIC_TRANSPORT )
 		end if
 	end if
 end sub
@@ -871,6 +879,13 @@ function astBuildBranch _
 
 	if( hPrepareBranchExpr( expr, dtype ) = FALSE ) then
 		return NULL
+	end if
+
+	'' A floating condition normalizes truth even when folding removes the
+	'' branch or a backend compares directly against zero. Its later boolean
+	'' carrier is internal; record the source boundary only here.
+	if( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
+		fbSemanticModelNumericConversion(expr, FB_DATATYPE_BOOLEAN, NULL, 0)
 	end if
 
 	'' If the condition expression uses temp vars, we may have to call their
@@ -1053,7 +1068,7 @@ function astBuildBranch _
 	select case typeGetDtAndPtrOnly( dtype )
 	case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
 		'' don't use typeRemap(), we are preserving const
-		dtype = typeJoin( dtype, symb_dtypeTB(typeGetDtAndPtrOnly( dtype )).remaptype )
+		dtype = typeJoin( dtype, symbGetDatatypeInfo(typeGetDtAndPtrOnly( dtype )).remaptype )
 	end select
 
 	if( call_dtors ) then

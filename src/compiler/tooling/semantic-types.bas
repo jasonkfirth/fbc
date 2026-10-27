@@ -17,7 +17,7 @@ function fbSemanticModelTypeFact _
 		fbSemanticModelFailAt("semantic-types.bas:17")
 		return ""
 	end if
-	dim as string type_name = *symb_dtypeTB(base_dtype).name
+	dim as string type_name = *symbGetDatatypeInfo(base_dtype).name
 	dim as string qualifiers
 	if( base_dtype = FB_DATATYPE_FIXSTR ) then type_name = "fixed-string"
 	'' Position zero describes the current value; each additional position
@@ -28,7 +28,7 @@ function fbSemanticModelTypeFact _
 	dim as string modifier
 	if( typeHasMangleDt(dtype) ) then
 		dim as integer mangle = typeGetMangleDt(dtype)
-		if( (mangle >= 0) and (mangle < FB_DATATYPES) ) then modifier = *symb_dtypeTB(mangle).name
+		if( (mangle >= 0) and (mangle < FB_DATATYPES) ) then modifier = *symbGetDatatypeInfo(mangle).name
 	end if
 	dim as string size
 	if( pointers > 0 ) then
@@ -39,8 +39,8 @@ function fbSemanticModelTypeFact _
 		end if
 	elseif( base_dtype = FB_DATATYPE_FIXSTR ) then
 		if( storage_bytes > 0 ) then size = fbSemanticModelNumber(storage_bytes)
-	elseif( symb_dtypeTB(base_dtype).size > 0 ) then
-		size = fbSemanticModelNumber(symb_dtypeTB(base_dtype).size)
+	elseif( symbGetDatatypeInfo(base_dtype).size > 0 ) then
+		size = fbSemanticModelNumber(symbGetDatatypeInfo(base_dtype).size)
 	end if
 	return "NT" + TABCHAR + domain + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + role + _
 		TABCHAR + type_name + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(subtype)) + _

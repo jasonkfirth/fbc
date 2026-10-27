@@ -44,6 +44,15 @@ private function hCompileStage2DirectlyToObj( ) as integer
 			'' Keep Win64 object emission with the Clang/LLVM toolchain. GNU as
 			'' may reject its Windows unwind directives or assembly syntax.
 			function = TRUE
+		elseif( (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) and _
+		        (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) and _
+		        (fbGetOption( FB_COMPOPT_ASMSYNTAX ) = FB_ASMSYNTAX_INTEL) and _
+		        (fbc.emitfinalasmonly = FALSE) and (fbc.keepfinalasm = FALSE) ) then
+			'' Clang's Win32 Intel assembly can contain symbol-immediate pushes
+			'' rejected by its own assembler. Normal object builds keep code
+			'' generation in one invocation; explicit assembly requests retain
+			'' the assembly-output path.
+			function = TRUE
 		elseif( ((fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG) or _
 		         (fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC)) and _
 		        (fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64) ) then
@@ -66,7 +75,7 @@ private function hGetAsmName _
 		byval stage as integer _
 	) as string
 
-	dim as zstring ptr ext = any
+	dim as const zstring ptr ext = any
 	dim as string asmfile
 
 	'' Based on the objfile name so it's also affected by -o
@@ -658,10 +667,9 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			ln += "-fno-unwind-tables "
 		end if
 
-		'' Newer GCC versions diagnose some const-qualified pointer helper calls
-		'' more strictly.  The generated C is an intermediate representation owned
-		'' by fbc, so keep that compatibility detail out of user programs.
-		ln += "-Wno-incompatible-pointer-types "
+		'' Keep pointer compatibility diagnostics enabled. Call lowering must
+		'' preserve declared qualifiers and runtime ABI types; these diagnostics
+		'' catch regressions in the generated C.
 
 		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC ) then
 			'' GCC 6 added -Wmisleading-indentation to -Wall.  The check is not

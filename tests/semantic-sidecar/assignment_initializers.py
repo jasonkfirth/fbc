@@ -23,6 +23,13 @@ Sub ScalarInitializers()
     Dim arrayPointer As Integer Ptr = @values(0)
     Dim first As Item
     Dim second As Item = first
+    Dim allocated As Integer Ptr
+    allocated = New Integer(original)
+    Dim declaredAllocation As Integer Ptr = New Integer(original)
+    Var inferredAllocation = New Integer(original)
+    Delete allocated
+    Delete declaredAllocation
+    Delete inferredAllocation
 End Sub
 '''
 
@@ -32,7 +39,9 @@ def check_initializers(test):
         with test.subTest(backend=backend):
             source = test.source(source_text(BODY, 'scalar-initializers.bas'), 'scalar-initializers.bas')
             output = test.emission_path('initializers', backend)
-            extra = ('-o', str(output))
+            # Model validates native datatype slots; dedicated linter producers
+            # can otherwise select their stable client ABI by default.
+            extra = ('-o', str(output), '-semantic-type-abi', 'native')
             test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = output.read_bytes()
             _, artifact = test.invoke([source], backend=backend, extra=extra)
@@ -47,9 +56,13 @@ def check_initializers(test):
                 fields = entry[4].split('\t')
                 left = expressions[int(fields[0])]
                 names.add(model.symbols[int(left[13])][2].lower())
+                test.assertEqual(model.types[int(left[13])][18], 'source')
                 test.assertEqual(fields[3:6], ['assign', 'builtin', '0'])
             test.assertEqual(names, {'integervalue', 'floatingvalue', 'textvalue', 'pointervalue',
-                                   'inferredvalue', 'staticvalue', 'arraypointer'})
+                                   'inferredvalue', 'staticvalue', 'arraypointer',
+                                   'declaredallocation', 'inferredallocation'})
+            test.assertTrue(all(model.statement_endings[int(row[3].split(':')[1])][2] == 'declaration'
+                                for row in entries))
             for mode in ('bindings', 'expressions'):
                 compact = test.compile(source, mode=mode, backend=backend, extra=extra)
                 test.assertEqual(output.read_bytes(), plain)

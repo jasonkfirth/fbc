@@ -74,12 +74,12 @@ declare sub hPrepOperand64 _
 
 declare sub hPUSH _
 	( _
-		byval rname as zstring ptr _
+		byval rname as const zstring ptr _
 	)
 
 declare sub hPOP _
 	( _
-		byval rname as zstring ptr _
+		byval rname as const zstring ptr _
 	)
 
 
@@ -111,7 +111,7 @@ declare function hGetRegName _
 
 declare sub outp _
 	( _
-		byval s as zstring ptr _
+		byval s as const zstring ptr _
 	)
 
 declare sub hLABEL _
@@ -121,19 +121,19 @@ declare sub hLABEL _
 
 declare sub hBRANCH _
 	( _
-		byval mnemonic as zstring ptr, _
-		byval label as zstring ptr _
+		byval mnemonic as const zstring ptr, _
+		byval label as const zstring ptr _
 	)
 
 declare sub hMOV _
 	( _
-		byval dname as zstring ptr, _
-		byval sname as zstring ptr _
+		byval dname as const zstring ptr, _
+		byval sname as const zstring ptr _
 	)
 
 declare function _init_opFnTB_SSE _
 	( _
-		byval _opFnTB_SSE as any ptr ptr _
+		byval _opFnTB_SSE as EMIT_OPCB ptr _
 	) as integer
 
 
@@ -152,8 +152,8 @@ end enum
 
 type CMPF_RECIPE
 	op as CMPF_OP
-	mnemonic as zstring ptr             '' 'normal' comparison to use
-	rev_mnemonic as zstring ptr         '' swapped comparison
+	mnemonic as const zstring ptr             '' 'normal' comparison to use
+	rev_mnemonic as const zstring ptr         '' swapped comparison
 	parity_false as integer
 	parity_true as integer
 	swapregs as integer

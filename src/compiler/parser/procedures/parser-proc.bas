@@ -25,10 +25,15 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-type-shapes.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-link.bi"
 #include once "parser/parser.bi"
+
+declare function parserGetLastTypeAlias( ) as FBSYMBOL ptr
+declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, byval alias_symbol as FBSYMBOL ptr)
+
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 
@@ -631,12 +636,14 @@ sub cProcRetType _
 		options and= not FB_SYMBTYPEOPT_CHECKSTRPTR
 	end if
 
+	fbSemanticModelTypeShapeDeclaration()
 	if( cSymbolType( dtype, subtype, , , options ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 		'' error recovery: fake a type
 		dtype = FB_DATATYPE_INTEGER
 		subtype = NULL
 	else
+		fbSemanticModelTypeAliasDeclaration(proc, parserGetLastTypeAlias( ))
 		'' check for invalid types
 		select case( typeGetDtAndPtrOnly( dtype ) )
 		case FB_DATATYPE_WCHAR
@@ -1421,6 +1428,12 @@ private function hPreAddHeaderProc _
 		byref dtype as integer, _
 		byref op as integer _
 	) as FBSYMBOL ptr
+
+	'' Only named procedures have a previous declaration, and only operators
+	'' have an operator code. Callers also inspect these outputs for headers
+	'' such as constructors, so define their absent states before dispatch.
+	head_proc = NULL
+	op = INVALID
 
 	select case( tk )
 	case FB_TK_CONSTRUCTOR, FB_TK_DESTRUCTOR

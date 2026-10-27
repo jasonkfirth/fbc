@@ -3016,20 +3016,20 @@ end sub
 '' functions table
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-#define EMIT_CBENTRY(op) @_emit##op##
+#define EMIT_CBENTRY(op) cast( EMIT_OPCB, @_emit##op## )
 
 
 function _init_opFnTB_SSE _
 	( _
-		byval _opFnTB_SSE as any ptr ptr _
+		byval _opFnTB_SSE as EMIT_OPCB ptr _
 	) as integer
 
 	'' load
 	if( _emitLOADB2F_x86 = NULL ) then
-		_emitLOADB2F_x86 = _opFnTB_SSE[EMIT_OP_LOADB2F]
+		_emitLOADB2F_x86 = cast( EMIT_BOPCB, _opFnTB_SSE[EMIT_OP_LOADB2F] )
 	end if
 	if( _emitLOADF2B_x86 = NULL ) then
-		_emitLOADF2B_x86 = _opFnTB_SSE[EMIT_OP_LOADF2B]
+		_emitLOADF2B_x86 = cast( EMIT_BOPCB, _opFnTB_SSE[EMIT_OP_LOADF2B] )
 	end if
 	_opFnTB_SSE[EMIT_OP_LOADF2I] = EMIT_CBENTRY(LOADF2I_SSE)
 	_opFnTB_SSE[EMIT_OP_LOADI2F] = EMIT_CBENTRY(LOADI2F_SSE)

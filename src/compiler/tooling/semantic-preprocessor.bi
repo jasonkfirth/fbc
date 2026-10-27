@@ -10,6 +10,8 @@
 #include once "lexer/lex.bi"
 
 declare sub fbSemanticModelResetPreprocessor( )
+declare function fbSemanticModelPPAssertBegin( ) as longint
+declare sub fbSemanticModelPPAssertEnd( byval identity as longint )
 declare function fbSemanticModelPPBranch _
 	( byval token as integer, byref source as LEX_LOCATION, byval first_branch as integer ) as longint
 declare sub fbSemanticModelPPDecision _

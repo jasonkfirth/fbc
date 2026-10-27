@@ -2236,6 +2236,10 @@ function rtlFileInputGet _
 		case FB_SIZETYPE_UINT32 : f = PROCLOOKUP( INPUTUINT )
 		case FB_SIZETYPE_INT64  : f = PROCLOOKUP( INPUTLONGINT )
 		case FB_SIZETYPE_UINT64 : f = PROCLOOKUP( INPUTULONGINT )
+		case else
+			 '' No runtime entry point exists for an unsupported integer width.
+			errReport( FB_ERRMSG_INVALIDDATATYPES )
+			exit function
 		end select
 
 	case FB_DATATYPE_SINGLE
@@ -2251,9 +2255,14 @@ function rtlFileInputGet _
 
 	proc = astNewCALL( f )
 
-	'' always calc len before pushing the param
 	if( args > INPUT_VALUE_ARGUMENT_COUNT ) then
+		'' Calculate length before the argument builder can consume dstexpr.
 		lgt = rtlCalcStrLen( dstexpr, dtype )
+	else
+		'' Scalar input has no length argument; finish it on this path.
+		if( astNewARG( proc, dstexpr ) = NULL ) then exit function
+		astAdd( rtlUStrFinishWrite( before, proc, after ) )
+		return TRUE
 	end if
 
 	'' byref dst as any | byval dst as wstring ptr

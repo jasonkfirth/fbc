@@ -80,6 +80,95 @@
 				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
+		/' C error-frame bridge: ERRORFRAMEENTER. '/ _
+		( _
+			@FB_RTL_ERRORFRAMEENTER, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_CDECLCALLBACK, _
+			5, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeAddrOf( FB_DATATYPE_FUNCTION ), FB_PARAMMODE_BYVAL, TRUE, 1 ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( FB_DATATYPE_VOID, NULL, FALSE, 0 ) _
+			} _
+		), _
+		/' C error-frame bridge: ERRORFRAMEBUFFER. '/ _
+		( _
+			@FB_RTL_ERRORFRAMEBUFFER, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
+		/' C error-frame bridge: ERRORFRAMEREADY. '/ _
+		( _
+			@FB_RTL_ERRORFRAMEREADY, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
+		/' C error-frame bridge: ERRORFRAMESETHANDLER. '/ _
+		( _
+			@FB_RTL_ERRORFRAMESETHANDLER, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_CDECLCALLBACK, _
+			5, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( typeAddrOf( FB_DATATYPE_FUNCTION ), FB_PARAMMODE_BYVAL, TRUE, 1 ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( FB_DATATYPE_LONG, NULL, FALSE, 0 ), _
+				( typeAddrOf( typeAddrOf( FB_DATATYPE_VOID ) ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
+		/' C error-frame bridge: ERRORFRAMERESTORE. '/ _
+		( _
+			@FB_RTL_ERRORFRAMERESTORE, NULL, _
+			typeAddrOf( FB_DATATYPE_VOID ), FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
+		/' C error-frame bridge: ERRORFRAMESETTARGET. '/ _
+		( _
+			@FB_RTL_ERRORFRAMESETTARGET, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			2, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
+		/' C error-frame bridge: ERRORFRAMEGETTARGET. '/ _
+		( _
+			@FB_RTL_ERRORFRAMEGETTARGET, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
+		/' C error-frame bridge: ERRORFRAMELEAVE. '/ _
+		( _
+			@FB_RTL_ERRORFRAMELEAVE, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE, 0 ) _
+			} _
+		), _
 		/' function fb_ErrorGetNum( ) as long '/ _
 		( _
 			@FB_RTL_ERRORGETNUM, NULL, _
@@ -393,7 +482,7 @@ sub rtlErrorSetHandler _
 		byval savecurrent as integer _
 	)
 
-	dim as ASTNODE ptr proc = any, expr = any
+	dim as ASTNODE ptr proc = any
 
 	''
 	proc = astNewCALL( PROCLOOKUP( ERRORSETHANDLER ) )
@@ -403,23 +492,33 @@ sub rtlErrorSetHandler _
 		exit sub
 	end if
 
-	''
-	expr = NULL
 	if( savecurrent ) then
 		if( fbIsModLevel( ) = FALSE ) then
 			with parser.currproc->proc.ext->err
 				if( .lasthnd = NULL ) then
-					.lasthnd = symbAddTempVar( typeAddrOf( FB_DATATYPE_VOID ) )
-					expr = astNewVAR( .lasthnd )
-					astAdd( astNewASSIGN( expr, proc ) )
+					'' Both values live until procedure exit, even when this
+					'' statement belongs to a nested lexical scope.
+					.lasthnd = symbAddImplicitVar( typeAddrOf( FB_DATATYPE_VOID ), NULL, FB_SYMBOPT_UNSCOPE )
+					.hndsaved = symbAddImplicitVar( FB_DATATYPE_INTEGER, NULL, FB_SYMBOPT_UNSCOPE )
 				end if
+
+				'' A local handler can be selected in either branch, or set
+				'' repeatedly in a loop. Save the previous handler on the
+				'' first runtime activation, not the first parsed statement.
+				dim as FBSYMBOL ptr previous = symbAddTempVar( typeAddrOf( FB_DATATYPE_VOID ) )
+				dim as FBSYMBOL ptr skipsave = symbAddLabel( NULL )
+				astAdd( astNewASSIGN( astNewVAR( previous ), proc ) )
+				astAdd( astNewBOP( AST_OP_NE, astNewVAR( .hndsaved ), _
+					astNewCONSTi( FALSE ), skipsave, AST_OPOPT_NONE ) )
+				astAdd( astNewASSIGN( astNewVAR( .lasthnd ), astNewVAR( previous ) ) )
+				astAdd( astNewASSIGN( astNewVAR( .hndsaved ), astNewCONSTi( TRUE ) ) )
+				astAdd( astNewLABEL( skipsave ) )
 			end with
+			exit sub
 		end if
 	end if
 
-	if( expr = NULL ) then
-		astAdd( proc )
-	end if
+	astAdd( proc )
 
 end sub
 

@@ -436,6 +436,10 @@ type EMIT_VTBL
 	) as const zstring ptr
 end type
 
+'' Opcode slots retain function-pointer storage. EMIT_NODECLASS selects the
+'' concrete callback type before a call; this storage type is never called.
+type EMIT_OPCB as sub( )
+
 type EMITCTX
 	inited                              as integer
 	output_error                        as integer          '' write or close failed for the current ASM file
@@ -457,7 +461,7 @@ type EMITCTX
 
 	''
 	vtbl                                as EMIT_VTBL
-	opFnTb                              as any ptr ptr
+	opFnTb                              as EMIT_OPCB ptr
 end type
 
 ''
