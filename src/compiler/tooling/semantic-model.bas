@@ -4392,6 +4392,10 @@ sub fbSemanticModelExportCurrentMemberPrefix _
     '' identity to own a receiver fact in that case.
     if( expression_id = 0 ) then exit sub
     dim as longint statement_id = fbSemanticModelCurrentStatement( )
+    '' Directive expressions such as #assert can contain member accesses
+    '' without belonging to a parsed statement. Their expression remains
+    '' available, but a receiver fact cannot name a statement owner.
+    if( statement_id = 0 ) then exit sub
     dim as longint receiver_id = fbSemanticModelSymbolId(receiver_subtype)
     dim as longint field_id = fbSemanticModelSymbolId(fld)
     if( (expression_id <= 0) or (statement_id <= 0) or (receiver_id <= 0) or (field_id <= 0) or _
