@@ -39,6 +39,7 @@ SEMANTIC_READER_FILES = (
     "semantic_frontend_abi.py",
     "semantic_backend_abi.py",
     "semantic_call_abi.py",
+    "semantic_datatypes.py",
     "semantic_literals.py",
     "semantic_queries.py",
     "semantic_selects.py",

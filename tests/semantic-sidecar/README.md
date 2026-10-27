@@ -546,4 +546,11 @@ production-observer controls cover rejected state and copied context lifetime.
 Native execution checks all export modes with working scalar/aggregate,
 BYREF/BYDESC/wide-string, optional and virtual operations.
 
+`raw_abi_consumer.py` exercises the complete reader with both native and
+stable-v1 encodings across fourteen fixture families, three backends, export
+modes and 32/64-bit targets. It compares normalized meaning and emitted code,
+proves raw rows retain their selected encoding, and rejects mismatched type
+vocabularies, encoding capabilities and semantic families. The written-type
+observer tests also pass stable models through the complete reader.
+
 <!-- end of README.md -->

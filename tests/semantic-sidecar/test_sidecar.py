@@ -5545,4 +5545,24 @@ Next
         from call_abi import check_instrumentation
         check_instrumentation(self)
 
+    def test_raw_datatype_abis_preserve_complete_reader_meaning_and_wire_rows(self) -> None:
+        from raw_abi_consumer import check_matrix
+        check_matrix(self)
+
+    def test_raw_datatype_abis_cover_modes_targets_and_call_components(self) -> None:
+        from raw_abi_consumer import check_modes
+        check_modes(self)
+
+    def test_raw_datatype_abis_reject_mixed_vocabulary_and_wrong_type_families(self) -> None:
+        from raw_abi_consumer import check_rejection
+        check_rejection(self)
+
+    def test_raw_datatype_abi_does_not_invent_older_reduced_metadata(self) -> None:
+        from raw_abi_consumer import check_legacy_reduced
+        check_legacy_reduced(self)
+
+    def test_raw_datatype_abis_preserve_binary_and_text_rows(self) -> None:
+        from raw_abi_consumer import check_binary
+        check_binary(self)
+
 # end of test_sidecar.py

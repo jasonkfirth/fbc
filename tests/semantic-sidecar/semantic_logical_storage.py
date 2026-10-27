@@ -7,6 +7,7 @@ This file intentionally does NOT treat these input snapshots as executable nodes
 import re
 
 from semantic_assignment_storage import COMPLETE_CLASSES, BINARY_CODES, UNARY_CODES, MAX_NODES, MAX_DEPTH, MAX_POINTER_DEPTH
+from semantic_datatypes import primitive_name
 
 
 def validate_logical_storage(model, number, subject_modules, node_kind_count, comparison=False, string_inputs=False):
@@ -23,9 +24,10 @@ def validate_logical_storage(model, number, subject_modules, node_kind_count, co
         operators = ('add', 'concatenate')
     work_left = 16000000
 
-    def original_strings(original):
+    def original_strings(original, module):
         return all(identity in expressions and
-                   int(expressions[identity][12]) & 0x1ff in (4, 7, 19, 20)
+                   not int(expressions[identity][12]) & 0x1e0 and
+                   primitive_name(model, module, int(expressions[identity][12])) in ("zstring", "wstring", "string", "fixed-string")
                    for identity in map(int, original[4:6]))
 
     def decimal(text, minimum=0, maximum=9223372036854775807):
@@ -44,7 +46,7 @@ def validate_logical_storage(model, number, subject_modules, node_kind_count, co
         original = model.expression_operands.get(identity)
         if (work_left < 0 or row[1] != 'expression' or module is None or original is None
                 or original[2] != 'binary' or original[3] not in operators
-                or string_inputs and not original_strings(original)
+                or string_inputs and not original_strings(original, module)
                 or model.capabilities[module].get(capability) != 'available'):
             raise ValueError('Logical storage has no available native short-circuit owner')
         fields = row[4].split('\t')
@@ -131,7 +133,7 @@ def validate_logical_storage(model, number, subject_modules, node_kind_count, co
     for identity, original in model.expression_operands.items():
         module = subject_modules['expression', identity]
         if (original[2] == 'binary' and original[3] in operators
-                and (not string_inputs or original_strings(original))
+                and (not string_inputs or original_strings(original, module))
                 and model.capabilities[module].get(capability) == 'available'
                 and identity not in groups):
             raise ValueError('Original short-circuit expression lacks its storage trees')

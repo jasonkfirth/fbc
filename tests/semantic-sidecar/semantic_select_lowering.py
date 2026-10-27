@@ -5,6 +5,8 @@ Responsibilities: Complete lowering receipts, operand ownership and bounded slot
 This file intentionally does NOT reproduce coercion or parse BASIC source.
 """
 
+from semantic_datatypes import primitive_name
+
 U64_MASK = (1 << 64) - 1
 TABLE_SLOTS = 8192
 INVERSE_RELATIONS = {45: 48, 48: 45, 46: 50, 50: 46, 47: 49, 49: 47}
@@ -42,8 +44,9 @@ def validate_select_lowering(model, inputs, clauses, alternatives, observations,
         if selected_type & 0x1e0:
             return False
         if kind == "unicode":
-            return base == 28
-        return base in ((4, 7, 19, 20) if kind == "wide" else (4, 19, 20))
+            return primitive_name(model, module, selected_type) == "ustring"
+        return primitive_name(model, module, selected_type) in (
+            ("zstring", "wstring", "string", "fixed-string") if kind == "wide" else ("zstring", "string", "fixed-string"))
 
     for owner, module, parts, fields in observations:
         work_left -= 1

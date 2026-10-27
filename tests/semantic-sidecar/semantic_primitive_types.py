@@ -5,6 +5,8 @@ Responsibilities: Keyword/dtype agreement, module counts and exact source origin
 This file intentionally does NOT infer type uses from value types or names.
 """
 
+from semantic_datatypes import primitive_name
+
 FEATURE = 'accepted-primitive-type-inputs'
 INPUT = 'primitive-type-input:'
 COUNT = 'accepted-primitive-type-count:'
@@ -12,15 +14,17 @@ LAYOUT_FEATURE = 'accepted-primitive-type-layouts'
 LAYOUT = 'primitive-type-layout:'
 LIMIT = 1_000_000
 
-# Native dtype base codes. INTEGER<bits> keeps the accepted explicit width;
+# Named Y families. INTEGER<bits> keeps the accepted explicit width;
 # UNSIGNED changes a signed family's selection without changing its token.
 BASES = {
-    'ANY': {0}, 'BOOLEAN': {1}, 'BYTE': {2, 3}, 'UBYTE': {3},
-    'SHORT': {5, 6}, 'USHORT': {6},
-    'INTEGER': {2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16},
-    'UINTEGER': {3, 6, 9, 12, 14, 16}, 'LONG': {11, 12}, 'ULONG': {12},
-    'LONGINT': {13, 14}, 'ULONGINT': {14}, 'SINGLE': {17}, 'DOUBLE': {18},
-    'STRING': {19, 20}, 'ZSTRING': {4}, 'WSTRING': {7}, 'USTRING': {28},
+    'ANY': {'any'}, 'BOOLEAN': {'boolean'}, 'BYTE': {'byte', 'ubyte'}, 'UBYTE': {'ubyte'},
+    'SHORT': {'short', 'ushort'}, 'USHORT': {'ushort'},
+    'INTEGER': {'byte', 'ubyte', 'short', 'ushort', 'integer', 'uinteger', 'long', 'ulong',
+                'longint', 'ulongint', 'integer128', 'uinteger128'},
+    'UINTEGER': {'ubyte', 'ushort', 'uinteger', 'ulong', 'ulongint', 'uinteger128'},
+    'LONG': {'long', 'ulong'}, 'ULONG': {'ulong'}, 'LONGINT': {'longint', 'ulongint'},
+    'ULONGINT': {'ulongint'}, 'SINGLE': {'single'}, 'DOUBLE': {'double'},
+    'STRING': {'string', 'fixed-string'}, 'ZSTRING': {'zstring'}, 'WSTRING': {'wstring'}, 'USTRING': {'ustring'},
 }
 DTYPE_MASK = 0x1FBFFFF  # Base, pointer, const, ByRef and native C-mangling bits.
 
@@ -112,7 +116,7 @@ def validate_primitive_types(model, number, subject_modules):
                     keywords[keyword_module, decimal(token_text, 1)] = spelling
         spelling = keywords.get((module, token))
         if ((dtype & ~DTYPE_MASK) or ((dtype & 0x1E0) >> 5) > 8
-                or (dtype & 31) not in BASES.get(spelling, ())):
+                or primitive_name(model, module, dtype) not in BASES.get(spelling, ())):
             raise ValueError('Primitive type keyword and selected dtype disagree')
         location_key, origin_key = ('source-context', source, key), ('symbol', identity, key)
         location = model.physical_locations.get(location_key)

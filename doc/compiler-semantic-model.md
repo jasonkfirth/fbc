@@ -38,6 +38,15 @@ means the native table has only 27 slots. Existing signed/unsigned `C` value
 kinds carry at most 64 integer bits. Wider constants are not published through
 those carriers; a missing value does not establish a narrowed constant.
 
+The supplied Python `Model` validates either vocabulary and checks it against
+the encoding capability when present. `model.datatype_abis` identifies the
+encoding per module. Raw rows, type codes and primitive identities retain the
+chosen encoding; validators resolve primitive families through that module's
+`Y` dictionary. Normalized type meaning remains the same across encodings.
+Reduced modes identify the encoding from their explicit capabilities while
+retaining their deliberate omission of target layout tables. Older reduced
+models without those receipts report the encoding unavailable.
+
 `-semantic-extra-facts <list>` requests additional full-model source
 observations. The comma-separated names are `hints`, `declarators`, `keywords`,
 `macro-access`, `includes`, `builtins`, `literal-groups`, `preprocessor`,
@@ -3704,9 +3713,9 @@ bits; that does not provide a 128-bit byte-conversion helper. Unsupported widths
 produce an ordinary invalid-size diagnostic before runtime-call selection.
 Ordinary Integer<128>/UInteger<128> behavior and runtime libraries are unchanged.
 
-The canonical Python `Model` checker uses the native datatype vocabulary, so
-tests using it request the native ABI explicitly. The observer regression also
-checks stable-v1 wire slots and the new ID-based observations independently.
+The canonical Python `Model` checker validates both native and stable-v1 models.
+The observer regression also checks the exact stable-v1 wire slots while using
+the full reader for payload, ownership, source revision and capability checks.
 GCC, Clang and gas64 controls compare emission with observations off/full and
 verify unavailable contracts in bindings mode. Neither observer changes the
 semantic schema or inserts a private capability-number reservation range.

@@ -1255,9 +1255,9 @@ prefix images. Actual restoration and fresh checkpoints are verified.
 `recording-current.json` identifies the active R11 services. Old process and
 session identifiers are invalid after reboot.
 
-The current evidence index records 69 original programs across 88 paired cases
-and 54 documented platform gaps. Seven current paired builds await runtime
-checks; 52 targets retain historical evidence only. The original animated alpha example's first
+The current evidence index records 71 original programs across 90 paired cases
+and 54 documented platform gaps. Twenty-one current paired builds await runtime
+checks; 36 targets retain historical evidence only. The original animated alpha example's first
 complete 320x240 RGBA canvas matches a separate GCC control exactly. Native
 clock inputs are observed and returned unchanged; only the GCC control imports
 those numeric inputs. The original loop exits through real Escape input.
@@ -1302,8 +1302,34 @@ not claimed. Prospector now links, while StrawberryNES needs FreeImage and
 Pyromax needs OpenGL/GLU. No dependency is installed into the frozen recording.
 
 R11 has genuinely completed its first new frame after recovery. There are now
-41 reviewed native images and a protected frame-41 checkpoint. The new frame's
+42 reviewed native images and a protected frame-42 checkpoint. The first new frame's
 full 1,024,000 pixels match its native-input GCC control exactly. The ordinary
 GCC frame differs by at most four channel levels, with one pixel above one;
 the complete differences remain recorded. The original 300-frame recording
 and its final completion audit are still pending.
+
+NebEdit now completes its normal Escape exit with unchanged source. All 32
+bitmap loads succeed, and its complete 1024x768 RGBA scene matches a separate
+GCC control of the actual native mouse values. Those native values are returned
+unchanged; no control inputs are supplied to the guest.
+
+The Griffon title audit found a shared adapter key-state mismatch: an integer
+`-1` is compared with a previous byte value of `255`, repeating held key events.
+A private `0/1` candidate passes press/hold/release checks on both targets and
+the full GCC menu quit path. Its native run remains active in resource/audio
+loading. The corpus header is unchanged and the program is not yet qualified.
+The recovery log records the live job and a FBLITE bitmap-hook verifier issue
+that must be resolved before its result is accepted.
+
+All nine remaining BASICVERSE sources and seven freebasic-projects sources
+now build from current snapshots on both targets, with two build workers.
+These remain build-only results until execution is checked. The original
+beautyofmath demo completes all nine formatted arithmetic rows with independently
+checked values and matching GCC/native transcripts; its final SLEEP is retained.
+
+Griffon's separate final-review service will check the actual whole title
+canvas, native tick identity, real menu quit and original asset/configuration
+inputs. It also checks opaque title-logo colours independently of GCC. The
+FBLITE bitmap-hook limitation remains explicit; individual load-return receipts
+are unavailable for that run. Its native audio preload and original recording
+remain live, and the public corpus header is still unchanged.
