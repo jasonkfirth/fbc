@@ -264,6 +264,19 @@ static __inline__ void fb_wstr_Del( FB_WCHAR *s )
 /* Return the length of a WSTRING. */
 static __inline__ ssize_t fb_wstr_Len( const FB_WCHAR *s )
 {
+	/* Packed BASIC fields may begin between native wchar_t boundaries.
+	   C library wide-string functions require properly aligned pointers. */
+	if( (uintptr_t)(const void *)s % sizeof( FB_WCHAR ) != 0 ) {
+		const unsigned char *p = (const unsigned char *)s;
+		ssize_t chars = 0;
+		FB_WCHAR value;
+		do {
+			memcpy( &value, p, sizeof( value ) );
+			if( value == 0 ) return chars;
+			p += sizeof( value );
+			++chars;
+		} while( TRUE );
+	}
 	/* without the null-term */
 	return wcslen( s );
 }
@@ -297,8 +310,9 @@ static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t
 	if( (src != NULL) && (chars > 0) )
 		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
 
-	/* add the null-term */
-	*dst = _LC('\0');
+	/* The destination may be a packed field, so do not dereference it. */
+	const FB_WCHAR terminator = _LC('\0');
+	memcpy( dst, &terminator, sizeof( terminator ) );
 }
 
 /* Copy n characters from A to B. */
@@ -375,6 +389,22 @@ static __inline__ size_t fb_wstr_InstrAny( const FB_WCHAR *s, const FB_WCHAR *ss
 
 static __inline__ int fb_wstr_Compare( const FB_WCHAR *str1, const FB_WCHAR *str2, ssize_t chars )
 {
+	if( ((uintptr_t)(const void *)str1 % sizeof( FB_WCHAR ) != 0) ||
+	    ((uintptr_t)(const void *)str2 % sizeof( FB_WCHAR ) != 0) ) {
+		const unsigned char *left = (const unsigned char *)str1;
+		const unsigned char *right = (const unsigned char *)str2;
+		while( chars > 0 ) {
+			FB_WCHAR a, b;
+			memcpy( &a, left, sizeof( a ) );
+			memcpy( &b, right, sizeof( b ) );
+			if( a != b ) return (a < b) ? -1 : 1;
+			if( a == 0 ) return 0;
+			left += sizeof( a );
+			right += sizeof( b );
+			--chars;
+		}
+		return 0;
+	}
 	return wcsncmp( str1, str2, chars );
 }
 

@@ -45,6 +45,10 @@ if( *readonly_record->readonly_text <> "original" ) then end 2
 if( *readonly_record->readonly_wide <> wstr("wide") ) then end 3
 if( readonly_record->raw_text <> "fixed" ) then end 4
 if( readonly_record->raw_wide <> wstr("wide-fixed") ) then end 5
+if( readonly_record->raw_wide >= wstr("wide-fixef") ) then end 14
+if( readonly_record->raw_wide <= wstr("wide-fixec") ) then end 15
+record_pointer->raw_wide = wstr("")
+if( readonly_record->raw_wide <> wstr("") ) then end 16
 *record_pointer->writable_text = "changed"
 if( *readonly_record->readonly_text <> "changed" ) then end 6
 record_pointer->readonly_text = 0

@@ -22,7 +22,7 @@ FBCALL FB_WCHAR *fb_WstrAssign( FB_WCHAR *dst, ssize_t dst_chars, FB_WCHAR *src 
 	/* src NULL? */
 	if( src_chars == 0 )
 	{
-		*dst = 0;
+		fb_wstr_Copy( dst, NULL, 0 );
 	}
 	else
 	{
