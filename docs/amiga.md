@@ -210,6 +210,11 @@ Every emulator session runs on its own authenticated Xvfb display with
 software rendering. The runner never uses the desktop display. Host audio
 is disabled while guest audio interrupts remain active. Xvfb and FS-UAE are
 terminated when a batch finishes, times out, or the runner receives SIGTERM.
+
+For interactive pointer tests through Xvfb or VNC, add `--mouse-integration`.
+This selects UAE's absolute mouse input and disables pointer grabbing inside
+that private display. Relative grabbing can otherwise deliver button events
+without motion. See the [FS-UAE mouse documentation](https://fs-uae.net/docs/mouse/).
 Install `xvfb` or set `AMIGA_XVFB_BIN` to its executable. An extracted local
 installation under `out/amiga/virtual-display` is also recognized.
 
@@ -1000,3 +1005,40 @@ unchanged. Stock GCC differs at 27 pixels by more than one channel value, with
 a maximum difference of four. `continuation-r7/resume-first-frame-proof.json`
 records the evidence. The reviewed native total is 33 frames and 33,792,000 RGB
 pixels; full native recording completion remains pending.
+
+### File-hash regressions exposed by fresh corpus runs
+
+Empty-file tests of the original MD5 example hung on the GCC control. The
+MD5, SHA-2 and SHA-3 File wrappers all selected a zero-sized block, then looped
+forever comparing zero remaining bytes against that block size. Explicit zero
+block sizes also failed to make progress. These are library source defects;
+changing FBC's valid comparison semantics would be incorrect.
+
+The necessary corpus corrections reject zero block sizes before opening the
+file and use a one-byte buffer for empty input so existing finalization runs
+without updates. Expanded checks found a second source defect: SHA-3's partial
+update loop consumed an extra byte in reverse order, reading past its input.
+It now consumes exactly the supplied bytes and permits zero-length updates
+without reading memory. Compiler implementation code was not changed.
+
+All 96 independent file-digest cases pass on GCC and Amiga, covering MD5, all
+SHA-2/SHA-3 digest sizes, empty/binary inputs and block boundaries. The six
+original file, console and checksum examples also pass twelve paired cases.
+Their example sources are unchanged; they link the corrected real hash module
+through its existing Make rules.
+
+Portable tests were added to the library's existing hash directory and are
+discovered automatically. Full maintained hash/HMAC suites pass on both
+targets: three suites, 13 tests and 194 assertions, with zero failures/errors.
+An existing big-endian SHA-384 fixture typo was corrected from `6EC3` to `6ECE`
+to match the little-endian bytes and independent expected digest. The first
+failure, original source, exact focused patch and qualification results are
+retained under `corpus-hash-fixes.json`, `file-hash-source-fix-v2`,
+`file-hash-requalification-fixed` and `maintained-hash-regressions-v2` in the
+recovery folder. Unrelated corpus edits were preserved.
+
+The original native recording has also completed frame 33. That full image
+matches the corrected native-input GCC replay byte for byte. The reviewed
+native total is 34 frames and 34,816,000 RGB pixels, with two frames recomputed
+since the frame-32 reboot checkpoint. A protected frame-33 checkpoint now
+exists. Full 300-frame native completion remains pending.
