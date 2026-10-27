@@ -2,7 +2,7 @@
 '' File: tooling/semantic-numeric-conversions.bi
 '' Purpose: Observe actual scalar conversion inputs before folding or lowering.
 '' Responsibilities: Expose one internal constructor hook with explicit source intent.
-'' This file intentionally does NOT evaluate values or choose diagnostics.
+'' This file intentionally does NOT contain: value evaluation or diagnostic selection.
 
 #pragma once
 #include once "ast/ast.bi"

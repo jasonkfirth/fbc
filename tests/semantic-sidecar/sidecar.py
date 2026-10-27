@@ -2162,11 +2162,21 @@ class Model:
             operands = self.expression_operands.get(identity)
             if operands is None or operands[2] != "binary":
                 raise ValueError("Numeric operand selections have no original binary operation")
+            module = subject_modules[domain, identity]
             for operand_id in operands[4:6]:
                 operand = expressions.get(int(operand_id))
-                if operand is None or int(operand[14]) or int(operand[12]) & 0x1e0 or int(operand[12]) & 31 not in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18):
+                if operand is None:
                     raise ValueError("Numeric selection has no original primitive operand")
-            module = subject_modules[domain, identity]
+                dtype, subtype = int(operand[12]), int(operand[14])
+                primitive = not subtype and not dtype & 0x1e0 and dtype & 31 in (1, 2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)
+                # Enum inputs are converted to primitive selected operands by
+                # the compiler; their original source type remains an enum.
+                enum = (not dtype & 0x1e0 and dtype & 31 == 10 and subtype > 0 and
+                        self.capabilities[module].get("enum-selected-numeric-operands") == "available" and
+                        self.symbols.get(subtype, [None] * 4)[3] == "9" and
+                        subject_modules.get(("symbol", subtype)) == module)
+                if not primitive and not enum:
+                    raise ValueError("Numeric selection has no original primitive or enum operand")
             for side in ("left", "right"):
                 if self.capabilities[module].get("selected-numeric-operands") == "unavailable":
                     raise ValueError("Numeric selections contradict unavailable coverage")

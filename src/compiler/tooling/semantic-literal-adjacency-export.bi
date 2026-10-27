@@ -2,7 +2,8 @@
 '' File: tooling/semantic-literal-adjacency-export.bi
 '' Purpose: Preserve implicit literal adjacency before constant folding loses its inputs.
 '' Responsibilities: Counted canonical input edges, distinct result snapshots and reset state.
-'' This file intentionally does NOT retain AST pointers or alter generated program code.
+'' This file intentionally does NOT contain: retained AST pointers or generated program code.
+
 #ifndef FB_SEMANTIC_LITERAL_ADJACENCY_EXPORT_BI
 #define FB_SEMANTIC_LITERAL_ADJACENCY_EXPORT_BI
 
@@ -45,4 +46,4 @@ sub fbSemanticModelStringLiteralJoin _
 end sub
 
 #endif
-'' end of semantic-literal-adjacency-export.bi
+'' end of tooling/semantic-literal-adjacency-export.bi

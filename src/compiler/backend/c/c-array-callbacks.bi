@@ -1,8 +1,8 @@
 '' Project: FreeBASIC C backend
-'' File: c-array-callbacks.bi
+'' File: backend/c/c-array-callbacks.bi
 '' Purpose: Adapt typed BASIC element methods to the runtime callback ABI.
 '' Responsibilities: Callback parameter spelling and per-unit C adapters.
-'' This file intentionally does NOT change BASIC procedure types or runtime layout.
+'' This file intentionally does NOT contain: BASIC procedure definitions or runtime layout changes.
 
 private function hIsArrayCallbackParam _
 	( _
@@ -115,4 +115,4 @@ private sub hClearArrayCallbacks( )
 	loop
 end sub
 
-'' end of c-array-callbacks.bi
+'' end of backend/c/c-array-callbacks.bi

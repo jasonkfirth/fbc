@@ -4386,6 +4386,11 @@ sub fbSemanticModelExportCurrentMemberPrefix _
         exit sub
     end if
     dim as longint expression_id = expr->semantic_expression
+    '' The ordinary exporter may omit a prefix whose source range cannot be
+    '' represented, particularly inside a compact macro expansion. It has
+    '' already marked that omission on the statement; there is no expression
+    '' identity to own a receiver fact in that case.
+    if( expression_id = 0 ) then exit sub
     dim as longint statement_id = fbSemanticModelCurrentStatement( )
     dim as longint receiver_id = fbSemanticModelSymbolId(receiver_subtype)
     dim as longint field_id = fbSemanticModelSymbolId(fld)

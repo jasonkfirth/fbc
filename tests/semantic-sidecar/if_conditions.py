@@ -99,8 +99,19 @@ def check_inputs(test):
             extra = ('-o', str(emitted))
             test.invoke([source], mode='off', backend=backend, extra=extra)
             plain = emitted.read_bytes()
-            model = test.compile(source, backend=backend, extra=extra)
+            _, artifact = test.invoke([source], backend=backend, extra=extra)
+            model = Model.read(artifact)
             test.assertEqual(emitted.read_bytes(), plain)
+            expressions = {int(row[1]): row for row in model.records['E']}
+            enum_inputs = [operand for (domain, identity), properties in model.properties.items()
+                           if domain == 'expression' and 'numeric-selected-left-dtype' in properties
+                           for operand in model.expression_operands[identity][4:6]
+                           if int(expressions[int(operand)][12]) & 31 == 10]
+            test.assertTrue(enum_inputs)
+            rows = [line.split('\t') for line in artifact.read_text().splitlines()]
+            next(row for row in rows if row[:3] == ['CAP', '1', 'enum-selected-numeric-operands'])[3] = 'unavailable'
+            with test.assertRaisesRegex(ValueError, 'Numeric selection has no original primitive or enum operand'):
+                Model('\n'.join('\t'.join(row) for row in rows) + '\n')
             receipts = [(owner, key, value) for (domain, owner), properties in model.properties.items()
                         if domain == 'symbol' for key, value in properties.items() if key.startswith(PREFIX)]
             test.assertEqual(len(receipts), EXPECTED_COUNT)

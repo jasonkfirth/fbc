@@ -3,7 +3,7 @@
 '' Purpose: Recover physical element indices before integer address lowering.
 '' Responsibilities: Preserve one evaluation, native-width index wrapping and
 ''     declared element/member storage for fixed one-dimensional C arrays.
-'' This file intentionally does NOT change descriptors, other ranks or byte views.
+'' This file intentionally does NOT contain: descriptor updates, multidimensional indexing or byte views.
 
 private function hCArrayIndexImmediate _
 	( byval n as EXPRNODE ptr, byref value as longint ) as integer
