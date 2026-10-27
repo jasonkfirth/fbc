@@ -2,8 +2,8 @@
 
 '' FB does not have a built-in data type corresponding to C's long double,
 '' so this provides the extra declarations for use by bindings.
-#ifdef __FB_64BIT__
-	'' GCC x86_64 & aarch64: sizeof(long double) = 16
+#if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
+	'' Most 64-bit GCC targets use a 16-byte long double.
 	type clongdouble
 		__(0 to 16-1) as ubyte
 		declare operator cast( ) as byte
@@ -19,7 +19,7 @@
 	end type
 	#assert sizeof( clongdouble ) = 16
 #elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
-	'' GCC ARM and MIPS o32: sizeof(long double) = 8
+	'' ARM32, MIPS o32, and Darwin/Windows ARM64 use 8 bytes.
 	type clongdouble
 		__(0 to 8-1) as ubyte
 		declare operator cast( ) as byte

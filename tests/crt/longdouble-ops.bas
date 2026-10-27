@@ -26,7 +26,7 @@
 SUITE( fbc_tests.crt.longdouble )
 
 	TEST( longdouble_size )
-		#ifdef __FB_64BIT__
+		#if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
 			CU_ASSERT( sizeof( clongdouble ) = 16 )
 		#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
 			CU_ASSERT( sizeof( clongdouble ) = 8 )
