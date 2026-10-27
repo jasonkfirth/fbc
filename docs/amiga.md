@@ -159,6 +159,38 @@ stop under the mixer lock, then joins the worker outside that lock before
 releasing device state. Output capture writes little-endian PCM WAV even
 though this target is big-endian.
 
+## Networking
+
+`OPEN TCP`, `OPEN TCP SERVER`, `TCP ACCEPT`, `EOF`, `EOC`, and `LOC` use
+version 4 of `bsdsocket.library`. A TCP/IP stack is required at run time;
+ordinary programs do not open this library. The adapter uses IPv4 and the
+original resolver vectors, so it also works with UAE's version 4 interface.
+It does not call newer Roadshow `getaddrinfo` vectors.
+
+Amiga socket descriptors and signals belong to the task that opens the
+library. Each BASIC task keeps its own library context in TLS. Idle sockets
+live in the native public pool and are borrowed into the calling task for
+each operation. This permits a listener to be opened in one thread, accepted
+in another, and closed after the creator exits. The private table supports
+64 simultaneous sockets and reports exhaustion through the normal file error.
+
+Receive buffering keeps byte-wise BASIC protocols from paying for a native
+socket call on every byte. EOF and EOC preserve unread buffered data. Actual
+reads wait for packet fragments with the BASIC file lock released, allowing
+another BASIC thread to supply the remaining bytes. Protocol timeouts bound
+those waits when specified.
+
+To enable UAE's socket interface and include the native TCP qualification:
+
+```sh
+build_scripts/amiga-run-probes.sh --bsdsocket --jit --timeout 240 \
+    --output out/amiga/probes-with-tcp
+```
+
+The TCP probe runs the shared text/binary, burst and wildcard-listener tests,
+then checks a listener after its creating thread exits and formatted INPUT
+split across delayed writes. It is compiled with `-g` so assertions execute.
+
 ## Native qualification
 
 Supply a local Kickstart ROM; ROMs are not distributed with the repository.
@@ -460,8 +492,9 @@ Other current platform limits are explicit:
   fail rather than truncating the requested offset.
 - Exec signals are wake-up bits, not POSIX fatal signals. CPU faults remain
   native Amiga alerts; automatic fatal-signal recovery is unavailable.
-- Unix-style dynamic libraries and TCP are unavailable with the pinned SDK.
-  Native Amiga library vectors require their own bindings.
+- Unix-style dynamic libraries are unavailable with the pinned SDK.
+  Native Amiga library vectors require their own bindings. TCP uses the
+  optional `bsdsocket.library` version 4 interface described above.
 - OpenGL, shaped/resizable graphics windows, and joystick polling are not
   implemented by this backend.
 
@@ -924,3 +957,46 @@ coordinates and raw channel values. The reviewed native total is now 26 images
 and 26,624,000 RGB pixels, including 22 preserved prefix images and four frames
 recomputed since the checkpoint. The original 300-frame native run remains
 incomplete.
+
+### October 27 recovery after reboot
+
+The old transient services and FS-UAE processes were gone after reboot, and
+their temporary working volume was lost. Rehashing the newest protected state
+and every archived frame verified a recoverable checkpoint at frame 32 and
+32 complete prefix images. The original unchanged recording resumed in
+`continuation-r7`, using an authenticated isolated Xvfb display and a durable
+working volume inside the recovery directory. Its executable, 300-frame loop,
+1280x800 output and later inference workload are unchanged.
+
+The new run has produced an independently inspected and protected live
+checkpoint. One controller now sends paced save-menu keys; the earlier
+independent menu helper is not running. Full-frame review and actual native
+completion auditing have resumed. Rechecking all 32 images covers 32,768,000
+RGB pixels, with no controlled difference above one channel value. This does
+not complete the original native recording. `recording-current.json` under
+the recovery directory identifies the current units, paths and checkpoint
+index; verify live process identities before any subsequent restart.
+
+The unfinished portable fb-ext batch also passes: 15 unchanged examples and
+17 execution cases with paired GCC controls, actual native exit records and
+staged executable hashes. Its private Make recipe now includes the real
+`ext-error` and `ext-memory` dependencies. Deterministic stdout is compared in
+full; shuffled-bit population and toggles, iterator key/value multisets, sorted
+rationals and thread request/response invariants are checked explicitly.
+
+The initial bit-array checker confused bit indices with character positions.
+The original `load` and `dump` methods reverse display order, so toggling bits
+30, 31 and 32 changes displayed positions 97, 96 and 95. Only that checker was
+corrected. The saved native jobs were revalidated without another native run
+or rebuild. Evidence is `fbext-cli-requalification/completion.json` under the
+recovery folder. These repeat historical targets and do not increase the
+historical distinct-execution count or qualify the entire fb-ext library.
+
+The resumed recording has now completed frame 32. Both its actual output and
+durable copy match the corrected native-input GCC image byte for byte across
+the full 1280x800 composite. This is the first completed frame after restoring
+the protected checkpoint following reboot, with the original executable still
+unchanged. Stock GCC differs at 27 pixels by more than one channel value, with
+a maximum difference of four. `continuation-r7/resume-first-frame-proof.json`
+records the evidence. The reviewed native total is 33 frames and 33,792,000 RGB
+pixels; full native recording completion remains pending.

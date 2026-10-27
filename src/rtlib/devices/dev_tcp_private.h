@@ -43,14 +43,14 @@ typedef struct {
 	unsigned int timeout;
 	int is_server;
 	int is_closed;
-#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
-	/* Drain a Watt receive queue in blocks. Repeated one-byte recv/MSG_PEEK
-	 * calls each pump the DOS stack and move its remaining receive bytes.
-	 * These indices and bytes are owned by the file handle under FB_LOCK().
+#if (defined(HOST_DOS) && defined(FB_DOS_WATT32)) || defined(HOST_AMIGA)
+	/* Drain native receive queues in blocks. Repeated one-byte recv/MSG_PEEK
+	 * calls pump Watt's stack or transfer Amiga socket ownership each time.
+	 * These indices and bytes belong to the file handle under FB_LOCK().
 	 */
-	size_t dos_read_begin;
-	size_t dos_read_end;
-	char dos_read_buffer[4096];
+	size_t read_begin;
+	size_t read_end;
+	char read_buffer[4096];
 #endif
 #if defined(HOST_WII)
 	FB_WII_TCP_PUMP *wii_pump;

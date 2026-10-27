@@ -27,6 +27,7 @@ SEMANTIC_READER_FILES = (
     "semantic_macro_calls.py",
     "semantic_source_memory.py",
     "semantic_flow.py",
+    "semantic_driver.py",
     "semantic_literals.py",
     "semantic_queries.py",
     "semantic_selects.py",

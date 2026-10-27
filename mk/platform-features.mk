@@ -324,12 +324,6 @@ endif
 # DOS -> no hosted sockets in the current runtime unless an explicit provider
 # is selected.  The Watt-32 adapter is still opt-in because it needs a packet
 # driver and WATTCP.CFG at run time.
-ifeq ($(TARGET_OS),amiga)
-  # The pinned newlib SDK does not supply a socket resolver or a native TCP
-  # stack. Keep TCP opt-in work separate from the executable/runtime port.
-  DISABLE_TCP := YesPlease
-endif
-
 ifeq ($(TARGET_OS),dos)
   ifeq ($(DOS_TCP_PROVIDER),watt32)
     ENABLE_DOS_WATT32 := YesPlease

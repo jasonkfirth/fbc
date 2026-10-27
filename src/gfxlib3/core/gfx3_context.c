@@ -1249,6 +1249,17 @@ int fb_gfx3_surface_present(FB_GFX3_SURFACE *surface, int wait)
 		return wait ? fb_gfx3_context_flush(context) :
 			fb_gfx3_context_submit_pending(context);
 	if (wait) {
+		content_revision = atomic_load(&context->visible_content_revision);
+		/*
+			SCREENSET already queued a presentation for this visible content.
+			Keep SCREENSYNC's completion guarantee by waiting behind that request
+			instead of swapping the same frame a second time.
+		*/
+		if ((atomic_load(&context->visible_surface_handle) == surface->handle) &&
+		    (atomic_load(&context->queued_present_revision) ==
+		     content_revision) &&
+		    !atomic_load(&context->pending_submission_work))
+			return fb_gfx3_context_flush(context);
 		command = fb_gfx3_command_create(FB_GFX3_COMMAND_PRESENT, 0);
 		if (command == NULL)
 			return FB_GFX3_OUT_OF_MEMORY;

@@ -53,6 +53,11 @@ by retaining a borrowed pointer. See `gfx3_image.h`, `gfx3_gpu_surface.h` and
 the architecture's cache and direct-access contracts before changing these
 paths.
 
+`SCREENSET` queues a presentation for the selected visible page. When that
+page's content has not changed, `SCREENSYNC` waits behind the queued present
+instead of submitting a second swap. If new visible writes arrive first,
+`SCREENSYNC` still queues and waits for a fresh presentation.
+
 ## OpenGL implementation
 
 All these units operate on one render-thread-owned `FB_GFX3_OPENGL_STATE`:

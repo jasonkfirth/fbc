@@ -313,6 +313,10 @@ declare sub fbcDriverCheckArgs()
 
 declare sub fbcDriverCompileModules( )
 
+declare sub fbcDriverSemanticModule( byval module as FBCIOFILE ptr, byval is_main as integer, _
+	byval is_fbctinf as integer, byval module_count as integer )
+declare sub fbcDriverSemanticResource( byref filename as string )
+
 declare function fbcDriverCompileXpm( ) as integer
 
 declare sub fbcDriverCompileStage2Modules( )

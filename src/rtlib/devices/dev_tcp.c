@@ -62,6 +62,8 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#elif defined(HOST_WII)
 		#include <errno.h>
 		#include <network.h>
+	#elif defined(HOST_AMIGA)
+		#include "drivers/amiga/dev_tcp_socket.h"
 	#else
 		#include <errno.h>
 		#include <netdb.h>
@@ -153,6 +155,25 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_SEND(s, b, l, f) send( s, b, l, f )
 	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
 	#define FB_TCP_CAN_QUERY_BYTES FALSE
+#elif defined(HOST_AMIGA)
+	#define FB_TCP_CLOSESOCKET(s) fb_AmigaTcpClose( s )
+	#define FB_TCP_SOCKET_ERROR(s) ((s) == FB_TCP_INVALID_SOCKET)
+	#define FB_TCP_ERRNO() errno
+	#define FB_TCP_WOULDBLOCK(err) ((err) == EAGAIN || (err) == EWOULDBLOCK)
+	#define FB_TCP_SHUT_WR 1
+	#define FB_TCP_SHUT_RDWR 2
+	#define FB_TCP_SELECT(n, r, w, e, t) fb_AmigaTcpSelect( n, r, w, e, t )
+	#define FB_TCP_IOCTL(s, cmd, argp) fb_AmigaTcpIoctl( s, cmd, argp )
+	#define FB_TCP_RECV(s, b, l, f) fb_AmigaTcpRecv( s, b, l, f )
+	#define FB_TCP_SEND(s, b, l, f) fb_AmigaTcpSend( s, b, l, f )
+	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) fb_AmigaTcpSetSockOpt( s, l, o, v, n )
+	#define FB_TCP_CAN_QUERY_BYTES TRUE
+	#define socket(d, t, p) fb_AmigaTcpSocket( d, t, p )
+	#define connect(s, a, n) fb_AmigaTcpConnect( s, a, n )
+	#define bind(s, a, n) fb_AmigaTcpBind( s, a, n )
+	#define listen(s, n) fb_AmigaTcpListen( s, n )
+	#define accept(s, a, n) fb_AmigaTcpAccept( s, a, n )
+	#define shutdown(s, h) fb_AmigaTcpShutdown( s, h )
 #else
 	#define FB_TCP_CLOSESOCKET(s) close( s )
 	#define FB_TCP_SOCKET_ERROR(s) ((s) == FB_TCP_INVALID_SOCKET)
@@ -182,7 +203,7 @@ static int fb_DevTcpWriteWstr( FB_FILE *handle, const FB_WCHAR *value, size_t va
 static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset );
 static int fb_DevTcpEof( FB_FILE *handle );
 static int fb_DevTcpServerEof( FB_FILE *handle );
-#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII)
+#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII) && !defined(HOST_AMIGA)
 static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port );
 #endif
 
@@ -559,7 +580,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 #endif
 }
 
-#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII)
+#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII) && !defined(HOST_AMIGA)
 static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port )
 {
 	char tmp[16];
@@ -584,9 +605,14 @@ static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned
 }
 #endif
 
-#if defined(HOST_WII)
-static int fb_hDevTcpBuildWiiAddress( const char *host, unsigned int port, int passive, struct sockaddr_in *addr )
+#if defined(HOST_WII) || defined(HOST_AMIGA)
+static int fb_hDevTcpBuildIPv4Address( const char *host, unsigned int port, int passive, struct sockaddr_in *addr )
 {
+#if defined(HOST_AMIGA)
+	/* Version 4 bsdsocket.library has the IPv4 resolver. Roadshow's newer
+	   getaddrinfo vectors are absent from AmiTCP-compatible stacks and UAE. */
+	return fb_AmigaTcpAddress( host, port, passive, addr );
+#else
 	u32 raw_addr;
 	struct hostent *hostent;
 
@@ -629,28 +655,29 @@ static int fb_hDevTcpBuildWiiAddress( const char *host, unsigned int port, int p
 
 	memcpy( &addr->sin_addr, hostent->h_addr_list[0], sizeof( struct in_addr ) );
 	return TRUE;
+#endif
 }
 #endif
 
 #if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS)
-#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
-/* Called with the file lock held. Connected Watt sockets are nonblocking;
- * recv pumps queued packets and returns EWOULDBLOCK if none are available.
+#if (defined(HOST_DOS) && defined(FB_DOS_WATT32)) || defined(HOST_AMIGA)
+/* Called with the file lock held. Connected sockets here are nonblocking;
+ * recv drains queued packets and returns EWOULDBLOCK if none are available.
  * Keep bytes read by EOF/EOC until GET consumes them, including a peer's final
  * packet. A closed transport must not hide data already owned by the handle.
  */
-static int fb_hDevTcpDosFill( DEV_TCP_INFO *info )
+static int fb_hDevTcpFillReadBuffer( DEV_TCP_INFO *info )
 {
 	int bytes;
-	if( info->dos_read_begin < info->dos_read_end )
+	if( info->read_begin < info->read_end )
 		return 1;
 	if( info->is_closed )
 		return -1;
-	bytes = FB_TCP_RECV( info->hSocket, info->dos_read_buffer,
-	                     sizeof( info->dos_read_buffer ), 0 );
+	bytes = FB_TCP_RECV( info->hSocket, info->read_buffer,
+	                     sizeof( info->read_buffer ), 0 );
 	if( bytes > 0 ) {
-		info->dos_read_begin = 0;
-		info->dos_read_end = bytes;
+		info->read_begin = 0;
+		info->read_end = bytes;
 		return 1;
 	}
 	if( bytes < 0 && FB_TCP_WOULDBLOCK( FB_TCP_ERRNO() ) )
@@ -669,24 +696,51 @@ static int fb_hDevTcpDosFill( DEV_TCP_INFO *info )
 #if !defined(HOST_WII)
 static int fb_hDevTcpRecvUnlocked( DEV_TCP_INFO *info, void *buffer, size_t length, int flags, int *err )
 {
-#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
-	int state = fb_hDevTcpDosFill( info );
-	size_t bytes;
+#if (defined(HOST_DOS) && defined(FB_DOS_WATT32)) || defined(HOST_AMIGA)
+	size_t total = 0;
 	(void)flags;
 	*err = 0;
-	if( state < -1 ) {
-		*err = FB_TCP_ERRNO();
-		return -1;
+	length = MIN( length, (size_t)INT_MAX );
+	while( total < length ) {
+		int state = fb_hDevTcpFillReadBuffer( info );
+		size_t bytes;
+#if defined(HOST_AMIGA)
+		if( state == 0 ) {
+			fd_set readers;
+			struct timeval timeout;
+			int ready, error;
+			FD_ZERO( &readers );
+			FD_SET( info->hSocket, &readers );
+			timeout.tv_sec = info->timeout / 1000;
+			timeout.tv_usec = (info->timeout % 1000) * 1000;
+			/* EOF only probes the buffer. An actual GET or formatted INPUT
+			   must wait for its next bytes, allowing the writer to run while
+			   a token or record crosses TCP packet boundaries. */
+			FB_UNLOCK();
+			ready = FB_TCP_SELECT( info->hSocket + 1, &readers, NULL, NULL,
+			                       info->timeout ? &timeout : NULL );
+			error = FB_TCP_ERRNO();
+			FB_LOCK();
+			if( ready > 0 ) continue;
+			if( total != 0 ) return (int)total;
+			*err = ready == 0 ? EWOULDBLOCK : error;
+			return -1;
+		}
+#endif
+		if( state <= 0 ) {
+			if( total != 0 ) return (int)total;
+			if( state == -1 ) return 0;
+			*err = state == 0 ? EWOULDBLOCK : FB_TCP_ERRNO();
+			return -1;
+		}
+		/* Join the tail of a previous fill with already available bytes.
+		   A buffer boundary must not shorten an otherwise complete GET. */
+		bytes = MIN( length - total, info->read_end - info->read_begin );
+		memcpy( (char *)buffer + total, info->read_buffer + info->read_begin, bytes );
+		info->read_begin += bytes;
+		total += bytes;
 	}
-	if( state < 0 ) return 0;
-	if( state == 0 ) {
-		*err = EWOULDBLOCK;
-		return -1;
-	}
-	bytes = MIN( length, info->dos_read_end - info->dos_read_begin );
-	memcpy( buffer, info->dos_read_buffer + info->dos_read_begin, bytes );
-	info->dos_read_begin += bytes;
-	return (int)bytes;
+	return (int)total;
 #else
 	FB_TCP_SOCKET hSocket = info->hSocket;
 	int bytes;
@@ -758,11 +812,11 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
-#elif defined(HOST_WII)
+#elif defined(HOST_WII) || defined(HOST_AMIGA)
 	struct sockaddr_in addr;
 	FB_TCP_SOCKET hSocket;
 
-	if( fb_hDevTcpBuildWiiAddress( tcp_proto->host, tcp_proto->port, FALSE, &addr ) == FALSE )
+	if( fb_hDevTcpBuildIPv4Address( tcp_proto->host, tcp_proto->port, FALSE, &addr ) == FALSE )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
 	hSocket = (FB_TCP_SOCKET)socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
@@ -831,12 +885,12 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 	(void)tcp_proto;
 	(void)hSocketOut;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
-#elif defined(HOST_WII)
+#elif defined(HOST_WII) || defined(HOST_AMIGA)
 	struct sockaddr_in addr;
 	FB_TCP_SOCKET hSocket;
 	int yes = 1;
 
-	if( fb_hDevTcpBuildWiiAddress( tcp_proto->host, tcp_proto->port, TRUE, &addr ) == FALSE )
+	if( fb_hDevTcpBuildIPv4Address( tcp_proto->host, tcp_proto->port, TRUE, &addr ) == FALSE )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
 	hSocket = (FB_TCP_SOCKET)socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
@@ -935,10 +989,10 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 #if (defined(HOST_DOS) && !defined(FB_DOS_WATT32)) || defined(HOST_JS)
 	(void)info;
 	return -1;
-#elif defined(HOST_DOS) && defined(FB_DOS_WATT32)
+#elif (defined(HOST_DOS) && defined(FB_DOS_WATT32)) || defined(HOST_AMIGA)
 	if( info == NULL || FB_TCP_SOCKET_ERROR( info->hSocket ) )
 		return -1;
-	return fb_hDevTcpDosFill( info );
+	return fb_hDevTcpFillReadBuffer( info );
 #elif defined(HOST_WII)
 	int state;
 
@@ -1073,16 +1127,18 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 		#endif
 
 		sent = fb_hDevTcpSendUnlocked( info, buffer + total, chunk, flags, &err );
-#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
+#if (defined(HOST_DOS) && defined(FB_DOS_WATT32)) || defined(HOST_AMIGA)
 		if( sent < 0 && FB_TCP_WOULDBLOCK( err ) ) {
 			fd_set writers;
-			struct timeval timeout = { 0, 100000 };
+			struct timeval timeout;
 			int ready;
+			timeout.tv_sec = 0;
+			timeout.tv_usec = 100000;
 			FD_ZERO( &writers );
 			FD_SET( info->hSocket, &writers );
-			/* A full Watt transmit queue is backpressure, not a disconnect.
-			 * Preserve complete PUT semantics while letting the peer thread
-			 * and audio worker run between bounded readiness polls.
+			/* A full nonblocking transmit queue is backpressure. Preserve
+			 * complete PUT semantics while letting the peer thread and
+			 * audio worker run between bounded readiness polls.
 			 */
 			FB_UNLOCK();
 			ready = FB_TCP_SELECT( info->hSocket + 1, NULL, &writers, NULL, &timeout );
@@ -1330,8 +1386,8 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 		*pOffset = bytes;
-#if defined(HOST_DOS) && defined(FB_DOS_WATT32)
-		*pOffset += info->dos_read_end - info->dos_read_begin;
+#if (defined(HOST_DOS) && defined(FB_DOS_WATT32)) || defined(HOST_AMIGA)
+		*pOffset += info->read_end - info->read_begin;
 #endif
 #endif
 	}

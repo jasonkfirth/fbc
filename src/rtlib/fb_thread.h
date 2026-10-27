@@ -49,6 +49,9 @@ enum {
 	FB_TLSKEY_USERVAR,
 	/* Append keys so old objects keep their existing TLS indices. */
 	FB_TLSKEY_ERRORFRAME,
+#ifdef HOST_AMIGA
+	FB_TLSKEY_AMIGA_TCP,
+#endif
 	FB_TLSKEYS
 };
 

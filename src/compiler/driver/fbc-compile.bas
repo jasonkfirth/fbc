@@ -218,6 +218,7 @@ private sub hCompileBas _
 			fbSetLibs( @fbc.libs, @fbc.libpaths )
 		end if
 
+		fbcDriverSemanticModule(module, is_main, is_fbctinf, module_count)
 		fbCompile( module->srcfile, asmfile, pponlyfile, is_main )
 
 		'' If there were any errors during parsing, just exit without
@@ -435,6 +436,7 @@ function fbcDriverCompileXpm( ) as integer
 
 	'' Remember *.xpm file name
 	xpmfile = fbc.xpm.srcfile
+	fbcDriverSemanticResource(xpmfile)
 
 	'' Set *.bas name based on input file name or -o <file>:
 	if( len( *fbc.xpm.objfile ) > 0 ) then

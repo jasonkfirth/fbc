@@ -71,6 +71,7 @@
 declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval symbolid as longint)
 #include once "tooling/semantic-output.bi"
 #include once "tooling/semantic-source.bi"
+#include once "tooling/semantic-driver.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-comments.bi"
@@ -723,6 +724,11 @@ sub fbSemanticModelMarkSourceRemapped(byval depth as integer)
 end sub
 
 private function hSemanticModelLocationIsPhysical(byref source as LEX_LOCATION) as integer
+	'' Resource conversion and archive metadata create compiler-owned BASIC.
+	'' Its byte coordinates remain observable, but they cannot authorize edits
+	'' to the resource or to user source. Preincluded user headers retain their
+	'' ordinary include contexts and physical source eligibility.
+	if( (env.includerec = 0) and fbSemanticModelDriverGenerated( ) ) then return FALSE
 	if( (source.is_physical = FALSE) or _
 		(env.includerec < 0) or _
 		(env.includerec >= SEMANTIC_MODEL_MAX_SOURCE_CONTEXTS) or _
@@ -4572,7 +4578,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 130
+	for capability as integer = 0 to 131
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -4704,6 +4710,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 128: feature = "source-numeric-conversions": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticExtraFactsEnabled(FB_SEMEXTRA_NUMERIC_CONVERSIONS), "available", "unavailable")
 		case 129: feature = "source-numeric-truth-inputs": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticExtraFactsEnabled(FB_SEMEXTRA_NUMERIC_CONVERSIONS), "available", "unavailable")
 		case 130: feature = "counted-preprocessor-assertions": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 131: feature = "driver-module-inputs": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelDriverReady( ), "available", "unavailable")
 		case 54: feature = "select-case-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 55: feature = "select-case-lowering-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 56: feature = "target-wide-literal-prefixes": coverage = iif(fbSemanticModelFullEnabled( ) and _
@@ -4774,6 +4781,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
 		TABCHAR + "array-initializer-input-closure" + TABCHAR + _
 		iif(fbSemanticExtraFactsEnabled(FB_SEMEXTRA_INITIALIZERS) and fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelExportDriverInputs( )
 end sub
 
 sub fbSemanticModelFinishModule(byval commit as integer)
@@ -4833,6 +4841,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 			"builtin-function-use-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + _
 			fbSemanticModelNumber(semantic_model_builtin_function_count))
 	end if
+	if( commit ) then fbSemanticModelExportModuleLibraries( )
 	if( (commit <> FALSE) and (len(semantic_model_pending_expression_value) > 0) ) then
 		dim as string pending_value = semantic_model_pending_expression_value
 		semantic_model_pending_expression_value = ""
@@ -5110,6 +5119,7 @@ function fbSemanticModelEnd(byval succeeded as integer) as integer
 	fbSemanticModelResetExpressions( )
 	fbSemanticModelResetAccess( )
 	fbSemanticModelResetMacros( )
+	fbSemanticModelDriverReset( )
 end function
 
 '' end of tooling/semantic-model.bas

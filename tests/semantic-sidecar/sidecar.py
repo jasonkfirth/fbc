@@ -19,6 +19,7 @@ import subprocess
 import sys
 from semantic_binary import decode as decode_binary
 from semantic_flow import validate_flow, validate_sequence_branches
+from semantic_driver import validate_driver_inputs
 from semantic_array_storage import validate_array_storage_inputs
 from semantic_literals import validate_wide_literals
 from semantic_queries import validate_query_inputs
@@ -673,6 +674,10 @@ class Model:
                         raise ValueError("Unknown constant value kind")
                     self.constants[key] = row[3], row[4]
                 elif tag == "K":
+                    if row[3].startswith(("driver-", "producer-")):
+                        if row[1] != "symbol" or row[3] in self.properties[key]:
+                            raise ValueError("Repeated or foreign driver input property")
+                        storage_property_modules[row[1], int(row[2]), row[3]] = counts["M"]
                     if row[3].startswith(("primitive-type-input:", "accepted-primitive-type-count:")):
                         if row[3] in self.properties[key]:
                             raise ValueError("Duplicate immutable primitive type observation")
@@ -1488,6 +1493,7 @@ class Model:
         if set(self.nodes) != set(range(1, counts["N"] + 1)):
             raise ValueError("Node identity sequence has gaps")
         self.validate_source_ownership(subject_modules)
+        validate_driver_inputs(self, number, subject_modules)
         validate_comments(self, number, subject_modules)
         validate_variable_names(self, number, subject_modules)
         validate_logical_storage(self, number, subject_modules, len(NODE_KINDS))

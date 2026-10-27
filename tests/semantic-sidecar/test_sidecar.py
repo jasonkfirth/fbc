@@ -58,6 +58,18 @@ class SidecarTests(unittest.TestCase):
         from macro_access_inputs import check_inputs
         check_inputs(self)
 
+    def test_driver_selected_inputs_and_reduced_mode_omissions(self) -> None:
+        from driver_inputs import check_inputs
+        check_inputs(self)
+
+    def test_driver_module_roles_and_restarts(self) -> None:
+        from driver_inputs import check_roles
+        check_roles(self)
+
+    def test_driver_input_groups_reject_corruption(self) -> None:
+        from driver_inputs import check_rejection
+        check_rejection(self)
+
     def test_macro_call_inputs(self) -> None:
         from macro_call_inputs import check_inputs
         check_inputs(self)

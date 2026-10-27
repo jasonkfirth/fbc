@@ -5,7 +5,6 @@ Responsibilities: Native identity, emission parity, transport and reduced captur
 This file intentionally does NOT infer operations from lowered runtime names.
 """
 from collections import Counter
-import subprocess
 
 from sidecar import Model
 
@@ -47,12 +46,10 @@ def check_inputs(test):
                                                 ("MACROITEMS", "erase"): 1}))
             test.assertEqual([row[4] for row in model.records["K"] if row[3].startswith(COUNT)], ["5"])
             binary = test.working / ("array-mutation-" + backend + ".fbcsem")
-            reply = subprocess.run([str(test.compiler), "-prefix", str(test.toolchain_prefix),
-                                    "-i", str(test.root / "inc"), "-gen", backend, "-maxerr", "20", "-r",
-                                    "-semantic-type-abi", "native", "-semantic-model", str(binary),
-                                    "-o", str(test.emission_path(source.stem, backend)), str(source)],
-                                   capture_output=True, timeout=120, check=False)
-            test.assertEqual(reply.returncode, 0, reply.stdout + reply.stderr)
+            # Keep the selected object name identical across transports now
+            # that the model also records the driver's effective inputs.
+            test.invoke([source], mode="off", backend=backend,
+                        extra=("-semantic-type-abi", "native", "-semantic-model", str(binary)))
             test.assertEqual(Model.read(binary).rows, model.rows)
             test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
             for mode, extra in (("bindings", ()), ("expressions", ()),

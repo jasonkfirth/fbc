@@ -5,7 +5,6 @@ Responsibilities: Exact source identities, transport parity and capture exclusio
 This file intentionally does NOT infer associations from statement positions.
 """
 from collections import Counter
-import subprocess
 
 from sidecar import Model
 
@@ -40,12 +39,11 @@ def check_inputs(test):
                                                      ("TEXT", "write"): 1}))
             test.assertEqual([row[4] for row in model.records["K"] if row[3].startswith(COUNT)], ["3"])
             binary = test.working / ("macro-access-" + backend + ".fbcsem")
-            result = subprocess.run([str(test.compiler), "-prefix", str(test.toolchain_prefix),
-                                     "-i", str(test.root / "inc"), "-gen", backend, "-maxerr", "20", "-r",
-                                     "-semantic-type-abi", "native", "-semantic-extra-facts", "macro-access", "-semantic-model", str(binary),
-                                     "-o", str(test.emission_path(source.stem, backend)), str(source)],
-                                    capture_output=True, timeout=120, check=False)
-            test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            # A transport comparison must preserve the driver's object name
+            # as well as the parser options and emitted source.
+            test.invoke([source], mode="off", backend=backend,
+                        extra=("-semantic-type-abi", "native", "-semantic-extra-facts", "macro-access",
+                               "-semantic-model", str(binary)))
             test.assertEqual(Model.read(binary).rows, model.rows)
             test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
             for mode, extra in (("full", ("-semantic-extra-facts", "none")),
