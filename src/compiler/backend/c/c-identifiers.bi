@@ -74,13 +74,14 @@ end function
 private function hCUseEmulatedTlsName( byval sym as FBSYMBOL ptr, byval rawname as const zstring ptr ) as integer
 	if( (env.clopt.target <> FB_COMPTARGET_WINCE) and _
 	    (env.clopt.target <> FB_COMPTARGET_WIN32) and _
-	    (env.clopt.target <> FB_COMPTARGET_OPENBSD) ) then return FALSE
+	    (env.clopt.target <> FB_COMPTARGET_OPENBSD) and _
+	    (env.clopt.target <> FB_COMPTARGET_RISCOS) ) then return FALSE
 	if( (sym = NULL) or (rawname = NULL) ) then return FALSE
 	if( sym->class <> FB_SYMBCLASS_VAR ) then return FALSE
 	if( symbIsThreadLocal(sym) = FALSE ) then return FALSE
 	if( left(*rawname, 5) = "fb_c_" or left(*rawname, 8) = "fb_type_" or _
 	    left(*rawname, 5) = "__FB_" ) then return FALSE
-	'' MinGW, CeGCC and OpenBSD emulated TLS prefix an explicit asm label with an
+	'' Some emulated TLS implementations prefix an explicit asm label with an
 	'' internal '*' marker, producing invalid assembler names. GCC accepts '$'
 	'' in C identifiers, so retain these ordinary mangled names directly. This
 	'' keeps exported TLS descriptor names compatible across object files.
