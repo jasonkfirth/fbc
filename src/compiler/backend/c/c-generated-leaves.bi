@@ -88,6 +88,13 @@ private sub hCLeafReference( byval sym as FBSYMBOL ptr )
 	end if
 end sub
 
+private sub hCLeafCallback( byval target as FBSYMBOL ptr )
+	hCLeafReference(target)
+	'' Adapter bodies live outside procedure spans. Retain their caller even
+	'' for public targets, so pruning cannot leave an unused adapter behind.
+	if( c_leaf_current <> NULL ) then c_leaf_current->must_keep = TRUE
+end sub
+
 private sub hCLeafBegin( byval proc as FBSYMBOL ptr )
 	c_leaf_current = NULL
 	if( symbIsNaked(proc) ) then
@@ -161,11 +168,11 @@ end sub
 
 private sub hCLeafPrune( )
 	'' Opaque assembly can name procedures without typed IR references.
-	'' Callback adapters and conversion builtins have separately owned bodies;
-	'' keep these modules intact until their dependencies are modeled here.
-	'' Debug line directives also depend on the original output ordering.
-	if( c_leaf_opaque or env.clopt.debuginfo or ((ctx.usedbuiltins and (not cuint(BUILTIN_STATICASSERT))) <> 0) or _
-		(listGetHead(@ctx.arraycallbacks) <> NULL) ) then exit sub
+	'' Adapter targets and callers are retained when the adapter is requested.
+	'' Numeric conversion helpers use reserved names and only system builtins;
+	'' they cannot refer to a compiler-generated BASIC procedure.
+	'' Debug line directives still depend on the original output ordering.
+	if( c_leaf_opaque or env.clopt.debuginfo ) then exit sub
 	if( (hCLeafRangesValid(TRUE, ctx.sections(0)) = FALSE) or (hCLeafRangesValid(FALSE, ctx.sections(1)) = FALSE) ) then
 		errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
 		exit sub

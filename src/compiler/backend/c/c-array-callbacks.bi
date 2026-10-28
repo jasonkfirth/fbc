@@ -56,6 +56,9 @@ private function hArrayCallbackArgument( byval expr as EXPRNODE ptr ) as EXPRNOD
 			dim as FBSYMBOL ptr subtype = NULL
 			if( param <> NULL ) then symbGetRealParamDtype( param, dtype, subtype )
 			if( typeIsPtr(dtype) ) then
+				'' Record the typed call before replacing its symbol expression with
+				'' an adapter name. The output pruner cannot recover that edge later.
+				hCLeafCallback(target)
 				var target_name = hGetCId( target )
 				var entry = cptr(CARRAYCALLBACK ptr, listGetHead(@ctx.arraycallbacks))
 				do while( entry <> NULL )
