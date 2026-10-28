@@ -8,7 +8,7 @@
 '' Module API: Internal include-only codec shared by the compiler and linter.
 '' This file intentionally does NOT contain:
 ''     - language parser behavior or lint policy, which remain in the callers.
-''
+'' Writer hosts define FBC_SEMANTIC_BINARY_WRITER_ONLY before including.
 '' Ownership: A writer dictionary belongs to one serial export transaction. A
 '' reader owns its compact bytes and strings; indexed reads are immutable after
 '' the sequential load. No native structure or pointer is written to disk.
@@ -281,7 +281,7 @@ end function
 '' -------------------------------------------------------------------------
 '' Bounded file reader and immutable indexed values
 '' -------------------------------------------------------------------------
-
+#ifndef FBC_SEMANTIC_BINARY_WRITER_ONLY
 private sub FbcSemReset(byref reader as FbcSemReader)
 	erase reader.strings
 	erase reader.tags
@@ -666,6 +666,6 @@ private function FbcSemLine(byref reader as FbcSemReader, byval start as long, _
 	next
 	return result
 end function
-
+#endif
 #endif
 '' end of fbc-semantic-binary.bi

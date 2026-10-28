@@ -50,7 +50,7 @@
 ''     fbSemanticModelEnd(). Module buffers and symbol tables are released at the
 ''     end of the compiler invocation and reused only between modules. A failed
 ''     parse can commit only expression-only records through an explicit R tag.
-
+#define FBC_SEMANTIC_BINARY_WRITER_ONLY
 #include once "core/fbint.bi"
 #include once "tooling/semantic-type-shapes.bi"
 #include once "ast/ast.bi"
@@ -89,7 +89,7 @@ declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval 
 #include once "tooling/semantic-primitive-types.bi"
 #include once "tooling/semantic-member-names.bi"
 #include once "fbc-semantic-binary.bi"
-
+#undef FBC_SEMANTIC_BINARY_WRITER_ONLY
 '' -------------------------------------------------------------------------
 '' Export limits and process-local module state
 '' -------------------------------------------------------------------------
