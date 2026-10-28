@@ -703,7 +703,7 @@ end type
 #include once "support/hlp.bi"
 
 declare function fbGetInputFileParentDir( ) as string
-declare sub fbAddLib(byval libname as zstring ptr)
+declare sub fbAddLib(byval libname as const zstring ptr)
 declare sub fbAddLibPath(byval path as zstring ptr)
 
 extern env as FBENV

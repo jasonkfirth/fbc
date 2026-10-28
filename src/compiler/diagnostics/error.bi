@@ -466,7 +466,7 @@ declare sub errPushParamLocation _
 		byval proc as FBSYMBOL_ ptr, _
 		byval tk as integer, _
 		byval paramindex as integer, _
-		byval paramid as zstring ptr _
+		byval paramid as const zstring ptr _
 	)
 declare sub errPopParamLocation( )
 
@@ -507,7 +507,7 @@ declare sub errReportParam _
 	( _
 		byval proc as FBSYMBOL_ ptr, _
 		byval pnum as integer, _
-		byval pid as zstring ptr, _
+		byval pid as const zstring ptr, _
 		byval msgnum as integer _
 	)
 
@@ -515,7 +515,7 @@ declare sub errReportParamWarn _
 	( _
 		byval proc as FBSYMBOL_ ptr, _
 		byval pnum as integer, _
-		byval pid as zstring ptr, _
+		byval pid as const zstring ptr, _
 		byval msgnum as integer _
 	)
 

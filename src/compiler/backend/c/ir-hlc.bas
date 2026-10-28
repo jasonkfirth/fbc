@@ -2846,7 +2846,7 @@ private function exprNewTEXT _
 	( _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
-		byval s as zstring ptr _
+		byval s as const zstring ptr _
 	) as EXPRNODE ptr
 
 	dim as EXPRNODE ptr n = any

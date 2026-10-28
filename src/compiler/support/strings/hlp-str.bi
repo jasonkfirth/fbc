@@ -24,7 +24,7 @@
 declare sub ZstrAssign _
 	( _
 		byval dst as zstring ptr ptr, _
-		byval src as zstring ptr _
+		byval src as const zstring ptr _
 	)
 
 declare sub ZstrAssignW _
@@ -47,7 +47,7 @@ declare sub ZstrConcatAssignW _
 
 declare function ZstrDup _
 	( _
-		byval s as zstring ptr _
+		byval s as const zstring ptr _
 	) as zstring ptr
 
 declare sub WstrAssign _

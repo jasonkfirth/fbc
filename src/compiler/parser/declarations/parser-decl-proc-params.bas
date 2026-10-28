@@ -166,7 +166,7 @@ end sub
 private sub hParamError _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval pid as zstring ptr, _
+		byval pid as const zstring ptr, _
 		byval msgnum as FB_ERRMSG = FB_ERRMSG_ILLEGALPARAMSPECAT, _
 		byval delta as integer = 1 _
 	)

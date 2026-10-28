@@ -35,7 +35,7 @@ type ERRPARAMLOCATION
 	proc            as FBSYMBOL ptr
 	tk              as integer
 	paramnum        as integer
-	paramid         as zstring ptr
+	paramid         as const zstring ptr '' Borrowed until pop; diagnostics only read it.
 end type
 
 type FB_ERRCTX
@@ -508,7 +508,7 @@ sub errPushParamLocation _
 		byval proc as FBSYMBOL ptr, _
 		byval tk as integer, _
 		byval paramnum as integer, _
-		byval paramid as zstring ptr _
+		byval paramid as const zstring ptr _
 	)
 
 	dim as ERRPARAMLOCATION ptr l = any
@@ -873,7 +873,7 @@ private function hMakeParamDesc _
 	static as string desc
 	dim as ERRPARAMLOCATION ptr paramloc = any
 	dim as FBSYMBOL ptr proc = any
-	dim as zstring ptr pname = any, pid = any
+	dim as const zstring ptr pname = any, pid = any
 	dim as integer pnum = any, addprnts = any
 
 	paramloc = listGetTail( @errctx.paramlocations )
@@ -987,7 +987,7 @@ sub errReportParam _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval paramnum as integer, _
-		byval paramid as zstring ptr, _
+		byval paramid as const zstring ptr, _
 		byval msgnum as integer _
 	)
 
@@ -1001,7 +1001,7 @@ sub errReportParamWarn _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval paramnum as integer, _
-		byval paramid as zstring ptr, _
+		byval paramid as const zstring ptr, _
 		byval msgnum as integer _
 	)
 

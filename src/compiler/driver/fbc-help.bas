@@ -181,7 +181,7 @@ sub fbcDriverPrintOptions( byval verbose as integer )
 
 end sub
 
-private sub hAppendConfigInfo( byref config as string, byval info as zstring ptr )
+private sub hAppendConfigInfo( byref config as string, byval info as const zstring ptr )
 	if( len( config ) > 0 ) then
 		config += ", "
 	end if

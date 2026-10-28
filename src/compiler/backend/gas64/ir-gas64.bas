@@ -3078,7 +3078,7 @@ private sub hmaybeemitglobalvar( byval sym as FBSYMBOL ptr )
 		hEmitVariable( sym )
 	end if
 end sub
-private sub no_roundsd(byval size as zstring ptr)
+private sub no_roundsd(byval size as const zstring ptr)
 	''when the CPU doesn't provide roundsd/roundss (needs see41)
 	asm_code("stmxcsr $mxcsr[rip]",KNOFREE)
 	asm_code("push $mxcsr[rip]",KNOFREE)

@@ -204,7 +204,7 @@ end function
 '':::::
 function symbAllocStrConst _
 	( _
-		byval sname as zstring ptr, _
+		byval sname as const zstring ptr, _
 		byval strlength as integer _
 	) as FBSYMBOL ptr
 

@@ -62,7 +62,7 @@ function astIsConst0OrMinus1( byval n as ASTNODE ptr ) as integer
 	return FALSE
 end function
 
-function astNewCONSTstr( byval v as zstring ptr ) as ASTNODE ptr
+function astNewCONSTstr( byval v as const zstring ptr ) as ASTNODE ptr
 	dim as FBSYMBOL ptr tc = any
 
 	'' assuming no escape sequences are used

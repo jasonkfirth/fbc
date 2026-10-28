@@ -270,7 +270,7 @@ end function
 function symbAddProcParam _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval id as zstring ptr, _
+		byval id as const zstring ptr, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval dimensions as integer, _

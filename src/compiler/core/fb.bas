@@ -1395,7 +1395,7 @@ function fbGetInputFileParentDir( ) as string
 end function
 
 '' Used to add libs found during parsing (#inclib, Lib "...", rtl-* callbacks)
-sub fbAddLib(byval libname as zstring ptr)
+sub fbAddLib(byval libname as const zstring ptr)
 
 	'' gfx library?
 	if( *libname = "fbgfx?" ) then

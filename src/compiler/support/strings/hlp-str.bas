@@ -90,7 +90,7 @@
 sub ZstrAssign _
 	( _
 		byval dst as zstring ptr ptr, _
-		byval src as zstring ptr _
+		byval src as const zstring ptr _
 	)
 
 	ASSIGN_SETUP( dst, src, zstring )
@@ -210,7 +210,7 @@ end sub
 '':::::
 function ZstrDup _
 	( _
-		byval s as zstring ptr _
+		byval s as const zstring ptr _
 	) as zstring ptr
 
 	dim as zstring ptr dst

@@ -110,7 +110,7 @@ end function
 function astAsmAppendText _
 	( _
 		byval tail as ASTASMTOK ptr, _
-		byval text as zstring ptr _
+		byval text as const zstring ptr _
 	) as ASTASMTOK ptr
 
 	tail = astAsmAppend( tail, AST_ASMTOK_TEXT )

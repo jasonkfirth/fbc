@@ -734,7 +734,7 @@ declare function astNewCONST _
 
 declare function astNewCONSTstr _
 	( _
-		byval v as zstring ptr _
+		byval v as const zstring ptr _
 	) as ASTNODE ptr
 
 declare function astNewCONSTwstr _
@@ -919,7 +919,7 @@ declare function astNewLIT _
 declare function astAsmAppendText _
 	( _
 		byval tail as ASTASMTOK ptr, _
-		byval text as zstring ptr _
+		byval text as const zstring ptr _
 	) as ASTASMTOK ptr
 
 declare function astAsmAppendSymb _

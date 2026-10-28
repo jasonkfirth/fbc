@@ -1424,7 +1424,7 @@ declare function symbAddEnumElement _
 declare function symbAddProcParam _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval id as zstring ptr, _
+		byval id as const zstring ptr, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval dimensions as integer, _
@@ -1713,7 +1713,7 @@ declare function symbAllocIntConst _
 
 declare function symbAllocStrConst _
 	( _
-		byval sname as zstring ptr, _
+		byval sname as const zstring ptr, _
 		byval lgt as integer _
 	) as FBSYMBOL ptr
 
