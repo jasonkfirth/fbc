@@ -601,6 +601,10 @@ private function hCheckVarargParam _
 			n->l = astNewCONV( FB_DATATYPE_DOUBLE, NULL, n->l )
 		end if
 
+	case FB_DATACLASS_UDT
+		'' C variadic arguments may carry aggregates by value. Their layout and
+		'' register classification are preserved by the selected call backend.
+
 	case else
 		errReport( FB_ERRMSG_PARAMTYPEMISMATCHAT )
 		return FALSE

@@ -5,6 +5,8 @@
   "compiler": "out/semantic-goal-20261027/fbc-resolution-context-v86",
   "compiler_sha256": "2816a6a572f9f07c9c774f5a9b44e4c7a0e9d18dc63769858e6e219afab3d941",
   "verified_checks": [
+    "All six v93 affected regressions passed in454.905seconds: actual lookup precedence/modes/ABIs, symbol filters, prototype property/descriptor matching, procedure error-state ownership and effective-context modes/backends/ABIs. Evidence: consumed-token-regressions-v93.log. The frozen v87 source audit remains7/9 passing; it does not qualify later v88-v93 source changes.",
+    "CAP182 parser-consumed-tokens passed six targeted families plus an extended unknown-class/limit guard and strengthened foreign-macro/raw-wire dtype integrity checks on immutable v93, SHA25610e8af39c54eddcbb91d4bbd859b8f5553bff2fcca2069633ec7e332af809a8b. Actual lexer payloads, active unions, native byte/wide units, source/macro/lookup provenance, type ABIs/text-binary/reset/reduced exclusions, PP/probe/inactive suppression and corrected-total corruption are covered. Evidence: consumed-tokens-verification-v93.json. General token-to-AST/binding causality and all original51 acceptance scopes remain open.",
     "Four recent native production guards passed in136.101seconds on v92 after compiling main/collector source copies in test scratch directories: lookup, symbol filtering, overload resolution and prototype matching. Evidence: local-guard-builds-v92.log. The six broader CFG/runtime/block/startup/effect regressions remain active.",
     "CAP181 native-procedure-runtime-state passed seven targeted families on immutable v92 (SHA25622883a7d400d0fb0cbd02e46b18845082594b5434f460f8479d8ef78c083d31b): hidden handler/module/function/activation/GOSUB storage, pre/post cleanup, native call-ret and forced/default setjmp modes, diagnostic/emission parity, transport/ABIs/reduced/reset, native class/limit guards and repaired-total corruption. Evidence: procedure-state-verification-v92.json. This closes the reviewed seven hidden-state fields, while precise exceptional CFG, complete use-def and all original51 acceptance obligations remain open.",
     "CAP180 complete-effective-contexts passed all four final integrity families in520.357seconds on immutable v91, SHA2561992ab1fc7d14e45265a7048e65e00b8f326e70023e6f682c62b214ebdb70043. Every required option deletion with repaired totals is rejected; absent optional REM remains accepted without explicit completeness. Modes/backends/raw ABIs, committed contexts and OPTION occurrence membership pass. Evidence: context-integrity-verification-v91.json.",
@@ -483,7 +485,7 @@
       "required_negative": "Do not silently replace invalid bytes, interpret arbitrary compiler bytes as UTF-8, truncate embedded control data, double-unescape fields, or publish a complete model the declared consumer cannot read."
     }
   ],
-  "next_required_scope": "Finish v92 six affected regressions and four scratch-directory guard rechecks; seven new procedure-state families pass. Complete frozen v87 source audit (5/9 passed), then current-source qualification. Explicit CAP180 context completeness with legacy optional-key compatibility passes all four final families. Continue all original51 scope requirements, now46 missing/301 partial fields, remaining token/source-expression causal links and complete CFG/use-def/effect/backend/class/route/target/fault acceptance.",
+  "next_required_scope": "Finish frozen v87 source audit (7/9 passed) then qualify current v93 sources/reader. All v93 six targeted families, extended unknown-class/limit guard, strengthened ownership/dtype checks and six affected regressions passed. Preserve all original51 acceptance requirements,24 missing/301 partial contract fields, token/expression/binding causal closure, EXTERN/macro/history, complete CFG/use-def/effect/backend and class/route/target/fault coverage.",
   "active_verification": {
     "source_v76": {
       "state": "complete-all-81-cases-passed",
@@ -605,9 +607,9 @@
       "verification_report": "out/semantic-goal-20261027/lookup-verification-v87.json",
       "source_output": "out/semantic-goal-20261027/self-lookup-v87",
       "source_log": "out/semantic-goal-20261027/self-lookup-v87.log",
-      "source_cases": 5,
+      "source_cases": 7,
       "source_total": 9,
-      "source_passed": 5
+      "source_passed": 7
     },
     "filters_v88": {
       "state": "five-targeted-and-eight-regression-families-passed",
@@ -698,6 +700,16 @@
       "guard_session": 66148,
       "guard_tests": 4,
       "guard_seconds": 136.101
+    },
+    "consumed_tokens_v93": {
+      "state": "six-targeted-extended-guard-strengthened-integrity-and-six-regressions-passed",
+      "compiler": "out/semantic-goal-20261027/fbc-consumed-tokens-v93",
+      "verification_report": "out/semantic-goal-20261027/consumed-tokens-verification-v93.json",
+      "regression_session": 8986,
+      "regression_log": "out/semantic-goal-20261027/consumed-token-regressions-v93.log",
+      "field_audit": "out/semantic-goal-20261027/field-audit-qualified-v93",
+      "regression_tests": 6,
+      "regression_seconds": 454.905
     }
   },
   "working_tree": "/home/jkfirth/fbc",

@@ -271,9 +271,10 @@ static void amiga_upload_exact_colours(int first)
 /* Sparse antialiasing can introduce hundreds of shades around a few large
    flat regions. Keep those regions exact instead of reducing the entire UI
    to RGB332. Rich images still use the existing fixed palette: this path
-   admits at most 512 colours, with four covering at least three quarters of
-   the canvas. The 1024-slot hash remains at most half full. */
-#define AMIGA_FRAME_COLOURS 512
+   admits at most 4096 colours, with four covering at least three quarters of
+   the canvas. The separate 8192-slot hash remains at most half full. */
+#define AMIGA_FRAME_COLOURS 4096
+#define AMIGA_FRAME_COLOUR_SLOTS 8192
 struct amiga_frame_colour {
     unsigned int colour;
     size_t count;
@@ -281,16 +282,19 @@ struct amiga_frame_colour {
     int pen;
 };
 static struct amiga_frame_colour amiga_frame_colours[AMIGA_FRAME_COLOURS];
-static UWORD amiga_frame_slots[AMIGA_COLOUR_SLOTS];
+static UWORD amiga_frame_slots[AMIGA_FRAME_COLOUR_SLOTS];
+/* Selection runs under the graphics lock. Keep its bounded scratch order
+   here rather than adding 8 KiB to every native graphics caller's stack. */
+static UWORD amiga_frame_order[AMIGA_FRAME_COLOURS];
 static int amiga_frame_count;
 
 static int amiga_frame_colour_index(unsigned int colour, int insert)
 {
     unsigned int slot = (colour ^ (colour >> 10) ^ (colour >> 20)) &
-        (AMIGA_COLOUR_SLOTS - 1U);
+        (AMIGA_FRAME_COLOUR_SLOTS - 1U);
     unsigned int probe;
 
-    for (probe = 0; probe < AMIGA_COLOUR_SLOTS; ++probe) {
+    for (probe = 0; probe < AMIGA_FRAME_COLOUR_SLOTS; ++probe) {
         unsigned int entry = amiga_frame_slots[slot];
         if (entry == 0) {
             int index = amiga_frame_count;
@@ -303,7 +307,7 @@ static int amiga_frame_colour_index(unsigned int colour, int insert)
         }
         if (amiga_frame_colours[entry - 1U].colour == colour)
             return (int)entry - 1;
-        slot = (slot + 1U) & (AMIGA_COLOUR_SLOTS - 1U);
+        slot = (slot + 1U) & (AMIGA_FRAME_COLOUR_SLOTS - 1U);
     }
     return -1;
 }
@@ -344,7 +348,6 @@ static int amiga_nearest_colour_pen(unsigned int colour, int *distance)
 
 static int amiga_prepare_dominant_colours(void)
 {
-    UWORD order[AMIGA_FRAME_COLOURS];
     size_t covered = 0;
     size_t total = (size_t)fb_amiga_gfx.width * (size_t)fb_amiga_gfx.height;
     int row, x, index;
@@ -366,15 +369,15 @@ static int amiga_prepare_dominant_colours(void)
             ++amiga_frame_colours[index].count;
         }
     }
-    for (index = 0; index < amiga_frame_count; ++index) order[index] = (UWORD)index;
-    qsort(order, (size_t)amiga_frame_count, sizeof(order[0]), amiga_compare_colour_counts);
+    for (index = 0; index < amiga_frame_count; ++index) amiga_frame_order[index] = (UWORD)index;
+    qsort(amiga_frame_order, (size_t)amiga_frame_count, sizeof(amiga_frame_order[0]), amiga_compare_colour_counts);
     for (index = 0; index < amiga_frame_count && index < 4; ++index)
-        covered += amiga_frame_colours[order[index]].count;
+        covered += amiga_frame_colours[amiga_frame_order[index]].count;
     if (covered < total - total / 4) return FALSE;
 
     amiga_reset_colour_table();
     for (index = 0; index < amiga_frame_count && index < 4; ++index)
-        amiga_colour_pen(amiga_frame_colours[order[index]].colour);
+        amiga_colour_pen(amiga_frame_colours[amiga_frame_order[index]].colour);
     for (index = 0; index < amiga_frame_count; ++index)
         amiga_frame_colours[index].pen = amiga_nearest_colour_pen(
             amiga_frame_colours[index].colour, &amiga_frame_colours[index].distance);

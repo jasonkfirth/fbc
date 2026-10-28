@@ -124,6 +124,29 @@ print copied
     test.assertEqual(sum(row[7] == "value" for row in tokens), 2)
 
 
+def check_hidden_macros(test):
+    source = test.source(SOURCE, "consumed-token-hidden-macros.bas")
+    for backend in test.backends:
+        baseline, _ = test.invoke([source], mode="off", backend=backend)
+        emission = test.emission_path(source.stem, backend).read_bytes()
+        result, path = test.invoke([source], backend=backend, extra=("-semantic-model-compact",))
+        test.assertEqual((result.stdout, result.stderr), (baseline.stdout, baseline.stderr))
+        test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
+        model = Model.read(path)
+        test.assertFalse(model.macro_invocations)
+        test.assertTrue(model.consumed_tokens[1])
+        test.assertTrue(all(row[18:21] == ["0", "0", "0"] for row in model.consumed_tokens[1]))
+        # Hidden provenance is an intentional graph omission, not permission
+        # for a token to point at an unexported internal allocation identity.
+        rows = [row.copy() for row in model.rows]
+        event = next(row for row in rows if row[3:4] and row[3].startswith("consumed-token:"))
+        fields = event[4].split("\t")
+        fields[19:21] = ["1", "1"]
+        event[4] = "\t".join(fields)
+        with test.assertRaises(ValueError):
+            Model(text_rows(rows))
+
+
 def check_corruption(test):
     model = test.compile(test.source(SOURCE, "consumed-token-corruption.bas"))
     for mutation in ("missing", "summary", "policy", "ordinal", "class", "context", "source", "union", "type-domain", "payload", "suffix", "numeric", "lookup", "text-length", "mapped-dtype", "duplicate"):

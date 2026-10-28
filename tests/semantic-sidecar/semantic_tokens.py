@@ -71,6 +71,8 @@ def validate_tokens(model, number, unescape):
             occurrence = model.source_contexts.get(int(invocation[4])) if invocation else None
             if occurrence is None or int(occurrence[4]) != module:
                 raise ValueError("Consumed token has no actual module-owned macro expansion")
+        elif fields[19:21] != ["0", "0"]:
+            raise ValueError("Consumed token invents an unavailable macro offset")
         if fields[25] == "1" and (not source or int(fields[21]) < 1 or int(fields[23]) < int(fields[21])):
             raise ValueError("Consumed token has no valid original-input coordinates")
         if kind in (0, 1, 2):

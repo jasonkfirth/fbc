@@ -5464,4 +5464,47 @@ dtype. `consumed-token-count` closes a module's dense stream. Payload copying
 checks native buffer bounds and a one-million-token limit; token pointers never
 survive a callback.
 
+## Native EXTERN policy transitions
+
+`extern-mangling-contexts` is available in full and expression models. Bindings
+models mark it unavailable. Full contexts additionally require the
+`language-policy parser-mangling` option, using the native `FB_MANGLING` values:
+0 BASIC, 1 C, 2 Windows, 3 Windows-MS, 4 C++, 5 Pascal, 6 runtime library.
+Pascal is an internal enumeration value; the current EXTERN grammar does not
+accept a Pascal spelling. Mangling policy is part of the configuration cache
+key, independently of the command-line and language-default structures.
+
+Module properties `extern-mangling:<ordinal>` contain these tab-separated fields:
+
+```text
+begin|end construct previous-mode committed-mode entry-CTX committed-CTX
+statement SRC spelling-present fallback-used spelling logical-file
+start-line start-column end-line end-column physical
+macro-invocation macro-start-unit macro-offset-valid
+```
+
+Columns are native zero-based lexer columns. The physical flag uses the
+existing source eligibility check, including remaps and generated driver input.
+The parser copies its selected string before consuming the literal. The
+spelling is the native zero-terminated value used by the grammar, rather than
+a reconstruction of the written token. Missing or unrecognized specifications
+retain the actual C fallback and a separate fallback flag. Restoration is
+recorded after the native assignment and before compound-stack storage is
+released. Repeated identical modes retain distinct scope receipts while their
+configuration identity can remain unchanged. A scope does not acquire an end
+receipt merely because publication or error recovery ended the module.
+
+Expression models have zero configuration IDs and retain explicit native modes.
+This permits rejected source to preserve actual decisions under its ordinary
+recovery marker. Full models retain their existing publication rule for source
+errors. Macro and remapped points do not acquire editable physical ranges.
+Policy does not imply an emitted or linker-resolved external symbol.
+
+`extern-mangling-counts` contains event, begin, end and remaining-open counts,
+including four zeros for modules without EXTERN scopes. The reader checks dense
+ordinals, every native EXTERN construct, native closure membership, source and
+configuration ownership, selected spelling/fallback agreement and restoration
+order. Scope depth is bounded at 1024 and events at one million. Observation
+does not repeat lexer queries, alter parser policy or retain native pointers.
+
 <!-- end of compiler-semantic-model.md -->

@@ -1,0 +1,14 @@
+# Project: FreeBASIC compiler test suite
+# File: va_cva_aggregate.bmk
+# Purpose: Link the C ABI test to its native C driver.
+# Responsibilities: Build aggregate-vararg and fixed-long-double probes.
+# This file does not contain Cva_Arg implementation or ABI emulation.
+# TEST_MODE : MULTI_MODULE_OK
+
+MAIN := va_cva_aggregate.bas
+EXTRA_OBJS := ../bindings/va_cva_aggregate.o
+
+$(SRCDIR)../bindings/va_cva_aggregate.o : $(SRCDIR)../bindings/va_cva_aggregate.c
+	$(CC) -Wall -Wextra -Werror -c $< -o $@
+
+# end of va_cva_aggregate.bmk

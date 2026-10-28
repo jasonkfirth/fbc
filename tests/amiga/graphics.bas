@@ -66,7 +66,7 @@ private sub TestTrueColourPalette(byval depth as integer)
 	'' collisions without relying on a particular native pen assignment.
 	screenlock
 	line (0, 0)-(318, 199), rgb(0, 0, 0), bf
-	pset (200, 5), stay
+	pset (200, 50), stay
 	for index as integer = 0 to 239
 		pset (index, 199), rgb((index and 31) * 8, (index shr 5) * 4 + 4, 17)
 	next
@@ -75,7 +75,7 @@ private sub TestTrueColourPalette(byval depth as integer)
 		RequireDisplayRGB(index, 199, FrameRGB( _
 			rgb((index and 31) * 8, (index shr 5) * 4 + 4, 17), depth), 1)
 	next
-	RequireDisplayRGB(200, 5, FrameRGB(stay, depth), 1)
+	RequireDisplayRGB(200, 50, FrameRGB(stay, depth), 1)
 
 	'' Replace colours until append-only allocation fills. The new earlier
 	'' pixel changes scan order when unused old colours are discarded, so
@@ -87,31 +87,31 @@ private sub TestTrueColourPalette(byval depth as integer)
 	next
 	screenunlock
 	RequireDisplayRGB(0, 0, FrameRGB(rgb(201, 69, 177), depth), 2)
-	RequireDisplayRGB(200, 5, FrameRGB(stay, depth), 2)
+	RequireDisplayRGB(200, 50, FrameRGB(stay, depth), 2)
 	for index as integer = 0 to 239
 		RequireDisplayRGB(index, 199, FrameRGB( _
 			rgb((index and 31) * 8, (index shr 5) * 4 + 4, 145), depth), 2)
 	next
 
-	'' This row has 319 distinct colours even after RGB565 normalization.
-	'' Returning to the fixed palette must repaint the untouched row too.
+	'' More than 4096 distinct RGB565 colours must still use the bounded
+	'' fixed fallback. Keep the untouched sample below these fourteen rows.
 	screenlock
-	for index as integer = 0 to 318
-		pset (index, 0), rgb((index and 31) * 8, _
-			((index shr 5) and 63) * 4, ((index * 7) and 31) * 8)
+	for index as integer = 0 to 4465
+		pset (index mod 319, index \ 319), rgb((index and 31) * 8, _
+			((index shr 5) and 63) * 4, ((index shr 11) and 31) * 8)
 	next
 	screenunlock
 	dim converted as ulong = FrameRGB(stay, depth)
 	dim red as integer = (converted shr 16) and 255
 	dim green as integer = (converted shr 8) and 255
 	dim blue as integer = converted and 255
-	RequireDisplayRGB(200, 5, rgb(NearestLevel(red, levels3()), _
+	RequireDisplayRGB(200, 50, rgb(NearestLevel(red, levels3()), _
 		NearestLevel(green, levels3()), NearestLevel(blue, levels2())) and &hffffff, 3)
 
-	'' Erase only the rich row. The low-colour frame fits again, and the
+	'' Erase only the rich rows. The low-colour frame fits again, and the
 	'' unchanged sample must recover its exact RGB without another PSET.
-	line (0, 0)-(318, 0), rgb(0, 0, 0)
-	RequireDisplayRGB(200, 5, FrameRGB(stay, depth), 4)
+	line (0, 0)-(318, 13), rgb(0, 0, 0), bf
+	RequireDisplayRGB(200, 50, FrameRGB(stay, depth), 4)
 end sub
 
 
@@ -155,6 +155,28 @@ private sub TestDominantPalette(byval depth as integer)
 	RequireDisplayRGB(318, 199, FrameRGB(rgb(212, 208, 200), depth), 7)
 	RequireDisplayRGB(50, 50, FrameRGB(rgb(128, 128, 128), depth), 7)
 	RequireDisplayRGB(150, 50, FrameRGB(rgb(0, 120, 215), depth), 7)
+end sub
+
+private sub TestRichDominantPalette(byval depth as integer)
+	'' The original Nebunoid menu has 1,427 shades around large flat regions.
+	'' Exercise more than 512 unique RGB565 colours without reducing those regions.
+	screenlock
+	line (0, 0)-(318, 199), rgb(240, 240, 240), bf
+	line (20, 20)-(100, 100), rgb(128, 128, 128), bf
+	line (120, 20)-(200, 100), rgb(0, 120, 215), bf
+	for index as integer = 0 to 1023
+		pset (index mod 256, index \ 256), rgb((index and 31) * 8, _
+			((index shr 5) and 31) * 8, 47)
+	next
+	screenunlock
+	RequireDisplayRGB(300, 50, FrameRGB(rgb(240, 240, 240), depth), 8)
+	RequireDisplayRGB(50, 50, FrameRGB(rgb(128, 128, 128), depth), 8)
+	RequireDisplayRGB(150, 50, FrameRGB(rgb(0, 120, 215), depth), 8)
+	'' New priorities must also repaint untouched rows in this larger table.
+	line (0, 100)-(318, 199), rgb(3, 108, 200), bf
+	RequireDisplayRGB(50, 150, FrameRGB(rgb(3, 108, 200), depth), 9)
+	RequireDisplayRGB(50, 50, FrameRGB(rgb(128, 128, 128), depth), 9)
+	RequireDisplayRGB(150, 50, FrameRGB(rgb(0, 120, 215), depth), 9)
 end sub
 
 private sub TestBorderlessPalette(byval depth as integer)
@@ -314,6 +336,7 @@ for mode as integer = 0 to 2
 	if depths(mode) > 8 then
 		TestTrueColourPalette(depths(mode))
 		TestDominantPalette(depths(mode))
+		TestRichDominantPalette(depths(mode))
 	end if
 	screen 0
 	if depths(mode) > 8 then print "Native exact palette and fallback transitions passed at depth "; depths(mode)

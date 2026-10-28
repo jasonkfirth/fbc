@@ -1576,3 +1576,21 @@ and MT runtimes. The 39 read-only queries use zero seek callbacks; the prior
 implementation used 78. All 18 maintained native probes pass with the change.
 This does not establish that the separate long-running corpus I/O waits are
 resolved; their original workloads remain under observation.
+
+### Antialiased menus with more than 512 shades
+
+The dominant-colour path now accepts up to 4,096 distinct source colours when
+its four most frequent colours cover at least three quarters of the canvas.
+It preserves those flat regions and spends the remaining pens on the largest
+frequency-weighted RGB errors. A separate 8,192-slot table keeps lookup work
+bounded. Its scratch ordering lives with graphics-lock-protected state,
+avoiding an 8 KiB addition to a native caller's stack. Frames beyond that
+bound still use the existing fixed palette; indexed and RTG paths are unchanged.
+
+Nebunoid's original menu has 1,427 shades. Its unchanged 786,432-pixel canvas
+still matches GCC exactly, while the actual native bitmap now shows 254
+colours rather than 17. Maximum channel error falls from 42 to 5, and all
+3,576 pixels of the dominant RGB(196,196,196) region become exact. No source
+settings, assets or pixels were replaced. All 18 maintained probes pass; the
+ordinary/MT graphics regression covers more than 512 shades, untouched-row
+remapping, and a greater-than-4,096-colour return to fixed-palette fallback.

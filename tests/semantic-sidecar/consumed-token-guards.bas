@@ -15,6 +15,7 @@ dim shared as LEX_CTX lex
 dim shared as PARSERCTX parser
 dim shared as integer observing = TRUE, failures, writes, points, fail_closed
 dim shared as integer full_mode, symbol_requests
+dim shared as integer macro_provenance = TRUE
 dim shared as string captured
 
 function fbSemanticModelTypedExpressionsEnabled( ) as integer
@@ -22,6 +23,9 @@ function fbSemanticModelTypedExpressionsEnabled( ) as integer
 end function
 function fbSemanticModelFullEnabled( ) as integer
 	return full_mode
+end function
+function fbSemanticModelMacroProvenanceEnabled( ) as integer
+	return macro_provenance
 end function
 function fbSemanticModelSymbolId( byval sym as FBSYMBOL ptr ) as longint
 	if( sym = NULL ) then return 0

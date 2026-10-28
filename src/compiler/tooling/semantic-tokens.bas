@@ -81,6 +81,16 @@ sub fbSemanticModelConsumedToken( byval token as FBTOKEN ptr )
 	end select
 	if( type_known ) then wire_type = fbSemanticModelTypeCode(culng(token->dtype))
 	consumed_count += 1
+	dim as longint macro_identity, macro_start
+	dim as integer macro_valid
+	'' Hidden macro provenance retains private frames for expression anchors.
+	'' Their allocation IDs have no MI record in this model, so expose only
+	'' the noneditable token point and leave the omitted graph link unavailable.
+	if( fbSemanticModelMacroProvenanceEnabled( ) and token->source.macro_identity > 0 ) then
+		macro_identity = token->source.macro_identity
+		macro_start = token->source.macro_start_unit
+		macro_valid = abs(token->source.macro_unit_valid <> FALSE)
+	end if
 	dim as string value = fbSemanticModelNumber(token->id) + TABCHAR + fbSemanticModelNumber(token->class) + TABCHAR + _
 		fbSemanticModelNumber(culng(token->dtype)) + TABCHAR + fbSemanticModelNumber(abs(type_known)) + TABCHAR + _
 		fbSemanticModelNumber(wire_type) + TABCHAR + fbSemanticModelNumber(token->len) + TABCHAR + text_kind + TABCHAR + _
@@ -89,8 +99,8 @@ sub fbSemanticModelConsumedToken( byval token as FBTOKEN ptr )
 		fbSemanticModelNumber(token->source.source_context) + TABCHAR + fbSemanticModelEscape(token->source.source_file) + TABCHAR + _
 		fbSemanticModelNumber(token->source.start_line) + TABCHAR + fbSemanticModelNumber(token->source.start_column) + TABCHAR + _
 		fbSemanticModelNumber(token->source.end_line) + TABCHAR + fbSemanticModelNumber(token->source.end_column) + TABCHAR + _
-		fbSemanticModelNumber(abs(token->source.is_physical <> FALSE)) + TABCHAR + fbSemanticModelNumber(token->source.macro_identity) + TABCHAR + _
-		fbSemanticModelNumber(token->source.macro_start_unit) + TABCHAR + fbSemanticModelNumber(abs(token->source.macro_unit_valid <> FALSE)) + TABCHAR + _
+		fbSemanticModelNumber(abs(token->source.is_physical <> FALSE)) + TABCHAR + fbSemanticModelNumber(macro_identity) + TABCHAR + _
+		fbSemanticModelNumber(macro_start) + TABCHAR + fbSemanticModelNumber(macro_valid) + TABCHAR + _
 		fbSemanticModelNumber(token->source.raw_start_line) + TABCHAR + fbSemanticModelNumber(token->source.raw_start_column) + TABCHAR + _
 		fbSemanticModelNumber(token->source.raw_end_line) + TABCHAR + fbSemanticModelNumber(token->source.raw_end_column) + TABCHAR + _
 		fbSemanticModelNumber(abs(token->source.raw_valid <> FALSE)) + TABCHAR + union_kind + TABCHAR + fbSemanticModelNumber(union_value) + TABCHAR + _

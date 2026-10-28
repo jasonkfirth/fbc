@@ -2618,6 +2618,34 @@ WithDefault()
         from contexts import check_completeness
         check_completeness(self)
 
+    def test_extern_mangling_preserves_native_scopes_and_declaration_contexts(self) -> None:
+        from extern_mangling import check_scopes
+        check_scopes(self)
+
+    def test_extern_mangling_preserves_modes_abis_transport_and_module_reset(self) -> None:
+        from extern_mangling import check_modes
+        check_modes(self)
+
+    def test_extern_mangling_preserves_fallback_and_unfinished_recovery(self) -> None:
+        from extern_mangling import check_recovery
+        check_recovery(self)
+
+    def test_extern_mangling_preserves_macro_include_remap_and_inactive_origins(self) -> None:
+        from extern_mangling import check_origins
+        check_origins(self)
+
+    def test_extern_mangling_rejects_missing_or_invented_policy_transitions(self) -> None:
+        from extern_mangling import check_corruption
+        check_corruption(self)
+
+    def test_extern_mangling_preserves_runtime_behavior_in_all_export_modes(self) -> None:
+        from extern_mangling import check_runtime
+        check_runtime(self)
+
+    def test_extern_mangling_production_collector_bounds_lifetimes_and_exclusions(self) -> None:
+        from extern_mangling import check_guards
+        check_guards(self)
+
     def test_effective_context_snapshots_preserve_modes_backends_and_type_abis(self) -> None:
         from contexts import check_modes
         check_modes(self)
@@ -5992,6 +6020,10 @@ Next
     def test_parser_consumed_tokens_exclude_inactive_preprocessor_and_probe_reads(self) -> None:
         from consumed_tokens import check_exclusions
         check_exclusions(self)
+
+    def test_parser_consumed_tokens_do_not_publish_hidden_macro_identities(self) -> None:
+        from consumed_tokens import check_hidden_macros
+        check_hidden_macros(self)
 
     def test_parser_consumed_tokens_reject_missing_or_inactive_payloads(self) -> None:
         from consumed_tokens import check_corruption

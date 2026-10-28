@@ -13,6 +13,7 @@ REQUIRED = {
     'language-policy': frozenset(('floatliteraldtype', 'int15literaldtype', 'int16literaldtype', 'int31literaldtype', 'int32literaldtype', 'int63literaldtype', 'int64literaldtype', 'integerkeyworddtype', 'opt', 'remkeyword-active')),
 }
 OCCURRENCES = ("option-statement-", "option-route-", "base-statement-")
+EXTERN_OPTION = ("language-policy", "parser-mangling")
 
 
 def validate_contexts(model, number):
@@ -20,11 +21,20 @@ def validate_contexts(model, number):
         if model.expressions_only or model.bindings_only:
             raise ValueError("Reduced model invents an unavailable configuration graph")
         options = model.options.get(identity, {})
+        if model.capabilities.get(module, {}).get("extern-mangling-contexts") == "available":
+            if EXTERN_OPTION not in options:
+                raise ValueError("Effective configuration lacks native EXTERN mangling policy")
+            if options[EXTERN_OPTION] not in range(7):
+                raise ValueError("Effective configuration has an unknown native mangling mode")
         if model.capabilities.get(module, {}).get("complete-effective-contexts") == "available":
             for domain, keys in REQUIRED.items():
                 if not all((domain, key) in options for key in keys):
                     raise ValueError("Effective configuration snapshot is incomplete")
         for domain, key in options:
+            if (domain, key) == EXTERN_OPTION:
+                if options[EXTERN_OPTION] not in range(7):
+                    raise ValueError("Effective configuration has an unknown native mangling mode")
+                continue
             if key in REQUIRED.get(domain, ()):
                 continue
             if domain != "language-default":

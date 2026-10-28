@@ -794,4 +794,12 @@ exclusions, type ABIs, reduced modes, binary transport and module reset have
 separate checks. The production guard links no lexer input/lookup implementation
 and tests inactive unions, rotating-buffer lifetime and the million-token bound.
 
+EXTERN policy tests cover all accepted spellings, nested and repeated scopes,
+declaration configuration, actual restoration, syntax fallback and unfinished
+recovery. Macro/include/remap and inactive origins, reduced availability, both
+type ABIs, transport/reset and off/on emission/runtime behavior have separate
+checks. Corrected-total mutations remove or forge scopes, contexts and counts.
+The production BASIC collector is copied into test scratch storage before
+compilation; its guard checks copied lifetime, exclusions and both bounds.
+
 <!-- end of README.md -->
