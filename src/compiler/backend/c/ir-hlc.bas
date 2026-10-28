@@ -347,6 +347,7 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/asm-names.bi"
 #include once "backend/c/c-identifiers.bi"
 #include once "backend/c/c-generated-leaves.bi"
+#include once "backend/c/c-abi-parameters.bi"
 
 declare sub hBuildStrLit( byref ln as string, byval z as zstring ptr, _
 	byval length as longint, byval paddedlength as longint )
@@ -414,6 +415,7 @@ end sub
 
 private sub _end( )
 	hCLeafFinish( )
+	hCAbiFinish( )
 	hCClearPointerViews(0)
 	listEnd(@c_pointer_views)
 	listEnd( @c_local_static_refs )
@@ -1222,6 +1224,8 @@ private function hEmitProcHeader _
 	) as string
 
 	dim as string ln, mangled
+	dim as CABIPARAM ptr abi_first = NULL, abi_last = NULL
+	dim as uinteger abi_prefix = 0
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as string semantic_result, semantic_convention, semantic_role
@@ -1371,6 +1375,7 @@ private function hEmitProcHeader _
 
 			if( (options and EMITPROC_ISPROTO) = 0 ) then
 				DZstrConcatAssign( params, " " + hGetCId( symbGetParamVar( param ) ) )
+				if( options = 0 ) then hCAbiParameter(abi_first, abi_last, param, len(*params.data))
 			end if
 		end if
 
@@ -1381,6 +1386,7 @@ private function hEmitProcHeader _
 		end if
 	wend
 
+	abi_prefix = len(ln)
 	if( params.data <> NULL ) then
 		ln += *params.data
 	end if
@@ -1403,7 +1409,11 @@ private function hEmitProcHeader _
 		hAppendCtorAttrib( ln, proc, FALSE )
 	end if
 
-	fbSemanticModelBackendAbiEnd(semantic_signature, ln)
+	if( abi_first <> NULL ) then
+		hCAbiDefinition(proc, ln, abi_prefix, abi_first, semantic_signature)
+	else
+		fbSemanticModelBackendAbiEnd(semantic_signature, ln)
+	end if
 	function = ln
 end function
 
@@ -2388,6 +2398,7 @@ private function _emitBegin( ) as integer
 	end if
 
 	hCLeafInit( )
+	hCAbiInit( )
 	hCClearPointerViews(0)
 	c_pointer_view_id = 0
 	c_pointer_raw_types = 0
@@ -2542,11 +2553,11 @@ private sub _emitEnd( )
 	'' Emit & close the main section
 	if( (ctx.sections(0).old = FALSE) andalso _
 	    (ctx.sections(0).bufferlen > 0) ) then
-		if( put( #env.outf.num, , *ctx.sections(0).buffer, _
-		         ctx.sections(0).bufferlen ) <> 0 ) then
+		if( hCAbiWriteOutput(ctx.sections(0).buffer, ctx.sections(0).bufferlen, c_leaf_opaque) = FALSE ) then
 			output_error = TRUE
 		end if
 	end if
+	hCAbiFinish( )
 	sectionEnd( )
 
 	if( close( #env.outf.num ) <> 0 ) then
@@ -3734,6 +3745,7 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr )
 		if( symbIsLabel( sym ) ) then
 			s += "&&"
 		elseif( symbIsProc( sym ) ) then
+			hCAbiAddress(sym)
 			s += "&"
 		end if
 		s += hGetCId( sym )

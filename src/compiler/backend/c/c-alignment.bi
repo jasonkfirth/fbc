@@ -37,7 +37,10 @@ private function hCStorageOffsetMod _
 	case EXPRCLASS_INDEX
 		var origin_mod = hCStorageOffsetMod(n->l, align)
 		if( origin_mod < 0 ) then return -1
-		var stride = symbGetSizeOf(n->l->sym) mod align
+		'' INDEX owns the array symbol. A member origin uses the shared union
+		'' for its C field name, so its sym member is not a symbol pointer.
+		if( n->sym = NULL ) then return -1
+		var stride = symbGetSizeOf(n->sym) mod align
 		if( stride = 0 ) then return origin_mod
 		var index_mod = hExprConstOffsetMod(n->r, align)
 		if( index_mod < 0 ) then return -1
