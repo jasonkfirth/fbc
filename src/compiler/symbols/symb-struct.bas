@@ -957,6 +957,9 @@ private function hGetReturnType( byval sym as FBSYMBOL ptr ) as integer
 		return FB_DATATYPE_STRUCT
 	end if
 
+	'' A filtered member list may contain no instance field. Without one,
+	'' the scalar register cases cannot classify the result; keep the
+	'' existing hidden-result fallback instead of dereferencing NULL.
 	select case as const( unpadlen )
 	case 1
 		res = FB_DATATYPE_BYTE
@@ -967,6 +970,9 @@ private function hGetReturnType( byval sym as FBSYMBOL ptr ) as integer
 	case 3
 		'' return as int only if first is a short
 		fld = symbUdtGetFirstField( sym )
+		if( fld = NULL ) then
+			return typeAddrOf( FB_DATATYPE_STRUCT )
+		end if
 		if( fld->lgt = 2 ) then
 			'' and if the struct is not packed
 			if( sym->lgt >= 4 ) then
@@ -978,6 +984,9 @@ private function hGetReturnType( byval sym as FBSYMBOL ptr ) as integer
 		'' return in ST(0) if there's only one element and it's a SINGLE
 		do
 			fld = symbUdtGetFirstField( sym )
+			if( fld = NULL ) then
+				return typeAddrOf( FB_DATATYPE_STRUCT )
+			end if
 
 			'' second field?
 			if( symbUdtGetNextField( fld ) ) then
@@ -1002,6 +1011,9 @@ private function hGetReturnType( byval sym as FBSYMBOL ptr ) as integer
 	case 5, 6, 7
 		'' return as longint only if first is a small int
 		fld = symbUdtGetFirstField( sym )
+		if( fld = NULL ) then
+			return typeAddrOf( FB_DATATYPE_STRUCT )
+		end if
 		if( fld->lgt <= 4 ) then
 			'' and if the struct is not packed
 			if( sym->lgt >= 8 ) then
@@ -1013,6 +1025,9 @@ private function hGetReturnType( byval sym as FBSYMBOL ptr ) as integer
 		'' return in ST(0) if there's only one element and it's a DOUBLE
 		do
 			fld = symbUdtGetFirstField( sym )
+			if( fld = NULL ) then
+				return typeAddrOf( FB_DATATYPE_STRUCT )
+			end if
 
 			'' second field?
 			if( symbUdtGetNextField( fld ) ) then
