@@ -1,11 +1,13 @@
 /'
 	Project: FreeBASIC C backend
 	File: c-generated-leaves.bi
-	Purpose: Omit unreferenced compiler-generated leaf procedures from C.
+	Purpose: Omit unreachable compiler-generated procedures from C.
 	Responsibilities: Own per-output C-name records, observe actual references,
-	retain conservative roots, and compact checked prototype/body spans.
+	trace private dependencies, retain roots, and compact checked spans.
 	This file does not change BASIC access flags, ABI, or source diagnostics.
 '/
+
+type CPROCLEAFEDGE as CPROCLEAFEDGE_
 
 type CPROCLEAF
 	name as zstring ptr
@@ -17,9 +19,16 @@ type CPROCLEAF
 	proto_last as uinteger
 	body_next as CPROCLEAF ptr
 	proto_next as CPROCLEAF ptr
+	dependencies as CPROCLEAFEDGE ptr
+	work_next as CPROCLEAF ptr
 end type
 
-dim shared as TLIST c_leaf_nodes
+type CPROCLEAFEDGE_
+	target as CPROCLEAF ptr
+	next_edge as CPROCLEAFEDGE ptr
+end type
+
+dim shared as TLIST c_leaf_nodes, c_leaf_edges
 dim shared as THASH c_leaf_names
 dim shared as integer c_leaf_ready, c_leaf_opaque
 dim shared as CPROCLEAF ptr c_leaf_current, c_leaf_bodies, c_leaf_body_tail
@@ -27,6 +36,7 @@ dim shared as CPROCLEAF ptr c_leaf_protos, c_leaf_proto_tail
 
 private sub hCLeafFinish( )
 	if( c_leaf_ready = FALSE ) then exit sub
+	listEnd(@c_leaf_edges)
 	hashEnd(@c_leaf_names)
 	var entry = cptr(CPROCLEAF ptr, listGetHead(@c_leaf_nodes))
 	while( entry <> NULL )
@@ -45,6 +55,7 @@ end sub
 private sub hCLeafInit( )
 	hCLeafFinish( )
 	listInit(@c_leaf_nodes, 32, sizeof(CPROCLEAF), LIST_FLAGS_CLEAR) '' Match expression-pool block sizing.
+	listInit(@c_leaf_edges, 32, sizeof(CPROCLEAFEDGE), LIST_FLAGS_CLEAR)
 	hashInit(@c_leaf_names, 128, FALSE) '' Chained buckets do not limit procedure count.
 	c_leaf_ready = TRUE
 	c_leaf_opaque = FALSE
@@ -68,16 +79,71 @@ private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
 	return entry
 end function
 
+private sub hCLeafDependency( byval target as CPROCLEAF ptr )
+	if( c_leaf_current = NULL ) then
+		'' Public bodies and global initializers are roots outside private spans.
+		target->referenced = TRUE
+		exit sub
+	end if
+	if( target = c_leaf_current ) then exit sub
+	var edge = c_leaf_current->dependencies
+	while( edge <> NULL )
+		if( edge->target = target ) then exit sub
+		edge = edge->next_edge
+	wend
+	edge = listNewNode(@c_leaf_edges)
+	edge->target = target
+	edge->next_edge = c_leaf_current->dependencies
+	c_leaf_current->dependencies = edge
+end sub
+
+'' The output owns every node and edge until pruning finishes. Edges borrow
+'' pooled nodes, never FBSYMBOL pointers that may expire during IR flushing.
+private sub hCLeafReachable( )
+	dim as CPROCLEAF ptr first = NULL, last = NULL
+	var entry = cptr(CPROCLEAF ptr, listGetHead(@c_leaf_nodes))
+	while( entry <> NULL )
+		if( entry->referenced or entry->must_keep ) then
+			entry->referenced = TRUE
+			if( last <> NULL ) then
+				last->work_next = entry
+			else
+				first = entry
+			end if
+			last = entry
+		end if
+		entry = listGetNext(entry)
+	wend
+	'' Each reachable node enters this queue once, including cycles. The pool
+	'' supplies the links, so traversal needs neither recursion nor allocation.
+	while( first <> NULL )
+		entry = first
+		first = first->work_next
+		if( first = NULL ) then last = NULL
+		var edge = entry->dependencies
+		while( edge <> NULL )
+			var target = edge->target
+			if( target->referenced = FALSE ) then
+				target->referenced = TRUE
+				target->work_next = NULL
+				if( last <> NULL ) then
+					last->work_next = target
+				else
+					first = target
+				end if
+				last = target
+			end if
+			edge = edge->next_edge
+		wend
+	wend
+end sub
+
 private sub hCLeafReference( byval sym as FBSYMBOL ptr )
 	if( c_leaf_ready = FALSE ) then exit sub
 	if( symbIsProc(sym) ) then
 		if( symbIsPrivate(sym) ) then
 			var entry = hCLeafGet(sym)
-			if( entry <> NULL ) then entry->referenced = TRUE
-			'' Removing a caller must not strand another private procedure.
-			'' Keep callers with private outgoing calls or addresses, even
-			'' when that caller itself has no surviving C reference.
-			if( c_leaf_current <> NULL ) then c_leaf_current->must_keep = TRUE
+			if( entry <> NULL ) then hCLeafDependency(entry)
 		end if
 	elseif( symbIsVar(sym) andalso (symbGetIsLiteral(sym) = FALSE) ) then
 		if( (symbIsLocal(sym) = FALSE) or symbIsStatic(sym) ) then
@@ -177,6 +243,7 @@ private sub hCLeafPrune( )
 		errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
 		exit sub
 	end if
+	hCLeafReachable( )
 	'' Each byte is moved at most once. Buffers retain their allocated capacity.
 	hCLeafCompact(TRUE, ctx.sections(0))
 	hCLeafCompact(FALSE, ctx.sections(1))
