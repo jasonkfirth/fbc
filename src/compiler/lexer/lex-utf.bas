@@ -60,6 +60,10 @@
 	#define U32_FROM_BE(c) U32_SWAP( c )
 #endif
 
+'' Converter bodies follow the native WSTRING element width. File byte order
+'' still belongs to U16_FROM_* and U32_FROM_* above. Keep the selection in
+'' the preprocessor so inactive helper calls cannot retain unused converters.
+
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 '' UTF-8
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -82,6 +86,7 @@
 	}
 
 '':::::
+#if sizeof(wstring) = 1
 private function hUTF8ToChar( ) as integer static
 	dim as ubyte src(0 to 6)
 	dim as ubyte ptr p
@@ -135,8 +140,10 @@ private function hUTF8ToChar( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 2
 private function hUTF8ToUTF16LE( ) as integer static
 	dim as ubyte src(0 to 6)
 	dim as ubyte ptr p
@@ -197,8 +204,10 @@ private function hUTF8ToUTF16LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF8ToUTF32LE( ) as integer static
 	dim as ubyte src(0 to 6)
 	dim as ubyte ptr p
@@ -248,8 +257,10 @@ private function hUTF8ToUTF32LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF8ToUTF32BE( ) as integer static
 	dim as ulong ptr dst
 	dim as uinteger c
@@ -267,18 +278,19 @@ private function hUTF8ToUTF32BE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
 sub lexReadUTF8( )
 	dim as integer chars
 
-	if sizeof(wstring) = 1 then
+	#if sizeof(wstring) = 1
 		chars = hUTF8ToChar( )
-	elseif sizeof(wstring) = 2 then
+	#elseif sizeof(wstring) = 2
 		chars = hUTF8ToUTF16LE( )
-	else
+	#else
 		chars = hUTF8ToUTF32LE( )
-	end if
+	#endif
 
 	lex.ctx->bufflen = chars
 	lex.ctx->buffptrw = @lex.ctx->buffw
@@ -290,6 +302,7 @@ end sub
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 '':::::
+#if sizeof(wstring) = 1
 private function hUTF16LEToChar( ) as integer static
 	dim as ushort c
 	dim as ubyte ptr dst
@@ -330,8 +343,10 @@ private function hUTF16LEToChar( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 2
 private function hUTF16LEToUTF16LE( ) as integer static
 
 #ifdef __FB_BIGENDIAN__
@@ -367,8 +382,10 @@ private function hUTF16LEToUTF16LE( ) as integer static
 #endif
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF16LEToUTF32LE( ) as integer static
 	dim as ushort c
 	dim as uinteger wc
@@ -410,8 +427,10 @@ private function hUTF16LEToUTF32LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF16LEToUTF32BE( ) as integer static
 	dim as ulong ptr dst
 	dim as uinteger c
@@ -429,18 +448,19 @@ private function hUTF16LEToUTF32BE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
 sub lexReadUTF16LE( ) static
 	dim as integer chars
 
-	if sizeof(wstring) = 1 then
+	#if sizeof(wstring) = 1
 		chars = hUTF16LEToChar( )
-	elseif sizeof(wstring) = 2 then
+	#elseif sizeof(wstring) = 2
 		chars = hUTF16LEToUTF16LE( )
-	else
+	#else
 		chars = hUTF16LEToUTF32LE( )
-	end if
+	#endif
 
 	lex.ctx->bufflen = chars
 	lex.ctx->buffptrw = @lex.ctx->buffw
@@ -452,6 +472,7 @@ end sub
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 '':::::
+#if sizeof(wstring) = 1
 private function hUTF16BEToChar( ) as integer static
 	dim as ushort c
 	dim as ubyte ptr dst
@@ -492,8 +513,10 @@ private function hUTF16BEToChar( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 2
 private function hUTF16BEToUTF16LE( ) as integer static
 	dim as ushort ptr dst
 	dim as ushort c
@@ -519,8 +542,10 @@ private function hUTF16BEToUTF16LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF16BEToUTF32LE( ) as integer static
 	dim as ushort c
 	dim as uinteger wc
@@ -561,25 +586,28 @@ private function hUTF16BEToUTF32LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF16BEToUTF32BE( ) as integer static
 
 	function = hUTF16BEToUTF32LE( )
 
 end function
+#endif
 
 '':::::
 sub lexReadUTF16BE( ) static
 	dim as integer chars
 
-	if sizeof(wstring) = 1 then
+	#if sizeof(wstring) = 1
 		chars = hUTF16BEToChar( )
-	elseif sizeof(wstring) = 2 then
+	#elseif sizeof(wstring) = 2
 		chars = hUTF16BEToUTF16LE( )
-	else
+	#else
 		chars = hUTF16BEToUTF32LE( )
-	end if
+	#endif
 
 	lex.ctx->bufflen = chars
 	lex.ctx->buffptrw = @lex.ctx->buffw
@@ -591,6 +619,7 @@ end sub
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 '':::::
+#if sizeof(wstring) = 1
 private function hUTF32LEToChar( ) as integer static
 	dim as ulong c
 	dim as ubyte ptr dst
@@ -622,8 +651,10 @@ private function hUTF32LEToChar( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 2
 private function hUTF32LEToUTF16LE( ) as integer static
 	dim as ulong c
 	dim as ushort ptr dst
@@ -662,8 +693,10 @@ private function hUTF32LEToUTF16LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF32LEToUTF32LE( ) as integer static
 
 #ifdef __FB_BIGENDIAN__
@@ -699,25 +732,28 @@ private function hUTF32LEToUTF32LE( ) as integer static
 #endif
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF32LEToUTF32BE( ) as integer static
 
 	function = hUTF32LEToUTF32LE( )
 
 end function
+#endif
 
 '':::::
 sub lexReadUTF32LE( )
 	dim as integer chars
 
-	if sizeof(wstring) = 1 then
+	#if sizeof(wstring) = 1
 		chars = hUTF32LEToChar( )
-	elseif sizeof(wstring) = 2 then
+	#elseif sizeof(wstring) = 2
 		chars = hUTF32LEToUTF16LE( )
-	else
+	#else
 		chars = hUTF32LEToUTF32LE( )
-	end if
+	#endif
 
 	lex.ctx->bufflen = chars
 	lex.ctx->buffptrw = @lex.ctx->buffw
@@ -729,6 +765,7 @@ end sub
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 '':::::
+#if sizeof(wstring) = 1
 private function hUTF32BEToChar( ) as integer static
 	dim as ulong c
 	dim as ubyte ptr dst
@@ -760,8 +797,10 @@ private function hUTF32BEToChar( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 2
 private function hUTF32BEToUTF16LE( ) as integer static
 	dim as ulong c
 	dim as ushort ptr dst
@@ -800,8 +839,10 @@ private function hUTF32BEToUTF16LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF32BEToUTF32LE( ) as integer static
 	dim as ulong ptr dst
 	dim as ulong c
@@ -827,25 +868,28 @@ private function hUTF32BEToUTF32LE( ) as integer static
 	function = chars
 
 end function
+#endif
 
 '':::::
+#if sizeof(wstring) = 4
 private function hUTF32BEToUTF32BE( ) as integer static
 
 	function = hUTF32BEToUTF32LE( )
 
 end function
+#endif
 
 '':::::
 sub lexReadUTF32BE( )
 	dim as integer chars
 
-	if sizeof(wstring) = 1 then
+	#if sizeof(wstring) = 1
 		chars = hUTF32BEToChar( )
-	elseif sizeof(wstring) = 2 then
+	#elseif sizeof(wstring) = 2
 		chars = hUTF32BEToUTF16LE( )
-	else
+	#else
 		chars = hUTF32BEToUTF32LE( )
-	end if
+	#endif
 
 	lex.ctx->bufflen = chars
 	lex.ctx->buffptrw = @lex.ctx->buffw
