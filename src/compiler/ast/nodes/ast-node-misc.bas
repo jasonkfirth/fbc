@@ -1034,7 +1034,8 @@ private function hAstNodeToStr _
 		return str( astConstGetInt( n ) ) & NODE_TYPE
 
 	case AST_NODECLASS_VAR
-		return "VAR( " & *iif( n->sym, symbGetName( n->sym ), @"<NULL>" ) & " )" & NODE_TYPE
+		return "VAR( " & *iif( n->sym, cptr( const zstring ptr, symbGetName( n->sym ) ), _
+		                          cptr( const zstring ptr, @"<NULL>" ) ) & " )" & NODE_TYPE
 
 	case AST_NODECLASS_FIELD
 		return "FIELD( " & *symbGetName( n->sym ) & " )" & NODE_TYPE

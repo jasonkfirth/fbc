@@ -1087,7 +1087,7 @@ sub objinfoReadLib( byref libname as string, byval libpaths as TLIST ptr )
 	objinfoReadLibfile( libfile )
 end sub
 
-private function hGetNextString( ) as zstring ptr
+private function hGetNextString( ) as const zstring ptr
 	dim as integer begin = any
 
 	function = @""

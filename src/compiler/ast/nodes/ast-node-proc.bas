@@ -1816,7 +1816,8 @@ private sub hGlobCtorBegin( byval is_ctor as integer )
 
 	'' sub ctorname|dtorname cdecl( ) constructor|destructor
 	proc = symbAddProc( symbPreAddProc( NULL ), symbUniqueLabel( ), _
-	                    iif( is_ctor, @FB_GLOBCTORNAME, @FB_GLOBDTORNAME ), _
+	                    iif( is_ctor, cptr( const zstring ptr, @FB_GLOBCTORNAME ), _
+	                         cptr( const zstring ptr, @FB_GLOBDTORNAME ) ), _
 	                    FB_DATATYPE_VOID, NULL, FB_SYMBATTRIB_PRIVATE, FB_PROCATTRIB_NONE, _
 	                    FB_FUNCMODE_CDECL, FB_SYMBOPT_DECLARING )
 

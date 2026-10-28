@@ -133,7 +133,7 @@ function hFloatToHex_C99 _
 		end if
 	end if
 
-	ret += "p" & (*iif( exp2 >= 0, @"+", @"-" )) + str( abs( exp2 ) )
+	ret += "p" & (*iif( exp2 >= 0, cptr( const zstring ptr, @"+" ), cptr( const zstring ptr, @"-" ) )) + str( abs( exp2 ) )
 
 	return ret
 
