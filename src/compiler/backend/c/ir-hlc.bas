@@ -3827,6 +3827,12 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		dim as longint offset
 		var origin = hCArrayStorageOrigin(n->l, offset)
 		assert(origin <> NULL)
+		'' ARRAYADDR is constructed only for a resolved storage origin.
+		'' Preserve the internal-error path if an invalid tree reaches output.
+		if( origin = NULL ) then
+			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+			exit sub
+		end if
 		ctx.exprtext += "(" + hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE) + ")((" + _
 		                hEmitType(FB_DATATYPE_UINT, NULL) + ")"
 		hExprFlush(origin->l, TRUE)
