@@ -25,6 +25,7 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-intrinsics.bi"
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
@@ -1318,75 +1319,95 @@ function cGfxStmt _
 		byval tk as FB_TOKEN _
 	) as integer
 
-	function = FALSE
+	dim as SEMANTIC_INTRINSIC_SITE semantic_dispatch
+	fbSemanticModelIntrinsicBegin(semantic_dispatch)
+	dim as string semantic_route
+
+	dim as integer res = FALSE
 
 	select case as const tk
 	case FB_TK_PSET
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxPSet( FALSE )
+		semantic_route = "cGfxPSet"
+		res = cGfxPSet( FALSE )
 
 	case FB_TK_PRESET
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxPSet( TRUE )
+		semantic_route = "cGfxPSet"
+		res = cGfxPSet( TRUE )
 
 	case FB_TK_LINE
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxLine( )
+		semantic_route = "cGfxLine"
+		res = cGfxLine( )
 
 	case FB_TK_CIRCLE
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxCircle( )
+		semantic_route = "cGfxCircle"
+		res = cGfxCircle( )
 
 	case FB_TK_PAINT
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxPaint( )
+		semantic_route = "cGfxPaint"
+		res = cGfxPaint( )
 
 	case FB_TK_DRAW
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxDraw( )
+		semantic_route = "cGfxDraw"
+		res = cGfxDraw( )
 
 	case FB_TK_VIEW
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxView( TRUE )
+		semantic_route = "cGfxView"
+		res = cGfxView( TRUE )
 
 	case FB_TK_WINDOW
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxView( FALSE )
+		semantic_route = "cGfxView"
+		res = cGfxView( FALSE )
 
 	case FB_TK_PALETTE
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxPalette( )
+		semantic_route = "cGfxPalette"
+		res = cGfxPalette( )
 
 	case FB_TK_PUT
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxPut( )
+		semantic_route = "cGfxPut"
+		res = cGfxPut( )
 
 	case FB_TK_GET
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxGet( )
+		semantic_route = "cGfxGet"
+		res = cGfxGet( )
 
 	case FB_TK_SCREEN
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxScreen( FALSE )
+		semantic_route = "cGfxScreen"
+		res = cGfxScreen( FALSE )
 
 	case FB_TK_SCREENQB
 		CHECK_CODEMASK( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		function = cGfxScreen( TRUE )
+		semantic_route = "cGfxScreen"
+		res = cGfxScreen( TRUE )
 
 	end select
+
+	fbSemanticModelIntrinsicEnd(semantic_dispatch, "statement", semantic_route, tk, res)
+	function = res
 
 end function
 
@@ -1396,19 +1417,26 @@ function cGfxFunct _
 		byval tk as FB_TOKEN _
 	) as ASTNODE ptr
 
+	dim as SEMANTIC_INTRINSIC_SITE semantic_dispatch
+	fbSemanticModelIntrinsicBegin(semantic_dispatch)
+	dim as string semantic_route
+
 	dim as ASTNODE ptr expr = NULL
 
 	select case tk
 	case FB_TK_POINT
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
+		semantic_route = "cGfxPoint"
 		cGfxPoint( expr )
 
 	case FB_TK_IMAGECREATE
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
+		semantic_route = "cGfxImageCreate"
 		cGfxImageCreate( expr )
 
 	end select
 
+	fbSemanticModelIntrinsicEnd(semantic_dispatch, "function", semantic_route, tk, expr <> NULL, expr)
 	function = expr
 
 end function

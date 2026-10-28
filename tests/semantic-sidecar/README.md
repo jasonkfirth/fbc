@@ -658,7 +658,15 @@ unknown; cloneable checks remain effectful. It compares emitted code and
 runtime behavior, checks ABI/transport/reset/omissions, mutates purity/aliases/
 masks/counts, and links the production selector and serializer into guard tests.
 
-<!-- end of README.md -->
+
+Native intrinsic dispatch tests exercise statement/function, graphics, sound and
+varargs grammar selections, folded and nested results, declined fallback routes,
+rejected inputs, inactive/PP/probe omissions, lookalike names, native/stable ABI,
+all three model modes and text/binary transport. The production collector guard
+checks copied entry state, unchanged AST payload, impossible arguments, the
+100,000-event bound and module reset without reparsing a source fixture.
+
+
 
 
 The reported diagnostic families exercise native syntax, lookup, overload,
@@ -715,3 +723,42 @@ report-only loci for missing includes, native counter/status agreement,
 compact validity records, and corrected-total corruption rejection. Physical
 coordinates remain source observations; rejected-module expressions stay
 provisional even when surrounding syntax parsed successfully.
+
+Native resolution tests exercise native screening and winner confirmation, nested
+constructor/CAST searches, zero-argument and omitted defaults, descriptor rank and
+mode, constant compatibility, property accessors, imports, ambiguity, no-match,
+access denial and binary-operator eligibility. Precision selections keep unknown
+scores explicit. Reduced bindings, inactive and preprocessor paths, rejected
+variadic/AS ANY declarations and ordinary variadic calls are exclusion controls.
+Native/stable ABI, binary/text, module/restart/remap, policy/count corruption and
+runtime evaluation checks accompany a production collector harness with copied
+snapshots, unchanged returns, a million-event limit and 1,024-level nesting.
+The CAST score-band regression is tested from the production transform and by
+an actual conversion through an overloaded call in every export mode.
+
+Resolution context tests require real procedure/formal/type identities and actual
+argument E associations. Same-spelled nested namespace types, overloaded CAST
+return/target subtypes, actual callee B records, reduced graphs, omitted operands,
+failed choices and corrected-total corruption are checked separately from names.
+Physical call bindings receive their actual callee access role. Macro procedure
+references retain their separate existing reference identities and source-call
+node counts; they never become B ordinals. These links do not turn considered
+candidates into executed calls or edit ranges.
+
+Native lookup tests compare compiler diagnostics and emission with tracing off,
+then inspect actual lexical/import/type/enum/keyword probes and returned chains.
+Ambiguous results retain every native alternative. Full/reduced graphs, both type
+ABIs, text/binary transport, module reset and corrected-total corruption have
+separate checks. The production collector guard has no linked name-search or
+chain-pool implementation; it checks unchanged returns, copied names, inactive
+gates, cyclic results and the 1,024-depth/million-event boundaries.
+
+Symbol-filter tests compile the actual four native helper bodies against a
+counting access hook and controlled symbols. They check matching and rejected
+classes/types, first-match access denial, all native string suffix categories,
+full-type versus masked-type behavior, unsuffixed DEF behavior and unchanged
+return values. Source fixtures cover all four filter kinds and seven predicate
+reasons; mode/type ABI/transport/reset and repaired-total corruption are separate
+families. These receipts do not turn considered symbols into executed calls.
+
+<!-- end of README.md -->

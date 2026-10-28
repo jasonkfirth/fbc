@@ -329,7 +329,7 @@ def compile_probes(args, prefix, env):
         raise SystemExit('Amiga object metadata check failed; see logs/objinfo-library.log')
     records = []
     names = ['native-io', 'file-info', 'allocator', 'thread-io', 'thread-exit', 'standard-input',
-                 'graphics', 'image-colours', 'objinfo-reader', 'sound',
+                 'graphics', 'console-colours', 'image-colours', 'objinfo-reader', 'sound',
                  'sound-exit', 'softfloat-convert', 'softfloat-multiply',
                  'softfloat-arithmetic']
     if args.bsdsocket:
@@ -368,11 +368,14 @@ def compile_probes(args, prefix, env):
                 objects.append('-mt')
             if name == 'tcp':
                 objects += ['-g', '-exx']
-            if name in ('graphics', 'sound', 'thread-io', 'file-info', 'allocator'):
+            if name in ('graphics', 'sound', 'thread-io', 'file-info', 'allocator', 'console-colours'):
                 bridge = binaries / (name + '-bridge.o')
                 code = run_command([cc, *cflags, '-c', str(resources / (name + '-bridge.c')),
                                     '-o', str(bridge)], args.output / 'logs' / (name + '-bridge.log'), env=env)
                 objects.append(str(bridge))
+            if name == 'console-colours':
+                objects += ['-Wl', '-Xlinker --wrap=fb_hInit',
+                            '-Wl', '-Xlinker --wrap=fb_hEnd']
             if name == 'allocator' and code == 0:
                 # Qualify failure fallback without exhausting guest memory.
                 # This explicit object also exercises allocator.c directly;

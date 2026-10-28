@@ -1962,6 +1962,186 @@ operations with that owner. Identifier lookalikes and graphics GET/PUT routes
 do not acquire a file-operation classification. These observations describe
 accepted source operations, not runtime success or external effects.
 
+Rejected parser roots can retain an unformattable datatype or a missing nominal
+subtype. `native-expression-recovery` then records the common root snapshot with
+kind `unformattable-type` and the actual exporter guard site. Such a root does
+not become an E record and does not enter the ordinary diagnostic type formatter.
+This preserves native diagnostics and avoids inventing a normalized type from
+recovery bits. Other observations in the rejected statement remain provisional.
+
+Native overload and access explanations
+
+Full and expression models advertise `native-overload-explanations` as available.
+Bindings models advertise it as unavailable. This capability covers the native
+`symbFindClosestOvlProc` and nonempty `symbFindCastOvlProc` searches, plus actual
+`symbCheckAccess` and `symbCheckAccessStruct` returns. It does not claim a complete
+lexical or prototype lookup trace.
+
+Module metadata `native-resolution:<ordinal>` forms a dense native event stream.
+The value's first tab-separated field identifies the event. Scope and candidate
+IDs are local to this module and this attempt. Names and owner names are copied
+hints rather than invented S identities; candidates are not call, binding or
+effect records. No pointer is retained or used later to reconstruct a decision.
+The source point is the lexer's last consumed token at observation time. A zero
+ST means no current parser statement; that point is not a certified callee extent.
+
+```
+begin     scope parent-scope parent-candidate kind args options requested-type ST CFG SRC point[7] symbol[8]
+candidate scope candidate ordinal pass symbol[8]
+argument  scope candidate ordinal score reason argument-mode parameter-mode optional dimensions parameter-type parameter-subtype argument-present argument-class argument-type argument-subtype parameter-name
+score     scope candidate score matches exact-count-known exact-count effective-parameters reason native-error-code
+rank      scope candidate action maximum-score tied-best-count current-choice
+end       scope choice confirmation maximum-score tied-best-count native-error-code returned-procedure
+access    scope candidate route allowed ST CFG point[7] symbol[8]
+```
+
+A symbol snapshot has presence, raw native class, datatype, attributes, procedure
+attributes, declared parameter count, inner-escaped name and inner-escaped owner
+name. Only procedure symbols have a nonnegative parameter count. An absent
+snapshot uses class zero, the invalid datatype sentinel, zero attributes,
+parameter count -1 and empty names. A point has inner-escaped filename, source
+context, displayed line/column, raw line/column and physical flag. Nonphysical
+points keep raw coordinates zero. Datatype bits follow the selected type ABI.
+The flag describes the lexer's raw origin, not edit eligibility. A direct token
+under `#line` can retain its physical root SRC and raw line while displaying a
+logical filename/line. Such a point does not certify a B/E/ST edit range.
+
+Kinds are `closest`, `cast` and `cast-precision`. Passes are `screen`, `confirm`,
+`cast` and `precision`. The native closest resolver screens the real chain and
+then confirms its proposed winner. Both passes are preserved, including nested
+constructor and CAST searches; the observer does not rerun either pass. Candidate
+order is observation order, including those nested searches. Exact counts that
+the native argument-count gate did not initialize have known=false and value -1.
+Property getter/setter filtering is recorded separately from parameter mismatch.
+
+Argument reasons distinguish omitted optional/required values, descriptor
+mode/type/rank checks, BYREF rules, constant compatibility, constructor/CAST
+conversion, enum mismatch and ordinary type differences. Trailing optional or
+required parameters were inspected without a native argument score: their score
+is -1, argument mode -1 and argument root absent. Their ordinals are the native
+loop positions. After an earlier mismatch the native trailing loop can inspect
+the still-current formal; the snapshot preserves that actual formal. Precision
+CAST selection also has score -1, with an observed better/skip branch instead of
+a fabricated conversion score. Ranking distinguishes better, tied, inferior,
+rejected and binary-operator-ineligible candidates. Access checks retain the
+actual allowed result and `member` or `type-chain` route, including checks made
+after an overload resolver returned. A local returned procedure does not prove
+that later access/argument checks passed or that the call executes.
+
+Every available module has `native-resolution-policy`: native minor scale,
+type-match score, full-match score, maximum nesting depth and event limit. These
+ranking constants remain native under stable-v1 datatype encoding; expression
+models need them even though they omit the primitive Y table. Mandatory
+`native-resolution-counts` has event, scope-open, scope-close, candidate, score,
+argument, rank and access counts, followed by remaining scope depth. Accepted
+modules must close every scope and candidate. Rejected modules can retain an
+explicit unfinished stack. Reset and discarded parser attempts restart IDs.
+Publication fails rather than dropping events at the 1,024-depth or 1,000,000-event
+bounds. Lexer probes, PP expression evaluation and disabled exports add no facts.
+
+The CAST conversion-score remap now subtracts HALFMATCH from that score band
+before adding CONVMATCH. The previous TYPEMATCH subtraction turned a valid exact
+half-match conversion into NO_MATCH. Boundary checks and actual overloaded calls
+with export off/full/expression/bindings verify the corrected choice and one-time
+conversion evaluation. Variadic or AS ANY overload declarations that the native
+compiler rejects do not acquire considered candidates; ordinary variadic calls
+retain their existing call-argument semantics without invented overload scoring.
+
+Native resolution identity contexts
+
+`native-resolution-contexts` is available in full and expression models and
+unavailable in bindings models. Each `begin`, `candidate`, `argument`, `end` and
+`access` event has one `native-resolution-context:<event-ordinal>` module value:
+
+```
+subject-SID left-type-SID right-type-SID argument-E-ID left-type[8] right-type[8]
+```
+
+The two type payloads use the same copied symbol-snapshot layout as native
+resolution events. For `begin`, left describes the head procedure's return
+subtype and right describes the requested CAST subtype. For `candidate`, left
+is that procedure's return subtype. For `argument`, subject is the actual formal,
+left is its nominal subtype and right is the argument's actual subtype. For
+`access`, subject is the checked symbol and left its subtype. For `end`, subject
+is the actual returned procedure and left its return subtype; failed searches
+have no returned subject. Other right-type positions are explicitly absent.
+
+Full models use the existing S identity registry, including its nominal and
+lexical parent closure. Same-spelled nominal types and overloads therefore stay
+distinct without joining by hints. Expression models retain copied type payloads
+with all three unavailable S references zero. Argument E references copy an
+existing parser association; no new E record is forced for a synthesized,
+omitted or already-erased operand. No native pointer survives the callback.
+
+The overloaded call parser also emits `native-resolution-use:<scope-ID>` after
+its actual closest-procedure search. Its twelve fields are site presence,
+inner-escaped filename, SRC, displayed start line/column and end line/column,
+raw-origin-valid flag, and raw start line/column and end line/column. A missing
+site has no invented coordinates. A present site is a copied parser input,
+separate from edit eligibility. Rejected searches retain their source attempt.
+
+If the parser actually exports a callee B record, full models additionally have
+`native-resolution-bound-use:<scope-ID>` whose value is that existing B ordinal.
+It must name the procedure returned by the native search. This does not declare
+that later argument construction succeeded or the call executes. Expression
+models publish no unavailable callee bindings. A generated callee uses
+`native-resolution-macro-use:<scope-ID>` instead: its positive value is the
+existing macro reference ordinal, tied to the returned procedure's macro origin.
+It is never reinterpreted as a B ordinal or an editable location. The existing
+source-call macro node/count contract remains unchanged. Mandatory
+`native-resolution-context-counts` closes context, parser-use and total bound-use
+(B or macro reference) counts,
+including zero. Direct non-overloaded calls and resolver routes outside this
+parser entry point do not acquire fabricated overload-use receipts.
+
+Native intrinsic dispatch observations
+
+The `native-intrinsic-dispatch` capability is available in every model mode.
+Module metadata `native-intrinsic-dispatch:<ordinal>` records the actual switch
+arm entered by `cQuirkStmt`, `cQuirkFunction`, and their sound/graphics dispatchers.
+Ordinals count completed callbacks, so nested functions finish before an
+outer intrinsic or PRINT statement. The mandatory `native-intrinsic-dispatch-count`
+includes zero and resets with each module and discarded parser attempt.
+
+The metadata value contains 26 tab-separated fields:
+
+```
+kind route token accepted errors-before errors-after outcome ST CFG
+root-present raw-AST-class datatype
+entry-point[7] last-consumed-token-point[7]
+```
+
+`kind` is `statement` or `function`; `route` names the native grammar routine
+selected by that switch arm. `token` is the raw native token ID, including the
+ASCII question mark used for PRINT. Each point contains inner-escaped filename,
+source context, displayed line/column, physical line/column and physical flag.
+These are observed points rather than a certified expression extent. The entry
+point is copied from the already-fetched lexer token without another token query
+or identifier-hint capture. Generated and remapped points retain their native
+physical policy.
+
+`accepted` copies the native nonzero statement return or nonnull function root.
+`outcome` is `recovered` when the native error counter increased, otherwise
+`accepted` or `declined` according to that return. LINE, VIEW, GET and PUT can
+first decline a nongraphics grammar and then select their graphics grammar.
+Those are separate observations. A later enclosing expression or statement can
+still fail after an intrinsic locally returned without errors. Neither local
+acceptance nor a returned root proves runtime success or execution.
+
+Function snapshots copy only the common AST class and unsigned datatype bits;
+the datatype follows the selected native/stable-v1 ABI. Statement observations
+have no retained root. An absent root uses class zero and the invalid datatype
+sentinel. There is no retained AST pointer, invented E/N identity, implicit
+source binding, or effect inference. Folded intrinsic results therefore remain
+observable even when no runtime call survives. Preprocessor evaluation, lexer
+probes, inactive code, unselected fallthrough and ordinary identifier lookalikes
+produce no dispatch facts. The module fails publication when another observation would exceed 100,000
+rather than silently truncating coverage.
+
+This capability covers the named dispatchers. Source operations handled by
+other grammar entry points still require their own records; this is not a claim
+that the entire G12 source-operation inventory is complete.
+
 Full and expression-only models advertise `source-va-list-operations` as
 available. Bindings-only models advertise it as unavailable. After the parser
 accepts a C vararg macro, an `EX` record with family `runtime-macro` records one
@@ -5050,5 +5230,90 @@ call/operation receipts against every actual IR action. It rejects invented
 runtime provenance, mismatched masks/names, false indirect purity, fabricated
 alias precision and repaired-count omissions. Reduced modes advertise
 unavailable effect coverage and omit these receipts.
+
+### Native name lookup
+
+Full and expression models advertise `native-name-lookups`. Binding models mark
+it unavailable. Module metadata `native-lookup:<ordinal>` copies the actual
+unqualified/qualified name search, including unsuccessful hash probes, keyword
+and macro precedence, lexical and namespace imports, type/base/enum precedence,
+and the returned native chain. A returned chain can retain several ambiguous
+symbols; it does not identify a selected call or a reference binding.
+
+The dense event stream has these tab-separated values:
+
+* `begin`: kind, search ID, parent ID, `unqualified|qualified`, original spelling,
+  preserve-case flag, import-search flag, ST, CFG, SRC, last-consumed file/line/
+  column, namespace snapshot.
+* `probe|decision`: kind, search ID, combined per-search step ordinal, native
+  phase or precedence reason, namespace snapshot, result-symbol snapshot.
+* `result`: kind, search ID, chain ordinal, native import flag, symbol snapshot.
+* `end`: kind, search ID, native token, native token class, result count, return
+  route. Qualified searches use -1 for both unavailable token outputs.
+
+A snapshot contains presence, native symbol class, dtype, attributes, procedure
+attributes, name, owner name and existing S identity. Null snapshots use class 0,
+invalid dtype 2147483648, zero attributes/identity and empty names. Expression
+models retain copied facts and use zero S identities. The snapshot reads common
+symbol fields, so it does not assume that a symbol being lexed has a finalized
+procedure or declaration payload.
+
+The begin point is the last consumed lexer position. Lookup also runs while the
+lexer fills a token or performs lookahead, so this point is not an editable range
+for the queried identifier. The collector does not request a token, repeat a
+lookup, allocate a chain-pool slot, retain a native pointer, or modify a result.
+Copied chain nodes remain valid evidence after the native pool is reused.
+
+`native-lookup-counts` closes events, begins, ends, probes, decisions, returned
+nodes and open depth. Each module resets the counters. Searches are limited to
+1,024 nested scopes and one million events, names to 65,536 bytes, and each result
+chain to the native 4,096-slot pool size. The independent reader checks ownership,
+step/chain order, route vocabulary, absent results and count closure. The
+production guard links the collector without a native lookup implementation and
+checks unchanged pointers, copied names, inactive preprocessing/probe gates,
+cycle termination and the depth/event boundaries.
+
+Name-search receipts remain separate from symbol-filter receipts and do not
+claim coverage of prototype comparison.
+
+### Native symbol filters
+
+`native-symbol-filters` is available in full and expression models and unavailable
+in bindings models. It observes the four native filters for class, class and full
+type, suffix, and default type. It consumes the existing chain and same-name hash
+order. It does not repeat name lookup or add access checks.
+
+Module metadata `native-symbol-filter:<ordinal>` has these tab-separated values:
+
+* `begin`: kind, scope ID, parent ID, filter kind, requested class, requested
+  datatype, ST, CFG, SRC, chain presence, head snapshot.
+* `candidate`: kind, scope ID, candidate ordinal, native match flag, predicate
+  reason, symbol snapshot. The combined ordinal follows the actual native
+  traversal across chain nodes and same-name hash links.
+* `access`: kind, scope ID, candidate ordinal, actual native allowed flag.
+* `end`: kind, scope ID, selected candidate ordinal or zero,
+  `selected|denied|not-found`, returned-symbol snapshot.
+
+Snapshots use the eight-field common-symbol format described for name lookup.
+The collector returns the original predicate/access integer and symbol pointer.
+An inaccessible first match ends the native search; a later accessible symbol
+does not become a fallback selection. A candidate is considered only once and a
+matched variable requires its actual access check before selection can close.
+
+The native suffix string branch accepts dynamic strings, USTRING, fixed strings
+and ZSTRING characters using the datatype-and-pointer mask. The native default
+string branch compares the full datatype for a suffixed symbol. An unsuffixed
+declaration retains its declaration type under DEF rules. These distinct paths
+are preserved in the predicate reason, rather than normalized to one string or
+default-type rule.
+
+`native-symbol-filter-policy` contains the native datatype/pointer mask,
+suffixed-attribute bit and four string datatypes under the selected type ABI.
+`native-symbol-filter-counts` closes event, begin, end, candidate, access and open
+depth counts. The collector limits nesting to 1,024 and events to one million.
+Its frames retain scalar receipts only. The reader checks actual traversal,
+copied predicate inputs, access closure, selected identities and module ownership.
+Prototype comparison and explicit name-search/filter/call causal links remain
+separate required work.
 
 <!-- end of compiler-semantic-model.md -->

@@ -272,4 +272,23 @@ diagnostics/error.bas	ERRPARAMLOCATION	paramnum	exported	K,DP	G38	Native user pa
 diagnostics/error.bas	ERRPARAMLOCATION	paramid	exported	K,DP	G38,G51	Provided parameter spelling copied while live and escaped independently within nested K groups.
 diagnostics/error.bas	FBWARNING	level	exported	K,DC	G38	The reporter copies its selected catalog warning level separately from the configured warning threshold.
 tooling/semantic-constructs.bas	SEMANTIC_SOURCE_STATEMENT	errors_at_begin	exported	K	G39,G40	Native error count at the observed statement opening; separate from the grammar caller comparison baseline and terminal status.
+tooling/semantic-intrinsics.bi	SEMANTIC_INTRINSIC_SITE	enabled	bookkeeping		G12,G46	Inactive/probe/preprocessor gate; no source operation is inferred from a disabled callback.
+tooling/semantic-intrinsics.bi	SEMANTIC_INTRINSIC_SITE	errors_before	exported	K	G12,G39	Copied native error baseline distinguishes a successful local grammar return from error recovery.
+tooling/semantic-intrinsics.bi	SEMANTIC_INTRINSIC_SITE	statement	exported	K	G10,G12	Actual native statement at intrinsic parser entry, including explicit zero when outside a statement.
+tooling/semantic-intrinsics.bi	SEMANTIC_INTRINSIC_SITE	configuration	exported	K	G07,G12	Selected configuration at intrinsic parser entry; bindings and compact expression modes retain their explicit zero policy.
+tooling/semantic-intrinsics.bi	SEMANTIC_INTRINSIC_SITE	source	exported	K	G03,G12	Copied already-fetched entry token source; does not turn a generated/remapped point into an editable range.
+tooling/semantic-resolution.bas	SEMANTIC_RESOLUTION_FRAME	identity	exported	K	G49,G41	Module-owned native resolver attempt identity, with actual nesting and no retained pointer.
+tooling/semantic-resolution.bas	SEMANTIC_RESOLUTION_FRAME	candidate	exported	K	G49	Actual open scoring attempt, also used as the parent of nested conversion searches.
+tooling/semantic-resolution.bas	SEMANTIC_RESOLUTION_FRAME	candidates	exported	K	G49	Native candidate-attempt order, including the separate winner confirmation pass.
+tooling/semantic-resolution.bas	SEMANTIC_RESOLUTION_FRAME	pending_rank	bookkeeping		G46,G49	Enforce score-before-rank callback closure without selecting a candidate.
+tooling/semantic-resolution.bas	SEMANTIC_RESOLUTION_FRAME	chosen	exported	K	G49	Copied current native ranking choice, distinct from the final returned result and execution.
+tooling/semantic-resolution.bas	SEMANTIC_RESOLUTION_FRAME	scored	bookkeeping		G46,G49	Most recently closed scoring callback, checked against a supplied confirmation identity; no native symbol or AST pointer is retained.
+tooling/semantic-resolution.bas	SEMANTIC_RESOLUTION_FRAME	confirmation	exported	K	G49	Identifies the actual confirmation pass, which has no additional screening rank event.
+tooling/semantic-lookup.bas	SEMANTIC_LOOKUP_FRAME	identity	exported	K	G49,G41	Module-owned native name-search identity and actual nesting; no retained native pointer.
+tooling/semantic-lookup.bas	SEMANTIC_LOOKUP_FRAME	ordinal	exported	K	G49	Combined order of actual hash probes and precedence decisions in this native search.
+tooling/semantic-filters.bas	SEMANTIC_FILTER_FRAME	identity	exported	K	G49,G41	Module-owned native symbol-filter attempt and actual nesting; no retained pointer.
+tooling/semantic-filters.bas	SEMANTIC_FILTER_FRAME	ordinal	exported	K	G49	Actual candidate order across native chain and same-name hash traversal.
+tooling/semantic-filters.bas	SEMANTIC_FILTER_FRAME	matched	exported	K	G49	Copied native class/suffix/default-type predicate result; the observer returns the original value.
+tooling/semantic-filters.bas	SEMANTIC_FILTER_FRAME	variable	bookkeeping		G46,G49	Scalar guard requiring a real variable access result before a variable selection can close.
+tooling/semantic-filters.bas	SEMANTIC_FILTER_FRAME	access_result	exported	K	G49	Actual native access result, including its unknown state before the native check runs.
 # end of semantic-sidecar-field-coverage.rules.tsv

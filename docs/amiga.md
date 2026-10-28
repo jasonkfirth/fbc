@@ -1529,3 +1529,34 @@ Maintained ordinary and multithreaded graphics tests cover dominant UI colours,
 rare colour bands, unchanged-row remapping, and all previous palette/input/page/
 window checks. Both baseline variants reproduce the UI failure and both updated
 variants pass. The unchanged GIF cases still retain all 247 displayed colours.
+
+
+### Native text-console colours and dimensions
+
+BASIC's DOS RGBI colour indices differ from Amiga console pen indices. The
+runtime now queries the active CON: window and selects its closest existing
+screen pens. Black and white remain exact on the stock four-pen Workbench
+screen; colours absent from that palette remain approximations. Logical COLOR
+return values are retained, and the public screen palette is unchanged.
+
+Console dimensions and cursor positions come from the actual console unit.
+For example, the tested 640x200 window with the stock font has 61 columns and 20
+rows, rather than the old hardcoded 80x25. Resizing refreshes the cell buffers
+and keeps cached coordinates within their new bounds.
+
+AmigaOS V36 and later erase commands use a separate window background. CLS
+therefore clears character cells with wrapping temporarily disabled, preserving
+the current BASIC background, VIEW PRINT boundaries, cursor, wrapping mode and
+borrowed window theme. This fixes Clumsier's black-on-white body and preserves
+its footer without changing the editor source.
+
+The maintained `console-colours` probe owns a real isolated CON: window. It
+checks geometry, logical colour returns, actual RGB text and blank cells,
+partial/final-row clears, wrap/cursor preservation, reordered palette pens and
+a genuine window shrink. Ordinary and MT baselines fail; both updated variants
+pass. All 17 native probes and the original fgConvertFBC/Library Master console
+workflows also pass with the updated runtime.
+
+Native packet and control-sequence contracts are described in the official
+[AmigaDOS packet documentation](https://wiki.amigaos.net/wiki/AmigaDOS_Packets)
+and [console control sequences](https://wiki.amigaos.net/wiki/AmigaOS_Manual:_Control_Sequences).

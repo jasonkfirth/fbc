@@ -44,11 +44,15 @@ function fbSemanticModelRecoveryNode( byval node as ASTNODE ptr, _
 		return node
 	end if
 	select case kind
-	case "replacement-constant", "replacement-zero", "retained-prefix", "replacement-expression"
+	case "replacement-constant", "replacement-zero", "retained-prefix", "replacement-expression", "unformattable-type"
 	case else
 		fbSemanticModelFailAt("unknown native expression recovery kind")
 		return node
 	end select
+	if( (kind = "unformattable-type") and (node = NULL) ) then
+		fbSemanticModelFailAt("unformattable recovery type has no root")
+		return node
+	end if
 
 	dim as integer root_class = 0
 	dim as longint dtype = FB_DATATYPE_INVALID

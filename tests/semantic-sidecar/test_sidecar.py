@@ -5965,6 +5965,158 @@ Next
         from declaration_recovery import check_transport_and_corruption
         check_transport_and_corruption(self)
 
+    def test_native_symbol_filters_production_helpers_preserve_selection_access_and_type_rules(self) -> None:
+        from filters import check_guards
+        check_guards(self)
+
+    def test_native_symbol_filters_preserve_class_suffix_and_default_type_decisions(self) -> None:
+        from filters import check_classes
+        check_classes(self)
+
+    def test_native_symbol_filters_preserve_modes_type_abis_transport_and_module_reset(self) -> None:
+        from filters import check_modes
+        check_modes(self)
+
+    def test_native_symbol_filters_reject_missing_and_impossible_selections(self) -> None:
+        from filters import check_corruption
+        check_corruption(self)
+
+    def test_native_symbol_filters_preserve_rejected_access_types_and_suffixes(self) -> None:
+        from filters import check_rejections
+        check_rejections(self)
+
+    def test_native_name_lookup_production_guards_preserve_chains_and_bounds(self) -> None:
+        from lookup import check_guards
+        check_guards(self)
+
+    def test_native_name_lookup_preserves_forward_type_and_redefined_macro_lifetimes(self) -> None:
+        from lookup import check_lifetimes
+        check_lifetimes(self)
+
+    def test_native_name_lookup_preserves_lexical_import_type_and_enum_precedence(self) -> None:
+        from lookup import check_precedence
+        check_precedence(self)
+
+    def test_native_name_lookup_retains_ambiguity_without_inventing_selection(self) -> None:
+        from lookup import check_ambiguity
+        check_ambiguity(self)
+
+    def test_native_name_lookup_preserves_keyword_macro_shadow_and_qb_quirks(self) -> None:
+        from lookup import check_keywords
+        check_keywords(self)
+
+    def test_native_name_lookup_preserves_modes_abis_transport_and_module_reset(self) -> None:
+        from lookup import check_modes
+        check_modes(self)
+
+    def test_native_name_lookup_rejects_missing_and_impossible_search_results(self) -> None:
+        from lookup import check_corruption
+        check_corruption(self)
+
+    def test_native_resolution_contexts_link_actual_symbols_parameters_expressions_and_callees(self) -> None:
+        from resolution_contexts import check_symbols
+        check_symbols(self)
+
+    def test_native_resolution_contexts_distinguish_nominal_types_and_cast_targets(self) -> None:
+        from resolution_contexts import check_nominal
+        check_nominal(self)
+
+    def test_native_resolution_contexts_preserve_reduced_omitted_and_rejected_states(self) -> None:
+        from resolution_contexts import check_reduced
+        check_reduced(self)
+
+    def test_native_resolution_contexts_preserve_macro_domains_abis_transport_and_repeated_modules(self) -> None:
+        from resolution_contexts import check_macro_and_transport
+        check_macro_and_transport(self)
+
+    def test_native_resolution_contexts_reject_forged_or_missing_graph_links(self) -> None:
+        from resolution_contexts import check_corruption
+        check_corruption(self)
+
+    def test_native_resolution_production_guards_preserve_returns_lifetimes_and_bounds(self) -> None:
+        from resolution import check_guards
+        check_guards(self)
+
+    def test_native_resolution_records_actual_scores_defaults_descriptors_and_conversions(self) -> None:
+        from resolution import check_matches
+        check_matches(self)
+
+    def test_native_resolution_preserves_ambiguity_no_match_and_access_denial(self) -> None:
+        from resolution import check_rejections
+        check_rejections(self)
+
+    def test_native_resolution_excludes_inactive_probe_lookalike_and_reduced_bindings(self) -> None:
+        from resolution import check_exclusions
+        check_exclusions(self)
+
+    def test_native_resolution_preserves_modes_type_abis_binary_transport_and_module_reset(self) -> None:
+        from resolution import check_transport
+        check_transport(self)
+
+    def test_native_resolution_rejects_incomplete_and_incoherent_explanations(self) -> None:
+        from resolution import check_corruption
+        check_corruption(self)
+
+    def test_native_resolution_preserves_operator_eligibility_without_executing_candidates(self) -> None:
+        from resolution import check_operator_eligibility
+        check_operator_eligibility(self)
+
+    def test_native_resolution_preserves_parameter_mode_type_and_omission_rejections(self) -> None:
+        from resolution import check_parameter_branches
+        check_parameter_branches(self)
+
+    def test_native_resolution_preserves_remapped_context_and_discards_restarted_attempts(self) -> None:
+        from resolution import check_contexts
+        check_contexts(self)
+
+    def test_native_resolution_preserves_byte_safe_source_names(self) -> None:
+        from resolution import check_source_bytes
+        check_source_bytes(self)
+
+    def test_native_resolution_cast_score_bands_preserve_nonzero_conversion_matches(self) -> None:
+        from resolution import check_cast_bands
+        check_cast_bands(self)
+
+    def test_native_resolution_cast_conversion_selects_and_evaluates_once(self) -> None:
+        from resolution import check_cast_runtime
+        check_cast_runtime(self)
+
+    def test_native_resolution_preserves_runtime_choice_and_argument_evaluation(self) -> None:
+        from resolution import check_runtime
+        check_runtime(self)
+
+    def test_native_intrinsic_dispatch_production_guards_preserve_values_and_bounds(self) -> None:
+        from intrinsic_dispatch import check_guards
+        check_guards(self)
+
+    def test_native_intrinsic_dispatch_covers_statement_function_graphics_and_sound_routes(self) -> None:
+        from intrinsic_dispatch import check_routes
+        check_routes(self)
+
+    def test_native_intrinsic_dispatch_excludes_inactive_probe_and_lookalike_uses(self) -> None:
+        from intrinsic_dispatch import check_exclusions
+        check_exclusions(self)
+
+    def test_native_intrinsic_dispatch_recovery_does_not_format_unresolved_types(self) -> None:
+        from intrinsic_dispatch import check_unformattable
+        check_unformattable(self)
+
+    def test_native_intrinsic_dispatch_preserves_nested_order_modes_abi_and_binary_transport(self) -> None:
+        from intrinsic_dispatch import check_transport
+        check_transport(self)
+
+    def test_native_intrinsic_dispatch_preserves_byte_safe_source_names(self) -> None:
+        from intrinsic_dispatch import check_source_bytes
+        check_source_bytes(self)
+
+    def test_native_intrinsic_dispatch_preserves_runtime_evaluation_and_erased_branches(self) -> None:
+        from intrinsic_dispatch import check_runtime
+        check_runtime(self)
+
+    def test_native_intrinsic_dispatch_rejects_incomplete_and_impossible_receipts(self) -> None:
+        from intrinsic_dispatch import check_rejection
+        check_rejection(self)
+
     def test_native_source_validity_preserves_reported_failure_boundaries(self) -> None:
         from source_validity import check_regions
         check_regions(self)

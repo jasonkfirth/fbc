@@ -29,6 +29,7 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-recovery.bi"
+#include once "tooling/semantic-resolution.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -423,6 +424,8 @@ private function hOvlProcArgList _
 	                                       arg_list->head ), _
 	                                  @err_num, _
 	                                  find_options )
+	dim as longint semantic_resolution = fbSemanticModelLastResolution( )
+	fbSemanticModelResolutionUse(semantic_resolution, semantic_site)
 
 	if( ovlproc = NULL ) then
 		symbFreeOvlCallArgs( @parser.ovlarglist, arg_list )
@@ -485,6 +488,7 @@ private function hOvlProcArgList _
 	end if
 
 	semantic_binding = hExportCalleeBinding(proc, base_parent, arg_list, semantic_site)
+	fbSemanticModelResolutionBoundUse(semantic_resolution, semantic_binding)
 	procexpr = astNewCALL( proc, procexpr )
 	if( procexpr <> NULL ) then
 		procexpr->semantic_binding = semantic_binding

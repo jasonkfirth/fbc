@@ -25,6 +25,9 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-resolution.bi"
+#include once "tooling/semantic-lookup.bi"
+#include once "tooling/semantic-filters.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-link.bi"
@@ -1074,6 +1077,7 @@ private function hLookupImportList _
 				id, _
 				index _
 			)
+		fbSemanticModelLookupProbe("import-list", symbGetImportNamespc(imp_), sym)
 
 		if( sym <> NULL ) then
 			chain_ = chainpoolNext()
@@ -1096,6 +1100,7 @@ private function hLookupImportList _
 				add = TRUE
 			end if
 
+			fbSemanticModelLookupDecision(iif(add, "import-accepted", "nonparent-import-rejected"), symbGetImportNamespc(imp_), sym)
 			if( add = TRUE ) then
 				chain_->sym = sym
 				chain_->next = NULL
@@ -1141,6 +1146,7 @@ private function hLookupActiveEnumImports _
 			if( (enum_ <> NULL) andalso _
 			    (symbGetType( enum_ ) = FB_DATATYPE_ENUM) andalso _
 			    (symbGetParent( enum_ ) = current_ns) ) then
+				fbSemanticModelLookupDecision("active-enum-member", current_ns, import_->sym)
 				dim as FBSYMCHAIN ptr match = chainpoolNext( )
 				match->sym = import_->sym
 				match->next = NULL
@@ -1180,6 +1186,7 @@ private function hLookupActiveEnumImports _
 			if( (enum_ <> NULL) andalso _
 			    (symbGetType( enum_ ) = FB_DATATYPE_ENUM) andalso _
 			    (symbGetParent( enum_ ) = hashtb->owner) ) then
+				fbSemanticModelLookupDecision("active-hash-enum-member", hashtb->owner, import_->sym)
 				dim as FBSYMCHAIN ptr match = chainpoolNext( )
 				match->sym = import_->sym
 				match->next = NULL
@@ -1223,19 +1230,23 @@ private function hsymbLookupNS _
 	hashtb = symb.hashlist.tail
 	do
 		sym = hashLookupEx( @hashtb->tb, id, index )
+		fbSemanticModelLookupProbe("lexical", hashtb->owner, sym)
 		while( sym )
 			'' return if it's not the global ns (as in C++, any nested
 			'' symbol has precedence over any imported one, even if the
 			'' latter was imported in the current ns)
 			if( hashtb->owner <> @symbGetGlobalNamespc( ) ) then
+				fbSemanticModelLookupDecision("lexical-selected", hashtb->owner, sym)
 				return symbNewChainpool( sym )
 			else
 				'' also if we are at the global ns, no need to check the imports
 				if( symbGetCurrentNamespc( ) = @symbGetGlobalNamespc( ) ) then
+					fbSemanticModelLookupDecision("global-selected", hashtb->owner, sym)
 					return symbNewChainpool( sym )
 				else
 					if( first_ancestor = NULL ) then
 						first_ancestor = sym
+						fbSemanticModelLookupDecision("defer-global-ancestor", hashtb->owner, sym)
 					end if
 				end if
 			end if
@@ -1246,6 +1257,9 @@ private function hsymbLookupNS _
 
 	'' imports?
 	imp_chain = hashLookupEx( @symb.imphashtb, id, index )
+	dim as FBSYMBOL ptr semantic_import = NULL
+	if( imp_chain <> NULL ) then semantic_import = imp_chain->sym
+	fbSemanticModelLookupProbe("unqualified-imports", NULL, semantic_import)
 	if( imp_chain <> NULL ) then
 
 		''
@@ -1256,21 +1270,25 @@ private function hsymbLookupNS _
 		''
 		chain_ = hLookupActiveEnumImports( imp_chain )
 		if( chain_ <> NULL ) then
+			fbSemanticModelLookupDecision("active-enum-selected", NULL, chain_->sym)
 			return chain_
 		end if
 
 		if( first_ancestor ) then
 			chain_ = symbNewChainpool( first_ancestor )
 			chain_->next = imp_chain
+			fbSemanticModelLookupDecision("ancestor-before-imports", NULL, first_ancestor)
 			return chain_
 		end if
 
 		'' No ancestor? Just return the imports.
+		fbSemanticModelLookupDecision("imports-returned", NULL, imp_chain->sym)
 		return imp_chain
 	end if
 
 	'' no imports? return only the first ancestor (if we already found it)
 	if( first_ancestor ) then
+		fbSemanticModelLookupDecision("ancestor-selected", NULL, first_ancestor)
 		return symbNewChainpool( first_ancestor )
 	end if
 
@@ -1299,13 +1317,16 @@ private function hsymbLookupTypeNS _
 	hashtb = symb.hashlist.tail
 	do
 		sym = hashLookupEx( @hashtb->tb, id, index )
+		fbSemanticModelLookupProbe("type-locals", hashtb->owner, sym)
 		while( sym )
 			if( symbIsLocal( sym ) ) then
 				'' but only if it's not main scoped local
 				if( symbGetScope( sym ) > FB_MAINSCOPE ) then
+					fbSemanticModelLookupDecision("local-selected", hashtb->owner, sym)
 					return symbNewChainpool( sym )
 				end if
 			end if
+			fbSemanticModelLookupDecision("local-pass-skipped", hashtb->owner, sym)
 			sym = sym->hash.next
 		wend
 		hashtb = hashtb->prev
@@ -1316,10 +1337,12 @@ private function hsymbLookupTypeNS _
 
 	'' search in UDT's (TYPE or CLASS) hash tb first
 	sym = hashLookupEx( @symbGetCompHashTb( ns ).tb, id, index )
+	fbSemanticModelLookupProbe("type-own", ns, sym)
 
 	'' don't access locals in a TYPE's namespace
 	while( sym )
 		if( symbIsLocal( sym ) ) then
+			fbSemanticModelLookupDecision("skip-type-local", ns, sym)
 			sym = sym->hash.next
 		else
 			exit while
@@ -1329,6 +1352,7 @@ private function hsymbLookupTypeNS _
 	'' Found the symbol in the type's namespace?
 	if( sym ) then
 		chain_ = symbNewChainpool( sym )
+		fbSemanticModelLookupDecision("type-own-selected", ns, sym)
 		return chain_
 	end if
 
@@ -1350,6 +1374,7 @@ private function hsymbLookupTypeNS _
 				select case symbGetType( parent )
 				case FB_DATATYPE_STRUCT ', FB_DATATYPE_CLASS
 					if( symbGetUDTBaseLevel( ns, parent ) > 0 ) then
+						fbSemanticModelLookupDecision("base-member-selected", parent, chain_->sym)
 						return symbNewChainpool( chain_->sym )
 					end if
 				case FB_DATATYPE_ENUM
@@ -1358,6 +1383,7 @@ private function hsymbLookupTypeNS _
 					'' into that UDT.  Imports are copied through the base
 					'' hierarchy, so their elements are inherited members.
 					''
+					fbSemanticModelLookupDecision("inherited-enum-selected", parent, chain_->sym)
 					return symbNewChainpool( chain_->sym )
 				end select
 				sym = sym->hash.next
@@ -1373,7 +1399,9 @@ private function hsymbLookupTypeNS _
 	hashtb = symb.hashlist.tail
 	do
 		sym = hashLookupEx( @hashtb->tb, id, index )
+		fbSemanticModelLookupProbe("type-fallback", hashtb->owner, sym)
 		if( sym ) then
+			fbSemanticModelLookupDecision("type-fallback-selected", hashtb->owner, sym)
 			return symbNewChainpool( sym )
 		end if
 		hashtb = hashtb->prev
@@ -1382,6 +1410,9 @@ private function hsymbLookupTypeNS _
 	'' still nothing? just return all the imports, which should only be from
 	'' using statements
 	imp_chain = hashLookupEx( @symb.imphashtb, id, index )
+	dim as FBSYMBOL ptr semantic_import = NULL
+	if( imp_chain <> NULL ) then semantic_import = imp_chain->sym
+	fbSemanticModelLookupProbe("type-imports", NULL, semantic_import)
 
 	return imp_chain
 
@@ -1400,6 +1431,8 @@ function symbLookup _
 	'' assume it's an unknown identifier
 	tk = FB_TK_ID
 	tk_class = FB_TKCLASS_IDENTIFIER
+
+	dim as longint semantic_lookup = fbSemanticModelLookupBegin("unqualified", id, symbGetCurrentNamespc( ), FALSE, TRUE)
 
 	hUcase( *id, sname )
 	id = @sname
@@ -1420,9 +1453,12 @@ function symbLookup _
 	hashtb = symb.hashlist.tail
 	do
 		dim as FBSYMBOL ptr sym = hashLookupEx( @hashtb->tb, id, index )
+		fbSemanticModelLookupProbe("keywords", hashtb->owner, sym)
 		while( sym )
 			if( sym->class = FB_SYMBCLASS_KEYWORD ) then
-				if( symbIsDisabledCommand( sym ) = FALSE ) then
+				dim as integer semantic_disabled = symbIsDisabledCommand( sym )
+				fbSemanticModelLookupDecision(iif(semantic_disabled, "keyword-disabled", "keyword-enabled"), hashtb->owner, sym)
+				if( semantic_disabled = FALSE ) then
 					tk = sym->key.id
 					tk_class = sym->key.tkclass
 					'' return if it's a KEYWORD or a OPERATOR token, they
@@ -1430,13 +1466,16 @@ function symbLookup _
 					if( tk_class <> FB_TKCLASS_QUIRKWD ) then
 						if( symbCanMacroShadowKeyword( sym ) ) then
 							var replacement = cptr( FBSYMBOL ptr, hashLookupEx( @hashtb->tb, id, index ) )
+							fbSemanticModelLookupProbe("keyword-shadow", hashtb->owner, replacement)
 							if( symbIsDefine( replacement ) ) then
 								tk = FB_TK_ID
 								tk_class = FB_TKCLASS_IDENTIFIER
-								return symbNewChainpool( replacement )
+								return fbSemanticModelLookupEnd(semantic_lookup, symbNewChainpool( replacement ), tk, tk_class, "macro-shadow")
 							end if
 						end if
-						return symbNewChainpool( sym )
+						return fbSemanticModelLookupEnd(semantic_lookup, symbNewChainpool( sym ), tk, tk_class, "keyword")
+					else
+						fbSemanticModelLookupDecision("defer-quirk-keyword", hashtb->owner, sym)
 					end if
 				end if
 			end if
@@ -1449,11 +1488,11 @@ function symbLookup _
 	if( symbGetCurrentNamespc( ) <> NULL ) then
 		select case symbGetClass( symbGetCurrentNamespc( ) )
 		case FB_SYMBCLASS_STRUCT, FB_SYMBCLASS_CLASS
-			return hsymbLookupTypeNS( id, tk, tk_class, hashtb, index )
+			return fbSemanticModelLookupEnd(semantic_lookup, hsymbLookupTypeNS( id, tk, tk_class, hashtb, index ), tk, tk_class, "type-namespace")
 		end select
 	end if
 
-	return hsymbLookupNS( id, tk, tk_class, hashtb, index )
+	return fbSemanticModelLookupEnd(semantic_lookup, hsymbLookupNS( id, tk, tk_class, hashtb, index ), tk, tk_class, "namespace")
 
 end function
 
@@ -1466,6 +1505,9 @@ private function hLookupImportHash _
 	) as FBSYMCHAIN ptr
 
 	dim as FBSYMCHAIN ptr chain_head = hashLookupEx( @symb.imphashtb, id, index )
+	dim as FBSYMBOL ptr semantic_import = NULL
+	if( chain_head <> NULL ) then semantic_import = chain_head->sym
+	fbSemanticModelLookupProbe("global-import-hash", ns, semantic_import)
 	if( chain_head = NULL ) then
 		return NULL
 	end if
@@ -1479,6 +1521,7 @@ private function hLookupImportHash _
 		dim as FBSYMBOL ptr exp_ = symbGetCompExportHead( symbGetNamespace( chain_->sym ) )
 		do
 			if( symbGetExportNamespc( exp_ ) = ns ) then
+				fbSemanticModelLookupDecision("export-to-namespace", ns, chain_->sym)
 				dim as FBSYMCHAIN ptr node = chainpoolNext()
 
 				node->sym = chain_->sym
@@ -1521,8 +1564,10 @@ function symbLookupAt _
 
 	assert( symbIsStruct( ns ) or symbIsNamespace( ns ) or symbIsEnum( ns ) )
 
+	dim as longint semantic_lookup = fbSemanticModelLookupBegin("qualified", id, ns, preserve_case, search_imports)
+
 	if( symbIsEnum( ns ) and (not symbEnumHasHashTb( ns )) ) then
-		exit function
+		return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "enum-without-table")
 	end if
 
 	if( preserve_case = FALSE ) then
@@ -1534,6 +1579,7 @@ function symbLookupAt _
 
 	'' search in UDT's (NAMESPACE, TYPE, CLASS or ENUM) hash tb first
 	dim as FBSYMBOL ptr sym = hashLookupEx( @symbGetCompHashTb( ns ).tb, id, index )
+	fbSemanticModelLookupProbe("qualified-own", ns, sym)
 
 	''
 	'' Imported names are considered only after the namespace's own symbols.
@@ -1545,6 +1591,7 @@ function symbLookupAt _
 	'' don't access local variables in an explicit namespace
 	while( sym )
 		if( symbIsLocal( sym ) and symbIsVar( sym ) ) then
+			fbSemanticModelLookupDecision("skip-qualified-local", ns, sym)
 			sym = sym->hash.next
 		else
 			exit while
@@ -1553,35 +1600,35 @@ function symbLookupAt _
 
 	if( sym = NULL ) then
 		if( search_imports = FALSE ) then
-			return NULL
+			return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "imports-disabled")
 		end if
 
 	else
 		dim as FBSYMCHAIN ptr chain_ = symbNewChainpool( sym )
-		return chain_
+		return fbSemanticModelLookupEnd(semantic_lookup, chain_, INVALID, INVALID, "own-symbol")
 	end if
 
 	'' nothing found, now search the imports (if any)..
 	if( symbGetCompExt( ns ) = NULL ) then
-		return NULL
+		return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "no-namespace-extension")
 	end if
 
 	if( symbGetCompImportHead( ns ) = NULL ) then
-		return NULL
+		return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "no-imports")
 	end if
 
 	'' special cases: the global ns
 	if( ns = @symbGetGlobalNamespc( ) ) then
-		return hLookupImportHash( ns, id, index )
+		return fbSemanticModelLookupEnd(semantic_lookup, hLookupImportHash( ns, id, index ), INVALID, INVALID, "global-imports")
 	end if
 
 	'' Are we in a type's namespace?  Only search for inherited members
 	select case symbGetClass( ns )
 	case FB_SYMBCLASS_STRUCT, FB_SYMBCLASS_CLASS
-		return hLookupImportList( ns, id, index, FB_SYMBLOOKUPOPT_PARENTS )
+		return fbSemanticModelLookupEnd(semantic_lookup, hLookupImportList( ns, id, index, FB_SYMBLOOKUPOPT_PARENTS ), INVALID, INVALID, "parent-imports")
 	end select
 
-	return hLookupImportList( ns, id, index )
+	return fbSemanticModelLookupEnd(semantic_lookup, hLookupImportList( ns, id, index ), INVALID, INVALID, "namespace-imports")
 
 end function
 
@@ -1616,6 +1663,8 @@ function symbFindByClass _
 		byval class_ as integer _
 	) as FBSYMBOL ptr
 
+	dim as longint semantic_filter = fbSemanticModelFilterBegin("class", class_, FB_DATATYPE_INVALID, chain_)
+
 	dim as FBSYMBOL ptr sym = any
 
 	'' Return on the matching path so a missing chain never leaves an
@@ -1623,17 +1672,17 @@ function symbFindByClass _
 	do while( chain_ <> NULL )
 		sym = chain_->sym
 		do
-			if( sym->class = class_ ) then
+			if( fbSemanticModelFilterCandidate(sym, sym->class = class_, "class") ) then
 				if( symbIsVar( sym ) ) then
-					if( symbVarCheckAccess( sym ) = FALSE ) then return NULL
+					if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) = FALSE ) then return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 				end if
-				return sym
+				return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 			end if
 			sym = sym->hash.next
 		loop while( sym <> NULL )
 		chain_ = chain_->next
 	loop
-	return NULL
+	return fbSemanticModelFilterEnd(semantic_filter, NULL, "not-found")
 
 end function
 
@@ -1643,6 +1692,8 @@ function symbFindVarBySuffix _
 		byval chain_ as FBSYMCHAIN ptr, _
 		byval suffix as integer _
 	) as FBSYMBOL ptr
+
+	dim as longint semantic_filter = fbSemanticModelFilterBegin("suffix", FB_SYMBCLASS_VAR, suffix, chain_)
 
 	dim as FBSYMBOL ptr sym = any
 
@@ -1656,13 +1707,15 @@ function symbFindVarBySuffix _
 				if( symbIsVar( sym ) ) then
 					select case symbGetType( sym )
 					case FB_DATATYPE_STRING, FB_DATATYPE_USTRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR
-						if( symbVarCheckAccess( sym ) ) then
-							return sym
+						fbSemanticModelFilterCandidate(sym, TRUE, "suffix-string")
+						if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) ) then
+							return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 						end if
-						return NULL
+						return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 					end select
 				end if
 
+				fbSemanticModelFilterCandidate(sym, FALSE, "suffix-string")
 				sym = sym->hash.next
 			loop while( sym <> NULL )
 
@@ -1676,13 +1729,15 @@ function symbFindVarBySuffix _
 			do
 				if( symbIsVar( sym ) ) then
 					if( symbGetType( sym ) = suffix ) then
-						if( symbVarCheckAccess( sym ) ) then
-							return sym
+						fbSemanticModelFilterCandidate(sym, TRUE, "suffix-type")
+						if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) ) then
+							return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 						end if
-						return NULL
+						return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 					end if
 				end if
 
+				fbSemanticModelFilterCandidate(sym, FALSE, "suffix-type")
 				sym = sym->hash.next
 			loop while( sym <> NULL )
 
@@ -1690,7 +1745,7 @@ function symbFindVarBySuffix _
 		loop
 	end if
 
-	return NULL
+	return fbSemanticModelFilterEnd(semantic_filter, NULL, "not-found")
 
 end function
 
@@ -1700,6 +1755,8 @@ function symbFindVarByDefType _
 		byval chain_ as FBSYMCHAIN ptr, _
 		byval def_dtype as integer _
 	) as FBSYMBOL ptr
+
+	dim as longint semantic_filter = fbSemanticModelFilterBegin("default-type", FB_SYMBCLASS_VAR, def_dtype, chain_)
 
 	dim as FBSYMBOL ptr sym = any
 
@@ -1715,19 +1772,22 @@ function symbFindVarByDefType _
 					if( symbIsSuffixed( sym ) ) then
 						select case sym->typ
 						case FB_DATATYPE_STRING, FB_DATATYPE_USTRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR
-							if( symbVarCheckAccess( sym ) ) then
-								return sym
+							fbSemanticModelFilterCandidate(sym, TRUE, "default-string")
+							if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) ) then
+								return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 							end if
-							return NULL
+							return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 						end select
 					else
-						if( symbVarCheckAccess( sym ) ) then
-							return sym
+						fbSemanticModelFilterCandidate(sym, TRUE, "default-unsuffixed")
+						if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) ) then
+							return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 						end if
-						return NULL
+						return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 					end if
 				end if
 
+				fbSemanticModelFilterCandidate(sym, FALSE, "default-string")
 				sym = sym->hash.next
 			loop while( sym <> NULL )
 
@@ -1742,19 +1802,22 @@ function symbFindVarByDefType _
 				if( symbIsVar( sym ) ) then
 					if( symbIsSuffixed( sym ) ) then
 						if( symbGetType( sym ) = def_dtype ) then
-							if( symbVarCheckAccess( sym ) ) then
-								return sym
+							fbSemanticModelFilterCandidate(sym, TRUE, "default-type")
+							if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) ) then
+								return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 							end if
-							return NULL
+							return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 						end if
 					else
-						if( symbVarCheckAccess( sym ) ) then
-							return sym
+						fbSemanticModelFilterCandidate(sym, TRUE, "default-unsuffixed")
+						if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) ) then
+							return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 						end if
-						return NULL
+						return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 					end if
 				end if
 
+				fbSemanticModelFilterCandidate(sym, FALSE, "default-type")
 				sym = sym->hash.next
 			loop while( sym <> NULL )
 
@@ -1762,7 +1825,7 @@ function symbFindVarByDefType _
 		loop
 	end if
 
-	return NULL
+	return fbSemanticModelFilterEnd(semantic_filter, NULL, "not-found")
 
 end function
 
@@ -1773,6 +1836,8 @@ function symbFindByClassAndType _
 		byval dtype as integer _
 	) as FBSYMBOL ptr
 
+	dim as longint semantic_filter = fbSemanticModelFilterBegin("class-and-type", symclass, dtype, chain_)
+
 	function = NULL
 
 	while( chain_ )
@@ -1780,14 +1845,14 @@ function symbFindByClassAndType _
 		var sym = chain_->sym
 		do
 
-			if( (sym->class = symclass) and (symbGetFullType( sym ) = dtype) ) then
+			if( fbSemanticModelFilterCandidate(sym, (sym->class = symclass) and (symbGetFullType( sym ) = dtype), "class-and-type") ) then
 				if( symclass = FB_SYMBCLASS_VAR ) then
 					'' check if symbol isn't a non-shared module level one
-					if( symbVarCheckAccess( sym ) = FALSE ) then
-						exit function
+					if( fbSemanticModelFilterAccess(symbVarCheckAccess( sym )) = FALSE ) then
+						return fbSemanticModelFilterEnd(semantic_filter, NULL, "denied")
 					end if
 				end if
-				return sym
+				return fbSemanticModelFilterEnd(semantic_filter, sym, "selected")
 			end if
 
 			sym = sym->hash.next
@@ -1795,6 +1860,8 @@ function symbFindByClassAndType _
 
 		chain_ = chain_->next
 	wend
+
+	return fbSemanticModelFilterEnd(semantic_filter, NULL, "not-found")
 
 end function
 
@@ -2526,7 +2593,7 @@ function symbCheckAccess _
 
 	'' Neither private nor protected? Always ok.
 	if( (sym->attrib and (FB_SYMBATTRIB_VIS_PRIVATE or FB_SYMBATTRIB_VIS_PROTECTED)) = 0 ) then
-		return TRUE
+		return fbSemanticModelResolutionAccess(sym, TRUE, "member")
 	end if
 
 	'' Notes:
@@ -2551,7 +2618,7 @@ function symbCheckAccess _
 	loop while( not symbIsStruct( parent ) )
 
 	'' check access based on parent
-	function = hsymbCheckAccessParent( sym, parent )
+	function = fbSemanticModelResolutionAccess(sym, hsymbCheckAccessParent( sym, parent ), "member")
 
 end function
 
@@ -2585,7 +2652,7 @@ function symbCheckAccessStruct _
 		'' are we at the top namespace that needs to be checked?
 		'' then no need to search additional parents
 		if( parent = @symbGetGlobalNamespc() ) then
-			return TRUE
+			return fbSemanticModelResolutionAccess(sym, TRUE, "type-chain")
 		end if
 	loop
 
@@ -2600,13 +2667,13 @@ function symbCheckAccessStruct _
 	do
 		'' check access based on parent
 		if( hsymbCheckAccessParent( sym, parent ) ) then
-			return TRUE
+			return fbSemanticModelResolutionAccess(sym, TRUE, "type-chain")
 		end if
 
 		parent = symbGetNamespace( parent )
 	loop while( parent <> @symbGetGlobalNamespc( ) )
 
-	function = FALSE
+	function = fbSemanticModelResolutionAccess(sym, FALSE, "type-chain")
 end function
 
 function symbCheckConstAssignTopLevel _

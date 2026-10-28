@@ -2,9 +2,14 @@
   "objective": "Complete the semantic model using the compiler-wide gap audit, including additional defects discovered during implementation.",
   "schema": "27",
   "goal_status": "active",
-  "compiler": "out/semantic-goal-20261027/fbc-source-validity-v78",
-  "compiler_sha256": "cc0214382b23c13eefab33a8a0e5cbeee5a92f4a8bba537233b39365e284f6b9",
+  "compiler": "out/semantic-goal-20261027/fbc-resolution-context-v86",
+  "compiler_sha256": "2816a6a572f9f07c9c774f5a9b44e4c7a0e9d18dc63769858e6e219afab3d941",
   "verified_checks": [
+    "CAP177 native-symbol-filters: five targeted families pass on immutable fbc-filters-v88 (SHA256 b5dec8f9f71062645197be4800241e949f77f0b07f3989db7e0247cb5e768db7). All four native filters and seven predicate reasons are exercised, including actual helper bodies, denial termination, full versus masked string types, unsuffixed DEF semantics, rejected-source diagnostic parity, modes/ABIs/binary/reset and corruption. Coverage fixtures use real suffix collisions and REDIM/DEF redeclarations; assertions remain strict. Evidence: filters-verification-v88.json. Eight regressions and the preceding v87 source audit remain active; original51 completion is not proved.",
+    "CAP176 native-name-lookups: all seven targeted families passed on immutable fbc-lookup-v87 (SHA2561cc65f34ac4d474ffa66eb8361330688c81d6cdb6013393fa0c7d2f462858bd7) in383.835seconds. Actual lexical/import/type/base/enum precedence, ambiguity, enabled/disabled/quirk keywords and macro shadowing, full/reduced/bindings exclusions, native/stable type ABI, text/binary, repeated modules, forward types/redefined macros, corrected-total corruption and production bounded-chain/lifetime/no-lookup guards. Evidence: lookup-verification-v87.json. The new nine-case compiler-source audit remains active; the older v86 audit was interrupted after one passing case. Original51 scopes remain open.",
+    "The v76 frozen source qualification completed all 81 cases: 27 modules across GCC/LLVM/Clang, comparing export-disabled/full/compact native emission with the frozen reader. Evidence: out/semantic-goal-20261027/self-qualification-v76/results.json. The later producer/reader changes remain separately unqualified by those old results. Five v86 identity-context families pass: distinct actual procedure/formal/S/E links, same-spelled nominal types and CAST targets, reduced/default/rejected states, macro versus B identity domains, native/stable text/binary/repeated-module behavior and corrected-total corruption. Exact positive methods are in resolution-contexts-verification-v86.json. Eighteen affected regression methods passed in 1257.283 seconds; the frozen eight-unit/24-case source qualification remains active; the goal remains incomplete.",
+    "v84 passes 24 combined targeted/regression methods (resolution-final-v84.log, 275.959 seconds) plus the parameter-branch family (resolution-parameter-branches-v84.log, 5.482 seconds): thirteen new families and twelve affected regressions. Native closest/cast screening, confirmation, nested conversion searches, argument/default/descriptor/constant/property rules, operator eligibility, ambiguity/access denial, raw/unknown scores, complete native policies/counts, copied ownership, 1000000-event/1024-depth bounds, stale confirmation rejection, ABI/text/binary, source-byte/remap/restart/module reset and 24 runtime partitions are covered. The half-match CAST-score remap is corrected and tested at native band boundaries plus real overloaded conversion calls. Exact successful methods and immutable compiler hash are in out/semantic-goal-20261027/resolution-verification-v84.json. Native lookup/prototype explanations and canonical symbol/type/source-expression links remain open G49 requirements; all 51 original scopes remain required.",
+    "v80 passes eight new native intrinsic-dispatch families and twelve affected regressions. All 60 named statement/function/graphics/sound routes, 17 math and 17 string token choices, 15 casts, 6 MK and 6 CV forms, serialization, QB REM/SCREEN and supported/unsupported VA_FIRST paths are observed. Folded roots, nested completion order, declined graphics fallback, disabled/PP/probe/lookalike exclusions, malformed inputs, all model modes, both type ABIs, binary parity, byte-safe source paths, twelve runtime partitions, 100000-event guards and corrected-total corruption are covered. Evidence: out/semantic-goal-20261027/intrinsic-verification-v80.json, including exact successful method/log locations; intrinsic-all-routes-v80.log (69.144 seconds); intrinsic-type-closure-v80.log (3.868 seconds); intrinsic-source-bytes-v80.log (16.989 seconds); intrinsic-regressions-v80.log (122.834 seconds). These observations do not close operations outside the named dispatchers or all 51 original scopes.",
     "v78 passes three native source-validity families and ten affected regression families (source-validity-targeted-v78.log, 7.207 seconds; source-validity-regressions-v78.log, 94.097 seconds). Native opening/comparison/final counters, parsed/recovered/unmatched outcomes, exact ST/STE and BLK/BEND stack counts, explicit absent endings, report-only missing-include loci, compact output and corrected-total corruption are covered. Source coordinates remain observed points rather than certified physical extents; rejected module expressions stay provisional.",
     "v76 passes five native declaration/type-recovery families and eight affected regressions (type-recovery-final-v76.log, 24.261 seconds; type-recovery-regressions-v76.log, 23.863 seconds). v77 adds producer rejection for invalid pointer/discarded decisions, wrong mock parameter classes and empty generated names, with the same five families passing (declaration-recovery-final-v77.log, 40.010 seconds). Native observations cover 21 explicit type choices, four generated-name routes and the mock parameter helper. Checks distinguish legal enum quirk names, typed fallback, pointer/discard rules, copied snapshots, no fabricated source bindings, ABI/binary parity, counts, corruption and restart/module reset. CAP170/171 remain partial.",
     "The v69 four-unit diagnostic source audit completed 12/12 cases across GCC, LLVM and Clang with unchanged off/full/compact emission (self-diagnostics-v69/results.json). The queued IR, effects and current recovery producer/parser source work is now in a live 27-unit, 81-case v76 frozen qualification, one worker. This does not certify unexercised recovery routes or close the complete original 51 scopes.",
@@ -152,7 +157,7 @@
       "id": "G12",
       "title": "Cover every source operation route consistently",
       "status": "in-progress",
-      "evidence": "Selected file statement routes emit SOP ownership after their actual grammar path succeeds; tested file-open, line-input and file-close source extents in all modes. All other source operation routes and variants remain required.",
+      "evidence": "Selected file statement routes emit SOP ownership after their actual grammar path succeeds; tested file-open, line-input and file-close source extents in all modes. All other source operation routes and variants remain required. CAP173 native-intrinsic-dispatch now records actual switch arms across all six generic/sound/graphics statement and function entry points, with native returns, error counters, explicit accepted/recovered/declined status, common result type/class and copied source/configuration/statement context. Eight new families cover all 60 route names, raw-token variants, fallback and exclusions. Non-dispatch operations and complete operand/target/variant policies remain.",
       "required_positive": "Every supported arithmetic, cast, address, member/index, type inquiry, allocation, mutation, string, memory, varargs, thread, console/file, graphics/sound, and error operation has a defined event policy.",
       "required_negative": "Do not classify identifier lookalikes, erased AST nodes, compiler helper calls, rejected overloads, or inactive macro text as source operations."
     },
@@ -176,7 +181,7 @@
       "id": "G15",
       "title": "Close alternate binding routes and distinguish semantic use roles",
       "status": "in-progress",
-      "evidence": "First forward-type use now binds the actual compiler-created symbol and canonical type. Alternate binding-role/source graph coverage remains.",
+      "evidence": "First forward-type use now binds the actual compiler-created symbol and canonical type. Alternate binding-role/source graph coverage remains. Physical procedure-call B occurrences are now enrolled in the staged access table so the existing AST call hook can report callee roles. Generated procedure references retain their distinct macro call-reference stream; they are not B ordinals. Canonical resolver links expose the actual selected procedure without joining by spelling.",
       "required_positive": "Forward references, aliases, qualified names, BASE/WITH members, function results, assembly BASIC symbols, varargs formals, labels, and overload selections resolve once to the correct symbols.",
       "required_negative": "Do not bind assembler-local names, unresolved recovery names, namespace lookalikes, keyword spellings, or indirect calls to invented procedure targets."
     },
@@ -368,7 +373,7 @@
       "id": "G39",
       "title": "Attach validity and failure regions to provisional facts",
       "status": "in-progress",
-      "evidence": "v69 native attempt/count summaries distinguish accepted modules from explicit R recovery. Reader rejects missing/duplicate R markers and repaired complete footers, exposes per-module recovery and conservative per-expression provisional/recovery-affected states using OWN/STE. Actual 1 + recovery produces a typed constant, now explicitly recovery-affected to the consumer. Surrounding statements, invalid defaults, missing includes, multiple inputs and restart boundaries pass dedicated verification. Explicit placeholder-creation provenance and full failure-region/validity coverage remain. Native replacement/prefix-root observations now cover 53 actual binary/unary branch sites with copied native routes, datatype ABI, context ownership and dense counts. Native pointer, lexer probe, ordinary abstract-procedure null pointer, bounds, byte path, ABI, transport, reset and corrected-count controls pass. CAP168 is partial; declaration, statement, skip, type and remaining recovery routes are still required. v75 broadens actual root/prefix observations to 135 sites and passes a forty-source parser-family matrix. CAP169 adds actual shared-helper token skipping with exact requested delimiter, nesting, callback counts, stopping point/reason, consumption and context closure. Thirteen combined families pass, including native helper byte-for-byte extraction tests with independent expected counts. These skip receipts do not alone certify failure regions; type/symbol/default validity and other recovery routes remain. v76/v77 add copied selected type bits at 21 explicit fallback/discard/pointer sites and transient snapshots for four generated-name paths plus the real mock-parameter helper. Five dedicated and eight affected families pass; malformed choice/symbol/name producer guards pass v77. These snapshots intentionally do not establish source bindings. Coverage remains partial for all remaining recovery/validity routes. v78 publishes native statement validity and terminal stack counts, validated against ST/STE, BLK/BEND and diagnostic terminal counters. Reader failure regions preserve actual opening/ending points, unmatched/recovered states, unfinished boundaries and unscoped diagnostic loci without inventing physical extents. Three dedicated and ten affected families pass. Complete remaining recovery/phase validity scope is still open.",
+      "evidence": "v69 native attempt/count summaries distinguish accepted modules from explicit R recovery. Reader rejects missing/duplicate R markers and repaired complete footers, exposes per-module recovery and conservative per-expression provisional/recovery-affected states using OWN/STE. Actual 1 + recovery produces a typed constant, now explicitly recovery-affected to the consumer. Surrounding statements, invalid defaults, missing includes, multiple inputs and restart boundaries pass dedicated verification. Explicit placeholder-creation provenance and full failure-region/validity coverage remain. Native replacement/prefix-root observations now cover 53 actual binary/unary branch sites with copied native routes, datatype ABI, context ownership and dense counts. Native pointer, lexer probe, ordinary abstract-procedure null pointer, bounds, byte path, ABI, transport, reset and corrected-count controls pass. CAP168 is partial; declaration, statement, skip, type and remaining recovery routes are still required. v75 broadens actual root/prefix observations to 135 sites and passes a forty-source parser-family matrix. CAP169 adds actual shared-helper token skipping with exact requested delimiter, nesting, callback counts, stopping point/reason, consumption and context closure. Thirteen combined families pass, including native helper byte-for-byte extraction tests with independent expected counts. These skip receipts do not alone certify failure regions; type/symbol/default validity and other recovery routes remain. v76/v77 add copied selected type bits at 21 explicit fallback/discard/pointer sites and transient snapshots for four generated-name paths plus the real mock-parameter helper. Five dedicated and eight affected families pass; malformed choice/symbol/name producer guards pass v77. These snapshots intentionally do not establish source bindings. Coverage remains partial for all remaining recovery/validity routes. v78 publishes native statement validity and terminal stack counts, validated against ST/STE, BLK/BEND and diagnostic terminal counters. Reader failure regions preserve actual opening/ending points, unmatched/recovered states, unfinished boundaries and unscoped diagnostic loci without inventing physical extents. Three dedicated and ten affected families pass. Complete remaining recovery/phase validity scope is still open. v80 fixes an exporter-induced internal diagnostic for rejected QB roots carrying unresolved datatype bits. Both parser and metadata expression exporters test formatter preconditions, retain raw unformattable-type recovery observations and omit invented typed E records. Off/full/bindings/expression diagnostics now match on three backends; missing roots and forged replacement kinds are rejected.",
       "required_positive": "A bad middle statement with valid surrounding statements, multiple failed modules, restarts, missing includes, and recovered default expressions retain clear validity boundaries.",
       "required_negative": "Never present a compiler recovery placeholder as a proved user expression or an incomplete full model as semantically complete."
     },
@@ -376,7 +381,7 @@
       "id": "G40",
       "title": "Declare phase, capability, and completeness coverage explicitly",
       "status": "in-progress",
-      "evidence": "CAP now declares available/partial/unavailable observation families per module and export mode; END remains transport completeness, with external-call effects and alias analysis explicitly unavailable. Complete phase/family validity and failure/drop reasons remain. CAP172 declares native parser statement/compound validity with exact mandatory receipt and stack closure, including zero-count models, explicit unfinished boundaries, terminal phase tag and comparison counter coherence. Three dedicated and ten regression families pass v78. This does not certify unobserved phase/family or producer-failure reasons.",
+      "evidence": "CAP now declares available/partial/unavailable observation families per module and export mode; END remains transport completeness, with external-call effects and alias analysis explicitly unavailable. Complete phase/family validity and failure/drop reasons remain. CAP172 declares native parser statement/compound validity with exact mandatory receipt and stack closure, including zero-count models, explicit unfinished boundaries, terminal phase tag and comparison counter coherence. Three dedicated and ten regression families pass v78. This does not certify unobserved phase/family or producer-failure reasons. CAP173 names the exact native intrinsic-dispatch scope, available in every model mode with mandatory zero-inclusive per-module count closure. Local parser success remains distinct from enclosing validity, runtime execution and complete G12 coverage. CAP174 names native closest/cast and access-check coverage in full/expression output, explicitly unavailable in bindings. Mandatory native policy and nine terminal counters distinguish actual scoring, unscored precision/default checks and unfinished lifetimes; lexical/prototype lookup remains outside this capability.",
       "required_positive": "Consumers can distinguish complete required families, intentional compact omissions, recovery, dependency truncation, and unavailable late/backend data.",
       "required_negative": "A zero-count missing family, overflow, ignored write, or failed producer cannot silently become a complete capability claim."
     },
@@ -384,7 +389,7 @@
       "id": "G41",
       "title": "Make snapshot phases, identity lifetimes, and cross-module ownership explicit",
       "status": "in-progress",
-      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains. Observation allocation IDs now remain unique independently of serialized record totals. A validated native parser phase separates successful grammar callbacks from full-only original/selected snapshots.",
+      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains. Observation allocation IDs now remain unique independently of serialized record totals. A validated native parser phase separates successful grammar callbacks from full-only original/selected snapshots. Resolver contexts register S references while native symbols are alive and only copy already-existing argument E associations. Expression-only output retains subtype snapshots with unavailable S/B references zero; no native pointer is retained or used later to reconstruct a relation.",
       "required_positive": "Multiple modules, prototype-to-body updates, forward patches, interned procptr formals, recycled symbols, and delayed/generated procedures preserve identity and phase ownership.",
       "required_negative": "Do not reuse a retired allocation identity, consume stale local pointers, conflate same-named external declarations across modules without linkage evidence, or promise stable IDs across different builds."
     },
@@ -399,8 +404,8 @@
     {
       "id": "G43",
       "title": "Cover every declaration, expression, statement, and intrinsic route",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "Retain the complete acceptance scope from the audit catalog. The first finite dispatcher coverage layer now checks all 60 named routes across the generic, graphics and sound dispatchers, plus token variants and QB/varargs paths. Source fixture expectations require actual route selections and omissions; the remaining compiler-wide grammar and special-case inventory is still required.",
       "required_positive": "Every source feature family and overload/special variant has required output assertions tied to intended semantics and source ownership.",
       "required_negative": "Malformed/inactive/ambiguous/access-denied/unsupported/lookalike variants emit no fabricated binding, target, layout, lifetime, or editable range."
     },
@@ -424,7 +429,7 @@
       "id": "G46",
       "title": "Exercise bounded failure, allocation, and publication contracts",
       "status": "in-progress",
-      "evidence": "BASIC publication and source hashing fixtures retain independent fault/hash oracles. Writer/source streams and native opaque positions have explicit ownership; construct/expression/access storage is released at invocation closure. General bounded traversal, all limits/OOM and lifecycle verification remain.",
+      "evidence": "BASIC publication and source hashing fixtures retain independent fault/hash oracles. Writer/source streams and native opaque positions have explicit ownership; construct/expression/access storage is released at invocation closure. General bounded traversal, all limits/OOM and lifecycle verification remain. Intrinsic observer guards now check copied entry filenames, unchanged AST values, disabled/probe/preprocessor gates, impossible flags/classes/counters, a 100000-event bound and module reset. Unformattable recovery observations reject absent roots. These are scoped additions to the broader fault/OOM acceptance work. Resolver collector guards preserve exact returned pointers, integers and AST values; reject invalid scopes/classes/modes/outcomes/stale confirmations; bound native event count at 1000000 and nesting at 1024; and reset discarded module state without retaining native pointers.",
       "required_positive": "Near-limit inputs, repeated modules/restarts/clones/deletes, and permitted deep trees complete with valid identity closure and no memory errors.",
       "required_negative": "Boundary overflow, OOM, null/corrupt internal contracts, full disk, close failure, interruption, and rejected alias publication leave no newly complete invalid model or leaked ownership."
     },
@@ -432,7 +437,7 @@
       "id": "G47",
       "title": "Validate semantic payload integrity beyond record totals",
       "status": "in-progress",
-      "evidence": "Reader now rejects class-kind disagreement, missing mandatory node payloads, invalid numeric/boolean values, malformed ASM order, missing copyback relations, dangling config uses. Remaining per-family semantic closure remains. The compiler graph exposed array element checks using immutable first-S types after forward resolution. The reader now selects the T snapshot preceding each actual subscript receipt. Nominal/alias transitions before and after resolution pass on GCC/LLVM/Clang, and a forged same-module nominal snapshot is rejected.",
+      "evidence": "Reader now rejects class-kind disagreement, missing mandatory node payloads, invalid numeric/boolean values, malformed ASM order, missing copyback relations, dangling config uses. Remaining per-family semantic closure remains. The compiler graph exposed array element checks using immutable first-S types after forward resolution. The reader now selects the T snapshot preceding each actual subscript receipt. Nominal/alias transitions before and after resolution pass on GCC/LLVM/Clang, and a forged same-module nominal snapshot is rejected. A dedicated intrinsic validator checks the finite route/kind vocabulary, dense ordinals, exact summaries, native return/error outcome coherence, root absence/class/type carriers, point flags, source/statement/configuration ownership and corrected-total mutations. Unformattable observations require a live root and the native exporter guard site. Resolver validation checks actual candidate/scoring/ranking lifetimes, omission and descriptor payloads, initialized exact-count rules, policy-dependent score coherence, current winner/ties, confirmation consistency and access results. Corrected-count mutation tests include missing/forged policy, headless candidates, invalid passing modes and impossible scores/outcomes. Dedicated resolver-context validation rejects missing/foreign/class-incompatible graph references, wrong event roles, omitted argument/type fabrication, missing native use/binding records, duplicate contexts and incorrect macro/B domain substitutions.",
       "required_positive": "All legitimate producer records, repeated snapshots, canonical replacements, zero/unknown optional states, and extensible capabilities validate under the documented schema rules.",
       "required_negative": "Unknown/impossible kind, bad numeric payload, missing required property, class/type contradiction, invalid relation, omitted action, duplicate/conflicting snapshot, and corrected-total corruption are rejected as appropriate."
     },
@@ -447,8 +452,8 @@
     {
       "id": "G49",
       "title": "Expose lookup and overload selection explanations",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "CAP174 native-overload-explanations records the actual closest/cast searches and both access-check entry points. Dense nested begin/candidate/argument/score/rank/end/access events preserve separate screening and confirmation passes, initialized versus unknown exact counts, constructor/cast conversion searches, property filtering, BYDESC rank/type/mode, constant compatibility, omitted defaults, binary-operator eligibility and native ambiguity/access outcomes. Thirteen targeted families pass on immutable v84, including off/on emission and 24 runtime partitions, both type ABIs, text/binary, module/restart/remap and raw filename controls, policy/count corruption, copied lifetimes and 1000000-event/1024-depth production guards. Actual variadic/AS ANY overload declaration rejection produces no fabricated candidates. Native score policy is explicit in reduced output. The discovered half-match CAST remap is repaired and exercised from the production transform and actual overloads. Lexical/prototype lookup, canonical symbol/type and source-expression links, remaining variants and complete integration are still required; G49 is not complete. CAP175 now attaches existing canonical S identities and argument E associations to real resolver event ordinals, copied nominal return/formal/argument/requested CAST subtypes, actual parser-use sites and actual returned callee B or separate macro-reference IDs. Five targeted families pass; full source/call-expression linkage and lexical/prototype lookup explanations remain open. CAP176 now copies actual unqualified/qualified name probes, precedence decisions and returned ambiguous chains with existing S identities, without re-running lookup or allocating native chain-pool slots. Seven targeted families pass on v87, including native/stable raw datatype mapping, old/new macro identities and forward-name lifetime. Class/suffix/default-type filters are being implemented separately; prototype matching and complete source-call-expression closure remain required. CAP177 observes the actual class/class-and-full-type/suffix/DEF filters, native variable access and returned identities. Five targeted families pass on v88 with all four helper kinds/seven predicates. Native first-match denial is preserved; failed filters retain no selected symbol. Prototype comparison, explicit lookup/filter/source-call causal joins and complete integration remain required.",
       "required_positive": "Ambiguity, inaccessible overloads, imported candidates, constructor/cast conversion ranking, default/variadic/BYDESC matching, and successful choice retain real resolver explanations.",
       "required_negative": "Never rerun resolution, expose discarded candidates as executed calls, or claim hypothetical candidates were actually considered."
     },
@@ -464,15 +469,15 @@
       "id": "G51",
       "title": "Define byte-safe text fields and match the supplied reader",
       "status": "in-progress",
-      "evidence": "Schema 20 ASCII wire escapes arbitrary bytes; independent reader round-trips all 256 byte values with surrogateescape and decodes valid UTF-8. Legacy literals/macros preserve input and off/full/compact emission. Filesystem-byte and all field domain tests remain.",
+      "evidence": "Schema 20 ASCII wire escapes arbitrary bytes; independent reader round-trips all 256 byte values with surrogateescape and decodes valid UTF-8. Legacy literals/macros preserve input and off/full/compact emission. Filesystem-byte and all field domain tests remain. New nested intrinsic source-point fields round-trip percent, tab and non-UTF-8 POSIX pathname bytes identically through text and binary output, with exact off/on diagnostic parity. Resolver entry and access source points round-trip percent/tab/non-UTF-8 POSIX filenames through text and binary with unchanged diagnostics.",
       "required_positive": "ASCII, UTF-8, accepted legacy literal/macro bytes, wide units, internal literal names, percent/control characters, and supported filesystem path encodings round-trip without loss and agree with exact C values.",
       "required_negative": "Do not silently replace invalid bytes, interpret arbitrary compiler bytes as UTF-8, truncate embedded control data, double-unescape fields, or publish a complete model the declared consumer cannot read."
     }
   ],
-  "next_required_scope": "Finish the active thirty-case v52 native-load/temporary audit and three-case v53 unused-return-carrier audit. Continue the complete original catalog, including late semantic payload/bridges, implicit object operations, full lifetime/evaluation and CFG/effect contracts, diagnostics/validity, lookup explanations, emission correspondence and comprehensive integration. Keep all 51 items.",
+  "next_required_scope": "Complete the frozen v87 nine-case source audit (currently2/9 passed) and v88 eight-method regression run. Queue v88 source qualification without replacing frozen inputs. Continue prototype comparison and explicit lookup/filter/source-call links, then every remaining requirement in the original51-item catalog; all source/validity/type/use-def/effect/backend/class/route/target/fault acceptance requirements remain in scope.",
   "active_verification": {
     "source_v76": {
-      "state": "verified-live",
+      "state": "complete-all-81-cases-passed",
       "compiler": "out/semantic-goal-20261027/fbc-type-recovery-v76",
       "compiler_sha256": "6fa2b0ab204d46c4489dffa79288ee8eb65679a90bf9d140a7f0643ed7b820fb",
       "session": 12967,
@@ -480,13 +485,19 @@
       "log": "out/semantic-goal-20261027/self-qualification-v76.log",
       "units": 27,
       "total_cases": 81,
-      "passed_saved": 8,
+      "passed_saved": 81,
       "processes": {
         "2815414": "5708380",
         "2815689": "5708847",
         "2815725": "5708973"
       },
-      "scope": "Previously queued G35 IR/control-flow, G37 runtime effect/layout and G39 parser/recovery units on GCC/LLVM/Clang, one worker, frozen source and reader. New v77 input guards change no legitimate source outcomes; current final-reader/artifact checks still required for complete acceptance."
+      "scope": "Previously queued G35 IR/control-flow, G37 runtime effect/layout and G39 parser/recovery units on GCC/LLVM/Clang, one worker, frozen source and reader. New v77 input guards change no legitimate source outcomes; current final-reader/artifact checks still required for complete acceptance.",
+      "last_verified_live": {
+        "2815414": false,
+        "2815689": false,
+        "2815725": false
+      },
+      "completed_result": "out/semantic-goal-20261027/self-qualification-v76/results.json"
     },
     "v78": {
       "state": "three-targeted-and-ten-regression-families-passed",
@@ -508,12 +519,96 @@
     },
     "pending_source_additions": [
       "v77 malformed recovery-choice guards",
-      "v78 source validity producer/reader"
+      "v78 source validity producer/reader",
+      "v80 native intrinsic dispatch, unformattable type guards and current independent reader",
+      "v84 native resolution/access collector, CAST band repair, policy/identity guards and independent reader"
     ],
-    "full_original_scope_count": 51
+    "full_original_scope_count": 51,
+    "v80": {
+      "state": "eight-targeted-and-twelve-regression-families-passed",
+      "compiler": "out/semantic-goal-20261027/fbc-intrinsic-recovery-v80",
+      "compiler_sha256": "24bd5c9d77d42005794c476e6e57e31b93ae5ab22fd856c04951d5b34d7166cf",
+      "initial_targeted_log": "out/semantic-goal-20261027/intrinsic-final-v80.log",
+      "route_log": "out/semantic-goal-20261027/intrinsic-all-routes-v80.log",
+      "route_session": 65286,
+      "regression_log": "out/semantic-goal-20261027/intrinsic-regressions-v80.log",
+      "regression_session": 60711,
+      "scope": "All 60 named dispatcher routes plus raw-token variants, native GOSUB/REM/SCREENQB behavior and legacy va_first supported/unsupported outcomes. Fixes native diagnostic interference from unformattable provisional expression types. G12 still requires operations outside these dispatchers, and all 51 original scopes remain required.",
+      "verification_report": "out/semantic-goal-20261027/intrinsic-verification-v80.json",
+      "targeted_families": 8,
+      "regression_families": 12
+    },
+    "v84": {
+      "state": "thirteen-targeted-and-twelve-regression-families-passed",
+      "compiler": "out/semantic-goal-20261027/fbc-resolution-v84",
+      "build_session": 62070,
+      "build_log": "out/semantic-goal-20261027/build-resolution-v84.log",
+      "scope": "Adds producer rejection of stale confirmation IDs; integrates current source inputs. Native candidate/score semantics and the CAST-band repair are unchanged from v83.",
+      "compiler_sha256": "6ea9e3d33c8c51568815982c58e6dd6086609b056d7829fb3b5e712d5aefcb64",
+      "test_session": 22819,
+      "test_log": "out/semantic-goal-20261027/resolution-final-v84.log",
+      "parameter_branch_log": "out/semantic-goal-20261027/resolution-parameter-branches-v84.log",
+      "targeted_families": 13,
+      "verification_report": "out/semantic-goal-20261027/resolution-verification-v84.json",
+      "combined_tests": 24,
+      "combined_seconds": 275.959,
+      "regression_families": 12
+    },
+    "contexts_v86": {
+      "state": "five-targeted-and-eighteen-regression-families-passed",
+      "compiler": "out/semantic-goal-20261027/fbc-resolution-context-v86",
+      "compiler_sha256": "2816a6a572f9f07c9c774f5a9b44e4c7a0e9d18dc63769858e6e219afab3d941",
+      "log": "out/semantic-goal-20261027/resolution-contexts-final-v86.log",
+      "session": 61796,
+      "scope": "Existing S/E identities, nominal/requested CAST context, actual parser-use links, physical callee ACC role and separate generated macro reference domains. Complete G49 lookup/prototype and final source-expression/call closure remain required.",
+      "symbol_log": "out/semantic-goal-20261027/resolution-context-symbols-final-v86.log",
+      "regression_log": "out/semantic-goal-20261027/resolution-contexts-regressions-v86.log",
+      "verification_report": "out/semantic-goal-20261027/resolution-contexts-verification-v86.json",
+      "regression_result": {
+        "tests": 18,
+        "seconds": 1257.283,
+        "result": "OK"
+      }
+    },
+    "source_contexts_v86": {
+      "state": "interrupted-one-of24-cases-passed",
+      "compiler": "out/semantic-goal-20261027/fbc-resolution-context-v86",
+      "compiler_sha256": "2816a6a572f9f07c9c774f5a9b44e4c7a0e9d18dc63769858e6e219afab3d941",
+      "session": 76514,
+      "output": "out/semantic-goal-20261027/self-contexts-v86",
+      "log": "out/semantic-goal-20261027/self-contexts-v86.log",
+      "units": 8,
+      "total_cases": 24,
+      "processes": {
+        "3147661": "6802573",
+        "3147839": "6803291",
+        "3147840": "6803306",
+        "3147843": "6803402",
+        "3147861": "6803688"
+      },
+      "root_processes": {
+        "3147661": "6802573"
+      }
+    },
+    "lookup_v87": {
+      "state": "seven-targeted-families-passed-source-qualification-running",
+      "compiler": "out/semantic-goal-20261027/fbc-lookup-v87",
+      "verification_report": "out/semantic-goal-20261027/lookup-verification-v87.json",
+      "source_output": "out/semantic-goal-20261027/self-lookup-v87",
+      "source_log": "out/semantic-goal-20261027/self-lookup-v87.log",
+      "source_cases": 2,
+      "source_total": 9
+    },
+    "filters_v88": {
+      "state": "five-targeted-families-passed-eight-regressions-running",
+      "compiler": "out/semantic-goal-20261027/fbc-filters-v88",
+      "verification_report": "out/semantic-goal-20261027/filters-verification-v88.json",
+      "regression_log": "out/semantic-goal-20261027/filters-regressions-v88.log",
+      "regression_session": 76919
+    }
   },
   "working_tree": "/home/jkfirth/fbc",
-  "integration_status": "Integrated into the shared working tree; unrelated pending changes and the later locale-test commit are preserved. Source changes are not committed on the shared master branch.",
+  "integration_status": "Integrated into the shared working tree. The v84 immutable compiler passes its combined 25-method verification; unrelated source changes remain preserved. Later v77-v84 source qualification and the complete 51-scope acceptance audit are still required. No commit or pull request was created for this batch.",
   "previous_verification": {
     "state": "terminated",
     "exit_status": 143,

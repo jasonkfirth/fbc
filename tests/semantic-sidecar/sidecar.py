@@ -46,6 +46,12 @@ from semantic_recovery import validate_recovery
 from semantic_skips import validate_skips
 from semantic_declaration_recovery import validate_declaration_recovery
 from semantic_validity import validate_validity
+from semantic_intrinsics import validate_intrinsics
+from semantic_resolution import validate_resolution
+from semantic_resolution_contexts import validate_resolution_contexts
+from semantic_lookup import validate_lookup
+from semantic_filters import validate_filters
+from semantic_prototypes import validate_prototypes
 from semantic_load_payloads import validate_load_payloads, validate_load_assembly
 from semantic_datatypes import (NATIVE_PRIMITIVE_NAMES as PRIMITIVE_NAMES, STABLE_PRIMITIVE_NAMES,
                                 NUMERIC_NAMES, BOOLEAN_NUMERIC_NAMES, FLOAT_NAMES, primitive_name)
@@ -1551,6 +1557,12 @@ class Model:
         validate_skips(self, number, unescape)
         validate_declaration_recovery(self, number, unescape)
         validate_validity(self, number)
+        validate_intrinsics(self, number, unescape, NODE_KINDS)
+        validate_resolution(self, number, unescape, NODE_KINDS)
+        validate_resolution_contexts(self, number, unescape, subject_modules)
+        validate_lookup(self, number, unescape, subject_modules)
+        validate_filters(self, number, unescape, subject_modules)
+        validate_prototypes(self, number, unescape, subject_modules)
         validate_driver_inputs(self, number, subject_modules)
         validate_data(self, number, unescape, subject_modules)
         validate_emission_names(self, number, unescape, subject_modules)

@@ -7,8 +7,9 @@ This file intentionally does NOT identify a later AST node from a recycled point
 
 FEATURE = "native-expression-recovery-steps"
 PREFIX = "native-expression-recovery"
-KINDS = {"replacement-constant", "replacement-zero", "retained-prefix", "replacement-expression"}
+KINDS = {"replacement-constant", "replacement-zero", "retained-prefix", "replacement-expression", "unformattable-type"}
 FILES = {
+    'tooling/semantic-model.bas',
     'parser/declarations/parser-decl-const.bas',
     'parser/declarations/parser-decl-proc-params.bas',
     'parser/declarations/parser-decl-struct.bas',
@@ -86,6 +87,9 @@ def validate_recovery(model, number, unescape, node_kinds):
                 or (not configuration and not model.expressions_only)):
             raise ValueError("Native recovery step has a dangling configuration")
         root_class = int(fields[9])
+        unformattable = fields[0] == "unformattable-type"
+        if unformattable != (fields[2] == "tooling/semantic-model.bas") or (unformattable and fields[8] != "1"):
+            raise ValueError("Unformattable type observation has no root or native export site")
         if fields[8] == "0":
             if root_class != 0 or fields[10] != "2147483648":
                 raise ValueError("Absent recovery root invents an AST payload")

@@ -120,13 +120,15 @@ original.class = AST_CLASSES
 if( fbSemanticModelRecoveryNode(@original, "retained-prefix", "guard", "file", 1) <> @original ) then end 13
 original.class = AST_NODECLASS_CONST
 if( failures <> 5 or writes or points ) then end 14
+fbSemanticModelRecoveryNode(NULL, "unformattable-type", "guard", "tooling/semantic-model.bas", 1)
+if( failures <> 6 or writes or points ) then end 23
 
 '' The callback sink counts rows instead of retaining the whole stress input.
 for ordinal as integer = 1 to 100000
 	fbSemanticModelRecoveryNode(@original, "retained-prefix", "guard", "file", 1)
 next
 fbSemanticModelRecoveryNode(@original, "retained-prefix", "guard", "file", 1)
-if( failures <> 6 or writes <> 100000 or points <> 100000 ) then end 10
+if( failures <> 7 or writes <> 100000 or points <> 100000 ) then end 10
 fbSemanticModelFinishRecovery(FALSE)
 writes = 0
 captured = ""

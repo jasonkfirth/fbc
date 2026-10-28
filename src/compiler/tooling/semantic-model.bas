@@ -93,6 +93,11 @@ declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval 
 #include once "tooling/semantic-source-file.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-recovery.bi"
+#include once "tooling/semantic-intrinsics.bi"
+#include once "tooling/semantic-resolution.bi"
+#include once "tooling/semantic-lookup.bi"
+#include once "tooling/semantic-filters.bi"
+#include once "tooling/semantic-prototypes.bi"
 #include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-comments.bi"
 #include once "tooling/semantic-variable-names.bi"
@@ -2429,6 +2434,10 @@ function fbSemanticModelExportCallBinding _
 		reference = hSemanticModelExportBinding(sym, source, FALSE, receiver, iif(is_type, "type", "expression"))
 	end if
 	if( sym <> NULL ) then
+		'' Procedure occurrences need the same staged access slot as variables
+		'' before the call AST can mark this actual B occurrence as a callee.
+		'' Negative macro tags keep their independent source-call identity.
+		if( (reference > 0) and (sym->class = FB_SYMBCLASS_PROC) ) then fbSemanticModelCaptureAccess(reference)
 		if( (sym->class = FB_SYMBCLASS_PROC) and symbGetIsRTL(sym) ) then
 			hBuiltinFunctionUse(sym, reference, "runtime")
 		end if
@@ -3901,6 +3910,27 @@ private function hSemanticModelEdgeName(byval edge as integer) as string
 	end select
 end function
 
+private function hSemanticModelCanFormatExpressionType( byval expr as ASTNODE ptr ) as integer
+	if( expr->dtype = FB_DATATYPE_INVALID ) then return TRUE
+	dim as integer dtype = typeGetDtOnly(expr->dtype)
+	dim as integer safe = dtype < FB_DATATYPES
+	select case dtype
+	case FB_DATATYPE_STRUCT, FB_DATATYPE_ENUM, FB_DATATYPE_FWDREF, FB_DATATYPE_FUNCTION
+		if( expr->subtype = NULL ) then safe = FALSE
+	end select
+	if( safe ) then return TRUE
+	'' Error recovery can leave an unresolved type on a surviving AST root.
+	'' The normal diagnostic formatter assumes a completed type and may issue
+	'' an internal error or dereference a missing nominal subtype. Preserve the
+	'' raw observation without asking that formatter to resolve it again.
+	fbSemanticModelRecoveryNode(expr, "unformattable-type", __FUNCTION__, _
+		"tooling/semantic-model.bas", __LINE__)
+	fbSemanticModelStatementExpressionMissing( )
+	semantic_model_last_exported_expression = 0
+	semantic_model_pending_operator_override = -1
+	return FALSE
+end function
+
 sub fbSemanticModelExportExpression _
 	( _
 		byval expr as ASTNODE ptr, _
@@ -3919,6 +3949,7 @@ sub fbSemanticModelExportExpression _
 		(semantic_model_module_failed) or (expr = NULL) ) then
 		exit sub
 	end if
+	if( hSemanticModelCanFormatExpressionType(expr) = FALSE ) then exit sub
 
 	dim as LEX_LOCATION observed_start = source_start
 	dim as LEX_LOCATION observed_end = source_end
@@ -4142,6 +4173,7 @@ sub fbSemanticModelExportParserExpression _
 	  byval semantic_operator_override as integer = -1, byval force_nonphysical_range as integer = FALSE )
 	if( fbSemanticModelTypedExpressionsEnabled( ) = FALSE ) then exit sub
 	if( expr = NULL ) then exit sub
+	if( hSemanticModelCanFormatExpressionType(expr) = FALSE ) then exit sub
 	'' Capture the actual callback inputs before export refines source concepts
 	'' or maps generated endpoints to invocation anchors. Metadata-only callers
 	'' use ExportExpression directly and do not become parser observations.
@@ -4690,6 +4722,11 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelResetStartup( )
 	fbSemanticModelResetDeclarations( )
 	fbSemanticModelResetRecovery( )
+	fbSemanticModelResetIntrinsics( )
+	fbSemanticModelResetResolution( )
+	fbSemanticModelResetLookup( )
+	fbSemanticModelResetFilters( )
+	fbSemanticModelResetPrototypes( )
 	fbSemanticModelResetObjectOperations( )
 	fbSemanticModelResetIRFlow( )
 	fbSemanticModelResetEffects( )
@@ -4753,7 +4790,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 172
+	for capability as integer = 0 to 178
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -4921,6 +4958,12 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 170: feature = "native-type-recovery-steps": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "partial", "unavailable")
 		case 171: feature = "native-symbol-recovery-steps": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "partial", "unavailable")
 		case 172: feature = "native-source-validity": coverage = "available"
+		case 173: feature = "native-intrinsic-dispatch": coverage = "available"
+		case 174: feature = "native-overload-explanations": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
+		case 175: feature = "native-resolution-contexts": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
+		case 176: feature = "native-name-lookups": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
+		case 177: feature = "native-symbol-filters": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
+		case 178: feature = "native-prototype-comparisons": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
 		case 121: feature = "string-subscript-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 122: feature = "selected-type-alias-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 123: feature = "type-alias-declaration-sites": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
@@ -5140,6 +5183,11 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	fbSemanticModelFinishStartup(commit)
 	fbSemanticModelFinishDeclarations(commit)
 	fbSemanticModelFinishRecovery(commit)
+	fbSemanticModelFinishIntrinsics(commit)
+	fbSemanticModelFinishResolution(commit)
+	fbSemanticModelFinishLookup(commit)
+	fbSemanticModelFinishFilters(commit)
+	fbSemanticModelFinishPrototypes(commit)
 	fbSemanticModelFinishSourceValidity(commit)
 	fbSemanticModelFinishObjectOperations(commit)
 	fbSemanticModelFinishIRFlow(commit)
