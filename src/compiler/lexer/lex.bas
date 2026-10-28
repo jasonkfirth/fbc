@@ -32,6 +32,8 @@
 #include once "parser/parser.bi"
 #include once "tooling/semantic-macros.bi"
 #include once "tooling/semantic-source.bi"
+#include once "tooling/semantic-tokens.bi"
+#include once "tooling/semantic-lookup.bi"
 
 declare sub         lexReadUTF8             ( )
 
@@ -2119,6 +2121,7 @@ private sub hCheckPeriods _
 						flags or LEXCHECK_EATPERIOD )
 
 		t->sym_chain = symbLookup( @t->text, t->id, t->class )
+		t->semantic_lookup = fbSemanticModelLastLookup()
 	end if
 
 end sub
@@ -2145,6 +2148,7 @@ private function readId( byref t as FBTOKEN, byval flags as LEXCHECK, _
 	'' use the special hash tb?
 	if( flags and LEXCHECK_KWDNAMESPC ) then
 		t.sym_chain = symbLookupAt(lex.ctx->kwdns, @t.text, FALSE, FALSE)
+		t.semantic_lookup = fbSemanticModelLastLookup()
 
 		'' not found?
 		if( t.sym_chain = NULL ) then
@@ -2166,6 +2170,7 @@ private function readId( byref t as FBTOKEN, byval flags as LEXCHECK, _
 	end if
 
 	t.sym_chain = symbLookup( @t.text, t.id, t.class )
+	t.semantic_lookup = fbSemanticModelLastLookup()
 
 	'' don't load defines?
 	if( flags and LEXCHECK_NODEFINE ) then
@@ -2327,6 +2332,7 @@ sub lexNextToken _
 	t->text[0] = 0                                  '' t.text = ""
 	t->len = 0
 	t->sym_chain = NULL
+	t->semantic_lookup = 0
 	t->literal_truncated = FALSE
 
 	'' skip white space
@@ -2908,6 +2914,7 @@ sub lexSkipToken( byval flags as LEXCHECK )
 	'' Observe committed parser consumption, not lookahead or PP scanning.
 	'' The exporter keeps the lexical class; it does not reinterpret names.
 	if( (lex.ctx->reclevel = 0) and (lex.ctx->semantic_probe = FALSE) and (pp.skipping = FALSE) ) then
+		fbSemanticModelConsumedToken(lex.ctx->head)
 		fbSemanticModelConsumedKeyword(lex.ctx->head)
 	end if
 

@@ -28,6 +28,7 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -128,7 +129,9 @@ function cParentExpression _
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: skip until next ')', fake an expr
 		hSkipUntil( CHAR_RPRNT, TRUE )
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-atom.bas", __LINE__)
 	end if
 
 	'' ')'
@@ -397,7 +400,9 @@ private function hBaseMemberAccess _
 		errReport( FB_ERRMSG_ILLEGALOUTSIDEAMETHOD )
 		'' error recovery: skip stmt, return
 		hSkipStmt( )
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-atom.bas", __LINE__)
 	end if
 
 	var parent = symbGetNamespace( proc )
@@ -410,7 +415,9 @@ private function hBaseMemberAccess _
 			errReport( FB_ERRMSG_CLASSNOTDERIVED )
 			'' error recovery: skip stmt, return
 			hSkipStmt( )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-atom.bas", __LINE__)
 		end if
 
 		'' BASE
@@ -420,7 +427,9 @@ private function hBaseMemberAccess _
 		if( hMatch( CHAR_DOT ) = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDPERIOD )
 			hSkipStmt( )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-atom.bas", __LINE__)
 		end if
 
 		'' (BASE '.')?

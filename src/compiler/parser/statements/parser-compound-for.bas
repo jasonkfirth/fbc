@@ -29,6 +29,7 @@
 #include once "symbols/symb.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-diagnostics.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '' The header observation covers numeric, pointer and overloaded counters.
 '' It records syntax selected by this parser, not a replacement grammar.
@@ -472,7 +473,9 @@ private sub hForAssign _
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake an expr
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/statements/parser-compound-for.bas", __LINE__)
 		end if
 
 		'' initial condition is a non-UDT constant?
@@ -484,7 +487,9 @@ private sub hForAssign _
 			if( expr = NULL ) then
 				errReport( FB_ERRMSG_INVALIDDATATYPES )
 				'' error recovery: fake an expr
-				expr = astNewCONSTi( 0 )
+				expr = fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/statements/parser-compound-for.bas", __LINE__)
 			end if
 
 			'' take the constant value
@@ -546,7 +551,9 @@ private sub hForTo _
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake an expr
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/statements/parser-compound-for.bas", __LINE__)
 		end if
 
 		'' EndCondition is a non-UDT constant?
@@ -557,7 +564,9 @@ private sub hForTo _
 			if( expr = NULL ) then
 				errReport( FB_ERRMSG_INVALIDDATATYPES )
 				'' error recovery: fake an expr
-				expr = astNewCONSTi( 0 )
+				expr = fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/statements/parser-compound-for.bas", __LINE__)
 			end if
 
 			'' remove any symbol, and
@@ -625,7 +634,9 @@ private sub hForStep _
 			if( expr = NULL ) then
 				errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 				'' error recovery: fake an expr
-				expr = astNewCONSTi( 1 )
+				expr = fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 1 ), "replacement-constant", __FUNCTION__, _
+					"parser/statements/parser-compound-for.bas", __LINE__)
 			end if
 		else
 			'' no STEP was specified, so it's 1
@@ -655,7 +666,9 @@ private sub hForStep _
 			if( expr = NULL ) then
 				errReport( FB_ERRMSG_INVALIDDATATYPES )
 				'' error recovery: fake an expr
-				expr = astNewCONSTi( 0 )
+				expr = fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/statements/parser-compound-for.bas", __LINE__)
 			end if
 
 			'' get step's positivity: >= 0?
@@ -735,7 +748,9 @@ private sub hForStep _
 		if( rhs = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
 			'' fake it
-			rhs = astNewCONSTi( 0 )
+			rhs = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/statements/parser-compound-for.bas", __LINE__)
 		end if
 
 		'' is_positive = rhs

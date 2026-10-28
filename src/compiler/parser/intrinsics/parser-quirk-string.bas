@@ -30,6 +30,7 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare function fbSemanticModelFullEnabled( ) as integer
 declare sub fbSemanticModelNativeByteInput _
@@ -870,7 +871,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		end if
 		if( expr1 = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
-			expr1 = astNewCONSTi( 0 )
+			expr1 = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
 		end if
 
 		dim as string format_kind = iif(is_wstr, "wstr", iif(fbLangIsSet(FB_LANG_QB), "str-qb", "str"))
@@ -922,7 +925,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		end if
 		if( expr1 = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
-			expr1 = astNewCONSTi( 0 )
+			expr1 = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
 		end if
 
 		function = expr1
@@ -946,7 +951,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		end if
 		if( expr1 = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
-			expr1 = astNewCONSTi( 0 )
+			expr1 = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
 		end if
 
 		function = expr1
@@ -989,7 +996,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		expr1 = rtlStrInstr( expr1, expr2, expr3, is_any )
 		if( expr1 = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
-			expr1 = astNewCONSTi( 0 )
+			expr1 = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
 		end if
 
 		function = expr1
@@ -1012,7 +1021,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		expr1 = rtlStrInstrRev( expr3, expr1, expr2, is_any )
 		if( expr1 = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
-			expr1 = astNewCONSTi( 0 )
+			expr1 = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
 		end if
 
 		function = expr1
@@ -1060,7 +1071,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 
 		if( expr1 = NULL ) then
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
-			expr1 = astNewCONSTi( 0 )
+			expr1 = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
 		end if
 		dim as string intrinsic_kind = iif(tk = FB_TK_TRIM, "trim", iif(tk = FB_TK_LTRIM, "ltrim", "rtrim"))
 		fbSemanticModelStringIntrinsic(expr1, intrinsic_kind, trim_argument_count, trim_arguments(), is_any, intrinsic_start, intrinsic_nonphysical_start)

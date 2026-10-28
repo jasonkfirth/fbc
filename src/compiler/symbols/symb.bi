@@ -696,6 +696,10 @@ end type
 
 type FB_PROCRTL
 	callback        as FBRTLCALLBACK
+	'' Copied registration facts only; no declaration/table pointer survives.
+	semantic_domain as integer
+	semantic_effects as ulongint
+	semantic_options as uinteger
 end type
 
 enum FB_PROC_RETURN_METHOD

@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '':::::
 #macro hParseRPNT( )
@@ -116,7 +117,9 @@ function cFunctionCall _
 		errReport( FB_ERRMSG_SYNTAXERROR )
 		'' error recovery: remove the SUB call, return a fake node
 		astDelTree( funcexpr )
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-function.bas", __LINE__)
 	end if
 
 	'' Take care of functions returning BYREF

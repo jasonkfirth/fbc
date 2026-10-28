@@ -194,6 +194,7 @@ type AST_NODE_OP  '' used by: bop, uop, addr
 	op              as integer
 	options         as AST_OPOPT
 	ex              as FBSYMBOL ptr                 '' (extra: label, etc)
+	semantic_scope_exit as longint                  '' BRANCH only, copied source exit identity
 end type
 
 type AST_NODE_OFFS
@@ -264,6 +265,8 @@ type AST_NODE_BREAK
 	scope           as integer
 	linenum         as integer
 	stmtnum         as integer                      '' can't use colnum as it's unreliable
+	semantic_identity as longint                    '' module-local scope exit observation
+	semantic_cleanup_count as integer              '' actual cleanup order for this exit
 	'' Physical source token for a parsed control-flow exit, retained until
 	'' scope cleanup is lowered after the parser has closed the block.
 	semantic_dependency       as integer
@@ -331,6 +334,11 @@ type ASTNODE
 	'' Positive B occurrence; negative MR identity is reserved for source CALLs.
 	'' The tag is observation-only and does not change AST layout or codegen.
 	semantic_binding as longint
+	semantic_exit_cleanup as longint              '' copied native scope-exit cleanup identity
+	semantic_lexical_cleanup as longint           '' copied normal teardown action identity
+	semantic_temporary_cleanup as longint         '' temporary action projection, copied by cloning
+	semantic_load_origin as longint               '' latest retained snapshot origin for native loading
+	semantic_object_operation as longint          '' copied head of native object operation observations
 
 	dtype           as integer
 	subtype         as FBSYMBOL ptr
@@ -572,7 +580,7 @@ declare function astScopeBegin( ) as ASTNODE ptr
 declare sub astScopeBreak( byval tolabel as FBSYMBOL ptr )
 declare sub astScopeEnd( byval s as ASTNODE ptr )
 declare function astScopeUpdBreakList( byval proc as ASTNODE ptr ) as integer
-declare sub astScopeDestroyVars( byval symtbtail as FBSYMBOL ptr )
+declare sub astScopeDestroyVars( byval symtbtail as FBSYMBOL ptr, byval owner as FBSYMBOL ptr )
 declare sub astScopeAllocLocals( byval symtbhead as FBSYMBOL ptr )
 declare function astTempScopeBegin _
 	( _
@@ -1476,7 +1484,7 @@ declare sub astDtorListDump( )
 declare sub astDtorListAdd( byval sym as FBSYMBOL ptr )
 declare sub astDtorListAddRef( byval sym as FBSYMBOL ptr )
 declare sub astDtorListRemoveRef( byval sym as FBSYMBOL ptr )
-declare function astDtorListFlush( byval cookie as integer = 0 ) as ASTNODE ptr
+declare function astDtorListFlush( byval cookie as integer = 0, byval semantic_identity as longint ptr = NULL ) as ASTNODE ptr
 declare sub astDtorListDel( byval sym as FBSYMBOL ptr )
 declare sub astDtorListScopeBegin( byval cookie as integer = 0 )
 declare function astDtorListScopeEnd( ) as integer
@@ -1585,6 +1593,11 @@ declare function astLoadMACRO( byval n as ASTNODE ptr ) as IRVREG ptr
 	(n)->semantic_expression = 0
 	(n)->semantic_operands = 0
 	(n)->semantic_binding = 0
+	(n)->semantic_exit_cleanup = 0
+	(n)->semantic_lexical_cleanup = 0
+	(n)->semantic_temporary_cleanup = 0
+	(n)->semantic_load_origin = 0
+	(n)->semantic_object_operation = 0
 	(n)->class = class_
 	(n)->dtype = dtype_
 	(n)->subtype = subtype_

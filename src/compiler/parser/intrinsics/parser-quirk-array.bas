@@ -31,6 +31,7 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-array-mutations.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '' EraseStmt = ERASE ID (',' ID)*
 function cEraseStmt() as integer
@@ -307,7 +308,9 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 			'' error recovery: skip until next ')' and fake an expr
 			hSkipUntil( CHAR_RPRNT, TRUE )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-array.bas", __LINE__)
 		end if
 
 		'' array?
@@ -322,7 +325,9 @@ function cArrayFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			errReport( FB_ERRMSG_EXPECTEDARRAY, TRUE )
 			'' error recovery: skip until next ')' and fake an expr
 			hSkipUntil( CHAR_RPRNT, TRUE )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-array.bas", __LINE__)
 		end if
 
 		'' astBuildArrayBound consumes the unindexed storage and can fold fixed

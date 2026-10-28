@@ -23,6 +23,7 @@
 
 #include once "core/fb.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-diagnostics.bi"
 #include once "core/fbint.bi"
 #include once "backend/ir.bi"
 #include once "lexer/lex.bi"
@@ -534,6 +535,19 @@ sub errPopParamLocation( )
 	listDelNode( @errctx.paramlocations, listGetTail( @errctx.paramlocations ) )
 end sub
 
+private sub hObserveDiagnosticContext( byval options as integer, byval show_source as integer, _
+	byval promoted as integer, byval warning_level as integer = -1 )
+	fbSemanticDiagnosticsPolicy(errctx.inited > 0, options, show_source, errctx.cnt, promoted, warning_level)
+	if( errctx.inited <= 0 ) then exit sub
+	'' The reporter's list is already ordered from the outer argument context
+	'' to the innermost one printed by hMakeParamDesc. Copy it before popping.
+	dim as ERRPARAMLOCATION ptr location = listGetHead(@errctx.paramlocations)
+	while( location <> NULL )
+		fbSemanticDiagnosticsParameter(location->proc, location->tk, location->paramnum, location->paramid)
+		location = listGetNext(location)
+	wend
+end sub
+
 private function errHaveParamLocation( ) as integer
 	function = (listGetTail( @errctx.paramlocations ) <> NULL)
 end function
@@ -561,6 +575,7 @@ private sub hPrintErrMsg _
 	if( msgex = NULL ) then
 		msgex = @""
 	end if
+	hObserveDiagnosticContext(options, showerror, FALSE)
 	fbSemanticModelDiagnostic("error", errnum, linenum, msg, msgex, customText)
 
 	if( len( env.inf.name ) > 0 ) then
@@ -762,8 +777,9 @@ sub errReportWarnEx _
 		msgex = hMakeParamDesc( msgex )
 	end if
 
+	hObserveDiagnosticContext(options, FALSE, fbPdCheckIsSet(FB_PDCHECK_ERROR), warningMsgs(msgnum).level)
+	fbSemanticModelDiagnostic("warning", msgnum, linenum, warningMsgs(msgnum).text, msgex, customText)
 	if( len( env.inf.name ) > 0 ) then
-		fbSemanticModelDiagnostic("warning", msgnum, linenum, warningMsgs(msgnum).text, msgex, customText)
 		print env.inf.name;
 	else
 		if( msgex <> NULL ) then

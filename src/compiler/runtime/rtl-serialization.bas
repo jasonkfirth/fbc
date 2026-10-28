@@ -38,7 +38,7 @@ dim shared as FB_RTL_PROCDEF funcdata(0 to ...) = _
 }
 
 sub rtlSerializationModInit( )
-	rtlAddIntrinsicProcs( @funcdata(0) )
+	rtlAddIntrinsicProcs( @funcdata(0), FALSE, FALSE, FB_RTL_DOMAIN_SERIALIZATION )
 end sub
 
 '' end of runtime/rtl-serialization.bas

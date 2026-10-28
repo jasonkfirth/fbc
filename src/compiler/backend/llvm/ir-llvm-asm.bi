@@ -128,7 +128,11 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	if( operandcount > 0 ) then constraints += ","
 	constraints += "~{cc},~{memory}"
 	hAsmClobbers( constraints )
-	hWriteLine( "call void asm sideeffect alignstack inteldialect """ + escaped + """, """ + _
+	dim as string dialect
+	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+		dialect = " inteldialect"
+	end if
+	hWriteLine( "call void asm sideeffect alignstack" + dialect + " """ + escaped + """, """ + _
 		constraints + """( " + operands + " )" )
 end sub
 

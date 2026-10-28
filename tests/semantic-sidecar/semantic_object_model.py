@@ -26,6 +26,12 @@ def validate_object_model(model, number, subject_modules):
     flag_masks = {owner: {(info[0], info[1]): int(info[2]) for info in definitions.values()}
                   for owner, definitions in model.flag_definitions.items()}
     base_rtti_links = []
+    assigned_members = defaultdict(set)
+    slot_totals, member_totals = defaultdict(int), defaultdict(int)
+    for proc, signature in model.signatures.items():
+        typed = model.types.get(proc)
+        if typed is not None and int(signature[12]) > 0:
+            assigned_members[int(typed[8])].add(proc)
     module = 0
 
     def integer(value, minimum=0, maximum=4294967295):
@@ -56,7 +62,7 @@ def validate_object_model(model, number, subject_modules):
         if row[0] == "M":
             module += 1
             continue
-        available = model.capabilities[module].get(FEATURE) == "available"
+        available = model.capabilities.get(module, {}).get(FEATURE) == "available"
         if available and row[0] == "T":
             latest_types[int(row[1])] = row
         elif available and row[0] == "U" and row[2] in ("type", "union"):
@@ -168,6 +174,10 @@ def validate_object_model(model, number, subject_modules):
                         or typed[8] != build[0] or bool(int(typed[11]) & mask) != bool(abstract)):
                     raise ValueError("Virtual member contradicts its assigned slot, owner or override")
             bucket[ordinal] = tuple(fields)
+            if parts[0] == "virtual-table-slot":
+                slot_totals[module] += 1
+            else:
+                member_totals[module] += 1
         elif parts[0] == "virtual-table-end":
             if len(parts) != 2 or len(fields) != 2 or identity not in builds[module] or identity in ends[module]:
                 raise ValueError("Virtual table closes another build")
@@ -181,6 +191,8 @@ def validate_object_model(model, number, subject_modules):
                 if slot in own:
                     raise ValueError("Virtual table repeats a member's assigned slot")
                 own[slot] = info
+            if {int(info[1]) for info in current_members.values()} != assigned_members[int(build[0])]:
+                raise ValueError("Virtual table omits an assigned native member")
             base_build_key = tables_by_type.get(int(build[3]))
             base_slots = slots[base_build_key] if base_build_key is not None else {}
             base_origins = slot_origins[base_build_key[0]].get(base_build_key[1], {}) if base_build_key is not None else {}
@@ -255,13 +267,24 @@ def validate_object_model(model, number, subject_modules):
     # module's snapshots, without filling a provisional payload retroactively.
     if any(rtti_by_type.get(base) != info for base, info in base_rtti_links):
         raise ValueError("RTTI initializer links another base type's descriptor")
+    for owner, snapshot in latest_snapshots.items():
+        if snapshot[0] != "owned":
+            continue
+        key = tables_by_type.get(owner)
+        if key is None:
+            raise ValueError("Owned object type lacks its actual virtual table build")
+        build = builds[key[0]][key[1]]
+        if (build[1:3] != snapshot[2:4] or build[3] != snapshot[1] or build[5] != snapshot[4]):
+            raise ValueError("Completed object snapshot contradicts its native table build")
+        history = rtti_histories[owner]
+        if not history or (history[-1][2] == "deferred") != (snapshot[7] == "1"):
+            raise ValueError("Owned object type lacks its current RTTI initialization state")
     model.object_models = {}
     for module, capabilities in model.capabilities.items():
         if capabilities.get(FEATURE) != "available":
             continue
         counts = [len(snapshots[module]), len(builds[module]),
-                  sum(len(values) for (owner, _), values in slots.items() if owner == module),
-                  sum(len(values) for (owner, _), values in members.items() if owner == module), len(rtti[module])]
+                  slot_totals[module], member_totals[module], len(rtti[module])]
         if (module not in closures or closures[module] != counts or counts[0] != expected_snapshots[module]
                 or set(builds[module]) != set(ends[module])):
             raise ValueError("Native object model module coverage is incomplete")

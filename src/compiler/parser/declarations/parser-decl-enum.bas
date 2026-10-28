@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "tooling/semantic-constructs.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -142,6 +143,8 @@ sub cEnumBody( byval s as FBSYMBOL ptr, byval attrib as FB_SYMBATTRIB )
 						errReport( FB_ERRMSG_DUPDEFINITION )
 						'' error recovery: fake an id
 						id = *symbUniqueLabel( )
+						fbSemanticModelRecoveryName(id, __FUNCTION__, _
+							"parser/declarations/parser-decl-enum.bas", __LINE__)
 					else
 						semantic_site = lexGetCurrentLocation( )
 						has_site = TRUE

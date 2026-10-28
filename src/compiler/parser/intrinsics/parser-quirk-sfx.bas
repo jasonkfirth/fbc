@@ -44,6 +44,7 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "tooling/semantic-intrinsics.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
@@ -659,27 +660,38 @@ function cSfxStmt _
 		byval tk as FB_TOKEN _
 	) as integer
 
+	dim as SEMANTIC_INTRINSIC_SITE semantic_dispatch
+	fbSemanticModelIntrinsicBegin(semantic_dispatch)
+	dim as string semantic_route
+
 	dim as ASTNODE ptr expr = NULL
 
 	select case as const tk
 	case FB_TK_MUSIC
+		semantic_route = "hParseMusic"
 		expr = hParseMusic( FALSE )
 
 	case FB_TK_SFX
+		semantic_route = "hParseSfx"
 		expr = hParseSfx( FALSE )
 
 	case FB_TK_MIDI
+		semantic_route = "hParseMidi"
 		expr = hParseMidi()
 
 	case FB_TK_DEVICE
+		semantic_route = "hParseDevice"
 		expr = hParseDevice( FALSE )
 
 	case FB_TK_CAPTURE
+		semantic_route = "hParseCapture"
 		expr = hParseCapture( FALSE )
 
 	case else
 		return FALSE
 	end select
+
+	fbSemanticModelIntrinsicEnd(semantic_dispatch, "statement", semantic_route, tk, TRUE)
 
 	if( expr <> NULL ) then
 		astAdd( expr )
@@ -693,25 +705,39 @@ function cSfxFunct _
 		byval tk as FB_TOKEN _
 	) as ASTNODE ptr
 
+	dim as SEMANTIC_INTRINSIC_SITE semantic_dispatch
+	fbSemanticModelIntrinsicBegin(semantic_dispatch)
+	dim as string semantic_route
+
+	dim as ASTNODE ptr expr = NULL
+
 	select case as const tk
 	case FB_TK_MUSIC
-		function = hParseMusic( TRUE )
+		semantic_route = "hParseMusic"
+		expr = hParseMusic( TRUE )
 
 	case FB_TK_SFX
-		function = hParseSfx( TRUE )
+		semantic_route = "hParseSfx"
+		expr = hParseSfx( TRUE )
 
 	case FB_TK_MIDI
-		function = hParseMidi()
+		semantic_route = "hParseMidi"
+		expr = hParseMidi()
 
 	case FB_TK_DEVICE
-		function = hParseDevice( TRUE )
+		semantic_route = "hParseDevice"
+		expr = hParseDevice( TRUE )
 
 	case FB_TK_CAPTURE
-		function = hParseCapture( TRUE )
+		semantic_route = "hParseCapture"
+		expr = hParseCapture( TRUE )
 
 	case else
-		function = NULL
+		expr = NULL
 	end select
+	fbSemanticModelIntrinsicEnd(semantic_dispatch, "function", semantic_route, tk, expr <> NULL, expr)
+	function = expr
+
 end function
 
 '' end of parser/intrinsics/parser-quirk-sfx.bas

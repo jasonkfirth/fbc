@@ -28,6 +28,7 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare sub fbSemanticModelExportImplicitCall _
 	( _
@@ -158,7 +159,9 @@ function cOperatorNew( ) as ASTNODE ptr
 		end if
 		if( elementsexpr = NULL ) then
 			errReport( FB_ERRMSG_TYPEMISMATCH, TRUE )
-			elementsexpr = astNewCONSTi( 1, FB_DATATYPE_UINT )
+			elementsexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 1, FB_DATATYPE_UINT ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-mem.bas", __LINE__)
 		end if
 	end if
 

@@ -10,11 +10,18 @@
 #include once "core/fbint.bi"
 #include once "lexer/lex.bi"
 
+declare sub fbSemanticDiagnosticsPolicy( byval initialized as integer, byval options as integer, _
+	byval show_source as integer, byval error_count as integer, byval promoted as integer, _
+	byval warning_level as integer = -1 )
+declare sub fbSemanticDiagnosticsParameter( byval proc as FBSYMBOL ptr, byval token as integer, _
+	byval parameter as integer, byval spelling as const zstring ptr )
+
 declare function fbSemanticDiagnosticsBegin( byref filename as const string ) as integer
 declare function fbSemanticDiagnosticsEnd( byval succeeded as integer ) as integer
 declare sub fbSemanticDiagnosticsProtectFile( byref filename as const string )
 declare sub fbSemanticDiagnosticsSource( byref filename as const string )
 declare sub fbSemanticDiagnosticsModule( byref filename as const string )
+declare sub fbSemanticDiagnosticsFinishModule( byref outcome as const string, byval error_count as integer )
 declare sub fbSemanticDiagnosticsContext( byref context_text as const string )
 
 '' A parser-selected point survives a continued header. It never denotes an

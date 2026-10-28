@@ -222,6 +222,44 @@ exact type/attribute spellings. It does not run another ABI or formatting pass.
 `tooling/semantic-call-abi.bas` copies actual call operands, emitted order and
 carried source identities. LLVM builtin lowering has separate receipts, and
 the observer releases copied state at module completion or rollback.
+`tooling/semantic-object-operations.bas` observes actual base/member/union/vptr
+initialization, chaining, generated members, materialization and destruction.
+Copied native choices and immutable root attachments keep compiler construction
+work separate from runtime execution. It performs no overload selection.
+`tooling/semantic-object-model.bas` copies actual virtual-table slots, assigned
+member indices and RTTI initialization phases, including deferred abstract
+storage. Type snapshots keep plain, incomplete and external runtime ownership
+distinct, and no object-model resolver is run a second time.
+`tooling/semantic-declarations.bas` preserves accepted B/DCL declaration receipt
+order across all source symbol classes, including macro names without physical
+ranges. It keeps acceptance order separate from native statement counters and
+lexical token order.
+`tooling/semantic-startup.bas` observes native startup list order, accepted
+priorities, generated global/static cleanup ownership and guarded instance
+paths. Backends copy selected attributes/array entries/section requests without
+running another registration or sorting pass.
+`tooling/semantic-blocks.bas` copies native procedure/scope boundaries and
+source scope exits before the break lists are consumed. Cleanup observations
+follow actual destructor insertion and retain their exiting edge and owner.
+`tooling/semantic-lifetimes.bas` observes normal scope/procedure teardown,
+including empty traversals, selected storage order and inserted cleanup roots.
+It uses the native selection rather than deriving destruction from type names.
+`tooling/semantic-temporaries.bas` observes native destructor-list registration,
+references, cookie changes, cancellation and flush actions. Scope occurrences
+keep identities across cookie reuse, and IIf records name their actual branch
+flushes. The observer does not run destructor selection a second time.
+`runtime/rtl-effects.bas` supplies metadata-only contracts for compiler-owned
+runtime registration families. `tooling/semantic-effects.bas` exports those
+contracts and keeps cloneability, unknown callees and alias uncertainty separate.
+No optimizer decision consumes the added effect metadata.
+`backend/ir-observe.bas` decorates requested-sidecar IR dispatch without
+changing callback arguments, results or availability. Its observer in
+`tooling/semantic-ir-flow.bas` records complete outer-dispatch block membership
+and actual late transfers, retaining unknown indirect/error/assembly targets.
+`tooling/semantic-loads.bas` records actual recursive AST-load intervals and
+snapshot provenance, including newly created load-time nodes. Emitted calls
+and runtime-check handler transfers retain their actual selection and unknown
+indirect targets. Compiler loading order is kept separate from runtime paths.
 The exporter serializes records through the writer's opaque interface. Make
 builds these modules through the ordinary BASIC rules in each compiler variant,
 and bootstrap emission translates them along with the rest of the compiler.

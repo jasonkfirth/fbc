@@ -126,13 +126,17 @@
 #include once "tooling/semantic-emission-names.bi"
 #include once "tooling/semantic-backend-abi.bi"
 #include once "tooling/semantic-call-abi.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
+#include once "symbols/symb.bi"
 #include once "support/containers/flist.bi"
 #include once "support/containers/hash.bi"
 #include once "lexer/lex.bi"
 #include once "backend/ir-private.bi"
 #include once "crt/mem.bi"
+
+declare function hGetMagicStructNumber( byval sym as FBSYMBOL ptr ) as integer
 
 enum
 	SECTION_HEAD  '' global declarations
@@ -279,6 +283,8 @@ declare sub _emitDBG _
 		ByVal filename As zstring ptr = 0 _
 	)
 declare function hVregToStr( byval vreg as IRVREG ptr ) as string
+declare function hLoadCLongDoubleNativeValue _
+	( byval value as IRVREG ptr, byval subtype as FBSYMBOL ptr ) as IRVREG ptr
 declare sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 declare sub hEmitStore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 declare sub hLoadVreg( byval v as IRVREG ptr )
@@ -349,6 +355,113 @@ private sub _init( )
 		dtypeName(FB_DATATYPE_UINT   ) = dtypeName(FB_DATATYPE_ULONG)
 	end if
 end sub
+
+'' LLVM lowering consults the module triple for target-specific va_list ABI
+'' handling. Keep it in the IR so va_start knows which register-save layout
+'' belongs to the selected FreeBASIC target.
+private function hLLVMTargetTriple( ) as string
+	dim as integer cpu_family = fbGetCpuFamily( )
+	dim as string arch = *fbGetFbcArch( )
+	dim as string vendor = "unknown"
+	dim as string os_id
+
+	select case cpu_family
+	case FB_CPUFAMILY_X86
+		if( env.clopt.cputype >= FB_CPUTYPE_686 ) then
+			arch = "i686"
+		else
+			arch = "i386"
+		end if
+	case FB_CPUFAMILY_X86_64
+		arch = "x86_64"
+	case FB_CPUFAMILY_ARM
+		select case env.clopt.cputype
+		case FB_CPUTYPE_ARMV4: arch = "armv4t"
+		case FB_CPUTYPE_ARMV5TE: arch = "armv5te"
+		case FB_CPUTYPE_ARMV6, FB_CPUTYPE_ARMV6_FP: arch = "armv6"
+		case FB_CPUTYPE_ARMV7A, FB_CPUTYPE_ARMV7A_FP: arch = "armv7"
+		end select
+	case FB_CPUFAMILY_AARCH64
+		arch = "aarch64"
+	case FB_CPUFAMILY_PPC
+		arch = "powerpc"
+	case FB_CPUFAMILY_PPC64
+		arch = "powerpc64"
+	case FB_CPUFAMILY_PPC64LE
+		arch = "powerpc64le"
+	case FB_CPUFAMILY_RISCV32
+		arch = "riscv32"
+	case FB_CPUFAMILY_RISCV64
+		arch = "riscv64"
+	case FB_CPUFAMILY_S390X
+		arch = "s390x"
+	case FB_CPUFAMILY_LOONGARCH64
+		arch = "loongarch64"
+	case FB_CPUFAMILY_MIPS32
+		arch = "mips"
+	case FB_CPUFAMILY_MIPS32EL
+		arch = "mipsel"
+	case FB_CPUFAMILY_MIPS64
+		arch = "mips64"
+	case FB_CPUFAMILY_MIPS64EL
+		arch = "mips64el"
+	case FB_CPUFAMILY_ASMJS
+		arch = "wasm32"
+	end select
+
+	select case env.clopt.target
+	case FB_COMPTARGET_LINUX
+		os_id = "linux-gnu"
+	case FB_COMPTARGET_ANDROID
+		os_id = "linux-android"
+	case FB_COMPTARGET_WIN32
+		vendor = "w64"
+		os_id = "windows-gnu"
+	case FB_COMPTARGET_WINCE
+		vendor = "unknown"
+		os_id = "windows-msvc"
+	case FB_COMPTARGET_CYGWIN
+		vendor = "pc"
+		os_id = "cygwin"
+	case FB_COMPTARGET_DARWIN
+		vendor = "apple"
+		os_id = "darwin"
+	case FB_COMPTARGET_FREEBSD
+		os_id = "freebsd"
+	case FB_COMPTARGET_DRAGONFLY
+		os_id = "dragonfly"
+	case FB_COMPTARGET_OPENBSD
+		os_id = "openbsd"
+	case FB_COMPTARGET_NETBSD
+		os_id = "netbsd"
+	case FB_COMPTARGET_HAIKU
+		os_id = "haiku"
+	case FB_COMPTARGET_SOLARIS
+		os_id = "solaris"
+	case FB_COMPTARGET_ILLUMOS
+		os_id = "illumos"
+	case FB_COMPTARGET_RISCOS
+		os_id = "riscos"
+	case FB_COMPTARGET_AROS
+		os_id = "aros"
+	case FB_COMPTARGET_AMIGA
+		os_id = "amigaos"
+	case FB_COMPTARGET_WII
+		os_id = "none"
+	case FB_COMPTARGET_JS
+		os_id = "unknown"
+	case FB_COMPTARGET_DOS
+		vendor = "pc"
+		os_id = "msdosdjgpp"
+	case FB_COMPTARGET_XBOX
+		vendor = "pc"
+		os_id = "xbox"
+	case else
+		os_id = "unknown"
+	end select
+
+	return arch + "-" + vendor + "-" + os_id
+end function
 
 private sub _end( )
 	irhlEnd( )
@@ -766,13 +879,18 @@ private function hEmitProcHeader _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval is_proto as integer, _
-		byval is_type as integer _
+		byval is_type as integer, _
+		byval emit_semantic as integer = TRUE _
 	) as string
 
 	dim as string ln
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as integer i386_int128_result = any
+	dim as integer cabi_clongdouble_result = _
+		hUsesCLongDoubleCABI( proc ) andalso _
+		hIsCLongDoubleType( symbGetProcRealType( proc ), _
+		                     symbGetProcRealSubtype( proc ) )
 	dim as string semantic_result, semantic_convention, semantic_role
 
 	assert( symbIsProc( proc ) )
@@ -789,6 +907,14 @@ private function hEmitProcHeader _
 	'' Keep the source scalar type in the body, but expose that target ABI here.
 	if( i386_int128_result ) then
 		semantic_result = "void"
+	elseif( cabi_clongdouble_result ) then
+		semantic_result = hGetCLongDoubleLLVMType( symbGetProcRealSubtype( proc ) )
+		if( semantic_result = "" ) then
+			errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+			           ": CLongDouble procedure results are not supported by the LLVM backend for this target" )
+			semantic_result = hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
+								symbGetProcRealSubtype( proc ) )
+		end if
 	else
 		'' Function result type (is 'void' for subs)
 		semantic_result = hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
@@ -796,7 +922,11 @@ private function hEmitProcHeader _
 	end if
 	ln += semantic_result
 	semantic_role = iif(is_type, "pointer-type", iif(is_proto, "declaration", "definition"))
-	dim as longint semantic_signature = fbSemanticModelBackendAbiBegin(proc, "llvm", semantic_role, semantic_result, semantic_convention)
+	dim as longint semantic_signature = 0
+	if( emit_semantic ) then
+		semantic_signature = fbSemanticModelBackendAbiBegin( _
+			proc, "llvm", semantic_role, semantic_result, semantic_convention )
+	end if
 
 	ln += " "
 
@@ -810,7 +940,7 @@ private function hEmitProcHeader _
 
 	'' If returning a struct, there's an extra parameter
 	dim as FBSYMBOL ptr hidden = NULL
-	if( symbProcReturnsOnStack( proc ) ) then
+	if( symbProcReturnsOnStack( proc ) andalso (cabi_clongdouble_result = FALSE) ) then
 		dim as integer semantic_hidden_dtype
 		dim as FBSYMBOL ptr semantic_hidden_subtype
 		dim as string semantic_hidden, semantic_hidden_attributes
@@ -846,8 +976,10 @@ private function hEmitProcHeader _
 			ln += semantic_hidden
 			ln += " " + hEmitParamName( hidden )
 		end if
-		fbSemanticModelBackendAbiParameter(semantic_signature, NULL, 0, 1, "hidden-result", semantic_hidden, _
-			semantic_hidden_dtype, semantic_hidden_subtype, semantic_hidden_attributes)
+		if( emit_semantic ) then
+			fbSemanticModelBackendAbiParameter(semantic_signature, NULL, 0, 1, "hidden-result", semantic_hidden, _
+				semantic_hidden_dtype, semantic_hidden_subtype, semantic_hidden_attributes)
+		end if
 
 		if( symbGetProcParams( proc ) > 0 ) then
 			ln += ", "
@@ -860,7 +992,8 @@ private function hEmitProcHeader _
 	while( param )
 		if( symbGetParamMode( param ) = FB_PARAMMODE_VARARG ) then
 			DZstrConcatAssign( params, "..." )
-			fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 0, "variadic", "...")
+			if( emit_semantic ) then _
+				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 0, "variadic", "...")
 		else
 			symbGetRealParamDtype( param, dtype, subtype )
 			dim as string semantic_kind = "value", semantic_parameter, semantic_attributes
@@ -875,7 +1008,8 @@ private function hEmitProcHeader _
 				hIsI386Integer128Param( dtype, symbGetParamMode( param ) )
 			if( split_i386_int128 ) then
 				DZstrConcatAssign( params, "i64" )
-				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 2, "i386-int128-low", "i64", FB_DATATYPE_ULONGINT)
+				if( emit_semantic ) then _
+					fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 2, "i386-int128-low", "i64", FB_DATATYPE_ULONGINT)
 				if( is_proto = FALSE ) then
 					paramvar = symbGetParamVar( param )
 					if( paramvar <> NULL ) then
@@ -883,12 +1017,25 @@ private function hEmitProcHeader _
 					end if
 				end if
 				DZstrConcatAssign( params, ", i64" )
-				fbSemanticModelBackendAbiParameter(semantic_signature, param, 1, 2, "i386-int128-high", "i64", FB_DATATYPE_ULONGINT)
+				if( emit_semantic ) then _
+					fbSemanticModelBackendAbiParameter(semantic_signature, param, 1, 2, "i386-int128-high", "i64", FB_DATATYPE_ULONGINT)
 				if( is_proto = FALSE ) then
 					if( paramvar <> NULL ) then
 						DZstrConcatAssign( params, " " + hEmitParamName( paramvar ) + ".high" )
 					end if
 				end if
+			elseif( hUsesCLongDoubleCABI( proc ) andalso _
+			        hIsCLongDoubleType( dtype, subtype ) ) then
+				semantic_parameter = hGetCLongDoubleLLVMType( subtype )
+				if( semantic_parameter = "" ) then
+					errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+					           ": CLongDouble procedure parameters are not supported by the LLVM backend for this target" )
+					semantic_parameter = hEmitType( dtype, subtype )
+				end if
+				DZstrConcatAssign( params, semantic_parameter )
+				if( emit_semantic ) then _
+					fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, _
+						"fixed-clongdouble-native", semantic_parameter, dtype, subtype)
 			elseif( hIsMemoryByval( dtype, subtype, symbGetParamMode(param) ) ) then
 				semantic_parameter = hEmitType(typeAddrOf(dtype), subtype)
 				DZstrConcatAssign( params, semantic_parameter )
@@ -896,12 +1043,14 @@ private function hEmitProcHeader _
 					semantic_attributes = hMemoryByvalAttribute( subtype )
 					DZstrConcatAssign( params, semantic_attributes )
 				end if
-				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, "memory-byval", semantic_parameter, _
-					typeAddrOf(dtype), subtype, semantic_attributes)
+				if( emit_semantic ) then _
+					fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, "memory-byval", semantic_parameter, _
+						typeAddrOf(dtype), subtype, semantic_attributes)
 			else
 				semantic_parameter = hEmitType(dtype, subtype)
 				DZstrConcatAssign( params, semantic_parameter )
-				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, semantic_kind, semantic_parameter, dtype, subtype)
+				if( emit_semantic ) then _
+					fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, semantic_kind, semantic_parameter, dtype, subtype)
 			end if
 
 			if( (is_proto = FALSE) andalso (split_i386_int128 = FALSE) ) then
@@ -951,7 +1100,7 @@ private function hEmitProcHeader _
 		end if
 	end if
 
-	fbSemanticModelBackendAbiEnd(semantic_signature, ln)
+	if( emit_semantic ) then fbSemanticModelBackendAbiEnd( semantic_signature, ln )
 	function = ln
 end function
 
@@ -1548,13 +1697,15 @@ end sub
 private sub hEmitCtorDtorArrayElement _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byref s as string _
+		byref s as string, _
+		byref kind as const string _
 	)
 	dim as integer priority = symbGetProcPriority( proc )
 
 	if( len( s ) > 0 ) then
 		s += ", "
 	end if
+	dim as integer semantic_start = len(s)
 
 	'' LLVM's ctor/dtor entries include an optional associated data pointer.
 	'' Keep it null for FreeBASIC module initialization procedures.
@@ -1569,6 +1720,8 @@ private sub hEmitCtorDtorArrayElement _
 	s += *symbGetMangledName( proc )
 	s += ", i8* null"
 	s += " }"
+	fbSemanticModelStartupEmission(proc, kind, "llvm", "array-entry", str(priority), _
+		iif(kind = "constructor", "llvm.global_ctors", "llvm.global_dtors"), mid(s, semantic_start + 1))
 
 end sub
 
@@ -1579,10 +1732,10 @@ private sub hAddGlobalCtorDtor( byval proc as FBSYMBOL ptr )
 
 	if( symbGetIsGlobalCtor( proc ) ) then
 		ctx.ctorcount += 1
-		hEmitCtorDtorArrayElement( proc, ctx.ctors )
+		hEmitCtorDtorArrayElement( proc, ctx.ctors, "constructor" )
 	elseif( symbGetIsGlobalDtor( proc ) ) then
 		ctx.dtorcount += 1
-		hEmitCtorDtorArrayElement( proc, ctx.dtors )
+		hEmitCtorDtorArrayElement( proc, ctx.dtors, "destructor" )
 	end if
 end sub
 
@@ -1611,6 +1764,7 @@ private function _emitBegin( ) as integer
 	ctx.inproc = FALSE
 	ctx.linenum = 0
 	ctx.section = SECTION_HEAD
+	hWriteLine( "target triple = """ + hLLVMTargetTriple( ) + """" )
 	strsetInit( @ctx.definedprocs, 64 )
 	strsetInit( @ctx.declaredprocs, 64 )
 	strsetInit( @ctx.udtnames, 64 )
@@ -1768,6 +1922,27 @@ private sub _procAllocArg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr
 	if( symbIsParamVarByval( sym ) andalso _
 	    (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
 		dtype = typeAddrOf( dtype )
+	end if
+	if( symbIsParamVarByval( sym ) andalso _
+	    hUsesCLongDoubleCABI( proc ) andalso _
+	    hIsCLongDoubleType( dtype, subtype ) ) then
+		var native_type = hGetCLongDoubleLLVMType( subtype )
+		if( native_type = "" ) then
+			errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+			           ": CLongDouble procedure parameters are not supported by the LLVM backend for this target" )
+			exit sub
+		end if
+		var aggregate_type = hEmitType( dtype, subtype )
+		ln = hEmitVarName( sym ) + " = alloca " + aggregate_type
+		hWriteLine( ln )
+		hWriteLine( "store " + aggregate_type + " zeroinitializer, " + _
+		            aggregate_type + "* " + hEmitVarName( sym ) + ", align 1" )
+		var native_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+		hWriteLine( hVregToStr( native_pointer ) + " = bitcast " + aggregate_type + _
+		            "* " + hEmitVarName( sym ) + " to " + native_type + "*" )
+		hWriteLine( "store " + native_type + " " + hEmitParamName( sym ) + ", " + _
+		            native_type + "* " + hVregToStr( native_pointer ) + ", align 1" )
+		exit sub
 	end if
 	dim as integer split_i386_int128 = _
 		symbIsParamVarByval( sym ) andalso _
@@ -2929,6 +3104,18 @@ private sub _emitLoadRes _
 	)
 
 	hAstCommand( "loadres " + vregPretty( v1 ) )
+	if( hUsesCLongDoubleCABI( ctx.current_proc ) andalso _
+	    hIsCLongDoubleType( vr->dtype, vr->subtype ) ) then
+		var native_type = hGetCLongDoubleLLVMType( vr->subtype )
+		if( native_type = "" ) then
+			errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+			           ": CLongDouble procedure results are not supported by the LLVM backend for this target" )
+			exit sub
+		end if
+		var native_value = hLoadCLongDoubleNativeValue( v1, vr->subtype )
+		hWriteLine( "ret " + native_type + " " + hVregToStr( native_value ) )
+		exit sub
+	end if
 
 	hLoadVreg( v1 )
 	_setVregDataType( v1, vr->dtype, vr->subtype )
@@ -2984,8 +3171,98 @@ end sub
 
 #include once "backend/llvm/ir-llvm-memory.bi"
 
+private function hLoadCLongDoubleNativeValue _
+	( byval value as IRVREG ptr, byval subtype as FBSYMBOL ptr ) as IRVREG ptr
+
+	var native_type = hGetCLongDoubleLLVMType( subtype )
+	if( native_type = "" ) then
+		errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+		           ": CLongDouble fixed arguments are not supported by the LLVM backend for this target" )
+		return value
+	end if
+
+	var aggregate_type = hEmitType( FB_DATATYPE_STRUCT, subtype )
+	dim as IRVREG ptr aggregate_pointer = any
+	if( value->typ = IR_VREGTYPE_REG ) then
+		hLoadVreg( value )
+		aggregate_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
+		var alloca_line = string( ctx.indent, TABCHAR ) + _
+			hVregToStr( aggregate_pointer ) + " = alloca " + aggregate_type + NEWLINE
+		hAppendOutputBuffer( @ctx.proc_allocas, strptr( alloca_line ), len( alloca_line ) )
+		hWriteLine( "store " + aggregate_type + " " + hVregToStr( value ) + ", " + _
+		            aggregate_type + "* " + hVregToStr( aggregate_pointer ) + ", align 1" )
+	else
+		hPrepareAddress( value )
+		aggregate_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
+		hWriteLine( hVregToStr( aggregate_pointer ) + " = bitcast " + _
+		            hEmitType( value->dtype, subtype ) + " " + hVregToStr( value ) + _
+		            " to " + aggregate_type + "*" )
+	end if
+
+	var native_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+	hWriteLine( hVregToStr( native_pointer ) + " = bitcast " + aggregate_type + _
+	            "* " + hVregToStr( aggregate_pointer ) + " to " + native_type + "*" )
+	var native_value = irhlAllocVreg( FB_DATATYPE_DOUBLE, NULL )
+	hWriteLine( hVregToStr( native_value ) + " = load " + native_type + ", " + _
+	            native_type + "* " + hVregToStr( native_pointer ) + ", align 1" )
+	return native_value
+end function
+
+private function hStoreCLongDoubleNativeValue _
+	( byval native_value as IRVREG ptr, byval subtype as FBSYMBOL ptr ) as IRVREG ptr
+
+	var native_type = hGetCLongDoubleLLVMType( subtype )
+	if( native_type = "" ) then
+		errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+		           ": CLongDouble fixed results are not supported by the LLVM backend for this target" )
+		return native_value
+	end if
+
+	var aggregate_type = hEmitType( FB_DATATYPE_STRUCT, subtype )
+	var aggregate_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
+	var alloca_line = string( ctx.indent, TABCHAR ) + _
+		hVregToStr( aggregate_pointer ) + " = alloca " + aggregate_type + NEWLINE
+	hAppendOutputBuffer( @ctx.proc_allocas, strptr( alloca_line ), len( alloca_line ) )
+	hWriteLine( "store " + aggregate_type + " zeroinitializer, " + _
+	            aggregate_type + "* " + hVregToStr( aggregate_pointer ) + ", align 1" )
+	var native_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+	hWriteLine( hVregToStr( native_pointer ) + " = bitcast " + aggregate_type + _
+	            "* " + hVregToStr( aggregate_pointer ) + " to " + native_type + "*" )
+	hWriteLine( "store " + native_type + " " + hVregToStr( native_value ) + ", " + _
+	            native_type + "* " + hVregToStr( native_pointer ) + ", align 1" )
+	var aggregate_value = irhlAllocVreg( FB_DATATYPE_STRUCT, subtype )
+	hWriteLine( hVregToStr( aggregate_value ) + " = load " + aggregate_type + ", " + _
+	            aggregate_type + "* " + hVregToStr( aggregate_pointer ) + ", align 1" )
+	return aggregate_value
+end function
+
+private sub hPrepareValistAddress( byval v as IRVREG ptr )
+	if( v->typ = IR_VREGTYPE_REG ) then
+		assert( typeIsPtr( v->dtype ) )
+		exit sub
+	end if
+
+	if( (v->sym <> NULL) andalso symbIsParamVarByval( v->sym ) andalso _
+	    (symbGetValistType( v->dtype, v->subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
+		'' A byval cva_list parameter is already a pointer to the array's
+		'' first element. Its local symbol holds that pointer value.
+		var subtype = v->subtype
+		hPrepareAddress( v )
+		_setVregDataType( v, typeAddrOf( typeAddrOf( FB_DATATYPE_STRUCT ) ), subtype )
+		var loaded = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
+		hWriteLine( hVregToStr( loaded ) + " = load " + _
+		    hEmitType( loaded->dtype, subtype ) + ", " + _
+		    hEmitType( v->dtype, subtype ) + " " + hVregToStr( v ) )
+		*v = *loaded
+	else
+		hPrepareAddress( v )
+	end if
+end sub
+
+'' Save a GP/SSE eightbyte in an addressable buffer before loading the UDT.
 private function hLoadCallArg( byval arg as IRCALLARG ptr ) as IRVREG ptr
 	dim varg as IRVREG ptr = arg->vr
+	dim as integer arg_mode = FB_PARAMMODE_VARARG
 	hInternalCommand( "arg " + vregPretty( varg ) )
 
 	'' Emit param's dtype (to match the declaration), not the arg's
@@ -2995,6 +3272,7 @@ private function hLoadCallArg( byval arg as IRCALLARG ptr ) as IRVREG ptr
 	'' carry its own actual type in the LLVM call instruction.
 	if( arg->param andalso (symbGetParamMode( arg->param ) <> FB_PARAMMODE_VARARG) ) then
 		symbGetRealParamDtype( arg->param, dtype, subtype )
+		arg_mode = symbGetParamMode( arg->param )
 		if( (symbGetParamMode( arg->param ) = FB_PARAMMODE_BYVAL) andalso _
 		    (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
 			dtype = typeAddrOf( dtype )
@@ -3003,7 +3281,22 @@ private function hLoadCallArg( byval arg as IRCALLARG ptr ) as IRVREG ptr
 		dtype = varg->dtype
 		subtype = varg->subtype
 	end if
+	if( arg->param andalso (arg_mode <> FB_PARAMMODE_VARARG) andalso _
+	    hUsesCLongDoubleCABI( symbGetParent( arg->param ) ) andalso _
+	    hIsCLongDoubleType( dtype, subtype ) ) then
+		return hLoadCLongDoubleNativeValue( varg, subtype )
+	end if
 	if( arg->param andalso hIsMemoryByval( dtype, subtype, symbGetParamMode(arg->param) ) ) then
+		return hCopyMemoryByval( varg, dtype, subtype )
+	end if
+	if( hIsSystemVVarargAggregate( dtype, subtype, arg_mode ) ) then
+		return hCopyMemoryByval( varg, dtype, subtype )
+	end if
+	if( hIsMicrosoftVarargAggregate( dtype, subtype, arg_mode ) ) then
+		return hCopyMemoryByval( varg, dtype, subtype )
+	end if
+	if( (arg_mode = FB_PARAMMODE_VARARG) andalso _
+	    hIsCLongDoubleType( dtype, subtype ) ) then
 		return hCopyMemoryByval( varg, dtype, subtype )
 	end if
 	'' An address REG may still name a pointer temporary's alloca.
@@ -3030,7 +3323,7 @@ private function hLoadCallArg( byval arg as IRCALLARG ptr ) as IRVREG ptr
 	    (symbGetValistType( symbGetFullType( arg->param ), _
 	                         symbGetSubtype( arg->param ) ) = FB_CVA_LIST_BUILTIN_C_STD) andalso _
 	    (typeIsPtr( varg->dtype ) = FALSE) ) then
-		hPrepareAddress( varg )
+		hPrepareValistAddress( varg )
 	else
 		hLoadVreg( varg )
 	end if
@@ -3057,13 +3350,23 @@ private sub hDoCall _
 	dim as IRVREG ptr varg = any, v0 = vr
 	dim as DZSTRING args
 	dim as integer i386_int128_result = any
+	dim as integer is_clongdouble_cabi_result = FALSE
 	dim as integer semantic_demanded = (vr <> NULL)
 	dim as integer semantic_result_dtype = FB_DATATYPE_VOID
 	dim as FBSYMBOL ptr semantic_result_subtype = NULL
 	dim as string semantic_result, semantic_convention
+	dim as integer is_variadic = FALSE
+	dim as integer is_systemv_call = (fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64) andalso _
+	                               ((env.target.options and FB_TARGETOPT_UNIX) <> 0)
+	dim as integer systemv_integer_registers_used = 0
+	dim as integer systemv_float_registers_used = 0
+	dim as FBSYMBOL ptr tail_param = symbGetProcTailParam( proc )
 	DZstrZero( args )
 
 	assert( symbIsProc( proc ) )
+	if( tail_param <> NULL ) then
+		is_variadic = (symbGetParamMode( tail_param ) = FB_PARAMMODE_VARARG)
+	end if
 	i386_int128_result = hIsI386Integer128Result( proc )
 	if( i386_int128_result ) then
 		'' The caller-owned slot is the LLVM result for this target ABI.
@@ -3079,6 +3382,9 @@ private sub hDoCall _
 						symbGetProcRealSubtype( proc ) )
 		end if
 	end if
+	is_clongdouble_cabi_result = (vr <> NULL) andalso _
+		hUsesCLongDoubleCABI( proc ) andalso _
+		hIsCLongDoubleType( vr->dtype, vr->subtype )
 
 	'' The LLVM call instruction must include the full function signature,
 	'' and it has to match the declaration. We have to emit this based on
@@ -3086,7 +3392,9 @@ private sub hDoCall _
 	'' have args with different dtype than the params.
 
 	if( vr ) then
-		if( irIsREG( vr ) ) then
+		if( is_clongdouble_cabi_result ) then
+			v0 = irhlAllocVreg( FB_DATATYPE_DOUBLE, NULL )
+		elseif( irIsREG( vr ) ) then
 			v0 = vr
 		else
 			v0 = irhlAllocVreg( vr->dtype, vr->subtype )
@@ -3095,14 +3403,36 @@ private sub hDoCall _
 		ln = hVregToStr( v0 ) + " = call "
 		semantic_convention = hEmitProcCallConv( proc )
 		ln += semantic_convention
-		semantic_result = hEmitType( v0->dtype, v0->subtype )
-		ln += semantic_result + " "
+		if( is_clongdouble_cabi_result ) then
+			semantic_result = hGetCLongDoubleLLVMType( vr->subtype )
+			if( semantic_result = "" ) then
+				errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+				           ": CLongDouble call results are not supported by the LLVM backend for this target" )
+				semantic_result = hEmitType( v0->dtype, v0->subtype )
+			end if
+		else
+			semantic_result = hEmitType( v0->dtype, v0->subtype )
+		end if
+		if( is_variadic ) then
+			ln += hEmitProcHeader( proc, TRUE, TRUE, FALSE ) + " "
+		else
+			ln += semantic_result + " "
+		end if
 		semantic_result_dtype = v0->dtype
 		semantic_result_subtype = v0->subtype
+		if( is_clongdouble_cabi_result ) then
+			semantic_result_dtype = vr->dtype
+			semantic_result_subtype = vr->subtype
+		end if
 	else
 		semantic_convention = hEmitProcCallConv( proc )
 		semantic_result = "void"
-		ln = "call " + semantic_convention + "void "
+		ln = "call " + semantic_convention
+		if( is_variadic ) then
+			ln += hEmitProcHeader( proc, TRUE, TRUE, FALSE ) + " "
+		else
+			ln += "void "
+		end if
 	end if
 	dim as longint semantic_call = fbSemanticModelCallAbiBegin(proc, "llvm", indirect, semantic_demanded, _
 		semantic_result_dtype, semantic_result_subtype, semantic_result, semantic_convention, level, bytestopop)
@@ -3116,6 +3446,43 @@ private sub hDoCall _
 		dim as integer semantic_input_dtype = arg->vr->dtype
 		dim as FBSYMBOL ptr semantic_input_subtype = arg->vr->subtype
 		dim as string semantic_kind, semantic_type, semantic_attributes, semantic_value
+		dim as integer arg_mode = FB_PARAMMODE_VARARG
+		dim as integer is_variadic_operand = is_variadic
+		dim as integer is_systemv_aggregate_vararg = FALSE
+		dim as integer is_microsoft_aggregate_vararg = FALSE
+		dim as integer is_clongdouble_vararg = FALSE
+		if( arg->param ) then
+			arg_mode = symbGetParamMode( arg->param )
+			is_variadic_operand = (arg_mode = FB_PARAMMODE_VARARG)
+		end if
+		if( is_systemv_call andalso is_variadic_operand ) then
+			is_systemv_aggregate_vararg = hIsSystemVVarargAggregate( _
+				semantic_input_dtype, semantic_input_subtype, FB_PARAMMODE_VARARG )
+		end if
+		if( is_variadic_operand ) then
+			is_microsoft_aggregate_vararg = hIsMicrosoftVarargAggregate( _
+				semantic_input_dtype, semantic_input_subtype, FB_PARAMMODE_VARARG )
+			is_clongdouble_vararg = hIsCLongDoubleType( _
+				semantic_input_dtype, semantic_input_subtype )
+		end if
+		if( is_systemv_call andalso (is_systemv_aggregate_vararg = FALSE) andalso _
+		    (is_clongdouble_vararg = FALSE) ) then
+			dim as integer call_dtype = semantic_input_dtype
+			dim as FBSYMBOL ptr call_subtype = semantic_input_subtype
+			dim as integer argument_integer_registers = 0
+			dim as integer argument_float_registers = 0
+			if( arg->param andalso (arg_mode <> FB_PARAMMODE_VARARG) ) then
+				symbGetRealParamDtype( arg->param, call_dtype, call_subtype )
+			end if
+			if( (arg_mode = FB_PARAMMODE_VARARG) orElse _
+			    (hUsesCLongDoubleCABI( proc ) = FALSE) orElse _
+			    (hIsCLongDoubleType( call_dtype, call_subtype ) = FALSE) ) then
+				hGetSystemVArgumentRegisterCounts( call_dtype, call_subtype, _
+					arg_mode, argument_integer_registers, argument_float_registers )
+			end if
+			systemv_integer_registers_used += argument_integer_registers
+			systemv_float_registers_used += argument_float_registers
+		end if
 
 		varg = hLoadCallArg( arg )
 		if( arg->param = NULL andalso i386_int128_result ) then
@@ -3140,6 +3507,19 @@ private sub hDoCall _
 					semantic_input_dtype, semantic_input_subtype, FB_DATATYPE_ULONGINT, NULL, "i64", "", low_name)
 				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 1, 2, "i386-int128-high", _
 					semantic_input_dtype, semantic_input_subtype, FB_DATATYPE_ULONGINT, NULL, "i64", "", high_name)
+			elseif( hUsesCLongDoubleCABI( proc ) andalso _
+			        hIsCLongDoubleType( dtype, subtype ) ) then
+				semantic_type = hGetCLongDoubleLLVMType( subtype )
+				if( semantic_type = "" ) then
+					errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+					           ": CLongDouble fixed arguments are not supported by the LLVM backend for this target" )
+					semantic_type = hEmitType( varg->dtype, varg->subtype )
+				end if
+				semantic_value = hVregToStr( varg )
+				DZstrConcatAssign( args, semantic_type + " " + semantic_value )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, _
+					"fixed-clongdouble-native", semantic_input_dtype, semantic_input_subtype, _
+					FB_DATATYPE_DOUBLE, NULL, semantic_type, "", semantic_value)
 			elseif( hIsMemoryByval( dtype, subtype, symbGetParamMode(arg->param) ) ) then
 				semantic_type = hEmitType( varg->dtype, varg->subtype )
 				DZstrConcatAssign( args, semantic_type )
@@ -3160,6 +3540,157 @@ private sub hDoCall _
 					(symbGetValistType(dtype, subtype) = FB_CVA_LIST_BUILTIN_C_STD) ) then semantic_kind = "va-list-decay"
 				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, semantic_kind, _
 					semantic_input_dtype, semantic_input_subtype, varg->dtype, varg->subtype, _
+					semantic_type, "", semantic_value)
+			end if
+		elseif( is_clongdouble_vararg ) then
+			semantic_type = hGetCLongDoubleLLVMType( semantic_input_subtype )
+			if( semantic_type = "" ) then
+				errReport( FB_ERRMSG_INVALIDDATATYPES, , _
+					": CLongDouble varargs are not supported by the LLVM backend for this target" )
+				semantic_type = hEmitType( varg->dtype, varg->subtype )
+				semantic_value = hVregToStr( varg )
+				DZstrConcatAssign( args, semantic_type + " " + semantic_value )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, _
+					"unsupported-clongdouble-vararg", semantic_input_dtype, _
+					semantic_input_subtype, varg->dtype, varg->subtype, _
+					semantic_type, "", semantic_value)
+			else
+				dim as IRVREG ptr native_pointer = irhlAllocVreg( _
+					typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+				dim as IRVREG ptr native_value = irhlAllocVreg( _
+					FB_DATATYPE_DOUBLE, NULL )
+				hWriteLine( hVregToStr( native_pointer ) + " = bitcast " + _
+					hEmitType( varg->dtype, varg->subtype ) + " " + hVregToStr( varg ) + _
+					" to " + semantic_type + "*" )
+				hWriteLine( hVregToStr( native_value ) + " = load " + semantic_type + ", " + _
+					semantic_type + "* " + hVregToStr( native_pointer ) + ", align 1" )
+				semantic_value = hVregToStr( native_value )
+				DZstrConcatAssign( args, semantic_type + " " + semantic_value )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, _
+					"variadic-clongdouble-native", semantic_input_dtype, _
+					semantic_input_subtype, FB_DATATYPE_STRUCT, semantic_input_subtype, _
+					semantic_type, "", semantic_value)
+			end if
+		elseif( is_systemv_aggregate_vararg ) then
+			dim as integer integer_register_count = 0
+			dim as integer floating_register_count = 0
+			dim as integer can_use_registers = hGetSystemVStructRegisterCounts( _
+				semantic_input_subtype, integer_register_count, floating_register_count )
+			if( can_use_registers ) then
+				can_use_registers = (systemv_integer_registers_used + integer_register_count <= 6) andalso _
+				                    (systemv_float_registers_used + floating_register_count <= 8)
+			end if
+			if( can_use_registers ) then
+				dim as string aggregate_type = hEmitType( _
+					FB_DATATYPE_STRUCT, semantic_input_subtype )
+				dim as string buffer_type = "[16 x i8]"
+				dim as integer structure_class = hGetMagicStructNumber( semantic_input_subtype )
+				dim as integer chunk_count = (semantic_input_subtype->lgt + 7) \ 8
+				dim as IRVREG ptr buffer = irhlAllocVreg( _
+					typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+				dim as IRVREG ptr typed_buffer = irhlAllocVreg( _
+					typeAddrOf( FB_DATATYPE_STRUCT ), semantic_input_subtype )
+				dim as IRVREG ptr aggregate_value = irhlAllocVreg( _
+					FB_DATATYPE_STRUCT, semantic_input_subtype )
+				dim as string alloca_line = string( ctx.indent, TABCHAR ) + _
+					hVregToStr( buffer ) + " = alloca " + buffer_type + ", align 8" + NEWLINE
+				hAppendOutputBuffer( @ctx.proc_allocas, strptr( alloca_line ), len( alloca_line ) )
+				hWriteLine( "store " + buffer_type + " zeroinitializer, " + _
+					buffer_type + "* " + hVregToStr( buffer ) + ", align 1" )
+				hWriteLine( hVregToStr( typed_buffer ) + " = bitcast " + _
+					buffer_type + "* " + hVregToStr( buffer ) + " to " + aggregate_type + "*" )
+				hWriteLine( hVregToStr( aggregate_value ) + " = load " + aggregate_type + ", " + _
+					aggregate_type + "* " + hVregToStr( varg ) )
+				hWriteLine( "store " + aggregate_type + " " + hVregToStr( aggregate_value ) + ", " + _
+					aggregate_type + "* " + hVregToStr( typed_buffer ) + ", align 1" )
+				for chunk as integer = 0 to chunk_count - 1
+					dim as integer is_floating_chunk = FALSE
+					select case as const structure_class
+					case KSTRUCT_X, KSTRUCT_XR
+						is_floating_chunk = (chunk = 0)
+					case KSTRUCT_RX, KSTRUCT_XX
+						is_floating_chunk = (chunk = 1) orElse (structure_class = KSTRUCT_XX)
+					end select
+					dim as IRVREG ptr byte_pointer = irhlAllocVreg( _
+						typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+					dim as IRVREG ptr qword_pointer = irhlAllocVreg( _
+						typeAddrOf( FB_DATATYPE_ULONGINT ), NULL )
+					dim as IRVREG ptr bits = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+					hWriteLine( hVregToStr( byte_pointer ) + " = getelementptr inbounds " + _
+						buffer_type + ", " + buffer_type + "* " + hVregToStr( buffer ) + _
+						", i64 0, i64 " + str( chunk * 8 ) )
+					hWriteLine( hVregToStr( qword_pointer ) + " = bitcast i8* " + _
+						hVregToStr( byte_pointer ) + " to i64*" )
+					hWriteLine( hVregToStr( bits ) + " = load i64, i64* " + _
+						hVregToStr( qword_pointer ) + ", align 1" )
+					if( chunk > 0 ) then DZstrConcatAssign( args, ", " )
+					if( is_floating_chunk ) then
+						dim as IRVREG ptr floating_value = irhlAllocVreg( _
+							FB_DATATYPE_DOUBLE, NULL )
+						hWriteLine( hVregToStr( floating_value ) + " = bitcast i64 " + _
+							hVregToStr( bits ) + " to double" )
+						semantic_type = "double"
+						semantic_value = hVregToStr( floating_value )
+						semantic_kind = "variadic-sse-eightbyte"
+						fbSemanticModelCallAbiArgument(semantic_call, arg->param, chunk, _
+							chunk_count, semantic_kind, semantic_input_dtype, semantic_input_subtype, _
+							FB_DATATYPE_DOUBLE, NULL, semantic_type, "", semantic_value)
+					else
+						semantic_type = "i64"
+						semantic_value = hVregToStr( bits )
+						semantic_kind = "variadic-gp-eightbyte"
+						fbSemanticModelCallAbiArgument(semantic_call, arg->param, chunk, _
+							chunk_count, semantic_kind, semantic_input_dtype, semantic_input_subtype, _
+							FB_DATATYPE_ULONGINT, NULL, semantic_type, "", semantic_value)
+					end if
+					DZstrConcatAssign( args, semantic_type + " " + semantic_value )
+				next
+				systemv_integer_registers_used += integer_register_count
+				systemv_float_registers_used += floating_register_count
+			else
+				semantic_type = hEmitType( varg->dtype, varg->subtype )
+				DZstrConcatAssign( args, semantic_type )
+				semantic_attributes = hMemoryByvalAttribute( semantic_input_subtype )
+				DZstrConcatAssign( args, semantic_attributes )
+				semantic_value = hVregToStr( varg )
+				DZstrConcatAssign( args, " " + semantic_value )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, _
+					"variadic-memory-byval", semantic_input_dtype, semantic_input_subtype, _
+					varg->dtype, varg->subtype, semantic_type, semantic_attributes, semantic_value)
+			end if
+		elseif( is_microsoft_aggregate_vararg ) then
+			dim as integer aggregate_size = semantic_input_subtype->lgt
+			if( (aggregate_size = 1) orElse (aggregate_size = 2) orElse _
+			    (aggregate_size = 4) orElse (aggregate_size = 8) ) then
+				dim as integer integer_dtype = any
+				select case aggregate_size
+				case 1: integer_dtype = FB_DATATYPE_UBYTE
+				case 2: integer_dtype = FB_DATATYPE_USHORT
+				case 4: integer_dtype = FB_DATATYPE_ULONG
+				case 8: integer_dtype = FB_DATATYPE_ULONGINT
+				end select
+				dim as string integer_type = "i" + str( aggregate_size * 8 )
+				dim as IRVREG ptr integer_pointer = irhlAllocVreg( _
+					typeAddrOf( integer_dtype ), NULL )
+				dim as IRVREG ptr integer_value = irhlAllocVreg( integer_dtype, NULL )
+				hWriteLine( hVregToStr( integer_pointer ) + " = bitcast " + _
+					hEmitType( varg->dtype, varg->subtype ) + " " + hVregToStr( varg ) + _
+					" to " + integer_type + "*" )
+				hWriteLine( hVregToStr( integer_value ) + " = load " + integer_type + _
+					", " + integer_type + "* " + hVregToStr( integer_pointer ) + ", align 1" )
+				semantic_type = integer_type
+				semantic_value = hVregToStr( integer_value )
+				DZstrConcatAssign( args, semantic_type + " " + semantic_value )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, _
+					"variadic-windows-aggregate-integer", semantic_input_dtype, _
+					semantic_input_subtype, integer_dtype, NULL, semantic_type, "", semantic_value)
+			else
+				semantic_type = hEmitType( varg->dtype, varg->subtype )
+				semantic_value = hVregToStr( varg )
+				DZstrConcatAssign( args, semantic_type + " " + semantic_value )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, _
+					"variadic-windows-aggregate-indirect", semantic_input_dtype, _
+					semantic_input_subtype, varg->dtype, varg->subtype, _
 					semantic_type, "", semantic_value)
 			end if
 		else
@@ -3196,7 +3727,14 @@ private sub hDoCall _
 	hWriteLine( ln )
 
 	if( vr ) then
-		if( irIsREG( vr ) = FALSE ) then
+		if( is_clongdouble_cabi_result ) then
+			var aggregate_value = hStoreCLongDoubleNativeValue( v0, vr->subtype )
+			if( irIsREG( vr ) ) then
+				*vr = *aggregate_value
+			else
+				hEmitStore( vr, aggregate_value )
+			end if
+		elseif( irIsREG( vr ) = FALSE ) then
 			hEmitStore( vr, v0 )
 		end if
 	end if
@@ -3301,27 +3839,265 @@ private sub _emitJmpTb _
 
 end sub
 
-private sub hPrepareValistAddress( byval v as IRVREG ptr )
-	if( v->typ = IR_VREGTYPE_REG ) then
-		assert( typeIsPtr( v->dtype ) )
+
+
+private sub hCvaArgStoreEightbyte( _
+	byref buffer_name as string, byref buffer_type as string, _
+	byval value as IRVREG ptr, byval is_floating as integer, _
+	byval destination_offset as integer _
+)
+	dim as IRVREG ptr byte_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+	dim as IRVREG ptr qword_pointer = irhlAllocVreg( typeAddrOf( FB_DATATYPE_ULONGINT ), NULL )
+	dim as string bits = hVregToStr( value )
+
+	hWriteLine( hVregToStr( byte_pointer ) + " = getelementptr inbounds " + _
+	            buffer_type + ", " + buffer_type + "* " + buffer_name + _
+	            ", i64 0, i64 " + str( destination_offset ) )
+	if( is_floating ) then
+		dim as IRVREG ptr integer_bits = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+		hWriteLine( hVregToStr( integer_bits ) + " = bitcast double " + _
+		            bits + " to i64" )
+		bits = hVregToStr( integer_bits )
+	end if
+	hWriteLine( hVregToStr( qword_pointer ) + " = bitcast i8* " + _
+	            hVregToStr( byte_pointer ) + " to i64*" )
+	hWriteLine( "store i64 " + bits + ", i64* " + _
+	            hVregToStr( qword_pointer ) + ", align 1" )
+end sub
+
+'' LLVM 21's x86 va_arg lowering crashes on aggregate result types. Consume
+'' each System V eightbyte as its GP/SSE scalar class, using overflow_arg_area
+'' when the complete aggregate does not fit in the register save area.
+private sub hCvaArgSystemVStruct(byval v1 as IRVREG ptr, _
+	byval vr as IRVREG ptr)
+	dim as integer lgt = symbGetSizeOf( vr->subtype )
+	dim as integer stack_alignment = vr->subtype->udt.natalign
+	dim as integer slot_size = (lgt + 7) And Not(7)
+	dim as integer structure_class = hGetMagicStructNumber( vr->subtype )
+	dim as integer integer_register_count = 0
+	dim as integer floating_register_count = 0
+	dim as integer can_use_registers = FALSE
+	dim as integer first_bytes = iif( lgt > 8, 8, lgt )
+	dim as integer second_bytes = lgt - first_bytes
+	dim as string list_type = hEmitType( FB_DATATYPE_STRUCT, v1->subtype )
+	dim as string result_type = hEmitType( vr->dtype, vr->subtype )
+	dim as string buffer_type
+	dim as string register_label = *symbUniqueLabel( )
+	dim as string overflow_label = *symbUniqueLabel( )
+	dim as string done_label = *symbUniqueLabel( )
+	dim as IRVREG ptr list_slot = irhlAllocVreg( _
+		typeAddrOf( FB_DATATYPE_STRUCT ), v1->subtype )
+	dim as IRVREG ptr buffer = irhlAllocVreg( FB_DATATYPE_STRUCT, vr->subtype )
+	dim as string alloca_line
+
+	if( lgt <= 0 ) then
+		errReportEx( FB_ERRMSG_INTERNAL, "LLVM Cva_Arg zero-sized aggregate" )
 		exit sub
 	end if
+	if( stack_alignment < 8 ) then stack_alignment = 8
+	if( stack_alignment > 16 ) then stack_alignment = 16
+	buffer_type = "[" + str( iif( lgt > 16, lgt, 16 ) ) + " x i8]"
 
-	if( (v->sym <> NULL) andalso symbIsParamVarByval( v->sym ) andalso _
-	    (symbGetValistType( v->dtype, v->subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
-		'' A byval cva_list parameter is already a pointer to the array's
-		'' first element. Its local symbol holds that pointer value.
-		var subtype = v->subtype
-		hPrepareAddress( v )
-		_setVregDataType( v, typeAddrOf( typeAddrOf( FB_DATATYPE_STRUCT ) ), subtype )
-		var loaded = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
-		hWriteLine( hVregToStr( loaded ) + " = load " + _
-		    hEmitType( loaded->dtype, subtype ) + ", " + _
-		    hEmitType( v->dtype, subtype ) + " " + hVregToStr( v ) )
-		*v = *loaded
-	else
-		hPrepareAddress( v )
+	alloca_line = string( ctx.indent, TABCHAR ) + hVregToStr( list_slot ) + _
+	              " = alloca " + list_type + NEWLINE
+	hAppendOutputBuffer( @ctx.proc_allocas, strptr( alloca_line ), len( alloca_line ) )
+	alloca_line = string( ctx.indent, TABCHAR ) + hVregToStr( buffer ) + _
+	              " = alloca " + buffer_type + NEWLINE
+	hAppendOutputBuffer( @ctx.proc_allocas, strptr( alloca_line ), len( alloca_line ) )
+
+	dim as IRVREG ptr before = irhlAllocVreg( FB_DATATYPE_STRUCT, v1->subtype )
+	hWriteLine( hVregToStr( before ) + " = load " + list_type + ", " + _
+	            list_type + "* " + hVregToStr( v1 ) )
+	hWriteLine( "store " + list_type + " " + hVregToStr( before ) + ", " + _
+	            list_type + "* " + hVregToStr( list_slot ) )
+	hWriteLine( "store " + buffer_type + " zeroinitializer, " + _
+	            buffer_type + "* " + hVregToStr( buffer ) + ", align 1" )
+
+	if( lgt <= 16 ) then
+		select case as const structure_class
+		case KSTRUCT_R
+			integer_register_count = 1
+			can_use_registers = TRUE
+		case KSTRUCT_X
+			floating_register_count = 1
+			can_use_registers = TRUE
+		case KSTRUCT_RR
+			integer_register_count = 2
+			can_use_registers = TRUE
+		case KSTRUCT_RX
+			integer_register_count = 1
+			floating_register_count = 1
+			can_use_registers = TRUE
+		case KSTRUCT_XR
+			integer_register_count = 1
+			floating_register_count = 1
+			can_use_registers = TRUE
+		case KSTRUCT_XX
+			floating_register_count = 2
+			can_use_registers = TRUE
+		end select
 	end if
+
+	if( can_use_registers ) then
+		dim as IRVREG ptr gp_field = irhlAllocVreg( _
+			typeAddrOf( FB_DATATYPE_ULONG ), NULL )
+		dim as IRVREG ptr fp_field = irhlAllocVreg( _
+			typeAddrOf( FB_DATATYPE_ULONG ), NULL )
+		dim as IRVREG ptr gp_offset = irhlAllocVreg( FB_DATATYPE_ULONG, NULL )
+		dim as IRVREG ptr fp_offset = irhlAllocVreg( FB_DATATYPE_ULONG, NULL )
+		dim as string register_condition
+		hWriteLine( hVregToStr( gp_field ) + " = getelementptr inbounds " + _
+		            list_type + ", " + list_type + "* " + hVregToStr( list_slot ) + _
+		            ", i32 0, i32 0" )
+		hWriteLine( hVregToStr( fp_field ) + " = getelementptr inbounds " + _
+		            list_type + ", " + list_type + "* " + hVregToStr( list_slot ) + _
+		            ", i32 0, i32 1" )
+		hWriteLine( hVregToStr( gp_offset ) + " = load i32, i32* " + _
+		            hVregToStr( gp_field ) )
+		hWriteLine( hVregToStr( fp_offset ) + " = load i32, i32* " + _
+		            hVregToStr( fp_field ) )
+
+		if( integer_register_count > 0 andalso floating_register_count > 0 ) then
+			dim as IRVREG ptr gp_available = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+			dim as IRVREG ptr fp_available = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+			dim as IRVREG ptr both_available = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+			hWriteLine( hVregToStr( gp_available ) + " = icmp ule i32 " + _
+			            hVregToStr( gp_offset ) + ", " + _
+			            str( 48 - integer_register_count * 8 ) )
+			hWriteLine( hVregToStr( fp_available ) + " = icmp ule i32 " + _
+			            hVregToStr( fp_offset ) + ", " + _
+			            str( 176 - floating_register_count * 16 ) )
+			hWriteLine( hVregToStr( both_available ) + " = and i1 " + _
+			            hVregToStr( gp_available ) + ", " + _
+			            hVregToStr( fp_available ) )
+			register_condition = hVregToStr( both_available )
+		elseif( integer_register_count > 0 ) then
+			dim as IRVREG ptr gp_available = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+			hWriteLine( hVregToStr( gp_available ) + " = icmp ule i32 " + _
+			            hVregToStr( gp_offset ) + ", " + _
+			            str( 48 - integer_register_count * 8 ) )
+			register_condition = hVregToStr( gp_available )
+		else
+			dim as IRVREG ptr fp_available = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+			hWriteLine( hVregToStr( fp_available ) + " = icmp ule i32 " + _
+			            hVregToStr( fp_offset ) + ", " + _
+			            str( 176 - floating_register_count * 16 ) )
+			register_condition = hVregToStr( fp_available )
+		end if
+		hWriteLine( "br i1 " + register_condition + ", label %" + _
+		            register_label + ", label %" + overflow_label )
+
+		hWriteLabel( strptr( register_label ) )
+		dim as integer first_is_float = CInt( _
+			(structure_class = KSTRUCT_X) orElse _
+			(structure_class = KSTRUCT_XR) orElse _
+			(structure_class = KSTRUCT_XX))
+		dim as IRVREG ptr first_value = irhlAllocVreg( _
+			iif( first_is_float, FB_DATATYPE_DOUBLE, FB_DATATYPE_ULONGINT ), NULL )
+		if( first_is_float ) then
+			hWriteLine( hVregToStr( first_value ) + " = va_arg " + list_type + "* " + _
+			            hVregToStr( list_slot ) + ", double" )
+		else
+			hWriteLine( hVregToStr( first_value ) + " = va_arg " + list_type + "* " + _
+			            hVregToStr( list_slot ) + ", i64" )
+		end if
+		hCvaArgStoreEightbyte( hVregToStr( buffer ), buffer_type, _
+		                       first_value, first_is_float, 0 )
+
+		if( second_bytes > 0 ) then
+			dim as integer second_is_float = CInt( _
+				(structure_class = KSTRUCT_RX) orElse _
+				(structure_class = KSTRUCT_XX))
+			dim as IRVREG ptr second_value = irhlAllocVreg( _
+				iif( second_is_float, FB_DATATYPE_DOUBLE, FB_DATATYPE_ULONGINT ), NULL )
+			if( second_is_float ) then
+				hWriteLine( hVregToStr( second_value ) + " = va_arg " + list_type + "* " + _
+				            hVregToStr( list_slot ) + ", double" )
+			else
+				hWriteLine( hVregToStr( second_value ) + " = va_arg " + list_type + "* " + _
+				            hVregToStr( list_slot ) + ", i64" )
+			end if
+			hCvaArgStoreEightbyte( hVregToStr( buffer ), buffer_type, _
+			                       second_value, second_is_float, 8 )
+		end if
+		hWriteLine( "br label %" + done_label )
+	else
+		hWriteLine( "br label %" + overflow_label )
+	end if
+
+	hWriteLabel( strptr( overflow_label ) )
+	dim as IRVREG ptr overflow_field = irhlAllocVreg( _
+		typeAddrOf( typeAddrOf( FB_DATATYPE_BYTE ) ), NULL )
+	dim as IRVREG ptr overflow_pointer = irhlAllocVreg( _
+		typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+	dim as IRVREG ptr overflow_integer = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+	dim as IRVREG ptr aligned_integer = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+	dim as IRVREG ptr aligned_pointer = irhlAllocVreg( _
+		typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+	dim as IRVREG ptr next_integer = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+	dim as IRVREG ptr next_pointer = irhlAllocVreg( _
+		typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+	dim as IRVREG ptr source_udt_pointer = irhlAllocVreg( _
+		typeAddrOf( FB_DATATYPE_STRUCT ), vr->subtype )
+	dim as IRVREG ptr source_value = irhlAllocVreg( FB_DATATYPE_STRUCT, vr->subtype )
+	dim as IRVREG ptr buffer_udt_pointer = irhlAllocVreg( _
+		typeAddrOf( FB_DATATYPE_STRUCT ), vr->subtype )
+	dim as string udt_pointer_type = result_type + "*"
+	hWriteLine( hVregToStr( overflow_field ) + " = getelementptr inbounds " + _
+	            list_type + ", " + list_type + "* " + hVregToStr( list_slot ) + _
+	            ", i32 0, i32 2" )
+	hWriteLine( hVregToStr( overflow_pointer ) + " = load i8*, i8** " + _
+	            hVregToStr( overflow_field ) )
+	hWriteLine( hVregToStr( overflow_integer ) + " = ptrtoint i8* " + _
+	            hVregToStr( overflow_pointer ) + " to i64" )
+	if( stack_alignment > 1 ) then
+		dim as IRVREG ptr aligned_plus = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+		hWriteLine( hVregToStr( aligned_plus ) + " = add i64 " + _
+		            hVregToStr( overflow_integer ) + ", " + _
+		            str( stack_alignment - 1 ) )
+		hWriteLine( hVregToStr( aligned_integer ) + " = and i64 " + _
+		            hVregToStr( aligned_plus ) + ", " + _
+		            str( -stack_alignment ) )
+	else
+		hWriteLine( hVregToStr( aligned_integer ) + " = add i64 " + _
+		            hVregToStr( overflow_integer ) + ", 0" )
+	end if
+	hWriteLine( hVregToStr( aligned_pointer ) + " = inttoptr i64 " + _
+	            hVregToStr( aligned_integer ) + " to i8*" )
+	hWriteLine( hVregToStr( next_integer ) + " = add i64 " + _
+	            hVregToStr( aligned_integer ) + ", " + str( slot_size ) )
+	hWriteLine( hVregToStr( next_pointer ) + " = inttoptr i64 " + _
+	            hVregToStr( next_integer ) + " to i8*" )
+	hWriteLine( "store i8* " + hVregToStr( next_pointer ) + ", i8** " + _
+	            hVregToStr( overflow_field ) )
+	hWriteLine( hVregToStr( source_udt_pointer ) + " = bitcast i8* " + _
+	            hVregToStr( aligned_pointer ) + " to " + udt_pointer_type )
+	hWriteLine( hVregToStr( source_value ) + " = load " + result_type + ", " + _
+	            udt_pointer_type + " " + hVregToStr( source_udt_pointer ) + _
+	            ", align 1" )
+	hWriteLine( hVregToStr( buffer_udt_pointer ) + " = bitcast " + _
+	            buffer_type + "* " + hVregToStr( buffer ) + " to " + _
+	            udt_pointer_type )
+	hWriteLine( "store " + result_type + " " + hVregToStr( source_value ) + _
+	            ", " + udt_pointer_type + " " + _
+	            hVregToStr( buffer_udt_pointer ) + ", align 1" )
+	if( can_use_registers ) then
+		hWriteLine( "br label %" + done_label )
+		hWriteLabel( strptr( done_label ) )
+	end if
+
+	dim as IRVREG ptr result_pointer = irhlAllocVreg( _
+		typeAddrOf( FB_DATATYPE_STRUCT ), vr->subtype )
+	hWriteLine( hVregToStr( result_pointer ) + " = bitcast " + buffer_type + "* " + _
+	            hVregToStr( buffer ) + " to " + result_type + "*" )
+	hWriteLine( hVregToStr( vr ) + " = load " + result_type + ", " + _
+	            result_type + "* " + hVregToStr( result_pointer ) + ", align 1" )
+
+	var after = irhlAllocVreg( FB_DATATYPE_STRUCT, v1->subtype )
+	hWriteLine( hVregToStr( after ) + " = load " + list_type + ", " + _
+	            list_type + "* " + hVregToStr( list_slot ) )
+	hWriteLine( "store " + list_type + " " + hVregToStr( after ) + ", " + _
+	            list_type + "* " + hVregToStr( v1 ) )
 end sub
 
 private sub _emitMacro _
@@ -3338,27 +4114,31 @@ private sub _emitMacro _
 
 	select case op
 	case AST_OP_VA_ARG
-		'' LLVM 21's x86-64 va_arg lowering expects an alloca backed
-		'' va_list. Copy through a local slot so expressions yielding a
-		'' pointer to someone else's list work too, then copy back its
-		'' advanced position.
-		var listtype = hEmitType( FB_DATATYPE_STRUCT, v1->subtype )
-		var slot = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), v1->subtype )
-		var allocline = string( ctx.indent, TABCHAR ) + hVregToStr( slot ) + _
-		    " = alloca " + listtype + NEWLINE
-		hAppendOutputBuffer( @ctx.proc_allocas, strptr( allocline ), len( allocline ) )
-		var before = irhlAllocVreg( FB_DATATYPE_STRUCT, v1->subtype )
-		hWriteLine( hVregToStr( before ) + " = load " + listtype + ", " + _
-		    listtype + "* " + hVregToStr( v1 ) )
-		hWriteLine( "store " + listtype + " " + hVregToStr( before ) + ", " + _
-		    listtype + "* " + hVregToStr( slot ) )
-		hWriteLine( hVregToStr( vr ) + " = va_arg " + listtype + "* " + _
-		    hVregToStr( slot ) + ", " + hEmitType( vr->dtype, vr->subtype ) )
-		var after = irhlAllocVreg( FB_DATATYPE_STRUCT, v1->subtype )
-		hWriteLine( hVregToStr( after ) + " = load " + listtype + ", " + _
-		    listtype + "* " + hVregToStr( slot ) )
-		hWriteLine( "store " + listtype + " " + hVregToStr( after ) + ", " + _
-		    listtype + "* " + hVregToStr( v1 ) )
+		if( (typeGetDtAndPtrOnly( vr->dtype ) = FB_DATATYPE_STRUCT) andalso _
+		    (fbGetCpuFamily( ) = FB_CPUFAMILY_X86_64) andalso _
+		    ((env.target.options and FB_TARGETOPT_UNIX) <> 0) ) then
+			hCvaArgSystemVStruct( v1, vr )
+		else
+			'' LLVM 21's x86-64 va_arg lowering expects an alloca-backed
+			'' va_list. Copy through a local slot so pointer expressions work too.
+			var listtype = hEmitType( FB_DATATYPE_STRUCT, v1->subtype )
+			var slot = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), v1->subtype )
+			var allocline = string( ctx.indent, TABCHAR ) + hVregToStr( slot ) + _
+			    " = alloca " + listtype + NEWLINE
+			hAppendOutputBuffer( @ctx.proc_allocas, strptr( allocline ), len( allocline ) )
+			var before = irhlAllocVreg( FB_DATATYPE_STRUCT, v1->subtype )
+			hWriteLine( hVregToStr( before ) + " = load " + listtype + ", " + _
+			    listtype + "* " + hVregToStr( v1 ) )
+			hWriteLine( "store " + listtype + " " + hVregToStr( before ) + ", " + _
+			    listtype + "* " + hVregToStr( slot ) )
+			hWriteLine( hVregToStr( vr ) + " = va_arg " + listtype + "* " + _
+			    hVregToStr( slot ) + ", " + hEmitType( vr->dtype, vr->subtype ) )
+			var after = irhlAllocVreg( FB_DATATYPE_STRUCT, v1->subtype )
+			hWriteLine( hVregToStr( after ) + " = load " + listtype + ", " + _
+			    listtype + "* " + hVregToStr( slot ) )
+			hWriteLine( "store " + listtype + " " + hVregToStr( after ) + ", " + _
+			    listtype + "* " + hVregToStr( v1 ) )
+		end if
 
 	case AST_OP_VA_START, AST_OP_VA_END, AST_OP_VA_COPY
 		var address = irhlAllocVreg( v1->dtype, v1->subtype )

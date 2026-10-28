@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-loads.bi"
 
 '' Labels (l = NULL; r = NULL)
 function astNewLABEL _
@@ -198,6 +199,7 @@ function astLoadASM( byval n as ASTNODE ptr ) as IRVREG ptr
 
 	if( ast.doemit ) then
 		if( n->asm.tokhead <> NULL ) then
+			fbSemanticModelLoadAssembly(n->asm.tokhead)
 			irEmitAsmLine( n->asm.tokhead )
 		end if
 	end if

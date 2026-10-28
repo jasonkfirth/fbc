@@ -29,6 +29,7 @@
 #include once "support/numeric/fp-policy.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 
 declare sub fbSemanticModelExportParserExpression _
@@ -159,7 +160,9 @@ function cTypeConvExpr _
 	expr = cExpression( )
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/intrinsics/parser-quirk-casting.bas", __LINE__)
 		conversion_valid = FALSE
 	end if
 
@@ -199,7 +202,9 @@ function cTypeConvExpr _
 			end if
 			errReport( errmsg, TRUE )
 
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-casting.bas", __LINE__)
 			conversion_valid = FALSE
 		end if
 	end if

@@ -29,6 +29,7 @@
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 
 declare sub fbSemanticModelExportParserExpression _
@@ -68,7 +69,9 @@ private function hMathOp(byval op as AST_OP) as ASTNODE ptr
 	fbSemanticModelAttachOperands(expr, operands)
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/intrinsics/parser-quirk-math.bas", __LINE__)
 	else
 		if( semantic_model_enabled andalso has_closing_parenthesis ) then
 			fbSemanticModelExportOperation(expr, op, source_start)
@@ -121,7 +124,9 @@ private function hAtan2() as ASTNODE ptr
 	fbSemanticModelAttachOperands(expr, operands)
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/intrinsics/parser-quirk-math.bas", __LINE__)
 	elseif( semantic_model_enabled andalso has_closing_parenthesis ) then
 		fbSemanticModelExportOperation(expr, AST_OP_ATAN2, source_start)
 		if( (expr->class = AST_NODECLASS_CALL) or _

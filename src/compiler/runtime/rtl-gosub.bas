@@ -196,23 +196,23 @@
 	'' No need to add these procs if GOSUB isn't allowed in the dialect...
 	if( fbLangOptIsSet( FB_LANG_OPT_GOSUB ) ) then
 
-		rtlAddIntrinsicProcs( @funcdata(0) )
+		rtlAddIntrinsicProcs( @funcdata(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
 
 		if( env.clopt.target = FB_COMPTARGET_WIN32 ) then
 			if( fbIs64bit() ) then
 				if( fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64 ) then
-					rtlAddIntrinsicProcs( @funcdata1_win64_arm(0) )
+					rtlAddIntrinsicProcs( @funcdata1_win64_arm(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
 				else
-					rtlAddIntrinsicProcs( @funcdata1_win64(0) )
-					rtlAddIntrinsicProcs( @funcdata1_win64_frameaddress(0) )
+					rtlAddIntrinsicProcs( @funcdata1_win64(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
+					rtlAddIntrinsicProcs( @funcdata1_win64_frameaddress(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
 				end if
 			else
-				rtlAddIntrinsicProcs( @funcdata1_win32(0) )
+				rtlAddIntrinsicProcs( @funcdata1_win32(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
 			end if
 		elseif( env.clopt.target = FB_COMPTARGET_NETBSD ) then
-			rtlAddIntrinsicProcs( @funcdata2_netbsd(0) )
+			rtlAddIntrinsicProcs( @funcdata2_netbsd(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
 		else
-			rtlAddIntrinsicProcs( @funcdata2_common(0) )
+			rtlAddIntrinsicProcs( @funcdata2_common(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
 		end if
 
 	end if

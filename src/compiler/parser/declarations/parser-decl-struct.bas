@@ -42,6 +42,7 @@ declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, b
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -339,7 +340,9 @@ private sub hFieldType _
 	if( symbIsParentNamespace( dtype, subtype ) ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		'' error recovery: fake a type
-		dtype = FB_DATATYPE_INTEGER
+		dtype = fbSemanticModelRecoveryType( _
+			FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+			"parser/declarations/parser-decl-struct.bas", __LINE__)
 		subtype = NULL
 		lgt = typeGetSize( dtype )
 	end if
@@ -516,7 +519,9 @@ private function hAddAndInitField _
 		if( subtype = parent ) then
 			errReport( FB_ERRMSG_RECURSIVEUDT )
 			'' error recovery: fake type
-			dtype = FB_DATATYPE_INTEGER
+			dtype = fbSemanticModelRecoveryType( _
+				FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+				"parser/declarations/parser-decl-struct.bas", __LINE__)
 			subtype = NULL
 			lgt = 0
 		end if
@@ -587,6 +592,8 @@ private function hFieldId _
 		errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 		'' error recovery: fake an id
 		id = *symbUniqueLabel( )
+		fbSemanticModelRecoveryName(id, __FUNCTION__, _
+			"parser/declarations/parser-decl-struct.bas", __LINE__)
 	end select
 
 	function = @id
@@ -840,14 +847,18 @@ private function cFieldAlignmentAttribute( byref semantic_packing as FB_SEMANTIC
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-struct.bas", __LINE__)
 	end if
 
 	if( astIsCONST( expr ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDCONST )
 		'' error recovery: fake an expr
 		astDelTree( expr )
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-struct.bas", __LINE__)
 	end if
 
 	'' follow the GCC 3.x ABI

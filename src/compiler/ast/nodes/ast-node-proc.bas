@@ -35,6 +35,9 @@
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-startup.bi"
+#include once "tooling/semantic-procedure-state.bi"
+#include once "tooling/semantic-object-operations.bi"
 
 declare sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, _
 	byval astproc as ASTNODE ptr, byval emitted as integer)
@@ -43,6 +46,7 @@ type FB_GLOBINSTANCE
 	sym             as FBSYMBOL_ ptr            '' for symbol
 	initree         as ASTNODE ptr              '' can't store in sym, or emit will use it
 	call_dtor       as integer
+	semantic_identity as longint                '' copied observation identity, never a native address
 end type
 
 declare function hModLevelIsEmpty( byval p as ASTNODE ptr ) as integer
@@ -751,6 +755,7 @@ sub astProcBegin( byval sym as FBSYMBOL ptr, byval ismain as integer )
 	end with
 
 	sym->proc.ext->stmtnum = parser.stmt.cnt
+	fbSemanticModelProcedureState(sym, "begin")
 
 	'' main()?
 	if( symbGetIsMainProc( sym ) ) then
@@ -810,6 +815,7 @@ private function hCheckErrHnd _
 		                         astNewCONSTstr( symbGetName( sym ) ) ), head_node )
 	end if
 
+	fbSemanticModelProcedureState(sym, "before-error-exit")
 	with sym->proc.ext->err
 		if( .lastfun <> NULL ) then
 			astAdd( rtlErrorSetFuncName( NULL, astNewVAR( .lastfun ) ) )
@@ -842,6 +848,8 @@ private function hCheckErrHnd _
 			.hndsaved = NULL
 		end if
 	end with
+
+	fbSemanticModelProcedureState(sym, "after-error-exit")
 
 	function = head_node
 
@@ -893,9 +901,11 @@ private function hMaybeCallResultCtor _
 		return head_node
 	end if
 
-	function = astAddAfter( astBuildCtorCall( symbGetSubtype( sym ), _
-	                                          astBuildProcResultVar( sym, res ) ), _
-	                        head_node )
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("result-initialization", symbGetSubtype(sym), res, defctor)
+	dim as ASTNODE ptr semantic_tree = astAddAfter( astBuildCtorCall( symbGetSubtype( sym ), _
+	                                          astBuildProcResultVar( sym, res ) ), head_node )
+	fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, iif(semantic_tree = NULL, "empty", "built"))
+	function = semantic_tree
 end function
 
 '':::::
@@ -968,7 +978,7 @@ function astProcEnd( byval callrtexit as integer ) as integer
 			end if
 		end if
 
-		astScopeDestroyVars(symbGetProcSymbTb(sym).tail)
+		astScopeDestroyVars(symbGetProcSymbTb(sym).tail, sym)
 	end if
 
 	''
@@ -1281,11 +1291,13 @@ private function hCallFieldCtor _
 	'' Fake dynamic array field that didn't have an initree - nothing to do
 	if( symbIsDynamic( fld ) ) then
 		assert( symbGetTypeIniTree( fld ) = NULL )
+		fbSemanticModelObjectOperationChoice("field-init", "fake-dynamic-skip")
 		exit function
 	end if
 
 	'' Do not initialize?
 	if( symbGetDontInit( fld ) ) then
+		fbSemanticModelObjectOperationChoice("field-init", "no-initialize")
 		exit function
 	end if
 
@@ -1293,10 +1305,12 @@ private function hCallFieldCtor _
 	if( symbHasDefCtor( fld ) ) then
 		'' not an array?
 		if( symbGetArrayDimensions( fld ) = 0 ) then
+			fbSemanticModelObjectOperationChoice("field-init", "default-constructor")
 			'' ctor( this.field )
 			function = astBuildCtorCall( symbGetSubtype( fld ), astBuildVarField( this_, fld ) )
 		'' array..
 		else
+			fbSemanticModelObjectOperationChoice("field-init", "default-constructor-array")
 			function = hCallCtorList( TRUE, this_, fld )
 		end if
 		exit function
@@ -1304,10 +1318,12 @@ private function hCallFieldCtor _
 
 	'' bitfield?
 	if( symbFieldIsBitfield( fld ) ) then
+		fbSemanticModelObjectOperationChoice("field-init", "zero-bitfield")
 		function = astNewASSIGN( astBuildVarField( this_, fld ), _
 		                         astNewCONSTi( 0, FB_DATATYPE_UINT ), _
 		                         AST_OPOPT_ISINI )
 	else
+		fbSemanticModelObjectOperationChoice("field-init", "zero-storage")
 		function = astNewMEM( AST_OP_MEMFILL, _
 		                      astBuildVarField( this_, fld ), _
 		                      astNewCONSTi( symbGetRealSize( fld ) ), _
@@ -1331,6 +1347,7 @@ private function hClearUnionFields _
 	base_ofs = symbGetOfs( base_fld )
 
 	do
+		fbSemanticModelObjectOperationSymbolChoice("union-member", fld)
 		lgt = symbGetRealSize( fld ) + (symbGetOfs( fld ) - base_ofs)
 		if( lgt > bytes ) then
 			bytes = lgt
@@ -1341,6 +1358,7 @@ private function hClearUnionFields _
 	loop while( fld andalso symbIsField( fld ) andalso symbGetIsUnionField( fld ) )
 
 	*pfinalfield = fld
+	fbSemanticModelObjectOperationNumberChoice("union-bytes", bytes)
 
 	'' clear all them at once
 	function = astNewMEM( AST_OP_MEMFILL, _
@@ -1399,7 +1417,8 @@ private function hCallFieldCtors _
 	) as ASTNODE ptr
 
 	dim as FBSYMBOL ptr fld = any, this_ = any
-	dim as ASTNODE ptr tree = any
+	dim as ASTNODE ptr tree = any, semantic_tree = NULL
+	dim as longint semantic_operation
 
 	tree = NULL
 	this_ = symbGetParamVar( symbGetProcHeadParam( proc ) )
@@ -1415,25 +1434,37 @@ private function hCallFieldCtors _
 			if( fld <> parent->udt.base ) then
 				'' part of an union?
 				if( symbGetIsUnionField( fld ) ) then
-					tree = astNewLINK( tree, hClearUnionFields( this_, fld, @fld ), AST_LINK_RETURN_NONE )
+					semantic_operation = fbSemanticModelObjectOperationBegin("union-initialization", parent, fld)
+					semantic_tree = hClearUnionFields( this_, fld, @fld )
+					fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, "built")
+					tree = astNewLINK( tree, semantic_tree, AST_LINK_RETURN_NONE )
 					'' hClearUnionFields() already skipped to the next field behind the union
 					continue while
 				else
 					'' not initialized?
 					if( symbGetTypeIniTree( fld ) = NULL ) then
-						tree = astNewLINK( tree, hCallFieldCtor( this_, fld ), AST_LINK_RETURN_NONE )
+						semantic_operation = fbSemanticModelObjectOperationBegin("field-initialization", parent, fld, NULL, 0)
+						semantic_tree = hCallFieldCtor( this_, fld )
 					elseif( symbIsDynamic( fld ) ) then
-						tree = astNewLINK( tree, hInitDynamicArrayField( this_, fld ), AST_LINK_RETURN_NONE )
+						semantic_operation = fbSemanticModelObjectOperationBegin("field-initialization", parent, fld, NULL, 1)
+						semantic_tree = hInitDynamicArrayField( this_, fld )
 					else
 						'' Note: flushing the field's TYPEINI against the whole "THIS" instance,
 						'' not against "THIS.thefield", because the TYPEINI contains absolute offsets.
-						tree = astNewLINK( tree, _
-						                   astTypeIniFlush( astBuildVarField( this_ ), _
-						                   astTypeIniClone( symbGetTypeIniTree( fld ) ), _
-						                   FALSE, AST_OPOPT_ISINI ), AST_LINK_RETURN_NONE )
+						semantic_operation = fbSemanticModelObjectOperationBegin("field-initialization", parent, fld, NULL, 2)
+						semantic_tree = astTypeIniFlush( astBuildVarField( this_ ), _
+						                   astTypeIniClone( symbGetTypeIniTree( fld ) ), FALSE, AST_OPOPT_ISINI )
 					end if
+					fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, iif(semantic_tree = NULL, "empty", "built"))
+					tree = astNewLINK( tree, semantic_tree, AST_LINK_RETURN_NONE )
 				end if
+			else
+				semantic_operation = fbSemanticModelObjectOperationBegin("field-exclusion", parent, fld, NULL, 1)
+				fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "skipped")
 			end if
+		else
+			semantic_operation = fbSemanticModelObjectOperationBegin("field-exclusion", parent, fld, NULL, 0)
+			fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "skipped")
 		end if
 
 		fld = fld->next
@@ -1452,9 +1483,12 @@ private function hCallBaseCtor _
 	dim as FBSYMBOL ptr base_ = any, this_ = any, subtype = any, defctor = any
 
 	base_ = parent->udt.base
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("base-initialization", parent, base_)
 
 	'' No base UDT? Then there's nothing to do.
 	if( base_ = NULL ) then
+		fbSemanticModelObjectOperationChoice("base-init", "no-base")
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "empty")
 		exit function
 	end if
 
@@ -1464,7 +1498,10 @@ private function hCallBaseCtor _
 	initree = proc->proc.ext->base_initree
 	if( initree ) then
 		proc->proc.ext->base_initree = NULL
-		return astTypeIniFlush( astBuildVarField( this_ ), initree, FALSE, AST_OPOPT_ISINI )
+		fbSemanticModelObjectOperationChoice("base-init", "explicit")
+		dim as ASTNODE ptr semantic_tree = astTypeIniFlush( astBuildVarField( this_ ), initree, FALSE, AST_OPOPT_ISINI )
+		fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, iif(semantic_tree = NULL, "empty", "built"))
+		return semantic_tree
 	end if
 
 	subtype = symbGetSubtype( base_ )
@@ -1472,6 +1509,7 @@ private function hCallBaseCtor _
 
 	'' Otherwise, try to call a default ctor, if any
 	if( defctor ) then
+		fbSemanticModelObjectOperationChoice("base-init", "default-constructor")
 		'' Check access here, because (unlike fields) it's not done
 		'' during the TYPE compound parsing
 		'' Check visibility of the default construtor
@@ -1481,10 +1519,15 @@ private function hCallBaseCtor _
 	'' No default ctor, but others? Then BASE() should have been used,
 	'' since a ctor must be called, but we cannot do it automatically.
 	elseif( symbGetCompCtorHead( subtype ) ) then
+		fbSemanticModelObjectOperationChoice("base-init", "missing-required-constructor")
 		errReport( FB_ERRMSG_NOBASEINIT )
+	else
+		fbSemanticModelObjectOperationChoice("base-init", "plain-storage")
 	end if
 
-	function = hCallFieldCtor( this_, base_ )
+	dim as ASTNODE ptr semantic_tree = hCallFieldCtor( this_, base_ )
+	fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, iif(semantic_tree = NULL, "empty", "built"))
+	function = semantic_tree
 end function
 
 private function hInitVptr _
@@ -1493,23 +1536,30 @@ private function hInitVptr _
 		byval proc as FBSYMBOL ptr _
 	) as ASTNODE ptr
 
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("vptr-initialization", parent)
+
 	'' Only if there is a vptr
 	if( symbGetHasRTTI( parent ) = FALSE ) then
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "empty")
 		exit function
 	end if
 
 	'' The vtable must be present/known for this
 	assert( parent->udt.ext->vtable )
+	fbSemanticModelObjectOperationSymbolChoice("vptr-table", parent->udt.ext->vtable)
 
 	var this_ = symbGetParamVar( symbGetProcHeadParam( proc ) )
 
 	'' this.vptr = cast( any ptr, (cast(byte ptr, @vtable) + sizeof(void *) * 2) )
 	'' assuming that everything with a vptr extends fb_Object
-	function = astNewASSIGN( _
+	dim as ASTNODE ptr semantic_tree = astNewASSIGN( _
 		astBuildVarField( this_, symbUdtGetFirstField( symb.rtti.fb_object ) ), _
 		                  astNewCONV( typeAddrOf( FB_DATATYPE_VOID ), NULL, _
 		                  astNewADDROF( astNewVAR( parent->udt.ext->vtable, env.pointersize * 2 ) ) ), _
 		AST_OPOPT_ISINI )
+	fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, "built")
+	function = semantic_tree
+
 end function
 
 private sub hCallCtors( byval n as ASTNODE ptr, byval sym as FBSYMBOL ptr )
@@ -1517,6 +1567,7 @@ private sub hCallCtors( byval n as ASTNODE ptr, byval sym as FBSYMBOL ptr )
 	dim as FBSYMBOL ptr parent = any
 
 	parent = symbGetNamespace( sym )
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("constructor-initialization", parent)
 
 	'' 1. base ctor (will set vtable ptr according to base)
 	tree = hCallBaseCtor( parent, sym )
@@ -1533,7 +1584,8 @@ private sub hCallCtors( byval n as ASTNODE ptr, byval sym as FBSYMBOL ptr )
 	if( n ) then
 		n = n->prev
 	end if
-	astAddAfter( tree, n )
+	tree = astAddAfter( tree, n )
+	fbSemanticModelObjectOperationEnd(semantic_operation, tree, iif(tree = NULL, "empty", "built"))
 end sub
 
 private sub hCallFieldDtor _
@@ -1542,29 +1594,34 @@ private sub hCallFieldDtor _
 		byval fld as FBSYMBOL ptr _
 	)
 
+	dim as ASTNODE ptr semantic_tree = NULL
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("field-destruction", symbGetSubtype(this_), fld)
+
 	assert( symbIsDescriptor( fld ) = FALSE )
 	assert( symbIsRef( fld ) = FALSE )
 
 	'' Dynamic array field?
 	if( symbIsDynamic( fld ) ) then
 		'' Always needs clean up, regardless of dtype
-		astAdd( rtlArrayErase( astNewNIDXARRAY( astBuildVarField( this_, fld ) ), TRUE, FALSE ) )
+		semantic_tree = astAdd( rtlArrayErase( astNewNIDXARRAY( astBuildVarField( this_, fld ) ), TRUE, FALSE ) )
 	elseif( symbGetArrayDimensions( fld ) = 0 ) then
 		'' Normal field
 		if( typeIsDynamicString( symbGetType( fld ) ) ) then
-			astAdd( rtlStrDelete( astBuildVarField( this_, fld ) ) )
+			semantic_tree = astAdd( rtlStrDelete( astBuildVarField( this_, fld ) ) )
 		elseif( symbHasDtor( fld ) ) then
 			'' dtor( this.field )
-			astAdd( astBuildDtorCall( symbGetSubtype( fld ), astBuildVarField( this_, fld ) ) )
+			semantic_tree = astAdd( astBuildDtorCall( symbGetSubtype( fld ), astBuildVarField( this_, fld ) ) )
 		end if
 	else
 		'' Fixed-size array field
 		if( typeIsDynamicString( symbGetType( fld ) ) ) then
-			astAdd( rtlArrayErase( astNewNIDXARRAY( astBuildVarField( this_, fld ) ), FALSE, FALSE ) )
+			semantic_tree = astAdd( rtlArrayErase( astNewNIDXARRAY( astBuildVarField( this_, fld ) ), FALSE, FALSE ) )
 		elseif( symbHasDtor( fld ) ) then
-			astAdd( hCallCtorList( FALSE, this_, fld ) )
+			semantic_tree = astAdd( hCallCtorList( FALSE, this_, fld ) )
 		end if
 	end if
+
+	fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, iif(semantic_tree = NULL, "empty", "built"))
 
 end sub
 
@@ -1608,14 +1665,17 @@ private sub hCallDeleteDtor _
 	dim as ASTNODE ptr thisptr = any, tree = any
 
 	parent = symbGetNamespace( proc )
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("deleting-destruction", parent)
 	dtor1 = symbGetCompDtor1( parent )
 	if( dtor1 = NULL ) then
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "empty")
 		exit sub
 	end if
 	this_ = symbGetParamVar( symbGetProcHeadParam( proc ) )
 	thisptr = astNewADDROF( astBuildVarField( this_ ) )
 	tree = astBuildDeleteOp( AST_OP_DEL, thisptr, NULL )
-	astAdd( tree )
+	tree = astAdd( tree )
+	fbSemanticModelObjectOperationEnd(semantic_operation, tree, iif(tree = NULL, "empty", "built"))
 
 end sub
 
@@ -1628,9 +1688,11 @@ private sub hCallBaseDtor _
 	dim as FBSYMBOL ptr base_ = any, dtor = any, this_ = any
 
 	base_ = parent->udt.base
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("base-destruction", parent, base_)
 
 	'' No base UDT? Then there's nothing to do.
 	if( base_ = NULL ) then
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "empty")
 		exit sub
 	end if
 
@@ -1645,6 +1707,7 @@ private sub hCallBaseDtor _
 
 	dtor = symbGetCompDtor1( symbGetSubtype( base_ ) )
 	if( dtor = NULL ) then
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "empty")
 		exit sub
 	end if
 
@@ -1658,25 +1721,29 @@ private sub hCallBaseDtor _
 	'' The only exception is if the base class' destructor is ABSTRACT,
 	'' then there is no implementation to call.
 	if( symbIsAbstract( dtor ) ) then
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "empty")
 		exit sub
 	end if
 
 	this_ = symbGetParamVar( symbGetProcHeadParam( proc ) )
-	astAdd( astBuildDtorCall( symbGetSubtype( base_ ), _
-	        astBuildVarField( this_, base_ ), _
-	        TRUE ) )
+	dim as ASTNODE ptr semantic_tree = astAdd( astBuildDtorCall( symbGetSubtype( base_ ), _
+	        astBuildVarField( this_, base_ ), TRUE ) )
+	fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, iif(semantic_tree = NULL, "empty", "built"))
 end sub
 
 private sub hCallDtors( byval proc as FBSYMBOL ptr )
 	dim as FBSYMBOL ptr parent = any
 
 	parent = symbGetNamespace( proc )
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("complete-destruction", parent)
 
 	'' 1st) fields dtors
 	hCallFieldDtors( parent, proc )
 
 	'' 2nd) base dtor
 	hCallBaseDtor( parent, proc )
+	fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "complete")
+
 end sub
 
 private sub hCallStaticCtor _
@@ -1732,6 +1799,7 @@ private sub hGenStaticInstancesDtors( byval proc as FBSYMBOL ptr )
 		'' must be flushed before the proc that has the static vars, because
 		'' they will be removed from hash and symbols table right-after that
 		'' proc is flushed
+		fbSemanticModelStaticCleanupBody(wrap->sym, proc, wrap->proc)
 		hProcFlush( n, TRUE )
 
 		wrap = listGetNext( wrap )
@@ -1797,6 +1865,7 @@ sub astProcAddGlobalInstance _
 	wrap->sym = sym
 	wrap->initree = initree
 	wrap->call_dtor = call_dtor
+	wrap->semantic_identity = fbSemanticModelGlobalInstance(sym, initree <> NULL, call_dtor)
 
 	'' can't be undefined
 	symbSetCantUndef( sym )
@@ -1829,16 +1898,19 @@ private sub hGlobCtorBegin( byval is_ctor as integer )
 	symbSetIsAccessed( proc )
 	symbSetIsParsed( proc )
 
+	fbSemanticModelStartupWrapper(proc, iif(is_ctor, "constructor", "destructor"))
 	astProcBegin( proc, FALSE )
 end sub
 
 private sub hGenGlobalInstancesCtor( )
 	dim as FB_GLOBINSTANCE ptr inst = any
+	dim as integer semantic_ordinal
 
 	'' any global instance with ctors?
 	if( ast.globinst.ctorcnt > 0 ) then
 		'' sub ctor cdecl( ) constructor
 		hGlobCtorBegin( TRUE )
+		semantic_ordinal = 0
 
 		'' for each node..
 		inst = listGetHead( @ast.globinst.list )
@@ -1847,6 +1919,8 @@ private sub hGenGlobalInstancesCtor( )
 			if( inst->initree <> NULL ) then
 				hCallStaticCtor( inst->sym, inst->initree )
 				inst->initree = NULL
+				semantic_ordinal += 1
+				fbSemanticModelGlobalInstanceAction(inst->semantic_identity, astGetProc( )->sym, "initialize", semantic_ordinal)
 			end if
 
 			inst = listGetNext( inst )
@@ -1860,6 +1934,7 @@ private sub hGenGlobalInstancesCtor( )
 	if( ast.globinst.dtorcnt > 0 ) then
 		'' sub dtor cdecl( ) destructor
 		hGlobCtorBegin( FALSE )
+		semantic_ordinal = 0
 
 		'' for each node (in inverse order)..
 		inst = listGetTail( @ast.globinst.list )
@@ -1867,6 +1942,8 @@ private sub hGenGlobalInstancesCtor( )
 			'' need to call dtor?
 			if( inst->call_dtor ) then
 				hCallStaticDtor( inst->sym )
+				semantic_ordinal += 1
+				fbSemanticModelGlobalInstanceAction(inst->semantic_identity, astGetProc( )->sym, "cleanup", semantic_ordinal)
 			end if
 
 			inst = listGetPrev( inst )

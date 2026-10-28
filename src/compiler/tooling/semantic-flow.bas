@@ -321,6 +321,26 @@ sub fbSemanticModelExportFlow(byval phase as longint)
 			next
 			hEdge(block, 0, "default-label", node->jmptb.deflabel)
 			previous = 0
+		case AST_NODECLASS_CALL
+			dim as string stop_reason
+			if( symbGetProcIsNoReturn(node->sym) ) then
+				stop_reason = "known-no-return"
+			elseif( (node->l = NULL) and symbGetIsRTL(node->sym) and (node->sym->id.alias <> NULL) ) then
+				if( *node->sym->id.alias = FB_RTL_END ) then stop_reason = "runtime-end"
+			end if
+			if( len(stop_reason) > 0 ) then
+				fbSemanticModelAppendDetail("K" + TABCHAR + "node" + TABCHAR + fbSemanticModelNumber(item->identity) + _
+					TABCHAR + "root-flow-stop" + TABCHAR + stop_reason)
+				hEdge(block, 0, "procedure-exit")
+				previous = 0
+			end if
+		case AST_NODECLASS_LOAD
+			if( node->lod.isres ) then
+				fbSemanticModelAppendDetail("K" + TABCHAR + "node" + TABCHAR + fbSemanticModelNumber(item->identity) + _
+					TABCHAR + "root-flow-stop" + TABCHAR + "return-value")
+				hEdge(block, 0, "procedure-exit")
+				previous = 0
+			end if
 		case AST_NODECLASS_ASM
 			hEdge(block, 0, "unknown-assembly")
 		end select

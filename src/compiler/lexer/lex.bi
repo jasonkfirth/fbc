@@ -101,6 +101,7 @@ type FBTOKEN
 
 	len             as integer                  '' length
 	sym_chain       as FBSYMCHAIN ptr           '' symbol found, if any
+	semantic_lookup as longint                  '' actual lookup attempt supplying this token; zero if unobserved
 
 	union
 		prdpos      as integer                  '' period '.' pos in symbol names

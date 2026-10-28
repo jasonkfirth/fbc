@@ -35,6 +35,8 @@ def main() -> int:
             backends.append("clang")
     fixtures = [
         ("abi", "tests/compiler-support/backend-abi.bas", "backend ABI passed"),
+        ("asm-att-llvm", "tests/quirk/inline-asm-att-llvm.bas",
+         "PASS: inline assembly dialect"),
         ("builtins", "tests/crt/builtin-backends.bas", ""),
         ("asm-registers", "tests/quirk/inline-asm-registers.bas", ""),
         ("qb-headers", "tests/qb/vb-string-helpers.bas", ""),
@@ -226,6 +228,9 @@ def main() -> int:
                 fixtures.append(("int128-abi", "tests/compiler-support/integer128-abi.bas",
                                  "128-bit C ABI passed"))
             if architecture == "x86_64" and system == "linux":
+                fixtures.append(("cva-forward-abi",
+                                 "tests/compiler-support/cva-forward-abi.bas",
+                                 "C va_list forwarding passed"))
                 int128_input_object = working / "integer128-abi-input.o"
                 c_build = subprocess.run([os.environ.get("GCC") or "gcc", "-m64", "-c",
                                           str(root / "tests/compiler-support/integer128-abi-input.c"),
@@ -275,6 +280,8 @@ def main() -> int:
             return 1
         for backend in backends:
             for name, source, expected in fixtures:
+                if name == "asm-att-llvm" and backend != "llvm":
+                    continue
                 executable = working / (backend + "-" + name)
                 input_source = root / source
                 if name.startswith("c-abi"):
@@ -291,6 +298,8 @@ def main() -> int:
                     # These fixtures contain Intel tokens. Darwin defaults to
                     # AT&T string expressions, so select their actual syntax.
                     command += ["-asm", "intel"]
+                if name == "asm-att-llvm":
+                    command += ["-asm", "att"]
                 if name == "qb-headers":
                     command += ["-lang", "qb"]
                 if name.startswith("thread-local"):

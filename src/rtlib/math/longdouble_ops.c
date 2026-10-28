@@ -13,6 +13,7 @@
 
         - preserve the target C compiler's native long double representation
         - provide arithmetic, comparison, and scalar conversion helpers
+        - read C long double values from native variadic argument lists
         - reject mismatched storage sizes before reading or writing values
 
     This file intentionally does NOT contain:
@@ -22,6 +23,7 @@
 */
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -176,6 +178,23 @@ double fb_LongDoubleToDouble(const void *source,
 			     unsigned int storage_size)
 {
 	return (double)longdouble_load(source, storage_size);
+}
+
+void fb_LongDoubleVaArgCopy(void *destination, unsigned int storage_size,
+			    va_list arguments)
+{
+	long double value;
+
+	/* The C compiler knows the target's x87, SSE, or stack va_list layout. */
+	longdouble_check_storage(destination, storage_size);
+	value = va_arg(arguments, long double);
+	memcpy(destination, &value, sizeof(value));
+}
+
+long double fb_LongDoubleToNative(const void *source,
+				  unsigned int storage_size)
+{
+	return longdouble_load(source, storage_size);
 }
 
 /* end of math/longdouble_ops.c */

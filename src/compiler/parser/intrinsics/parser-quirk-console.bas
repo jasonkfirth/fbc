@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '':::::
 '' ViewStmt   =   VIEW (PRINT (Expression TO Expression)?) .
@@ -57,7 +58,9 @@ function cViewStmt(byval is_func as integer) as ASTNODE ptr
 		if( expr1 <> NULL ) then
 			if( hMatch( FB_TK_TO, LEXCHECK_POST_SUFFIX ) = FALSE ) then
 				errReport( FB_ERRMSG_SYNTAXERROR )
-				expr1 = astNewCONSTi( 0 )
+				expr1 = fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/intrinsics/parser-quirk-console.bas", __LINE__)
 			end if
 			hMatchExpressionEx( expr2, FB_DATATYPE_INTEGER )
 		else

@@ -132,7 +132,8 @@ sub rtlAddIntrinsicProcs _
 	( _
 		byval procdef as const FB_RTL_PROCDEF ptr, _
 		byval is_sfxlib as integer = FALSE, _
-		byval is_gfxlib as integer = FALSE _
+		byval is_gfxlib as integer = FALSE, _
+		byval semantic_domain as FB_RTL_SEMANTIC_DOMAIN = FB_RTL_DOMAIN_UNKNOWN _
 	)
 	dim as FBSYMBOL ptr param = any
 	dim as integer callconv = any
@@ -316,6 +317,9 @@ sub rtlAddIntrinsicProcs _
 
 			if( proc <> NULL ) then
 				symbSetProcCallback( proc, procdef->callback )
+				proc->proc.rtl.semantic_domain = semantic_domain
+				proc->proc.rtl.semantic_effects = rtlSemanticEffects(semantic_domain, procdef)
+				proc->proc.rtl.semantic_options = procdef->options
 				if( procdef->options and FB_RTL_OPT_UTF8ARGS ) then
 					proc->stats or= FB_SYMBSTATS_UTF8ARGS
 				end if

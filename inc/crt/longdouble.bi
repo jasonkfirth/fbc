@@ -2,6 +2,7 @@
 
 '' FB does not have a built-in data type corresponding to C's long double,
 '' so this provides the extra declarations for use by bindings.
+#include once "crt/stdarg.bi"
 #if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
 	'' Most 64-bit GCC targets use a 16-byte long double.
 	type clongdouble
@@ -99,6 +100,17 @@ declare function fb_LongDoubleToUnsigned cdecl alias "fb_LongDoubleToUnsigned" _
 	(byval source as const any ptr, byval storage_size as uinteger) as ulongint
 declare function fb_LongDoubleToDouble cdecl alias "fb_LongDoubleToDouble" _
 	(byval source as const any ptr, byval storage_size as uinteger) as double
+'' CLongDouble is byte-backed, so the C runtime must consume its native ABI slot.
+declare sub fb_LongDoubleVaArgCopy cdecl alias "fb_LongDoubleVaArgCopy" _
+	(byval destination as any ptr, byval storage_size as uinteger, _
+	 byval arguments as Cva_List)
+
+private function fb_LongDoubleVaArg _
+	(byval arguments as Cva_List) as CLongDouble
+	dim result as CLongDouble
+	fb_LongDoubleVaArgCopy( @result, sizeof( result ), arguments )
+	return result
+end function
 
 private operator clongdouble.cast( ) as byte
 	return cast( byte, fb_LongDoubleToSigned( @this, sizeof( clongdouble ) ) )

@@ -145,12 +145,12 @@
 
 sub rtlProfileModInit( )
 	if( (env.clopt.target = FB_COMPTARGET_WIN32) and fbIs64bit( ) ) then
-		rtlAddIntrinsicProcs( @dataMcountWin64(0) )
+		rtlAddIntrinsicProcs( @dataMcountWin64(0), FALSE, FALSE, FB_RTL_DOMAIN_PROFILE )
 	else
-		rtlAddIntrinsicProcs( @dataMcountNormal(0) )
+		rtlAddIntrinsicProcs( @dataMcountNormal(0), FALSE, FALSE, FB_RTL_DOMAIN_PROFILE )
 	end if
-	rtlAddIntrinsicProcs( @dataMonstartup(0) )
-	rtlAddIntrinsicProcs( @funcdata(0) )
+	rtlAddIntrinsicProcs( @dataMonstartup(0), FALSE, FALSE, FB_RTL_DOMAIN_PROFILE )
+	rtlAddIntrinsicProcs( @funcdata(0), FALSE, FALSE, FB_RTL_DOMAIN_PROFILE )
 end sub
 
 sub rtlProfileModEnd( )

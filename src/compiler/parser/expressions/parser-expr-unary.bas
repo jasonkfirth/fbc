@@ -58,6 +58,7 @@ declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, b
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-preprocessor.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "tooling/semantic-macros.bi"
 
@@ -217,7 +218,9 @@ function cNegNotExpression _
 		if( negexpr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake a new node
-			negexpr = astNewCONSTi( 0 )
+			negexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		else
 			dim as longint operands = fbSemanticModelCaptureOperands(negexpr, NULL, "unary", AST_OP_NEG, source_start)
 			negexpr = astNewUOP( AST_OP_NEG, negexpr )
@@ -228,7 +231,9 @@ function cNegNotExpression _
 		if( negexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a new node
-			negexpr = astNewCONSTi( 0 )
+			negexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 		if( export_semantics ) then
 			hSemanticModelExportCurrentExpression(negexpr, source_start, _
@@ -245,7 +250,9 @@ function cNegNotExpression _
 		if( negexpr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake a new node
-			negexpr = astNewCONSTi( 0 )
+			negexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		else
 			dim as longint operands = fbSemanticModelCaptureOperands(negexpr, NULL, "unary", AST_OP_PLUS, source_start)
 			negexpr = astNewUOP( AST_OP_PLUS, negexpr )
@@ -256,7 +263,9 @@ function cNegNotExpression _
 		if( negexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a new node
-			negexpr = astNewCONSTi( 0 )
+			negexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 		if( negexpr->class <> AST_NODECLASS_UOP ) then
 			semantic_operator_override = AST_OP_PLUS
@@ -284,7 +293,9 @@ function cNegNotExpression _
 		if( negexpr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake a new node
-			negexpr = astNewCONSTi( 0 )
+			negexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		else
 			dim as longint operands = fbSemanticModelCaptureOperands(negexpr, NULL, "unary", AST_OP_NOT, source_start)
 			negexpr = astNewUOP( AST_OP_NOT, negexpr )
@@ -295,7 +306,9 @@ function cNegNotExpression _
 		if( negexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a new node
-			negexpr = astNewCONSTi( 0 )
+			negexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 
 		if( export_semantics ) then
@@ -563,7 +576,9 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 		errReport( FB_ERRMSG_EXPECTEDLPRNT )
 		'' error recovery: skip until ')', fake a node
 		hSkipUntil( CHAR_RPRNT, TRUE )
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end if
 	lexSkipToken( )
 
@@ -574,9 +589,13 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 		hSkipUntil( CHAR_COMMA )
 
 		if( options and AST_CONVOPT_PTRONLY ) then
-			dtype = typeAddrOf( FB_DATATYPE_VOID )
+			dtype = fbSemanticModelRecoveryType( _
+				typeAddrOf( FB_DATATYPE_VOID ), "pointer", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		else
-			dtype = FB_DATATYPE_INTEGER
+			dtype = fbSemanticModelRecoveryType( _
+				FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 		subtype = NULL
 	end if
@@ -590,9 +609,13 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 		errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 		'' error recovery: create a fake type
 		if( options and AST_CONVOPT_PTRONLY ) then
-			dtype = typeAddrOf( FB_DATATYPE_VOID )
+			dtype = fbSemanticModelRecoveryType( _
+				typeAddrOf( FB_DATATYPE_VOID ), "pointer", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		else
-			dtype = FB_DATATYPE_INTEGER
+			dtype = fbSemanticModelRecoveryType( _
+				FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 		subtype = NULL
 
@@ -629,7 +652,9 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: create a fake node
-		expr = astNewCONSTz( dtype, subtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTz( dtype, subtype ), "replacement-zero", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end if
 
 	options or= AST_CONVOPT_CHECKSTR
@@ -654,7 +679,9 @@ private function hCast( byval options as AST_CONVOPT, byref source as LEX_LOCATI
 		errReport( errmsg, TRUE )
 
 		'' error recovery: create a fake node
-		expr = astNewCONSTz( dtype, subtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTz( dtype, subtype ), "replacement-zero", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end if
 
 	'' ')'
@@ -704,7 +731,9 @@ function cDerefExpression( ) as ASTNODE ptr
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake a node
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end if
 
 	'' Only a typed pointer input establishes this observation. A UDT's
@@ -791,7 +820,9 @@ private function hProcPtrBody _
 				proc = sym
 			elseif( check_exact ) then
 				errReport( FB_ERRMSG_NOMATCHINGPROC, TRUE )
-				return astNewCONSTi( 0 )
+				return fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/expressions/parser-expr-unary.bas", __LINE__)
 			end if
 		end if
 
@@ -872,14 +903,18 @@ function cProcPtrBody _
 		errReport( FB_ERRMSG_UNDEFINEDSYMBOL )
 		'' error recovery: skip until ')' and fake a node
 		hSkipUntil( CHAR_RPRNT, TRUE )
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end if
 
 	if( symbGetClass( sym ) <> FB_SYMBCLASS_PROC ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 		'' error recovery: skip until ')' and fake a node
 		hSkipUntil( CHAR_RPRNT, TRUE )
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end if
 
 	hCheckEmptyProcParens()
@@ -902,7 +937,9 @@ function cProcPtrBody _
 				errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 				'' error recovery: skip until ')' and fake a node
 				hSkipUntil( CHAR_RPRNT, TRUE )
-				return astNewCONSTi( 0 )
+				return fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/expressions/parser-expr-unary.bas", __LINE__)
 			end if
 
 			select case typeGetDtAndPtrOnly( dtype )
@@ -915,7 +952,9 @@ function cProcPtrBody _
 				errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 				'' error recovery: skip until ')' and fake a node
 				hSkipUntil( CHAR_RPRNT, TRUE )
-				return astNewCONSTi( 0 )
+				return fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/expressions/parser-expr-unary.bas", __LINE__)
 			end select
 		end if
 
@@ -947,7 +986,9 @@ private function hVarPtrBody _
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 		'' error recovery: fake a node
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end if
 
 	'' skip any casting if they won't do any conversion
@@ -967,14 +1008,18 @@ private function hVarPtrBody _
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
 			'' error recovery: fake a node
 			astDelTree( expr )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 
 	case else
 		errReportEx( FB_ERRMSG_INVALIDDATATYPES, "for @ or VARPTR" )
 		'' error recovery: fake a node
 		astDelTree( expr )
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-unary.bas", __LINE__)
 	end select
 
 	'' check op overloading
@@ -987,12 +1032,16 @@ private function hVarPtrBody _
 			'' build a proc call
 			expr = astBuildCall( proc, expr )
 			if( expr = NULL ) then
-				expr = astNewCONSTi( 0 )
+				expr = fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/expressions/parser-expr-unary.bas", __LINE__)
 			end if
 			return expr
 		else
 			if( err_num <> FB_ERRMSG_OK ) then
-				return astNewCONSTi( 0 )
+				return fbSemanticModelRecoveryNode( _
+					astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+					"parser/expressions/parser-expr-unary.bas", __LINE__)
 			end if
 		end if
 	end scope
@@ -1061,7 +1110,9 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			errReport( FB_ERRMSG_EXPECTEDLPRNT )
 			'' error recovery: skip until ')' and fake a node
 			hSkipUntil( CHAR_RPRNT, TRUE )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 
 		expr = hVarPtrBody( NULL, NULL, "varptr" )
@@ -1082,7 +1133,9 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			errReport( FB_ERRMSG_EXPECTEDLPRNT )
 			'' error recovery: skip until ')' and fake a node
 			hSkipUntil( CHAR_RPRNT, TRUE )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 
 		expr = cProcPtrBody( 0, NULL )
@@ -1103,7 +1156,9 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			errReport( FB_ERRMSG_EXPECTEDLPRNT )
 			'' error recovery: skip until ')' and fake a node
 			hSkipUntil( CHAR_RPRNT, TRUE )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 
 		expr = cHighestPrecExpr( NULL, NULL )
@@ -1111,7 +1166,9 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			errReport( FB_ERRMSG_INVALIDDATATYPES )
 			'' error recovery: skip until ')' and fake a node
 			hSkipUntil( CHAR_RPRNT, TRUE )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 
 		dim as integer dtype = astGetDataType( expr )
@@ -1130,7 +1187,9 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			'' error recovery: skip until ')' and fake a node
 			hSkipUntil( CHAR_RPRNT, TRUE )
 			astDelTree( expr )
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-unary.bas", __LINE__)
 		end if
 
 		'' check for invalid classes (functions, etc)

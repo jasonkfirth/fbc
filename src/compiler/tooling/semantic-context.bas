@@ -6,6 +6,7 @@
 
 #include once "tooling/semantic-private.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "parser/parser.bi"
 #include once "crt/mem.bi"
 
 '' Compiler modules execute serially. These snapshots contain only scalar
@@ -18,6 +19,7 @@ dim shared as FBCMMLINEOPT semantic_context_compiler
 dim shared as FBOPTION semantic_context_defaults
 dim shared as FB_LANG_CTX semantic_context_language
 dim shared as integer semantic_context_remkeyword_active
+dim shared as integer semantic_context_mangling
 
 sub fbSemanticModelResetContext( )
 	semantic_context_valid = FALSE
@@ -46,13 +48,15 @@ function fbSemanticModelCurrentContext( ) as longint
 	if( semantic_context_valid ) then
 		if( (memcmp(@semantic_context_compiler, @env.clopt, sizeof(FBCMMLINEOPT)) = 0) and _
 			(memcmp(@semantic_context_defaults, @env.opt, sizeof(FBOPTION)) = 0) and _
-			(memcmp(@semantic_context_language, @env.lang, sizeof(FB_LANG_CTX)) = 0) ) then
+			(memcmp(@semantic_context_language, @env.lang, sizeof(FB_LANG_CTX)) = 0) and _
+			(semantic_context_mangling = parser.mangling) ) then
 			return semantic_context_id
 		end if
 	end if
 	semantic_context_compiler = env.clopt
 	semantic_context_defaults = env.opt
 	semantic_context_language = env.lang
+	semantic_context_mangling = parser.mangling
 	semantic_context_id = fbSemanticModelNextDetailIdentity( )
 	semantic_context_valid = TRUE
 	fbSemanticModelAppendDetail("CTX" + TABCHAR + fbSemanticModelNumber(semantic_context_id) + _
@@ -115,6 +119,10 @@ function fbSemanticModelCurrentContext( ) as longint
 	hOption("language-policy", "opt", env.lang.opt)
 	hOption("language-policy", "integerkeyworddtype", fbSemanticModelTypeCode(env.lang.integerkeyworddtype))
 	hOption("language-policy", "remkeyword-active", abs(semantic_context_remkeyword_active <> FALSE))
+	'' EXTERN changes parser policy without modifying env.clopt or env.opt.
+	'' Include it in the cache key so declarations inside a scope retain the
+	'' selected policy and later declarations see the restored outer mode.
+	hOption("language-policy", "parser-mangling", parser.mangling)
 	hOption("language-policy", "int15literaldtype", fbSemanticModelTypeCode(env.lang.int15literaldtype))
 	hOption("language-policy", "int16literaldtype", fbSemanticModelTypeCode(env.lang.int16literaldtype))
 	hOption("language-policy", "int31literaldtype", fbSemanticModelTypeCode(env.lang.int31literaldtype))

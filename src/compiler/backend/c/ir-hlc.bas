@@ -122,6 +122,7 @@
 #include once "tooling/semantic-emission-names.bi"
 #include once "tooling/semantic-backend-abi.bi"
 #include once "tooling/semantic-call-abi.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
@@ -290,6 +291,7 @@ type IRHLCCTX
 
 	globalvarpass           as integer  '' Global var emitting is done in 2 passes; this allows the callbacks to identify the current pass.
 	computedgotoaddress     as integer  '' A real label address or required entry reference has been emitted.
+	currproc                as FBSYMBOL ptr  '' Borrowed procedure symbol while emitting its body.
 	procentrylabel          as FBSYMBOL ptr  '' Borrowed from the procedure AST while emitting its body.
 	procentrysection        as integer
 	procentryoffset         as uinteger
@@ -909,6 +911,7 @@ private sub hAppendCtorAttrib _
 	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then exit sub
 
 	if( proc->stats and (FB_SYMBSTATS_GLOBALCTOR or FB_SYMBSTATS_GLOBALDTOR) ) then
+		dim as integer semantic_start = len(ln)
 		if( in_front = FALSE ) then
 			ln += " "
 		end if
@@ -928,6 +931,9 @@ private sub hAppendCtorAttrib _
 		if( in_front ) then
 			ln += " "
 		end if
+		fbSemanticModelStartupEmission(proc, iif(symbGetIsGlobalCtor(proc), "constructor", "destructor"), _
+			"c", iif(in_front, "definition-attribute", "declaration-attribute"), _
+			iif(priority = 0, "", str(priority)), "function-attribute", mid(ln, semantic_start + 1))
 	end if
 end sub
 
@@ -1221,6 +1227,44 @@ private function hProcDoesNotReturn( byval proc as FBSYMBOL ptr ) as integer
 	return FALSE
 end function
 
+private function hIsCLongDoubleType _
+	( byval dtype as integer, byval subtype as FBSYMBOL ptr ) as integer
+
+	if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT ) then return FALSE
+	if( subtype = NULL ) then return FALSE
+	return (*symbGetName( subtype ) = "CLONGDOUBLE")
+end function
+
+private function hUsesCLongDoubleCABI( byval proc as FBSYMBOL ptr ) as integer
+	if( proc = NULL ) then return FALSE
+	return (symbGetProcMode( proc ) = FB_FUNCMODE_CDECL)
+end function
+
+private function hCLongDoubleFromNativeExpression _
+	( byref native_expression as string, byval subtype as FBSYMBOL ptr ) as string
+
+	var identifier = "fb_c_clongdouble_native_result_" + str( symbUniqueId( ) )
+	var native_identifier = identifier + "_native"
+	var type_name = hEmitType( FB_DATATYPE_STRUCT, subtype )
+	function = "__extension__ ({ " + type_name + " " + identifier + "; " + _
+		"long double " + native_identifier + " = " + native_expression + "; " + _
+		"__builtin_memset( (void*)&" + identifier + ", 0, sizeof( " + identifier + " ) ); " + _
+		"__builtin_memcpy( (void*)&" + identifier + ", (const void*)&" + native_identifier + ", " + _
+		"(sizeof( " + identifier + " ) < sizeof( " + native_identifier + " ) ? " + _
+		"sizeof( " + identifier + " ) : sizeof( " + native_identifier + " )) ); " + _
+		identifier + "; })"
+end function
+
+private function hCLongDoubleToNativeExpression _
+	( byref value_expression as string, byval subtype as FBSYMBOL ptr ) as string
+
+	var identifier = "fb_c_clongdouble_native_argument_" + str( symbUniqueId( ) )
+	var type_name = hEmitType( FB_DATATYPE_STRUCT, subtype )
+	function = "__extension__ ({ " + type_name + " " + identifier + " = " + _
+		value_expression + "; fb_LongDoubleToNative( (const void*)&" + identifier + ", " + _
+		str( subtype->lgt ) + "u ); })"
+end function
+
 private function hEmitProcHeader _
 	( _
 		byval proc as FBSYMBOL ptr, _
@@ -1246,8 +1290,16 @@ private function hEmitProcHeader _
 	end if
 
 	'' Function result type (is 'void' for subs)
-	semantic_result = hEmitType( typeUnsetIsConst( symbGetProcRealType( proc ) ), _
-					symbGetProcRealSubtype( proc ), TRUE )
+	dim as integer cabi_clongdouble_result = _
+		hUsesCLongDoubleCABI( proc ) andalso _
+		hIsCLongDoubleType( symbGetProcRealType( proc ), _
+		                     symbGetProcRealSubtype( proc ) )
+	if( cabi_clongdouble_result ) then
+		semantic_result = "long double"
+	else
+		semantic_result = hEmitType( typeUnsetIsConst( symbGetProcRealType( proc ) ), _
+						symbGetProcRealSubtype( proc ), TRUE )
+	end if
 	ln += semantic_result
 
 	'' Calling convention if needed (for function pointers it's usually not
@@ -1307,7 +1359,7 @@ private function hEmitProcHeader _
 
 	'' If returning a struct, there's an extra parameter
 	dim as FBSYMBOL ptr hidden = NULL
-	if( symbProcReturnsOnStack( proc ) ) then
+	if( symbProcReturnsOnStack( proc ) andalso (cabi_clongdouble_result = FALSE) ) then
 		dim as integer semantic_hidden_dtype
 		dim as FBSYMBOL ptr semantic_hidden_subtype
 		if( options and EMITPROC_ISPROTO ) then
@@ -1370,7 +1422,15 @@ private function hEmitProcHeader _
 					end if
 					hAdjustCParamType( mangled, param_index, dtype, subtype )
 				end if
-				dim as string semantic_parameter = hEmitType(dtype, subtype, TRUE)
+				dim as integer cabi_clongdouble_parameter = _
+					hUsesCLongDoubleCABI( proc ) andalso _
+					hIsCLongDoubleType( dtype, subtype )
+				dim as string semantic_parameter
+				if( cabi_clongdouble_parameter ) then
+					semantic_parameter = "long double"
+				else
+					semantic_parameter = hEmitType(dtype, subtype, TRUE)
+				end if
 				DZstrConcatAssign( params, semantic_parameter )
 				dim as string semantic_kind = "value"
 				if( (dtype <> semantic_original_dtype) or (subtype <> semantic_original_subtype) ) then semantic_kind = "libc-adjusted"
@@ -1378,7 +1438,12 @@ private function hEmitProcHeader _
 			end if
 
 			if( (options and EMITPROC_ISPROTO) = 0 ) then
-				DZstrConcatAssign( params, " " + hGetCId( symbGetParamVar( param ) ) )
+				var parameter_identifier = hGetCId( symbGetParamVar( param ) )
+				if( hUsesCLongDoubleCABI( proc ) andalso _
+				    hIsCLongDoubleType( dtype, subtype ) ) then
+					parameter_identifier = "fb_c_native_" + parameter_identifier
+				end if
+				DZstrConcatAssign( params, " " + parameter_identifier )
 				if( options = 0 ) then hCAbiParameter(abi_first, abi_last, param, len(*params.data))
 			end if
 		end if
@@ -2468,6 +2533,7 @@ private function _emitBegin( ) as integer
 	end if
 	hCRememberViewType(FB_DATATYPE_STRING, NULL)
 	hWriteLine( "typedef int8 boolean;", TRUE )
+	hWriteLine( "extern long double fb_LongDoubleToNative(const void *, unsigned int);", TRUE )
 
 	'' body
 	sectionBegin( )
@@ -5068,7 +5134,17 @@ end sub
 
 private sub _emitLoadRes( byval v1 as IRVREG ptr, byval vr as IRVREG ptr )
 	_emitStore( vr, v1 )
-	hWriteLine( "return " + exprFlush( exprNewVREG( vr ) ) + ";" )
+	if( hUsesCLongDoubleCABI( ctx.currproc ) andalso _
+	    hIsCLongDoubleType( vr->dtype, vr->subtype ) ) then
+		var identifier = "fb_c_clongdouble_return_" + str( symbUniqueId( ) )
+		var type_name = hEmitType( typeUnsetIsConst( vr->dtype ), vr->subtype, TRUE )
+		hWriteLine( type_name + " " + identifier + " = " + _
+		            exprFlush( exprNewVREG( vr ) ) + ";" )
+		hWriteLine( "return fb_LongDoubleToNative( (const void*)&" + _
+		            identifier + ", " + str( vr->subtype->lgt ) + "u );" )
+	else
+		hWriteLine( "return " + exprFlush( exprNewVREG( vr ) ) + ";" )
+	end if
 end sub
 
 private sub _emitAddr _
@@ -5176,7 +5252,12 @@ private sub hDoCall _
 			if( arg->param->param.mode = FB_PARAMMODE_VARARG ) then semantic_kind = "variadic-value"
 		end if
 
-		var expr = exprNewVREG( arg->vr )
+		dim as integer is_longdouble_vararg = _
+			arg->param andalso _
+			(arg->param->param.mode = FB_PARAMMODE_VARARG) andalso _
+			hIsCLongDoubleType( semantic_input_dtype, semantic_input_subtype )
+		dim as integer is_longdouble_cabi_argument = FALSE
+		var expr = exprNewVREG( arg->vr, is_longdouble_vararg )
 
 		'' param will be NULL for hidden struct result arg, since
 		'' no corresponding PARAM exists.
@@ -5200,6 +5281,9 @@ private sub hDoCall _
 					hAdjustCParamType( mangled, param_index, dtype, subtype )
 				end if
 				if( (dtype <> semantic_original_dtype) or (subtype <> semantic_original_subtype) ) then semantic_kind = "libc-adjusted"
+				is_longdouble_cabi_argument = _
+					hUsesCLongDoubleCABI( proc ) andalso _
+					hIsCLongDoubleType( dtype, subtype )
 				if( allocation_argument ) then
 					expr = hCAllocationArgument(expr)
 				else
@@ -5213,7 +5297,22 @@ private sub hDoCall _
 		dim as integer semantic_selected_dtype = expr->dtype
 		dim as FBSYMBOL ptr semantic_selected_subtype = expr->subtype
 		if( semantic_kind = "array-callback" ) then semantic_selected_dtype = FB_DATATYPE_INVALID
-		dim as string semantic_value = exprFlush( expr )
+		dim as string semantic_value
+		if( is_longdouble_vararg ) then
+			var source_address = exprNewCAddress( expr )
+			semantic_value = "fb_LongDoubleToNative((const void*)" + _
+				exprFlush( source_address ) + ", " + _
+				str( semantic_input_subtype->lgt ) + "u)"
+			semantic_kind = "variadic-clongdouble-native"
+		elseif( is_longdouble_cabi_argument ) then
+			semantic_value = hCLongDoubleToNativeExpression( _
+				exprFlush( expr ), subtype )
+			semantic_kind = "fixed-clongdouble-native"
+			semantic_selected_dtype = FB_DATATYPE_INVALID
+			semantic_selected_subtype = NULL
+		else
+			semantic_value = exprFlush( expr )
+		end if
 		fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, semantic_kind, _
 			semantic_input_dtype, semantic_input_subtype, semantic_selected_dtype, semantic_selected_subtype, "", "", semantic_value)
 		DZstrConcatAssign( args, semantic_value )
@@ -5234,6 +5333,10 @@ private sub hDoCall _
 	DZstrAllocate( args, 0 )
 	s += " )"
 	fbSemanticModelCallAbiEnd(semantic_call, s)
+	if( (vr <> NULL) andalso hUsesCLongDoubleCABI( proc ) andalso _
+	    hIsCLongDoubleType( vr->dtype, vr->subtype ) ) then
+		s = hCLongDoubleFromNativeExpression( s, vr->subtype )
+	end if
 
 	if( vr = NULL ) then
 		s += ";"
@@ -5424,8 +5527,10 @@ private sub _emitMacro _
 
 	case AST_OP_VA_ARG
 		l = exprNewVREG( v1, TRUE /' mutable va_list '/ )
-		l = exprNewMACRO( op, vr->dtype, vr->sym, l, NULL )
-		exprSTORE( vr, l )
+		l = exprNewMACRO( op, vr->dtype, vr->subtype, l, NULL )
+		'' Struct va_arg results are rvalues in C. Store one into a temporary so
+		'' aggregate-copy emission can take its address safely.
+		exprSTORE( vr, l, typeGetDtAndPtrOnly( vr->dtype ) = FB_DATATYPE_STRUCT )
 
 	case AST_OP_VA_COPY
 		l = exprNewVREG( v1, TRUE /' destination va_list '/ )
@@ -6046,7 +6151,6 @@ private sub hVarIniSeparator( )
 end sub
 
 private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
-	'' Typed null initializers must agree with their pointer declarations.
 	var dtype = symbGetType( sym ) or typeGetConstMask( symbGetFullType( sym ) )
 
 	'' AST stores boolean true as -1, but we emit it as 1 for gcc compatibility
@@ -6054,10 +6158,17 @@ private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
 		value = 1
 	end if
 
-	var l = exprNewIMMi( value, dtype )
-	if( symbIsRef( sym ) ) then
-		dtype = typeAddrOf( dtype )
+	if( (value = 0) andalso typeIsPtr( dtype ) andalso _
+	    (symbIsRef( sym ) = FALSE) ) then
+		'' C integer zero is a null pointer constant. Avoid a typed cast here,
+		'' because it can erase a C typedef alias from the emitted pointer type.
+		ctx.varini += hVarIniFieldPrefix( ) + "0"
+		hVarIniSeparator( )
+		exit sub
 	end if
+
+	var l = exprNewIMMi( value, dtype )
+	if( symbIsRef( sym ) ) then dtype = typeAddrOf( dtype )
 	l = exprNewCAST( dtype, sym->subtype, l )
 
 	ctx.varini += hVarIniFieldPrefix( ) + exprFlush( l )
@@ -6469,6 +6580,7 @@ private sub _emitProcBegin _
 		byval initlabel as FBSYMBOL ptr _
 	)
 
+	ctx.currproc = proc
 	hClearCStaticReferences( )
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
@@ -6525,6 +6637,32 @@ private sub _emitProcBegin _
 	hWriteLine( "{" )
 	sectionIndent( )
 	sectionBegin( )
+
+	'' CLongDouble is stored as a byte-backed UDT in FreeBASIC, while the
+	'' CDecl boundary receives native C long double values.
+	dim as FBSYMBOL ptr param = symbGetProcLastParam( proc )
+	do while( param <> NULL )
+		if( (symbGetParamMode( param ) <> FB_PARAMMODE_VARARG) ) then
+			dim as integer dtype = any
+			dim as FBSYMBOL ptr subtype = any
+			symbGetRealParamDtype( param, dtype, subtype )
+			if( hUsesCLongDoubleCABI( proc ) andalso _
+			    hIsCLongDoubleType( dtype, subtype ) ) then
+				var local_identifier = hGetCId( symbGetParamVar( param ) )
+				var native_identifier = "fb_c_native_" + local_identifier
+				var type_name = hEmitType( typeUnsetIsConst( dtype ), subtype, TRUE )
+				hWriteLine( type_name + " " + local_identifier + ";" )
+				hWriteLine( "__builtin_memset( (void*)&" + local_identifier + _
+				            ", 0, sizeof( " + local_identifier + " ) );" )
+				hWriteLine( "__builtin_memcpy( (void*)&" + local_identifier + _
+				            ", (const void*)&" + native_identifier + ", " + _
+				            "(sizeof( " + local_identifier + " ) < sizeof( " + _
+				            native_identifier + " ) ? sizeof( " + local_identifier + _
+				            " ) : sizeof( " + native_identifier + " )) );" )
+			end if
+		end if
+		param = symbGetProcPrevParam( proc, param )
+	loop
 
 end sub
 
@@ -6596,8 +6734,11 @@ private sub _emitProcEnd _
 		if( priority = 0 ) then priority = maximum_priority
 		dim as string section_priority = right( "00000" + str( maximum_priority - priority ), 5 )
 		dim as string proc_name = hGetCId( proc )
-		hWriteLine( "static void (*fb_c_fini_" + proc_name + ")(void) " + _
-			"__attribute__((section("".fini_array." + section_priority + """), used)) = " + proc_name + ";", TRUE )
+		dim as string semantic_registration = "static void (*fb_c_fini_" + proc_name + ")(void) " + _
+			"__attribute__((section("".fini_array." + section_priority + """), used)) = " + proc_name + ";"
+		hWriteLine(semantic_registration, TRUE)
+		fbSemanticModelStartupEmission(proc, "destructor", "c", "array-entry", section_priority, _
+			".fini_array." + section_priority, semantic_registration)
 	end if
 
 	'' Forget any left-over expression nodes (unused function results)

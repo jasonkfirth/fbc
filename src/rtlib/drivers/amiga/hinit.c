@@ -34,6 +34,12 @@
 
 #include <dos/dos.h>
 #include <proto/dos.h>
+#include <dos/dosextens.h>
+#include <proto/exec.h>
+#include <proto/graphics.h>
+#include <intuition/intuition.h>
+#include <graphics/gfxbase.h>
+#include <devices/conunit.h>
 
 #include <pthread.h>
 #include <stdio.h>
@@ -180,9 +186,203 @@ static int default_getch(void)
 /* Native AmigaOS console                                                       */
 /* ------------------------------------------------------------------------- */
 
+typedef struct FB_AMIGA_CONSOLE_QUERY {
+    struct InfoData information __attribute__((aligned(4)));
+    struct MsgPort *handler;
+    struct Window *window;
+    struct ConUnit *unit;
+    BPTR output;
+    LONG saved_error;
+    int acquired;
+} FB_AMIGA_CONSOLE_QUERY;
+
+static void fb_hAmigaConsoleRelease(FB_AMIGA_CONSOLE_QUERY *query)
+{
+#ifdef ACTION_UNDISK_INFO
+    /* Newer handlers retain AUTO/iconified windows for DISK_INFO callers. */
+    if (query->acquired)
+        DoPkt(query->handler, ACTION_UNDISK_INFO, 0, 0, 0, 0, 0);
+#endif
+    SetIoErr(query->saved_error);
+}
+
+static int fb_hAmigaConsoleAcquire(FB_AMIGA_CONSOLE_QUERY *query)
+{
+    struct FileHandle *handle;
+    struct IOStdReq *request;
+
+    memset(query, 0, sizeof(*query));
+    query->saved_error = IoErr();
+    query->output = Output();
+    if (query->output == BNULL || IsInteractive(query->output) == DOSFALSE)
+        goto failed;
+    handle = (struct FileHandle *)BADDR(query->output);
+    query->handler = handle->fh_Type;
+    if (query->handler == NULL)
+        goto failed;
+    /* The packet requires longword-aligned InfoData on the word-aligned
+       68k ABI. CON:/RAW: return a native Window pointer in id_VolumeNode,
+       despite that field's BPTR type. AUX: may return no window or unit. */
+    if (DoPkt(query->handler, ACTION_DISK_INFO,
+              MKBADDR(&query->information), 0, 0, 0, 0) == DOSFALSE)
+        goto failed;
+    query->acquired = TRUE;
+    if ((ULONG)query->information.id_DiskType != 0x434f4e00UL &&
+        (ULONG)query->information.id_DiskType != 0x52415700UL)
+        goto failed;
+    query->window = (struct Window *)query->information.id_VolumeNode;
+    if (query->window == NULL || query->window->WScreen == NULL)
+        goto failed;
+    request = (struct IOStdReq *)query->information.id_InUse;
+    if (request != NULL && request->io_Device != NULL &&
+        request->io_Device->dd_Library.lib_Node.ln_Name != NULL &&
+        strcmp((char *)request->io_Device->dd_Library.lib_Node.ln_Name,
+               "console.device") == 0 && request->io_Unit != NULL) {
+        query->unit = (struct ConUnit *)request->io_Unit;
+        if (query->unit->cu_Window != query->window)
+            query->unit = NULL;
+    }
+    return TRUE;
+
+failed:
+    fb_hAmigaConsoleRelease(query);
+    return FALSE;
+}
+
+static int fb_hAmigaConsoleSize(int *columns, int *rows)
+{
+    FB_AMIGA_CONSOLE_QUERY query;
+    int result = FALSE;
+    if (!fb_hAmigaConsoleAcquire(&query))
+        return FALSE;
+    if (query.unit != NULL && query.unit->cu_XMax >= 0 &&
+        query.unit->cu_YMax >= 0) {
+        *columns = (int)query.unit->cu_XMax + 1;
+        *rows = (int)query.unit->cu_YMax + 1;
+        result = TRUE;
+    }
+    fb_hAmigaConsoleRelease(&query);
+    return result;
+}
+
+static int fb_hAmigaConsolePen(unsigned int colour)
+{
+    /* BASIC uses DOS RGBI ordering; Amiga SGR numbers name screen pens. */
+    static const unsigned int colours[16] = {
+        0x000000U, 0x0000aaU, 0x00aa00U, 0x00aaaaU,
+        0xaa0000U, 0xaa00aaU, 0xaa5500U, 0xaaaaaaU,
+        0x555555U, 0x5555ffU, 0x55ff55U, 0x55ffffU,
+        0xff5555U, 0xff55ffU, 0xffff55U, 0xffffffU
+    };
+    FB_AMIGA_CONSOLE_QUERY query;
+    struct Library *graphics = NULL;
+    struct GfxBase *GfxBase;
+    ULONG palette[8 * 3];
+    int count, index, depth, best = -1;
+    int best_distance = 3 * 255 * 255 + 1;
+    unsigned int wanted = colours[colour & 15U];
+
+    if (!fb_hAmigaConsoleAcquire(&query))
+        return -1;
+    if (query.window->WScreen->RastPort.BitMap == NULL ||
+        query.window->WScreen->ViewPort.ColorMap == NULL)
+        goto cleanup;
+    depth = query.window->WScreen->RastPort.BitMap->Depth;
+    if (depth < 1 || depth > 32)
+        goto cleanup;
+    /* SGR30..37/40..47 address the console's first eight pens. */
+    count = (depth < 3) ? (1 << depth) : 8;
+    graphics = OpenLibrary((CONST_STRPTR)"graphics.library", 39);
+    if (graphics == NULL)
+        goto cleanup;
+    GfxBase = (struct GfxBase *)graphics;
+    GetRGB32(query.window->WScreen->ViewPort.ColorMap, 0, (ULONG)count, palette);
+    for (index = 0; index < count; ++index) {
+        int red = (int)((wanted >> 16) & 255U) - (int)(palette[index * 3] >> 24);
+        int green = (int)((wanted >> 8) & 255U) - (int)(palette[index * 3 + 1] >> 24);
+        int blue = (int)(wanted & 255U) - (int)(palette[index * 3 + 2] >> 24);
+        int distance = red * red + green * green + blue * blue;
+        if (distance < best_distance) {
+            best = index;
+            best_distance = distance;
+        }
+    }
+
+cleanup:
+    if (graphics != NULL)
+        CloseLibrary(graphics);
+    fb_hAmigaConsoleRelease(&query);
+    return best;
+}
+
+static int fb_hAmigaConsoleWrite(BPTR output, const char *text, int length)
+{
+    int offset = 0;
+    while (offset < length) {
+        LONG written = Write(output, (APTR)(text + offset), length - offset);
+        if (written <= 0 || written > length - offset)
+            return FALSE;
+        offset += written;
+    }
+    return TRUE;
+}
+
+static int fb_hAmigaConsoleClearLine(void)
+{
+    static const char spaces[] =
+        "                                                                ";
+    FB_AMIGA_CONSOLE_QUERY query;
+    char cursor[32];
+    int x, y, remaining, wrapping, result = TRUE;
+
+    if (!fb_hAmigaConsoleAcquire(&query))
+        return FALSE;
+    if (query.unit == NULL || query.unit->cu_XCP < 0 || query.unit->cu_YCP < 0 ||
+        query.unit->cu_XCP > query.unit->cu_XMax ||
+        query.unit->cu_YCP > query.unit->cu_YMax) {
+        fb_hAmigaConsoleRelease(&query);
+        return FALSE;
+    }
+    x = query.unit->cu_XCP;
+    y = query.unit->cu_YCP;
+    remaining = (int)query.unit->cu_XMax - x + 1;
+    wrapping = query.unit->cu_Modes[PMB_AWM >> 3] & (1U << (PMB_AWM & 7));
+    /* V36 erase commands use a separate window background. Paint blank
+       character cells instead: this keeps BASIC's current background and
+       leaves cells outside VIEW PRINT and the borrowed window theme intact.
+       Disable wrapping so clearing the final column cannot scroll a row. */
+    if (wrapping && !fb_hAmigaConsoleWrite(query.output, FB_AmigaOS_CSI "?7l", 4))
+        result = FALSE;
+    while (result && remaining > 0) {
+        int chunk = remaining < (int)sizeof(spaces) - 1 ?
+            remaining : (int)sizeof(spaces) - 1;
+        result = fb_hAmigaConsoleWrite(query.output, spaces, chunk);
+        remaining -= chunk;
+    }
+    /* Restore cursor and mode even after a short/failed output operation. */
+    snprintf(cursor, sizeof(cursor), FB_AmigaOS_CSI "%d;%dH", y + 1, x + 1);
+    if (!fb_hAmigaConsoleWrite(query.output, cursor, (int)strlen(cursor)))
+        result = FALSE;
+    if (wrapping && !fb_hAmigaConsoleWrite(query.output, FB_AmigaOS_CSI "?7h", 4))
+        result = FALSE;
+    fb_hAmigaConsoleRelease(&query);
+    return result;
+}
+
+
+
 void fb_hRecheckCursorPos(void)
 {
-    /* AmigaOS has no synchronous cursor-position query required by rtlib. */
+    FB_AMIGA_CONSOLE_QUERY query;
+    if (!fb_hAmigaConsoleAcquire(&query))
+        return;
+    if (query.unit != NULL && query.unit->cu_XCP >= 0 && query.unit->cu_YCP >= 0 &&
+        query.unit->cu_XCP <= query.unit->cu_XMax &&
+        query.unit->cu_YCP <= query.unit->cu_YMax) {
+        __fb_con.cur_x = (int)query.unit->cu_XCP + 1;
+        __fb_con.cur_y = (int)query.unit->cu_YCP + 1;
+    }
+    fb_hAmigaConsoleRelease(&query);
 }
 
 void fb_hRecheckConsoleSize(int requery_cursorpos)
@@ -195,12 +395,14 @@ void fb_hRecheckConsoleSize(int requery_cursorpos)
     int copy_rows;
     int row;
 
+    columns = (__fb_con.w > 0) ? __fb_con.w : FB_AmigaOS_CONSOLE_COLUMNS;
+    rows = (__fb_con.h > 0) ? __fb_con.h : FB_AmigaOS_CONSOLE_ROWS;
+    fb_hAmigaConsoleSize(&columns, &rows);
+    if (columns != __fb_con.w || rows != __fb_con.h)
+        __fb_console_resized = TRUE;
     if (__fb_console_resized == FALSE)
         return;
     __fb_console_resized = FALSE;
-
-    columns = (__fb_con.w > 0) ? __fb_con.w : FB_AmigaOS_CONSOLE_COLUMNS;
-    rows = (__fb_con.h > 0) ? __fb_con.h : FB_AmigaOS_CONSOLE_ROWS;
     char_buffer = calloc((size_t)columns * (size_t)rows, 2);
     if (char_buffer == NULL)
         return;
@@ -225,6 +427,13 @@ void fb_hRecheckConsoleSize(int requery_cursorpos)
     __fb_con.w = columns;
     __fb_con.h = rows;
 
+    /* A resized window may leave cached coordinates outside the new cell
+       buffer. Keep subsequent PRINT copies inside the successful allocation. */
+    if (__fb_con.cur_x < 1) __fb_con.cur_x = 1;
+    if (__fb_con.cur_y < 1) __fb_con.cur_y = 1;
+    if (__fb_con.cur_x > columns) __fb_con.cur_x = columns;
+    if (__fb_con.cur_y > rows) __fb_con.cur_y = rows;
+
     if (requery_cursorpos != FALSE)
         fb_hRecheckCursorPos();
     fb_DevScrnMaybeUpdateWidth();
@@ -234,6 +443,7 @@ int fb_hTermOut(int code, int param1, int param2)
 {
     char sequence[64];
     int length;
+    int pen;
     BPTR output;
 
     if (__fb_con.inited == FALSE)
@@ -253,6 +463,8 @@ int fb_hTermOut(int code, int param1, int param2)
         length = snprintf(sequence, sizeof(sequence), "\f");
         break;
     case SEQ_CLEOL:
+        if (fb_hAmigaConsoleClearLine())
+            return TRUE;
         length = snprintf(sequence, sizeof(sequence), FB_AmigaOS_CSI "K");
         break;
     case SEQ_WINDOW_SIZE:
@@ -264,12 +476,14 @@ int fb_hTermOut(int code, int param1, int param2)
         length = snprintf(sequence, sizeof(sequence), "\a");
         break;
     case SEQ_FG_COLOR:
+        pen = fb_hAmigaConsolePen(__fb_con.fg_color);
         length = snprintf(sequence, sizeof(sequence),
-            FB_AmigaOS_CSI "%dm", 30 + param2);
+            FB_AmigaOS_CSI "%dm", 30 + ((pen >= 0) ? pen : param2));
         break;
     case SEQ_BG_COLOR:
+        pen = fb_hAmigaConsolePen(__fb_con.bg_color);
         length = snprintf(sequence, sizeof(sequence),
-            FB_AmigaOS_CSI "%dm", 40 + param2);
+            FB_AmigaOS_CSI "%dm", 40 + ((pen >= 0) ? pen : param2));
         break;
     case SEQ_RESET_COLOR:
         length = snprintf(sequence, sizeof(sequence), FB_AmigaOS_CSI "0m");
@@ -340,6 +554,16 @@ int fb_hInitConsole(void)
         __fb_con.mouse_init();
     BG_UNLOCK();
 
+    /* Native CON: starts black on grey; BASIC's logical defaults are grey
+       on black. Select matching pens without changing the screen palette. */
+    {
+        static const unsigned char ansi[8] = { 0, 4, 2, 6, 1, 5, 3, 7 };
+        fb_hTermOut(SEQ_RESET_COLOR, 0, 0);
+        if (__fb_con.fg_color & 8U)
+            fb_hTermOut(SEQ_BRIGHT_COLOR, 0, 0);
+        fb_hTermOut(SEQ_FG_COLOR, 0, ansi[__fb_con.fg_color & 7U]);
+        fb_hTermOut(SEQ_BG_COLOR, 0, ansi[__fb_con.bg_color & 7U]);
+    }
     return 0;
 }
 

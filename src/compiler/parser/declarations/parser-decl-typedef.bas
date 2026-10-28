@@ -25,6 +25,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare function parserGetLastTypeAlias( ) as FBSYMBOL ptr
 declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, byval alias_symbol as FBSYMBOL ptr)
@@ -315,6 +316,8 @@ private function hReadId _
 		errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 		'' error recovery: fake an id
 		id = *symbUniqueLabel( )
+		fbSemanticModelRecoveryName(id, __FUNCTION__, _
+			"parser/declarations/parser-decl-typedef.bas", __LINE__)
 	end select
 
 	function = @id

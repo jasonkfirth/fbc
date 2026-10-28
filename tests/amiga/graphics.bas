@@ -33,6 +33,168 @@ private function NearestLevel(byval value as integer, levels() as integer) as in
 	return best
 end function
 
+'' True-colour palette fixtures inspect native RGB after palette transitions.
+private function FrameRGB(byval colour as ulong, byval depth as integer) as ulong
+	dim red as integer = (colour shr 16) and 255
+	dim green as integer = (colour shr 8) and 255
+	dim blue as integer = colour and 255
+	if depth = 16 then
+		red = ((red shr 3) * 255) \ 31
+		green = ((green shr 2) * 255) \ 63
+		blue = ((blue shr 3) * 255) \ 31
+	end if
+	return rgb(red, green, blue) and &hffffff
+end function
+
+private sub RequireDisplayRGB(byval x as integer, byval y as integer, _
+	byval expected as ulong, byval stage as integer)
+	dim observed as ulong = amiga_test_display_pixel(x, y)
+	if observed <> expected then
+		screen 0
+		print "True-colour palette mismatch: stage="; stage; " x="; x; " y="; y; _
+			" expected="; hex(expected, 6); " observed="; hex(observed, 6)
+		end 63
+	end if
+end sub
+
+private sub TestTrueColourPalette(byval depth as integer)
+	dim stay as ulong = rgb(93, 17, 203)
+	dim levels3(0 to 7) as integer => {0, 36, 73, 109, 146, 182, 219, 255}
+	dim levels2(0 to 3) as integer => {0, 85, 170, 255}
+	'' Both true-colour formats must preserve every colour when the source
+	'' plus stable UI pens fits. The 240 distinct colours also exercise hash
+	'' collisions without relying on a particular native pen assignment.
+	screenlock
+	line (0, 0)-(318, 199), rgb(0, 0, 0), bf
+	pset (200, 50), stay
+	for index as integer = 0 to 239
+		pset (index, 199), rgb((index and 31) * 8, (index shr 5) * 4 + 4, 17)
+	next
+	screenunlock
+	for index as integer = 0 to 239
+		RequireDisplayRGB(index, 199, FrameRGB( _
+			rgb((index and 31) * 8, (index shr 5) * 4 + 4, 17), depth), 1)
+	next
+	RequireDisplayRGB(200, 50, FrameRGB(stay, depth), 1)
+
+	'' Replace colours until append-only allocation fills. The new earlier
+	'' pixel changes scan order when unused old colours are discarded, so
+	'' the unchanged row containing 'stay' must also be uploaded again.
+	screenlock
+	pset (0, 0), rgb(201, 69, 177)
+	for index as integer = 0 to 239
+		pset (index, 199), rgb((index and 31) * 8, (index shr 5) * 4 + 4, 145)
+	next
+	screenunlock
+	RequireDisplayRGB(0, 0, FrameRGB(rgb(201, 69, 177), depth), 2)
+	RequireDisplayRGB(200, 50, FrameRGB(stay, depth), 2)
+	for index as integer = 0 to 239
+		RequireDisplayRGB(index, 199, FrameRGB( _
+			rgb((index and 31) * 8, (index shr 5) * 4 + 4, 145), depth), 2)
+	next
+
+	'' More than 4096 distinct RGB565 colours must still use the bounded
+	'' fixed fallback. Keep the untouched sample below these fourteen rows.
+	screenlock
+	for index as integer = 0 to 4465
+		pset (index mod 319, index \ 319), rgb((index and 31) * 8, _
+			((index shr 5) and 63) * 4, ((index shr 11) and 31) * 8)
+	next
+	screenunlock
+	dim converted as ulong = FrameRGB(stay, depth)
+	dim red as integer = (converted shr 16) and 255
+	dim green as integer = (converted shr 8) and 255
+	dim blue as integer = converted and 255
+	RequireDisplayRGB(200, 50, rgb(NearestLevel(red, levels3()), _
+		NearestLevel(green, levels3()), NearestLevel(blue, levels2())) and &hffffff, 3)
+
+	'' Erase only the rich rows. The low-colour frame fits again, and the
+	'' unchanged sample must recover its exact RGB without another PSET.
+	line (0, 0)-(318, 13), rgb(0, 0, 0), bf
+	RequireDisplayRGB(200, 50, FrameRGB(stay, depth), 4)
+end sub
+
+
+private sub TestDominantPalette(byval depth as integer)
+	'' Antialiased UI text can exceed the exact pen budget while almost all
+	'' pixels still use a handful of flat colours. Preserve those regions.
+	screenlock
+	line (0, 0)-(318, 199), rgb(240, 240, 240), bf
+	line (20, 20)-(100, 100), rgb(128, 128, 128), bf
+	line (120, 20)-(200, 100), rgb(0, 120, 215), bf
+	for index as integer = 0 to 319
+		pset (index mod 160, index \ 160), rgb((index and 31) * 8, _
+			(index shr 5) * 4, 215)
+	next
+	for index as integer = 0 to 127
+		pset (index, 2), rgb(index * 2, index * 2, index * 2)
+	next
+	screenunlock
+	RequireDisplayRGB(318, 199, FrameRGB(rgb(240, 240, 240), depth), 6)
+	RequireDisplayRGB(50, 50, FrameRGB(rgb(128, 128, 128), depth), 6)
+	RequireDisplayRGB(150, 50, FrameRGB(rgb(0, 120, 215), depth), 6)
+
+
+	'' Keep rare colour bands within two RGB565 component steps. With a
+	'' maximum expanded five-bit step of nine, this fixture permits eighteen
+	'' levels rather than allowing distant grey pens to replace coloured edges.
+	for index as integer = 0 to 319
+		dim expected as ulong = FrameRGB(rgb((index and 31) * 8, _
+			(index shr 5) * 4, 215), depth)
+		dim observed as ulong = amiga_test_display_pixel(index mod 160, index \ 160)
+		for component as integer = 0 to 2
+			dim channel_bits as integer = component * 8
+			if abs(cint((expected shr channel_bits) and 255) - _
+				cint((observed shr channel_bits) and 255)) > 18 then end 64
+		next
+	next
+
+	'' A new large region changes palette priorities. The untouched grey
+	'' block must retain its colour after every pen assignment is rebuilt.
+	line (201, 3)-(318, 199), rgb(212, 208, 200), bf
+	RequireDisplayRGB(318, 199, FrameRGB(rgb(212, 208, 200), depth), 7)
+	RequireDisplayRGB(50, 50, FrameRGB(rgb(128, 128, 128), depth), 7)
+	RequireDisplayRGB(150, 50, FrameRGB(rgb(0, 120, 215), depth), 7)
+end sub
+
+private sub TestRichDominantPalette(byval depth as integer)
+	'' The original Nebunoid menu has 1,427 shades around large flat regions.
+	'' Exercise more than 512 unique RGB565 colours without reducing those regions.
+	screenlock
+	line (0, 0)-(318, 199), rgb(240, 240, 240), bf
+	line (20, 20)-(100, 100), rgb(128, 128, 128), bf
+	line (120, 20)-(200, 100), rgb(0, 120, 215), bf
+	for index as integer = 0 to 1023
+		pset (index mod 256, index \ 256), rgb((index and 31) * 8, _
+			((index shr 5) and 31) * 8, 47)
+	next
+	screenunlock
+	RequireDisplayRGB(300, 50, FrameRGB(rgb(240, 240, 240), depth), 8)
+	RequireDisplayRGB(50, 50, FrameRGB(rgb(128, 128, 128), depth), 8)
+	RequireDisplayRGB(150, 50, FrameRGB(rgb(0, 120, 215), depth), 8)
+	'' New priorities must also repaint untouched rows in this larger table.
+	line (0, 100)-(318, 199), rgb(3, 108, 200), bf
+	RequireDisplayRGB(50, 150, FrameRGB(rgb(3, 108, 200), depth), 9)
+	RequireDisplayRGB(50, 50, FrameRGB(rgb(128, 128, 128), depth), 9)
+	RequireDisplayRGB(150, 50, FrameRGB(rgb(0, 120, 215), depth), 9)
+end sub
+
+private sub TestBorderlessPalette(byval depth as integer)
+	'' Black backdrop plus 255 distinct colours fills every available pen.
+	'' No window UI pens may reduce that capacity in a borderless display.
+	screenlock
+	line (0, 0)-(318, 199), rgb(0, 0, 0), bf
+	for index as integer = 1 to 255
+		pset (index, 100), rgb((index and 31) * 8, (index shr 5) * 4 + 4, 17)
+	next
+	screenunlock
+	RequireDisplayRGB(0, 100, 0, 5)
+	for index as integer = 1 to 255
+		RequireDisplayRGB(index, 100, FrameRGB( _
+			rgb((index and 31) * 8, (index shr 5) * 4 + 4, 17), depth), 5)
+	next
+end sub
+
 dim depths(0 to 2) as integer => {8, 16, 32}
 screencontrol fb.SET_DRIVER_NAME, "AMIGA"
 for mode as integer = 0 to 2
@@ -96,8 +258,7 @@ for mode as integer = 0 to 2
 				green = ((green shr 2) * 255) \ 63
 				blue = ((blue shr 3) * 255) \ 31
 			end if
-			expected = rgb(NearestLevel(red, levels3()), NearestLevel(green, levels3()), _
-				NearestLevel(blue, levels2())) and &hffffff
+			expected = rgb(red, green, blue) and &hffffff
 		end if
 		dim observed as ulong = amiga_test_display_pixel(17, 17)
 		if observed <> expected then
@@ -172,7 +333,13 @@ for mode as integer = 0 to 2
 	dim x as integer, y as integer
 	if getmouse(x, y) <> 0 then end 10
 	if x <> 73 or y <> 91 then end 11
+	if depths(mode) > 8 then
+		TestTrueColourPalette(depths(mode))
+		TestDominantPalette(depths(mode))
+		TestRichDominantPalette(depths(mode))
+	end if
 	screen 0
+	if depths(mode) > 8 then print "Native exact palette and fallback transitions passed at depth "; depths(mode)
 	print "Native graphics pixels and input passed at depth "; depths(mode)
 next
 
@@ -200,6 +367,7 @@ for mode as integer = 0 to 2
 		if amiga_test_window_layout(1) <> 0 then end 58
 		pset (0, 0), iif(depths(mode) = 8, 15, rgb(255, 255, 255))
 		if amiga_test_display_pixel(0, 0) <> &hffffff then end 59
+		if depths(mode) > 8 then TestBorderlessPalette(depths(mode))
 		screen 0
 	next
 next

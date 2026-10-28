@@ -506,6 +506,9 @@ end type
 ''
 ''
 ''
+declare sub irObserveInit( )
+declare sub irObserveEnd( )
+
 extern as IR_VTBL irtac_vtbl
 extern as IR_VTBL irhlc_vtbl
 extern as IR_VTBL irllvm_vtbl

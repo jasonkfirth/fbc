@@ -857,8 +857,8 @@ declare function hSfxlib_cb _
 
 sub rtlSfxModInit( )
 
-	rtlAddIntrinsicProcs( @funcdata(0), TRUE )
-	rtlAddIntrinsicProcs( @cmddata(0), TRUE )
+	rtlAddIntrinsicProcs( @funcdata(0), TRUE, FALSE, FB_RTL_DOMAIN_SOUND )
+	rtlAddIntrinsicProcs( @cmddata(0), TRUE, FALSE, FB_RTL_DOMAIN_SOUND )
 
 end sub
 

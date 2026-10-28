@@ -111,6 +111,118 @@ private function hIsMemoryByval _
 	return (subtype->lgt > 16)
 end function
 
+private function hIsCLongDoubleType _
+	( byval dtype as integer, byval subtype as FBSYMBOL ptr ) as integer
+
+	if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT ) then return FALSE
+	if( subtype = NULL ) then return FALSE
+	return (*symbGetName( subtype ) = "CLONGDOUBLE")
+end function
+
+private function hUsesCLongDoubleCABI( byval proc as FBSYMBOL ptr ) as integer
+	if( proc = NULL ) then return FALSE
+	return (symbGetProcMode( proc ) = FB_FUNCMODE_CDECL)
+end function
+
+private function hIsSystemVVarargAggregate _
+	( byval dtype as integer, byval subtype as FBSYMBOL ptr, byval mode as integer ) as integer
+
+	if( mode <> FB_PARAMMODE_VARARG ) then return FALSE
+	if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT ) then return FALSE
+	if( subtype = NULL ) then return FALSE
+	if( symbIsBuiltinVaListType( dtype, subtype ) ) then return FALSE
+	if( hIsCLongDoubleType( dtype, subtype ) ) then return FALSE
+	return (fbGetCpuFamily() = FB_CPUFAMILY_X86_64) andalso _
+	       ((env.target.options and FB_TARGETOPT_UNIX) <> 0)
+end function
+
+private function hIsMicrosoftVarargAggregate _
+	( byval dtype as integer, byval subtype as FBSYMBOL ptr, byval mode as integer ) as integer
+
+	if( mode <> FB_PARAMMODE_VARARG ) then return FALSE
+	if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT ) then return FALSE
+	if( subtype = NULL ) then return FALSE
+	if( symbIsBuiltinVaListType( dtype, subtype ) ) then return FALSE
+	if( hIsCLongDoubleType( dtype, subtype ) ) then return FALSE
+	return (fbGetCpuFamily() = FB_CPUFAMILY_X86_64) andalso _
+	       (env.clopt.target = FB_COMPTARGET_WIN32)
+end function
+
+private function hGetCLongDoubleLLVMType( byval subtype as FBSYMBOL ptr ) as string
+	if( subtype = NULL ) then return ""
+	if( subtype->lgt = 8 ) then return "double"
+
+	select case fbGetCpuFamily( )
+	case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
+		return "x86_fp80"
+	case FB_CPUFAMILY_PPC64, FB_CPUFAMILY_PPC64LE
+		return "ppc_fp128"
+	case FB_CPUFAMILY_AARCH64, FB_CPUFAMILY_RISCV64, _
+	     FB_CPUFAMILY_S390X, FB_CPUFAMILY_LOONGARCH64, _
+	     FB_CPUFAMILY_MIPS64, FB_CPUFAMILY_MIPS64EL
+		return "fp128"
+	case else
+		return ""
+	end select
+end function
+
+private function hGetSystemVStructRegisterCounts _
+	( byval subtype as FBSYMBOL ptr, byref integer_count as integer, _
+	  byref floating_count as integer ) as integer
+
+	integer_count = 0
+	floating_count = 0
+	if( subtype = NULL ) then return FALSE
+	if( (subtype->lgt <= 0) or (subtype->lgt > 16) ) then return FALSE
+
+	select case as const hGetMagicStructNumber( subtype )
+	case KSTRUCT_R
+		integer_count = 1
+	case KSTRUCT_X
+		floating_count = 1
+	case KSTRUCT_RR
+		integer_count = 2
+	case KSTRUCT_RX
+		integer_count = 1
+		floating_count = 1
+	case KSTRUCT_XR
+		integer_count = 1
+		floating_count = 1
+	case KSTRUCT_XX
+		floating_count = 2
+	case else
+		return FALSE
+	end select
+
+	return TRUE
+end function
+
+private sub hGetSystemVArgumentRegisterCounts _
+	( byval dtype as integer, byval subtype as FBSYMBOL ptr, _
+	  byval mode as integer, byref integer_count as integer, _
+	  byref floating_count as integer )
+
+	integer_count = 0
+	floating_count = 0
+	if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_STRUCT ) then
+		if( (mode = FB_PARAMMODE_BYVAL) or (mode = FB_PARAMMODE_VARARG) ) then
+			if( symbIsBuiltinVaListType( dtype, subtype ) ) then
+				integer_count = 1
+			elseif( hGetSystemVStructRegisterCounts( _
+			        subtype, integer_count, floating_count ) = FALSE ) then
+				'' Memory-class aggregates do not consume argument registers.
+			end if
+		else
+			'' BYREF and BYDESC parameters cross the call boundary as pointers.
+			integer_count = 1
+		end if
+	elseif( typeGetClass( dtype ) = FB_DATACLASS_FPOINT ) then
+		floating_count = 1
+	else
+		integer_count = 1
+	end if
+end sub
+
 private function hMemoryByvalAlignment( byval subtype as FBSYMBOL ptr ) as integer
 	'' System V rounds stack aggregate alignment up to eight bytes.
 	var align = subtype->udt.natalign
