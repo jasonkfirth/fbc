@@ -348,6 +348,7 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/c-identifiers.bi"
 #include once "backend/c/c-generated-leaves.bi"
 #include once "backend/c/c-abi-parameters.bi"
+#include once "backend/c/c-auto-descriptors.bi"
 
 declare sub hBuildStrLit( byref ln as string, byval z as zstring ptr, _
 	byval length as longint, byval paddedlength as longint )
@@ -396,6 +397,7 @@ dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
 private sub _init( )
 	irhlInit( )
 	listInit( @c_pointer_views, 8, sizeof(CPOINTERVIEW), LIST_FLAGS_CLEAR )
+	listInit(@c_auto_descriptors, 8, sizeof(CAUTODESC), LIST_FLAGS_CLEAR)
 	listInit( @c_local_static_refs, 8, sizeof(FBSYMBOL ptr), LIST_FLAGS_NOCLEAR ) '' Small reusable reference blocks.
 	listInit( @ctx.anonstack, 8, sizeof( FBSYMBOL ptr ), LIST_FLAGS_NOCLEAR )
 	listInit( @ctx.exprnodes, 32, sizeof( EXPRNODE ), LIST_FLAGS_CLEAR )
@@ -418,6 +420,8 @@ private sub _end( )
 	hCAbiFinish( )
 	hCClearPointerViews(0)
 	listEnd(@c_pointer_views)
+	hCAutoDescClear()
+	listEnd(@c_auto_descriptors)
 	listEnd( @c_local_static_refs )
 	''
 	'' Section buffers are retained while the compiler processes input modules so
@@ -1758,6 +1762,11 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 
 	'' Fake dynamic array symbol? Descriptor will be emitted instead
 	if( symbGetIsDynamic( sym ) ) then
+		exit sub
+	end if
+
+	if( hCAutoDescUnused(sym) ) then
+		hEmitUDT(symbGetSubtype(sym), FALSE)
 		exit sub
 	end if
 
@@ -4711,6 +4720,12 @@ private sub exprSTORE _
 	dim as EXPRNODE ptr l = NULL
 	dim as EXPRNODE ptr addr = NULL
 
+	if( vr->typ = IR_VREGTYPE_VAR andalso hCAutoDescUnused(vr->sym) ) then
+		'' Only pure, unread descriptor initialization can reach this path.
+		exprFreeTree(r)
+		exit sub
+	end if
+
 	if( irIsREG( vr ) ) then
 		if( has_sidefx ) then
 			'' Expressions (REG) with side-effects (i.e. CALLs)
@@ -6438,6 +6453,7 @@ private sub _emitProcBegin _
 	hClearCStaticReferences( )
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
+	hCAutoDescBegin(astGetProc()->l)
 	hAsmBeginNames( proc )
 	if( not symbIsNaked( proc ) ) then
 		if( astProcMayReturn( astGetProc( ) ) = FALSE ) then
@@ -6549,6 +6565,7 @@ private sub _emitProcEnd _
 
 	sectionEnd( )
 	hCLeafEnd( )
+	hCAutoDescClear()
 	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
 	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then
 		'' NetBSD walks .fini_array forwards, including in shared libraries.
