@@ -5,6 +5,13 @@
   "compiler": "out/semantic-goal-20261027/fbc-resolution-context-v86",
   "compiler_sha256": "2816a6a572f9f07c9c774f5a9b44e4c7a0e9d18dc63769858e6e219afab3d941",
   "verified_checks": [
+    "v101 startup list projection and independent repaired-count lifecycle negatives pass2tests611.582seconds. Unused private-parent wrapper membership separately passes22.599seconds; exact narrow/wide MA argument/source and invalid-span assertions pass2tests106.386seconds. Five startup fields and five macro-argument fields now have verified representation/derivation. Current inventory10 missing/300 partial. Original51 complete-scope requirements and current-source qualification remain open.",
+    "v101 qualifies direct narrow/wide macro argument text/source assertions and invalid-extent negative family (2tests106.386seconds), plus static wrapper membership without emitted private parent/body (1test22.599seconds across three backends). Reader append-list links preserve registration occurrences, not unique procedure names or runtime priority order. Five LEXPP_ARG fields are now verified exported;15 missing/300 partial fields remain. All seven v99 reconciliation families pass786.574seconds and all seven v98 affected regressions pass1286.210seconds. New startup list negative recheck remains active; all51 original requirements remain.",
+    "v100 source-review accounts for all21 previously missing field rows with exact producer hashes and proposed dispositions. Proposals remain unqualified and do not alter authoritative coverage. One additional field is behaviorally qualified: AST_NODE_BLOCK.proc semantics are native-procedure-block ismain, while nested decl_last is an insertion cursor; native block source family passes. Current review has20 missing/300 partial fields. DATA positive/QB/corruption families also pass in the ongoing reconciliation run. Broader source/phase/route acceptance remains open.",
+    "v99 adds a real DATA constructor guard (4.515seconds) with poisoned allocation storage, exact active tags, literal guards, list order, container count and final link. FB and QB source suites pass new independent wire-to-transient-payload derivations, including wide/NUL/address/raw fields and no invented DATA N nodes. AST_NODE_DATASTMT.id is now documented derivable; elmts was already captured in descriptor cells. Current inventory has21 missing and300 partial fields. Remaining reconciliation/integration families are running. Evidence: data-payload-review-v99.json.",
+    "The strengthened v98 pragma entry-spelling invariant and full repaired-count mutation family pass in120.488seconds. A known but different option name at scope entry can no longer be accepted with another selected pragma. Seven affected regressions and current-source qualification remain open.",
+    "All eight v98 pragma families pass: seven source families434.131seconds and actual native helper/collector guard43.441seconds. Five scalar groups, native stacks, independent overflow/underflow and setters, callback invocation, accepted/failed/partial reservations, invalid routes/closures, ABIs/binary/reduced/reset, origins, repaired-count action omissions and twelve runtime partitions are verified. Source entry-spelling integrity was strengthened and its mutation recheck is running; seven affected regressions and current source qualification remain open. Evidence: pragma-verification-v98.json.",
+    "All seven v97 affected regression families pass in853.638seconds: complete effective-context corruption, node construction/module reset, EXTERN declarations, default/class/suffix filters, actual name lookup precedence, diagnostic transport/corruption and isolated frozen-reader closure. Evidence: default-type-regressions-v97.log. v97 source qualification and all original51 acceptance scopes remain open.",
     "v97 passes eight native DEF policy families across GCC/Clang/LLVM: all13 registered directives;31 A-through-underscore slots and outside fallback; clamping/reversal/unsigned ASC behavior; repeated/context ownership; dialect/recovery/QB compile-time changes; macro/include/remap/inactive origins; ABIs/binary/reduced/reset; repaired-count corruption; twelve runtime partitions; and actual native helper/collector bounds. First mode fixture was corrected to explicit AS LONG for its modern-FB second module; final mode family passes74.847seconds. Structure checks351 BASIC source/header files and21 host graphs; binary contract matches. Seven affected regressions and v97 source qualification remain pending. Evidence: default-types-verification-v97.json.",
     "v96 qualifies ten targeted EXTERN/token families, the isolated frozen-reader import closure family, and eight affected regressions (301.918seconds). Native policy/context selections, nested/repeated restoration, source prototype and ordinary-variable ownership, rejected/inactive/unfinished routes, macro/include/remap origins, ABIs/transport/reset, byte-identical emission, twelve runtime partitions, repaired-count corruption and1024-depth/1000000-event bounds pass. Hidden-provenance tokens no longer expose internal macro IDs. Frozen v87 source audit completes9/9; it does not qualify newer sources. Current v96 source qualification is frozen separately for42 cases, with1/42 passed so far. Evidence: extern-contexts-verification-v96.json.",
     "All six v93 affected regressions passed in454.905seconds: actual lookup precedence/modes/ABIs, symbol filters, prototype property/descriptor matching, procedure error-state ownership and effective-context modes/backends/ABIs. Evidence: consumed-token-regressions-v93.log. The frozen v87 source audit remains7/9 passing; it does not qualify later v88-v93 source changes.",
@@ -130,7 +137,7 @@
       "id": "G07",
       "title": "Record effective options and their source history",
       "status": "in-progress",
-      "evidence": "CTX/OPT capture all 64 compiler/default/language policy fields; USE preserves AST construction and declaration configuration. Temporal directive provenance, DEF ranges, keyword policy and complete source association remain. CAP183 now adds actual parser mangling to the full configuration cache and counted native EXTERN selection/restoration receipts in full and expression output. Repeated modes, syntax fallback, scopes left open by recovery, declaration B/OWN/ST and prototype DCL/USE ownership, macro/include/remap origins and compact exclusions pass v96. The remaining directive/pragma history still requires coverage. CAP184 now copies the actual31-slot A..underscore DEF table plus dialect fallback, requires32 full-context entries, observes actual normalized setter changes and invalidates configuration only on native value changes. Eight v97 families pass, including native unsigned ASC clamping, repeated directives, dialect/recovery, macro/include/remap/inactive paths and runtime parity. Pragma stacks and remaining temporal directive history remain.",
+      "evidence": "CTX/OPT capture all 64 compiler/default/language policy fields; USE preserves AST construction and declaration configuration. Temporal directive provenance, DEF ranges, keyword policy and complete source association remain. CAP183 now adds actual parser mangling to the full configuration cache and counted native EXTERN selection/restoration receipts in full and expression output. Repeated modes, syntax fallback, scopes left open by recovery, declaration B/OWN/ST and prototype DCL/USE ownership, macro/include/remap origins and compact exclusions pass v96. The remaining directive/pragma history still requires coverage. CAP184 now copies the actual31-slot A..underscore DEF table plus dialect fallback, requires32 full-context entries, observes actual normalized setter changes and invalidates configuration only on native value changes. Eight v97 families pass, including native unsigned ASC clamping, repeated directives, dialect/recovery, macro/include/remap/inactive paths and runtime parity. Pragma stacks and remaining temporal directive history remain. CAP185 now retains actual pragma selections, native stack depths/saved values/failures, independent setter results and callback/reservation subactions with source, configuration and local error context. Eight v98 targeted families pass, including partial ASM/EXTERN reservation and malformed/rejected routes. Stronger reader integrity, integration regressions and remaining #LANG/#CMDLINE attempt/history acceptance remain open.",
       "required_positive": "OPTION BASE changes, DEF letter ranges, push/pop pragmas, EXTERN policy, #LANG, #CMDLINE restart, and per-module resets yield the expected contexts.",
       "required_negative": "Rolled-back attempts and popped options cannot leak into later facts; export must not enable options, checks, profiling, or debug information itself."
     },
@@ -402,7 +409,7 @@
       "id": "G41",
       "title": "Make snapshot phases, identity lifetimes, and cross-module ownership explicit",
       "status": "in-progress",
-      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains. Observation allocation IDs now remain unique independently of serialized record totals. A validated native parser phase separates successful grammar callbacks from full-only original/selected snapshots. Resolver contexts register S references while native symbols are alive and only copy already-existing argument E associations. Expression-only output retains subtype snapshots with unavailable S/B references zero; no native pointer is retained or used later to reconstruct a relation.",
+      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains. Observation allocation IDs now remain unique independently of serialized record totals. A validated native parser phase separates successful grammar callbacks from full-only original/selected snapshots. Resolver contexts register S references while native symbols are alive and only copy already-existing argument E associations. Expression-only output retains subtype snapshots with unavailable S/B references zero; no native pointer is retained or used later to reconstruct a relation. Current field reconciliation retains literal-only evaluation/replay entry, exit and parent-context identity as an explicit open requirement, including evaluations that create no MI invocation.",
       "required_positive": "Multiple modules, prototype-to-body updates, forward patches, interned procptr formals, recycled symbols, and delayed/generated procedures preserve identity and phase ownership.",
       "required_negative": "Do not reuse a retired allocation identity, consume stale local pointers, conflate same-named external declarations across modules without linkage evidence, or promise stable IDs across different builds."
     },
@@ -487,7 +494,7 @@
       "required_negative": "Do not silently replace invalid bytes, interpret arbitrary compiler bytes as UTF-8, truncate embedded control data, double-unescape fields, or publish a complete model the declared consumer cannot read."
     }
   ],
-  "next_required_scope": "Finish seven v97 affected regressions (session71828) and frozen v96 source audit (session18120,6/42 passed); then qualify v97 source/reader independently. Preserve all original51 requirements and remaining field/route/class/target/fault scopes. Continue pragma/directive history, source-expression/binding causal closure, use-def/CFG/effects and backend correspondence.",
+  "next_required_scope": "Continue remaining10 missing/300 partial field requirements and the complete original51-item report. Verified v101 macro arguments and startup append/membership/negative contracts are complete within their stated scope. Remaining raw lexer control, PP chain derivations, base initializer provenance and numeric observer index dispositions need their specific evidence. Frozen v96 source audit session18120/root3513082 start8280373 remains live7/42; no current-source completion claim.",
   "active_verification": {
     "source_v76": {
       "state": "complete-all-81-cases-passed",
@@ -756,22 +763,166 @@
       }
     },
     "default_types_v97": {
-      "state": "eight-targeted-passed-seven-regressions-running",
+      "state": "eight-targeted-and-seven-regression-families-passed-source-qualification-pending",
       "compiler_sha256": "a8deb29b98014f799a9eeecb5956163a505e4b8e45168f28d1167a611192d426",
       "verification_report": "out/semantic-goal-20261027/default-types-verification-v97.json",
       "regressions": {
-        "state": "running",
-        "session": 71828,
+        "result": "OK",
         "tests": 7,
-        "log": "out/semantic-goal-20261027/default-type-regressions-v97.log",
-        "processes": [
-          {
-            "pid": 3619728,
-            "start_ticks": "8576951",
-            "state": "R"
-          }
-        ]
+        "seconds": 853.638,
+        "log": "out/semantic-goal-20261027/default-type-regressions-v97.log"
       }
+    },
+    "pragmas_v98": {
+      "state": "eight-targeted-strengthened-integrity-seven-regressions-passed-source-qualification-pending",
+      "compiler_sha256": "2fba730190ad1b54c68e95dffe66c8516fa1e9059d4263d5a56edb28050edbaa",
+      "snapshot": "out/semantic-goal-20261027/pragmas-work-v98-current",
+      "source_session": 71116,
+      "source_log": "out/semantic-goal-20261027/pragmas-first-v98.log",
+      "guard_log": "out/semantic-goal-20261027/pragma-guards-final-v98.log",
+      "source_processes": [
+        {
+          "pid": 3636903,
+          "start_ticks": "8680480",
+          "state": "R"
+        }
+      ],
+      "verification_report": "out/semantic-goal-20261027/pragma-verification-v98.json",
+      "targeted_families": 8,
+      "integrity": {
+        "tests": 1,
+        "seconds": 120.488,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/pragma-integrity-final-v98.log"
+      },
+      "regressions": {
+        "tests": 7,
+        "seconds": 1286.21,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/pragma-regressions-v98.log"
+      }
+    },
+    "data_payload_review_v99": {
+      "state": "native-DATA-guard-and-two-source-families-passed-remaining-reconciliation-tests-running",
+      "report": "out/semantic-goal-20261027/data-payload-review-v99.json",
+      "field_audit": {
+        "files": 353,
+        "functions": 4393,
+        "layouts": 297,
+        "fields": 1819,
+        "exported": 301,
+        "bookkeeping": 738,
+        "backend-detail": 448,
+        "partial": 300,
+        "derivable": 11,
+        "missing": 21
+      },
+      "source_session": 94070,
+      "live_test_processes": [
+        {
+          "pid": 3645581,
+          "start_ticks": "8732841",
+          "state": "R"
+        },
+        {
+          "pid": 3659671,
+          "start_ticks": "8779873",
+          "state": "R"
+        }
+      ]
+    },
+    "field_review_v100": {
+      "state": "source-review-proposals-retained-native-procedure-payload-qualified",
+      "review": "out/semantic-goal-20261027/remaining-field-review-v100.json",
+      "field_audit": {
+        "files": 353,
+        "functions": 4393,
+        "layouts": 297,
+        "fields": 1819,
+        "exported": 302,
+        "bookkeeping": 738,
+        "backend-detail": 448,
+        "partial": 300,
+        "derivable": 11,
+        "missing": 20
+      },
+      "source_suite": 94070
+    },
+    "field_contracts_v101": {
+      "state": "macro-argument-and-startup-projection-contracts-passed",
+      "compiler": "out/semantic-goal-20261027/fbc-pragmas-v98",
+      "compiler_sha256": "2fba730190ad1b54c68e95dffe66c8516fa1e9059d4263d5a56edb28050edbaa",
+      "macro_argument_families": {
+        "tests": 2,
+        "seconds": 106.386,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/macro-argument-contracts-v101.log",
+        "scope": "Direct MA narrow/wide payload, availability, filename/endpoints; expansion/substitution/callback/noneditable invalid extents across transports/modes/backends."
+      },
+      "unused_static_family": {
+        "tests": 1,
+        "seconds": 22.599,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/startup-unemitted-membership-final-v101.log",
+        "scope": "Allocated static wrapper membership persists without emitted private parent or cleanup body across GCC/Clang/LLVM."
+      },
+      "startup_list_recheck": {
+        "tests": 2,
+        "seconds": 611.582,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/startup-list-contracts-v101.log"
+      },
+      "field_audit": {
+        "files": 353,
+        "functions": 4393,
+        "layouts": 297,
+        "fields": 1819,
+        "exported": 311,
+        "bookkeeping": 738,
+        "backend-detail": 448,
+        "partial": 300,
+        "derivable": 12,
+        "missing": 10
+      },
+      "scope_note": "Five macro field dispositions now verified; other remaining-field-review-v100 proposals are unqualified. All original51 requirements remain."
+    },
+    "conditional_state_v102": {
+      "state": "conditional-state-and-remaining-field-reconciliation-passed",
+      "compiler": "out/semantic-goal-20261027/fbc-pragmas-v98",
+      "compiler_sha256": "2fba730190ad1b54c68e95dffe66c8516fa1e9059d4263d5a56edb28050edbaa",
+      "conditional_families": {
+        "tests": 6,
+        "seconds": 156.324,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/conditional-state-contracts-v102.log"
+      },
+      "field_audit": {
+        "files": 353,
+        "functions": 4393,
+        "layouts": 297,
+        "fields": 1819,
+        "exported": 312,
+        "bookkeeping": 743,
+        "backend-detail": 448,
+        "partial": 301,
+        "derivable": 15
+      },
+      "pending": [
+        "The field audit still contains 301 partial fields. No source/phase/route/class/target/fault scope is declared complete.",
+        "Literal-only evaluation and replay parent/context topology is explicitly retained as an open G04/G05/G06/G41 audit requirement.",
+        "Full explicit base-initializer transformation lineage remains G11/G32.",
+        "Frozen v96 source audit session18120/root3513082 start8280373 remains live8/42; no current-source qualification claim.",
+        "All original 51 acceptance scopes remain."
+      ],
+      "snapshot": "out/semantic-goal-20261027/conditional-state-v102-final",
+      "remaining_field_families": {
+        "tests": 3,
+        "seconds": 478.672,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/remaining-field-behavior-v102.log"
+      },
+      "scope_note": "Field dispositions are not completion acceptance. Lexer kind remains partial for literal-only evaluation/replay identity. Private native recursion/numeric list storage is bookkeeping; selected semantic payload has separate producer receipts.",
+      "structure": "353 documented files and 21 host source graphs pass; no tracked compiler C implementation."
     }
   },
   "working_tree": "/home/jkfirth/fbc",

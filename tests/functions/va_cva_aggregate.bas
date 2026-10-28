@@ -1,8 +1,8 @@
 '' Project: FreeBASIC compiler tests
 '' File: va_cva_aggregate.bas
-'' Purpose: Exercise C aggregate varargs and fixed CLongDouble calls.
-'' Responsibilities: Cover register classes, stack overflow, fixed C arguments
-'' and results, and native long-double formatting.
+'' Purpose: Exercise C aggregate varargs, fixed CLongDouble calls, and literals.
+'' Responsibilities: Cover register classes, stack overflow, fixed C arguments,
+'' results, exact long-double literals, and native formatting.
 '' This file contains no platform ABI emulation or native C test driver.
 #lang "fb"
 
@@ -72,7 +72,7 @@ End Function
 Function ReadCvaLongDouble CDecl Alias "read_cva_longdouble" _
     (ByVal arguments As Cva_List) As Integer
     Dim As CLongDouble value = fb_LongDoubleVaArg(arguments)
-    Return value = 1.75#
+    Return -CInt(value = 1.75#)
 End Function
 
 Function ReadOwnCvaAggregates CDecl _
@@ -101,6 +101,8 @@ Declare Function cva_aggregate_overflow CDecl _
     Alias "cva_aggregate_overflow" () As LongInt
 Declare Function cva_longdouble_register CDecl _
     Alias "cva_longdouble_register" () As Integer
+Declare Sub cva_write_longdouble_precision CDecl _
+    Alias "cva_write_longdouble_precision" (ByVal destination As Any Ptr)
 #if defined( __FB_X86__ ) and defined( __FB_64BIT__ ) and defined( __FB_LINUX__ )
 Declare Function cva_longdouble_identity CDecl _
     Alias "cva_longdouble_identity" (ByVal value As CLongDouble) As CLongDouble
@@ -138,6 +140,18 @@ memory_value = Type<AggregateMemory>(9, 10, 11)
 If ReadOwnCvaAggregatesOverflow(1, 2, 3, 4, 5, 6, rr, small_value, x_value, _
                                 rx, xr, xx, memory_value) <> 1235534567911 Then End 4
 If cva_longdouble_register() <> 1 Then End 5
+
+Dim As CLongDouble literal_value = CLongDoubleFromStringValue( _
+    StrPtr(!"1.0000000000000001"))
+Dim As CLongDouble c_literal_value
+cva_write_longdouble_precision(@c_literal_value)
+If (literal_value = c_literal_value) <> -1 Then End 10
+If (literal_value > CLongDoubleFromStringValue(StrPtr(!"1.0"))) <> -1 Then End 11
+Dim As CLongDouble fractional_value = _
+    CLongDoubleFromStringValue(StrPtr(!"1.75"))
+If Cast(Long, fractional_value) <> 1 Then End 12
+If Cast(Long, CLongDoubleFromStringValue(StrPtr(!"-1.75"))) <> -1 Then End 13
+If Cast(ULong, fractional_value) <> 1 Then End 14
 
 Dim As CLongDouble fixed_input = CLongDoubleFromDoubleValue(1.75#)
 #if defined( __FB_X86__ ) and defined( __FB_64BIT__ ) and defined( __FB_LINUX__ )

@@ -12,6 +12,26 @@ from semantic_data import FEATURE
 from sidecar import Model
 
 
+def check_native_nodes(test):
+    native = (test.root / "src/compiler/ast/nodes/ast-node-data.bas").read_text()
+    bodies = []
+    for name in ("astDataStmtBegin", "astDataStmtStore"):
+        start = native.index("function " + name)
+        end = native.index("\nend function", start) + len("\nend function")
+        bodies.append(native[start:end])
+    guard = (test.root / "tests/semantic-sidecar/data-node-guards.bas").read_text()
+    source = test.working / "data-node-guards.bas"
+    source.write_text(guard.replace("'' Native constructors are inserted here.", "\n".join(bodies)))
+    executable = test.working / ("data-node-guards.exe" if test.native_windows else "data-node-guards")
+    result = subprocess.run([str(test.compiler), "-prefix", str(test.toolchain_prefix), "-e", "-i", str(test.root / "inc"),
+                             "-i", str(test.root / "src/compiler"), "-x", str(executable), str(source)],
+                            cwd=test.working, capture_output=True, text=True, timeout=120)
+    test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+    result = subprocess.run([str(executable)], cwd=test.working, capture_output=True, text=True, timeout=30)
+    test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+    test.assertIn("DATA_NODE_GUARDS_PASS", result.stdout)
+
+
 SOURCE = '''dim shared target(0 to 2) as long
 restore
 restore later
@@ -48,6 +68,10 @@ def check_streams(test):
             items = facts["item"]
             test.assertEqual([items[1, ordinal][0] for ordinal in range(7)],
                              ["number", "number", "number", "string", "string", "wide-string", "address"])
+            test.assertEqual(model.data_ast_payloads[1, 1]["item_ids"], (2, 2, 2, 1, 1, 32768, 65534))
+            for group, payload in model.data_ast_payloads.items():
+                test.assertEqual(payload["trailer_id"], 65535)
+                test.assertEqual(payload["container_elements"], len(payload["item_ids"]) + 1)
             test.assertEqual([items[1, ordinal][4:6] for ordinal in range(6)], [
                 ["signed", "-1"], ["unsigned", "18446744073709551615"],
                 ["float64-bits", "0x3FF8000000000000"], ["bytes", "6869"],
@@ -98,6 +122,7 @@ def check_qb_and_modules(test):
             expected = [b"RawValue", b"1+2", b"a,b", b"", b"", b"hello there"]
             test.assertEqual([bytes.fromhex(fields[5]) for fields in facts["item"].values()], expected)
             test.assertTrue(all(fields[0] == "qb-raw" and fields[3] == "0" for fields in facts["item"].values()))
+            test.assertEqual(model.data_ast_payloads[1, 1], {"item_ids": (1,) * 6, "trailer_id": 65535, "container_elements": 7})
             context = int(facts["group"][1][1])
             test.assertNotIn(("source-context", context, "data-item:1:3"), model.physical_locations)
             test.assertIn(("source-context", context, "data-item:1:4"), model.physical_locations)

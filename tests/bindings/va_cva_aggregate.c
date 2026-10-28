@@ -9,6 +9,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <string.h>
 
 struct AggregateRR {
     int64_t first_value;
@@ -114,6 +115,12 @@ int64_t cva_aggregate_overflow(void)
 int cva_longdouble_register(void)
 {
     return send_longdouble(0, 1.75L);
+}
+
+void cva_write_longdouble_precision(void *destination)
+{
+    const long double value = 1.0000000000000001L;
+    memcpy(destination, &value, sizeof(value));
 }
 
 #if defined(__linux__) && defined(__x86_64__)

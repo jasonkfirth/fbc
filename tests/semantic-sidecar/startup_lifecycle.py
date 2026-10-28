@@ -30,6 +30,11 @@ def check_lists_and_instances(test):
             expected = [test.one(model, name, "procedure") for name in ("EarlyStartup", "SameStartupA", "SameStartupB")]
             source_order = [int(row[0]) for row in facts["startup-registration"].values() if int(row[0]) in expected]
             test.assertEqual(source_order, expected)
+            for kind in ("constructor", "destructor"):
+                entries = model.startup_registration_lists[1, kind]
+                test.assertEqual([entry[1] for entry in entries],
+                                 [int(fields[0]) for fields in facts["startup-registration"].values() if fields[1] == kind])
+                test.assertEqual([entry[2] for entry in entries], [entry[0] for entry in entries[1:]] + ([0] if entries else []))
             test.assertEqual([fields_for(model, "startup-priority-input", identity)[-1][1] for identity in expected], ["101", "201", "201"])
             global_symbols = [test.one(model, name, "variable") for name in ("first_startup", "second_startup")]
             instances = {int(row[0]): identity for identity, row in facts["global-instance"].items()}
@@ -59,6 +64,8 @@ def check_lists_and_instances(test):
             test.assertTrue(all(row[2] == "0" for row in array_paths if row[6] == "array-allocation"))
             parent = test.one(model, "UseStartupStatics", "procedure")
             test.assertTrue(all(row[1] == str(parent) for row in local_path + scalar_path + array_paths))
+            test.assertIn((local, int(local_path[0][2])), model.static_cleanup_members[1, parent])
+            test.assertNotIn((scalar, 0), model.static_cleanup_members[1, parent])
             guard_instances = {int(row[0]) for row in facts["static-instance-guard"].values()}
             for identity, row in facts["static-instance"].items():
                 if row[3] == "1" or row[5] == "1":
@@ -69,6 +76,34 @@ def check_lists_and_instances(test):
             test.assertEqual(model.properties["symbol", assigned]["return-used"], "0")
             test.assertEqual(model.properties["symbol", returned]["return-used"], "1")
             test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
+
+
+def check_unemitted_membership(test):
+    source = test.source('''type CleanupItem
+    value as long
+    declare destructor()
+end type
+destructor CleanupItem()
+end destructor
+private sub NeverCalled()
+    static item as CleanupItem
+end sub
+print 1
+''', "startup-unemitted-membership.bas")
+    for backend in test.backends:
+        model = test.compile(source, backend=backend)
+        parent = test.one(model, "NeverCalled", "procedure")
+        entries = model.static_cleanup_members[1, parent]
+        test.assertEqual(len(entries), 1)
+        variable, wrapper = entries[0]
+        test.assertEqual(model.symbols[variable][3], "1")
+        test.assertEqual(model.symbols[wrapper][3], "3")
+        emitted = {int(row[2]) for row in model.records["PH"] if row[3:5] == ["pre-load", "1"]}
+        test.assertNotIn(parent, emitted)
+        bodies = model.startup_lifecycles[1]["static-cleanup-body"]
+        test.assertFalse(any(row[2] == str(wrapper) for row in bodies.values()))
+        # An allocated wrapper is retained as membership even though neither
+        # the uncalled parent nor that wrapper has an emitted cleanup body.
 
 
 def check_backend_priorities(test):

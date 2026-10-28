@@ -215,6 +215,8 @@ def validate_startup(model, number, subject_modules):
         bucket[ordinal] = tuple(fields)
 
     model.startup_lifecycles = {}
+    model.startup_registration_lists = {}
+    model.static_cleanup_members = {}
     model.declarator_orders = {}
     for module, capabilities in model.capabilities.items():
         if capabilities.get(DECLARATION_FEATURE) == "available":
@@ -268,5 +270,23 @@ def validate_startup(model, number, subject_modules):
             if model.properties["symbol", proc].get("startup-priority") != priorities[-1]:
                 raise ValueError("Final procedure priority differs from the last accepted input")
         model.startup_lifecycles[module] = {family: facts[family] for family in FAMILIES}
+        # Registration IDs identify occurrences, not unique procedures. Keep
+        # repeated symbols and derive the native tail-append link separately
+        # for each kind; priority/backend records describe different orders.
+        for selected_kind in ("constructor", "destructor"):
+            entries = [(identity, int(fields[0])) for identity, fields in facts["startup-registration"].items()
+                       if fields[1] == selected_kind]
+            model.startup_registration_lists[module, selected_kind] = tuple(
+                (identity, proc, entries[index + 1][0] if index + 1 < len(entries) else 0)
+                for index, (identity, proc) in enumerate(entries))
+        # Static initialization records own wrapper membership even when an
+        # unused parent never emits a wrapper body. This is allocation order,
+        # not a statement that a conditional atexit registration executed.
+        members = defaultdict(list)
+        for fields in facts["static-instance"].values():
+            if fields[4] == "1":
+                members[int(fields[1])].append((int(fields[0]), int(fields[2])))
+        for parent, entries in members.items():
+            model.static_cleanup_members[module, parent] = tuple(entries)
 
 # end of semantic_startup.py

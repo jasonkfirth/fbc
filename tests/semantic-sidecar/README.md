@@ -816,4 +816,18 @@ transport/reset, runtime parity and repaired-count corruptions have explicit
 checks. The production guard compiles the native getter/setter bodies with the
 actual observer, verifying unchanged native table behavior and the event bound.
 
+Pragma tests exercise every scalar group and callback, nested/interleaved option
+stacks, overflow/underflow followed by actual setters, partial reservation
+success, rejected routes and malformed closures. Full/expression/binding
+availability, ABIs, transport, reset, source origins, noninterference and
+repaired-count action omissions have dedicated checks. A production guard
+compiles actual native push/pop bodies with the collector and tests copied
+lifetime, exclusions and both bounds without reimplementing stack behavior.
+
+Transient DATA payload checks compile the actual container/item constructors
+against a bounded poisoned allocation arena. They verify every live leaf tag,
+literal guards, final link, active container count and native item order. Source
+fixtures independently check the reader's documented tag/count derivation,
+including wide/NUL/address and QB raw items, without creating DATA N records.
+
 <!-- end of README.md -->

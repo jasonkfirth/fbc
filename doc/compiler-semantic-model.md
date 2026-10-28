@@ -5554,4 +5554,132 @@ The reader checks every initial value, native/wire ABI agreement, actual clamp
 and reversal rules, changed flags, before/after context values, source ownership,
 macro availability and every context's table at its construction position.
 
+## Native pragma history
+
+`native-pragma-history` is available in full and expression output. Binding
+output marks it unavailable. Dense module properties `native-pragma:<ordinal>`
+retain actual preprocessor decisions. A scope starts when the native pragma
+parser receives its initial spelling and ends on its actual return route.
+No callback or constant expression is evaluated again to obtain these facts.
+
+The first payload field is an event kind, followed by its scope ID:
+
+```text
+begin:    parent requested ST CTX SRC file SL SC EL EC physical MI unit valid
+select:   index group option-code flags set|push|pop selected-name
+unknown:  requested-option
+push/pop: index depth-before depth-after accepted saved-or-returned-value
+apply:    index requested-value setter-value effective-before effective-after entry-CTX committed-CTX
+callback: index once|reserve
+reserve:  asm|extern|symbol name accepted symbol-ID
+end:      reason errors-before errors-after CTX
+```
+
+The native option indices are msbitfields, once, constness, reserve, gui,
+private and profile. Callback options have flag 4. Scalar options have flags
+27, preserving push/pop, assignment, preprocessing output and boolean policy.
+PRIVATE is the inverse of the public-procedure default. CONSTNESS applies its
+bit while retaining unrelated pedantic-check bits. GUI records the native
+setter result, including a rejected scope change that leaves the value intact.
+
+Stack outcomes and option applications are deliberately separate. An overflowing
+push does not cancel the later assignment. An underflowing pop returns false,
+which the caller still applies. Reservation actions preserve each native call:
+an accepted ASM reservation can survive a later failed EXTERN reservation.
+Full output identifies an accepted ordinary reserved symbol; reduced output
+leaves its unavailable symbol ID zero. A callback record identifies invocation,
+while its actions and the enclosing error counters describe the result.
+
+Completion reasons are completed, unknown-option, disallowed-stack and
+disallowed-assignment. Completed means the parser reached its ordinary end;
+it does not imply that every stack or callback action succeeded. Missing closing
+parentheses can follow an already committed assignment. Source points retain
+native zero-based columns and the existing physical-source eligibility check.
+Hidden macro graphs have zero unavailable expansion links. Expression models
+retain zero configuration IDs without inventing full context snapshots.
+
+`native-pragma-counts` closes event, begin, end and remaining-open counts plus
+the native per-option stack limit, currently eight. Observation nesting is
+bounded at 1024 and events at one million. Native pragma stacks reset with each
+parser/module initialization. The reader validates nesting, vocabulary, actual
+stack contents, applied values, configuration ownership, callback/reservation
+order and mandatory action/count closure.
+
+## Transient DATA payload interpretation
+
+DATA construction uses one AST union differently for its container and leaves.
+The container initializes `data.elmts`. Each stored item initializes `data.id`;
+reading the other member would misinterpret an active payload. These temporary
+nodes are consumed while building the descriptor initializer and do not become
+new N records in the published graph.
+
+The source DATA observer copies the selected item kind before consumption. Its
+native AST tag is derivable without source-text guessing:
+
+| Captured source kind | Transient AST tag |
+| --- | ---: |
+| string or QB raw byte field | ZSTR, 1 |
+| number | CONST, 2 |
+| wide-string | WSTR, 32768 |
+| address | OFFSET, 65534 |
+| final descriptor link | LINK, 65535 |
+
+These AST tags differ from final runtime descriptor tags. Lowering replaces
+string and numeric tags with their actual stored lengths; wide tags include
+the native wide-string marker. The existing data-payload receipt preserves that
+selected runtime tag separately. NULL, 0, belongs to lowered sentinel handling
+and is not a source item category.
+
+Each descriptor receipt copies `tree->data.elmts` after the native final link is
+appended. Its cell count is therefore exactly the source group's item count
+plus one. The independent reader exposes `data_ast_payloads[(module, group)]`
+with derived item tags, the link tag and the captured container element count.
+These values have no separate AST node identity or invented source range.
+
+The nested procedure payload in `AST_NODE_BLOCK.proc` is initialized only for
+native procedure nodes. Its `ismain` flag is retained in the existing
+native-procedure-block receipt, independently of driver module roles. Ordinary
+scope-block storage does not initialize that procedure-only member and is not
+read as a procedure payload. `AST_NODE_PROC.decl_last` is the insertion cursor
+used by `astAddUnscoped`; it is private construction state. Published declaration
+order and final ordered roots describe the resulting program without exposing
+that cursor or inventing a procedure N node.
+
+## Startup list interpretation
+
+The reader exposes `startup_registration_lists[(module, kind)]` as ordered
+`(registration occurrence, procedure symbol, next occurrence)` tuples. Zero
+terminates each constructor/destructor list. Entries come from actual native
+tail-append receipts; repeated procedure symbols remain distinct occurrences.
+Source priorities and backend placement are separate facts. These links do not
+predict runtime loader ordering among equal priorities.
+
+`static_cleanup_members[(module, parent procedure)]` contains the allocated
+variable/wrapper pairs in native registration construction order. Allocation
+membership is retained even when an unused private parent never emits a body.
+The separate static-cleanup-body receipts describe bodies actually emitted.
+Neither list membership nor a guarded registration path asserts that runtime
+execution reached an atexit call.
+
+## Conditional table interpretation
+
+`conditional_states[branch]` interprets captured PPB/PPD decisions without
+evaluating the condition again. It exposes source nesting depth, the stored
+native truth and else-seen count, and explicit availability. Native `istrue`
+is not simply the current branch's selected flag: after a true earlier branch,
+an ELSEIF can evaluate true while remaining unselected and leaving the native
+chain truth set. ELSE then inverts that stored truth and increments else-seen.
+
+Parent-inactive directives are scanned by `ppSkip` without allocating native
+conditional-table entries. Their source topology is preserved, but native
+truth/count values are unavailable, not false/zero. Unfinished recovery decisions
+also retain unavailable native values. Source depth is derived from source
+parent relationships and is not claimed to be the native `PP_CTX.level` index.
+That private active-table index differs from independently scanned inactive
+nesting and does not need a public allocator identity.
+
+`conditional_skipped_regions` exposes the captured PPS intervals. Coordinate
+availability remains unchanged; generated or remapped source does not become
+editable merely because an inactive region has an owning branch.
+
 <!-- end of compiler-semantic-model.md -->

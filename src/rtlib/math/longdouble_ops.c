@@ -22,7 +22,11 @@
         - compiler parsing or code generation
 */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
 #include <math.h>
+#include <locale.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -150,6 +154,34 @@ void fb_LongDoubleFromDouble(void *destination, double value,
 			     unsigned int storage_size)
 {
 	longdouble_store(destination, storage_size, (long double)value);
+}
+
+void fb_LongDoubleFromString(void *destination, const char *text,
+			     unsigned int storage_size)
+{
+	char *end;
+	long double value;
+
+	if (text == NULL) abort();
+#if defined(_WIN32) && !defined(__CYGWIN__)
+	_locale_t c_locale = _create_locale(LC_NUMERIC, "C");
+	if (c_locale == NULL) abort();
+	value = _strtold_l(text, &end, c_locale);
+	_free_locale(c_locale);
+#elif defined(__unix__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__)
+	locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+	if (c_locale == (locale_t)0) abort();
+	value = strtold_l(text, &end, c_locale);
+	freelocale(c_locale);
+#else
+	/* Older targets without locale-specific conversion stay correct in C locale. */
+	struct lconv *numeric_locale = localeconv();
+	if ((numeric_locale == NULL) || (numeric_locale->decimal_point == NULL) ||
+	    (strcmp(numeric_locale->decimal_point, ".") != 0)) abort();
+	value = strtold(text, &end);
+#endif
+	if ((end == text) || (*end != '\0')) abort();
+	longdouble_store(destination, storage_size, value);
 }
 
 int64_t fb_LongDoubleToSigned(const void *source,

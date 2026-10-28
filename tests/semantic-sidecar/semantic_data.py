@@ -84,6 +84,7 @@ def validate_data(model, number, unescape, subject_modules):
             origins.append((module, row))
 
     model.data_streams = {}
+    model.data_ast_payloads = {}
     expected_ranges = {}
     for module, capabilities in model.capabilities.items():
         if capabilities.get(FEATURE) != "available":
@@ -218,6 +219,19 @@ def validate_data(model, number, unescape, subject_modules):
             if not label and descriptors and array != next(iter(descriptors)):
                 raise ValueError("Blank RESTORE does not select the first native descriptor")
         model.data_streams[module] = facts
+        # These are interpretations of captured transient payloads, not new
+        # AST nodes. DATA item kinds are selected from the active native id
+        # before lowering; descriptor cells copy the root's elmts after its
+        # final LINK cell was appended. NULL is only a lowered sentinel.
+        native_ids = {"string": 1, "qb-raw": 1, "number": 2, "wide-string": 32768, "address": 65534}
+        for group, fields in groups.items():
+            descriptor = int(fields[2])
+            count = int(fields[3])
+            model.data_ast_payloads[module, group] = {
+                "item_ids": tuple(native_ids[items[group, ordinal][0]] for ordinal in range(count)),
+                "trailer_id": 65535,
+                "container_elements": int(descriptors[descriptor][3]),
+            }
     if next_links or read_links:
         raise ValueError("DATA relationship has no matching native observation")
     for module, row in locations:

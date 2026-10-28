@@ -27,6 +27,8 @@
 #include once "lexer/lex.bi"
 #include once "parser/parser.bi"
 #include once "preprocessor/pp.bi"
+#include once "tooling/semantic-pragmas.bi"
+#include once "tooling/semantic-hooks.bi"
 
 enum LEXPP_PRAGMAFLAG_ENUM
 	LEXPP_PRAGMAFLAG_NONE                 = 0
@@ -107,6 +109,7 @@ end sub
 private sub pragmaPush( byval pragmaIdx as LEXPP_PRAGMAOPT_ENUM, byval value as longint )
 	with pragmaStk(pragmaIdx)
 		if( .tos >= FB_MAXPRAGMARECLEVEL ) then
+			fbSemanticModelPragmaStack("push", pragmaIdx, .tos, .tos, FALSE, value)
 			errReport( FB_ERRMSG_RECLEVELTOODEEP )
 			'' error recovery: skip
 			exit sub
@@ -114,6 +117,7 @@ private sub pragmaPush( byval pragmaIdx as LEXPP_PRAGMAOPT_ENUM, byval value as 
 
 		.stk(.tos) = value
 		.tos += 1
+		fbSemanticModelPragmaStack("push", pragmaIdx, .tos - 1, .tos, TRUE, value)
 	end with
 end sub
 
@@ -123,11 +127,13 @@ private sub pragmaPop( byval pragmaIdx as LEXPP_PRAGMAOPT_ENUM, byref value as l
 			errReport( FB_ERRMSG_STACKUNDERFLOW )
 			'' error recovery: skip
 			value = FALSE
+			fbSemanticModelPragmaStack("pop", pragmaIdx, .tos, .tos, FALSE, value)
 			exit sub
 		end if
 
 		.tos -= 1
 		value = .stk(.tos)
+		fbSemanticModelPragmaStack("pop", pragmaIdx, .tos + 1, .tos, TRUE, value)
 	end with
 end sub
 
@@ -232,7 +238,9 @@ private sub pragmaReserve( )
 	end if
 
 	if( haveAsm = TRUE ) then
-		if( parserInlineAsmAddKeyword( id ) = FALSE ) then
+		dim as integer semantic_result = parserInlineAsmAddKeyword( id )
+		fbSemanticModelPragmaReserve("asm", id, semantic_result)
+		if( semantic_result = FALSE ) then
 			errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 			'' error recovery: skip line
 			hSkipUntil( FB_TK_EOL )
@@ -241,7 +249,9 @@ private sub pragmaReserve( )
 	end if
 
 	if( haveExtern = TRUE ) then
-		if( parserGlobalAsmAddKeyword( id ) = FALSE ) then
+		dim as integer semantic_result = parserGlobalAsmAddKeyword( id )
+		fbSemanticModelPragmaReserve("extern", id, semantic_result)
+		if( semantic_result = FALSE ) then
 			errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 			'' error recovery: skip line
 			hSkipUntil( FB_TK_EOL )
@@ -262,6 +272,7 @@ private sub pragmaReserve( )
 		id, NULL, _
 		FB_DATATYPE_INVALID, NULL, _
 		FB_SYMBATTRIB_LOCAL, FB_PROCATTRIB_NONE )
+	fbSemanticModelPragmaReserve("symbol", id, sym <> NULL, sym)
 
 	if( sym = NULL ) then
 		errReportEx( FB_ERRMSG_DUPDEFINITION, id )
@@ -275,6 +286,24 @@ private sub pragmaReserve( )
 
 end sub
 
+'' These reads expose the same native values saved by PUSH. They do not
+'' evaluate expressions or repeat callbacks. PRIVATE is the inverse of the
+'' stored public-procedure default; the other boolean groups keep their native
+'' truth representation. GUI retains its actual console/GUI option value.
+private function hPragmaValue( byval p as integer ) as longint
+	select case pragmaOpt(p).grp
+	case LEXPP_PRAGMAGRP_PDCHECK
+		return fbPdCheckIsSet(pragmaOpt(p).opt)
+	case LEXPP_PRAGMAGRP_COMPOPT
+		return fbGetOption(pragmaOpt(p).opt)
+	case LEXPP_PRAGMAGRP_FBOPTION
+		select case pragmaOpt(p).opt
+		case FBOPTION_PROCPUBLIC: return env.opt.procpublic = 0
+		case FBOPTION_PROCPROFILE: return env.opt.procprofile <> 0
+		end select
+	end select
+	return 0
+end function
 
 '':::::
 '' Pragma           =   PRAGMA
@@ -288,8 +317,10 @@ sub ppPragma( )
 	dim as string tk
 	dim as integer p = -1, ispop = FALSE, ispush = FALSE
 	dim as longint value = any
+	dim as integer semantic_errors = errGetCount( )
 
 	tk = lcase( *lexGetText( ) )
+	dim as longint semantic_scope = fbSemanticModelPragmaBegin(tk)
 	if( tk = "push" ) then
 		ispush = TRUE
 	elseif( tk = "pop" ) then
@@ -318,6 +349,7 @@ sub ppPragma( )
 	next
 
 	if( p = -1 ) then
+		fbSemanticModelPragmaUnknown(tk)
 		errReport( FB_ERRMSG_SYNTAXERROR )
 		'' error recovery: skip line
 		if( ispop or ispush ) then
@@ -325,8 +357,11 @@ sub ppPragma( )
 		else
 			hSkipUntil( FB_TK_EOL )
 		end if
+		fbSemanticModelPragmaEnd(semantic_scope, "unknown-option", semantic_errors, errGetCount( ))
 		return
 	end if
+	fbSemanticModelPragmaSelect(p, pragmaOpt(p).grp, pragmaOpt(p).opt, pragmaOpt(p).flags, _
+		iif(ispush, "push", iif(ispop, "pop", "set")), tk)
 
 	if( ispush or ispop ) then
 		if( (pragmaOpt(p).flags and LEXPP_PRAGMAFLAG_CAN_PUSHPOP) = 0 ) then
@@ -337,6 +372,7 @@ sub ppPragma( )
 			else
 				hSkipUntil( FB_TK_EOL )
 			end if
+			fbSemanticModelPragmaEnd(semantic_scope, "disallowed-stack", semantic_errors, errGetCount( ))
 			return
 		end if
 	end if
@@ -387,6 +423,7 @@ sub ppPragma( )
 					errReport( FB_ERRMSG_SYNTAXERROR )
 					'' error recovery: skip line
 					hSkipUntil( FB_TK_EOL )
+					fbSemanticModelPragmaEnd(semantic_scope, "disallowed-assignment", semantic_errors, errGetCount( ))
 					return
 				end if
 
@@ -420,12 +457,16 @@ sub ppPragma( )
 	if( (pragmaOpt(p).flags and LEXPP_PRAGMAFLAG_HAS_CALLBACK) <> 0 ) then
 		select case p
 		case LEXPP_PRAGMAOPT_ONCE
+			fbSemanticModelPragmaCallback(p, "once")
 			fbPragmaOnce()
 		case LEXPP_PRAGMAOPT_RESERVE
+			fbSemanticModelPragmaCallback(p, "reserve")
 			pragmaReserve()
 		end select
 	else
 		if( (pragmaOpt(p).flags and (LEXPP_PRAGMAFLAG_CAN_PUSHPOP or LEXPP_PRAGMAFLAG_CAN_ASSIGN)) <> 0 ) then
+			dim as longint semantic_requested = value, semantic_before = hPragmaValue(p)
+			dim as longint semantic_context = fbSemanticModelCurrentContext( )
 			select case pragmaOpt(p).grp
 			case LEXPP_PRAGMAGRP_PDCHECK
 				value = (value and pragmaOpt(p).opt) or (fbGetOption( FB_COMPOPT_PEDANTICCHK ) and not pragmaOpt(p).opt)
@@ -441,6 +482,7 @@ sub ppPragma( )
 					env.opt.procprofile = ( value <> 0 )
 				end select
 			end select
+			fbSemanticModelPragmaApply(p, semantic_requested, value, semantic_before, hPragmaValue(p), semantic_context)
 		end if
 	end if
 
@@ -455,6 +497,7 @@ sub ppPragma( )
 			lexSkipToken( )
 		end if
 	end if
+	fbSemanticModelPragmaEnd(semantic_scope, "completed", semantic_errors, errGetCount( ))
 end sub
 
 '' end of preprocessor/pp-pragma.bas
