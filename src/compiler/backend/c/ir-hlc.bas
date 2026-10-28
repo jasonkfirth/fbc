@@ -4261,14 +4261,15 @@ end function
 private function exprNewVREG _
 	( _
 		byval vreg as IRVREG ptr, _
-		byval is_lvalue as integer = FALSE _
+		byval is_lvalue as integer = FALSE, _
+		byval write_value as integer = TRUE _
 	) as EXPRNODE ptr
 
 	dim as EXPRNODE ptr l = any
 	dim as integer dtype = any, have_offset = any
 	dim as EXPRNODE ptr byte_index = NULL
 	dim as integer accessdtype = vreg->dtype
-	if( is_lvalue ) then
+	if( is_lvalue and write_value ) then
 		'' The AST has already checked writes, including initialization of
 		'' CONST variables. Their C storage is mutable during initialization;
 		'' remove only the stored value's const, keeping pointee qualifiers.
@@ -4291,7 +4292,7 @@ private function exprNewVREG _
 				'' recursion
 				l = exprNewVREG( vreg->vidx )
 				var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
-					FALSE, (is_lvalue = FALSE), is_lvalue)
+					FALSE, (is_lvalue = FALSE), (is_lvalue and write_value))
 				if( member <> NULL ) then
 					l = member
 					exit select
@@ -4373,7 +4374,7 @@ private function exprNewVREG _
 		if( (is_c_array = FALSE) andalso (vreg->vidx = NULL) andalso _
 		    ((typeIsPtr(l->dtype) = FALSE) or (vreg->typ = IR_VREGTYPE_PTR)) ) then
 			var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
-				FALSE, (is_lvalue = FALSE), is_lvalue)
+				FALSE, (is_lvalue = FALSE), (is_lvalue and write_value))
 			if( member <> NULL ) then
 				l = member
 				exit select
@@ -5055,7 +5056,8 @@ private sub _emitAddr _
 			end if
 		end if
 
-		l = exprNewCAddress( exprNewVREG( v1, TRUE /' lvalue '/ ) )
+		'' Taking an address requires storage, but does not grant write access.
+		l = exprNewCAddress( exprNewVREG( v1, TRUE, FALSE /' address only '/ ) )
 
 	case AST_OP_DEREF
 		'' Note: The deref is already done in the vreg itself; as in
