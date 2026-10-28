@@ -2626,6 +2626,10 @@ WithDefault()
         from extern_mangling import check_modes
         check_modes(self)
 
+    def test_extern_mangling_distinguishes_variable_declarations_from_compound_policy(self) -> None:
+        from extern_mangling import check_variable_declarations
+        check_variable_declarations(self)
+
     def test_extern_mangling_preserves_fallback_and_unfinished_recovery(self) -> None:
         from extern_mangling import check_recovery
         check_recovery(self)
@@ -2957,12 +2961,33 @@ WithDefault()
             sys.path.remove(scripts)
         with tempfile.TemporaryDirectory(prefix="frozen-reader-", dir=self.working) as temporary:
             destination = Path(temporary)
-            freeze_semantic_reader(self.root, destination)
-            self.assertEqual(sorted(path.name for path in destination.glob("*.py")),
-                             sorted(SEMANTIC_READER_FILES))
-            result = subprocess.run([sys.executable, "-c",
-                                     "import sidecar; assert sidecar.SCHEMA == '27'"],
+            copied = freeze_semantic_reader(self.root, destination)
+            self.assertEqual(sorted(path.name for path in destination.glob("*.py")), list(copied))
+            self.assertTrue(set(SEMANTIC_READER_FILES) <= set(copied))
+            self.assertIn("semantic_extern.py", copied)
+            result = subprocess.run([sys.executable, "-I", "-c",
+                                     "import sys; sys.path.insert(0, sys.argv[1]); "
+                                     "import sidecar; assert sidecar.SCHEMA == '27'", str(destination)],
                                     cwd=destination, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            # A newly added local dependency and its nested cyclic import
+            # must freeze without another edit to the historical root list.
+            synthetic = destination / "source/tests/semantic-sidecar"
+            synthetic.mkdir(parents=True)
+            for name in copied:
+                shutil.copy2(destination / name, synthetic / name)
+            with (synthetic / "sidecar.py").open("a") as source:
+                source.write("\nimport semantic_freeze_one\n")
+            (synthetic / "semantic_freeze_one.py").write_text("from semantic_freeze_two import TOKEN\n")
+            (synthetic / "semantic_freeze_two.py").write_text("import semantic_freeze_one\nTOKEN = 17\n")
+            nested = destination / "nested"
+            nested.mkdir()
+            names = freeze_semantic_reader(destination / "source", nested)
+            self.assertTrue({"semantic_freeze_one.py", "semantic_freeze_two.py"} <= set(names))
+            result = subprocess.run([sys.executable, "-I", "-c",
+                                     "import sys; sys.path.insert(0, sys.argv[1]); import sidecar; "
+                                     "from semantic_freeze_one import TOKEN; assert TOKEN == 17", str(nested)],
+                                    cwd=nested, capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_safe_edit_planning_requires_exact_fresh_nonoverlapping_locations(self) -> None:

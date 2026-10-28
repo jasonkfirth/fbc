@@ -5,6 +5,7 @@
   "compiler": "out/semantic-goal-20261027/fbc-resolution-context-v86",
   "compiler_sha256": "2816a6a572f9f07c9c774f5a9b44e4c7a0e9d18dc63769858e6e219afab3d941",
   "verified_checks": [
+    "v96 qualifies ten targeted EXTERN/token families, the isolated frozen-reader import closure family, and eight affected regressions (301.918seconds). Native policy/context selections, nested/repeated restoration, source prototype and ordinary-variable ownership, rejected/inactive/unfinished routes, macro/include/remap origins, ABIs/transport/reset, byte-identical emission, twelve runtime partitions, repaired-count corruption and1024-depth/1000000-event bounds pass. Hidden-provenance tokens no longer expose internal macro IDs. Frozen v87 source audit completes9/9; it does not qualify newer sources. Current v96 source qualification is frozen separately for42 cases, with1/42 passed so far. Evidence: extern-contexts-verification-v96.json.",
     "All six v93 affected regressions passed in454.905seconds: actual lookup precedence/modes/ABIs, symbol filters, prototype property/descriptor matching, procedure error-state ownership and effective-context modes/backends/ABIs. Evidence: consumed-token-regressions-v93.log. The frozen v87 source audit remains7/9 passing; it does not qualify later v88-v93 source changes.",
     "CAP182 parser-consumed-tokens passed six targeted families plus an extended unknown-class/limit guard and strengthened foreign-macro/raw-wire dtype integrity checks on immutable v93, SHA25610e8af39c54eddcbb91d4bbd859b8f5553bff2fcca2069633ec7e332af809a8b. Actual lexer payloads, active unions, native byte/wide units, source/macro/lookup provenance, type ABIs/text-binary/reset/reduced exclusions, PP/probe/inactive suppression and corrected-total corruption are covered. Evidence: consumed-tokens-verification-v93.json. General token-to-AST/binding causality and all original51 acceptance scopes remain open.",
     "Four recent native production guards passed in136.101seconds on v92 after compiling main/collector source copies in test scratch directories: lookup, symbol filtering, overload resolution and prototype matching. Evidence: local-guard-builds-v92.log. The six broader CFG/runtime/block/startup/effect regressions remain active.",
@@ -128,7 +129,7 @@
       "id": "G07",
       "title": "Record effective options and their source history",
       "status": "in-progress",
-      "evidence": "CTX/OPT capture all 64 compiler/default/language policy fields; USE preserves AST construction and declaration configuration. Temporal directive provenance, DEF ranges, keyword policy and complete source association remain.",
+      "evidence": "CTX/OPT capture all 64 compiler/default/language policy fields; USE preserves AST construction and declaration configuration. Temporal directive provenance, DEF ranges, keyword policy and complete source association remain. CAP183 now adds actual parser mangling to the full configuration cache and counted native EXTERN selection/restoration receipts in full and expression output. Repeated modes, syntax fallback, scopes left open by recovery, declaration B/OWN/ST and prototype DCL/USE ownership, macro/include/remap origins and compact exclusions pass v96. Effective DEF letter tables and remaining directive/pragma history are still required.",
       "required_positive": "OPTION BASE changes, DEF letter ranges, push/pop pragmas, EXTERN policy, #LANG, #CMDLINE restart, and per-module resets yield the expected contexts.",
       "required_negative": "Rolled-back attempts and popped options cannot leak into later facts; export must not enable options, checks, profiling, or debug information itself."
     },
@@ -240,7 +241,7 @@
       "id": "G21",
       "title": "Expose source mangling mode and emitted external identity",
       "status": "in-progress",
-      "evidence": "BASIC observers retain native selected C/LLVM/assembler identifiers and separate object identities, with counted module closure. Existing declaration linkage now covers all variables. Explicit states distinguish automatic storage, toolchain-managed private/static/TLS symbols, intrinsic rewriting and assembler quoting; unused prototypes remain unobserved and procedure-pointer types have no object identity. Five families pass with C++/ordinary aliases, builtin mappings, native object equality/nm evidence, target prefixes/Windows stdcall/fastcall and COFF/Mach-O object checks. Discovery repaired duplicate LLVM platform prefixes and non-Windows stdcall decoration. Complete phase/target interaction and shared-tree integration remain; no complete G21 claim.",
+      "evidence": "BASIC observers retain native selected C/LLVM/assembler identifiers and separate object identities, with counted module closure. Existing declaration linkage now covers all variables. Explicit states distinguish automatic storage, toolchain-managed private/static/TLS symbols, intrinsic rewriting and assembler quoting; unused prototypes remain unobserved and procedure-pointer types have no object identity. Five families pass with C++/ordinary aliases, builtin mappings, native object equality/nm evidence, target prefixes/Windows stdcall/fastcall and COFF/Mach-O object checks. Discovery repaired duplicate LLVM platform prefixes and non-Windows stdcall decoration. Complete phase/target interaction and shared-tree integration remain; no complete G21 claim. CAP183 preserves native EXTERN scope policy independently of compiler-selected emitted identities; parser policy is not an inferred link symbol. Ten v96 targeted families pass; original final-emission acceptance remains open.",
       "required_positive": "C/C++/Windows/rtlib aliases, namespace overloads, data exports, proc addresses, and builtin mappings identify the correct compiler-selected link symbol.",
       "required_negative": "Do not force code emission/mangling side effects during observation or invent linker addresses/resolutions for external declarations."
     },
@@ -455,8 +456,8 @@
     {
       "id": "G48",
       "title": "Keep the compiler coverage manifest current and reviewable",
-      "status": "pending",
-      "evidence": "Retain the complete acceptance scope from the audit catalog.",
+      "status": "in-progress",
+      "evidence": "Current v96 source inventory reviews345 files and1785 fields with explicit last-matching-rule dispositions;298 exported,23 missing and300 partial. Native parser mangling and saved EXTERN restoration mode now have source/behavior evidence. The reader freezer automatically follows local import closure, with isolated nested/cyclic import proof. Full per-field/route capability and acceptance traceability, including the original class/target/fault requirements, remains open.",
       "required_positive": "Every current field/route has a documented semantic disposition, evidence, required capability, and acceptance coverage or justified intentional exclusion.",
       "required_negative": "A new or changed class/payload/route cannot satisfy completeness merely by adding a name to a switch, a hook text match, or an untested fallback rule."
     },
@@ -485,7 +486,7 @@
       "required_negative": "Do not silently replace invalid bytes, interpret arbitrary compiler bytes as UTF-8, truncate embedded control data, double-unescape fields, or publish a complete model the declared consumer cannot read."
     }
   ],
-  "next_required_scope": "Finish frozen v87 source audit (7/9 passed) then qualify current v93 sources/reader. All v93 six targeted families, extended unknown-class/limit guard, strengthened ownership/dtype checks and six affected regressions passed. Preserve all original51 acceptance requirements,24 missing/301 partial contract fields, token/expression/binding causal closure, EXTERN/macro/history, complete CFG/use-def/effect/backend and class/route/target/fault coverage.",
+  "next_required_scope": "Finish frozen current-source qualification session18120 (42 cases, latest1/42 passed); preserve all original51 requirements. v96 targeted/freezer/eight-regression checks pass. Continue effective DEF letter policy and directive/pragma history, source-expression/binding causal closure, remaining23 missing/300 partial field contracts, and full class/route/target/use-def/CFG/effect/backend/fault acceptance.",
   "active_verification": {
     "source_v76": {
       "state": "complete-all-81-cases-passed",
@@ -710,6 +711,48 @@
       "field_audit": "out/semantic-goal-20261027/field-audit-qualified-v93",
       "regression_tests": 6,
       "regression_seconds": 454.905
+    },
+    "extern_contexts_v96": {
+      "state": "ten-targeted-one-freezer-eight-regressions-passed-current-source-audit-running",
+      "compiler_sha256": "925510ebd1bc18fcb91af3bffd8f21b42842f89dc6cd4fe11ac6c4079e362a2d",
+      "verification_report": "out/semantic-goal-20261027/extern-contexts-verification-v96.json",
+      "field_audit": {
+        "files": 345,
+        "functions": 4328,
+        "layouts": 290,
+        "fields": 1785,
+        "exported": 298,
+        "bookkeeping": 738,
+        "backend-detail": 416,
+        "partial": 300,
+        "derivable": 10,
+        "missing": 23
+      },
+      "source_audit": {
+        "state": "running",
+        "session": 18120,
+        "output": "out/semantic-goal-20261027/self-current-v96-reader2",
+        "log": "out/semantic-goal-20261027/self-current-v96-reader2.log",
+        "cases": 42,
+        "latest_actual": "1/42 passed",
+        "processes": [
+          {
+            "pid": 3513082,
+            "start_ticks": "8280373",
+            "state": "S"
+          },
+          {
+            "pid": 3513252,
+            "start_ticks": "8281050",
+            "state": "S"
+          },
+          {
+            "pid": 3513253,
+            "start_ticks": "8281068",
+            "state": "S"
+          }
+        ]
+      }
     }
   },
   "working_tree": "/home/jkfirth/fbc",

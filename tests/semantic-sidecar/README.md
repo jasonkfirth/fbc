@@ -802,4 +802,10 @@ checks. Corrected-total mutations remove or forge scopes, contexts and counts.
 The production BASIC collector is copied into test scratch storage before
 compilation; its guard checks copied lifetime, exclusions and both bounds.
 
+Frozen source audits copy the reader's local Python import closure, including
+imports inside validators. An isolated import test adds unlisted nested and
+cyclic dependencies and proves that the copied reader can import independently
+of the working tree. The source bytes inspected for imports are the bytes copied
+into the audit manifest.
+
 <!-- end of README.md -->

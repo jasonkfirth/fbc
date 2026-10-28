@@ -119,6 +119,31 @@ def check_modes(test):
     test.assertTrue(all(model.options[identity][EXTERN_OPTION] == 0 for identity, module in model.configurations.items() if module == 2))
 
 
+def check_variable_declarations(test):
+    source = test.source('''extern "C"
+extern CVariable as long
+extern "C++"
+extern CppVariable as long
+end extern
+extern RestoredVariable as long
+end extern
+dim LocalVariable as long
+print LocalVariable
+''', "extern-variable-declarations.bas")
+    for backend in test.backends:
+        model = test.compile(source, backend=backend)
+        test.assertEqual(len(model.extern_transitions[1]), 4)
+        for name, mode in (("CVariable", 1), ("CppVariable", 4), ("RestoredVariable", 1), ("LocalVariable", 0)):
+            symbols = set(model.named(name))
+            bindings = [ordinal for ordinal, row in enumerate(model.records["B"], 1)
+                        if int(row[1]) in symbols and row[2] == "declaration"]
+            test.assertTrue(bindings, name)
+            for binding in bindings:
+                statement = model.statement_owners["binding", binding]
+                context = int(model.statements[statement][6])
+                test.assertEqual(model.options[context][EXTERN_OPTION], mode, name)
+
+
 def check_recovery(test):
     cases = (("unknown", 'extern "not-a-mode"\ndeclare sub RecoveredProc()\nend extern\n', "not-a-mode"),
              ("missing", 'extern\ndeclare sub RecoveredProc()\nend extern\n', ""),
@@ -134,7 +159,7 @@ def check_recovery(test):
                 model = Model.read(path, expressions_only=True, allow_recovery=True)
                 test.assertEqual(model.recovered_modules, {1})
                 transitions = model.extern_transitions[1]
-                if spelling is not None:
+                if spelling is not None and label != "missing":
                     test.assertEqual(len(transitions), 2)
                     test.assertEqual(transitions[0][3], "1")
                     test.assertEqual(transitions[0][8:11], [str(int(bool(spelling))), "1", spelling])
@@ -143,13 +168,17 @@ def check_recovery(test):
                     test.assertEqual(len(transitions), 1)
                     test.assertTrue(all(scope["end"] is None for scope in model.extern_scopes.values()))
                 else:
+                    # Bare EXTERN is routed through variable declaration
+                    # recovery before the compound parser is entered.
                     test.assertFalse(transitions)
                 _, full_path = test.invoke([source], backend=backend, success=False)
                 if full_path.exists():
-                    rejected_full = Model.read(full_path)
-                    test.assertFalse(rejected_full.extern_transitions)
-                    test.assertFalse(rejected_full.constructs)
-                    test.assertFalse(rejected_full.configurations)
+                    # Failed full output can retain its header/dependency
+                    # prefix. It has no complete footer or committed module.
+                    with test.assertRaisesRegex(ValueError, "completeness footer"):
+                        Model.read(full_path)
+                    lines = full_path.read_text().splitlines()
+                    test.assertFalse(any(line.startswith(("BLK\t", "CTX\t", "END\t")) or "extern-mangling" in line for line in lines))
 
 
 def check_origins(test):

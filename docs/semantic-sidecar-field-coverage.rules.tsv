@@ -295,6 +295,9 @@ tooling/semantic-prototypes.bas	SEMANTIC_PROTOTYPE_FRAME	identity	exported	K	G49
 tooling/semantic-prototypes.bas	SEMANTIC_PROTOTYPE_FRAME	ordinal	exported	K	G49	Actual native overload candidate order, distinct from call-scoring attempts.
 tooling/semantic-prototypes.bas	SEMANTIC_PROTOTYPE_FRAME	remaining	exported	K	G49	Actual backwards parameter traversal count after method/property filtering.
 tooling/semantic-prototypes.bas	SEMANTIC_PROTOTYPE_FRAME	stage	bookkeeping		G46,G49	Guard BYDESC/type/subtype comparison order and native early exits without choosing a procedure.
+parser/parser.bi	PARSERCTX	mangling	exported	CTX,OPT,K	G07,G21	Full context cache includes actual parser-mangling policy. Native EXTERN begin/restoration receipts retain previous/committed modes, native scope and source identities; expression/recovery output keeps explicit modes with unavailable CFG zero. Ten v96 targeted families qualify this scope; emitted external identity is separate.
+parser/parser.bi	FB_CMPSTMT_EXTERN	lastmang	exported	K,BLK,BEND	G07,G21	Copied previous mode at actual native scope entry is checked against the restoration assignment before stack release. Repeated modes retain distinct constructs; unterminated recovery does not acquire an invented end. Producer: tooling/semantic-extern.bas.
+
 # end of semantic-sidecar-field-coverage.rules.tsv
 
 # Current-producer reconciliation; these field facts do not close their whole gap scopes.

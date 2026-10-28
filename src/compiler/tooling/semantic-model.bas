@@ -101,6 +101,7 @@ declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval 
 #include once "tooling/semantic-procedure-state.bi"
 #include once "tooling/semantic-tokens.bi"
 #include once "tooling/semantic-extern.bi"
+#include once "tooling/semantic-default-types.bi"
 #include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-comments.bi"
 #include once "tooling/semantic-variable-names.bi"
@@ -4733,6 +4734,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelResetProcedureState( )
 	fbSemanticModelResetTokens( )
 	fbSemanticModelResetExtern( )
+	fbSemanticModelResetDefaultTypes( )
 	fbSemanticModelResetObjectOperations( )
 	fbSemanticModelResetIRFlow( )
 	fbSemanticModelResetEffects( )
@@ -4796,7 +4798,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 183
+	for capability as integer = 0 to 184
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -4975,6 +4977,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 181: feature = "native-procedure-runtime-state": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 182: feature = "parser-consumed-tokens": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 183: feature = "extern-mangling-contexts": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
+		case 184: feature = "native-default-type-policy": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
 		case 121: feature = "string-subscript-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 122: feature = "selected-type-alias-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 123: feature = "type-alias-declaration-sites": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
@@ -5057,6 +5060,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		TABCHAR + "array-initializer-input-closure" + TABCHAR + _
 		iif(fbSemanticExtraFactsEnabled(FB_SEMEXTRA_INITIALIZERS) and fbSemanticModelFullEnabled( ), "available", "unavailable"))
 	fbSemanticModelExportDriverInputs( )
+	fbSemanticModelBeginDefaultTypes( )
 	fbSemanticModelBeginFlags( )
 end sub
 
@@ -5202,6 +5206,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	fbSemanticModelFinishProcedureState(commit)
 	fbSemanticModelFinishTokens(commit)
 	fbSemanticModelFinishExtern(commit)
+	fbSemanticModelFinishDefaultTypes(commit)
 	fbSemanticModelFinishSourceValidity(commit)
 	fbSemanticModelFinishObjectOperations(commit)
 	fbSemanticModelFinishIRFlow(commit)

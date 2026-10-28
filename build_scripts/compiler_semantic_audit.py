@@ -8,6 +8,7 @@ This file intentionally does NOT contain: source selection or BASIC name resolut
 from __future__ import annotations
 
 from collections import Counter
+import ast
 import codecs
 import hashlib
 import os
@@ -88,14 +89,39 @@ SEMANTIC_READER_FILES = (
 )
 
 
-def freeze_semantic_reader(root: Path, destination: Path) -> None:
-    """Copy the independent reader and every module needed to import it."""
+def freeze_semantic_reader(root: Path, destination: Path) -> tuple[str, ...]:
+    """Copy the reader roots and their complete local Python import closure."""
     source = root / "tests" / "semantic-sidecar"
-    for name in SEMANTIC_READER_FILES:
+    pending = list(SEMANTIC_READER_FILES)
+    copied = set()
+    # Reader modules are siblings. Inspect imports without executing the
+    # source, including imports inside validation functions. A visited set
+    # handles intentional cycles through sidecar's shared wire helpers.
+    while pending:
+        name = pending.pop()
+        if name in copied:
+            continue
         path = source / name
         if not path.is_file():
             raise FileNotFoundError("Semantic reader dependency is missing: " + str(path))
-        shutil.copy2(path, destination / name)
+        data = path.read_bytes()
+        imports = ast.parse(data, filename=str(path))
+        for node in ast.walk(imports):
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                modules = [node.module]
+            else:
+                continue
+            for module in modules:
+                local = module.split(".", 1)[0] + ".py"
+                if (source / local).is_file() and local not in copied:
+                    pending.append(local)
+        # Copy the exact bytes inspected above, so a concurrent source edit
+        # cannot change an import after its dependency list was captured.
+        (destination / name).write_bytes(data)
+        copied.add(name)
+    return tuple(sorted(copied))
 
 
 def digest(path: Path) -> str:

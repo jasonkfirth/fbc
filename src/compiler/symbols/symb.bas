@@ -28,6 +28,7 @@
 #include once "tooling/semantic-resolution.bi"
 #include once "tooling/semantic-lookup.bi"
 #include once "tooling/semantic-filters.bi"
+#include once "tooling/semantic-default-types.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-link.bi"
@@ -2392,6 +2393,8 @@ sub symbSetDefType _
 	)
 
 	dim as integer i = any
+	dim as integer semantic_first = ichar, semantic_last = echar, semantic_changed
+	dim as longint semantic_context = fbSemanticModelCurrentContext( )
 
 	if( ichar < asc("A") ) then
 		ichar = asc("A")
@@ -2410,8 +2413,10 @@ sub symbSetDefType _
 	end if
 
 	for i = ichar to echar
+		if( deftypeTB(i - asc("A")) <> dtype ) then semantic_changed = TRUE
 		deftypeTB(i - asc("A")) = dtype
 	next
+	fbSemanticModelDefaultTypeRange(semantic_first, semantic_last, ichar, echar, dtype, semantic_changed, semantic_context)
 
 end sub
 

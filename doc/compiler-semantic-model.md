@@ -629,8 +629,9 @@ identity is distinct from symbol allocation identity. A formal's preserved
 written name can supply T's name when the compiler intentionally discarded its
 internal prototype name.
 
-CTX/OPT snapshots contain all current compiler option, language-default, and
-literal/feature-policy fields. AST nodes retain the context at construction,
+CTX/OPT snapshots contain the compiler option, language-default, and
+literal/feature-policy fields listed by their capability contract. AST nodes
+retain the context at construction,
 including through cloning. USE connects node and declaration identities to
 those snapshots. A later snapshot never retroactively changes an earlier
 declaration or node. Rolled-back parse attempts discard their context records.
