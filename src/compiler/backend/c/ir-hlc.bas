@@ -2344,8 +2344,21 @@ private sub hWriteGenericF2I _
 		'' code away from target libm/fenv paths that may not be module-safe.
 		hWriteLine( hEmitType( ptype, NULL ) + " " + callname + "( " + hEmitType( ptype, NULL ) + " );", TRUE )
 		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")" + callname + "( value ))", TRUE )
-	else
+	elseif( (rtype = FB_DATATYPE_INTEGER128) or (rtype = FB_DATATYPE_UINTEGER128) ) then
+		'' Native 128-bit types have a separate C extension and ABI contract.
+		'' Keep their existing single-cast form outside the 32/64-bit helpers.
 		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")__builtin_" + callname + "( value ))", TRUE )
+	else
+		'' Keep the floating result typed until the integer conversion.
+		'' The input is evaluated once; nearbyint retains the active rounding mode.
+		hWriteLine( "static inline " + hEmitType( rtype, NULL ) + _
+			" fb_" + fname + "( " + hEmitType( ptype, NULL ) + " value )", TRUE )
+		hWriteLine( "{", TRUE )
+		sectionIndent( )
+			hWriteLine( hEmitType( ptype, NULL ) + " rounded = __builtin_" + callname + "( value );", TRUE )
+			hWriteLine( "return (" + hEmitType( rtype, NULL ) + ")rounded;", TRUE )
+		sectionUnindent( )
+		hWriteLine( "}", TRUE )
 	end if
 
 end sub
