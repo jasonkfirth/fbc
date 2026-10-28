@@ -4,24 +4,17 @@ Purpose: Preserve compiler-owned type structure and native byte observations.
 Responsibilities: Independent trees, counted closure, ABI variants and emission.
 This file intentionally does NOT implement a complexity score or lint predicate.
 """
-from collections import Counter, defaultdict
-from sidecar import Model, unescape
+from collections import Counter
+from sidecar import Model
 
 
 def stable_observations(test, path):
-    # The canonical Model validates the native datatype vocabulary. This probe
-    # independently checks stable wire slots and the new ID-only observations;
-    # the product reader has separate complete stable-model qualification.
-    rows = [[unescape(field) for field in line.split('\t')]
-            for line in path.read_text().splitlines()]
-    test.assertEqual(rows[0][:2],['FBCSEM','27'])
-    test.assertEqual(rows[-1][:2],['END','27'])
-    records, capabilities = defaultdict(list), defaultdict(dict)
-    for row in rows:
-        records[row[0]].append(row)
-        if row[0] == 'CAP':
-            test.assertNotIn(row[2],capabilities[int(row[1])])
-            capabilities[int(row[1])][row[2]] = row[3]
+    # Use the complete consumer for stable models too. Slot assertions below
+    # additionally protect the published encoding without bypassing payload,
+    # ownership, source revision or capability checks.
+    model = Model.read(path)
+    model.validate_physical_locations()
+    records, capabilities = model.records, model.capabilities
     primitives = {int(row[1]):row for row in records['Y']}
     test.assertEqual(set(primitives),set(range(29)))
     test.assertEqual(primitives[8][2],'integer')

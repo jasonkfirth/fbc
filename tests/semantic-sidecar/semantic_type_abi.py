@@ -113,8 +113,11 @@ def check_type_bits(test) -> None:
     # An existing SDK can have an older library layout than the compiler tree.
     # Let its native driver link the emitted objects, as the bootstrap build
     # does, rather than making the test copy or rearrange SDK libraries.
-    candidates = [test.toolchain_prefix / name for name in
-                  ("fbc64.exe", "bin/fbc.exe", "bin/fbc", "fbc.exe", "fbc")]
+    # SDK directories can retain both native and cross-host binaries. A PE
+    # executable being present does not make it runnable on a POSIX host.
+    names = (("fbc64.exe", "bin/fbc.exe", "fbc.exe", "bin/fbc", "fbc") if test.native_windows
+             else ("bin/fbc", "fbc"))
+    candidates = [test.toolchain_prefix / name for name in names]
     linker = next((path for path in candidates if path.is_file()), test.compiler)
     common = [str(test.compiler), "-prefix", test.toolchain_prefix.as_posix(), "-w", "all", "-exx",
               "-i", (test.root / "src/compiler").as_posix()]

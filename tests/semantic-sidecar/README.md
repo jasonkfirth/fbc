@@ -435,4 +435,122 @@ node ownership and dispatch kind. The direct CALL control keeps the original
 virtual selection, so an extra static-target relation cannot hide behind an
 unrelated missing relation. No method or override is executed by these tests.
 
+`driver_inputs.py` checks actual module roles, main selection, restarts, search
+order, predefines, preincludes, requested libraries, and explicit versus planned
+objects. Reduced models omit the family; malformed groups and older producers
+exercise rejection and compatibility separately. Native archive and XPM cases
+cover generated modules, noneditable generated source and preservation of the
+original resource under a rejected sidecar alias. Export retains unchanged
+GCC, LLVM and Clang output.
+
+`parser_observations.py` checks the native parser phase across full and reduced
+models, independently of full-only input/selected snapshots. Ordered closures,
+actual AST/type fields and independently computed SHA-256 value fingerprints
+are validated. Corrupt digests, missing events, mismatched results and false
+capability claims are rejected with corrected transport totals. Reduced models
+retain no constant value payloads. Macro expression tests cover ordinary
+operands on both sides of expansions and hidden provenance without changing
+backend output.
+
+`receiver_contexts.py` checks field receiver observations inside preprocessing
+TYPEOF/SIZEOF queries and ordinary statements, including zero statement owners.
+Independent context markers, nominal types and selected-field relationships
+are checked; forged contexts and missing markers are rejected. The case also
+requires unchanged backend emission and explicit reduced-mode omissions.
+
+`data_streams.py` checks ordinary and QB DATA values, exact NUL/wide payloads,
+address offsets, source order, actual forward descriptor links, synthetic empty
+descriptors, forward-label and blank RESTORE selections, and READ destinations.
+Inactive and raw QB text cannot invent source operations. Empty QB fields have
+no fabricated range. Module resets, binary/text parity, reduced-mode omissions
+and unchanged GCC/Clang/LLVM emissions are required. Recounted corrupt models
+exercise missing items/payloads/runtime links, reversed chains, wrong targets,
+foreign sources, excessive counts and false capability claims.
+
+`emission_names.py` checks actual C/LLVM/assembler identifiers separately from
+object symbols, including aliases, C++ linkage, builtin mappings and explicit
+unknown states for private symbols, local statics and backend adaptation.
+Unused prototypes remain unobserved; procedure-pointer types have no object
+names. Native objects must be identical with export off and on, and selected
+object names must agree with `nm`. Windows x86, Darwin x86-64 and ELF x86 cases
+check prefixes and calling-convention decoration; LLVM tools additionally
+validate COFF and Mach-O objects when available. Transport parity, module
+resets, reduced omissions and recount-corrected corruptions are covered.
+
+`array_forward_types.py` checks array element snapshots before and after
+forward type and alias resolution. Each access uses the live `T` snapshot
+written at that access, while the original `S` remains immutable. A forged
+same-module nominal type is rejected, and backend emission remains identical.
+
+`namespace_visibility.py` checks source USING order and the native import
+relationships created by each request, including transitive imports, duplicate
+and parent/self no-ops, namespace reopening and propagation. Procedure/block
+imports retain lexical lifetime owners separately from namespace destinations.
+After removal, the same written identifier binds to its actual outer variable.
+Repeated includes, expanded/inactive operands, exact source ranges, module
+resets, transport parity, reduced omissions and diagnostics parity are covered.
+Binding contexts cover lexical tables, lookup namespaces/hash owners, scoped
+enums, anonymous aggregates, out-of-line methods and reopened occurrences.
+Recounted corruptions exercise false owners/targets, invented request results,
+missing links/closure, forged lifetime states and incomplete binding contexts.
+
+`named_flags.py` checks every bit, zero and all bits across all native symbol
+classes, plus invalid classes, groups and dictionary bounds. The executable
+`flag-vocabulary.bas` links the BASIC mapper directly. Independent controls
+distinguish reused status bits and jump-table storage from procedure status.
+Real symbol snapshots, all nine const positions on eight-level pointers,
+address temporaries, fixed-string expression/node widths, nominal identities,
+32/64-bit targets, WCHAR policy and QB promotions are checked. Full and reduced
+GCC/Clang/LLVM output must match export-disabled output. Binary/text equality,
+module reset and recount-corrected dictionary, payload and closure corruption
+are covered.
+`semantic_normalized_types.py` pairs NT with each live T/N/E snapshot. Its
+controls remove or contradict valid native observations while keeping their
+transport totals consistent, and retain the older no-closure contract.
+Type controls also distinguish aliases from separate nominal types, pointer
+signatures and variadic markers, Z/WSTRING storage, and actual C mangling
+classifiers from the datatype slots used to encode them.
+
+`layout_observations.py` checks original FIELD requests, coercion, inheritance
+and QB defaults separately from native alignment decisions. The fixture covers
+managed strings, dynamic descriptor fields and logical aliases, fixed arrays,
+GCC/MS bitfield containers, hidden base storage, repeated anonymous relocation,
+forward types and incomplete self-type queries. Linux/Windows 32/64-bit metadata,
+all three high-level backends, exact off/full/reduced output, native execution,
+stateful macro callbacks, repeated includes, transport and module reset are
+covered. Corrupt packets and recount-corrected missing fields remain invalid.
+Architecture controls additionally cover m68k word alignment, RISC OS double
+alignment, Windows CE's alignment ceiling and AArch64 metadata. The reader
+distinguishes pointer storage width from pointer/descriptor alignment. This
+driver's unsupported JS target produces diagnostics without a complete model;
+the separate JS compiler's QB exception remains a separate acceptance case.
+
+`frontend_abi.py` checks source modes against live frontend ABI types,
+nontrivial BYVAL indirection, BYREF qualifiers, descriptor pointers, variadic
+markers, instance formals and result kinds. C/Clang/LLVM and native assembler
+results remain distinct frontend policies. Target slot widths, transport,
+module reset, reduced omissions and corrected-total corruption are covered.
+
+`backend_abi.py` checks selected C/LLVM signature components against actual
+header text, including i386 integer128 word pairs/sret, large aggregate byval,
+va_list decay, C argv/callback/libc adaptations, PASCAL order and function-pointer
+types. It checks explicit reduced/assembler omissions, unused prototypes,
+transport/reset and damaged component or signature closure.
+
+`call_abi.py` checks selected C/LLVM call arguments, actual variadic promotions,
+hidden results, split integer128 values, aggregate memory arguments, va_list
+decay, PASCAL order, source context and indirect/virtual target roles. It also
+checks LLVM's separate builtin lowering receipts, exact call text, transport,
+module reset, reduced/assembler omissions and damaged observations. Standalone
+production-observer controls cover rejected state and copied context lifetime.
+Native execution checks all export modes with working scalar/aggregate,
+BYREF/BYDESC/wide-string, optional and virtual operations.
+
+`raw_abi_consumer.py` exercises the complete reader with both native and
+stable-v1 encodings across fourteen fixture families, three backends, export
+modes and 32/64-bit targets. It compares normalized meaning and emitted code,
+proves raw rows retain their selected encoding, and rejects mismatched type
+vocabularies, encoding capabilities and semantic families. The written-type
+observer tests also pass stable models through the complete reader.
+
 <!-- end of README.md -->

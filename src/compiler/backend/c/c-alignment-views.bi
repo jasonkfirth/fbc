@@ -3,7 +3,7 @@
 '' Purpose: Keep declared member paths when a record pointer may be unaligned.
 '' Responsibilities: Remember declaration scopes and emit compatible alignment-one
 ''     typedefs without changing the original record layout or BASIC symbols.
-'' This file intentionally does NOT change public parameter or by-value types.
+'' This file intentionally does NOT contain: public parameter or by-value type definitions.
 
 private sub hCRememberViewType( byval dtype as integer, byval subtype as FBSYMBOL ptr )
 	var entry = cptr(CALIGNVIEW ptr, listNewNode(@ctx.alignmentviews))

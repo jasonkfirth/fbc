@@ -508,6 +508,13 @@ def stage_batch(args, controller, records, batch):
                       f'kickstart_file = {args.kickstart}\n'
                       f'hard_drive_0 = {boot}\nhard_drive_0_label = FBCTest\n'
                       'hard_drive_0_priority = 10\n')
+    if getattr(args, 'mouse_integration', False):
+        # Relative pointer grabbing does not reliably deliver motion through
+        # Xvfb or VNC. Native Intuition windows support UAE's absolute pointer.
+        with config.open('a') as settings:
+            settings.write('joystick_port_0 = mouse\njoystick_port_0_mode = mouse\n'
+                           'mouse_integration = 1\ninitial_input_grab = 0\n'
+                           'automatic_input_grab = 0\n')
     return boot, config
 
 
@@ -674,6 +681,8 @@ def main():
     parser.add_argument('--jit', action='store_true', help='Enable FS-UAE integer CPU JIT')
     parser.add_argument('--bsdsocket', action='store_true',
                         help='Enable native BSD sockets and include the TCP probe')
+    parser.add_argument('--mouse-integration', action='store_true',
+                        help='Use absolute pointer input for Xvfb or VNC sessions')
     args = parser.parse_args()
     if min(args.jobs, args.batch_size, args.timeout, args.compile_timeout) <= 0:
         parser.error('Counts and timeouts must be positive')

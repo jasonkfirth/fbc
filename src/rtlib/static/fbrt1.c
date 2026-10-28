@@ -17,7 +17,22 @@
 /* note: they must be static, or shared libraries in Linux would reuse the 
 		 same function */
 
-#if defined(HOST_SOLARIS)
+#if defined(HOST_NETBSD)
+	/* NetBSD walks finalizers forwards. Keep runtime cleanup after BASIC
+	   destructors, whose priorities are reversed by the compiler. */
+	static void fb_hDoInit( void )
+	{
+		fb_hRtInit( );
+		fb_InitProfile( );
+	}
+	static void fb_hDoExit( void )
+	{
+		fb_EndProfile( 0 );
+		fb_hRtExit( );
+	}
+	static void (*priorityhDoInit)( void ) __attribute__((section(".init_array.00100"), used)) = fb_hDoInit;
+	static void (*priorityhDoExit)( void ) __attribute__((section(".fini_array.65535"), used)) = fb_hDoExit;
+#elif defined(HOST_SOLARIS)
 	/*
 	   Solaris runs .init_array before .init.  Newer GCC releases use
 	   .init_array for ordinary constructors, so putting runtime startup in

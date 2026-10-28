@@ -3,7 +3,7 @@
 '' Purpose: Prove address alignment before emitting typed scalar access.
 '' Responsibilities: Distinguish stored values from storage addresses and retain
 ''     unknown low bits through casts, members, array indices and arithmetic.
-'' This file intentionally does NOT change BASIC pointer or array descriptors.
+'' This file intentionally does NOT contain: BASIC pointer or array descriptor implementations.
 
 declare function hExprConstOffsetMod _
 	( byval n as EXPRNODE ptr, byval align as integer ) as integer

@@ -178,6 +178,11 @@ if ! cppcheck \
     --file-list="$source_list" \
     2> "$lint_log"; then
     cat "$lint_log" >&2
+    # Keep the same diagnostics for the Actions failure artifact. The
+    # temporary working log is removed by the exit trap.
+    if [ -n "${RUNNER_TEMP:-}" ]; then
+        cp "$lint_log" "$RUNNER_TEMP/fbc-cppcheck.log"
+    fi
     exit 1
 fi
 

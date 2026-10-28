@@ -30,7 +30,7 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
 
-declare sub fbSemanticModelExportExpression _
+declare sub fbSemanticModelExportParserExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
@@ -60,7 +60,7 @@ private sub hExportValistOperation _
 
 	if( (tree = NULL) or (operands = 0) or (complete_range = FALSE) ) then exit sub
 	fbSemanticModelAttachOperands(tree, operands)
-	fbSemanticModelExportExpression(tree, source_start, source_end, _
+	fbSemanticModelExportParserExpression(tree, source_start, source_end, _
 		nonphysical_tokens_at_start, nonphysical_tokens_at_end, op)
 end sub
 

@@ -5,6 +5,8 @@ Responsibilities: Accepted storage, statement ownership and complete coverage.
 This file intentionally does NOT parse declarations or implement lint policy.
 """
 
+from semantic_datatypes import primitive_name
+
 
 def validate_string_declarations(model, number, subject_modules):
     inputs, declarations = {}, {}
@@ -21,7 +23,10 @@ def validate_string_declarations(model, number, subject_modules):
 
     def storage(identity):
         symbol = model.symbols.get(identity)
-        return symbol is not None and symbol[3] in ('1', '12') and symbol[4:6] == ['19', '0'] and not int(symbol[7]) & 0x40000 and identity not in array_symbols
+        module = subject_modules.get(('symbol', identity))
+        return (symbol is not None and symbol[3] in ('1', '12') and symbol[5] == '0'
+                and not int(symbol[4]) & ~31 and primitive_name(model, module, int(symbol[4])) == 'string'
+                and not int(symbol[7]) & 0x40000 and identity not in array_symbols)
 
     for module, capabilities in model.capabilities.items():
         if available(module) and capabilities.get('declaration-typing-inputs') != 'available':

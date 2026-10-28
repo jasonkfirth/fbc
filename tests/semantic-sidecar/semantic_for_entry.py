@@ -1,8 +1,11 @@
-"""FreeBASIC sidecar: semantic_for_entry.py.
-
-Validate selected scalar FOR entry decisions and counter coverage.
-This module does not reconstruct numeric conversions or runtime loop behavior.
+"""Project: FreeBASIC semantic sidecar
+File: semantic_for_entry.py
+Purpose: Validate selected scalar FOR entry decisions and counter coverage.
+Responsibilities: Folded input ownership, available decisions and complete closure.
+This file intentionally does NOT reconstruct conversions or runtime loop behavior.
 """
+
+from semantic_datatypes import NUMERIC_NAMES, primitive_name
 
 
 def validate_for_entry(model, number, subject_modules):
@@ -10,9 +13,10 @@ def validate_for_entry(model, number, subject_modules):
     prefix = "for-entry-result:"
     for (domain, identity), properties in model.properties.items():
         symbol = model.symbols.get(identity) if domain == "symbol" else None
+        module = subject_modules[domain, identity]
         scalar = symbol is not None and int(symbol[3]) == 1 and (
-            (not int(symbol[5]) and int(symbol[4]) & 0x1ff in
-             (2, 3, 5, 6, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18)) or
+            (not int(symbol[5]) and not int(symbol[4]) & 0x1e0
+             and primitive_name(model, module, int(symbol[4])) in NUMERIC_NAMES) or
             (int(symbol[4]) & 0x1ff == 10 and
              int(model.symbols.get(int(symbol[5]), [0, 0, 0, 0])[3]) == 9))
         module = subject_modules[domain, identity]

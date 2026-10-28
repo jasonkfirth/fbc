@@ -19,6 +19,28 @@ import tempfile
 
 TARGETS = ("dos", "linux-x86", "linux-x86_64", "win32", "win64")
 LOCATION = re.compile(r"^.*\.(?:bas|bi)\(.*\) warning .*\(.*\): ", re.MULTILINE)
+GENERATED_TEMP_FIXTURES = {
+    "branch-cross-for-fb-2", "branch-cross-for-fb-3",
+    "branch-cross-for-fb-4", "branch-cross-with-fb",
+}
+GENERATED_TEMP = re.compile(r"(?<=, variable: )(?:TMP\$[0-9]+|LT_[0-9]+)$", re.MULTILINE)
+
+
+def comparable_report(text: str, fixture: str) -> str:
+    if fixture not in GENERATED_TEMP_FIXTURES:
+        return text
+    # Temporary numbers depend on compiler-host allocation order. Keep each
+    # distinct identity and every warning, but compare their order of use.
+    identities: dict[str, str] = {}
+
+    def replace(match: re.Match[str]) -> str:
+        original = match.group()
+        if original not in identities:
+            prefix = "TMP" if original.startswith("TMP$") else "LT"
+            identities[original] = prefix + "-generated-" + str(len(identities) + 1)
+        return identities[original]
+
+    return GENERATED_TEMP.sub(replace, text)
 
 
 def main() -> int:
@@ -79,7 +101,8 @@ def main() -> int:
                     pending.unlink(missing_ok=True)
             else:
                 expected = reference.read_text(encoding="utf-8") if reference.is_file() else ""
-                if not reference.is_file() or expected != text:
+                if (not reference.is_file() or
+                        comparable_report(expected, reference.stem) != comparable_report(text, reference.stem)):
                     failures += 1
                     print("WARNING_REPORT_DIFF " + str(reference.relative_to(source)))
                     print("".join(difflib.unified_diff(expected.splitlines(True), text.splitlines(True),

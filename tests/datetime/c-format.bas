@@ -8,6 +8,9 @@
 #include once "crt/stdio.bi"
 #include once "vbcompat.bi"
 
+declare sub fb_I18nSet alias "fb_I18nSet"( byval on_off as long )
+declare function fb_I18nGet alias "fb_I18nGet"() as long
+
 SUITE( fbc_tests.datetime.c_format )
 
 	TEST( promoted_arguments )
@@ -29,9 +32,14 @@ SUITE( fbc_tests.datetime.c_format )
 	TEST( clock_strings )
 		dim current_date as string = date$
 		dim current_time as string = time$
+		dim previous_i18n as long = fb_I18nGet()
 		CU_ASSERT_EQUAL( len(current_date), 10 )
 		CU_ASSERT_EQUAL( len(current_time), 8 )
+		'' DATE$ uses month-day-year even when IsDate uses the current locale.
+		fb_I18nSet 0
+		if not isdate(current_date) then print "unrecognized DATE$: "; current_date
 		CU_ASSERT( isdate(current_date) )
+		fb_I18nSet previous_i18n
 		CU_ASSERT( valint(left(current_time, 2)) >= 0 )
 		CU_ASSERT( valint(left(current_time, 2)) <= 23 )
 		CU_ASSERT( valint(mid(current_time, 4, 2)) <= 59 )

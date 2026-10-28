@@ -92,6 +92,7 @@ sequence. Its implementation modules have separate translation units:
 | `fbc-compile.bas` | Source compilation, parser restarts, assembly, resources, archives |
 | `fbc-link.bas` | Object metadata, default libraries, startup objects, linking |
 | `fbc-help.bas` | Usage and version presentation |
+| `fbc-semantic.bas` | Selected module roles, ordered driver inputs, and resource identity |
 | `fbc-platform.bas` | Target hook implementations and dispatch |
 
 `fbc-private.bi` is a driver implementation contract. The invocation context
@@ -199,8 +200,30 @@ same export checks against the maintained OMA programs.
 stream. Both use the runtime's fixed-width metadata query; native filesystem
 structures stay in the runtime. Compiler sources and bootstrap inputs remain
 BASIC.
+`tooling/semantic-data.bas` observes DATA values before descriptor lowering,
+and records native READ/RESTORE selections without predicting runtime cursors.
+`tooling/semantic-emission-names.bas` retains names supplied by backend selection
+and keeps unknown object identities explicit. It does not invoke the mangler.
+`tooling/semantic-namespace-visibility.bas` records actual USING requests,
+native relationship lifetimes and binding-time lexical/lookup contexts.
+`tooling/semantic-flag-names.bas` supplies class-aware names for initialized
+native flags. `tooling/semantic-flags.bas` publishes their definitions and live
+snapshots alongside the target datatype table's actual ranks and remappings.
+`tooling/semantic-layout.bas` observes packing requests, native alignment and
+storage decisions, anonymous-member relocation and initialized type snapshots.
+Its callers retain transient decisions on their stack; the exporter keeps
+semantic identities and counts without retaining native symbol pointers.
+`tooling/semantic-abi.bas` publishes live frontend procedure/formal ABI
+snapshots, keeping source modes, unresolved layouts, descriptor pointers and
+frontend slot policy separate from final backend allocation.
+`tooling/semantic-backend-abi.bas` copies selected C/LLVM signature components
+at the existing formatters, including split words, indirect arguments and
+exact type/attribute spellings. It does not run another ABI or formatting pass.
+`tooling/semantic-call-abi.bas` copies actual call operands, emitted order and
+carried source identities. LLVM builtin lowering has separate receipts, and
+the observer releases copied state at module completion or rollback.
 The exporter serializes records through the writer's opaque interface. Make
-builds both modules through the ordinary BASIC rules in each compiler variant,
+builds these modules through the ordinary BASIC rules in each compiler variant,
 and bootstrap emission translates them along with the rest of the compiler.
 
 ### LLVM interoperability

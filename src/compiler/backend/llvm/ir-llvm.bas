@@ -123,6 +123,9 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-link.bi"
+#include once "tooling/semantic-emission-names.bi"
+#include once "tooling/semantic-backend-abi.bi"
+#include once "tooling/semantic-call-abi.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
@@ -528,64 +531,83 @@ private function hGetBuiltin( byval proc as FBSYMBOL ptr ) as LLVM_BUILTIN
 	return LLVM_BUILTIN_NONE
 end function
 
+private function hObjectSymbolName( byref pname as const string ) as string
+	if( left(pname, 1) <> "@" ) then
+		fbSemanticLinkFail( )
+		return ""
+	end if
+	'' This is the emitter's typed global identifier, not source text.
+	'' LLVM's byte-one prefix suppresses target mangling; its @ marker
+	'' and identifier quotes do not belong to the object symbol. Without
+	'' the escape, LLVM supplies the target's ordinary C symbol prefix.
+	dim as string object_name = mid(pname, 2)
+	if( left(object_name, 1) = """" ) then
+		if( (len(object_name) < 2) or (right(object_name, 1) <> """") ) then
+			fbSemanticLinkFail( )
+			return ""
+		else
+			object_name = mid(object_name, 2, len(object_name) - 2)
+			'' Quoted LLVM identifiers encode a byte as backslash plus
+			'' exactly two hexadecimal digits. Decode that native IR
+			'' representation once, before applying its mangling escape.
+			dim as string decoded
+			dim as integer position = 1
+			do while( position <= len(object_name) )
+				if( object_name[position - 1] = asc("\") ) then
+					if( position + 2 > len(object_name) ) then
+						fbSemanticLinkFail( )
+						return ""
+					end if
+					dim as integer value = 0
+					for digit as integer = position + 1 to position + 2
+						dim as integer code = asc(object_name, digit)
+						select case code
+						case asc("0") to asc("9"): code -= asc("0")
+						case asc("A") to asc("F"): code = code - asc("A") + 10
+						case asc("a") to asc("f"): code = code - asc("a") + 10
+						case else
+							fbSemanticLinkFail( )
+							return ""
+						end select
+						value = value * 16 + code
+					next
+					decoded += chr(value)
+					position += 3
+				else
+					decoded += chr(object_name[position - 1])
+					position += 1
+				end if
+			loop
+			object_name = decoded
+		end if
+	end if
+	if( left(object_name, 1) = chr(1) ) then
+		object_name = mid(object_name, 2)
+	elseif( env.underscoreprefix ) then
+		object_name = "_" + object_name
+	end if
+	return object_name
+end function
+
 private function hEmitProcName( byval proc as FBSYMBOL ptr ) as string
 	var pname = *symbGetMangledName( proc )
-	if( hGetBuiltin( proc ) = LLVM_BUILTIN_LIBC ) then
+	var builtin = hGetBuiltin( proc )
+	if( builtin = LLVM_BUILTIN_LIBC ) then
 		'' These builtins have the libc ABI, including their return values.
-		'' Using the actual libc name also allows LLVM's library optimizations.
+		'' The selected libc name is shared by calls and procedure addresses.
 		pname = "@" + irGetBuiltinLibcName( proc )
 	end if
-	if( fbSemanticLinkProcedureObjectNeeded(proc) ) then
-		'' This is the emitter's typed global identifier, not source text.
-		'' LLVM's byte-one prefix suppresses target mangling; its @ marker
-		'' and identifier quotes do not belong to the object symbol. Without
-		'' the escape, LLVM supplies the target's ordinary C symbol prefix.
-		dim as string object_name = mid(pname, 2)
-		if( left(object_name, 1) = """" ) then
-			if( (len(object_name) < 2) or (right(object_name, 1) <> """") ) then
-				fbSemanticLinkFail( )
-			else
-				object_name = mid(object_name, 2, len(object_name) - 2)
-				'' Quoted LLVM identifiers encode a byte as backslash plus
-				'' exactly two hexadecimal digits. Decode that native IR
-				'' representation once, before applying its mangling escape.
-				dim as string decoded
-				dim as integer position = 1
-				do while( position <= len(object_name) )
-					if( object_name[position - 1] = asc("\") ) then
-						if( position + 2 > len(object_name) ) then
-							fbSemanticLinkFail( )
-							exit do
-						end if
-						dim as integer value = 0
-						for digit as integer = position + 1 to position + 2
-							dim as integer code = asc(object_name, digit)
-							select case code
-							case asc("0") to asc("9"): code -= asc("0")
-							case asc("A") to asc("F"): code = code - asc("A") + 10
-							case asc("a") to asc("f"): code = code - asc("a") + 10
-							case else
-								fbSemanticLinkFail( )
-								return pname
-							end select
-							value = value * 16 + code
-						next
-						decoded += chr(value)
-						position += 3
-					else
-						decoded += chr(object_name[position - 1])
-						position += 1
-					end if
-				loop
-				object_name = decoded
-			end if
+	fbSemanticModelEmissionName(proc, "llvm", pname)
+	if( fbSemanticLinkProcedureObjectNeeded(proc) or fbSemanticModelObjectNameNeeded(proc) ) then
+		if( symbIsPrivate(proc) and (symbIsExport(proc) = FALSE) ) then
+			fbSemanticModelEmissionName(proc, "object", "", "unavailable", "llvm-private")
+		elseif( (builtin = LLVM_BUILTIN_NONE) or (builtin = LLVM_BUILTIN_LIBC) ) then
+			var object_name = hObjectSymbolName(pname)
+			fbSemanticModelEmissionName(proc, "object", object_name)
+			fbSemanticLinkProcedureObject(proc, object_name)
+		else
+			fbSemanticModelEmissionName(proc, "object", "", "unavailable", "backend-intrinsic")
 		end if
-		if( left(object_name, 1) = chr(1) ) then
-			object_name = mid(object_name, 2)
-		elseif( env.underscoreprefix ) then
-			object_name = "_" + object_name
-		end if
-		fbSemanticLinkProcedureObject(proc, object_name)
 	end if
 	return pname
 end function
@@ -604,6 +626,25 @@ private function hSymbolKey( byval sym as FBSYMBOL ptr ) as string
 	return hex( culngint( cuint( sym ) ), 16 )
 end function
 
+declare function hGlobalVarLinkage( byval sym as FBSYMBOL ptr, byval has_initializer as integer ) as string
+
+private sub hObserveVarName( byval sym as FBSYMBOL ptr, byref identifier as const string )
+	fbSemanticModelEmissionName(sym, "llvm", identifier)
+	if( fbSemanticModelObjectNameNeeded(sym) = FALSE ) then exit sub
+	if( left(identifier, 1) <> "@" ) then
+		fbSemanticModelEmissionName(sym, "object", "", "none", "automatic-storage")
+	elseif( symbIsThreadLocal(sym) ) then
+		fbSemanticModelEmissionName(sym, "object", "", "unavailable", "backend-tls")
+	elseif( symbGetIsLiteral(sym) or (hGlobalVarLinkage(sym, FALSE) = "private") ) then
+		'' LLVM's assembler printer chooses private-label prefixes. Its IR
+		'' identifier remains exact, but is not itself a known object symbol.
+		fbSemanticModelEmissionName(sym, "object", "", "unavailable", "llvm-private")
+	else
+		var object_name = hObjectSymbolName(identifier)
+		fbSemanticModelEmissionName(sym, "object", object_name)
+	end if
+end sub
+
 private function hEmitVarName( byval sym as FBSYMBOL ptr ) as string
 	if( symbIsProc( sym ) ) then
 		hCheckBuiltinAddress( sym )
@@ -611,6 +652,7 @@ private function hEmitVarName( byval sym as FBSYMBOL ptr ) as string
 	end if
 	var id = *symbGetMangledName( sym )
 	if( symbIsVar( sym ) = FALSE or left( id, 1 ) <> "%" ) then
+		hObserveVarName(sym, id)
 		return id
 	end if
 
@@ -621,9 +663,12 @@ private function hEmitVarName( byval sym as FBSYMBOL ptr ) as string
 	if( item = NULL ) then
 		ctx.localnamecount += 1
 		strsetAdd( @ctx.localnames, key, ctx.localnamecount )
-		return id + "." + str( ctx.localnamecount )
+		id += "." + str( ctx.localnamecount )
+	else
+		id += "." + str( item->userdata )
 	end if
-	return id + "." + str( item->userdata )
+	hObserveVarName(sym, id)
+	return id
 end function
 
 private function hSymName( byval sym as FBSYMBOL ptr ) as string
@@ -728,25 +773,30 @@ private function hEmitProcHeader _
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as integer i386_int128_result = any
+	dim as string semantic_result, semantic_convention, semantic_role
 
 	assert( symbIsProc( proc ) )
 
 	'' LLVM attaches calling conventions to declarations and calls, not
 	'' function types. A procedure pointer retains its BASIC convention in
 	'' the symbol, which hEmitProcCallConv supplies at the indirect call.
-	if( is_type = FALSE ) then ln += hEmitProcCallConv( proc )
+	if( is_type = FALSE ) then semantic_convention = hEmitProcCallConv( proc )
+	ln += semantic_convention
 
 	i386_int128_result = hIsI386Integer128Result( proc )
 
 	'' The i386 C ABI returns aligned 16-byte aggregates through an sret pointer.
 	'' Keep the source scalar type in the body, but expose that target ABI here.
 	if( i386_int128_result ) then
-		ln += "void"
+		semantic_result = "void"
 	else
 		'' Function result type (is 'void' for subs)
-		ln += hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
+		semantic_result = hEmitType( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
 					symbGetProcRealSubtype( proc ) )
 	end if
+	ln += semantic_result
+	semantic_role = iif(is_type, "pointer-type", iif(is_proto, "declaration", "definition"))
+	dim as longint semantic_signature = fbSemanticModelBackendAbiBegin(proc, "llvm", semantic_role, semantic_result, semantic_convention)
 
 	ln += " "
 
@@ -761,28 +811,43 @@ private function hEmitProcHeader _
 	'' If returning a struct, there's an extra parameter
 	dim as FBSYMBOL ptr hidden = NULL
 	if( symbProcReturnsOnStack( proc ) ) then
+		dim as integer semantic_hidden_dtype
+		dim as FBSYMBOL ptr semantic_hidden_subtype
+		dim as string semantic_hidden, semantic_hidden_attributes
 		if( i386_int128_result ) then
 			if( is_proto ) then
-				ln += hEmitType( typeAddrOf( symbGetFullType( proc ) ), NULL )
+				semantic_hidden_dtype = typeAddrOf( symbGetFullType( proc ) )
+				semantic_hidden_subtype = NULL
 			else
 				hidden = proc->proc.ext->res
-				ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), _
-				                symbGetSubtype( hidden ) )
+				semantic_hidden_dtype = typeAddrOf( symbGetType( hidden ) )
+				semantic_hidden_subtype = symbGetSubtype( hidden )
 			end if
+			semantic_hidden = hEmitType(semantic_hidden_dtype, semantic_hidden_subtype)
+			ln += semantic_hidden
 			if( is_type = FALSE ) then
-				ln += " sret(i128) align " + str( LLVM_I386_INT128_ABI_ALIGNMENT )
+				semantic_hidden_attributes = " sret(i128) align " + str( LLVM_I386_INT128_ABI_ALIGNMENT )
+				ln += semantic_hidden_attributes
 			end if
 			if( is_proto = FALSE ) then
 				ln += " " + hEmitParamName( hidden )
 			end if
 		elseif( is_proto ) then
 			hidden = symbGetSubType( proc )
-			ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), hidden )
+			semantic_hidden_dtype = typeAddrOf( symbGetType( hidden ) )
+			semantic_hidden_subtype = hidden
+			semantic_hidden = hEmitType(semantic_hidden_dtype, semantic_hidden_subtype)
+			ln += semantic_hidden
 		else
 			hidden = proc->proc.ext->res
-			ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), symbGetSubtype( hidden ) )
+			semantic_hidden_dtype = typeAddrOf( symbGetType( hidden ) )
+			semantic_hidden_subtype = symbGetSubtype( hidden )
+			semantic_hidden = hEmitType(semantic_hidden_dtype, semantic_hidden_subtype)
+			ln += semantic_hidden
 			ln += " " + hEmitParamName( hidden )
 		end if
+		fbSemanticModelBackendAbiParameter(semantic_signature, NULL, 0, 1, "hidden-result", semantic_hidden, _
+			semantic_hidden_dtype, semantic_hidden_subtype, semantic_hidden_attributes)
 
 		if( symbGetProcParams( proc ) > 0 ) then
 			ln += ", "
@@ -795,18 +860,22 @@ private function hEmitProcHeader _
 	while( param )
 		if( symbGetParamMode( param ) = FB_PARAMMODE_VARARG ) then
 			DZstrConcatAssign( params, "..." )
+			fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 0, "variadic", "...")
 		else
 			symbGetRealParamDtype( param, dtype, subtype )
+			dim as string semantic_kind = "value", semantic_parameter, semantic_attributes
 			dim as FBSYMBOL ptr paramvar = NULL
 			if( (symbGetParamMode( param ) = FB_PARAMMODE_BYVAL) andalso _
 			    (symbGetValistType( dtype, subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
 				'' C's array typedef decays to a pointer at this boundary.
 				dtype = typeAddrOf( dtype )
+				semantic_kind = "va-list-decay"
 			end if
 			dim as integer split_i386_int128 = _
 				hIsI386Integer128Param( dtype, symbGetParamMode( param ) )
 			if( split_i386_int128 ) then
 				DZstrConcatAssign( params, "i64" )
+				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 2, "i386-int128-low", "i64", FB_DATATYPE_ULONGINT)
 				if( is_proto = FALSE ) then
 					paramvar = symbGetParamVar( param )
 					if( paramvar <> NULL ) then
@@ -814,18 +883,25 @@ private function hEmitProcHeader _
 					end if
 				end if
 				DZstrConcatAssign( params, ", i64" )
+				fbSemanticModelBackendAbiParameter(semantic_signature, param, 1, 2, "i386-int128-high", "i64", FB_DATATYPE_ULONGINT)
 				if( is_proto = FALSE ) then
 					if( paramvar <> NULL ) then
 						DZstrConcatAssign( params, " " + hEmitParamName( paramvar ) + ".high" )
 					end if
 				end if
 			elseif( hIsMemoryByval( dtype, subtype, symbGetParamMode(param) ) ) then
-				DZstrConcatAssign( params, hEmitType( typeAddrOf(dtype), subtype ) )
+				semantic_parameter = hEmitType(typeAddrOf(dtype), subtype)
+				DZstrConcatAssign( params, semantic_parameter )
 				if( is_type = FALSE ) then
-					DZstrConcatAssign( params, hMemoryByvalAttribute( subtype ) )
+					semantic_attributes = hMemoryByvalAttribute( subtype )
+					DZstrConcatAssign( params, semantic_attributes )
 				end if
+				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, "memory-byval", semantic_parameter, _
+					typeAddrOf(dtype), subtype, semantic_attributes)
 			else
-				DZstrConcatAssign( params, hEmitType( dtype, subtype ) )
+				semantic_parameter = hEmitType(dtype, subtype)
+				DZstrConcatAssign( params, semantic_parameter )
+				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, semantic_kind, semantic_parameter, dtype, subtype)
 			end if
 
 			if( (is_proto = FALSE) andalso (split_i386_int128 = FALSE) ) then
@@ -875,6 +951,7 @@ private function hEmitProcHeader _
 		end if
 	end if
 
+	fbSemanticModelBackendAbiEnd(semantic_signature, ln)
 	function = ln
 end function
 
@@ -2969,6 +3046,7 @@ private sub hDoCall _
 	( _
 		byval pname as zstring ptr, _
 		byval proc as FBSYMBOL ptr, _
+		byval indirect as integer, _
 		byval bytestopop as integer, _
 		byval vr as IRVREG ptr, _
 		byval level as integer _
@@ -2979,6 +3057,10 @@ private sub hDoCall _
 	dim as IRVREG ptr varg = any, v0 = vr
 	dim as DZSTRING args
 	dim as integer i386_int128_result = any
+	dim as integer semantic_demanded = (vr <> NULL)
+	dim as integer semantic_result_dtype = FB_DATATYPE_VOID
+	dim as FBSYMBOL ptr semantic_result_subtype = NULL
+	dim as string semantic_result, semantic_convention
 	DZstrZero( args )
 
 	assert( symbIsProc( proc ) )
@@ -3011,11 +3093,19 @@ private sub hDoCall _
 		end if
 
 		ln = hVregToStr( v0 ) + " = call "
-		ln += hEmitProcCallConv( proc )
-		ln += hEmitType( v0->dtype, v0->subtype ) + " "
+		semantic_convention = hEmitProcCallConv( proc )
+		ln += semantic_convention
+		semantic_result = hEmitType( v0->dtype, v0->subtype )
+		ln += semantic_result + " "
+		semantic_result_dtype = v0->dtype
+		semantic_result_subtype = v0->subtype
 	else
-		ln = "call " + hEmitProcCallConv( proc ) + "void "
+		semantic_convention = hEmitProcCallConv( proc )
+		semantic_result = "void"
+		ln = "call " + semantic_convention + "void "
 	end if
+	dim as longint semantic_call = fbSemanticModelCallAbiBegin(proc, "llvm", indirect, semantic_demanded, _
+		semantic_result_dtype, semantic_result_subtype, semantic_result, semantic_convention, level, bytestopop)
 
 	ln += *pname + "( "
 
@@ -3023,13 +3113,21 @@ private sub hDoCall _
 	arg = listGetTail( @irhl.callargs )
 	while( arg andalso (arg->level = level) )
 		prev = listGetPrev( arg )
+		dim as integer semantic_input_dtype = arg->vr->dtype
+		dim as FBSYMBOL ptr semantic_input_subtype = arg->vr->subtype
+		dim as string semantic_kind, semantic_type, semantic_attributes, semantic_value
 
 		varg = hLoadCallArg( arg )
 		if( arg->param = NULL andalso i386_int128_result ) then
-			DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
-			DZstrConcatAssign( args, " sret(i128) align " + _
-			                         str( LLVM_I386_INT128_ABI_ALIGNMENT ) )
-			DZstrConcatAssign( args, " " + hVregToStr( varg ) )
+			semantic_type = hEmitType( varg->dtype, varg->subtype )
+			DZstrConcatAssign( args, semantic_type )
+			semantic_attributes = " sret(i128) align " + str( LLVM_I386_INT128_ABI_ALIGNMENT )
+			DZstrConcatAssign( args, semantic_attributes )
+			semantic_value = hVregToStr( varg )
+			DZstrConcatAssign( args, " " + semantic_value )
+			fbSemanticModelCallAbiArgument(semantic_call, NULL, 0, 1, "hidden-result", _
+				semantic_input_dtype, semantic_input_subtype, varg->dtype, varg->subtype, _
+				semantic_type, semantic_attributes, semantic_value)
 		elseif( arg->param andalso _
 		        (symbGetParamMode(arg->param) <> FB_PARAMMODE_VARARG) ) then
 			dim dtype as integer, subtype as FBSYMBOL ptr
@@ -3038,17 +3136,42 @@ private sub hDoCall _
 				dim as string low_name, high_name
 				hSplitI386Integer128( varg, low_name, high_name )
 				DZstrConcatAssign( args, "i64 " + low_name + ", i64 " + high_name )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 2, "i386-int128-low", _
+					semantic_input_dtype, semantic_input_subtype, FB_DATATYPE_ULONGINT, NULL, "i64", "", low_name)
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 1, 2, "i386-int128-high", _
+					semantic_input_dtype, semantic_input_subtype, FB_DATATYPE_ULONGINT, NULL, "i64", "", high_name)
 			elseif( hIsMemoryByval( dtype, subtype, symbGetParamMode(arg->param) ) ) then
-				DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
-				DZstrConcatAssign( args, hMemoryByvalAttribute( subtype ) )
-				DZstrConcatAssign( args, " " + hVregToStr( varg ) )
+				semantic_type = hEmitType( varg->dtype, varg->subtype )
+				DZstrConcatAssign( args, semantic_type )
+				semantic_attributes = hMemoryByvalAttribute( subtype )
+				DZstrConcatAssign( args, semantic_attributes )
+				semantic_value = hVregToStr( varg )
+				DZstrConcatAssign( args, " " + semantic_value )
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, "memory-byval", _
+					semantic_input_dtype, semantic_input_subtype, varg->dtype, varg->subtype, _
+					semantic_type, semantic_attributes, semantic_value)
 			else
-				DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
-				DZstrConcatAssign( args, " " + hVregToStr( varg ) )
+				semantic_type = hEmitType( varg->dtype, varg->subtype )
+				DZstrConcatAssign( args, semantic_type )
+				semantic_value = hVregToStr( varg )
+				DZstrConcatAssign( args, " " + semantic_value )
+				semantic_kind = "value"
+				if( (symbGetParamMode(arg->param) = FB_PARAMMODE_BYVAL) andalso _
+					(symbGetValistType(dtype, subtype) = FB_CVA_LIST_BUILTIN_C_STD) ) then semantic_kind = "va-list-decay"
+				fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, semantic_kind, _
+					semantic_input_dtype, semantic_input_subtype, varg->dtype, varg->subtype, _
+					semantic_type, "", semantic_value)
 			end if
 		else
-			DZstrConcatAssign( args, hEmitType( varg->dtype, varg->subtype ) )
-			DZstrConcatAssign( args, " " + hVregToStr( varg ) )
+			semantic_type = hEmitType( varg->dtype, varg->subtype )
+			DZstrConcatAssign( args, semantic_type )
+			semantic_value = hVregToStr( varg )
+			DZstrConcatAssign( args, " " + semantic_value )
+			semantic_kind = "unmapped-value"
+			if( arg->param <> NULL ) then semantic_kind = "variadic-value"
+			fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, semantic_kind, _
+				semantic_input_dtype, semantic_input_subtype, varg->dtype, varg->subtype, _
+				semantic_type, "", semantic_value)
 		end if
 
 		listDelNode( @irhl.callargs, arg )
@@ -3068,6 +3191,7 @@ private sub hDoCall _
 	DZstrAllocate( args, 0 )
 
 	ln += " )"
+	fbSemanticModelCallAbiEnd(semantic_call, ln)
 
 	hWriteLine( ln )
 
@@ -3089,7 +3213,9 @@ private sub _emitCall _
 	hAstCommand( "call " + hSymName( proc ) + "()" )
 	if( hEmitBuiltinCall( proc, vr, level ) = FALSE ) then
 		var pname = hEmitProcName( proc )
-		hDoCall( strptr( pname ), proc, bytestopop, vr, level )
+		hDoCall( strptr( pname ), proc, FALSE, bytestopop, vr, level )
+	else
+		fbSemanticModelCallAbiBuiltin(proc, level)
 	end if
 
 end sub
@@ -3108,7 +3234,7 @@ private sub _emitCallPtr _
 
 	hAstCommand( "callptr " + vregPretty( v1 ) )
 	hLoadVreg( v1 )
-	hDoCall( hVregToStr( v1 ), proc, bytestopop, vr, level )
+	hDoCall( hVregToStr( v1 ), proc, TRUE, bytestopop, vr, level )
 
 end sub
 

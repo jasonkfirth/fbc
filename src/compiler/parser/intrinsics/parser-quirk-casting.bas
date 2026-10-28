@@ -31,7 +31,7 @@
 #include once "tooling/semantic-expressions.bi"
 
 
-declare sub fbSemanticModelExportExpression _
+declare sub fbSemanticModelExportParserExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
@@ -245,7 +245,7 @@ function cTypeConvExpr _
 		fbSemanticModelExportOperation(expr, iif(is_overloaded_conversion, AST_OP_CAST, _
 			semantic_operator_override), source_start)
 		nonphysical_tokens_at_end = lexGetNonphysicalTokenCount( )
-		fbSemanticModelExportExpression(expr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(expr, source_start, source_end, _
 			nonphysical_tokens_at_start, nonphysical_tokens_at_end, _
 			semantic_operator_override)
 	end if

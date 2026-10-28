@@ -119,6 +119,9 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-link.bi"
+#include once "tooling/semantic-emission-names.bi"
+#include once "tooling/semantic-backend-abi.bi"
+#include once "tooling/semantic-call-abi.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
@@ -180,6 +183,7 @@ end enum
 
 const C_MEMBER_VIEW_VALUE = 1
 const C_MEMBER_VIEW_STORAGE = 2
+const C_MEMBER_VIEW_WRITE = 3
 
 type EXPRNODE
 	class       as integer  '' EXPRCLASS_*
@@ -894,6 +898,10 @@ private sub hAppendCtorAttrib _
 
 	dim as integer priority = any
 
+	'' NetBSD finalizers are emitted as ordered array entries after the body.
+	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
+	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then exit sub
+
 	if( proc->stats and (FB_SYMBSTATS_GLOBALCTOR or FB_SYMBSTATS_GLOBALDTOR) ) then
 		if( in_front = FALSE ) then
 			ln += " "
@@ -1185,8 +1193,16 @@ private function hGetProcObjectName _
 end function
 
 private sub hObserveProcObjectName( byval proc as FBSYMBOL ptr, byref identifier as const string )
-	if( fbSemanticLinkProcedureObjectNeeded(proc) = FALSE ) then exit sub
+	if( (fbSemanticLinkProcedureObjectNeeded(proc) = FALSE) and _
+	    (fbSemanticModelObjectNameNeeded(proc) = FALSE) ) then exit sub
+	if( (left(identifier, 10) = "__builtin_") and (hNeedAbiAlias(proc) = FALSE) ) then
+		'' The C compiler can inline or rewrite a builtin. Its identifier is
+		'' not evidence of an object symbol with that spelling.
+		fbSemanticModelEmissionName(proc, "object", "", "unavailable", "backend-intrinsic")
+		exit sub
+	end if
 	var object_name = hGetProcObjectName( proc, identifier )
+	fbSemanticModelEmissionName(proc, "object", object_name)
 	fbSemanticLinkProcedureObject( proc, object_name )
 end sub
 
@@ -1208,6 +1224,7 @@ private function hEmitProcHeader _
 	dim as string ln, mangled
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
+	dim as string semantic_result, semantic_convention, semantic_role
 
 	if( options = 0 ) then
 		'' ctor/dtor flags on bodies
@@ -1221,8 +1238,9 @@ private function hEmitProcHeader _
 	end if
 
 	'' Function result type (is 'void' for subs)
-	ln += hEmitType( typeUnsetIsConst( symbGetProcRealType( proc ) ), _
+	semantic_result = hEmitType( typeUnsetIsConst( symbGetProcRealType( proc ) ), _
 					symbGetProcRealSubtype( proc ), TRUE )
+	ln += semantic_result
 
 	'' Calling convention if needed (for function pointers it's usually not
 	'' put in this place, but should work nonetheless)
@@ -1232,27 +1250,31 @@ private function hEmitProcHeader _
 			select case( env.clopt.target )
 			case FB_COMPTARGET_WIN32, FB_COMPTARGET_XBOX
 				'' MinGW recognizes this shorter & prettier version
-				ln += " __stdcall"
+				semantic_convention = " __stdcall"
 			case else
 				'' Linux GCC only accepts this
-				ln += " __attribute__((stdcall))"
+				semantic_convention = " __attribute__((stdcall))"
 			end select
 		case FB_FUNCMODE_THISCALL
 			select case( env.clopt.target )
 			case FB_COMPTARGET_WIN32, FB_COMPTARGET_XBOX
-				ln += " __thiscall"
+				semantic_convention = " __thiscall"
 			case else
-				ln += " __attribute__((thiscall))"
+				semantic_convention = " __attribute__((thiscall))"
 			end select
 		case FB_FUNCMODE_FASTCALL
 			select case( env.clopt.target )
 			case FB_COMPTARGET_WIN32, FB_COMPTARGET_XBOX
-				ln += " __fastcall"
+				semantic_convention = " __fastcall"
 			case else
-				ln += " __attribute__((fastcall))"
+				semantic_convention = " __attribute__((fastcall))"
 			end select
 		end select
 	end if
+	ln += semantic_convention
+	semantic_role = iif((options and EMITPROC_ISPROCPTR) <> 0, "pointer-type", _
+		iif((options and EMITPROC_ISPROTO) <> 0, "declaration", "definition"))
+	dim as longint semantic_signature = fbSemanticModelBackendAbiBegin(proc, "c", semantic_role, semantic_result, semantic_convention)
 
 	if( (options and EMITPROC_ISPROCPTR) = 0 ) then
 		if( hProcDoesNotReturn( proc ) ) then ln += " __attribute__((noreturn))"
@@ -1267,7 +1289,9 @@ private function hEmitProcHeader _
 		ln += hGetCId( proc )
 		ln += ")"
 	else
-		ln += hGetCId( proc )
+		var identifier = hGetCId( proc )
+		ln += identifier
+		fbSemanticModelEmissionName(proc, "c", identifier)
 	end if
 
 	'' Parameter list
@@ -1276,14 +1300,22 @@ private function hEmitProcHeader _
 	'' If returning a struct, there's an extra parameter
 	dim as FBSYMBOL ptr hidden = NULL
 	if( symbProcReturnsOnStack( proc ) ) then
+		dim as integer semantic_hidden_dtype
+		dim as FBSYMBOL ptr semantic_hidden_subtype
 		if( options and EMITPROC_ISPROTO ) then
 			hidden = symbGetSubType( proc )
-			ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), hidden )
+			semantic_hidden_dtype = typeAddrOf( symbGetType( hidden ) )
+			semantic_hidden_subtype = hidden
 		else
 			hidden = proc->proc.ext->res
-			ln += hEmitType( typeAddrOf( symbGetType( hidden ) ), symbGetSubtype( hidden ) )
-			ln += " " + hGetCId( hidden )
+			semantic_hidden_dtype = typeAddrOf( symbGetType( hidden ) )
+			semantic_hidden_subtype = symbGetSubtype( hidden )
 		end if
+		dim as string semantic_hidden = hEmitType(semantic_hidden_dtype, semantic_hidden_subtype)
+		ln += semantic_hidden
+		fbSemanticModelBackendAbiParameter(semantic_signature, NULL, 0, 1, "hidden-result", semantic_hidden, _
+			semantic_hidden_dtype, semantic_hidden_subtype)
+		if( (options and EMITPROC_ISPROTO) = 0 ) then ln += " " + hGetCId(hidden)
 
 		if( symbGetProcParams( proc ) > 0 ) then
 			ln += ", "
@@ -1302,13 +1334,17 @@ private function hEmitProcHeader _
 	while( param )
 		if( symbGetParamMode( param ) = FB_PARAMMODE_VARARG ) then
 			DZstrConcatAssign( params, "..." )
+			fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 0, "variadic", "...")
 		else
 			'' Emit clang-compatible datatype for main()'s argv,
 			'' clang is very strict about this...
 			if( param->stats and FB_SYMBSTATS_ARGV ) then
 				DZstrConcatAssign( params, "char**" )
+				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, "argv", "char**")
 			else
 				symbGetRealParamDtype( param, dtype, subtype )
+				dim as integer semantic_original_dtype = dtype
+				dim as FBSYMBOL ptr semantic_original_subtype = subtype
 				if( (options and EMITPROC_ISPROTO) <> 0 ) then
 					dim as string libc_procptr = hEmitLibcProcPtrParam( mangled, param_index )
 					if( hIsArrayCallbackParam( proc, param_index ) ) then
@@ -1316,6 +1352,7 @@ private function hEmitProcHeader _
 					end if
 					if( len( libc_procptr ) > 0 ) then
 						DZstrConcatAssign( params, libc_procptr )
+						fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, "libc-callback", libc_procptr)
 						param = symbGetProcPrevParam( proc, param )
 						param_index += 1
 						if( param ) then
@@ -1325,7 +1362,11 @@ private function hEmitProcHeader _
 					end if
 					hAdjustCParamType( mangled, param_index, dtype, subtype )
 				end if
-				DZstrConcatAssign( params, hEmitType( dtype, subtype, TRUE ) )
+				dim as string semantic_parameter = hEmitType(dtype, subtype, TRUE)
+				DZstrConcatAssign( params, semantic_parameter )
+				dim as string semantic_kind = "value"
+				if( (dtype <> semantic_original_dtype) or (subtype <> semantic_original_subtype) ) then semantic_kind = "libc-adjusted"
+				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, semantic_kind, semantic_parameter, dtype, subtype)
 			end if
 
 			if( (options and EMITPROC_ISPROTO) = 0 ) then
@@ -1362,6 +1403,7 @@ private function hEmitProcHeader _
 		hAppendCtorAttrib( ln, proc, FALSE )
 	end if
 
+	fbSemanticModelBackendAbiEnd(semantic_signature, ln)
 	function = ln
 end function
 
@@ -1440,17 +1482,17 @@ private sub hEmitUDT( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 
 		end if
 
-		'' Switching from a parent to a child scope isn't allowed,
-		'' the UDT declaration will be forced to be emitted in the
-		'' parent scope anyways, since apparently that's where we
-		'' need it. (used by _procAllocStaticVars())
-		if( section > ctx.section ) then
+		'' BASIC scope numbers predate the separate C declaration and body
+		'' sections. Map the old scope to its declaration section so a local
+		'' record is complete before its hoisted variables. Clamp to the
+		'' current scope when static locals need a child type in their parent.
+		if( ctx.section >= 2 ) then
+			var current_scope_section = (ctx.section \ 2) + 1
+			if( section > current_scope_section ) then section = current_scope_section
+			if( section >= 2 ) then section = (section - 1) * 2
+		elseif( section > ctx.section ) then
 			section = ctx.section
 		end if
-		'' Each C block has a declaration header followed by its body. Keep
-		'' complete local types in that header so hoisted pointer variables
-		'' can use their typedefs. Both sections belong to the same C scope.
-		if( section >= 3 andalso (section mod 2) = 1 ) then section -= 1
 	else
 		'' Write to toplevel
 		section = 0
@@ -1580,13 +1622,35 @@ private sub hEmitVarDecl _
 		'' top-level const on the BASIC variable itself is not emitted here.
 		ln += hEmitType( typeUnsetIsConst( dtype ), sym->subtype, TRUE )
 	end if
-	ln += " " + hGetCId( sym )
+	var identifier = hGetCId( sym )
+	ln += " " + identifier
+	fbSemanticModelEmissionName(sym, "c", identifier)
 	ln += hEmitArrayDecl( sym )
+	dim as string selected_object_name
 	if( sym->class = FB_SYMBCLASS_VAR andalso symbIsLocal(sym) = FALSE ) then
-		if( hCNameNeedsEncoding(symbGetMangledName(sym)) ) then
+		if( hCNameNeedsEncoding(symbGetMangledName(sym)) andalso _
+		    (hCUseEmulatedTlsName(sym, symbGetMangledName(sym)) = FALSE) ) then
 			'' Global C tokens may differ; retain the original object identity.
 			var object_name = hGetMangledNameForASM( sym, TRUE )
 			hAppendCObjectAlias( ln, object_name )
+			selected_object_name = object_name
+		end if
+	end if
+	if( fbSemanticModelObjectNameNeeded(sym) ) then
+		if( symbIsThreadLocal(sym) ) then
+			fbSemanticModelEmissionName(sym, "object", "", "unavailable", "backend-tls")
+		elseif( symbIsLocal(sym) ) then
+			if( symbIsStatic(sym) ) then
+				fbSemanticModelEmissionName(sym, "object", "", "unavailable", "c-local-static")
+			else
+				fbSemanticModelEmissionName(sym, "object", "", "none", "automatic-storage")
+			end if
+		else
+			if( len(selected_object_name) = 0 ) then
+				selected_object_name = identifier
+				if( env.underscoreprefix ) then selected_object_name = "_" + selected_object_name
+			end if
+			fbSemanticModelEmissionName(sym, "object", selected_object_name)
 		end if
 	end if
 
@@ -3705,7 +3769,11 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			var viewname = hCAlignmentViewName(viewdtype, n->l->subtype)
 			assert(len(viewname) > 0)
 			ctx.exprtext += "("
-			if( typeIsConstAt(viewdtype, 0) ) then ctx.exprtext += "const "
+			'' BASIC CONST storage is emitted as writable C storage so its
+			'' runtime initializer can assign individual members. The frontend
+			'' has already checked whether a store is permitted; retain const
+			'' on read and address views, but not on that checked store view.
+			if( typeIsConstAt(viewdtype, 0) andalso n->member_view <> C_MEMBER_VIEW_WRITE ) then ctx.exprtext += "const "
 			ctx.exprtext += viewname + "*)("
 			hExprFlush(n->l, FALSE)
 			ctx.exprtext += ")"
@@ -4223,7 +4291,7 @@ private function exprNewVREG _
 				'' recursion
 				l = exprNewVREG( vreg->vidx )
 				var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
-					FALSE, (is_lvalue = FALSE))
+					FALSE, (is_lvalue = FALSE), is_lvalue)
 				if( member <> NULL ) then
 					l = member
 					exit select
@@ -4305,7 +4373,7 @@ private function exprNewVREG _
 		if( (is_c_array = FALSE) andalso (vreg->vidx = NULL) andalso _
 		    ((typeIsPtr(l->dtype) = FALSE) or (vreg->typ = IR_VREGTYPE_PTR)) ) then
 			var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
-				FALSE, (is_lvalue = FALSE))
+				FALSE, (is_lvalue = FALSE), is_lvalue)
 			if( member <> NULL ) then
 				l = member
 				exit select
@@ -4853,9 +4921,14 @@ end sub
 '' v1 = cast( <v1's dtype>, v2 )
 private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	var r = exprNewVREG( v2 )
+	'' A read through a pointer can carry const qualification even when the
+	'' value being converted is a Boolean. Ignore qualifiers here, while
+	'' retaining pointer levels so a Boolean pointer is never treated as one.
+	var result_is_boolean = (typeGetDtAndPtrOnly(v1->dtype) = FB_DATATYPE_BOOLEAN)
+	var input_is_boolean = (typeGetDtAndPtrOnly(r->dtype) = FB_DATATYPE_BOOLEAN)
 
 	'' float/int := bool?
-	if( (v1->dtype <> FB_DATATYPE_BOOLEAN) and (r->dtype = FB_DATATYPE_BOOLEAN) ) then
+	if( (result_is_boolean = FALSE) and input_is_boolean ) then
 		'' 0/-1 := 0/1
 		if( r->class = EXPRCLASS_IMM ) then
 			r->val.i = (r->val.i <> 0)
@@ -4865,7 +4938,7 @@ private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 		end if
 
 	'' bool := float/int?
-	elseif( (v1->dtype = FB_DATATYPE_BOOLEAN) and (r->dtype <> FB_DATATYPE_BOOLEAN) ) then
+	elseif( result_is_boolean and (input_is_boolean = FALSE) ) then
 		'' 0/1 := zero/non-zero
 		if( r->class = EXPRCLASS_IMM ) then
 			'' (FB's <> 0 produces 0/-1 so we have to negate to get 0/1)
@@ -5020,6 +5093,8 @@ end function
 private sub hDoCall _
 	( _
 		byref s as string, _
+		byval proc as FBSYMBOL ptr, _
+		byval indirect as integer, _
 		byval bytestopop as integer, _
 		byval vr as IRVREG ptr, _
 		byval level as integer _
@@ -5031,12 +5106,27 @@ private sub hDoCall _
 	dim as integer param_index = 0
 	dim as DZSTRING args
 	DZstrZero( args )
+	dim as integer semantic_result_dtype = FB_DATATYPE_INVALID
+	dim as FBSYMBOL ptr semantic_result_subtype = NULL
+	if( vr <> NULL ) then
+		semantic_result_dtype = vr->dtype
+		semantic_result_subtype = vr->subtype
+	end if
+	dim as longint semantic_call = fbSemanticModelCallAbiBegin(proc, "c", indirect, vr <> NULL, _
+		semantic_result_dtype, semantic_result_subtype, "", "", level, bytestopop)
 
 	'' Flush argument list
 	s += "( "
 	arg = listGetTail( @irhl.callargs )
 	while( arg andalso (arg->level = level) )
 		dim as IRCALLARG ptr prev = listGetPrev( arg )
+		dim as integer semantic_input_dtype = arg->vr->dtype
+		dim as FBSYMBOL ptr semantic_input_subtype = arg->vr->subtype
+		dim as string semantic_kind = "unmapped-value"
+		if( arg->param <> NULL ) then
+			semantic_kind = "value"
+			if( arg->param->param.mode = FB_PARAMMODE_VARARG ) then semantic_kind = "variadic-value"
+		end if
 
 		var expr = exprNewVREG( arg->vr )
 
@@ -5048,16 +5138,20 @@ private sub hDoCall _
 			'' BYREF AS ANY params, where the exact type will only
 			'' be known later, or never)
 			symbGetRealParamDtype( arg->param, dtype, subtype )
-			var proc = symbGetParent( arg->param )
-			if( hIsArrayCallbackParam( proc, param_index ) ) then
+			var param_proc = symbGetParent( arg->param )
+			if( hIsArrayCallbackParam( param_proc, param_index ) ) then
 				expr = hArrayCallbackArgument( expr )
+				semantic_kind = "array-callback"
 			else
+				dim as integer semantic_original_dtype = dtype
+				dim as FBSYMBOL ptr semantic_original_subtype = subtype
 				var allocation_argument = FALSE
-				if( proc <> NULL ) then
-					var mangled = *symbGetMangledName( proc )
+				if( param_proc <> NULL ) then
+					var mangled = *symbGetMangledName( param_proc )
 					allocation_argument = hEmitMutableLibcPtrParam(mangled, param_index)
 					hAdjustCParamType( mangled, param_index, dtype, subtype )
 				end if
+				if( (dtype <> semantic_original_dtype) or (subtype <> semantic_original_subtype) ) then semantic_kind = "libc-adjusted"
 				if( allocation_argument ) then
 					expr = hCAllocationArgument(expr)
 				else
@@ -5068,7 +5162,13 @@ private sub hDoCall _
 		'' A hidden result argument is absent from the declared parameter list.
 		if( arg->param <> NULL ) then param_index += 1
 
-		DZstrConcatAssign( args, exprFlush( expr ) )
+		dim as integer semantic_selected_dtype = expr->dtype
+		dim as FBSYMBOL ptr semantic_selected_subtype = expr->subtype
+		if( semantic_kind = "array-callback" ) then semantic_selected_dtype = FB_DATATYPE_INVALID
+		dim as string semantic_value = exprFlush( expr )
+		fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, semantic_kind, _
+			semantic_input_dtype, semantic_input_subtype, semantic_selected_dtype, semantic_selected_subtype, "", "", semantic_value)
+		DZstrConcatAssign( args, semantic_value )
 
 		listDelNode( @irhl.callargs, arg )
 
@@ -5085,6 +5185,7 @@ private sub hDoCall _
 	end if
 	DZstrAllocate( args, 0 )
 	s += " )"
+	fbSemanticModelCallAbiEnd(semantic_call, s)
 
 	if( vr = NULL ) then
 		s += ";"
@@ -5107,7 +5208,7 @@ private sub _emitCall _
 
 	hCLeafReference( proc )
 	s = hGetCId( proc )
-	hDoCall( s, bytestopop, vr, level )
+	hDoCall( s, proc, FALSE, bytestopop, vr, level )
 
 end sub
 
@@ -5123,7 +5224,7 @@ private sub _emitCallPtr _
 	static as string s
 
 	s = "(" + exprFlush( exprNewVREG( v1 ) ) + ")"
-	hDoCall( s, bytestopop, vr, level )
+	hDoCall( s, proc, TRUE, bytestopop, vr, level )
 
 end sub
 
@@ -6434,6 +6535,20 @@ private sub _emitProcEnd _
 
 	sectionEnd( )
 	hCLeafEnd( )
+	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
+	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then
+		'' NetBSD walks .fini_array forwards, including in shared libraries.
+		'' Reverse the BASIC priority in the section name so destructors run
+		'' in the opposite order to constructors. The default priority is
+		'' the highest value, as it is for the C compiler's destructor.
+		const maximum_priority = 65535
+		dim as integer priority = symbGetProcPriority( proc )
+		if( priority = 0 ) then priority = maximum_priority
+		dim as string section_priority = right( "00000" + str( maximum_priority - priority ), 5 )
+		dim as string proc_name = hGetCId( proc )
+		hWriteLine( "static void (*fb_c_fini_" + proc_name + ")(void) " + _
+			"__attribute__((section("".fini_array." + section_priority + """), used)) = " + proc_name + ";", TRUE )
+	end if
 
 	'' Forget any left-over expression nodes (unused function results)
 	do

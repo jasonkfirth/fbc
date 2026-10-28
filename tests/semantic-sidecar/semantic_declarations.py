@@ -5,6 +5,8 @@ Responsibilities: Group completion, native symbols, formal coverage and bounds.
 This file intentionally does NOT parse source or infer declaration policy.
 """
 
+from semantic_datatypes import BOOLEAN_NUMERIC_NAMES, primitive_name
+
 def validate_declaration_types(model, number, subject_modules, procedure_headers=()):
     groups, endings, inputs, formals, statements = {}, {}, {}, {}, set()
     array_symbols = {int(row[1]) for row in model.records['A']}
@@ -82,7 +84,8 @@ def validate_declaration_types(model, number, subject_modules, procedure_headers
             raise ValueError('Invalid variable declaration type')
         if initializer == '3':
             dtype = int(symbol[4])
-            if declared in array_symbols or not dtype & 0x1e0 and not 1 <= dtype & 31 <= 18:
+            scalar_names = BOOLEAN_NUMERIC_NAMES | {'enum', 'zstring', 'wstring'}
+            if declared in array_symbols or not dtype & 0x1e0 and primitive_name(model, module, dtype) not in scalar_names:
                 raise ValueError('Simple initializer does not target a numeric scalar')
         observed[identity].add(ordinal)
     for identity, (owner, module, count) in endings.items():

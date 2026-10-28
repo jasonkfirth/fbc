@@ -1,29 +1,27 @@
 """Project: FreeBASIC semantic sidecar
 File: semantic_driver.py
-Purpose: Validate driver-selected module roles and ordered input snapshots.
-Responsibilities: Check namespace ownership, bounded groups, and mode omissions.
+Purpose: Validate driver-selected roles and ordered module input snapshots.
+Responsibilities: Check bounded groups, namespace ownership, and mode omissions.
 This file intentionally does NOT resolve libraries or infer driver policy.
 """
 
 from collections import defaultdict
 import re
 
-
 FEATURE = "driver-module-inputs"
 MAX_INPUTS = 65536
-SCALARS = frozenset(("driver-module", "driver-role", "driver-source", "driver-object",
-                     "driver-main", "driver-ordinal", "driver-entry", "driver-outtype",
-                     "producer-version", "producer-build-date", "producer-source-sha1", "producer-fork-id"))
+SCALARS = frozenset(("driver-module", "driver-role", "driver-source", "driver-object", "driver-main",
+                     "driver-ordinal", "driver-entry", "driver-outtype", "producer-version", "producer-build-date",
+                     "producer-source-sha1", "producer-fork-id"))
 COUNTS = ("driver-input-count", "driver-module-library-count", "driver-module-library-path-count")
-INPUT_KINDS = frozenset(("compiler-prefix", "compiler-include", "compiler-library", "sysroot", "source-options",
-                         "source-input", "resource-input", "source-object", "resource-object", "object-input",
-                         "archive-input", "library-input", "library-path", "excluded-library",
-                         "predefine", "preinclude", "include-path", "assembler-options", "compiler-options", "linker-options",
-                         "tool-prefix", "main-input", "subsystem", "target-prefix", "no-default-libraries",
-                         "no-runtime-startup", "static-link", "strip-symbols", "retain-object", "source-emission-only",
-                         "assembly-emission-only"))
 FLAGS = frozenset(("no-default-libraries", "no-runtime-startup", "static-link", "strip-symbols", "retain-object",
                    "source-emission-only", "assembly-emission-only"))
+SINGLE_INPUTS = FLAGS | frozenset(("compiler-prefix", "compiler-include", "compiler-library", "sysroot", "source-options",
+                                  "assembler-options", "compiler-options", "linker-options", "tool-prefix", "main-input",
+                                  "subsystem", "target-prefix"))
+INPUT_KINDS = SINGLE_INPUTS | frozenset(("source-input", "resource-input", "source-object", "resource-object", "object-input",
+                                        "archive-input", "library-input", "library-path", "excluded-library", "predefine",
+                                        "preinclude", "include-path"))
 
 
 def validate_driver_inputs(model, number, subject_modules):
@@ -64,13 +62,13 @@ def validate_driver_inputs(model, number, subject_modules):
         if role not in ("main", "secondary", "archive-metadata", "resource"):
             raise ValueError("Unknown driver module role")
         if facts["driver-main"] not in ("0", "1") or (facts["driver-main"] == "1") != (role == "main"):
-            raise ValueError("Driver role disagrees with its actual main flag")
-        ordinal = number(facts["driver-ordinal"], -1)
+            raise ValueError("Driver role disagrees with its main flag")
+        source_ordinal = number(facts["driver-ordinal"], -1)
         if role in ("resource", "archive-metadata"):
-            if ordinal != -1:
-                raise ValueError("Generated module invents a source input ordinal")
-        elif ordinal < 1:
-            raise ValueError("Source module has no driver input ordinal")
+            if source_ordinal != -1:
+                raise ValueError("Generated module invents a source ordinal")
+        elif source_ordinal < 1:
+            raise ValueError("Source module has no driver ordinal")
         number(facts["driver-outtype"], 0)
         if not facts["driver-source"] or not facts["driver-object"]:
             raise ValueError("Driver module lacks a source or object name")
@@ -90,9 +88,8 @@ def validate_driver_inputs(model, number, subject_modules):
                 expected.add(key)
                 if key not in facts:
                     raise ValueError("Driver input sequence is incomplete")
-                value = facts[key]
                 if prefix == "driver-input-":
-                    kind, separator, value = value.partition("\t")
+                    kind, separator, value = facts[key].partition("\t")
                     if not separator or kind not in INPUT_KINDS:
                         raise ValueError("Unknown driver input category")
                     if kind in FLAGS and value not in ("0", "1"):
@@ -100,6 +97,13 @@ def validate_driver_inputs(model, number, subject_modules):
                     inputs.append((kind, value))
         if set(facts) != expected:
             raise ValueError("Driver input sequence contains uncounted entries")
+        for kind in SINGLE_INPUTS:
+            if sum(observed == kind for observed, _ in inputs) != 1:
+                raise ValueError("Driver policy input is missing or repeated")
+        if role in ("main", "secondary"):
+            sources = [value for kind, value in inputs if kind == "source-input"]
+            if source_ordinal > len(sources) or sources[source_ordinal - 1] != facts["driver-source"]:
+                raise ValueError("Driver source ordinal disagrees with its ordered inputs")
         model.driver_inputs[module] = {"owner": owner, "properties": facts, "inputs": inputs}
 
 # end of semantic_driver.py

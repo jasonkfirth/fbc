@@ -93,7 +93,12 @@ private function hFindCMemberPath _
 				var localoffset = offset - symbGetOfs(fld)
 				var extent = symbGetRealSize(fld)
 				if( localoffset >= 0 andalso localoffset < extent ) then
-					var fielddtype = symbGetFullType(fld)
+					'' Match the type actually used in the emitted C record. Field
+					'' declarations drop mangling modifiers and top-level const;
+					'' using the full BASIC type here can instead spell a va_list
+					'' array pointer where the C field holds a record pointer.
+					var fielddtype = symbGetType(fld) or typeGetConstMask(symbGetFullType(fld))
+					fielddtype = typeUnsetIsConst(fielddtype)
 					var fieldsubtype = symbGetSubtype(fld)
 					var elementsize = symbGetSizeOf(fld)
 					var element = 0ll
@@ -137,7 +142,8 @@ private function exprTryCMember _
 	( byval base_expr as EXPRNODE ptr, byval offset as longint, _
 	  byval wanted as integer, byval wantedsubtype as FBSYMBOL ptr, _
 	  byval address_only as integer = FALSE, _
-	  byval read_value as integer = FALSE ) as EXPRNODE ptr
+	  byval read_value as integer = FALSE, _
+	  byval write_value as integer = FALSE ) as EXPRNODE ptr
 
 	'' Low-level IR may have converted a declared record pointer to bytes.
 	'' Recover its declared origin through pointer casts, but never through
@@ -217,7 +223,13 @@ private function exprTryCMember _
 	if( is_pointer and len(path) > 0 ) then path = "->" + mid(path, 2)
 	var result = exprNew(EXPRCLASS_MEMBER, actualdtype, actualsubtype)
 	result->text = ZstrDup(strptr(path))
-	if( is_pointer ) then result->member_view = C_MEMBER_VIEW_VALUE
+	if( is_pointer ) then
+		if( write_value ) then
+			result->member_view = C_MEMBER_VIEW_WRITE
+		else
+			result->member_view = C_MEMBER_VIEW_VALUE
+		end if
+	end if
 	'' Drop erased-type wrappers only after a complete path was proved.
 	do while( base_expr <> origin )
 		var next_expr = base_expr->l

@@ -82,7 +82,7 @@ declare sub fbSemanticModelSetExpressionOperatorOverride _
 		byref source_end as LEX_LOCATION, _
 		byval operator_override as integer _
 	)
-declare sub fbSemanticModelExportExpression _
+declare sub fbSemanticModelExportParserExpression _
 	( _
 		byval expr as ASTNODE ptr, _
 		byref source_start as LEX_LOCATION, _
@@ -104,7 +104,7 @@ private sub hSemanticModelExportCurrentExpression _
 	)
 	if( expr = NULL ) then exit sub
 	dim as LEX_LOCATION source_end = lexGetLastLocation( )
-	fbSemanticModelExportExpression(expr, source_start, source_end, _
+	fbSemanticModelExportParserExpression(expr, source_start, source_end, _
 		nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 		semantic_operator_override)
 end sub
@@ -199,7 +199,7 @@ function cExpression _
 					semantic_dtor_generation, source_start, source_end, _
 					nonphysical_tokens_at_start, nonphysical_tokens_at_end, expr )
 			end if
-			fbSemanticModelExportExpression(expr, source_start, source_end, _
+			fbSemanticModelExportParserExpression(expr, source_start, source_end, _
 				nonphysical_tokens_at_start, nonphysical_tokens_at_end)
 		end if
 	end if
@@ -307,7 +307,7 @@ function cBoolExpression( ) as ASTNODE ptr
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	end if
@@ -388,7 +388,7 @@ function cLogExpression _
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
@@ -461,7 +461,7 @@ function cLogOrExpression _
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
@@ -534,7 +534,7 @@ function cLogAndExpression _
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(logexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
@@ -630,7 +630,7 @@ function cRelExpression _
 	function = relexpr
 	if( export_semantics andalso (relexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(relexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(relexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (relexpr <> NULL) and _
@@ -792,7 +792,7 @@ function cCatExpression _
 	function = catexpr
 	if( export_semantics andalso (catexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(catexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(catexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (catexpr <> NULL) and _
@@ -883,7 +883,7 @@ function cAddExpression _
 	function = addexpr
 	if( export_semantics andalso (addexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(addexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(addexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (addexpr <> NULL) and _
@@ -967,7 +967,7 @@ function cShiftExpression _
 	function = shiftexpr
 	if( export_semantics andalso (shiftexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(shiftexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(shiftexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
@@ -1039,7 +1039,7 @@ function cModExpression _
 	function = modexpr
 	if( export_semantics andalso (modexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(modexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(modexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
@@ -1111,7 +1111,7 @@ function cIntDivExpression _
 	function = idivexpr
 	if( export_semantics andalso (idivexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(idivexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(idivexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
@@ -1189,7 +1189,7 @@ function cMultExpression _
 	function = mulexpr
 	if( export_semantics andalso (mulexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(mulexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(mulexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
@@ -1263,7 +1263,7 @@ function cExpExpression _
 	function = expexpr
 	if( export_semantics andalso (expexpr <> NULL) ) then
 		source_end = lexGetLastLocation( )
-		fbSemanticModelExportExpression(expexpr, source_start, source_end, _
+		fbSemanticModelExportParserExpression(expexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (expexpr <> NULL) and _

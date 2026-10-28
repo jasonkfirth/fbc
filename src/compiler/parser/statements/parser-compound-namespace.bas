@@ -27,6 +27,8 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-namespace-visibility.bi"
 declare sub fbSemanticModelSourcePolicyInput _
 	( byref kind as const string, byref value as const string, byval source as LEX_LOCATION ptr = NULL )
 
@@ -266,6 +268,9 @@ sub cUsingStmt( )
 
 	do
 		'' ID
+		dim as LEX_LOCATION semantic_first = lexGetCurrentLocation( )
+		dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
+		dim as longint semantic_binding = fbSemanticModelBindingCount( )
 		sym = cParentId( FB_IDOPT_DONTCHKPERIOD )
 		if( sym = NULL ) then
 			if( lexGetToken( ) <> FB_TK_ID ) then
@@ -281,7 +286,11 @@ sub cUsingStmt( )
 			if( symbIsNamespace( sym ) = FALSE ) then
 				errReport( FB_ERRMSG_TYPEMISMATCH )
 			else
-				symbNamespaceImport( sym )
+				dim as LEX_LOCATION semantic_last = lexGetLastLocation( )
+				dim as longint semantic_request = fbSemanticModelUsingBegin(sym, semantic_first, semantic_last, _
+					semantic_nonphysical, lexGetNonphysicalTokenCount( ), semantic_binding + 1, fbSemanticModelBindingCount( ))
+				dim as integer native_result = symbNamespaceImport( sym )
+				fbSemanticModelUsingEnd(semantic_request, native_result)
 				accepted = TRUE
 			end if
 		end if

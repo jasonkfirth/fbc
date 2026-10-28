@@ -3322,7 +3322,12 @@ private sub hAddGlobalCtorDtor( byval proc as FBSYMBOL ptr )
 	elseif( symbGetIsGlobalDtor( proc ) ) then
 		ctx.dtorcount += 1
 		asm_info("Destructor name/prio="+*symbGetMangledName( proc )+" / "+str( symbGetProcPriority( proc ) ))
-		if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
+		if( env.clopt.target = FB_COMPTARGET_NETBSD ) then
+			'' NetBSD walks finalizer arrays forwards, so reverse the priority.
+			dim as integer priority = symbGetProcPriority( proc )
+			if( priority = 0 ) then priority = CTOR_DTOR_PRIORITY_MAX
+			asm_section(".fini_array." + right("00000" + str(CTOR_DTOR_PRIORITY_MAX - priority), 5) + ",""aw"",@fini_array")
+		elseif ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
 			asm_section(".fini_array")
 		else
 			if symbGetProcPriority( proc )=0 then

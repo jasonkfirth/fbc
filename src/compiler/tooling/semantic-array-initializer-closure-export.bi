@@ -2,7 +2,8 @@
 '' File: tooling/semantic-array-initializer-closure-export.bi
 '' Purpose: Own counted original array-element coverage for one synchronous module.
 '' Responsibilities: Reset state and emit one independent full-mode closure header.
-'' This file intentionally does NOT infer initializer roles, retain ASTs or alter codegen.
+'' This file intentionally does NOT contain: initializer role inference, AST ownership or code generation.
+
 #ifndef FB_ARRAY_INITIALIZER_CLOSURE_EXPORT_BI
 #define FB_ARRAY_INITIALIZER_CLOSURE_EXPORT_BI
 
@@ -24,4 +25,4 @@ sub fbSemanticModelExportArrayInitializerInputCount( )
 end sub
 
 #endif
-'' end of semantic-array-initializer-closure-export.bi
+'' end of tooling/semantic-array-initializer-closure-export.bi

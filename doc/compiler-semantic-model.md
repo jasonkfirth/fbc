@@ -38,6 +38,15 @@ means the native table has only 27 slots. Existing signed/unsigned `C` value
 kinds carry at most 64 integer bits. Wider constants are not published through
 those carriers; a missing value does not establish a narrowed constant.
 
+The supplied Python `Model` validates either vocabulary and checks it against
+the encoding capability when present. `model.datatype_abis` identifies the
+encoding per module. Raw rows, type codes and primitive identities retain the
+chosen encoding; validators resolve primitive families through that module's
+`Y` dictionary. Normalized type meaning remains the same across encodings.
+Reduced modes identify the encoding from their explicit capabilities while
+retaining their deliberate omission of target layout tables. Older reduced
+models without those receipts report the encoding unavailable.
+
 `-semantic-extra-facts <list>` requests additional full-model source
 observations. The comma-separated names are `hints`, `declarators`, `keywords`,
 `macro-access`, `includes`, `builtins`, `literal-groups`, `preprocessor`,
@@ -1174,6 +1183,102 @@ snapshots may repeat as forward declarations become complete; the latest
 snapshot applies, matching `T` metadata. Expression and node subjects have
 one snapshot. All `NT` records contribute to the detail count.
 
+`normalized-type-closure` is available only in full models. It requires one
+normalized type for each valid native `T`, `N` and `E` snapshot. The invalid
+datatype sentinel has no `NT`. A symbol `NT` belongs to its following `T`;
+node/expression snapshots belong to their preceding native record. Parser
+receipts may occur before the delayed expression `NT`. Readers check the
+native base/nominal type, pointer count, const/reference bits and mangling
+modifier at that capture point. Pointer storage must equal the module's target
+width. Missing, duplicated, foreign or contradictory pairs are rejected.
+Older producers without this capability do not promise complete `NT` coverage.
+
+The same capability supplies five global-namespace
+`mangling-modifier-definition:<ordinal>` properties, numbered from zero. Each
+value contains the native/selected-ABI primitive ID and its stable mangling
+meaning: `c-long`, `c-unsigned-long`, `c-char`, `c-bool` or `c-va-list`.
+`NT` retains the classifier's primitive name in its last field for compatibility.
+That name is not a source type: the mangler uses the `integer` slot for C long
+and the `zstring` slot for C char. These definitions provide the meaning without
+requiring a consumer to reconstruct private compiler enums. The independent
+reader exposes the per-module dictionary as `mangling_modifiers` and requires
+the complete, unique vocabulary.
+
+A fixed-string variable, array element or field supplies its initialized
+storage length to its expression and node snapshots. An unavailable length
+stays empty. A pointer to a fixed string still reports the pointer's width.
+The exporter reads only the selected symbol's common header for this length;
+it does not inspect an inactive AST or symbol payload.
+ZSTRING and WSTRING `NT` widths describe their primitive code units; `T` retains
+the selected variable or field's complete storage width. Accepted primitive
+layout observations additionally retain the written bound and type spelling.
+
+### Named symbol flags and primitive policy
+
+Full models advertise `named-symbol-flags` and `primitive-type-policy`.
+Bindings-only and expression-only models mark both unavailable and omit
+their properties. These extensions use existing `K` records and do not change
+schema 27 or either transport's record layout.
+
+The module's global namespace owns the flag dictionary:
+
+| Property | Decoded value fields |
+| --- | --- |
+| `named-flag-contract` | `1` |
+| `flag-definition:<ordinal>` | group, stable name, native unsigned 32-bit mask, applicable symbol classes or `*` |
+| `flag-definition-count` | number of definitions |
+| `return-method-definition:<ordinal>` | native enum value, stable name |
+| `aggregate-return-definition:<ordinal>` | native enum value, stable name |
+| `named-flag-counts:<module>` | common symbol, aggregate and procedure-status snapshot counts |
+
+Dictionary ordinals start at zero. Contract 1 defines 100 named flags in
+`attributes`, `procedure-attributes`, `status`, `aggregate-options` and
+`procedure-status`. The public names and class applicability are stable;
+consumers obtain the current native masks from the dictionary. A mask has
+one bit, and two definitions cannot apply to the same bit and symbol class
+within a group. Aggregate classes use `type` for both structs and unions.
+
+Each `T` is immediately followed by `symbol-flags:<ordinal>` on that symbol.
+Its six fields are attribute names and unmapped bits, procedure-attribute
+names and unmapped bits, then status names and unmapped bits. Each aggregate
+`U` similarly has `aggregate-flags:<ordinal>` with option names and unmapped
+bits. Each initialized `procedure-status` property has an adjacent
+`procedure-flags:<ordinal>` with status names and unmapped bits. These three
+ordinal sequences start at one independently per module. They describe the
+adjacent native snapshot, including subsequent changes to the same symbol.
+
+Names are comma-separated in dictionary order. Unmapped bits are canonical
+unsigned decimal values, including zero. A reused status bit can mean
+`temporary-lifetime` for a variable, `union-field` for a field, and
+`procedure-emitted` for a procedure. A class-inapplicable bit remains unmapped;
+it never acquires another class's meaning. The aggregate va_list type mask
+is a nonboolean field and remains in the unmapped bits. None of these
+observations mutates flags or implies source visibility, execution or effect.
+
+Each `F` has an adjacent `return-method-kind` with `fpu`, `sse` or `default`.
+Each initialized `aggregate-register-return` has an adjacent
+`aggregate-register-return-kind` with `none`, `integer`, `integer-integer`,
+`integer-float`, `float`, `float-integer` or `float-float`. The dictionaries
+associate these names with the native enums. They retain the compiler's
+classifier at capture; they do not describe final physical registers.
+
+For every `Y`, the global namespace owns `primitive-type-policy:<Y type ID>`
+with four fields: primitive name, native integer promotion rank, remapped
+primitive name, and storage category. Categories are `none`, `boolean`,
+`signed-N`/`unsigned-N` for N of 8, 16, 32, 64 or 128, and `float-32`/`float-64`.
+This is the initialized target datatype table, including the actual WCHAR
+remapping. `integer-promotion-policy` is `disabled-qb` in QB mode and
+`rank-based` otherwise. These policy facts are separate from the selected
+types already recorded on individual operations.
+
+The independent reader requires complete dictionaries, class-correct
+decoding, adjacent snapshot agreement, dense sequences, exact module closure
+and one policy entry per primitive. It rejects invented names, overlapping
+definitions, foreign owners, missing snapshots and false coverage claims
+even when transport totals have been corrected.
+
+### Procedure flow
+
 `PH` observes a procedure's `pre-load` AST, with an emitted flag distinguishing
 emitted and observed-only procedures. `NP` assigns each body node to that phase.
 Symbol initializer and default-argument trees remain separate metadata trees,
@@ -1201,6 +1306,264 @@ its path and line describe an informational point, not an editable range.
 Procedure symbol IDs are absent in expression-only output. These records
 contribute to the detail count in complete output and preserve the compiler's
 message, detail, and custom text without parsing console output.
+
+## Aggregate packing and native layout observations
+
+Full models advertise `aggregate-packing-inputs` and `native-aggregate-layout`.
+These observations separate the accepted source request, the argument passed
+to the native type constructor, and its initialized packing policy. They also
+retain the native field, anonymous-member and tail-padding decisions. The
+observer copies decisions during the original operation. It does not run
+layout again or infer a machine location from an early symbol offset.
+
+All properties below belong to the module's global namespace. Each family has
+an independent one-based module sequence, except insertion results, which use
+their insertion's ID. Subject IDs refer to actual STRUCT/UNION symbols.
+
+| Property | Decoded value fields |
+| --- | --- |
+| `aggregate-packing-input:<id>` | type, header statement/source/compound, FIELD present, expression or zero, folded native integer request or empty, coerced request, passed alignment, initialized packing, anonymous parent or zero |
+| `aggregate-layout-begin:<id>` | type, passed alignment, initialized packing, union flag, anonymous parent or zero, observation statement/source/compound |
+| `aggregate-layout-field:<id>` | parent, field, storage kind, alignment decision, applied padding, selected dtype/subtype, element bytes, original field offset, storage bytes, bit position/width, descriptor field or zero, parent offset/length/natural alignment afterward |
+| `aggregate-layout-insert:<id>` | parent, inner type, alignment decision, old parent offset/length/natural alignment, insertion base offset, inner length/natural alignment, union flag |
+| `aggregate-layout-promote:<id>` | insertion, member, old offset, new offset, new symbol-table owner, FIELD-class flag |
+| `aggregate-layout-insert-result:<id>` | resulting parent offset/length/natural alignment, relocated member count |
+| `aggregate-layout-end:<id>` | type, tail alignment decision, unpadded length, padded length, natural alignment, initialized packing |
+| `aggregate-layout-snapshot:<id>` | type, natural alignment, initialized packing, length, unpadded length, native finalized flag, hidden base storage field or zero |
+| `aggregate-layout-subject:<id>` | type, `created` or `preexisting`, last observed finalized flag, seven family counts |
+| `aggregate-layout-counts:<module>` | seven family counts, subject count |
+
+The seven counted families are packing input, creation, field, insertion,
+promotion, completion and snapshot, in that order. Every native aggregate U
+has one layout snapshot companion. Its values agree with that capture's T/U
+and initialized alignment/finalization properties. An incomplete native type
+can have a growing length while its finalized flag remains zero; that is not
+a completed ABI layout. The hidden base storage field remains distinct from
+the declared base type identified by U.
+
+An alignment decision has eight fields: input offset, initialized packing,
+input dtype/subtype, natural alignment, chosen alignment, reason and computed
+padding. Reasons are `natural`, `packing`, `managed-descriptor` and `none`.
+`none` has seven zero numeric fields and means the native calculation did not
+take place. It does not describe an ANY-typed allocation. This occurs for a
+shared bitfield unit, a logical dynamic-array field, and a union overlay.
+
+Field storage kinds are `allocated`, `shared-bitfield` and `dynamic-alias`.
+Storage bytes do not mean additional allocation for the latter two kinds.
+Dynamic aliases select the actual descriptor FIELD that owns their storage.
+Array element bytes and total storage bytes remain separate. The array
+descriptor attribute applies to both VAR and FIELD symbols in the named flag
+dictionary.
+
+Bitfield container selection can consume computed padding by choosing a
+smaller integer container. Applied padding and selected dtype/element width
+therefore remain separate from the original alignment calculation. Natural
+aggregate alignment follows the selected native container. Anonymous insertion
+can relocate a field several times; the relocation sequence preserves each
+intermediate offset rather than treating its first S as final layout.
+
+FIELD=3 is coerced to 2 by the native parser. Negative requests and requests
+larger than the target pointer width become zero. Other in-range requests
+retain their native behavior, including non-power-of-two values. Anonymous
+aggregates inherit the enclosing packing when the coerced request is zero,
+including an explicitly written FIELD=0. QB supplies its native default of
+one when the passed value is zero, except for the JS target. Absence, explicit
+zero, coercion, inheritance and language defaults remain distinct facts.
+
+Managed string and dynamic-array descriptors keep natural field alignment
+under packing. A consumer must not derive every field's alignment from one
+minimum of aggregate natural alignment and packing. The recorded decision
+describes that native operation, not an unconditional runtime base address.
+
+`created` means that native creation was observed in this module transaction.
+`preexisting` does not invent a source declaration or earlier creation event.
+Header contexts and expression IDs preserve source ownership; they supply no
+new editing range. Generated types do not acquire a written FIELD request.
+Inactive declarations have no request or layout creation event.
+
+The independent reader validates initialized snapshots, request coercion,
+language policy, field storage dispositions, actual offset changes, hidden
+base storage, exact per-subject and module closure, and every native field
+owned by an observed creation. Recounting a missing logical field does not
+make its model complete. Each sequence and the subject set is bounded at one
+million, with the ordinary staging bound still enforced. Rollback and module
+reset release all owned hash keys and counters. Reduced modes mark both
+capabilities unavailable and omit the family. The wire record layout and
+schema 27 remain unchanged.
+
+## Frontend procedure ABI snapshots
+
+`frontend-procedure-abi` is available in full models. It supplies one
+`frontend-procedure-abi:<ordinal>` K on each F's procedure and one
+`frontend-parameter-abi:<ordinal>` K on each G's formal. The two module-local
+ordinal sequences begin at one independently. Global-namespace
+`frontend-abi-counts:<module>` closes them with procedure and formal counts.
+
+The procedure value has six fields: state, source dtype/subtype, cached ABI
+result dtype/subtype, and frontend result kind. State is `available`,
+`pending-type`, `pending-layout` or `unavailable`. Available result kinds are
+`value`, `byref` and `hidden`; unresolved states have an empty kind. `byref`
+is the source BYREF result, while `hidden` is the native frontend's explicit
+caller-result storage policy. C/LLVM can retain a frontend aggregate value
+whose later backend ABI still selects hidden storage. These records do not
+replace backend return decomposition.
+
+The formal value has thirteen fields:
+
+1. Procedure symbol ID.
+2. Source ordinal, including -1 for an implicit instance formal.
+3. State.
+4. Source passing mode.
+5. Source dtype.
+6. Source subtype or zero.
+7. Lowered frontend dtype or empty.
+8. Lowered frontend subtype or empty.
+9. Native frontend argument-slot bytes.
+10. Native frontend register ordinal, including zero when unassigned there.
+11. Actual descriptor type or zero.
+12. Implicit-instance flag.
+13. Classification or empty.
+
+Available classifications are `value`, `implicit-reference`, `reference`
+and `descriptor`. The production lowering helper maps nontrivial BYVAL values
+to implicit references, explicit BYREF values to pointers and BYDESC formals
+to their selected descriptor pointers. This observer passes only local output
+variables to that readonly helper. It does not reselect an overload or change
+a formal. A copied method callback can retain the raw instance attribute while
+its G ordinal makes that argument explicit; the ABI instance flag follows G.
+
+Unfinished by-value types use `pending-type` or `pending-layout`. A missing
+BYDESC descriptor uses `pending-descriptor`. An invalid source type can be
+`unavailable`. None of these states invents a lowered dtype/subtype or
+classification. A VARARG marker instead has state and classification
+`variadic`, no lowered value and zero slot bytes. It never reaches the native
+helper's unsupported VARARG branch.
+
+Slot bytes describe the frontend parameter policy, including pointer-size
+rounding. They do not prove that those bytes occupy the final machine stack.
+The frontend register ordinal similarly does not describe all C/LLVM or
+machine register assignment. These distinctions preserve actual compiler
+knowledge without claiming final backend locations.
+
+The independent reader checks live T/F and G ownership, mode/ordinal/instance
+agreement, reference qualifiers, descriptor identity, scalar slot sizes,
+explicit pending states and exact complete closure. Both sequences are bounded
+at one million snapshots. Reduced models mark the capability unavailable and
+omit these properties. The record layout and schema 27 remain unchanged.
+
+## Selected C and LLVM ABI signatures
+
+`selected-backend-abi` is available in full C/Clang/LLVM exports. Native
+assembler backends and reduced modes mark it unavailable. The C and LLVM
+signature formatters copy the choices they actually made, including nested
+function-pointer types. They do not invoke a second formatting or ABI pass.
+
+Global-namespace properties use these decoded values:
+
+| Property | Fields |
+| --- | --- |
+| `emitted-abi-signature:<id>` | procedure/type symbol, `c` or `llvm`, role, selected result spelling, selected convention spelling |
+| `emitted-abi-parameter:<ordinal>` | signature, formal or zero, emitted position, part index, part count, kind, exact type spelling, native dtype or empty, native subtype or empty, attributes |
+| `emitted-abi-end:<signature>` | component count, complete selected header spelling |
+| `emitted-abi-counts:<module>` | signature count, component count |
+
+Signature and component sequences start at one independently per module.
+Positions and part indices start at zero. Roles are `declaration`, `definition`
+and `pointer-type`. Explicit identities permit recursive formatting without
+retaining native pointers or confusing an inner signature with its caller.
+Repeated signatures are separate observations of actual formatting calls.
+
+Kinds are `value`, `argv`, `libc-callback`, `libc-adjusted`, `hidden-result`,
+`variadic`, `i386-int128-low`, `i386-int128-high`, `memory-byval` and
+`va-list-decay`. A hidden result has no source formal. A variadic marker is
+`...`, has zero parts, and describes no fixed value. Ordinary values have one
+part. An i386 integer128 formal has two adjacent i64 components in low/high
+order. Its LLVM result can instead select void plus an sret pointer with the
+actual alignment attribute.
+
+LLVM large System V aggregate arguments retain the selected pointer and byval
+attribute; pointer types omit declaration-only parameter attributes. The
+selected va_list array decay remains distinct from an ordinary aggregate.
+C records also distinguish main argv spelling, callback prototype overrides
+and adjusted libc parameter types from the frontend formal type. Native type
+fields remain empty when a C-only override does not supply a corresponding
+BASIC datatype. They are never inferred from a C spelling.
+
+The selected header is formatting evidence. A C or LLVM type is not final
+machine register assignment, a runtime address, or evidence that an external
+compiler/linker retained the declaration. Unused source prototypes have no
+invented backend signature observation. Function-pointer types remain types.
+Source-formal order and emitted order can differ, as for PASCAL; formal IDs
+preserve that correspondence.
+
+The reader validates backend/role ownership, exact component positions,
+complete split words, formal membership, special attributes, header result
+and convention consistency, and complete signature/module closure. Signatures
+and components are each bounded at one million. Each spelling is bounded at
+65,536 bytes; excessive facts fail publication instead of being truncated.
+Module completion or rollback releases all owned signature keys and counters.
+The production collector is also exercised independently with the compiler's
+real hash, list and allocation modules. These controls reject malformed or
+oversized observations, prove nested signatures keep separate identities,
+and check that reset, rollback and inactive hooks retain no observations.
+The wire record layout and schema 27 are unchanged.
+
+## Selected C and LLVM call-site ABI
+
+`selected-call-abi` covers full C/Clang/LLVM call formatter observations.
+Native assembler backends and reduced modes mark it unavailable. The AST
+copies its carried caller, expression, statement, source occurrence and
+virtual static-target identities immediately before native call dispatch.
+Zero means the call carries no such identity. Compiler-generated profiling
+and copyback operations receive their own context instead of inheriting the
+previous source call. Call target symbols for indirect dispatch describe the
+selected procedure-pointer type; the static virtual target has a separate
+field.
+
+Global-namespace properties contain these decoded fields:
+
+| Property | Fields |
+| --- | --- |
+| `emitted-abi-call:<id>` | target/type symbol, stage, direct/indirect dispatch, caller or zero, carried expression or zero, statement or zero, source occurrence or zero, virtual static target or zero, result demanded, result native dtype or empty, result subtype or empty, explicit result spelling, convention spelling, native nesting level, frontend bytes-to-pop counter |
+| `emitted-abi-argument:<ordinal>` | call, formal or zero, emitted position, part index, part count, kind, input dtype, input subtype, selected dtype or empty, selected subtype or empty, exact explicit type spelling, attributes, exact selected value spelling |
+| `emitted-abi-call-end:<call>` | component count, complete selected call text |
+| `emitted-abi-call-counts:<module>` | call count, component count |
+
+The input type is the already lowered operand entering the backend. Its
+source spelling and pre-conversion type belong to the source expression and
+argument graph. LLVM records its explicit selected result and argument type
+tokens. C syntax has no corresponding explicit call result/type tokens, so
+those spellings remain empty. Its selected native expression type is copied
+where available. A C array callback adapter has no invented BASIC callback
+type. Native register-value demand and the frontend bytes-to-pop counter
+retain their capture-phase meaning; they describe no final machine location.
+
+Kinds include `value`, `variadic-value`, `hidden-result`, `unmapped-value`,
+`i386-int128-low`, `i386-int128-high`, `memory-byval`, `va-list-decay`,
+`array-callback` and `libc-adjusted`. Variadic values carry their actual promoted
+types and share the declaration's variadic marker symbol. Hidden result
+storage has no source formal. An argument emitted without a formal or carried
+hidden-result context remains `unmapped-value`. Split values keep adjacent
+low/high parts and the same input type. Memory-byval and sret attributes are
+copied from the actual call formatting branch. Component positions describe
+emitted order, including PASCAL's reversed formal order.
+
+LLVM's selected builtin route can consume a call without entering the ordinary
+call formatter. The full LLVM-only `llvm-builtin-call-lowering` capability
+exposes separate `emitted-abi-builtin:<ordinal>` properties containing target,
+`llvm-builtin-lowering`, caller, carried expression, statement, source
+occurrence, virtual static target and nesting level. The target here is a
+direct builtin and the virtual target is zero. `emitted-abi-builtin-count:<module>`
+closes that sequence. These receipts identify selected builtin lowering;
+they do not invent an ordinary call or assert that one machine call results.
+
+The reader checks ownership, context references, fixed versus variadic formal
+membership, native types, complete split pairs, component spellings against
+selected call text, and exact call/module closure. Call, component and builtin
+sequences are independently bounded at one million; individual text fields
+are bounded at 65,536 bytes. Completion and rollback clear all copied state.
+The producer retains no AST, symbol, expression-tree or virtual-register
+pointers. The record layout and schema 27 are unchanged.
 
 ## Source statements and compounds
 
@@ -2407,7 +2770,7 @@ by the DIM, STATIC, COMMON and EXTERN grammar, and CONST declarations, retain a
 separate group for each accepted parser dispatch. REDIM operations, FOR counter
 syntax, auto-typed VAR and ordinary instance fields are outside this group.
 Each group uses the procedure identity, or the global namespace when there is
-no procedure. Its opening detail position supplies the group identity:
+no procedure. Its opening allocates an opaque observation identity:
 
 ```
 K symbol owner declaration-type-group:group statement-ID<TAB>kind
@@ -3255,12 +3618,19 @@ use the original index before conversion, address construction or UTF lowering.
 `member-receiver-inputs` describes accepted field prefixes with an active source
 expression range. Its `member-receiver-input` property contains four tab-separated
 fields: receiver datatype, actual receiver type ID, selected field ID and owning
-statement ID. The datatype passes through the selected native/stable semantic
+statement ID, or zero when preprocessing has no language statement. The datatype passes through the selected native/stable semantic
 ABI, just like E/T facts. A `member-receiver-type` edge independently joins the
 expression to its receiver type and selected field. The receiver can differ from
 the field's declaring base type. Implicit member writes without an active range
 keep the ordinary expression exporter's omission behavior; adding this observer
 must not make those valid modules fail. Reduced exports withhold these families.
+
+`member-receiver-contexts` adds a `member-receiver-context` property containing
+`statement` or `preprocessor`. The latter agrees with the independently emitted
+`preprocessor-expression=1` marker on that E observation. A type query can occur
+without an ST or while another statement remains open; neither case creates a
+new statement or proves runtime execution. The reader checks the selected field,
+receiver type, module, relationship and actual optional statement ownership.
 
 `declaration_observations_probe.bas` and `declaration_observations.py` preserve
 these relationships in the normal semantic-sidecar runner. They compare enabled
@@ -3295,7 +3665,7 @@ into declaration roots. No parser AST pointer is retained. Frames are bounded
 at 64 levels and accepted nodes at one million per module. Module reset clears
 all frame, count and last-root state.
 
-Each `K symbol` opening `type-shape-open:<id>` reserves its detail identity
+Each `K symbol` opening `type-shape-open:<id>` reserves its observation identity
 before recursively parsing children. The matching `type-shape-input:<id>` has
 twelve tab-separated fields:
 
@@ -3343,9 +3713,9 @@ bits; that does not provide a 128-bit byte-conversion helper. Unsupported widths
 produce an ordinary invalid-size diagnostic before runtime-call selection.
 Ordinary Integer<128>/UInteger<128> behavior and runtime libraries are unchanged.
 
-The canonical Python `Model` checker uses the native datatype vocabulary, so
-tests using it request the native ABI explicitly. The observer regression also
-checks stable-v1 wire slots and the new ID-based observations independently.
+The canonical Python `Model` checker validates both native and stable-v1 models.
+The observer regression also checks the exact stable-v1 wire slots while using
+the full reader for payload, ownership, source revision and capability checks.
 GCC, Clang and gas64 controls compare emission with observations off/full and
 verify unavailable contracts in bindings mode. Neither observer changes the
 semantic schema or inserts a private capability-number reservation range.
@@ -3365,6 +3735,297 @@ own macro origin without an invented contiguous physical type range. Reduced
 exports mark this capability unavailable. The regression covers inline roots,
 generated parameters, wholly generated roots and generated result endpoints in
 native/stable models across GCC, Clang and gas64 without changing emission.
+
+## Driver module inputs
+
+Full models advertise `driver-module-inputs` when the native driver has supplied
+the module snapshot. Its properties belong to that module's global namespace.
+Bindings and expression models mark the capability unavailable and omit these
+properties. Earlier schema-27 producers can omit the whole family.
+
+`driver-module` is the committed module ordinal. `driver-role` is `main`,
+`secondary`, `resource`, or `archive-metadata`, selected from the actual driver
+call. `driver-main` preserves the main flag independently of the source name.
+`driver-ordinal` is the one-based source input ordinal, or the native driver's
+`-1` sentinel for generated resource and archive modules. `driver-source`,
+`driver-object`, `driver-entry`, and `driver-outtype` retain the selected source,
+planned object, entry override, and output policy before source parsing.
+
+`producer-version` matches the header. `producer-build-date` is the configured
+ISO build date. `producer-source-sha1` and `producer-fork-id` preserve the build's
+configured strings, including empty values when unavailable. They do not claim
+a digest of the running executable.
+
+`driver-input-count` closes a contiguous zero-based list of `driver-input-N`
+properties. Each value contains a category, one tab, and the original value;
+the ordinary wire escaping preserves both that separator and any input bytes.
+Categories distinguish source, resource, explicit object, and archive inputs
+from objects planned for source or resource compilation. Other categories
+retain predefines, preincludes, include search order, requested libraries and
+paths, exclusions, compiler paths, tool prefixes, extra tool options, source
+command-line options, and driver flags. Order is preserved within each native
+list, including repeated include paths. The order of categories does not
+reconstruct the original argument sequence.
+
+At module completion, `driver-module-library-count` and
+`driver-module-library-path-count` close their corresponding zero-based
+`driver-module-library-N` and `driver-module-library-path-N` lists. These include
+accepted source directives. Requests do not prove that a linker searched or
+selected an archive. FILE, SRC and D continue to describe consumed source;
+unopened objects, archives and headers do not become source dependencies merely
+because they occur in the input snapshot.
+
+Snapshots are bounded to 65,536 input entries, copied before parsing, replaced
+on restarts, and released at invocation shutdown. Namespace, module, count,
+ordinal and capability checks reject incomplete or foreign observations even
+with corrected transport totals. Generated resource and archive BASIC ranges
+cannot authorize edits to user input. Preincluded user headers retain their
+ordinary physical source eligibility. The original XPM input remains protected
+after conversion changes the driver's source filename.
+
+## Native parser expression observations
+
+`parser-expression-observations` identifies a common observation phase in full
+and expression-only exports. The expression grammar emits these receipts at
+its native result callbacks. Original-input and selected-operand snapshots
+remain separate E observations; their additional full-mode facts do not imply
+that another source operation was parsed or executed.
+
+`K expression <E-ID> parser-observation:<ordinal> <payload>` links one callback
+to the typed E result that accepted it. Ordinals start at one per module. A
+deduplicated E result can retain several callbacks. The payload contains twelve
+tab-separated fields, with the ordinary percent-byte encoding applied once to
+each textual subfield before the outer K value is encoded:
+
+1. Original callback source path.
+2. Start line.
+3. Start column.
+4. End line.
+5. End column.
+6. Actual AST class.
+7. Actual raw operator or -1.
+8. Actual native dtype, including qualifiers.
+9. Native type spelling.
+10. The grammar's requested operator override or -1.
+11. `sha256` when a canonical constant value is known, otherwise empty.
+12. The SHA-256 of `value-kind`, one TAB byte, and its canonical C value text,
+    or empty when the value is unavailable.
+
+These original callback coordinates can describe replacement tokens and are
+not an editing range. E and LOC retain their separately validated source
+projection. A macro endpoint maps through its written invocation; an ordinary
+endpoint beyond that invocation remains part of the complete expression span.
+Internal macro observation identities remain unique when provenance records
+are omitted.
+
+Observation identities are invocation-local allocation IDs, independent of
+record totals. They need not be contiguous or equal a record position. Discarded
+parse attempts can leave gaps. Record counts and native E checkpoints retain
+their separately documented counting semantics.
+
+`K expression <last-module-E-ID> parser-observation-count <count>` closes the
+module sequence, including zero when a module has only other E snapshots. A
+module with no E records has no callbacks and needs no expression-owned closure.
+Readers reject duplicate or missing ordinals, foreign results, inconsistent
+AST/type/value fingerprints and missing closures. Bindings-only exports mark
+the capability unavailable and omit these properties. Expression-only exports
+allow only this narrowly defined K family; full symbol, AST and constant-value
+records remain omitted. Fingerprints retain comparison evidence without
+copying literal payloads into the reduced model.
+
+The native source audit compares these ordered, validated parser sequences
+exactly across modes, in addition to unchanged emitted code and dependencies.
+For older producers without the capability it retains the earlier exact E
+comparison. It does not derive a parser trace by selecting overlapping ranges,
+discarding unmatched observations, or treating all full-mode snapshots as the
+same semantic phase.
+
+## Source DATA streams and selected READ/RESTORE targets
+
+`source-data-streams` is available for full exports. The family uses `K` rows
+owned by the module's global namespace. Bindings and expression exports mark
+it unavailable and omit its rows. Each module ends with `data-counts:<module>`:
+five tab-separated counts for source groups, source items, lowered descriptors,
+READ destinations and explicit RESTORE statements. Each count is bounded at
+one million. Zero counts close an observed empty family.
+
+Source group, READ and RESTORE identities start at one in each module. Item
+ordinals start at zero within their group. Every item has one original-value
+row and one lowered-payload row, in source order. Field lists below are the
+decoded `K` value; embedded value text is percent-escaped inside that value.
+
+| Property | Fields |
+| --- | --- |
+| `data-group:<group>` | statement, source context, descriptor symbol, source item count |
+| `data-item:<group>:<ordinal>` | kind, datatype ABI code, subtype symbol or zero, original expression or zero, value kind, escaped value text, address symbol or zero, signed byte offset |
+| `data-payload:<group>:<ordinal>` | stored unsigned 16-bit tag, escaped numeric runtime text |
+| `data-descriptor:<symbol>` | previous descriptor or zero, selected label or zero, source group or zero, total cell count |
+| `data-read:<read>` | statement, source context, destination ordinal within READ, original destination expression |
+| `data-read-runtime:<read>` | selected runtime procedure symbol |
+| `data-restore:<restore>` | statement, source context, requested label or zero, selected descriptor symbol |
+
+Item kinds are `number`, `string`, `wide-string`, `address` and `qb-raw`.
+Numeric and string values use the ordinary constant kinds. Narrow values
+preserve exact bytes, including embedded NULs; wide values preserve native
+decoded units. Address items retain the actual OFFSET symbol and byte offset.
+Numeric runtime text comes from the compiler's actual conversion during DATA
+lowering. A value wider than the constant wire kinds remains unavailable in
+the original-value fields; its datatype and actual lowered text remain.
+
+QB DATA stores uninterpreted token text after the language's trimming and
+single-token quote removal. Its expression identity is zero. Macro names and
+operator-like text in that mode do not become evaluated expressions. Empty
+fields retain their empty value without inventing a written token range.
+Ordinary DATA items link to distinct original expression snapshots. These
+snapshots are separate from the common parser observation phase and retain
+expression macro provenance. `data-item` and `data-read` LOC roles attach
+verified physical ranges to their actual source contexts; expanded items do
+not acquire editable ranges. Available endpoint macro origins use the same
+roles on the global namespace.
+
+Descriptor rows follow actual construction order. Each source group has one
+extra terminal LINK cell; that cell has no source item or original expression.
+Compiler-created empty descriptors have group zero and exactly one LINK cell.
+`H symbol <previous> symbol <next> data-next 0` records the actual forward
+runtime link. The C emitter's reverse declaration list is not source order.
+A label belongs to the descriptor selected by `astDataStmtAdd`, including an
+empty descriptor when the native compiler selects one there.
+
+READ observes each original destination before runtime lowering consumes it.
+Its runtime property has a matching namespace-to-procedure `H` relation whose
+role is `data-read-runtime:<read>`. Explicit RESTORE records the descriptor
+actually passed to the runtime, including forward-label placeholders and
+empty first descriptors. Generated cursor initialization has no source
+RESTORE identity. These facts do not predict a runtime cursor through branches,
+loops or procedure calls, and do not invent retained DATA AST nodes.
+
+The independent reader requires complete groups, dense source order, matching
+original expression types and values, same-module statements and symbols,
+native descriptor links, selected runtime relationships and count closure.
+It refuses missing or fabricated items even after transport totals are fixed.
+
+## Selected backend identifiers and object symbols
+
+`selected-emission-names` is available in full models. The compiler observes
+names already selected by its native emitter or assembler-name path; exporting
+the model never requests a name for an unused source declaration. Procedure
+pointer types have no emission-name observations. Bindings and expression
+models mark the family unavailable and omit its properties.
+
+`K symbol <symbol> emission-name:<ordinal> <value>` has four tab-separated
+fields: stage, state, escaped spelling and reason. The ordinal is dense across
+the module, starting at one. Each symbol has at most one observation per stage.
+The stage is `c`, `llvm`, `gas`, `gas64` or `object`. C and LLVM stages retain
+the exact selected backend identifier; assembler stages retain the selected
+assembler spelling. The `object` stage is separate because an encoded C token
+or quoted LLVM identifier is not an object symbol.
+
+State `selected` requires a nonempty spelling and an empty reason. State `none`
+has an empty spelling and reason `automatic-storage`, describing a local
+variable without a separate object symbol. State `unavailable` has an empty
+spelling and one of these reasons:
+
+| Reason | Meaning |
+| --- | --- |
+| `c-local-static` | The C compiler selects the local static object's final name. |
+| `llvm-private` | LLVM's assembler printer selects private-label spelling. |
+| `backend-intrinsic` | An intrinsic identifier can be rewritten or inlined. |
+| `backend-tls` | TLS object adaptation remains owned by the target toolchain. |
+| `assembler-quoted` | An escaped assembler alias has no verified decoded object name. |
+
+The full model records compiler-known C aliases, platform prefixes, Windows
+stdcall/fastcall decoration, and LLVM's explicit-name escape at the actual
+selection points. Clang and LLVM libc mappings are observed after selection.
+A GCC builtin identifier alone does not prove a corresponding object symbol.
+These observations do not establish that an external tool retained a symbol,
+that a linker selected a library, or that any runtime address was resolved.
+
+`emission-name-count:<module>` on the global namespace closes the sequence,
+including zero observations. The producer and reader bound it at one million
+events and each spelling at 65,536 bytes. A missing symbol/stage observation
+means that its name was not observed; it is not a request to derive a name from
+the alias. An earlier `procedure-object-symbol-state` remains a snapshot at
+symbol export and can precede a later emission-name observation.
+
+`procedure-linkage` retains the accepted procedure mangling policy independently
+of its calling convention. `variable-linkage` now retains the same policy for
+all variable snapshots, including definitions and local storage. The `T` alias
+field remains source linkage information and is not object-name evidence.
+
+Native tests compare selected identifiers with emitted text, compare complete
+objects with export off and on while keeping intermediate filenames stable,
+and check object symbols with `nm`. Target cases cover Windows x86 decoration,
+Darwin prefixes and ELF x86 names. When LLVM tools are present, they also check
+COFF and Mach-O symbols without requiring foreign runtime libraries. The
+independent reader rejects malformed stages, false unknown states, foreign
+owners, procedure-pointer identities, duplicate observations and damaged
+closure after transport totals are corrected.
+
+## Namespace import observations and binding contexts
+
+`namespace-import-observations` is available in full models. It records accepted
+USING operands in source order and the relationships actually created by the
+native importer. It does not perform another lookup. Properties belong to the
+module's global namespace; IDs start at one independently in each module.
+
+| Property | Decoded value fields |
+| --- | --- |
+| `namespace-using:<id>` | statement, source context, construct or zero, current lexical table owner, current lookup namespace, selected namespace, first binding or zero, last binding or zero, `written` or `expanded` |
+| `namespace-using-result:<id>` | native success flag, new relationship count |
+| `namespace-import:<id>` | native import symbol, target namespace/type, destination namespace/type, lexical lifetime owner, USING ID or zero, refresh ID or zero, observation statement or zero, observation source context or zero, observation construct or zero, `created` or `preexisting` |
+| `namespace-import-remove:<id>` | observation statement, source context, construct, native hash-only flag |
+| `namespace-import-state:<id>` | `removed` or `retained` |
+| `namespace-refresh:<id>` | reopened namespace, observation statement, source context, construct |
+| `namespace-refresh-result:<id>` | new relationship count |
+| `namespace-visibility-counts:<module>` | USING count, observed relationship count, removal count, refresh count |
+
+A USING success flag is the importer's actual return value. Duplicate imports
+can succeed without creating another relationship. Parent/self imports can
+return false without a parser error. Each accepted operand retains its own
+outcome. Requests can create transitive relationships, while reopening a
+namespace can propagate newly added imports into existing importers. The
+refresh IDs distinguish those updates from new written USING operands.
+
+An import symbol's lexical table controls its removal. Its destination instead
+owns the native namespace import list. Procedure and block imports can have
+different lexical and destination owners, so a relationship does not by itself
+prove visibility outside the current scope. `retained` means that removal was
+not observed before module capture ended; it does not imply global visibility
+or an unbounded lifetime. Relationships created before capture are marked
+`preexisting` when first observed before removal, without inventing a source
+creation event.
+
+USING source ranges use `namespace-using:<id>` LOC roles on the actual source
+context. Expanded operands receive no editable physical range. Their optional
+binding interval names the original namespace/qualifier bindings emitted by
+the parser, including the existing binding macro origins. Repeated includes
+retain distinct source occurrence IDs even when they share a file revision.
+
+`binding-scope-contexts` independently closes the context of every full-model
+binding. `namespace-binding:<B ordinal>` has six fields: current statement or
+zero, source context or zero, source construct or zero, lexical table owner,
+current namespace, and current hash-table owner. These are the native parser
+context at binding capture, not the selected symbol's ownership or a claim
+about the namespace searched by qualified/member/WITH resolution. Symbol
+ownership and receiver/selection facts retain their separate contracts.
+Nested type and anonymous aggregate fields can belong to a different storage
+owner while binding capture still uses the enclosing parser table. Consumers
+must preserve that distinction rather than inventing an extra lookup scope
+from layout ownership. Unscoped enums can also create an implicit native
+import relationship with no written USING request.
+
+`namespace-binding-count:<module>` closes this complete binding set, including
+zero bindings. Source construct IDs distinguish reopened namespace occurrences,
+scoped enums, anonymous aggregates and out-of-line bodies while native symbol
+identities can remain shared. Bindings/expression-only exports mark both
+capabilities unavailable and omit these properties. Requests, relationships,
+refreshes and binding contexts are bounded independently at one million;
+the ordinary staging and record limits still apply.
+
+The independent reader checks native relationship links, lexical ownership,
+source/module identities, request/refresh nesting, exact result counts, removal
+states, binding context completeness and closure. A retained relationship is
+never promoted to an unconditional visible import by the reader.
 
 <!-- end of compiler-semantic-model.md -->
 

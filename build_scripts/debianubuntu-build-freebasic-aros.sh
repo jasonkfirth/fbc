@@ -960,6 +960,10 @@ build_aros_image() {
     # distfiles only collects targets that already exist.  Building Workbench
     # first guarantees that command-line tools, graphics support, AHI, and the
     # SDK are present on media used for native compilation and guest testing.
+    # The commodities link against rexxsyslib, but their Workbench target
+    # does not declare that module as a prerequisite. Stage its link library
+    # first so parallel Workbench builds do not depend on scanner order.
+    run make -C "$build_dir" -j"$JOBS" workbench-libs-rexxsyslib
     run make -C "$build_dir" -j"$JOBS" workbench
     run make -C "$build_dir" -j"$JOBS" distfiles
 }

@@ -28,6 +28,19 @@ SEMANTIC_READER_FILES = (
     "semantic_source_memory.py",
     "semantic_flow.py",
     "semantic_driver.py",
+    "semantic_parser_observations.py",
+    "semantic_receiver_context.py",
+    "semantic_data.py",
+    "semantic_emission_names.py",
+    "semantic_namespace_visibility.py",
+    "semantic_flags.py",
+    "semantic_normalized_types.py",
+    "semantic_layout.py",
+    "semantic_frontend_abi.py",
+    "semantic_backend_abi.py",
+    "semantic_call_abi.py",
+    "semantic_datatypes.py",
+    "semantic_object_model.py",
     "semantic_literals.py",
     "semantic_queries.py",
     "semantic_selects.py",
@@ -215,7 +228,22 @@ def audit_exports(common: list[str], modules: list[Path], work: Path,
                 record["modes"][mode]["node_kinds"] = dict(Counter(
                     model.properties["node", identity]["kind"] for identity in model.nodes))
             elif full is not None:
-                if expression_facts(model) != expression_facts(full):
+                # Full exports also contain pre-conversion inputs and selected
+                # operand snapshots. Compare the native parser phase directly
+                # when its independent sequence/closure contract is available.
+                # Older producers retain the original exact E comparison.
+                full_parser = all(full.capabilities[module].get("parser-expression-observations") == "available"
+                                  for module in range(1, len(full.contexts) + 1))
+                compact_parser = all(model.capabilities[module].get("parser-expression-observations") == "available"
+                                     for module in range(1, len(model.contexts) + 1))
+                if full_parser != compact_parser:
+                    raise ValueError("Full and compact parser observation coverage differs")
+                if full_parser:
+                    if model.parser_observations != full.parser_observations:
+                        raise ValueError("Full and compact native parser observations differ")
+                    record["parser_observation_counts"] = {str(module): len(events)
+                                                           for module, events in model.parser_observations.items()}
+                elif expression_facts(model) != expression_facts(full):
                     raise ValueError("Full and compact expression facts differ")
                 if model.records["D"] != full.records["D"]:
                     raise ValueError("Full and compact dependency closures differ")

@@ -1,7 +1,7 @@
 '' Project: FreeBASIC compiler - semantic source revisions
 '' File: tooling/semantic-source-file.bas
 '' Purpose: Identify the exact regular file opened by the compiler.
-'' Responsibilities: Hash its bytes, preserve stream position, and verify closure.
+'' Responsibilities: Hash observed bytes, preserve stream position, and verify closure.
 '' This file intentionally does NOT contain: decoding, parsing, or path lookup.
 
 #include once "tooling/semantic-source-file.bi"
@@ -214,6 +214,20 @@ function fbSemanticSourceClose( byval handle as any ptr ) as long
 	    (bytes <> revision->bytes) or (digest <> revision->digest) ) then status = 0
 	delete revision
 	return status
+end function
+
+function fbSemanticValueDigest( byref kind as const string, byref value as const string ) as string
+	if( len(kind) = 0 ) then return ""
+	dim as SEMANTIC_SOURCE_HASH hash
+	hHashInit(hash)
+	'' TAB separates the canonical C value kind from its encoded value.
+	dim as ubyte separator = 9
+	if( hHashUpdate(hash, cptr(const ubyte ptr, strptr(kind)), len(kind)) = FALSE ) then return ""
+	if( hHashUpdate(hash, @separator, 1) = FALSE ) then return ""
+	if( hHashUpdate(hash, cptr(const ubyte ptr, strptr(value)), len(value)) = FALSE ) then return ""
+	dim as zstring * 65 digest
+	hHashFinish(hash, @digest)
+	return digest
 end function
 
 '' end of tooling/semantic-source-file.bas

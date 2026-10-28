@@ -2,7 +2,7 @@
 '' File: tooling/semantic-array-mutations.bas
 '' Purpose: Retain parsed ERASE and REDIM targets before runtime lowering consumes them.
 '' Responsibilities: Selected array identity, original place and counted closure.
-'' This file intentionally does NOT decide whether a collection is useful.
+'' This file intentionally does NOT contain: collection usefulness decisions.
 
 #include once "tooling/semantic-private.bi"
 #include once "tooling/semantic-array-mutations.bi"

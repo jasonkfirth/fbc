@@ -31,6 +31,7 @@ Sub DerivedRecord.TouchOther()
 End Sub
 
 Dim Shared As DerivedRecord SharedRecord
+#assert TypeOf(SharedRecord.OtherValue) = TypeOf(Long)
 
 ' Implicit member writes and member-valued defaults must retain the ordinary
 ' expression exporter's treatment of parser work without an active range.

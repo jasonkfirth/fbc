@@ -29,6 +29,10 @@ dim shared as integer coordinate_line, coordinate_next_line
 dim shared as longint coordinate_offset, coordinate_next_offset
 dim shared as string coordinate_text
 dim shared as integer coordinate_format
+'' Cache validation for the current line so later locations can stop at their
+'' requested boundary without rescanning the whole line each time: 0 means
+'' unchecked, 1 valid and -1 invalid.
+dim shared as integer coordinate_line_validity
 
 sub fbSemanticModelResetCoordinates( )
 	coordinate_index_source = 0
@@ -40,6 +44,7 @@ sub fbSemanticModelResetCoordinates( )
 	coordinate_offset = 0
 	coordinate_next_offset = 0
 	coordinate_text = ""
+	coordinate_line_validity = 0
 end sub
 
 private function hUnitWidth( ) as integer
@@ -200,6 +205,7 @@ private function hReadLine( byval source as longint, byval line_number as intege
 	coordinate_line = line_number
 	coordinate_offset = line_start
 	coordinate_text = text
+	coordinate_line_validity = 0
 	coordinate_next_line = line_number + 1
 	coordinate_next_offset = position
 	return TRUE
@@ -209,22 +215,32 @@ end function
 '' UTF-16 coordinate and byte-boundary projection
 '' -------------------------------------------------------------------------
 
+private function hInvalidCoordinateLine( ) as integer
+	coordinate_line_validity = -1
+	return FALSE
+end function
+
 private function hResolveColumn _
 	( byval source as longint, byval line_number as integer, byval decoder_column as integer, _
 	  byref column as integer, byref offset as longint ) as integer
 	if( (decoder_column < 0) or (hReadLine(source, line_number) = FALSE) ) then
 		return FALSE
 	end if
+	if( coordinate_line_validity < 0 ) then return FALSE
 	dim as integer index = 0
-	dim as integer decoded = 0, canonical = 0
+	dim as integer decoded = 0, canonical = 0, selected = -1, selected_column = -1
 	dim as integer unit_width = hUnitWidth( )
 	while( index < len(coordinate_text) )
 		if( decoded = decoder_column ) then
-			'' The requested boundary is proved by its prefix. Later bytes can
-			'' use an unknown encoding without invalidating this earlier token.
-			column = canonical
-			offset = coordinate_offset + index
-			return TRUE
+			if( coordinate_line_validity > 0 ) then
+				column = canonical
+				offset = coordinate_offset + index
+				return TRUE
+			end if
+			'' Editable locations require a valid whole line. Keep the selected
+			'' boundary while checking the remaining encoded characters.
+			selected = index
+			selected_column = canonical
 		end if
 		dim as ulong codepoint = hCodeUnit(coordinate_text, index)
 		dim as integer units = unit_width
@@ -236,17 +252,17 @@ private function hResolveColumn _
 				case &hC2 to &hDF: trailing = 1
 				case &hE0 to &hEF: trailing = 2
 				case &hF0 to &hF4: trailing = 3
-				case else: return FALSE
+				case else: return hInvalidCoordinateLine( )
 				end select
-				if( index + trailing >= len(coordinate_text) ) then return FALSE
+				if( index + trailing >= len(coordinate_text) ) then return hInvalidCoordinateLine( )
 				for extra as integer = 1 to trailing
 					dim as integer next_byte = coordinate_text[index + extra]
-					if( (next_byte < &h80) or (next_byte > &hBF) ) then return FALSE
+					if( (next_byte < &h80) or (next_byte > &hBF) ) then return hInvalidCoordinateLine( )
 					if( extra = 1 ) then
-						if( (codepoint = &hE0) and (next_byte < &hA0) ) then return FALSE
-						if( (codepoint = &hED) and (next_byte > &h9F) ) then return FALSE
-						if( (codepoint = &hF0) and (next_byte < &h90) ) then return FALSE
-						if( (codepoint = &hF4) and (next_byte > &h8F) ) then return FALSE
+						if( (codepoint = &hE0) and (next_byte < &hA0) ) then return hInvalidCoordinateLine( )
+						if( (codepoint = &hED) and (next_byte > &h9F) ) then return hInvalidCoordinateLine( )
+						if( (codepoint = &hF0) and (next_byte < &h90) ) then return hInvalidCoordinateLine( )
+						if( (codepoint = &hF4) and (next_byte > &h8F) ) then return hInvalidCoordinateLine( )
 					end if
 					next
 				units = trailing + 1
@@ -254,16 +270,16 @@ private function hResolveColumn _
 			end if
 		elseif( unit_width = 2 ) then
 			if( (codepoint >= &hD800) and (codepoint <= &hDBFF) ) then
-				if( index + 3 >= len(coordinate_text) ) then return FALSE
+				if( index + 3 >= len(coordinate_text) ) then return hInvalidCoordinateLine( )
 				dim as ulong low = hCodeUnit(coordinate_text, index + 2)
-				if( (low < &hDC00) or (low > &hDFFF) ) then return FALSE
+				if( (low < &hDC00) or (low > &hDFFF) ) then return hInvalidCoordinateLine( )
 				units = 4
 				columns = 2
 			elseif( (codepoint >= &hDC00) and (codepoint <= &hDFFF) ) then
-				return FALSE
+				return hInvalidCoordinateLine( )
 			end if
 		else
-			if( (codepoint > &h10FFFF) or ((codepoint >= &hD800) and (codepoint <= &hDFFF)) ) then return FALSE
+			if( (codepoint > &h10FFFF) or ((codepoint >= &hD800) and (codepoint <= &hDFFF)) ) then return hInvalidCoordinateLine( )
 			columns = iif(codepoint > &hFFFF, 2, 1)
 		end if
 		dim as integer decoder_columns = columns
@@ -275,9 +291,14 @@ private function hResolveColumn _
 		canonical += columns
 		index += units
 	wend
-	if( decoded <> decoder_column ) then return FALSE
-	column = canonical
-	offset = coordinate_offset + index
+	coordinate_line_validity = 1
+	if( decoded = decoder_column ) then
+		selected = index
+		selected_column = canonical
+	end if
+	if( selected < 0 ) then return FALSE
+	column = selected_column
+	offset = coordinate_offset + selected
 	return TRUE
 end function
 

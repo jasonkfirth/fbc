@@ -2,7 +2,7 @@
 '' File: tooling/semantic-array-mutations.bi
 '' Purpose: Preserve selected source ERASE and REDIM targets before lowering.
 '' Responsibilities: Shared observer entry points and per-module count lifecycle.
-'' This file intentionally does NOT define array semantics or linter policies.
+'' This file intentionally does NOT contain: array semantics or linter policies.
 
 #ifndef __FB_SEMANTIC_ARRAY_MUTATIONS_BI__
 #define __FB_SEMANTIC_ARRAY_MUTATIONS_BI__

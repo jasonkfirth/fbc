@@ -34,6 +34,125 @@ class SidecarTests(unittest.TestCase):
     backends: list[str]
     native_windows: bool
 
+    def test_named_flags_cover_native_bits_and_class_specific_aliases(self) -> None:
+        from named_flags import check_native_matrix
+        check_native_matrix(self)
+
+    def test_named_symbol_flags_preserve_live_snapshots_and_omissions(self) -> None:
+        from named_flags import check_real_symbols
+        check_real_symbols(self)
+
+    def test_primitive_type_policies_and_fixed_string_expression_width(self) -> None:
+        from named_flags import check_type_policies
+        check_type_policies(self)
+
+    def test_named_flag_transport_and_module_reset(self) -> None:
+        from named_flags import check_transport_and_reset
+        check_transport_and_reset(self)
+
+    def test_named_flags_reject_fabricated_or_incomplete_snapshots(self) -> None:
+        from named_flags import check_rejection
+        check_rejection(self)
+
+    def test_namespace_import_order_and_native_lifetime(self) -> None:
+        from namespace_visibility import check_order_and_lifetime
+        check_order_and_lifetime(self)
+
+    def test_namespace_import_noops_contexts_and_scope_omissions(self) -> None:
+        from namespace_visibility import check_noops_and_source_contexts
+        check_noops_and_source_contexts(self)
+
+    def test_namespace_import_transport_and_module_reset(self) -> None:
+        from namespace_visibility import check_transport_and_modules
+        check_transport_and_modules(self)
+
+    def test_namespace_import_observations_reject_fabricated_visibility(self) -> None:
+        from namespace_visibility import check_rejection
+        check_rejection(self)
+
+    def test_binding_scope_contexts_preserve_native_owners_and_occurrences(self) -> None:
+        from namespace_visibility import check_binding_contexts
+        check_binding_contexts(self)
+
+    def test_array_subscripts_use_live_forward_and_alias_types(self) -> None:
+        from array_forward_types import check_forward_arrays
+        check_forward_arrays(self)
+
+    def test_selected_backend_names_and_object_identity_states(self) -> None:
+        from emission_names import check_names
+        check_names(self)
+
+    def test_selected_builtin_object_names_preserve_backend_uncertainty(self) -> None:
+        from emission_names import check_builtins
+        check_builtins(self)
+
+    def test_emission_names_transport_native_objects_and_module_reset(self) -> None:
+        from emission_names import check_transport_and_objects
+        check_transport_and_objects(self)
+
+    def test_emission_names_reject_fabricated_or_incomplete_facts(self) -> None:
+        from emission_names import check_rejection
+        check_rejection(self)
+
+    def test_emission_names_target_decoration_matches_native_objects(self) -> None:
+        from emission_names import check_target_decoration
+        check_target_decoration(self)
+
+    def test_data_source_items_native_descriptors_and_restore_targets(self) -> None:
+        from data_streams import check_streams
+        check_streams(self)
+
+    def test_data_qb_raw_items_module_resets_and_omissions(self) -> None:
+        from data_streams import check_qb_and_modules
+        check_qb_and_modules(self)
+
+    def test_data_binary_text_transport_parity(self) -> None:
+        from data_streams import check_transport
+        check_transport(self)
+
+    def test_data_read_primitive_selections_and_runtime_behavior(self) -> None:
+        from data_streams import check_read_types_and_runtime
+        check_read_types_and_runtime(self)
+
+    def test_data_streams_reject_incomplete_or_fabricated_inputs(self) -> None:
+        from data_streams import check_rejection
+        check_rejection(self)
+
+    def test_parser_alias_cast_snapshot_is_separate_from_common_phase(self) -> None:
+        from parser_observations import check_alias_cast_phase
+        check_alias_cast_phase(self)
+
+    def test_member_receiver_preprocessor_and_statement_contexts(self) -> None:
+        from receiver_contexts import check_contexts
+        check_contexts(self)
+
+    def test_parser_observations_preserve_exact_sequences_and_value_fingerprints(self) -> None:
+        from parser_observations import check_sequences
+        check_sequences(self)
+
+    def test_parser_observations_reject_corrupt_or_missing_receipts(self) -> None:
+        from parser_observations import check_rejection
+        check_rejection(self)
+
+    def test_macro_expression_boundaries_keep_both_written_operands(self) -> None:
+        from macro_expression_spans import check_boundaries
+        check_boundaries(self)
+
+
+
+
+    def test_driver_generated_modules_and_resource_protection(self) -> None:
+        from driver_inputs import check_generated
+        check_generated(self)
+
+    def test_driver_input_binary_text_parity(self) -> None:
+        from driver_inputs import check_transport
+        check_transport(self)
+
+    def test_numeric_promotions_preserve_original_enum_operands(self) -> None:
+        from driver_inputs import check_enum_promotions
+        check_enum_promotions(self)
+
     def test_requested_source_observations_are_independent(self) -> None:
         from semantic_type_abi import check_requests
         check_requests(self)
@@ -991,7 +1110,9 @@ End Function
                 self.assertTrue(any(row[2] == "1" and row[15].casefold() == type_name.casefold() for row in rows))
             if mode == "expressions":
                 self.assertFalse(model.records["B"])
-                self.assertFalse(any(model.records[tag] for tag in DETAIL_TAGS - PROVENANCE_TAGS))
+                self.assertFalse(any(model.records[tag] for tag in DETAIL_TAGS - PROVENANCE_TAGS - {"K"}))
+                from semantic_parser_observations import is_parser_property
+                self.assertTrue(all(row[1] == "expression" and is_parser_property(row[3]) for row in model.records["K"]))
                 self.assertTrue(model.records["FILE"])
                 self.assertTrue(all(row[13:15] == ["0", "0"] for row in model.records["E"]))
 
@@ -1179,11 +1300,10 @@ End Function
                 self.assertEqual(include_contexts[0][8:], ["0", "", "0", "0", "0", "0"])
                 include_outcomes = [row for row in model.records["INC"] if row[5] == "opened"]
                 self.assertEqual(len(include_outcomes), 1)
-                # The full producer now retains the invoking name as a
+                # Both modes retain the invoking name as a
                 # noneditable anchor. It remains distinct from a literal
                 # filename range and from the opened child's source context.
-                expected_origin = (["0", self.compiler_path(source), "2", "9", "2", "20"]
-                                   if mode == "full" else ["0", "", "0", "0", "0", "0"])
+                expected_origin = ["0", self.compiler_path(source), "2", "9", "2", "20"]
                 self.assertEqual(include_outcomes[0][6:], expected_origin)
                 self.assertEqual(
                     model.records["D"],
@@ -5324,5 +5444,125 @@ Next
                 self.assertLessEqual(len(literals[0]["original-float-text"]), 1024)
                 self.assertGreater(int(literals[0]["original-float-digits"]), 1024)
                 self.assertEqual(self.emission_path(long_source.stem, backend).read_bytes(), long_emission)
+
+    def test_normalized_types_reject_native_contradictions_and_missing_snapshots(self) -> None:
+        from named_flags import check_normalized_rejection
+        check_normalized_rejection(self)
+
+    def test_aggregate_packing_requests_and_target_layouts(self) -> None:
+        from layout_observations import check_requests
+        check_requests(self)
+
+    def test_native_aggregate_storage_decisions_and_relocations(self) -> None:
+        from layout_observations import check_storage
+        check_storage(self)
+
+    def test_aggregate_packing_source_contexts_and_qb_defaults(self) -> None:
+        from layout_observations import check_contexts
+        check_contexts(self)
+
+    def test_aggregate_layout_transport_and_module_reset(self) -> None:
+        from layout_observations import check_transport
+        check_transport(self)
+
+    def test_aggregate_layout_rejects_invented_or_incomplete_facts(self) -> None:
+        from layout_observations import check_rejection
+        check_rejection(self)
+
+    def test_native_layout_architecture_policies(self) -> None:
+        from layout_observations import check_architectures
+        check_architectures(self)
+
+    def test_frontend_abi_modes_and_result_kinds(self) -> None:
+        from frontend_abi import check_modes
+        check_modes(self)
+
+    def test_frontend_abi_target_slot_policy(self) -> None:
+        from frontend_abi import check_targets
+        check_targets(self)
+
+    def test_frontend_abi_transport_and_module_reset(self) -> None:
+        from frontend_abi import check_transport
+        check_transport(self)
+
+    def test_frontend_abi_rejects_invented_or_missing_snapshots(self) -> None:
+        from frontend_abi import check_rejection
+        check_rejection(self)
+
+    def test_frontend_abi_guards_pending_types_and_variadic_markers(self) -> None:
+        from frontend_abi import check_guards
+        check_guards(self)
+
+    def test_selected_backend_abi_components_match_actual_headers(self) -> None:
+        from backend_abi import check_choices
+        check_choices(self)
+
+    def test_selected_backend_abi_omissions_are_explicit(self) -> None:
+        from backend_abi import check_omissions
+        check_omissions(self)
+
+    def test_selected_backend_abi_transport_and_module_reset(self) -> None:
+        from backend_abi import check_transport
+        check_transport(self)
+
+    def test_selected_backend_abi_rejects_incomplete_components(self) -> None:
+        from backend_abi import check_rejection
+        check_rejection(self)
+
+    def test_selected_backend_abi_production_guards_and_reset(self) -> None:
+        from backend_abi import check_guards
+        check_guards(self)
+
+    def test_selected_call_abi_components_match_actual_emission(self) -> None:
+        from call_abi import check_choices
+        check_choices(self)
+
+    def test_selected_call_abi_omissions_are_explicit(self) -> None:
+        from call_abi import check_omissions
+        check_omissions(self)
+
+    def test_selected_call_abi_transport_and_module_reset(self) -> None:
+        from call_abi import check_transport
+        check_transport(self)
+
+    def test_selected_call_abi_rejects_contradictory_components(self) -> None:
+        from call_abi import check_rejection
+        check_rejection(self)
+
+    def test_selected_call_abi_production_guards_and_context_lifetime(self) -> None:
+        from call_abi import check_guards
+        check_guards(self)
+
+    def test_selected_call_abi_preserves_native_execution_in_every_mode(self) -> None:
+        from call_abi import check_execution
+        check_execution(self)
+
+    def test_selected_call_abi_keeps_llvm_builtin_lowering_distinct(self) -> None:
+        from call_abi import check_builtins
+        check_builtins(self)
+
+    def test_selected_call_abi_preserves_instrumented_and_optimized_emission(self) -> None:
+        from call_abi import check_instrumentation
+        check_instrumentation(self)
+
+    def test_raw_datatype_abis_preserve_complete_reader_meaning_and_wire_rows(self) -> None:
+        from raw_abi_consumer import check_matrix
+        check_matrix(self)
+
+    def test_raw_datatype_abis_cover_modes_targets_and_call_components(self) -> None:
+        from raw_abi_consumer import check_modes
+        check_modes(self)
+
+    def test_raw_datatype_abis_reject_mixed_vocabulary_and_wrong_type_families(self) -> None:
+        from raw_abi_consumer import check_rejection
+        check_rejection(self)
+
+    def test_raw_datatype_abi_does_not_invent_older_reduced_metadata(self) -> None:
+        from raw_abi_consumer import check_legacy_reduced
+        check_legacy_reduced(self)
+
+    def test_raw_datatype_abis_preserve_binary_and_text_rows(self) -> None:
+        from raw_abi_consumer import check_binary
+        check_binary(self)
 
 # end of test_sidecar.py

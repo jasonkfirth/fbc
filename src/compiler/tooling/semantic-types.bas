@@ -6,6 +6,21 @@
 
 #include once "tooling/semantic-private.bi"
 
+function fbSemanticModelKnownStorageBytes( byval expr as ASTNODE ptr ) as longint
+	if( expr = NULL ) then return 0
+	if( typeGetDtAndPtrOnly(expr->dtype) <> FB_DATATYPE_FIXSTR ) then return 0
+	select case expr->class
+	case AST_NODECLASS_VAR, AST_NODECLASS_IDX, AST_NODECLASS_FIELD
+		if( expr->sym = NULL ) then return 0
+		if( (expr->sym->class <> FB_SYMBCLASS_VAR) and (expr->sym->class <> FB_SYMBCLASS_FIELD) ) then return 0
+		if( typeGetDtAndPtrOnly(expr->sym->typ) <> FB_DATATYPE_FIXSTR ) then return 0
+		'' Fixed-string width belongs to the selected variable or field. It is
+		'' not recoverable from the primitive datatype entry or its spelling.
+		return expr->sym->lgt
+	end select
+	return 0
+end function
+
 function fbSemanticModelTypeFact _
 	( byref domain as const string, byval identity as longint, byval dtype as integer, _
 	  byval subtype as FBSYMBOL ptr, byval storage_bytes as longint, byref role as const string ) as string

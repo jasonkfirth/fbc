@@ -1113,6 +1113,13 @@ def test_warning_normalization(root: Path, working: Path) -> None:
           'puts("probe.bas(7) warning 25(1): expected source warning");\n'
           'puts("include.bi(12) warning 3(2): expected include warning");\n'
           'if (getenv("WARNING_FIXTURE_CHANGED")) puts("unexpected warning");\n'
+          'if (getenv("WARNING_FIXTURE_TEMPS")) {\n'
+          'const char *first = getenv("WARNING_FIXTURE_RENUMBER") ? "TMP$9" : "TMP$2";\n'
+          'const char *second = getenv("WARNING_FIXTURE_COLLAPSE") ? first : '
+          '(getenv("WARNING_FIXTURE_RENUMBER") ? "TMP$10" : "TMP$3");\n'
+          'printf("Branch crossing local variable definition, to label: A, variable: %s\\n", first);\n'
+          'printf("Branch crossing local variable definition, to label: B, variable: %s\\n", second);\n'
+          '}\n'
           'return 0; }\n')
     compiler = working / "fake-fbc.exe"
     result = subprocess.run([FIXTURE_CC, "fake-compiler.c", "-o", str(compiler)],
@@ -1144,6 +1151,21 @@ def test_warning_normalization(root: Path, working: Path) -> None:
                             capture_output=True, text=True, timeout=30, check=False)
     require(result.returncode == 0 and all("unexpected warning" in path.read_text() for path in references),
             "explicit warning update failed", result)
+    write(working / "branch-cross-with-fb.bas", "end 0\n")
+    environment.pop("WARNING_FIXTURE_CHANGED")
+    environment.update(TEST_FILTER="branch-cross-with-fb.bas", WARNING_FIXTURE_TEMPS="1")
+    result = subprocess.run(command + ["--update"], cwd=working, env=environment,
+                            capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0, "temporary warning fixture update failed", result)
+    environment["WARNING_FIXTURE_RENUMBER"] = "1"
+    result = subprocess.run(command, cwd=working, env=environment,
+                            capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode == 0, "renumbered generated temporaries did not match", result)
+    environment["WARNING_FIXTURE_COLLAPSE"] = "1"
+    result = subprocess.run(command, cwd=working, env=environment,
+                            capture_output=True, text=True, timeout=30, check=False)
+    require(result.returncode != 0 and "WARNING_REPORT_DIFF" in result.stdout,
+            "distinct generated temporary identities were not checked", result)
 
 
 def test_source_artifact_guard(root: Path, working: Path) -> None:
