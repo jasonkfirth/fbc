@@ -252,21 +252,32 @@ private sub hLoadIDX( byval vreg as IRVREG ptr )
 end sub
 
 '':::::
+'' Datatype is required; omit class or kind outputs when they are not consumed.
 #macro hGetVREG( vreg, dt, dc, t )
 	if( vreg <> NULL ) then
+#if __FB_ARG_COUNT__(t) > 0
 		t = vreg->typ
+#endif
 
 		dt = typeGet( vreg->dtype )
 		if( dt = FB_DATATYPE_POINTER ) then
 			dt = FB_DATATYPE_UINT
 		end if
 
+#if __FB_ARG_COUNT__(dc) > 0
 		dc = symbGetDatatypeInfo(dt).class
+#else
+		symbGetDatatypeInfo(dt)
+#endif
 
 	else
+#if __FB_ARG_COUNT__(t) > 0
 		t  = INVALID
+#endif
 		dt = FB_DATATYPE_INVALID
+#if __FB_ARG_COUNT__(dc) > 0
 		dc = INVALID
+#endif
 	end if
 #endmacro
 
@@ -1336,9 +1347,9 @@ private sub hReuse _
 	)
 
 	dim as IRVREG ptr v1 = any, v2 = any, vr = any
-	dim as integer v1_dtype = any, v1_dclass = any, v1_typ = any
+	dim as integer v1_dtype = any, v1_dclass = any
 	dim as integer v2_dtype = any, v2_dclass = any, v2_typ = any
-	dim as integer vr_dtype = any, vr_dclass = any, vr_typ = any
+	dim as integer vr_dtype = any
 	dim as integer op = any
 
 	op = t->op
@@ -1346,9 +1357,9 @@ private sub hReuse _
 	v2 = t->v2.reg.vreg
 	vr = t->vr.reg.vreg
 
-	hGetVREG( v1, v1_dtype, v1_dclass, v1_typ )
+	hGetVREG( v1, v1_dtype, v1_dclass,  )
 	hGetVREG( v2, v2_dtype, v2_dclass, v2_typ )
-	hGetVREG( vr, vr_dtype, vr_dclass, vr_typ )
+	hGetVREG( vr, vr_dtype, ,  )
 
 	'' Allow operand reg to be re-used as result reg (to avoid allocating yet another reg)
 	'' but only if the dtype is similar (same size, same signedness),
@@ -1567,7 +1578,7 @@ private sub hFreePreservedRegs( ) static
 end sub
 
 private function hPreserveReg( byval vr as IRVREG ptr ) as integer
-	dim as integer vr_dclass = any, vr_dtype = any, vr_typ = any
+	dim as integer vr_dclass = any, vr_dtype = any
 	dim as integer preserved1 = any, preserved2 = any
 	dim as integer freg1 = any, freg2 = any
 	dim as IRVREG origvreg = any, origvaux = any, destvreg = any
@@ -1582,7 +1593,7 @@ private function hPreserveReg( byval vr as IRVREG ptr ) as integer
 	'' spilled, to ensure the LONGINT's dwords stay together, either both
 	'' in regs, or both on stack.
 
-	hGetVREG( vr, vr_dtype, vr_dclass, vr_typ )
+	hGetVREG( vr, vr_dtype, vr_dclass,  )
 
 	assert( irIsREG( vr ) )
 	origvreg = *vr
@@ -1734,12 +1745,12 @@ private sub hLoadPointer( byval v1 as IRVREG ptr )
 end sub
 
 private sub hLoadResult( byval proc as FBSYMBOL ptr, byval vr as IRVREG ptr )
-	dim as integer vtype = any, dtype = any, dclass = any, reg1 = any, reg2 = any
+	dim as integer dtype = any, dclass = any, reg1 = any, reg2 = any
 	dim as IRVREG ptr va = any
 
 	'' Load result, if any (fb allows function calls w/o saving the result)
 	if( vr ) then
-		hGetVREG( vr, dtype, dclass, vtype )
+		hGetVREG( vr, dtype, dclass,  )
 		emitGetResultReg( dtype, dclass, reg1, reg2 )
 
 		if( ISLONGINT( dtype ) ) then
@@ -1861,16 +1872,16 @@ private sub hFlushUOP _
 		byval vr as IRVREG ptr _
 	) static
 
-	dim as integer v1_typ, v1_dtype, v1_dclass
-	dim as integer vr_typ, vr_dtype, vr_dclass
+	dim as integer v1_dtype, v1_dclass
+	dim as integer vr_dtype, vr_dclass
 	dim as IRVREG ptr va
 
 	dim as integer v1vector
 	v1vector = v1->vector
 
 	''
-	hGetVREG( v1, v1_dtype, v1_dclass, v1_typ )
-	hGetVREG( vr, vr_dtype, vr_dclass, vr_typ )
+	hGetVREG( v1, v1_dtype, v1_dclass,  )
+	hGetVREG( vr, vr_dtype, vr_dclass,  )
 
 	hLoadIDX( v1 )
 	hLoadIDX( vr )
@@ -1983,15 +1994,15 @@ private sub hFlushBOP _
 		byval vr as IRVREG ptr _
 	) static
 
-	dim as integer v1_typ, v1_dtype, v1_dclass
+	dim as integer v1_dtype, v1_dclass
 	dim as integer v2_typ, v2_dtype, v2_dclass
-	dim as integer vr_typ, vr_dtype, vr_dclass
+	dim as integer vr_dtype, vr_dclass
 	dim as IRVREG ptr va
 
 	''
-	hGetVREG( v1, v1_dtype, v1_dclass, v1_typ )
+	hGetVREG( v1, v1_dtype, v1_dclass,  )
 	hGetVREG( v2, v2_dtype, v2_dclass, v2_typ )
-	hGetVREG( vr, vr_dtype, vr_dclass, vr_typ )
+	hGetVREG( vr, vr_dtype, vr_dclass,  )
 
 	hLoadIDX( v1 )
 	hLoadIDX( v2 )
@@ -2102,14 +2113,14 @@ private sub hFlushCOMP _
 	dim as string lname
 	dim as integer v1_typ, v1_dtype, v1_dclass
 	dim as integer v2_typ, v2_dtype, v2_dclass
-	dim as integer vr_typ, vr_dtype, vr_dclass
+	dim as integer vr_dtype, vr_dclass
 	dim as IRVREG ptr va
 	dim as integer doload
 
 	''
 	hGetVREG( v1, v1_dtype, v1_dclass, v1_typ )
 	hGetVREG( v2, v2_dtype, v2_dclass, v2_typ )
-	hGetVREG( vr, vr_dtype, vr_dclass, vr_typ )
+	hGetVREG( vr, vr_dtype, vr_dclass,  )
 
 	hLoadIDX( v1 )
 	hLoadIDX( v2 )
@@ -2233,7 +2244,7 @@ private sub hFlushSTORE _
 		byval v2 as IRVREG ptr _
 	) static
 
-	dim as integer v1_typ, v1_dtype, v1_dclass
+	dim as integer v1_dtype, v1_dclass
 	dim as integer v2_typ, v2_dtype, v2_dclass
 	dim as IRVREG ptr va
 
@@ -2244,7 +2255,7 @@ private sub hFlushSTORE _
 	end if
 
 	''
-	hGetVREG( v1, v1_dtype, v1_dclass, v1_typ )
+	hGetVREG( v1, v1_dtype, v1_dclass,  )
 	hGetVREG( v2, v2_dtype, v2_dclass, v2_typ )
 
 	hLoadIDX( v1 )
@@ -2354,13 +2365,13 @@ private sub hFlushCONVERT _
 		byval v2 as IRVREG ptr _
 	) static
 
-	dim as integer v1_typ, v1_dtype, v1_dclass
+	dim as integer v1_dtype, v1_dclass
 	dim as integer v2_typ, v2_dtype, v2_dclass
 	dim as integer reuse
 	dim as IRVREG ptr va
 
 	''
-	hGetVREG( v1, v1_dtype, v1_dclass, v1_typ )
+	hGetVREG( v1, v1_dtype, v1_dclass,  )
 	hGetVREG( v2, v2_dtype, v2_dclass, v2_typ )
 
 	hLoadIDX( v1 )

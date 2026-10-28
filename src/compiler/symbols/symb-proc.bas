@@ -2292,7 +2292,7 @@ private function hCheckOvlParam _
 		'' score, such that we prefer passing arguments to the parameter
 		'' with the closest base type.
 		''
-		var baselevel = 0
+
 		dim match as FB_OVLPROC_MATCH_SCORE = FB_OVLPROC_NO_MATCH
 		if( param_subtype = arg_subtype ) then
 			match = FB_OVLPROC_FULLMATCH

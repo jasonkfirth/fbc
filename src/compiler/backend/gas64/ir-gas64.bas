@@ -9184,8 +9184,10 @@ private sub _emitvariniofs(byval sym as FBSYMBOL ptr,byval rhs as FBSYMBOL ptr,b
 	asm_info("ofs="+Str(ofs))
 
 	var s = *symbGetMangledName( rhs )
+#ifdef __GAS64_DEBUG__
 	var symdtype = symbGetType( sym )
 	var ptrdtype = typeAddrOf( symbGetType( rhs ) )
+#endif
 
 	asm_info("symdtype="+typedumpToStr(symdtype,0))
 	asm_info("ptrdtype="+typedumpToStr(ptrdtype,0))
