@@ -42,8 +42,7 @@ declare sub regInitClass _
 
 declare sub sregInitClass _
 	( _
-		byval this_ as REGCLASS ptr, _
-		sizeTb() as REG_SIZEMASK _
+		byval this_ as REGCLASS ptr _
 	)
 
 '':::::
@@ -66,7 +65,7 @@ function regNewClass _
 	if( this_->isstack = FALSE ) then
 		regInitClass( this_, sizeTb() )
 	else
-		sregInitClass( this_, sizeTb() )
+		sregInitClass( this_)
 	end if
 
 	function = this_
@@ -860,11 +859,10 @@ end sub
 '':::::
 private sub sregInitClass _
 	( _
-		byval this_ as REGCLASS ptr, _
-		sizeTb() as REG_SIZEMASK _
+		byval this_ as REGCLASS ptr _
 	)
 
-	'' sizeTb() is unused (x86 assumption)
+	'' Stacked x86 registers do not select registers by size mask.
 
 	sregClear( this_ )
 

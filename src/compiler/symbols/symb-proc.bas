@@ -1900,7 +1900,6 @@ end function
 
 			var match = hCalcTypesDiff( param_dtype, _
 			                            param_subtype, _
-			                            symbGetPtrCnt( proc ), _
 			                            symbGetFullType( proc ), _
 			                            symbGetSubType( proc ), _
 			                            NULL, _
@@ -1953,7 +1952,6 @@ private function hCalcTypesDiff _
 	( _
 		byval param_dtype_in as integer, _
 		byval param_subtype as FBSYMBOL ptr, _
-		byval param_ptrcnt as integer, _
 		byval arg_dtype_in as integer, _
 		byval arg_subtype as FBSYMBOL ptr, _
 		byval arg_expr as ASTNODE ptr, _
@@ -2174,11 +2172,9 @@ end function
 '':::::
 private function hCheckOvlParam _
 	( _
-		byval parent as FBSYMBOL ptr, _
 		byval param as FBSYMBOL ptr, _
 		byval arg_expr as ASTNODE ptr, _
 		byval arg_mode as integer, _
-		byval err_num as FB_ERRMSG ptr, _
 		byval options as FB_SYMBFINDOPT _
 	) as FB_OVLPROC_MATCH_SCORE
 
@@ -2375,7 +2371,6 @@ private function hCheckOvlParam _
 	'' last resource, calc the differences
 	function = hCalcTypesDiff( param_dtype, _
 	                           param_subtype, _
-	                           param_ptrcnt, _
 	                           arg_dtype, _
 	                           arg_subtype, _
 	                           arg_expr, _
@@ -2389,7 +2384,6 @@ private function hCheckOvlProc _
 		byval ovl_head_proc as FBSYMBOL ptr, _
 		byval args as integer, _
 		byval arg_head as FB_CALL_ARG ptr, _
-		byval err_num as FB_ERRMSG ptr, _
 		byval options as FB_SYMBFINDOPT, _
 		byval ovl as FBSYMBOL ptr, _
 		byref exact_matches as integer, _
@@ -2443,11 +2437,9 @@ private function hCheckOvlProc _
 
 			'' Check for matching parameter.
 			arg_matchscore = hCheckOvlParam( _
-				ovl, _
 				param, _
 				arg->expr, _
 				arg->mode, _
-				err_num, _
 				options )
 
 			if( arg_matchscore = FB_OVLPROC_NO_MATCH ) then
@@ -2522,7 +2514,6 @@ function symbFindClosestOvlProc _
 			ovl_head_proc, _
 			args, _
 			arg_head, _
-			err_num, _
 			options or FB_SYMBFINDOPT_NO_ERROR, _
 			ovl, _
 			exact_matches, _
@@ -2565,7 +2556,6 @@ function symbFindClosestOvlProc _
 				ovl_head_proc, _
 				args, _
 				arg_head, _
-				err_num, _
 				options, _
 				closest_proc, _
 				exact_matches, _
@@ -2848,7 +2838,6 @@ private function hCheckCastOvl _
 	'' last resource, calc the differences
 	function = hCalcTypesDiff( proc_dtype, _
 	                           proc_subtype, _
-	                           symbGetPtrCnt( proc ), _
 	                           to_dtype, _
 	                           to_subtype, _
 	                           NULL )

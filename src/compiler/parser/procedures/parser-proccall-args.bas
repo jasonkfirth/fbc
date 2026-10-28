@@ -54,7 +54,6 @@ end sub
 ''
 private function hProcArg _
 	( _
-		byval proc as FBSYMBOL ptr, _
 		byval param as FBSYMBOL ptr, _
 		byval argnum as integer, _
 		byref expr as ASTNODE ptr, _
@@ -696,7 +695,7 @@ function cProcArgList _
 			end if
 
 			dim as AST_SEMANTIC_SOURCE_RANGE semantic_range
-			if( hProcArg( proc, param, args, expr, mode, have_eq_outside_parens, options, semantic_range ) = FALSE ) then
+			if( hProcArg( param, args, expr, mode, have_eq_outside_parens, options, semantic_range ) = FALSE ) then
 				exit do
 			end if
 

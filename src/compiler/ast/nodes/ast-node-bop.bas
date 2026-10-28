@@ -860,9 +860,7 @@ end function
 private function hCheckDerefWcharPtr _
 	( _
 		byval l as ASTNODE ptr, _
-		byval pldtype as integer ptr, _
-		byval r as ASTNODE ptr, _
-		byval rdtype as integer _
+		byval pldtype as integer ptr _
 	) as integer
 
 	dim as ASTNODE ptr ll = any
@@ -1112,11 +1110,11 @@ private function hCheckBopStrings _
 		'' form of string indexing when dealing with a DEREF'ed ptr.
 		else
 			if( typeGet( ldtype ) = FB_DATATYPE_WCHAR ) then
-				if( hCheckDerefWcharPtr( l, @ldtype, r, rdtype ) = FALSE ) then
+				if( hCheckDerefWcharPtr( l, @ldtype) = FALSE ) then
 					return H_BOP_STRING_ERROR
 				end if
 			else
-				if( hCheckDerefWcharPtr( r, @rdtype, l, ldtype ) = FALSE ) then
+				if( hCheckDerefWcharPtr( r, @rdtype) = FALSE ) then
 					return H_BOP_STRING_ERROR
 				end if
 			end if

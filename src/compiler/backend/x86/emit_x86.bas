@@ -715,8 +715,7 @@ end sub
 '':::::
 private sub hPUBLIC _
 	( _
-		byval label as zstring ptr, _
-		byval isexport as integer _
+		byval label as zstring ptr _
 	) static
 
 	dim ostr as string
@@ -724,17 +723,8 @@ private sub hPUBLIC _
 	ostr = NEWLINE + ".globl "
 	ostr += *label
 
-' PENDING: shared lib compatibility between win32/linux
-'          rtlib/gfxlib needs -fvisibility=hidden, only available in gcc 4
-'   if( env.clopt.target = FB_COMPTARGET_LINUX ) then
-'       if( isexport ) then
-'           ostr += NEWLINE + ".protected "
-'           ostr += *label
-'       else
-'           ostr += NEWLINE + ".hidden "
-'           ostr += *label
-'       end if
-'   end if
+	'' Public labels keep default ELF visibility until shared-library
+	'' visibility policy also covers rtlib/gfxlib.
 
 	ostr += NEWLINE
 	outEx( ostr )
@@ -874,11 +864,11 @@ private sub hEmitVarBss _
 	'' allocation modifier
 	if( (attrib and FB_SYMBATTRIB_COMMON) = 0 ) then
 		if( (attrib and FB_SYMBATTRIB_PUBLIC) > 0 ) then
-			hPUBLIC( *symbGetMangledName( s ), TRUE )
+			hPUBLIC( *symbGetMangledName( s ))
 		end if
 		alloc = ".lcomm"
 	else
-		hPUBLIC( *symbGetMangledName( s ), FALSE )
+		hPUBLIC( *symbGetMangledName( s ))
 		alloc = ".comm"
 	end if
 
@@ -7556,7 +7546,7 @@ sub emitVARINIBEGIN( byval sym as FBSYMBOL ptr )
 
 	'' public?
 	if( symbIsPublic( sym ) ) then
-		hPUBLIC( *symbGetMangledName( sym ), symbIsExport( sym ) )
+		hPUBLIC( *symbGetMangledName( sym ))
 	end if
 
 	hLABEL( *symbGetMangledName( sym ) )
@@ -8245,7 +8235,7 @@ private sub _procFooter _
 	hALIGN( 16 )
 
 	if( ispublic ) then
-		hPUBLIC( mangledName, symbIsExport( proc ) )
+		hPUBLIC( mangledName)
 	end if
 
 	hLABEL( mangledName )

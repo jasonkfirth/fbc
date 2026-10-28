@@ -33,8 +33,7 @@ private function hCheckStringOps _
 	( _
 		byval l as ASTNODE ptr, _
 		byval ldclass as FB_DATACLASS, _
-		byval r as ASTNODE ptr, _
-		byval rdclass as FB_DATACLASS _
+		byval r as ASTNODE ptr _
 	) as integer
 
 	dim as ASTNODE ptr other = any
@@ -64,9 +63,7 @@ end function
 private function hCheckUDTOps _
 	( _
 		byval l as ASTNODE ptr, _
-		byval ldclass as FB_DATACLASS, _
 		byref r as ASTNODE ptr, _
-		byval rdclass as FB_DATACLASS, _
 		byval no_upcast as integer _
 	) as integer
 
@@ -300,7 +297,7 @@ function astCheckASSIGN _
 
 		'' both not strings?
 		if( ldclass <> rdclass ) then
-			if( hCheckStringOps( l, ldclass, r, rdclass ) = FALSE ) then
+			if( hCheckStringOps( l, ldclass, r) = FALSE ) then
 				exit function
 			end if
 		end if
@@ -311,7 +308,7 @@ function astCheckASSIGN _
 	elseif( (ldtype = FB_DATATYPE_STRUCT) or _
 			(rdtype = FB_DATATYPE_STRUCT) ) then
 
-		if( hCheckUDTOps( l, ldclass, r, rdclass, no_upcast ) = FALSE ) then
+		if( hCheckUDTOps( l, r, no_upcast ) = FALSE ) then
 			exit function
 		end if
 
@@ -676,7 +673,7 @@ function astNewASSIGN _
 
 		'' both not strings?
 		if( ldclass <> rdclass ) then
-			if( hCheckStringOps( l, ldclass, r, rdclass ) = FALSE ) then
+			if( hCheckStringOps( l, ldclass, r) = FALSE ) then
 				exit function
 			end if
 
@@ -693,7 +690,7 @@ function astNewASSIGN _
 	elseif( (ldtype = FB_DATATYPE_STRUCT) or _
 			(rdtype = FB_DATATYPE_STRUCT) ) then
 
-		if( hCheckUDTOps( l, ldclass, r, rdclass, FALSE ) = FALSE ) then
+		if( hCheckUDTOps( l, r, FALSE ) = FALSE ) then
 			exit function
 		end if
 

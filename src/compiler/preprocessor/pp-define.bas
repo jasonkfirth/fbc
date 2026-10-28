@@ -1342,8 +1342,6 @@ end function
 '':::::
 private function hReadMacroText _
 	( _
-		byval args as integer, _
-		byval paramhead as FB_DEFPARAM ptr, _
 		byval ismultiline as integer _
 	) as FB_DEFTOK ptr
 
@@ -1899,7 +1897,7 @@ sub ppDefine( byval ismultiline as integer )
 	end if
 
 	'' macro..
-	tokhead = hReadMacroText( params, paramhead, ismultiline )
+	tokhead = hReadMacroText( ismultiline )
 
 	'' Parameter names are represented by argument numbers in the replacement
 	'' token list, so equivalent definitions can be compared directly even when

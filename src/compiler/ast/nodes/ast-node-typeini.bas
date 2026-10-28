@@ -764,8 +764,7 @@ end function
 private function hAstCheckTypeIniAssignment _
 	( _
 		byval n as ASTNODE ptr, _
-		byval maxsize as longint, _
-		byval scoped as integer _
+		byval maxsize as longint _
 	) as integer
 
 	if( (maxsize > 0) ) then
@@ -838,7 +837,7 @@ function astTypeIniFlush overload _
 		select case( n->class )
 		'' Write the given initializer expression to the given offset in the target
 		case AST_NODECLASS_TYPEINI_ASSIGN
-			if( hAstCheckTypeIniAssignment( n, maxsize, scoped ) ) then
+			if( hAstCheckTypeIniAssignment( n, maxsize) ) then
 				if( n->sym ) then
 					'' Field?
 					if( symbIsField( n->sym ) ) then
@@ -866,7 +865,7 @@ function astTypeIniFlush overload _
 
 		'' Clear the given amount of bytes at the given offset in the target
 		case AST_NODECLASS_TYPEINI_PAD
-			if( hAstCheckTypeIniAssignment( n, maxsize, scoped ) ) then
+			if( hAstCheckTypeIniAssignment( n, maxsize) ) then
 				l = astBuildDerefAddrOf( astCloneTree( target ), n->typeini.ofs, n->dtype, n->subtype )
 				l = astNewMEM( AST_OP_MEMFILL, l, astNewCONSTi( n->typeini.bytes ) )
 				t = astNewLINK( t, l, AST_LINK_RETURN_NONE )
@@ -875,7 +874,7 @@ function astTypeIniFlush overload _
 		'' Use the given CALL (and its ARGs) as-is, but insert the byref instance argument,
 		'' pointing to the given offset in the target
 		case AST_NODECLASS_TYPEINI_CTORCALL
-			if( hAstCheckTypeIniAssignment( n, maxsize, scoped ) ) then
+			if( hAstCheckTypeIniAssignment( n, maxsize) ) then
 				l = astBuildDerefAddrOf( astCloneTree( target ), n->typeini.ofs, n->dtype, n->subtype, n->sym )
 
 				l = astPatchCtorCall( n->l, l )

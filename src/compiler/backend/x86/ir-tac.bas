@@ -80,7 +80,6 @@ declare sub hFlushLOAD _
 
 declare sub hFlushCONVERT _
 	( _
-		byval op as integer, _
 		byval v1 as IRVREG ptr, _
 		byval v2 as IRVREG ptr _
 	)
@@ -1473,7 +1472,7 @@ private sub _flush static
 			hFlushLOAD( op, v1, vr )
 
 		case AST_NODECLASS_CONV
-			hFlushCONVERT( op, v1, v2 )
+			hFlushCONVERT( v1, v2 )
 
 		case AST_NODECLASS_STACK
 			hFlushSTACK( op, v1, v2, t->ex2 )
@@ -2360,7 +2359,6 @@ end sub
 '':::::
 private sub hFlushCONVERT _
 	( _
-		byval op as integer, _
 		byval v1 as IRVREG ptr, _
 		byval v2 as IRVREG ptr _
 	) static

@@ -1209,8 +1209,6 @@ end function
 private function hsymbLookupNS _
 	( _
 		byval id as zstring ptr, _
-		byref tk as FB_TOKEN, _
-		byref tk_class as FB_TKCLASS, _
 		byval hashtb as FBHASHTB ptr, _
 		byval index as uinteger _
 	) as FBSYMCHAIN ptr
@@ -1283,8 +1281,6 @@ end function
 private function hsymbLookupTypeNS _
 	( _
 		byval id as zstring ptr, _
-		byref tk as FB_TOKEN, _
-		byref tk_class as FB_TKCLASS, _
 		byval hashtb as FBHASHTB ptr, _
 		byval index as uinteger _
 	) as FBSYMCHAIN ptr
@@ -1449,11 +1445,11 @@ function symbLookup _
 	if( symbGetCurrentNamespc( ) <> NULL ) then
 		select case symbGetClass( symbGetCurrentNamespc( ) )
 		case FB_SYMBCLASS_STRUCT, FB_SYMBCLASS_CLASS
-			return hsymbLookupTypeNS( id, tk, tk_class, hashtb, index )
+			return hsymbLookupTypeNS( id, hashtb, index )
 		end select
 	end if
 
-	return hsymbLookupNS( id, tk, tk_class, hashtb, index )
+	return hsymbLookupNS( id, hashtb, index )
 
 end function
 

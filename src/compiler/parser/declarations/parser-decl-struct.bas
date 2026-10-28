@@ -757,7 +757,6 @@ private function hTypeAdd _
 		byval isunion as integer, _
 		byval align as integer, _
 		byref semantic_packing as FB_SEMANTIC_PACKING_INPUT, _
-		byval baseDType as integer = 0, _
 		byval baseSubtype as FBSYMBOL ptr = NULL, _
 		byval baseStringType as integer = 0 _
 	) as FBSYMBOL ptr
@@ -1299,7 +1298,7 @@ sub cTypeDecl( byval attrib as FB_SYMBATTRIB )
 	dim as FBSYMBOL ptr currblocksym = parser.currblock
 	dim as integer scope_depth = parser.scope
 
-	sym = hTypeAdd( NULL, id, palias, isunion, align, semantic_packing, baseDType, baseSubtype, stringType )
+	sym = hTypeAdd( NULL, id, palias, isunion, align, semantic_packing, baseSubtype, stringType )
 	if( checkid ) then
 		fbSemanticModelExportBinding(sym, semantic_site, TRUE)
 		fbSemanticModelTypeDeclarationSpelling(sym, @id, iif(isunion, "union", "type"), semantic_site)

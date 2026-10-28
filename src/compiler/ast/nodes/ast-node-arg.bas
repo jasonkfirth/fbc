@@ -113,7 +113,6 @@ end function
 
 private function hAllocTempWstrPtr _
 	( _
-		byval parent as ASTNODE ptr, _
 		byval n as ASTNODE ptr _
 	) as ASTNODE ptr
 
@@ -325,7 +324,7 @@ private sub hStrArgToStrPtrParam _
 		'' If it's a WSTRING function result, copy to temp WSTRING so
 		'' that the result is automatically freed later.
 		if( astIsCALL( n->l ) ) then
-			n->l = hAllocTempWstrPtr( parent, n->l )
+			n->l = hAllocTempWstrPtr( n->l )
 		else
 			n->l = astNewADDROF( n->l )
 		end if
@@ -567,7 +566,6 @@ end function
 private function hCheckVarargParam _
 	( _
 		byval parent as ASTNODE ptr, _
-		byval param as FBSYMBOL ptr, _
 		byval n as ASTNODE ptr _
 	) as integer
 
@@ -936,7 +934,7 @@ private function hCheckParam _
 
 	'' vararg?
 	case FB_PARAMMODE_VARARG
-		return hCheckVarargParam( parent, param, n )
+		return hCheckVarargParam( parent, n )
 
 	case FB_PARAMMODE_BYREF
 		'' as any?

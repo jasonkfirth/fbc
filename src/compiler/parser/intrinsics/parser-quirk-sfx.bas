@@ -466,9 +466,7 @@ end function
 '' ----------------------------------------------------------------------------
 
 private function hParseMidi _
-	( _
-		byval is_func as integer _
-	) as ASTNODE ptr
+	() as ASTNODE ptr
 
 	dim as integer had_parens
 	dim as ASTNODE ptr expr1, expr2, expr3
@@ -671,7 +669,7 @@ function cSfxStmt _
 		expr = hParseSfx( FALSE )
 
 	case FB_TK_MIDI
-		expr = hParseMidi( FALSE )
+		expr = hParseMidi()
 
 	case FB_TK_DEVICE
 		expr = hParseDevice( FALSE )
@@ -703,7 +701,7 @@ function cSfxFunct _
 		function = hParseSfx( TRUE )
 
 	case FB_TK_MIDI
-		function = hParseMidi( TRUE )
+		function = hParseMidi()
 
 	case FB_TK_DEVICE
 		function = hParseDevice( TRUE )

@@ -4076,7 +4076,7 @@ private sub _emitlabel( byval label as FBSYMBOL ptr )
 		asm_code("sub rsp, " + str(GAS64_GOSUB_FRAME_BYTES) + " #stack for gosub")
 	end if
 end sub
-private sub prepare_idx(byval v1 as IRVREG ptr, byref op1 as string, byref op3 as string)
+private sub prepare_idx(byval v1 as IRVREG ptr, byref op1 as string)
 
 	dim as string regtempo
 	'asm_info("prepare_op v1->sym="+str(v1->sym)+" "+str(v1->vidx->sym))
@@ -4473,9 +4473,6 @@ private sub bop_float( _
 	byval vr as IRVREG ptr, _
 	byref op1 as string, _
 	byref op2 as string, _
-	byref op3 as string, _
-	byref op4 as string, _
-	byref prefix as string, _
 	byval label as FBSYMBOL ptr, _
 	byval options as IR_EMITOPT _
 	)
@@ -4701,7 +4698,7 @@ private sub hBopLoadOperand _
 		prefix = ""
 
 	case IR_VREGTYPE_IDX
-		prepare_idx( vreg, operand, setup_code )
+		prepare_idx( vreg, operand)
 
 	case IR_VREGTYPE_PTR
 		operand = hPointerOperand(vreg)
@@ -5415,7 +5412,7 @@ private sub hloadoperandsandwritebop(byval op as integer,byval v1 as IRVREG ptr,
 
 	If( typeGetClass( v1->dtype ) = FB_DATACLASS_FPOINT) Or ( typeGetClass( v2->dtype ) = FB_DATACLASS_FPOINT) then
 		asm_info("Bop with float")
-		bop_float(op,v1,v2,vr,op1,op2,op3,op4,prefix1,label,options)
+		bop_float(op,v1,v2,vr,op1,op2,label,options)
 		exit sub
 	end if
 
@@ -5812,7 +5809,7 @@ private sub _emituop(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRVR
 			prefix=""
 
 		case IR_VREGTYPE_IDX
-			prepare_idx(v1,op1,op3)
+			prepare_idx(v1,op1)
 		case IR_VREGTYPE_PTR ''format ofs1 <vidx=reg>
 			op1=Str(v1->ofs)+"["+*regstrq(reg_findreal(v1->vidx->reg))+"]"
 
@@ -6011,20 +6008,18 @@ end function
 
 private function hConvertLoadSource _
 	( _
-		byval v1 as IRVREG ptr, _
 		byval v2 as IRVREG ptr, _
 		byref v2dtype as FB_DATATYPE, _
 		byref prefix1 as string, _
 		byref prefix2 as string, _
 		byref op1 as string, _
 		byref op2 as string, _
-		byref op4 as string, _
 		byref srcreg as integer _
 	) as integer
 
 	select case v2->typ
 	case IR_VREGTYPE_IDX
-		prepare_idx( v2, op2, op4 )
+		prepare_idx( v2, op2)
 
 	case IR_VREGTYPE_REG
 		prefix2 = ""
@@ -6092,7 +6087,6 @@ private function hConvertLoadOperands _
 		byref prefix2 as string, _
 		byref op1 as string, _
 		byref op2 as string, _
-		byref op4 as string, _
 		byref regresult as integer, _
 		byref srcreg as integer _
 	) as integer
@@ -6113,13 +6107,12 @@ private function hConvertLoadOperands _
 	end if
 
 	prefix2 = hConvertSourcePrefix( v2dtype )
-	function = hConvertLoadSource( v1, v2, v2dtype, prefix1, prefix2, _
-	                               op1, op2, op4, srcreg )
+	function = hConvertLoadSource( v2, v2dtype, prefix1, prefix2, _
+	                               op1, op2, srcreg )
 end function
 
 private sub hConvertToFloat _
 	( _
-		byval v1 as IRVREG ptr, _
 		byval v2 as IRVREG ptr, _
 		byval v1dtype as FB_DATATYPE, _
 		byval v2dtype as FB_DATATYPE, _
@@ -6427,7 +6420,7 @@ private sub _emitconvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	end if
 
 	if( hConvertLoadOperands( v1, v2, v1dtype, v2dtype, _
-	                          prefix1, prefix2, op1, op2, op4, _
+	                          prefix1, prefix2, op1, op2, _
 	                          regresult, srcreg ) ) then
 		exit sub
 	end if
@@ -6435,7 +6428,7 @@ private sub _emitconvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	''====================  writing code ===============================
 	if op4<>"" then emitop3_op4(op4)
 	if( typeGetClass( v1dtype ) = FB_DATACLASS_FPOINT ) then
-		hConvertToFloat( v1, v2, v1dtype, v2dtype, op1, op2, prefix2 )
+		hConvertToFloat( v2, v1dtype, v2dtype, op1, op2, prefix2 )
 		exit sub
 	end if
 
@@ -6554,7 +6547,7 @@ private sub _emitconvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	end if
 
 end sub
-private sub emitStoreStruct(byval v1 as IRVREG ptr, byval v2 as IRVREG ptr,byref op1 as string,byref op3 as string)
+private sub emitStoreStruct( byval v2 as IRVREG ptr,byref op1 as string,byref op3 as string)
 	dim as string dest
 	'' A dereferenced pointer or array element need not carry a variable symbol.
 	'' Copy the returned UDT's size, not the size of an enclosing array variable.
@@ -6664,7 +6657,7 @@ private sub hStoreLoadDestination _
 
 	select case v1->typ
 	case IR_VREGTYPE_IDX
-		prepare_idx( v1, op1, setup_code )
+		prepare_idx( v1, op1)
 
 	case IR_VREGTYPE_REG
 		dim as integer real_reg = reg_findreal( v1->reg )
@@ -6725,13 +6718,12 @@ private sub hStoreLoadSource _
 	( _
 		byval v1 as IRVREG ptr, _
 		byval v2 as IRVREG ptr, _
-		byref op2 as string, _
-		byref setup_code as string _
+		byref op2 as string _
 	)
 
 	select case v2->typ
 	case IR_VREGTYPE_IDX
-		prepare_idx( v2, op2, setup_code )
+		prepare_idx( v2, op2)
 
 	case IR_VREGTYPE_REG
 		dim as FB_DATATYPE dtype = typeGetDtAndPtrOnly( v2->dtype )
@@ -7037,7 +7029,7 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 			exit sub
 		end if
 		hStoreLoadDestination( v1, v2, op1, op3 )
-		hStoreLoadSource( v1, v2, op2, op4 )
+		hStoreLoadSource( v1, v2, op2)
 		if( op4 <> "" ) then emitop3_op4( op4 )
 		if( op3 <> "" ) then emitop3_op4( op3 )
 		dim as integer scratch_reg = reg_findtemp( )
@@ -7073,12 +7065,12 @@ private sub _emitstore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 			v1->sym->ofs=v2->ofs
 			asm_info("v1="+vregdumpfull(v1))
 		else
-			emitStoreStruct(v1,v2,op1,op3)
+			emitStoreStruct(v2,op1,op3)
 		end if
 		exit sub
 	end if
 
-	hStoreLoadSource( v1, v2, op2, op4 )
+	hStoreLoadSource( v1, v2, op2)
 	dtype = typeGetDtAndPtrOnly( v1->dtype )
 	if( typeIsPtr( dtype ) ) then
 		dtype = FB_DATATYPE_INTEGER
@@ -7106,7 +7098,7 @@ private sub _emitloadres(byval v1 as IRVREG ptr,byval vr as IRVREG Ptr)
 	select case v1->typ ''source
 
 		case IR_VREGTYPE_IDX
-			prepare_idx(v1,op1,op3)
+			prepare_idx(v1,op1)
 
 		case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
 			if hIsNativeElfTlsSymbol(v1->sym) then
@@ -7256,7 +7248,7 @@ private sub _emitaddr(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRV
 			select case v1->typ ''source
 
 				case IR_VREGTYPE_IDX
-					prepare_idx(v1,op1,op3)
+					prepare_idx(v1,op1)
 
 				case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
 					if hIsNativeElfTlsSymbol(v1->sym) then
@@ -7290,7 +7282,7 @@ private sub _emitaddr(byval op as integer,byval v1 as IRVREG ptr,byval vr as IRV
 		case AST_OP_DEREF '' ====== DEREF =========================================================
 			select case v1->typ ''source
 				case IR_VREGTYPE_IDX
-					prepare_idx(v1,op1,op3)
+					prepare_idx(v1,op1)
 					if op3<>"" then emitop3_op4(op3)
 
 				case IR_VREGTYPE_VAR ''format varname ofs1   local/static  ofs1 could be zero
@@ -7354,7 +7346,6 @@ private sub hCallLoadArgument _
 		byval vreg as IRVREG ptr, _
 		byref dtype as FB_DATATYPE, _
 		byref operand as string, _
-		byref setup_code as string, _
 		byref real_reg as integer _
 	)
 
@@ -7374,7 +7365,7 @@ private sub hCallLoadArgument _
 
 	select case vreg->typ
 	case IR_VREGTYPE_IDX
-		prepare_idx( vreg, operand, setup_code )
+		prepare_idx( vreg, operand)
 
 	case IR_VREGTYPE_REG
 		real_reg = reg_findreal( vreg->reg )
@@ -7928,7 +7919,6 @@ end function
 private sub hCallEmitInteger128RegisterArgument _
 	( _
 		byval v2 as IRVREG ptr, _
-		byval dtype as FB_DATATYPE, _
 		byval cptarg as integer, _
 		byval cptint as integer, _
 		byval cptfloat as integer, _
@@ -7988,7 +7978,7 @@ private sub hCallEmitRegisterArgument _
 		                                    cptfloat, reg2, variadic, op1 )
 
 	elseif( typeIsInteger128Scalar( dtype ) ) then
-		hCallEmitInteger128RegisterArgument( v2, dtype, cptarg, cptint, _
+		hCallEmitInteger128RegisterArgument( v2, cptarg, cptint, _
 			cptfloat, reg2, variadic, op1, op3 )
 	elseif dtype=FB_DATATYPE_STRUCT then
 		hCallEmitStructRegisterArgument( v2, paramtype, cptarg, cptint, _
@@ -8210,7 +8200,7 @@ private sub hdocall(byval proc as FBSYMBOL ptr,byref pname as string,byref first
 		asm_info("arg " + vregPretty( v2 ) )
 		asm_info("arg="+vregdumpfull(v2)+" "+"vreg="+Str(v2->reg))
 
-		hCallLoadArgument( v2, dtype, op1, op3, reg2 )
+		hCallLoadArgument( v2, dtype, op1, reg2 )
 ''======================
 		''============
 		''writing code
@@ -8350,7 +8340,7 @@ private sub _emitcallptr _
 			op1=*regstrq(reg_findreal(v1->reg))
 
 		case IR_VREGTYPE_IDX
-			prepare_idx(v1,op1,op3)
+			prepare_idx(v1,op1)
 
 		case IR_VREGTYPE_PTR ''format ofs1 <vidx=reg>
 			op1=Str(v1->ofs)+"["+*regstrq(reg_findreal(v1->vidx->reg))+"]"
@@ -8704,7 +8694,7 @@ private sub emitmemmove(byval v1 as IRVREG ptr,byval v2 as IRVREG ptr,byval byte
 
 			select case v1->typ
 				case IR_VREGTYPE_IDX
-					prepare_idx(v1,op1,op3)
+					prepare_idx(v1,op1)
 
 				case IR_VREGTYPE_REG
 					op1=*regstrq(reg_findreal(v1->reg))

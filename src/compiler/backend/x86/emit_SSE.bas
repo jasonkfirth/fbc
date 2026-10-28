@@ -95,7 +95,6 @@ end sub
 
 private sub hMoveSSEREGToFPUSTACK _
 	( _
-		byval dvreg as IRVREG ptr, _
 		byval svreg as IRVREG ptr _
 	)
 
@@ -131,7 +130,7 @@ private sub _emitLOADF2B_SSE( byval dvreg as IRVREG ptr, byval svreg as IRVREG p
 
 	if( svreg->regFamily = IR_REG_SSE ) then
 		if( svreg->typ = IR_VREGTYPE_REG ) then
-			hMoveSSEREGToFPUSTACK( dvreg, svreg )
+			hMoveSSEREGToFPUSTACK( svreg )
 		end if
 	end if
 
@@ -156,7 +155,7 @@ private sub _emitSTORF2L_SSE _
 	if( typeIsSigned( dvreg->dtype ) = 0) then exit sub
 
 	if( svreg->regFamily = IR_REG_SSE ) then
-		hMoveSSEREGToFPUSTACK( dvreg, svreg )
+		hMoveSSEREGToFPUSTACK( svreg )
 	end if
 
 	hPrepOperand( dvreg, dst )

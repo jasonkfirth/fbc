@@ -731,8 +731,7 @@ end function
 private function hProcPtrResolveOverload _
 	( _
 		byval ovl_head_proc as FBSYMBOL ptr, _
-		byval proc as FBSYMBOL ptr, _
-		byval check_exact as boolean = FALSE _
+		byval proc as FBSYMBOL ptr _
 	) as FBSYMBOL ptr
 
 	dim as FBSYMBOL ptr sym = ovl_head_proc
@@ -773,7 +772,6 @@ end sub
 
 private function hProcPtrBody _
 	( _
-		byval base_parent as FBSYMBOL ptr, _
 		byval proc as FBSYMBOL ptr, _
 		byval check_exact as boolean, _
 		byval is_vtable_index as integer, _
@@ -926,13 +924,13 @@ function cProcPtrBody _
 		parser.ctxsym = subtype
 		parser.ctx_dtype = dtype
 
-		expr = hProcPtrBody( base_parent, sym, is_exact, is_vtable_index, semantic_site )
+		expr = hProcPtrBody( sym, is_exact, is_vtable_index, semantic_site )
 
 		parser.ctxsym = oldsym
 		parser.ctx_dtype = old_dtype
 
 	else
-		expr = hProcPtrBody( base_parent, sym, FALSE, is_vtable_index, semantic_site )
+		expr = hProcPtrBody( sym, FALSE, is_vtable_index, semantic_site )
 	end if
 
 	return expr
@@ -1046,7 +1044,7 @@ function cAddrOfExpression( ) as ASTNODE ptr
 			lexSkipToken( LEXCHECK_POST_LANG_SUFFIX )
 			semantic_site = lexGetLastLocation( )
 			hCheckEmptyProcParens()
-			return hProcPtrBody( base_parent, sym, FALSE, FALSE, semantic_site )
+			return hProcPtrBody( sym, FALSE, FALSE, semantic_site )
 		end if
 
 		'' anything else

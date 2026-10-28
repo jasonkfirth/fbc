@@ -1372,8 +1372,7 @@ declare sub parseArgsFromFile _
 private sub handleArg _
 	( _
 		byref arg as string, _
-		byval is_source as integer, _
-		byval is_file as integer _
+		byval is_source as integer _
 	)
 	'' If the previous option wants this argument as parameter,
 	'' call the handler with it, now that it's known.
@@ -1560,7 +1559,7 @@ sub fbcParseArgsFromString _
 			arg = left(args, i)
 			arg = trim(arg)
 			arg = strUnquote(arg)
-			handleArg( arg, is_source, is_file )
+			handleArg( arg, is_source)
 		end if
 
 		args = right(args, length - i)
@@ -1630,7 +1629,7 @@ sub fbcDriverParseArgs( byval argc as integer, byval argv as zstring ptr ptr )
 	dim as string arg
 	for i as integer = 1 to (argc - 1)
 		arg = *argv[i]
-		handleArg( arg, FALSE, FALSE )
+		handleArg( arg, FALSE)
 	next
 
 	'' Waiting for argument to an option? If the user did something like
