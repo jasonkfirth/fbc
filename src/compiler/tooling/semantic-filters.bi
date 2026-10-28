@@ -16,6 +16,9 @@ declare function fbSemanticModelFilterCandidate( byval sym as FBSYMBOL ptr, byva
 declare function fbSemanticModelFilterAccess( byval allowed as integer ) as integer
 declare function fbSemanticModelFilterEnd( byval identity as longint, byval result as FBSYMBOL ptr, _
 	byref outcome as const string ) as FBSYMBOL ptr
+declare function fbSemanticModelLastFilter( ) as longint
+declare sub fbSemanticModelQualifiedFilterUse( byval lookup_id as longint, byval filter_id as longint, _
+	byval requested_class as integer, byval result as FBSYMBOL ptr )
 declare sub fbSemanticModelResetFilters( )
 declare sub fbSemanticModelFinishFilters( byval commit as integer )
 #endif

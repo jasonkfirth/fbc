@@ -59,7 +59,7 @@ def validate_diagnostic_contexts(model, number, subject_modules):
 
     contexts, parameters, totals = {}, {}, {}
     for row in model.records["K"]:
-        if row[1] == "module" and row[3].startswith(("native-expression-recovery", "native-token-skip", "native-type-recovery", "native-symbol-recovery", "native-statement-", "native-source-validity", "native-intrinsic-dispatch", "native-resolution", "native-lookup", "native-symbol-filter", "native-prototype")):
+        if row[1] == "module" and row[3].startswith(("native-expression-recovery", "native-token-skip", "native-type-recovery", "native-symbol-recovery", "native-statement-", "native-source-validity", "native-intrinsic-dispatch", "native-resolution", "native-lookup", "native-symbol-filter", "native-prototype", "native-qualified-filter", "native-procedure-state", "consumed-token")):
             continue
         if row[1] == "module":
             module = number(row[2], 1)

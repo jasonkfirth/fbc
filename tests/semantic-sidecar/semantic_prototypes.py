@@ -191,8 +191,11 @@ def validate_prototypes(model, number, unescape, owners):
                 effective = int(event[4]) - bool(int(event[11]) & method_bit)
                 if is_property:
                     # VOID is ABI slot0 in both supported raw datatype ABIs.
-                    if (int(begin[3]) & getter_bit and event[9] == "0"
-                            or not int(begin[3]) & getter_bit and event[9] != "0"):
+                    # The native predicate strips const/mangling flags and
+                    # retains the nine datatype/pointer bits.
+                    returns_void = int(event[9]) & 511 == 0
+                    if (int(begin[3]) & getter_bit and returns_void
+                            or not int(begin[3]) & getter_bit and not returns_void):
                         effective = -1
                 if int(event[3]) != query_params or int(event[5]) != effective or bool(int(event[6])) != is_property:
                     raise ValueError("Native prototype arity/property gate contradicts its copied declaration")

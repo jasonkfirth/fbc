@@ -36,6 +36,7 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-startup.bi"
+#include once "tooling/semantic-procedure-state.bi"
 #include once "tooling/semantic-object-operations.bi"
 
 declare sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, _
@@ -754,6 +755,7 @@ sub astProcBegin( byval sym as FBSYMBOL ptr, byval ismain as integer )
 	end with
 
 	sym->proc.ext->stmtnum = parser.stmt.cnt
+	fbSemanticModelProcedureState(sym, "begin")
 
 	'' main()?
 	if( symbGetIsMainProc( sym ) ) then
@@ -813,6 +815,7 @@ private function hCheckErrHnd _
 		                         astNewCONSTstr( symbGetName( sym ) ) ), head_node )
 	end if
 
+	fbSemanticModelProcedureState(sym, "before-error-exit")
 	with sym->proc.ext->err
 		if( .lastfun <> NULL ) then
 			astAdd( rtlErrorSetFuncName( NULL, astNewVAR( .lastfun ) ) )
@@ -845,6 +848,8 @@ private function hCheckErrHnd _
 			.hndsaved = NULL
 		end if
 	end with
+
+	fbSemanticModelProcedureState(sym, "after-error-exit")
 
 	function = head_node
 

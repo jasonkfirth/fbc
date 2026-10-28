@@ -1560,3 +1560,19 @@ workflows also pass with the updated runtime.
 Native packet and control-sequence contracts are described in the official
 [AmigaDOS packet documentation](https://wiki.amigaos.net/wiki/AmigaDOS_Packets)
 and [console control sequences](https://wiki.amigaos.net/wiki/AmigaOS_Manual:_Control_Sequences).
+
+### Read-only file length queries
+
+Native `LOF` now examines an ordinary read-only file's open DOS handle instead
+of seeking to EOF and back. This preserves newlib's input buffer and avoids
+refilling it just to answer a length query. The query reads fresh metadata,
+so an append through another handle remains visible. Writable and custom
+streams retain the existing seek/tell fallback and its flush behavior.
+
+The maintained `file-size` probe checks buffered input and unchanged cursors,
+positions beyond EOF, external append visibility, UTF-8/16/32 byte lengths,
+closed handles and writable-stream fallback. Its 89 checks pass in ordinary
+and MT runtimes. The 39 read-only queries use zero seek callbacks; the prior
+implementation used 78. All 18 maintained native probes pass with the change.
+This does not establish that the separate long-running corpus I/O waits are
+resolved; their original workloads remain under observation.

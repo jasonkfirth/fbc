@@ -634,6 +634,11 @@ literal/feature-policy fields. AST nodes retain the context at construction,
 including through cloning. USE connects node and declaration identities to
 those snapshots. A later snapshot never retroactively changes an earlier
 declaration or node. Rolled-back parse attempts discard their context records.
+`complete-effective-contexts` explicitly promises all 65 fixed keys in current
+full snapshots. Reduced modes mark it unavailable. The reader rejects every
+missing required key, unknown keys and foreign OPTION occurrence statements
+even if the record totals have been repaired. Older producers without this
+promise retain their documented optional-key behavior.
 Full models add optional `OPT <context> language-policy remkeyword-active <flag>`.
 The flag is one while the native REM keyword remains installed, and zero after
 an accepted `OPTION NOKEYWORD REM` removes that keyword from the lookup hash.
@@ -5315,5 +5320,148 @@ Its frames retain scalar receipts only. The reader checks actual traversal,
 copied predicate inputs, access closure, selected identities and module ownership.
 Prototype comparison and explicit name-search/filter/call causal links remain
 separate required work.
+
+### Native declaration/prototype matching
+
+`native-prototype-comparisons` observes `symbFindOverloadProc` in full and
+expression models. Binding models mark it unavailable. This native routine
+matches a declaration or definition against existing procedure signatures. Its
+selected result does not assert that a procedure was called or executed.
+
+Module metadata `native-prototype:<ordinal>` has these tab-separated values:
+
+* `begin`: kind, scope ID, parent ID, native options, ST, CFG, SRC, overload-head
+  snapshot, query-procedure snapshot, head declared parameter count, query
+  declared parameter count. Nonprocedures use -1 for unavailable counts.
+* `candidate`: kind, scope ID, candidate ordinal, query effective parameter
+  count, candidate declared count, candidate effective count, head-property
+  flag, candidate snapshot.
+* `parameter`: kind, scope ID, candidate ordinal, remaining parameter count,
+  `bydesc|type|subtype`, actual distinction flag, left mode/rank, right mode/rank,
+  left formal snapshot, right formal snapshot, left nominal subtype snapshot,
+  right nominal subtype snapshot.
+* `end`: kind, scope ID, selected candidate ordinal or zero,
+  `selected|not-found|invalid-input`, returned-symbol snapshot.
+
+All snapshots use the eight-field common-symbol format above. Canonical S
+identities close nominal comparisons in full output. Expression output preserves
+the actual nominal distinction and copied hints; equal spellings cannot prove
+that two native subtype pointers were identical.
+
+The native routine subtracts implicit method instances before comparing arity.
+It rejects the wrong property accessor by replacing the candidate effective
+count with -1. Eligible parameters are compared backwards, first for BYDESC
+mode/rank distinction, then full raw datatype, then nominal subtype identity.
+Unknown BYDESC ranks do not establish a dimensional distinction. BYVAL versus
+BYREF alone does not distinguish prototypes in this routine; a later prototype
+validator can still reject the declaration. Early exits and selected matches
+remain separate receipts.
+
+`native-prototype-policy` carries the native METHOD, PROPERTY and PROPGET bits.
+`native-prototype-counts` closes events, begins, ends, candidates, parameter
+comparisons and open depth. Scalar-only frames are bounded to 1,024 nested scopes
+and one million events. The observer returns the native predicate integer and
+result pointer unchanged and does not repeat any matching operation.
+
+### Qualified lookup to class-filter handoff
+
+`native-qualified-filter-links` observes the actual
+`symbLookupByNameAndClass` wrapper in full and expression output. Bindings output
+marks it unavailable. `native-qualified-filter:<ordinal>` contains the completed
+lookup ID, completed class-filter ID or zero, requested class and returned
+eight-field symbol snapshot. `native-qualified-filter-count` closes each module.
+
+An empty lookup skips the native class filter and has filter ID 0. A nonempty
+lookup runs the existing filter; its beginning names the exact returned chain
+head and its final result must equal the wrapper result. This includes an
+unsuccessful filter over a nonempty chain. The receipt links actual attempts and
+does not claim that every qualified lookup or filter used this wrapper.
+
+The native wrapper captures completed attempt IDs immediately after each call.
+The observer does not infer a join from names, source ranges or pointer reuse,
+and it does not attach metadata to shared chain-pool/import nodes. Counters reset
+per module; inactive/probe/preprocessor gates cannot reuse an earlier identity.
+
+### Native procedure runtime state
+
+Full models advertise `native-procedure-runtime-state`. Expression and bindings
+models mark it unavailable because these relationships require canonical hidden
+storage identities. `native-procedure-state:<ordinal>` is module-owned metadata
+with thirteen tab-separated fields:
+
+1. owner procedure S identity;
+2. actual generated-action kind;
+3. current ST, CFG and SRC identities;
+4. saved-handler, saved-module-name, saved-function-name and handler-saved-flag
+   S identities;
+5. GOSUB context S identity;
+6. `none|call-ret|setjmp` implementation;
+7. handler-save temporary VAR and generated target LABEL identities.
+
+Absent storage is zero. The collector copies initialized extension fields and
+actual selected temporaries/targets; it does not retain native pointers. The
+action kinds are `begin`, `handler-allocated`, `handler-save`, `module-name-save`,
+`function-name-save`, `before-error-exit`, `after-error-exit`, `gosub-allocated`,
+`gosub-direct`, `gosub-computed`, `gosub-return` and `gosub-exit`.
+
+Local handler storage is procedure-owned even when an ON LOCAL ERROR statement
+appears inside a lexical block. The generated save uses a previous-handler
+temporary, an already-saved flag and a target label. Pre/post epilogue snapshots
+retain the selected storage before native pointers are cleared. GOSUB receipts
+retain the actual context variable and selected implementation. A generated
+GOSUB exit does not imply that the context is deallocated during compilation.
+
+These are construction/lowering receipts, not runtime execution events. In
+particular, a conditional local-handler save may never execute. No receipt
+assigns a precise exceptional target to every runtime error. The module's
+`native-procedure-state-count` closes the dense stream, bounded to one million
+observations. The reader checks procedure/storage/target classes, module
+ownership, allocation/save transitions and before/after error cleanup.
+
+### Committed parser tokens
+
+Full models advertise `parser-consumed-tokens`. Expression and binding models
+mark it unavailable. `consumed-token:<ordinal>` copies a lexer token when the
+parser commits `lexSkipToken`, before the rotating lookahead slot is reused.
+It does not request another token. Speculative probes, preprocessor evaluation,
+preprocessor recursion and inactive scans are excluded. An EOF that the parser
+does not consume is not invented as a consumed token.
+
+The payload has 43 tab-separated fields:
+
+| Positions | Contents |
+| --- | --- |
+| 0-4 | Native token ID/class, native raw dtype, datatype-slot flag, mapped wire dtype |
+| 5-8 | Native length, `bytes|wide-units`, copied payload, preceding-space flag |
+| 9-12 | ST, CFG, SRC, logical source filename |
+| 13-17 | Logical start/end line/column and native physical flag |
+| 18-20 | Actual macro expansion, replacement-unit offset and offset availability |
+| 21-25 | Raw start/end line/column and original-input availability |
+| 26-29 | Active union kind/value, identifier suffix availability and suffix character |
+| 30-39 | Numeric availability, exact alphabetic suffix, original prefix/length/digits/dot/exponent/leading-zero observations, transported payload handle and macro units |
+| 40-42 | String availability, native truncation flag, completed lookup ID |
+
+The native dtype field is preserved separately because the lexer also stores
+token/operator values in that slot. Only identifier, keyword, quirk, numeric and
+string datatype slots receive a value under the selected semantic datatype ABI.
+Other token classes have unavailable mapped datatype 2147483648. This does not
+turn a lexer token into an AST expression or a reference binding.
+
+Only the active `prdpos|hassuffix|hasesc` union is read. Numeric tokens retain
+their initialized `numeric_suffix` and suffix-presence flag; their inactive
+identifier `suffixchar` is not read. Nonapplicable fields carry explicit zero/
+empty values and availability flags. Native wide text is eight uppercase hex
+digits per code unit. Narrow payloads preserve exactly the native byte count,
+including embedded zero bytes, without assuming a terminator.
+
+The lookup ID is attached immediately after the actual lexer lookup and follows
+normal token/lookahead copying. The collector does not modify a chain-pool node
+or repeat lookup. Macro/source coordinates retain their native availability and
+are not promoted to editable source ranges by this receipt.
+
+`consumed-token-policy` carries the native token buffer limit and native WCHAR
+dtype. `consumed-token-count` closes a module's dense stream. Payload copying
+checks native buffer bounds and a one-million-token limit; token pointers never
+survive a callback.
 
 <!-- end of compiler-semantic-model.md -->

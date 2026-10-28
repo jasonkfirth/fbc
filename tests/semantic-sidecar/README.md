@@ -761,4 +761,37 @@ return values. Source fixtures cover all four filter kinds and seven predicate
 reasons; mode/type ABI/transport/reset and repaired-total corruption are separate
 families. These receipts do not turn considered symbols into executed calls.
 
+Prototype tests compile the production matcher and BYDESC predicate against
+controlled procedure/parameter lists. Source tests cover arity and type failures,
+backwards parameter order, same-spelled nominal types, method/property gates and
+descriptor ranks. A BYVAL/BYREF mismatch checks that the actual match survives
+even when later declaration validation rejects it. Both type ABIs, binary/text,
+reduced modes, module reset and corrected-total corruption have separate checks.
+
+Qualified-filter tests compile the production wrapper and class-filter body
+against both production collectors. The native guard checks a selected symbol,
+a nonempty search with no matching class, an empty search with no filter,
+unchanged chain/hash nodes, inactive gates and reset. Source, transport and
+corruption families verify explicit attempt IDs and exact returned snapshots.
+
+Configuration-integrity tests remove each of the 65 required keys separately
+while repairing footer totals, reject unknown/foreign option receipts and check
+type ABIs, backends and reduced exclusions. Complete snapshots advertise their
+own capability, so legacy models can omit the optional REM-keyword key without
+being mistaken for a corrupted complete snapshot.
+
+Procedure-state tests cover local-handler storage and conditional save actions,
+module/function-name restoration, native GOSUB allocation/dispatch/return/exit,
+absent storage, reduced exclusions, type ABIs, binary/text and module reset.
+The production collector guard checks initialized union/class guards, disabled
+mode, its million-event bound and reset. Negative model mutations preserve
+footer totals and reject missing or fabricated state/action relationships.
+
+Consumed-token tests check actual parser consumption, every ordinary lexical
+class, copied mixed-case/suffix/numeric/string payloads, macro/source provenance,
+native wide units and raw versus mapped dtype domains. Inactive/PP/lookahead
+exclusions, type ABIs, reduced modes, binary transport and module reset have
+separate checks. The production guard links no lexer input/lookup implementation
+and tests inactive unions, rotating-buffer lifetime and the million-token bound.
+
 <!-- end of README.md -->

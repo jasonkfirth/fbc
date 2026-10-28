@@ -18,6 +18,7 @@ declare sub fbSemanticModelLookupDecision( byref reason as const string, byval n
 	byval found as FBSYMBOL ptr )
 declare function fbSemanticModelLookupEnd( byval identity as longint, byval result as FBSYMCHAIN ptr, _
 	byval token as integer, byval token_class as integer, byref route as const string ) as FBSYMCHAIN ptr
+declare function fbSemanticModelLastLookup( ) as longint
 declare sub fbSemanticModelResetLookup( )
 declare sub fbSemanticModelFinishLookup( byval commit as integer )
 

@@ -26,6 +26,7 @@
 #include once "ast/ast.bi"
 #include once "lexer/lex.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-procedure-state.bi"
 
 ''
 '' GOSUB/RETURN support
@@ -88,6 +89,7 @@ sub astGosubAddInit( byval proc as FBSYMBOL ptr )
 
 	symbSetProcGosubSym( proc, sym )
 	symbSetProcStatGosub( proc )
+	fbSemanticModelProcedureState(proc, "gosub-allocated", iif(AsmBackend(), "call-ret", "setjmp"))
 end sub
 
 sub astGosubAddJmp _
@@ -134,6 +136,8 @@ sub astGosubAddJmp _
 		'' end if
 		astAdd( astNewLABEL( label ) )
 	end if
+	fbSemanticModelProcedureState(proc, "gosub-direct", iif(AsmBackend(), "call-ret", "setjmp"), NULL, l)
+
 end sub
 
 sub astGosubAddJumpPtr _
@@ -183,6 +187,8 @@ sub astGosubAddJumpPtr _
 		'' jump to exit label
 		astAdd( astNewBRANCH( AST_OP_JMP, exitlabel ) )
 	end if
+	fbSemanticModelProcedureState(proc, "gosub-computed", iif(AsmBackend(), "call-ret", "setjmp"), NULL, exitlabel)
+
 end sub
 
 '':::::
@@ -286,6 +292,8 @@ function astGosubAddReturn _
 
 	end if
 
+	fbSemanticModelProcedureState(proc, "gosub-return", iif(AsmBackend(), "call-ret", "setjmp"), NULL, l)
+
 end function
 
 sub astGosubAddExit(byval proc as FBSYMBOL ptr)
@@ -293,6 +301,7 @@ sub astGosubAddExit(byval proc as FBSYMBOL ptr)
 		if( AsmBackend() = FALSE ) then
 			astAdd( rtlGosubExit( astNewADDROF( astNewVAR( symbGetProcGosubSym( proc ) ) ) ) )
 		end if
+		fbSemanticModelProcedureState(proc, "gosub-exit", iif(AsmBackend(), "call-ret", "setjmp"))
 	end if
 end sub
 

@@ -2990,26 +2990,30 @@ end sub
 #include once "backend/llvm/ir-llvm-memory.bi"
 
 private sub hPrepareValistAddress( byval v as IRVREG ptr )
+	if( (v->sym <> NULL) andalso symbIsParamVarByval( v->sym ) andalso _
+	    (symbGetValistType( v->dtype, v->subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
+		'' A byval cva_list parameter is already a pointer to the array's
+		'' first element. Calls represent it as a REG, while its local symbol
+		'' holds the pointer in stack storage. Load that value before forwarding.
+		var slot = *v
+		if( slot.typ = IR_VREGTYPE_REG ) then slot.typ = IR_VREGTYPE_VAR
+		hPrepareAddress( @slot )
+		'' LLVM stores the C va_list array argument as a pointer in the local slot.
+		_setVregDataType( @slot, typeAddrOf( typeAddrOf( FB_DATATYPE_STRUCT ) ), slot.subtype )
+		var loaded = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), slot.subtype )
+		hWriteLine( hVregToStr( loaded ) + " = load " + _
+		    hEmitType( loaded->dtype, loaded->subtype ) + ", " + _
+		    hEmitType( slot.dtype, slot.subtype ) + " " + hVregToStr( @slot ) )
+		*v = *loaded
+		exit sub
+	end if
+
 	if( v->typ = IR_VREGTYPE_REG ) then
 		assert( typeIsPtr( v->dtype ) )
 		exit sub
 	end if
 
-	if( (v->sym <> NULL) andalso symbIsParamVarByval( v->sym ) andalso _
-	    (symbGetValistType( v->dtype, v->subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
-		'' A byval cva_list parameter is already a pointer to the array's
-		'' first element. Its local symbol holds that pointer value.
-		var subtype = v->subtype
-		hPrepareAddress( v )
-		_setVregDataType( v, typeAddrOf( typeAddrOf( FB_DATATYPE_STRUCT ) ), subtype )
-		var loaded = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
-		hWriteLine( hVregToStr( loaded ) + " = load " + _
-		    hEmitType( loaded->dtype, subtype ) + ", " + _
-		    hEmitType( v->dtype, subtype ) + " " + hVregToStr( v ) )
-		*v = *loaded
-	else
-		hPrepareAddress( v )
-	end if
+	hPrepareAddress( v )
 end sub
 
 private function hLoadCallArg( byval arg as IRCALLARG ptr ) as IRVREG ptr

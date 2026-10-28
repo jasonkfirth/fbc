@@ -50,7 +50,7 @@ SEMANTIC_READER_FILES = (
     "semantic_loads.py",
     "semantic_ir_flow.py",
     "semantic_effects.py",
-    "diagnostic_context.py", "semantic_recovery.py", "semantic_skips.py", "semantic_declaration_recovery.py", "semantic_validity.py", "semantic_intrinsics.py", "semantic_resolution.py", "semantic_resolution_contexts.py", "semantic_lookup.py", "semantic_filters.py", "semantic_prototypes.py",
+    "diagnostic_context.py", "semantic_recovery.py", "semantic_skips.py", "semantic_declaration_recovery.py", "semantic_validity.py", "semantic_intrinsics.py", "semantic_resolution.py", "semantic_resolution_contexts.py", "semantic_lookup.py", "semantic_filters.py", "semantic_prototypes.py", "semantic_qualified_filters.py", "semantic_contexts.py", "semantic_procedure_state.py", "semantic_tokens.py",
     "semantic_load_payloads.py",
     "semantic_literals.py",
     "semantic_queries.py",

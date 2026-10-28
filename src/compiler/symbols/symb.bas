@@ -1645,14 +1645,19 @@ function symbLookupByNameAndClass _
 	dim as FBSYMCHAIN ptr chain_ = any
 
 	chain_ = symbLookupAt( ns, id, preserve_case, search_imports )
+	dim as longint semantic_lookup = fbSemanticModelLastLookup( )
+	dim as longint semantic_filter
+	dim as FBSYMBOL ptr semantic_result = NULL
 
 	'' any found?
 	if( chain_ <> NULL ) then
 		'' check if classes match
-		function = symbFindByClass( chain_, class_ )
-	else
-		function = NULL
+		semantic_result = symbFindByClass( chain_, class_ )
+		semantic_filter = fbSemanticModelLastFilter( )
 	end if
+
+	fbSemanticModelQualifiedFilterUse(semantic_lookup, semantic_filter, class_, semantic_result)
+	function = semantic_result
 
 end function
 

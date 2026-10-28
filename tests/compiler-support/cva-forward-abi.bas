@@ -9,8 +9,8 @@
 ''
 '' Responsibilities:
 ''
-''     - consume a variadic string through nested Cva_List parameters
-''     - exercise Cva_Start, Cva_Arg, and Cva_End with the host ABI
+''     - copy and consume a variadic string through nested Cva_List parameters
+''     - exercise Cva_Start, Cva_Copy, Cva_Arg, and Cva_End with the host ABI
 ''
 '' This file intentionally does NOT contain:
 ''
@@ -18,7 +18,10 @@
 ''     - C library printf calls
 
 function read_string cdecl( byval args as cva_list ) as integer
-	dim as const zstring ptr value = cva_arg( args, const zstring ptr )
+	dim as cva_list copied_args
+	cva_copy( copied_args, args )
+	dim as const zstring ptr value = cva_arg( copied_args, const zstring ptr )
+	cva_end( copied_args )
 	if( value = 0 ) then return -1
 	return len( *value )
 end function

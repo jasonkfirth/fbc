@@ -2614,6 +2614,14 @@ WithDefault()
         self.assertFalse([row for row in model.records["B"] if row[2] == "reference"
                           and source_range(row, 4) == self.span(source, "as SelfType", "SelfType")])
 
+    def test_effective_context_snapshots_reject_each_missing_native_option(self) -> None:
+        from contexts import check_completeness
+        check_completeness(self)
+
+    def test_effective_context_snapshots_preserve_modes_backends_and_type_abis(self) -> None:
+        from contexts import check_modes
+        check_modes(self)
+
     def test_effective_context_changes_follow_node_construction_and_module_reset(self) -> None:
         first = self.source('#lang "fblite"\noption base 1\ndim first_values(2) as integer\n'
                             'option base 0\ndim second_values(2) as integer\n'
@@ -5964,6 +5972,102 @@ Next
     def test_native_declaration_recovery_preserves_transport_and_rejects_corruption(self) -> None:
         from declaration_recovery import check_transport_and_corruption
         check_transport_and_corruption(self)
+
+    def test_parser_consumed_tokens_production_collector_copies_active_unions_and_bounds(self) -> None:
+        from consumed_tokens import check_guards
+        check_guards(self)
+
+    def test_parser_consumed_tokens_preserve_native_payloads_and_lookup_provenance(self) -> None:
+        from consumed_tokens import check_payloads
+        check_payloads(self)
+
+    def test_parser_consumed_tokens_preserve_wide_native_code_units(self) -> None:
+        from consumed_tokens import check_wide
+        check_wide(self)
+
+    def test_parser_consumed_tokens_preserve_abis_transport_modes_and_module_reset(self) -> None:
+        from consumed_tokens import check_modes
+        check_modes(self)
+
+    def test_parser_consumed_tokens_exclude_inactive_preprocessor_and_probe_reads(self) -> None:
+        from consumed_tokens import check_exclusions
+        check_exclusions(self)
+
+    def test_parser_consumed_tokens_reject_missing_or_inactive_payloads(self) -> None:
+        from consumed_tokens import check_corruption
+        check_corruption(self)
+
+    def test_native_procedure_state_production_collector_bounds_and_gates(self) -> None:
+        from procedure_state import check_guards
+        check_guards(self)
+
+    def test_native_procedure_state_preserves_error_handler_ownership_and_cleanup(self) -> None:
+        from procedure_state import check_handlers
+        check_handlers(self)
+
+    def test_native_procedure_state_preserves_gosub_storage_and_dispatch_actions(self) -> None:
+        from procedure_state import check_gosub
+        check_gosub(self)
+
+    def test_native_procedure_state_excludes_absent_and_reduced_storage(self) -> None:
+        from procedure_state import check_exclusions
+        check_exclusions(self)
+
+    def test_native_procedure_state_preserves_native_assembly_and_forced_setjmp_modes(self) -> None:
+        from procedure_state import check_assembly
+        check_assembly(self)
+
+    def test_native_procedure_state_preserves_type_abis_transport_and_module_reset(self) -> None:
+        from procedure_state import check_transport
+        check_transport(self)
+
+    def test_native_procedure_state_rejects_missing_or_fabricated_actions(self) -> None:
+        from procedure_state import check_corruption
+        check_corruption(self)
+
+    def test_native_qualified_filter_production_wrapper_links_only_executed_attempts(self) -> None:
+        from qualified_filters import check_guards
+        check_guards(self)
+
+    def test_native_qualified_filter_links_preserve_actual_attempts_and_returns(self) -> None:
+        from qualified_filters import check_links
+        check_links(self)
+
+    def test_native_qualified_filter_links_preserve_modes_abis_transport_and_reset(self) -> None:
+        from qualified_filters import check_modes
+        check_modes(self)
+
+    def test_native_qualified_filter_links_reject_missing_or_forged_attempts(self) -> None:
+        from qualified_filters import check_corruption
+        check_corruption(self)
+
+    def test_native_prototype_production_matcher_preserves_returns_rules_and_bounds(self) -> None:
+        from prototypes import check_guards
+        check_guards(self)
+
+    def test_native_prototype_records_actual_arity_types_and_reverse_parameter_order(self) -> None:
+        from prototypes import check_matches
+        check_matches(self)
+
+    def test_native_prototype_distinguishes_same_spelled_nominal_types(self) -> None:
+        from prototypes import check_nominal
+        check_nominal(self)
+
+    def test_native_prototype_preserves_method_property_and_descriptor_rules(self) -> None:
+        from prototypes import check_methods
+        check_methods(self)
+
+    def test_native_prototype_preserves_modes_abis_transport_and_module_reset(self) -> None:
+        from prototypes import check_modes
+        check_modes(self)
+
+    def test_native_prototype_preserves_matched_declarations_under_outer_mode_rejection(self) -> None:
+        from prototypes import check_rejection
+        check_rejection(self)
+
+    def test_native_prototype_rejects_missing_and_impossible_comparisons(self) -> None:
+        from prototypes import check_corruption
+        check_corruption(self)
 
     def test_native_symbol_filters_production_helpers_preserve_selection_access_and_type_rules(self) -> None:
         from filters import check_guards

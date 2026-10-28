@@ -24,6 +24,7 @@ private dim shared as SEMANTIC_LOOKUP_FRAME lookup_stack(0 to LOOKUP_DEPTH_LIMIT
 private dim shared as integer lookup_depth
 private dim shared as longint lookup_events, lookup_begins, lookup_ends
 private dim shared as longint lookup_probes, lookup_decisions, lookup_results
+private dim shared as longint lookup_last
 
 private function hEnabled( ) as integer
 	if( fbSemanticModelTypedExpressionsEnabled( ) = FALSE ) then return FALSE
@@ -32,6 +33,7 @@ private function hEnabled( ) as integer
 end function
 
 sub fbSemanticModelResetLookup( )
+	lookup_last = 0
 	lookup_depth = 0
 	lookup_events = 0
 	lookup_begins = 0
@@ -80,8 +82,14 @@ private function hSymbol( byval sym as FBSYMBOL ptr ) as string
 		fbSemanticModelNumber(pattrib) + TABCHAR + hName(sym) + TABCHAR + hName(owner) + TABCHAR + fbSemanticModelNumber(identity)
 end function
 
+function fbSemanticModelLastLookup( ) as longint
+	if( hEnabled( ) = FALSE ) then return 0
+	return lookup_last
+end function
+
 function fbSemanticModelLookupBegin( byref kind as const string, byval spelling as const zstring ptr, _
 	byval namespc as FBSYMBOL ptr, byval preserve_case as integer, byval search_imports as integer ) as longint
+	lookup_last = 0
 	if( hEnabled( ) = FALSE ) then return 0
 	if( (spelling = NULL) or (lookup_depth >= LOOKUP_DEPTH_LIMIT) or _
 		((kind <> "unqualified") and (kind <> "qualified")) ) then
@@ -93,21 +101,22 @@ function fbSemanticModelLookupBegin( byref kind as const string, byval spelling 
 	dim as longint parent
 	if( lookup_depth > 0 ) then parent = lookup_stack(lookup_depth - 1).identity
 	lookup_begins += 1
+	dim as longint identity = lookup_begins
 	with lookup_stack(lookup_depth)
-		.identity = lookup_begins
+		.identity = identity
 		.ordinal = 0
 	end with
 	lookup_depth += 1
 	dim as LEX_LOCATION source = lexGetLastLocation( )
 	'' This is the last consumed lexer point, not a fabricated location for
 	'' a token that the lexer may still be filling or looking ahead to.
-	hEvent("begin" + TABCHAR + fbSemanticModelNumber(lookup_begins) + TABCHAR + fbSemanticModelNumber(parent) + TABCHAR + _
+	hEvent("begin" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(parent) + TABCHAR + _
 		kind + TABCHAR + fbSemanticModelEscape(query) + TABCHAR + fbSemanticModelNumber(abs(preserve_case <> FALSE)) + TABCHAR + _
 		fbSemanticModelNumber(abs(search_imports <> FALSE)) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentContext( )) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + _
 		fbSemanticModelEscape(source.source_file) + TABCHAR + fbSemanticModelNumber(source.start_line) + TABCHAR + _
 		fbSemanticModelNumber(source.start_column) + TABCHAR + hSymbol(namespc))
-	return lookup_begins
+	return identity
 end function
 
 function fbSemanticModelLookupProbe( byref phase as const string, byval namespc as FBSYMBOL ptr, _
@@ -159,6 +168,7 @@ function fbSemanticModelLookupEnd( byval identity as longint, byval result as FB
 	hEvent("end" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(token) + TABCHAR + _
 		fbSemanticModelNumber(token_class) + TABCHAR + fbSemanticModelNumber(count) + TABCHAR + route)
 	lookup_depth -= 1
+	lookup_last = identity
 	return result
 end function
 

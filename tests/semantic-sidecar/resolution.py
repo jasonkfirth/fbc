@@ -113,6 +113,12 @@ def check_guards(test):
     executable = test.working / ("resolution-guards.exe" if test.native_windows else "resolution-guards")
     sources = [test.root / "tests/semantic-sidecar/resolution-guards.bas",
                test.root / "src/compiler/tooling/semantic-resolution.bas"]
+    copied_sources = []
+    for source in sources:
+        local = test.working / source.name
+        local.write_bytes(source.read_bytes())
+        copied_sources.append(local)
+    sources = copied_sources
     result = subprocess.run([str(test.compiler), "-prefix", str(test.toolchain_prefix), "-e",
                              "-i", str(test.root / "inc"), "-i", str(test.root / "src/compiler"),
                              "-m", "resolution-guards", "-x", str(executable), *map(str, sources)],

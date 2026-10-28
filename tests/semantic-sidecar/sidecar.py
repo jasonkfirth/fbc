@@ -51,6 +51,10 @@ from semantic_resolution import validate_resolution
 from semantic_resolution_contexts import validate_resolution_contexts
 from semantic_lookup import validate_lookup
 from semantic_filters import validate_filters
+from semantic_qualified_filters import validate_qualified_filters
+from semantic_contexts import validate_contexts
+from semantic_procedure_state import validate_procedure_state
+from semantic_tokens import validate_tokens
 from semantic_prototypes import validate_prototypes
 from semantic_load_payloads import validate_load_payloads, validate_load_assembly
 from semantic_datatypes import (NATIVE_PRIMITIVE_NAMES as PRIMITIVE_NAMES, STABLE_PRIMITIVE_NAMES,
@@ -1560,8 +1564,12 @@ class Model:
         validate_intrinsics(self, number, unescape, NODE_KINDS)
         validate_resolution(self, number, unescape, NODE_KINDS)
         validate_resolution_contexts(self, number, unescape, subject_modules)
+        validate_contexts(self, number)
+        validate_procedure_state(self, number, subject_modules)
         validate_lookup(self, number, unescape, subject_modules)
+        validate_tokens(self, number, unescape)
         validate_filters(self, number, unescape, subject_modules)
+        validate_qualified_filters(self, number, unescape, subject_modules)
         validate_prototypes(self, number, unescape, subject_modules)
         validate_driver_inputs(self, number, subject_modules)
         validate_data(self, number, unescape, subject_modules)

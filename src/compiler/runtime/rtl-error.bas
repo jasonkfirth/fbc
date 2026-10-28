@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
+#include once "tooling/semantic-procedure-state.bi"
 
 	dim shared as FB_RTL_PROCDEF funcdata( 0 to ... ) = _
 	{ _
@@ -500,6 +501,7 @@ sub rtlErrorSetHandler _
 					'' statement belongs to a nested lexical scope.
 					.lasthnd = symbAddImplicitVar( typeAddrOf( FB_DATATYPE_VOID ), NULL, FB_SYMBOPT_UNSCOPE )
 					.hndsaved = symbAddImplicitVar( FB_DATATYPE_INTEGER, NULL, FB_SYMBOPT_UNSCOPE )
+					fbSemanticModelProcedureState(parser.currproc, "handler-allocated")
 				end if
 
 				'' A local handler can be selected in either branch, or set
@@ -513,6 +515,7 @@ sub rtlErrorSetHandler _
 				astAdd( astNewASSIGN( astNewVAR( .lasthnd ), astNewVAR( previous ) ) )
 				astAdd( astNewASSIGN( astNewVAR( .hndsaved ), astNewCONSTi( TRUE ) ) )
 				astAdd( astNewLABEL( skipsave ) )
+				fbSemanticModelProcedureState(parser.currproc, "handler-save", "none", previous, skipsave)
 			end with
 			exit sub
 		end if
@@ -590,6 +593,7 @@ function rtlErrorSetModName _
 			.lastmod = symbAddTempVar( typeAddrOf( FB_DATATYPE_CHAR ) )
 			expr = astNewVAR( .lastmod )
 			function = astNewASSIGN( expr, proc )
+			fbSemanticModelProcedureState(sym, "module-name-save")
 		end with
 	else
 		function = proc
@@ -618,6 +622,7 @@ function rtlErrorSetFuncName _
 			.lastfun = symbAddTempVar( typeAddrOf( FB_DATATYPE_CHAR ) )
 			expr = astNewVAR( .lastfun )
 			function = astNewASSIGN( expr, proc )
+			fbSemanticModelProcedureState(sym, "function-name-save")
 		end with
 	else
 		function = proc

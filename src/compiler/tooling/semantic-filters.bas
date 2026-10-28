@@ -25,6 +25,7 @@ end type
 private dim shared as SEMANTIC_FILTER_FRAME filter_stack(0 to FILTER_DEPTH_LIMIT - 1)
 private dim shared as integer filter_depth
 private dim shared as longint filter_events, filter_begins, filter_ends, filter_candidates, filter_accesses
+private dim shared as longint filter_last, qualified_uses
 
 private function hEnabled( ) as integer
 	if( fbSemanticModelTypedExpressionsEnabled( ) = FALSE ) then return FALSE
@@ -33,6 +34,8 @@ private function hEnabled( ) as integer
 end function
 
 sub fbSemanticModelResetFilters( )
+	filter_last = 0
+	qualified_uses = 0
 	filter_depth = 0
 	filter_events = 0
 	filter_begins = 0
@@ -80,8 +83,33 @@ private function hSymbol( byval sym as FBSYMBOL ptr ) as string
 		fbSemanticModelNumber(pattrib) + TABCHAR + hName(sym) + TABCHAR + hName(owner) + TABCHAR + fbSemanticModelNumber(identity)
 end function
 
+function fbSemanticModelLastFilter( ) as longint
+	if( hEnabled( ) = FALSE ) then return 0
+	return filter_last
+end function
+
+sub fbSemanticModelQualifiedFilterUse( byval lookup_id as longint, byval filter_id as longint, _
+	byval requested_class as integer, byval result as FBSYMBOL ptr )
+	if( hEnabled( ) = FALSE ) then exit sub
+	if( lookup_id <= 0 or filter_id < 0 or filter_id > filter_begins or qualified_uses >= FILTER_EVENT_LIMIT ) then
+		fbSemanticModelFailAt("invalid native qualified class-filter link")
+		exit sub
+	end if
+	if( filter_id = 0 and result <> NULL ) then
+		fbSemanticModelFailAt("native qualified class-filter result has no filter")
+		exit sub
+	end if
+	qualified_uses += 1
+	'' The wrapper supplies actual completed attempt IDs immediately. No
+	'' lookup is repeated and no shared chain-pool node acquires metadata.
+	hProperty("native-qualified-filter:" + fbSemanticModelNumber(qualified_uses), _
+		fbSemanticModelNumber(lookup_id) + TABCHAR + fbSemanticModelNumber(filter_id) + TABCHAR + _
+		fbSemanticModelNumber(requested_class) + TABCHAR + hSymbol(result))
+end sub
+
 function fbSemanticModelFilterBegin( byref kind as const string, byval class_ as integer, _
 	byval dtype as integer, byval chain_ as FBSYMCHAIN ptr ) as longint
+	filter_last = 0
 	if( hEnabled( ) = FALSE ) then return 0
 	if( filter_depth >= FILTER_DEPTH_LIMIT ) then fbSemanticModelFailAt("native symbol filter depth limit"): return 0
 	select case kind
@@ -91,8 +119,9 @@ function fbSemanticModelFilterBegin( byref kind as const string, byval class_ as
 	dim as longint parent
 	if( filter_depth ) then parent = filter_stack(filter_depth - 1).identity
 	filter_begins += 1
+	dim as longint identity = filter_begins
 	with filter_stack(filter_depth)
-		.identity = filter_begins
+		.identity = identity
 		.ordinal = 0
 		.matched = FALSE
 		.variable = FALSE
@@ -101,11 +130,11 @@ function fbSemanticModelFilterBegin( byref kind as const string, byval class_ as
 	filter_depth += 1
 	dim as FBSYMBOL ptr head = NULL
 	if( chain_ <> NULL ) then head = chain_->sym
-	hEvent("begin" + TABCHAR + fbSemanticModelNumber(filter_begins) + TABCHAR + fbSemanticModelNumber(parent) + TABCHAR + _
+	hEvent("begin" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(parent) + TABCHAR + _
 		kind + TABCHAR + fbSemanticModelNumber(class_) + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentContext( )) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + fbSemanticModelNumber(abs(chain_ <> NULL)) + TABCHAR + hSymbol(head))
-	return filter_begins
+	return identity
 end function
 
 function fbSemanticModelFilterCandidate( byval sym as FBSYMBOL ptr, byval matches as integer, _
@@ -168,6 +197,7 @@ function fbSemanticModelFilterEnd( byval identity as longint, byval result as FB
 	filter_ends += 1
 	hEvent("end" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(selected) + TABCHAR + outcome + TABCHAR + hSymbol(result))
 	filter_depth -= 1
+	filter_last = identity
 	return result
 end function
 
@@ -175,6 +205,7 @@ sub fbSemanticModelFinishFilters( byval commit as integer )
 	if( commit and fbSemanticModelTypedExpressionsEnabled( ) ) then
 		'' These are native predicate inputs, not a second type policy in the
 		'' consumer. Datatype values follow the selected sidecar type ABI.
+		hProperty("native-qualified-filter-count", fbSemanticModelNumber(qualified_uses))
 		hProperty("native-symbol-filter-policy", fbSemanticModelNumber(FB_DT_TYPEMASK or FB_DT_PTRMASK) + TABCHAR + _
 			fbSemanticModelNumber(FB_SYMBATTRIB_SUFFIXED) + TABCHAR + fbSemanticModelTypeNumber(FB_DATATYPE_STRING) + TABCHAR + _
 			fbSemanticModelTypeNumber(FB_DATATYPE_USTRING) + TABCHAR + fbSemanticModelTypeNumber(FB_DATATYPE_FIXSTR) + TABCHAR + _

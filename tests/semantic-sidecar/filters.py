@@ -29,10 +29,12 @@ def check_guards(test):
     index = guard.index(marker)
     source.write_text(guard[:index] + "\n".join(bodies) + "\n\n" + guard[index:])
     executable = test.working / ("filters-guards.exe" if test.native_windows else "filters-guards")
+    collector = test.working / "semantic-filters.bas"
+    collector.write_bytes((test.root / "src/compiler/tooling/semantic-filters.bas").read_bytes())
     result = subprocess.run([str(test.compiler), "-prefix", str(test.toolchain_prefix), "-e",
                              "-i", str(test.root / "inc"), "-i", str(test.root / "src/compiler"),
                              "-m", source.stem, "-x", str(executable), str(source),
-                             str(test.root / "src/compiler/tooling/semantic-filters.bas")],
+                             str(collector)],
                             cwd=test.working, capture_output=True, text=True, timeout=120)
     test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
     result = subprocess.run([str(executable)], cwd=test.working, capture_output=True, text=True, timeout=120)
