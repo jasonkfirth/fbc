@@ -1,10 +1,10 @@
 /'
 	Project: FreeBASIC C backend
-	File: c-auto-descriptors.bi
+	File: backend/c/c-auto-descriptors.bi
 	Purpose: Omit unused metadata for private automatic fixed arrays.
 	Responsibilities: Prove descriptor initialization is pure and keep every
 	descriptor read, escaped address, lifetime wrapper and uncertain access.
-	This file does not remove array data or change its initialization or ABI.
+	This file intentionally does NOT contain: array data removal, initialization changes or ABI changes.
 '/
 
 type CAUTODESC

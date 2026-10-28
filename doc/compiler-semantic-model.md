@@ -5508,4 +5508,50 @@ configuration ownership, selected spelling/fallback agreement and restoration
 order. Scope depth is bounded at 1024 and events at one million. Observation
 does not repeat lexer queries, alter parser policy or retain native pointers.
 
+## Native default type policy
+
+`native-default-type-policy` advertises the actual DEF table in full and
+expression models. Binding models mark it unavailable. The native table spans
+ASCII 65 through 95, A through underscore, including punctuation after Z.
+Lookup uppercases ASCII lowercase initials and uses a separate dialect fallback
+outside that table. Initial table and fallback values are copied after native
+symbol initialization. No lookup or parser callback is repeated.
+
+Full contexts require `language-default def-type-65` through `def-type-95` and
+`def-type-other`. Values use the selected semantic datatype ABI. A committed
+range assignment invalidates the configuration cache only when an actual table
+entry changes. Repeated identical directives retain separate event receipts
+while their before/after context can remain the same.
+
+The module property `native-default-type-initial` has 66 tab-separated fields:
+the inclusive native first/last codes, 32 native dtype values and 32 mapped wire
+dtype values. Each table contains 31 entries followed by the outside fallback.
+`native-default-type:<ordinal>` has these 20 fields:
+
+```text
+raw-first raw-last effective-first effective-last native-dtype wire-dtype
+changed entry-CTX committed-CTX statement SRC logical-file
+start-line start-column end-line end-column physical
+macro-invocation macro-start-unit macro-offset-valid
+```
+
+Raw bounds are the setter arguments after the parser's uppercase conversion,
+before native clamping and reversal. ASC bounds are native unsigned integers;
+negative direct setter arguments consequently clamp to underscore. Ordinary
+source parsing supplies nonnegative character codes. The source point is the last token
+consumed before the actual assignment. Its native columns are zero based;
+physical eligibility uses the existing remap/generated-input check. Hidden
+macro graphs have zero unavailable expansion links. Expression output has zero
+configuration IDs but retains actual type values and range decisions, including
+updates made on a recovering parser route. Inactive or forbidden declarations
+that never invoke the setter have no range receipt. A QB DEF inside an uncalled
+procedure still changes this compiler-wide parsing policy; it is not a claim
+that the procedure executed.
+
+`native-default-type-count` closes a dense module event sequence, including
+zero. The collector bounds changes at one million and keeps no native pointers.
+The reader checks every initial value, native/wire ABI agreement, actual clamp
+and reversal rules, changed flags, before/after context values, source ownership,
+macro availability and every context's table at its construction position.
+
 <!-- end of compiler-semantic-model.md -->

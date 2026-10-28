@@ -808,4 +808,12 @@ cyclic dependencies and proves that the copied reader can import independently
 of the working tree. The source bytes inspected for imports are the bytes copied
 into the audit manifest.
 
+Default-type tests cover every DEF directive, native A-through-underscore table
+and outside fallback, clamped/reversed ranges, repeated assignments, declaration
+contexts and independent OPTION changes. Dialects, recovery, compile-time QB
+procedure effects, macros/includes/remaps/inactive code, both type ABIs,
+transport/reset, runtime parity and repaired-count corruptions have explicit
+checks. The production guard compiles the native getter/setter bodies with the
+actual observer, verifying unchanged native table behavior and the event bound.
+
 <!-- end of README.md -->

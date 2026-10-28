@@ -2618,6 +2618,38 @@ WithDefault()
         from contexts import check_completeness
         check_completeness(self)
 
+    def test_default_type_policy_preserves_every_native_def_directive(self) -> None:
+        from default_types import check_directives
+        check_directives(self)
+
+    def test_default_type_policy_preserves_clamping_reversal_repetition_and_contexts(self) -> None:
+        from default_types import check_ranges
+        check_ranges(self)
+
+    def test_default_type_policy_preserves_modes_abis_transport_and_module_reset(self) -> None:
+        from default_types import check_modes
+        check_modes(self)
+
+    def test_default_type_policy_preserves_dialect_and_recovery_routes(self) -> None:
+        from default_types import check_dialects_and_recovery
+        check_dialects_and_recovery(self)
+
+    def test_default_type_policy_preserves_macro_include_remap_and_inactive_origins(self) -> None:
+        from default_types import check_origins
+        check_origins(self)
+
+    def test_default_type_policy_rejects_missing_or_fabricated_tables_and_changes(self) -> None:
+        from default_types import check_corruption
+        check_corruption(self)
+
+    def test_default_type_policy_preserves_runtime_behavior_in_all_export_modes(self) -> None:
+        from default_types import check_runtime
+        check_runtime(self)
+
+    def test_default_type_policy_production_helpers_preserve_native_bounds_and_exclusions(self) -> None:
+        from default_types import check_guards
+        check_guards(self)
+
     def test_extern_mangling_preserves_native_scopes_and_declaration_contexts(self) -> None:
         from extern_mangling import check_scopes
         check_scopes(self)

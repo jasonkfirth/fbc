@@ -3,7 +3,7 @@
 '' Purpose: Represent BASIC object pointers without a natural-alignment promise.
 '' Responsibilities: Own scoped C typedefs and preserve pointee types, qualifiers
 ''     and pointer depth. GCC/Clang lower accesses using the actual alignment.
-'' This file intentionally does NOT change record layout, by-value objects,
+'' This file intentionally does NOT contain: changes to record layout, by-value objects,
 ''     function-pointer targets, builtin va_list types or machine-level ABI.
 
 private sub hCClearPointerViews( byval firstsection as integer )

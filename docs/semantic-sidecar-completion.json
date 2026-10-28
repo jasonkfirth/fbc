@@ -5,6 +5,7 @@
   "compiler": "out/semantic-goal-20261027/fbc-resolution-context-v86",
   "compiler_sha256": "2816a6a572f9f07c9c774f5a9b44e4c7a0e9d18dc63769858e6e219afab3d941",
   "verified_checks": [
+    "v97 passes eight native DEF policy families across GCC/Clang/LLVM: all13 registered directives;31 A-through-underscore slots and outside fallback; clamping/reversal/unsigned ASC behavior; repeated/context ownership; dialect/recovery/QB compile-time changes; macro/include/remap/inactive origins; ABIs/binary/reduced/reset; repaired-count corruption; twelve runtime partitions; and actual native helper/collector bounds. First mode fixture was corrected to explicit AS LONG for its modern-FB second module; final mode family passes74.847seconds. Structure checks351 BASIC source/header files and21 host graphs; binary contract matches. Seven affected regressions and v97 source qualification remain pending. Evidence: default-types-verification-v97.json.",
     "v96 qualifies ten targeted EXTERN/token families, the isolated frozen-reader import closure family, and eight affected regressions (301.918seconds). Native policy/context selections, nested/repeated restoration, source prototype and ordinary-variable ownership, rejected/inactive/unfinished routes, macro/include/remap origins, ABIs/transport/reset, byte-identical emission, twelve runtime partitions, repaired-count corruption and1024-depth/1000000-event bounds pass. Hidden-provenance tokens no longer expose internal macro IDs. Frozen v87 source audit completes9/9; it does not qualify newer sources. Current v96 source qualification is frozen separately for42 cases, with1/42 passed so far. Evidence: extern-contexts-verification-v96.json.",
     "All six v93 affected regressions passed in454.905seconds: actual lookup precedence/modes/ABIs, symbol filters, prototype property/descriptor matching, procedure error-state ownership and effective-context modes/backends/ABIs. Evidence: consumed-token-regressions-v93.log. The frozen v87 source audit remains7/9 passing; it does not qualify later v88-v93 source changes.",
     "CAP182 parser-consumed-tokens passed six targeted families plus an extended unknown-class/limit guard and strengthened foreign-macro/raw-wire dtype integrity checks on immutable v93, SHA25610e8af39c54eddcbb91d4bbd859b8f5553bff2fcca2069633ec7e332af809a8b. Actual lexer payloads, active unions, native byte/wide units, source/macro/lookup provenance, type ABIs/text-binary/reset/reduced exclusions, PP/probe/inactive suppression and corrected-total corruption are covered. Evidence: consumed-tokens-verification-v93.json. General token-to-AST/binding causality and all original51 acceptance scopes remain open.",
@@ -129,7 +130,7 @@
       "id": "G07",
       "title": "Record effective options and their source history",
       "status": "in-progress",
-      "evidence": "CTX/OPT capture all 64 compiler/default/language policy fields; USE preserves AST construction and declaration configuration. Temporal directive provenance, DEF ranges, keyword policy and complete source association remain. CAP183 now adds actual parser mangling to the full configuration cache and counted native EXTERN selection/restoration receipts in full and expression output. Repeated modes, syntax fallback, scopes left open by recovery, declaration B/OWN/ST and prototype DCL/USE ownership, macro/include/remap origins and compact exclusions pass v96. Effective DEF letter tables and remaining directive/pragma history are still required.",
+      "evidence": "CTX/OPT capture all 64 compiler/default/language policy fields; USE preserves AST construction and declaration configuration. Temporal directive provenance, DEF ranges, keyword policy and complete source association remain. CAP183 now adds actual parser mangling to the full configuration cache and counted native EXTERN selection/restoration receipts in full and expression output. Repeated modes, syntax fallback, scopes left open by recovery, declaration B/OWN/ST and prototype DCL/USE ownership, macro/include/remap origins and compact exclusions pass v96. The remaining directive/pragma history still requires coverage. CAP184 now copies the actual31-slot A..underscore DEF table plus dialect fallback, requires32 full-context entries, observes actual normalized setter changes and invalidates configuration only on native value changes. Eight v97 families pass, including native unsigned ASC clamping, repeated directives, dialect/recovery, macro/include/remap/inactive paths and runtime parity. Pragma stacks and remaining temporal directive history remain.",
       "required_positive": "OPTION BASE changes, DEF letter ranges, push/pop pragmas, EXTERN policy, #LANG, #CMDLINE restart, and per-module resets yield the expected contexts.",
       "required_negative": "Rolled-back attempts and popped options cannot leak into later facts; export must not enable options, checks, profiling, or debug information itself."
     },
@@ -486,7 +487,7 @@
       "required_negative": "Do not silently replace invalid bytes, interpret arbitrary compiler bytes as UTF-8, truncate embedded control data, double-unescape fields, or publish a complete model the declared consumer cannot read."
     }
   ],
-  "next_required_scope": "Finish frozen current-source qualification session18120 (42 cases, latest1/42 passed); preserve all original51 requirements. v96 targeted/freezer/eight-regression checks pass. Continue effective DEF letter policy and directive/pragma history, source-expression/binding causal closure, remaining23 missing/300 partial field contracts, and full class/route/target/use-def/CFG/effect/backend/fault acceptance.",
+  "next_required_scope": "Finish seven v97 affected regressions (session71828) and frozen v96 source audit (session18120,6/42 passed); then qualify v97 source/reader independently. Preserve all original51 requirements and remaining field/route/class/target/fault scopes. Continue pragma/directive history, source-expression/binding causal closure, use-def/CFG/effects and backend correspondence.",
   "active_verification": {
     "source_v76": {
       "state": "complete-all-81-cases-passed",
@@ -750,6 +751,24 @@
             "pid": 3513253,
             "start_ticks": "8281068",
             "state": "S"
+          }
+        ]
+      }
+    },
+    "default_types_v97": {
+      "state": "eight-targeted-passed-seven-regressions-running",
+      "compiler_sha256": "a8deb29b98014f799a9eeecb5956163a505e4b8e45168f28d1167a611192d426",
+      "verification_report": "out/semantic-goal-20261027/default-types-verification-v97.json",
+      "regressions": {
+        "state": "running",
+        "session": 71828,
+        "tests": 7,
+        "log": "out/semantic-goal-20261027/default-type-regressions-v97.log",
+        "processes": [
+          {
+            "pid": 3619728,
+            "start_ticks": "8576951",
+            "state": "R"
           }
         ]
       }

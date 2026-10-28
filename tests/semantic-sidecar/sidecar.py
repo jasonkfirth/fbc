@@ -54,6 +54,7 @@ from semantic_filters import validate_filters
 from semantic_qualified_filters import validate_qualified_filters
 from semantic_contexts import validate_contexts
 from semantic_extern import validate_extern
+from semantic_default_types import validate_default_types
 from semantic_procedure_state import validate_procedure_state
 from semantic_tokens import validate_tokens
 from semantic_prototypes import validate_prototypes
@@ -1567,6 +1568,7 @@ class Model:
         validate_resolution_contexts(self, number, unescape, subject_modules)
         validate_contexts(self, number)
         validate_extern(self, number, unescape)
+        validate_default_types(self, number, unescape)
         validate_procedure_state(self, number, subject_modules)
         validate_lookup(self, number, unescape, subject_modules)
         validate_tokens(self, number, unescape)

@@ -1,10 +1,10 @@
 /'
 	Project: FreeBASIC C backend
-	File: c-generated-leaves.bi
+	File: backend/c/c-generated-leaves.bi
 	Purpose: Omit unreachable compiler-generated procedures from C.
 	Responsibilities: Own per-output C-name records, observe actual references,
 	trace private dependencies, retain roots, and compact checked spans.
-	This file does not change BASIC access flags, ABI, or source diagnostics.
+	This file intentionally does NOT contain: BASIC access flag, ABI or source diagnostic changes.
 '/
 
 type CPROCLEAFEDGE as CPROCLEAFEDGE_

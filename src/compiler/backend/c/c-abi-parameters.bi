@@ -1,10 +1,10 @@
 /'
 	Project: FreeBASIC C backend
-	File: c-abi-parameters.bi
+	File: backend/c/c-abi-parameters.bi
 	Purpose: Express ignored formal parameters required by a calling contract.
 	Responsibilities: Own per-output names, observe procedure addresses, and
 	check unused parameters against the complete emitted procedure body.
-	This file does not change procedure types, call operands or BASIC diagnostics.
+	This file intentionally does NOT contain: procedure type, call operand or BASIC diagnostic changes.
 '/
 
 type CABIPARAM
