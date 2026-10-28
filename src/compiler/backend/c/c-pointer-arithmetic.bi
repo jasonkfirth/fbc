@@ -28,6 +28,28 @@ private function hCAccessPointerType _
 	return typeAddrOf(dtype)
 end function
 
+private sub hCReadAddress( byval address as EXPRNODE ptr, byval remaining as integer = 64 )
+	'' This tree is owned by a scalar read. Qualify its storage addresses,
+	'' including intermediate casts, without changing the loaded value type.
+	'' Stop at integer conversions and opaque text; neither proves a pointer
+	'' path. The budget bounds traversal of source-generated cast chains.
+	if( remaining <= 0 ) then exit sub
+	if( typeIsPtr(address->dtype) = FALSE ) then exit sub
+	if( typeGetPtrCnt(address->dtype) = 1 andalso _
+	    typeGetDtOnly(address->dtype) = FB_DATATYPE_FUNCTION ) then exit sub
+	address->dtype = typeAddrOf(typeSetIsConst(typeDeref(address->dtype)))
+	select case address->class
+	case EXPRCLASS_CAST
+		if( typeIsPtr(address->l->dtype) ) then hCReadAddress(address->l, remaining - 1)
+	case EXPRCLASS_BOP
+		select case address->op
+		case AST_OP_ADD, AST_OP_SUB
+			if( typeIsPtr(address->l->dtype) ) then hCReadAddress(address->l, remaining - 1)
+			if( typeIsPtr(address->r->dtype) ) then hCReadAddress(address->r, remaining - 1)
+		end select
+	end select
+end sub
+
 private function hCByteOffsetPointer( byval dtype as integer ) as integer
 
 	dtype = typeUnsetIsConst(dtype)
