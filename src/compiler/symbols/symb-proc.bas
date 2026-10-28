@@ -2537,7 +2537,7 @@ private function hCheckOvlProc _
 
 	if( semantic_exact_known ) then semantic_exact = exact_matches
 	fbSemanticModelResolutionScore(semantic_candidate, matchscore, is_match, semantic_exact_known, _
-		semantic_exact, params, semantic_reason, *err_num)
+		semantic_exact, params, semantic_reason, 0)
 	return matchscore
 
 end function
