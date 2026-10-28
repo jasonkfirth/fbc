@@ -56,6 +56,7 @@ function astNewBRANCH _
 	n->op.op = op
 	n->op.ex = label
 	n->op.options = AST_OPOPT_ALLOCRES
+	n->op.semantic_scope_exit = 0
 
 end function
 

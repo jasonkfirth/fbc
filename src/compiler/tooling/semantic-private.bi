@@ -26,6 +26,7 @@ declare sub fbSemanticModelAppendProvenance( byref value as const string )
 declare sub fbSemanticModelFail( )
 declare sub fbSemanticModelFailAt( byref reason as const string )
 declare sub fbSemanticModelMarkSourceRemapped( byval depth as integer )
+declare function fbSemanticModelClaimWideLiteralPrefix( byval sym as FBSYMBOL ptr ) as integer
 declare function fbSemanticModelNextVisit( ) as ulongint
 declare function fbSemanticModelVisitSymbol _
 	( byval sym as FBSYMBOL ptr, byval visit as ulongint ) as integer

@@ -126,6 +126,7 @@
 #include once "tooling/semantic-emission-names.bi"
 #include once "tooling/semantic-backend-abi.bi"
 #include once "tooling/semantic-call-abi.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
@@ -1548,13 +1549,15 @@ end sub
 private sub hEmitCtorDtorArrayElement _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byref s as string _
+		byref s as string, _
+		byref kind as const string _
 	)
 	dim as integer priority = symbGetProcPriority( proc )
 
 	if( len( s ) > 0 ) then
 		s += ", "
 	end if
+	dim as integer semantic_start = len(s)
 
 	'' LLVM's ctor/dtor entries include an optional associated data pointer.
 	'' Keep it null for FreeBASIC module initialization procedures.
@@ -1569,6 +1572,8 @@ private sub hEmitCtorDtorArrayElement _
 	s += *symbGetMangledName( proc )
 	s += ", i8* null"
 	s += " }"
+	fbSemanticModelStartupEmission(proc, kind, "llvm", "array-entry", str(priority), _
+		iif(kind = "constructor", "llvm.global_ctors", "llvm.global_dtors"), mid(s, semantic_start + 1))
 
 end sub
 
@@ -1579,10 +1584,10 @@ private sub hAddGlobalCtorDtor( byval proc as FBSYMBOL ptr )
 
 	if( symbGetIsGlobalCtor( proc ) ) then
 		ctx.ctorcount += 1
-		hEmitCtorDtorArrayElement( proc, ctx.ctors )
+		hEmitCtorDtorArrayElement( proc, ctx.ctors, "constructor" )
 	elseif( symbGetIsGlobalDtor( proc ) ) then
 		ctx.dtorcount += 1
-		hEmitCtorDtorArrayElement( proc, ctx.dtors )
+		hEmitCtorDtorArrayElement( proc, ctx.dtors, "destructor" )
 	end if
 end sub
 
@@ -2984,6 +2989,29 @@ end sub
 
 #include once "backend/llvm/ir-llvm-memory.bi"
 
+private sub hPrepareValistAddress( byval v as IRVREG ptr )
+	if( v->typ = IR_VREGTYPE_REG ) then
+		assert( typeIsPtr( v->dtype ) )
+		exit sub
+	end if
+
+	if( (v->sym <> NULL) andalso symbIsParamVarByval( v->sym ) andalso _
+	    (symbGetValistType( v->dtype, v->subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
+		'' A byval cva_list parameter is already a pointer to the array's
+		'' first element. Its local symbol holds that pointer value.
+		var subtype = v->subtype
+		hPrepareAddress( v )
+		_setVregDataType( v, typeAddrOf( typeAddrOf( FB_DATATYPE_STRUCT ) ), subtype )
+		var loaded = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
+		hWriteLine( hVregToStr( loaded ) + " = load " + _
+		    hEmitType( loaded->dtype, subtype ) + ", " + _
+		    hEmitType( v->dtype, subtype ) + " " + hVregToStr( v ) )
+		*v = *loaded
+	else
+		hPrepareAddress( v )
+	end if
+end sub
+
 private function hLoadCallArg( byval arg as IRCALLARG ptr ) as IRVREG ptr
 	dim varg as IRVREG ptr = arg->vr
 	hInternalCommand( "arg " + vregPretty( varg ) )
@@ -3030,7 +3058,7 @@ private function hLoadCallArg( byval arg as IRCALLARG ptr ) as IRVREG ptr
 	    (symbGetValistType( symbGetFullType( arg->param ), _
 	                         symbGetSubtype( arg->param ) ) = FB_CVA_LIST_BUILTIN_C_STD) andalso _
 	    (typeIsPtr( varg->dtype ) = FALSE) ) then
-		hPrepareAddress( varg )
+		hPrepareValistAddress( varg )
 	else
 		hLoadVreg( varg )
 	end if
@@ -3299,29 +3327,6 @@ private sub _emitJmpTb _
 
 	hWriteLine( "]" )
 
-end sub
-
-private sub hPrepareValistAddress( byval v as IRVREG ptr )
-	if( v->typ = IR_VREGTYPE_REG ) then
-		assert( typeIsPtr( v->dtype ) )
-		exit sub
-	end if
-
-	if( (v->sym <> NULL) andalso symbIsParamVarByval( v->sym ) andalso _
-	    (symbGetValistType( v->dtype, v->subtype ) = FB_CVA_LIST_BUILTIN_C_STD) ) then
-		'' A byval cva_list parameter is already a pointer to the array's
-		'' first element. Its local symbol holds that pointer value.
-		var subtype = v->subtype
-		hPrepareAddress( v )
-		_setVregDataType( v, typeAddrOf( typeAddrOf( FB_DATATYPE_STRUCT ) ), subtype )
-		var loaded = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
-		hWriteLine( hVregToStr( loaded ) + " = load " + _
-		    hEmitType( loaded->dtype, subtype ) + ", " + _
-		    hEmitType( v->dtype, subtype ) + " " + hVregToStr( v ) )
-		*v = *loaded
-	else
-		hPrepareAddress( v )
-	end if
 end sub
 
 private sub _emitMacro _

@@ -27,6 +27,7 @@
 #include once "core/fbint.bi"
 #include once "tooling/semantic-type-shapes.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-link.bi"
 #include once "parser/parser.bi"
@@ -2240,12 +2241,14 @@ function cProcHeader _
 		end if
 		symbAddGlobalCtor( proc )
 		symbSetProcPriority( proc, priority )
+		fbSemanticModelStartupPriority(proc, priority)
 	elseif( stats and FB_SYMBSTATS_GLOBALDTOR ) then
 		if( proc->attrib and (FB_SYMBATTRIB_VIS_PRIVATE or FB_SYMBATTRIB_VIS_PROTECTED) ) then
 			errReport( FB_ERRMSG_NOACCESSTODTOR, TRUE )
 		end if
 		symbAddGlobalDtor( proc )
 		symbSetProcPriority( proc, priority )
+		fbSemanticModelStartupPriority(proc, priority)
 	end if
 
 	if( tk = FB_TK_PROPERTY ) then

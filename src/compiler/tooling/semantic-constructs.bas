@@ -24,6 +24,7 @@ declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
 
 type SEMANTIC_SOURCE_STATEMENT
 	identity as longint
+	errors_at_begin as integer
 	parent as longint
 	compound as longint
 	source as LEX_LOCATION
@@ -83,10 +84,18 @@ type SEMANTIC_RESULT_COUNTS
 	exits as longint
 end type
 dim shared as SEMANTIC_RESULT_COUNTS semantic_result_counts( )
+'' These counters describe observed parser boundaries, including unfinished
+'' recovery stacks. They do not certify an entire source file as valid.
+private dim shared as longint validity_statement_begins, validity_statement_ends
+private dim shared as longint validity_compound_begins, validity_compound_ends
 
 declare sub hIfStatementEnd( byval slot as integer )
 
 sub fbSemanticModelResetConstructs( )
+	validity_statement_begins = 0
+	validity_statement_ends = 0
+	validity_compound_begins = 0
+	validity_compound_ends = 0
 	erase semantic_result_counts
 	deallocate(semantic_statements)
 	deallocate(semantic_compounds)
@@ -96,6 +105,21 @@ sub fbSemanticModelResetConstructs( )
 	semantic_statement_capacity = 0
 	semantic_compound_depth = 0
 	semantic_compound_capacity = 0
+end sub
+
+private sub hValidityProperty( byref key as const string, byref value as const string )
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "module" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + key + TABCHAR + fbSemanticModelEscape(value))
+end sub
+
+sub fbSemanticModelFinishSourceValidity( byval commit as integer )
+	if( commit and fbSemanticModelEnabled( ) ) then
+		hValidityProperty("native-source-validity-counts", "native-parser" + TABCHAR + _
+			fbSemanticModelNumber(validity_statement_begins) + TABCHAR + fbSemanticModelNumber(validity_statement_ends) + TABCHAR + _
+			fbSemanticModelNumber(semantic_statement_depth) + TABCHAR + fbSemanticModelNumber(validity_compound_begins) + TABCHAR + _
+			fbSemanticModelNumber(validity_compound_ends) + TABCHAR + fbSemanticModelNumber(semantic_compound_depth) + TABCHAR + _
+			fbSemanticModelNumber(errGetCount( )))
+	end if
 end sub
 
 function fbSemanticModelResultInputCount( byval identity as longint ) as longint
@@ -278,6 +302,7 @@ function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval toke
 	dim as longint identity = fbSemanticModelNextDetailIdentity( )
 	with semantic_statements[semantic_statement_depth]
 		.identity = identity
+		.errors_at_begin = errGetCount( )
 		.parent = parent
 		.compound = compound
 		.source = source
@@ -307,11 +332,14 @@ function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval toke
 		end if
 	end with
 	semantic_statement_depth += 1
+	validity_statement_begins += 1
 	fbSemanticModelAppendProvenance("ST" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(parent) + _
 		TABCHAR + fbSemanticModelNumber(compound) + TABCHAR + fbSemanticModelNumber(owner) + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + fbSemanticModelNumber(context) + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + fbSemanticModelNumber(parser.stmt.cnt) + _
 		TABCHAR + fbSemanticModelNumber(token) + TABCHAR + fbSemanticModelNumber(token_class) + TABCHAR + hLocation(source))
+	hValidityProperty("native-statement-open:" + fbSemanticModelNumber(identity), _
+		fbSemanticModelNumber(semantic_statements[semantic_statement_depth - 1].errors_at_begin))
 	fbSemanticModelMacroOrigin("statement", identity, source.macro_identity, "start")
 	return identity
 end function
@@ -327,6 +355,9 @@ sub fbSemanticModelStatementEnd( byval identity as longint, byref route as const
 	dim as LEX_LOCATION end_site = ending
 	dim as string outcome = iif(errGetCount( ) = errors_before, "parsed", "recovered")
 	if( route = "unmatched" ) then outcome = "unmatched"
+	validity_statement_ends += 1
+	hValidityProperty("native-statement-close:" + fbSemanticModelNumber(identity), _
+		fbSemanticModelNumber(errors_before) + TABCHAR + fbSemanticModelNumber(errGetCount( )) + TABCHAR + route + TABCHAR + outcome)
 	'' An unmatched first statement has no last consumed token. Later unmatched
 	'' statements can retain the preceding statement's endpoint instead. Use
 	'' the observed opening point in these cases, without inventing an extent.
@@ -524,6 +555,7 @@ function fbSemanticModelConstructBegin( byval token as integer ) as longint
 		.if_else = FALSE
 	end with
 	semantic_compound_depth += 1
+	validity_compound_begins += 1
 	fbSemanticModelAppendProvenance("BLK" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelNumber(parent) + _
 		TABCHAR + fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(owner) + TABCHAR + kind + _
 		TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + fbSemanticModelNumber(context) + TABCHAR + hLocation(source))
@@ -553,6 +585,7 @@ sub fbSemanticModelConstructEnd( byval identity as longint, byref ending as LEX_
 		end with
 	end if
 	semantic_compound_depth -= 1
+	validity_compound_ends += 1
 	fbSemanticModelAppendProvenance("BEND" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + TABCHAR + hLocation(ending))
 	fbSemanticModelMacroOrigin("construct", identity, ending.macro_identity, "end")

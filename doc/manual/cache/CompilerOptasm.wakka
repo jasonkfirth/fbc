@@ -1,5 +1,5 @@
 {{fbdoc item="title" value="Compiler Option: -asm"}}----
-Set assembler format for inline assembly under -gen gcc
+Set assembler format for inline assembly under -gen gcc or -gen llvm
 
 {{fbdoc item="syntax"}}##
 	**-asm** < //format// >
@@ -9,7 +9,7 @@ Set assembler format for inline assembly under -gen gcc
 		The assembler format: //intel// or //att//
 
 {{fbdoc item="desc"}}
-	The ##-asm## compiler option sets the assembler format for inline ##[[KeyPgAsm|Asm]]## blocks when using [[CompilerOptgen|-gen gcc]].
+	The ##-asm## compiler option sets the assembler format for x86 and x86_64 inline ##[[KeyPgAsm|Asm]]## blocks when using [[CompilerOptgen|-gen gcc]] or [[CompilerOptgen|-gen llvm]].
 	
 		- ##-gen gcc -asm intel##: FB inline assembly blocks must use FB's usual Intel syntax format. Under -gen gcc, fbc will try to translate it to gcc's format automatically. For example:
 			%%(freebasic)
@@ -32,6 +32,11 @@ print a
 %%
 	
 	The x86 ASM backend ([[CompilerOptgen|-gen gas]]) currently only supports ##-asm intel## and using ##-asm att## results in an error.
+
+	With ##-gen llvm##, ##-asm## selects the dialect used by the native LLVM
+	inline-assembly backend. For example, ##-asm att## accepts AT&T register
+	syntax such as ##movl %eax, %ebx##. The GCC extended constraint syntax shown
+	above remains specific to ##-gen gcc##.
 
 {{fbdoc item="see"}}
 	- [[KeyPgDdfbasm|__FB_ASM__]]

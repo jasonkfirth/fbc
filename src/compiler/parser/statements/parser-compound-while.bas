@@ -27,6 +27,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '':::::
 ''WhileStmtBegin  =   WHILE Expression .
@@ -52,7 +53,9 @@ sub cWhileStmtBegin( )
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/statements/parser-compound-while.bas", __LINE__)
 	end if
 
 	'' branch

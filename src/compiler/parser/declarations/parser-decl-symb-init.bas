@@ -29,6 +29,7 @@
 #include once "backend/ir.bi"
 #include once "symbols/symb.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare function fbSemanticModelFullEnabled( ) as integer
 
@@ -142,7 +143,9 @@ private function hDoAssign _
 			errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 			'' error recovery: create a fake expression
 			astDelTree( expr )
-			expr = astNewCONSTz( ctx.dtype, ctx.subtype )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTz( ctx.dtype, ctx.subtype ), "replacement-zero", __FUNCTION__, _
+				"parser/declarations/parser-decl-symb-init.bas", __LINE__)
 		end if
 
 	else
@@ -207,7 +210,9 @@ private function hElmInit _
 		hSkipUntil( CHAR_COMMA )
 
 		'' generate an expression matching the symbol's type
-		expr = astNewCONSTz( ctx.dtype, ctx.subtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTz( ctx.dtype, ctx.subtype ), "replacement-zero", __FUNCTION__, _
+			"parser/declarations/parser-decl-symb-init.bas", __LINE__)
 	end if
 
 	'' to hand it back if necessary
@@ -463,7 +468,9 @@ private function hUDTInitObject( byref ctx as FB_INITCTX ) as integer
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-symb-init.bas", __LINE__)
 	end if
 
 	'' Constructor selection can replace the parsed input with a call node.

@@ -26,6 +26,7 @@
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-numeric-conversions.bi"
+#include once "tooling/semantic-temporaries.bi"
 #include once "runtime/rtl.bi"
 
 declare sub fbSemanticModelAssociateTemporaryDestructorsForRange _
@@ -280,6 +281,7 @@ function astNewIIF _
 	dim as integer call_true_defctor = any, call_false_defctor = any
 	dim as FBSYMBOL ptr falselabel = any, subtype = any, temp = any
 	dim as ulongint semantic_dtor_generation = ast.dtorlistgeneration
+	dim as longint semantic_true_flush = 0, semantic_false_flush = 0
 
 	function = NULL
 
@@ -467,10 +469,10 @@ function astNewIIF _
 	'' Zero (0) can be given for one or both cookies, in case the
 	'' corresponding expression won't have any temp var to destruct.
 	if( truecookie ) then
-		truexpr  = astNewLINK( truexpr , astDtorListFlush( truecookie  ), AST_LINK_RETURN_NONE )
+		truexpr  = astNewLINK( truexpr , astDtorListFlush( truecookie, @semantic_true_flush ), AST_LINK_RETURN_NONE )
 	end if
 	if( falsecookie ) then
-		falsexpr = astNewLINK( falsexpr, astDtorListFlush( falsecookie ), AST_LINK_RETURN_NONE )
+		falsexpr = astNewLINK( falsexpr, astDtorListFlush( falsecookie, @semantic_false_flush ), AST_LINK_RETURN_NONE )
 	end if
 
 	n = astNewNode( AST_NODECLASS_IIF, dtype, subtype )
@@ -479,6 +481,7 @@ function astNewIIF _
 	n->l = varexpr
 	n->r = astNewLINK( condexpr, astNewLINK( truexpr, falsexpr, AST_LINK_RETURN_NONE ), AST_LINK_RETURN_NONE )
 	n->iif.falselabel = falselabel
+	fbSemanticModelTemporaryConditional(temp, semantic_true_flush, semantic_false_flush)
 
 	function = n
 end function

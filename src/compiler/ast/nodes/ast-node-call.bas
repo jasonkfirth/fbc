@@ -29,6 +29,7 @@
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-loads.bi"
 #include once "tooling/semantic-call-abi.bi"
 
 sub astCallInit
@@ -411,6 +412,7 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 		dim as FBSYMBOL ptr semantic_caller = NULL
 		if( astGetProc( ) <> NULL ) then semantic_caller = astGetProc( )->sym
 		fbSemanticModelCallAbiContext(n, semantic_caller)
+		fbSemanticModelLoadCall(proc, is_indirect, "call")
 		if( is_indirect ) then
 			irEmitCALLPTR( proc, call_target, vr, bytestopop, reclevel )
 		else
@@ -434,6 +436,7 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 		if( pcvr ) then
 			if( ast.doemit ) then
 				irEmitPUSHARG( NULL, pcvr, 0, reclevel, NULL )
+				fbSemanticModelLoadCall(n->call.profend->sym, FALSE, "profile-end")
 				irEmitCALLFUNCT( n->call.profend->sym, 0, NULL, reclevel )
 			end if
 		end if

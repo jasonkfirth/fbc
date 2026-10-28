@@ -39,6 +39,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '':::::
 sub hSkipUntil _
@@ -50,25 +51,47 @@ sub hSkipUntil _
 	)
 
 	dim as integer prntcnt
+	dim as integer semantic_capture = fbSemanticModelRecoveryEnabled( )
+	dim as integer semantic_started, semantic_stopped_token, semantic_consumed_stop
+	dim as integer semantic_errors = errGetCount( )
+	dim as longint semantic_skipped
+	dim as LEX_LOCATION semantic_first, semantic_stopping
+	dim as string semantic_reason
 
 	prntcnt = 0
 	do
-		select case as const lexGetToken( flags )
+		dim as integer current_token = lexGetToken( flags )
+		if( semantic_capture ) then
+			'' Read the already-buffered location. lexGetCurrentLocation also
+			'' captures identifier hints, which discarded tokens must not add.
+			if( semantic_started = FALSE ) then
+				semantic_first = lex.ctx->head->source
+				semantic_started = TRUE
+			end if
+			semantic_stopping = lex.ctx->head->source
+			semantic_stopped_token = current_token
+		end if
+		select case as const current_token
 		case FB_TK_EOL
+			if( semantic_capture ) then semantic_reason = "end-of-line"
 			exit do
 
 		case FB_TK_STMTSEP, FB_TK_COMMENT, FB_TK_REM
 			'' anything but EOL? exit..
 			if( token <> FB_TK_EOL ) then
+				if( semantic_capture ) then semantic_reason = "statement-boundary"
 				exit do
 			end if
 
 		case FB_TK_EOF
+			if( semantic_capture ) then fbSemanticModelRecoverySkip(token, doeat, flags, stop_on_comma, _
+				semantic_skipped, current_token, FALSE, prntcnt, semantic_errors, semantic_first, semantic_stopping, "end-of-file")
 			exit sub
 
 		'' '('?
 		case CHAR_LPRNT
 			if( token = CHAR_LPRNT ) then
+				if( semantic_capture ) then semantic_reason = "target"
 				exit do
 			end if
 
@@ -84,6 +107,7 @@ sub hSkipUntil _
 				prntcnt -= 1
 			else
 				if( token = CHAR_RPRNT ) then
+					if( semantic_capture ) then semantic_reason = "target"
 					exit do
 				end if
 			end if
@@ -94,6 +118,7 @@ sub hSkipUntil _
 				prntcnt -= 1
 			else
 				if( token = CHAR_RBRACE ) then
+					if( semantic_capture ) then semantic_reason = "target"
 					exit do
 				end if
 			end if
@@ -104,6 +129,7 @@ sub hSkipUntil _
 			if( (token = CHAR_COMMA) or stop_on_comma ) then
 				'' not inside parentheses?
 				if( prntcnt = 0 ) then
+					if( semantic_capture ) then semantic_reason = "comma"
 					exit do
 				end if
 			end if
@@ -111,12 +137,14 @@ sub hSkipUntil _
 		case else
 			'' token found? exit..
 			if( lexGetToken( flags ) = token ) then
+				if( semantic_capture ) then semantic_reason = "target"
 				exit do
 			end if
 
 		end select
 
 		lexSkipToken( flags )
+		if( semantic_capture ) then semantic_skipped += 1
 	loop
 
 	'' skip token?
@@ -124,8 +152,15 @@ sub hSkipUntil _
 		'' same?
 		if( token = lexGetToken( flags ) ) then
 			lexSkipToken( flags )
+			if( semantic_capture ) then
+				semantic_skipped += 1
+				semantic_consumed_stop = TRUE
+			end if
 		end if
 	end if
+	if( semantic_capture ) then fbSemanticModelRecoverySkip(token, doeat, flags, stop_on_comma, _
+		semantic_skipped, semantic_stopped_token, semantic_consumed_stop, prntcnt, semantic_errors, _
+		semantic_first, semantic_stopping, semantic_reason)
 
 end sub
 
@@ -201,7 +236,9 @@ function hMatchExpr _
 			return NULL
 		end if
 
-		expr = astNewCONSTz( dtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTz( dtype ), "replacement-zero", __FUNCTION__, _
+			"parser/parser-helper.bas", __LINE__)
 	end if
 
 	function = expr
@@ -287,7 +324,9 @@ sub hMaybeComplainTypeUsage _
 		if( symbCheckAccessStruct( subtype ) = FALSE ) then
 			errReport( FB_ERRMSG_ILLEGALMEMBERACCESS )
 			'' error recovery: fake a type
-			dtype = FB_DATATYPE_INTEGER
+			dtype = fbSemanticModelRecoveryType( _
+				FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+				"parser/parser-helper.bas", __LINE__)
 			subtype = NULL
 			lgt = typeGetSize( dtype )
 		end if
@@ -332,7 +371,9 @@ sub hSymbolType _
 	if( cSymbolType( dtype, subtype, lgt, , options ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
 		'' error recovery: fake a type
-		dtype = FB_DATATYPE_INTEGER
+		dtype = fbSemanticModelRecoveryType( _
+			FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+			"parser/parser-helper.bas", __LINE__)
 		subtype = NULL
 		lgt = typeGetSize( dtype )
 	end if
@@ -341,7 +382,9 @@ sub hSymbolType _
 	if( dtype = FB_DATATYPE_VOID ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		'' error recovery: fake a type
-		dtype = typeAddrOf( dtype )
+		dtype = fbSemanticModelRecoveryType( _
+			typeAddrOf( dtype ), "pointer", __FUNCTION__, _
+			"parser/parser-helper.bas", __LINE__)
 		subtype = NULL
 		lgt = typeGetSize( dtype )
 	end if
@@ -350,7 +393,9 @@ sub hSymbolType _
 	if( typeHasMangleDt( dtype ) and (typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_VOID) ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		'' error recovery: fake a type
-		dtype = typeAddrOf( dtype )
+		dtype = fbSemanticModelRecoveryType( _
+			typeAddrOf( dtype ), "pointer", __FUNCTION__, _
+			"parser/parser-helper.bas", __LINE__)
 		subtype = NULL
 		lgt = typeGetSize( dtype )
 	end if
@@ -463,7 +508,9 @@ sub hComplainAboutEllipsis _
 		if( exprTB(i,1) = NULL ) then
 			errReport( errmsg )
 			'' Error recovery: Allow further use of the exprTB() as if there were no ellipsis
-			exprTB(i,1) = astNewCONSTi( 0 )
+			exprTB(i,1) = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/parser-helper.bas", __LINE__)
 		end if
 	next
 

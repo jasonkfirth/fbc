@@ -47,9 +47,11 @@ sub irInit( )
 	ir.options = 0
 
 	ir.vtbl.init( )
+	irObserveInit( )
 end sub
 
 sub irEnd( )
+	irObserveEnd( )
 	ir.vtbl.end( )
 
 	ir.options = 0

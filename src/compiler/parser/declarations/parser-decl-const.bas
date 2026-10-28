@@ -32,6 +32,7 @@ declare sub fbSemanticModelTypeAliasDeclaration(byval subject as FBSYMBOL ptr, b
 
 #include once "ast/ast.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as longint) as longint
 declare sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as longint, _
@@ -57,7 +58,8 @@ private sub hGetType( byref dtype as integer, byref subtype as FBSYMBOL ptr )
 		fbSemanticModelTypeShapeDeclaration()
 		if( cSymbolType( dtype, subtype ) = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDIDENTIFIER )
-			dtype = FB_DATATYPE_INTEGER
+			dtype = fbSemanticModelRecoveryType(FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+				"parser/declarations/parser-decl-const.bas", __LINE__)
 			subtype = NULL
 		end if
 
@@ -69,7 +71,9 @@ private sub hGetType( byref dtype as integer, byref subtype as FBSYMBOL ptr )
 		     FB_DATATYPE_STRUCT, FB_DATATYPE_FWDREF
 			errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 			'' error recovery: discard type
-			dtype = FB_DATATYPE_INVALID
+			dtype = fbSemanticModelRecoveryType( _
+				FB_DATATYPE_INVALID, "discarded", __FUNCTION__, _
+				"parser/declarations/parser-decl-const.bas", __LINE__)
 			subtype = NULL
 		end select
 	else
@@ -198,7 +202,9 @@ private sub cConstAssign _
 			dtype = FB_DATATYPE_INTEGER
 		end if
 		'' 2. Create a fake expression
-		expr = astNewCONSTz( dtype, subtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTz( dtype, subtype ), "replacement-zero", __FUNCTION__, _
+			"parser/declarations/parser-decl-const.bas", __LINE__)
 	end if
 
 	'' Keep the observation identity, not an AST pointer that conversion can free.
@@ -242,7 +248,9 @@ private sub cConstAssign _
 			errReportEx( FB_ERRMSG_EXPECTEDCONST, id )
 			'' error recovery: create a fake node
 			astDelTree( expr )
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/declarations/parser-decl-const.bas", __LINE__)
 			exprdtype = FB_DATATYPE_INTEGER
 		end if
 
@@ -255,7 +263,9 @@ private sub cConstAssign _
 				astDelTree( expr )
 				exprdtype = dtype
 				subtype = NULL
-				expr = astNewCONSTstr( NULL )
+				expr = fbSemanticModelRecoveryNode( _
+					astNewCONSTstr( NULL ), "replacement-expression", __FUNCTION__, _
+					"parser/declarations/parser-decl-const.bas", __LINE__)
 			end if
 
 			'' Convert expression to given type if needed
@@ -265,7 +275,9 @@ private sub cConstAssign _
 				if( expr = NULL ) then
 					errReportEx( FB_ERRMSG_INVALIDDATATYPES, id )
 					'' error recovery: create a fake node
-					expr = astNewCONSTi( 0 )
+					expr = fbSemanticModelRecoveryNode( _
+						astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+						"parser/declarations/parser-decl-const.bas", __LINE__)
 					dtype = FB_DATATYPE_INTEGER
 					subtype = NULL
 				elseif( astIsCONST( expr ) = FALSE ) then
@@ -274,7 +286,9 @@ private sub cConstAssign _
 					'' Reading its union as a constant can silently invent a value.
 					errReportEx( FB_ERRMSG_EXPECTEDCONST, id )
 					astDelTree( expr )
-					expr = astNewCONSTi( 0 )
+					expr = fbSemanticModelRecoveryNode( _
+						astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+						"parser/declarations/parser-decl-const.bas", __LINE__)
 					dtype = FB_DATATYPE_INTEGER
 					subtype = NULL
 				end if

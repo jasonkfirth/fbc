@@ -27,6 +27,7 @@
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-loads.bi"
 #include once "lexer/lex.bi"
 
 '':::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -138,6 +139,7 @@ function astLoadBOUNDCHK _
 		           label, IR_EMITOPT_NONE )
 		irEmitJUMPPTR( vr )
 		irEmitLABELNF( label )
+		fbSemanticModelLoadCheck("bounds-or-dimensions", label)
 	end if
 
 	''
@@ -232,6 +234,7 @@ function astLoadPTRCHK _
 		           label, IR_EMITOPT_NONE )
 		irEmitJUMPPTR( vr )
 		irEmitLABELNF( label )
+		fbSemanticModelLoadCheck("null-pointer", label)
 	end if
 
 	'' re-load, see above

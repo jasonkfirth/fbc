@@ -29,6 +29,7 @@
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 enum FB_CASETYPE
 	FB_CASETYPE_SINGLE
@@ -110,7 +111,9 @@ sub cSelectStmtBegin( )
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/statements/parser-compound-select.bas", __LINE__)
 	end if
 
 	dim as longint semantic_expression = expr->semantic_expression
@@ -121,7 +124,9 @@ sub cSelectStmtBegin( )
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		astDelTree( expr )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/statements/parser-compound-select.bas", __LINE__)
 	end if
 
 	'' add exit label
@@ -245,9 +250,11 @@ private sub hCaseExpression _
 	if( casectx.expr1 = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		casectx.expr1 = astNewCONSTz( iif( symbGetIsTemporary( sym ), _
+		casectx.expr1 = fbSemanticModelRecoveryNode( _
+			astNewCONSTz( iif( symbGetIsTemporary( sym ), _
 							FB_DATATYPE_WCHAR, _
-							symbGetType( sym ) ) )
+							symbGetType( sym ) ) ), "replacement-zero", __FUNCTION__, _
+			"parser/statements/parser-compound-select.bas", __LINE__)
 	end if
 
 	'' TO Expression

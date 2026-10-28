@@ -1002,15 +1002,18 @@ static int platform_x11_client_size(void *state, uint32_t *width,
 	uint32_t *height)
 {
 	FB_GFX3_PLATFORM_X11 *platform = (FB_GFX3_PLATFORM_X11 *)state;
-	XWindowAttributes attributes;
 
 	if ((platform == NULL) || (width == NULL) || (height == NULL))
 		return FB_GFX3_INVALID;
-	if (!XGetWindowAttributes(platform->display, platform->window,
-	    &attributes) || (attributes.width < 0) || (attributes.height < 0))
+	/*
+		ConfigureNotify is consumed by platform_x11_pump_events on this same
+		render thread. Its cached size avoids a synchronous X11 round trip every
+		time the renderer submits a command batch or presents a frame.
+	*/
+	if ((platform->view_width == 0u) || (platform->view_height == 0u))
 		return FB_GFX3_FAILED;
-	*width = (uint32_t)attributes.width;
-	*height = (uint32_t)attributes.height;
+	*width = platform->view_width;
+	*height = platform->view_height;
 	return FB_GFX3_OK;
 }
 

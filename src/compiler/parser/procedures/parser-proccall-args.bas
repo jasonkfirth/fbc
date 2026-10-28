@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -119,7 +120,9 @@ private function hProcArg _
 			end if
 			errReport( FB_ERRMSG_ARGCNTMISMATCH )
 			'' error recovery: fake an expr
-			expr = astNewCONSTz( symbGetType( param ), symbGetSubType( param ) )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTz( symbGetType( param ), symbGetSubType( param ) ), "replacement-zero", __FUNCTION__, _
+				"parser/procedures/parser-proccall-args.bas", __LINE__)
 		end if
 	else
 		'' '('')'?

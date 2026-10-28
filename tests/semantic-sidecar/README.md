@@ -553,4 +553,165 @@ proves raw rows retain their selected encoding, and rejects mismatched type
 vocabularies, encoding capabilities and semantic families. The written-type
 observer tests also pass stable models through the complete reader.
 
+`object_model.py` checks actual vtable slots and inherited payload origins,
+abstract declarations, concrete overrides, empty/plain types, virtual
+destructors and deferred/activated RTTI. Target and optimization partitions
+compare exact emission; namespace controls keep equal short names distinct.
+Runtime checks exercise virtual dispatch and IS across export modes. Source
+snapshot, table/member, RTTI and closure corruptions include recounted removals.
+`object-model-guards.bas` links the production observer to checked boundaries
+for invalid classes/initializers, readonly capture, rollback and inactive hooks.
+
+`startup_lifecycle.py` checks constructor/destructor registration and accepted
+priorities, forward global initialization, reverse global cleanup, generated
+wrappers and one-time static paths. Dynamic array allocation keeps its own
+guarded path. Target/backend cases retain actual encoded priorities and NetBSD
+or shared-library placement. Runtime controls compare all export modes; legacy
+controls check native declaration counters and GOSUB status. Transport/reset,
+unavailable modes, damaged ownership/order and production guards are covered.
+
+`native_blocks.py` exercises native procedure/scope wrappers, original scope
+exits, surviving branch links and selected cleanup order. Nested returns and
+loop exits retain actual targets. Plain storage has no invented cleanup.
+Runtime controls compare destruction/return behavior across export modes;
+corruption controls reject invalid parents, targets, intervals, cleanup order
+and recounted missing cleanup. `native-block-guards.bas` exercises the production
+observer with invalid inputs, rollback, reset and disabled export.
+Provenance controls retain each block's construction statement/source/configuration,
+distinguish repeated includes and link inserted cleanup roots to their original
+exiting edges. Corrected-count removals contradict the separate block snapshots
+or actual cleanup insertion choices. The production guard also checks metadata
+copying and clearing when an AST node is reused.
+
+`lexical_lifetimes.py` checks normal reverse-order scope/procedure teardown,
+empty groups, selected managed objects/strings/arrays and borrowed/static/plain
+storage exclusions. Tests compare emitted code and runtime destruction across
+export modes, both raw type encodings and binary/text transport. Corruptions
+include recounted missing groups/actions/roots. The production observer guard
+checks bad classes, bounds, inserted/elided roots, copying, reset and rollback.
+
+`temporary_lifetimes.py` exercises native temporary registrations, reference and
+cookie transitions, cancellation, recycled cookies, selected flush actions and
+IIf branch ownership. Runtime controls check selected-arm behavior across all
+export modes. Transport/reset controls cover both raw datatype encodings;
+negative controls reject impossible transitions and corrected-count omissions.
+`temporary-lifetime-guards.bas` drives the production observer through reference
+release, cookie reuse, empty/branch flushes, invalid inputs and rollback.
+Projection controls associate retained cleanup nodes with their selected native
+flush actions, close zero/multiple projections, and reject missing links or
+swapped IIf branch ownership against the actual EV arm trees.
+
+`load_actions.py` checks actual recursive loading intervals, snapshot/inherited
+origins, emitted runtime calls and conditional check-handler transfers. Unicode
+scalar reads exercise a call created after the pre-load snapshot. Tests retain
+unknown indirect handlers, omit checks when disabled, compare exact emission
+and runtime behavior, and reject malformed or recounted missing intervals.
+`load-action-guards.bas` drives the production observer through nested origins,
+late callee metadata, invalid classes/roles, rollback and inactive hooks.
+
+`load_payloads.py` checks actual active union payloads and typed call arguments,
+both native/stable datatype encodings, sparse jump tables and assembly tokens.
+Assembly controls distinguish entry tokens from the actual emitted stream
+after native C/LLVM line joining. Corrected-count omissions, foreign targets,
+wrong class unions, malformed arguments and emitted-token ownership are rejected.
+
+
+`accepted_declarations.py` checks shared acceptance order across published source
+bindings and DCL receipts. It covers procedure/formal/type/field/namespace and
+variable routes, repeated legacy declarations, macro-generated names and unnamed
+formals, unchanged native emission, zero counts, modes, binary/text parity and
+module reset. Mutations reject wrong symbols/classes/provenance, swapped receipts
+and omissions even when the declaration and transport counts are repaired.
+
+
+The wide literal regression in `accepted_declarations.py` checks repeated live
+symbol snapshots under C and GAS64, single publication of immutable target
+prefixes, reader rejection of duplicated prefix records, exact unchanged emitted
+bytes and independent prefix publication across module resets.
+
+
+`object_operations.py` checks all 21 native object-operation kinds across C,
+LLVM and Clang, including C++ deleting wrappers, anonymous union ownership,
+actual base storage fields, generated bodies, constructor chaining, result
+assignment versus RETURN, excluded ANY/fake-array fields, and plain storage
+without invented constructors. It compares emitted bytes, executes all four
+export modes, checks both type ABIs and binary/text parity, and mutates native
+choices, selected calls, roots, base relationships and repaired-count omissions.
+The production guard executable checks nesting, shared/cloned roots, reset,
+invalid inputs, disabled capture and discarded lexer probes.
+
+
+`ir_flow.py` verifies actual IR block/action membership and transfers across
+C, LLVM, Clang, GAS and GAS64. Fixtures cover nested and late check labels,
+loops, switches, GOSUB/computed dispatch, error handlers and RESUME NEXT,
+assembly, result returns, and runtime versus arbitrary aliased call targets.
+Tests compare emitted bytes, run all four export modes, check both type ABIs
+and binary/text parity, mutate edges/reachability/targets/repaired counts, and
+exercise production graph guards. Runtime error recovery is compiled with
+`-exx`, which supplies the resume state required by this compiler.
+
+
+`effect_contracts.py` checks runtime-domain/effect provenance, allocation and
+release, string mutation, I/O, sound/graphics, synchronization, error handling,
+profiling and computation. Lookalike externals and indirect calls remain
+unknown; cloneable checks remain effectful. It compares emitted code and
+runtime behavior, checks ABI/transport/reset/omissions, mutates purity/aliases/
+masks/counts, and links the production selector and serializer into guard tests.
+
 <!-- end of README.md -->
+
+
+The reported diagnostic families exercise native syntax, lookup, overload,
+access, invalid layout, include, argument and error-limit reports; warning
+suppression and promotion; model/diagnostic parity in each export mode; native
+backend open failures; and invocation warnings after parser teardown. A
+preinclude warning followed by a language restart proves discarded attempt
+ownership. Native reporter and collector harnesses check nested frame order,
+all active symbol kinds, copied byte strings, lexer lifetime, count and byte
+bounds, previous-output preservation, and reset. Corruption controls remove
+reports while repairing totals, change native counters and attempt outcomes,
+and omit required contexts. Text/binary model parity and older diagnostic
+transports are checked separately.
+
+
+Native expression recovery tests cover missing operands at binary precedence
+levels, invalid unary/binary operands, typed cast replacement, legitimate zero
+and abstract-procedure pointers, module and restart reset, corrected-count
+corruption, datatype ABI and binary parity, and byte-exact POSIX filenames.
+The production observer harness checks pointer preservation, probes, disabled
+capture, null roots, bounds and reset. The capability remains partial while
+other native recovery routes are reviewed.
+
+
+The broader recovery-family matrix ties rejected constant/parameter/type
+specifications, packing and initializer failures, array bounds, calls and
+byref results, graphics/memory/file/string/math intrinsics, and missing
+conditions/loop/select operands to their actual native recovery routes.
+Valid omitted OPEN lengths, FOR steps, constant IIF arms and abstract-method
+null pointers provide controls against classifying ordinary constructors as
+recovery. These route tests supplement the partial coverage declaration.
+
+
+Shared token-skip tests exercise real parser calls and the exact production
+helper body. Independent expectations cover nested parentheses/braces,
+requested comma and comma-stop policy, statement/line/EOF boundaries, exact
+fetch/skip counts, endpoint consumption, probe/off capture, structured source
+ownership, repaired-count corruption and compact/binary transport. A skip
+observation records native parser control flow; it does not invent a binding
+or by itself declare an expression invalid.
+
+
+Declaration recovery tests exercise explicit primitive/pointer fallback,
+discarded constant types, fixed-string parameters, missing callback results,
+cast/PEEK repair, generated variable/typedef/field/enum names and real anonymous
+mock parameters. Legal named-enum quirk members remain a negative control.
+Native/stable binary parity, module/restart boundaries, copied snapshot lifetime
+and count/class/ownership corruption are checked independently.
+
+
+Native source-validity tests prove parsed/recovered/parsed boundaries around
+an invalid middle statement, unknown endings for unfinished source compounds,
+report-only loci for missing includes, native counter/status agreement,
+compact validity records, and corrected-total corruption rejection. Physical
+coordinates remain source observations; rejected-module expressions stay
+provisional even when surrounding syntax parsed successfully.

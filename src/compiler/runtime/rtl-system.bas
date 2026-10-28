@@ -728,7 +728,7 @@ sub rtlSystemModInit( )
 		end if
 	next
 
-	rtlAddIntrinsicProcs( @funcdata(0) )
+	rtlAddIntrinsicProcs( @funcdata(0), FALSE, FALSE, FB_RTL_DOMAIN_SYSTEM )
 
 end sub
 

@@ -26,6 +26,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "parser/parser.bi"
 #include once "support/containers/hash.bi"
 #include once "support/containers/list.bi"
@@ -948,6 +949,9 @@ private sub hFinalizeProcMetadata _
 	end if
 
 	proc->proc.rtl.callback = NULL
+	proc->proc.rtl.semantic_domain = 0
+	proc->proc.rtl.semantic_effects = 0
+	proc->proc.rtl.semantic_options = 0
 
 end sub
 
@@ -1480,6 +1484,9 @@ function symbPreAddProc( byval symbol as zstring ptr ) as FBSYMBOL ptr
 	proc->proc.realsubtype = NULL
 	proc->proc.returnMethod = FB_RETURN_FPU
 	proc->proc.rtl.callback = NULL
+	proc->proc.rtl.semantic_domain = 0
+	proc->proc.rtl.semantic_effects = 0
+	proc->proc.rtl.semantic_options = 0
 	proc->proc.ovl.minparams = 0
 	proc->proc.ovl.maxparams = 0
 	proc->proc.ovl.next = NULL
@@ -3065,11 +3072,13 @@ end function
 function symbAddGlobalCtor( byval proc as FBSYMBOL ptr ) as FB_GLOBCTORLIST_ITEM ptr
 	symbSetIsGlobalCtor( proc )
 	function = hAddToGlobCtorList( @symb.globctorlist, proc )
+	fbSemanticModelStartupRegistration(proc, "constructor")
 end function
 
 function symbAddGlobalDtor( byval proc as FBSYMBOL ptr ) as FB_GLOBCTORLIST_ITEM ptr
 	symbSetIsGlobalDtor( proc )
 	function = hAddToGlobCtorList( @symb.globdtorlist, proc )
+	fbSemanticModelStartupRegistration(proc, "destructor")
 end function
 
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

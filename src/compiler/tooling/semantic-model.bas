@@ -81,8 +81,18 @@ declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval 
 #include once "tooling/semantic-backend-abi.bi"
 #include once "tooling/semantic-call-abi.bi"
 #include once "tooling/semantic-object-model.bi"
+#include once "tooling/semantic-startup.bi"
+#include once "tooling/semantic-declarations.bi"
+#include once "tooling/semantic-object-operations.bi"
+#include once "tooling/semantic-ir-flow.bi"
+#include once "tooling/semantic-effects.bi"
+#include once "tooling/semantic-blocks.bi"
+#include once "tooling/semantic-lifetimes.bi"
+#include once "tooling/semantic-temporaries.bi"
+#include once "tooling/semantic-loads.bi"
 #include once "tooling/semantic-source-file.bi"
 #include once "tooling/semantic-diagnostics.bi"
+#include once "tooling/semantic-recovery.bi"
 #include once "tooling/semantic-link.bi"
 #include once "tooling/semantic-comments.bi"
 #include once "tooling/semantic-variable-names.bi"
@@ -150,6 +160,7 @@ private type SEMANTIC_MODEL_SYMBOL
 	alias_formal_identity as longint
 	alias_needs_formal_point as integer
 	initializerid as longint
+	wide_prefix_exported as integer
 	declaration_name as zstring ptr
 end type
 
@@ -957,6 +968,7 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 		semantic_model_symbols[index].alias_formal_identity = 0
 		semantic_model_symbols[index].alias_needs_formal_point = 0
 		semantic_model_symbols[index].initializerid = 0
+		semantic_model_symbols[index].wide_prefix_exported = FALSE
 		semantic_model_symbols[index].declaration_name = NULL
 		semantic_model_symbol_count += 1
 
@@ -1005,6 +1017,21 @@ function fbSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 	if( (fbSemanticModelFullEnabled( ) = FALSE) and _
 		(semantic_model_bindings_only = FALSE) ) then return 0
 	return hSemanticModelSymbolId(sym)
+end function
+
+function fbSemanticModelClaimWideLiteralPrefix( byval sym as FBSYMBOL ptr ) as integer
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then return FALSE
+	dim as integer index = hSemanticModelFindSymbol(sym)
+	if( index < 0 ) then
+		fbSemanticModelFailAt("wide literal prefix lacks its symbol identity")
+		return FALSE
+	end if
+	'' Live payload loading and final symbol traversal can snapshot one literal
+	'' repeatedly. Its target prefix is immutable within this module/backend;
+	'' publish it once while allowing the ordinary symbol flags to change.
+	if( semantic_model_symbols[index].wide_prefix_exported ) then return FALSE
+	semantic_model_symbols[index].wide_prefix_exported = TRUE
+	return TRUE
 end function
 
 function fbSemanticModelNextVisit( ) as ulongint
@@ -1108,6 +1135,7 @@ private function hSemanticModelExportDeclaration(byval sym as FBSYMBOL ptr, byre
 		fbSemanticModelAppendProvenance("ORIG" + TABCHAR + "declaration" + TABCHAR + _
 			fbSemanticModelNumber(occurrence) + TABCHAR + fbSemanticModelNumber(sourceid))
 	end if
+	fbSemanticModelAcceptedDeclaration(sym, "declaration", occurrence)
 	return occurrence
 end function
 
@@ -1517,10 +1545,12 @@ sub fbSemanticModelDeclarationType(byval groupid as longint, byval owner as long
 		exit sub
 	end if
 	dim as string role = "declaration-type-input:" + fbSemanticModelNumber(groupid) + ":" + fbSemanticModelNumber(ordinal)
-	dim as string payload = fbSemanticModelNumber(fbSemanticModelSymbolId(sym)) + TABCHAR + written_type + TABCHAR + _
+	dim as longint symbolid = fbSemanticModelSymbolId(sym)
+	dim as string payload = fbSemanticModelNumber(symbolid) + TABCHAR + written_type + TABCHAR + _
 		fbSemanticModelNumber(initializer_kind) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentSource( ))
 	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + TABCHAR + role + TABCHAR + _
 		fbSemanticModelEscape(payload))
+	fbSemanticModelDeclarationOrder(symbolid, owner, groupid, ordinal, fbSemanticModelCurrentStatement( ), fbSemanticModelCurrentSource( ))
 	'' This is the actual identifier token, including its suffix when present.
 	'' Expanded tokens retain a macro origin instead of an invented name range.
 	fbSemanticModelExportCoordinates("source-context", fbSemanticModelCurrentSource( ), role, source, source)
@@ -2254,6 +2284,7 @@ private function hSemanticModelExportBinding _
 			fbSemanticModelMacroOrigin("symbol", fbSemanticModelSymbolId(sym), source.macro_identity, _
 				"declaration-" + fbSemanticModelNumber(source.macro_identity))
 			hSemanticModelAliasBinding(sym, 2, source.macro_identity)
+			fbSemanticModelAcceptedDeclaration(sym, "macro-point", source.macro_identity)
 		elseif( (is_declaration = FALSE) and (source.macro_identity > 0) and _
 			fbSemanticModelFullEnabled( ) ) then
 			'' A replacement token can have only a logical point. Its selected
@@ -2322,6 +2353,7 @@ private function hSemanticModelExportBinding _
 		fbSemanticModelExportCoordinates("binding", semantic_model_binding_count + semantic_model_module_binding_count, "range", source, source)
 		fbSemanticModelMacroOrigin("binding", semantic_model_binding_count + semantic_model_module_binding_count, source.macro_identity, "name")
 		function = semantic_model_binding_count + semantic_model_module_binding_count
+		if( is_declaration ) then fbSemanticModelAcceptedDeclaration(sym, "binding", semantic_model_binding_count + semantic_model_module_binding_count)
 		hSemanticModelAliasBinding(sym, 1, semantic_model_binding_count + semantic_model_module_binding_count)
 		dim as longint sourceid = fbSemanticModelCurrentSource( )
 		if( sourceid > 0 ) then
@@ -4655,6 +4687,16 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelResetBackendAbi( )
 	fbSemanticModelResetCallAbi( )
 	fbSemanticModelResetObjectModel( )
+	fbSemanticModelResetStartup( )
+	fbSemanticModelResetDeclarations( )
+	fbSemanticModelResetRecovery( )
+	fbSemanticModelResetObjectOperations( )
+	fbSemanticModelResetIRFlow( )
+	fbSemanticModelResetEffects( )
+	fbSemanticModelResetBlocks( )
+	fbSemanticModelResetLifetimes( )
+	fbSemanticModelResetTemporaries( )
+	fbSemanticModelResetLoads( )
 	fbSemanticModelResetEmissionNames( )
 	fbSemanticModelResetMemberNames( )
 	fbSemanticModelResetConstructs( )
@@ -4711,7 +4753,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 147
+	for capability as integer = 0 to 172
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -4854,6 +4896,31 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 146: feature = "llvm-builtin-call-lowering": coverage = iif(fbSemanticModelFullEnabled( ) and _
 			(env.clopt.backend = FB_BACKEND_LLVM), "available", "unavailable")
 		case 147: feature = "native-object-model": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 148: feature = "native-startup-lifecycle": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 149: feature = "accepted-declarator-order": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 150: feature = "native-block-structure": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 151: feature = "native-block-provenance": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 152: feature = "native-lexical-cleanup": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 153: feature = "native-temporary-lifetime-events": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 154: feature = "native-temporary-cleanup-nodes": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 155: feature = "native-ast-load-actions": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 156: feature = "native-ast-load-payloads": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 157: feature = "native-asm-load-emission": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 158: feature = "accepted-source-declaration-order": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 159: feature = "accepted-macro-declaration-order": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
+		case 160: feature = "native-object-operations": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 161: feature = "native-base-subobject-fields": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 162: feature = "native-ir-control-flow": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 163: feature = "preload-root-transfer-policies": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 164: feature = "native-effect-contracts": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
+		case 165: feature = "reported-diagnostic-contexts": coverage = "available"
+		case 166: feature = "reported-diagnostic-counts": coverage = "available"
+		case 167: feature = "reported-warning-levels": coverage = "available"
+		case 168: feature = "native-expression-recovery-steps": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "partial", "unavailable")
+		case 169: feature = "native-token-skip-steps": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "partial", "unavailable")
+		case 170: feature = "native-type-recovery-steps": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "partial", "unavailable")
+		case 171: feature = "native-symbol-recovery-steps": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "partial", "unavailable")
+		case 172: feature = "native-source-validity": coverage = "available"
 		case 121: feature = "string-subscript-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 122: feature = "selected-type-alias-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 123: feature = "type-alias-declaration-sites": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")
@@ -5070,6 +5137,17 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	fbSemanticModelFinishBackendAbi(commit)
 	fbSemanticModelFinishCallAbi(commit)
 	fbSemanticModelFinishObjectModel(commit)
+	fbSemanticModelFinishStartup(commit)
+	fbSemanticModelFinishDeclarations(commit)
+	fbSemanticModelFinishRecovery(commit)
+	fbSemanticModelFinishSourceValidity(commit)
+	fbSemanticModelFinishObjectOperations(commit)
+	fbSemanticModelFinishIRFlow(commit)
+	fbSemanticModelFinishEffects(commit)
+	fbSemanticModelFinishBlocks(commit)
+	fbSemanticModelFinishLifetimes(commit)
+	fbSemanticModelFinishTemporaries(commit)
+	fbSemanticModelFinishLoads(commit)
 	if( (commit <> FALSE) and (semantic_model_module_failed = FALSE) ) then
 		if( semantic_model_module_buffer_len > 0 ) then
 			if( fbSemanticOutputWrite(semantic_model_output, semantic_model_module_buffer, _
@@ -5153,6 +5231,7 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 	fbSemanticModelExportSymbolDetails(proc, TRUE)
 	fbSemanticModelExportSymbols(symbGetProcHeadParam(proc))
 	fbSemanticModelExportSymbols(symbGetProcSymbTbHead(proc))
+	fbSemanticModelProcedureBlock(astproc)
 	'' The exit label is a compiler-owned target. Its identity distinguishes
 	'' routine returns from EXIT FOR/DO/WHILE and arbitrary source labels,
 	'' even after scope cleanup has replaced the original break node.

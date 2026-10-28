@@ -29,6 +29,7 @@
 #include once "lexer/lex.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-object-operations.bi"
 
 ''
 '' vars
@@ -806,7 +807,9 @@ function astBuildCtorCall _
 	dim as integer params = any
 
 	ctor = symbGetCompDefCtor( sym )
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("default-constructor-call", sym, NULL, ctor)
 	if( ctor = NULL ) then
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "empty")
 		return NULL
 	end if
 
@@ -821,6 +824,7 @@ function astBuildCtorCall _
 		params -= 1
 	loop
 
+	fbSemanticModelObjectOperationEnd(semantic_operation, proc, "built")
 	function = proc
 
 end function
@@ -837,6 +841,7 @@ function astBuildDtorCall _
 
 	'' Can be virtual
 	dtor = symbGetCompDtor1( sym )
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("destructor-call", sym, NULL, dtor, abs(ignore_virtual <> FALSE))
 	if( ignore_virtual ) then
 		callexpr = astNewCALL( dtor )
 	else
@@ -845,6 +850,8 @@ function astBuildDtorCall _
 
 	astNewARG( callexpr, thisexpr )
 
+	fbSemanticModelObjectOperationChoice("dispatch", iif(callexpr->l = NULL, "direct", "virtual"))
+	fbSemanticModelObjectOperationEnd(semantic_operation, callexpr, "built")
 	function = callexpr
 end function
 
@@ -919,20 +926,25 @@ function astBuildImplicitCtorCall _
 	dim as FBSYMBOL ptr proc = any
 
 	proc = symbFindCtorOvlProc( subtype, expr, arg_mode, @err_num )
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("implicit-construction", subtype, NULL, proc, arg_mode, err_num)
 	if( proc = NULL ) then
 		is_ctorcall = FALSE
 
 		if( err_num <> FB_ERRMSG_OK ) then
 			errReportParam( symbGetCompCtorHead( subtype ), 0, NULL, err_num )
+			fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "error")
 			return NULL
 		end if
 
 		'' could be a shallow copy..
+		fbSemanticModelObjectOperationEnd(semantic_operation, expr, "shallow")
 		return expr
 	end if
 
 	'' Check visibility of the constructor
-	if( symbCheckAccess( proc ) = FALSE ) then
+	dim as integer semantic_access = symbCheckAccess( proc )
+	fbSemanticModelObjectOperationChoice("access", iif(semantic_access, "accessible", "inaccessible"))
+	if( semantic_access = FALSE ) then
 		errReport( FB_ERRMSG_NOACCESSTOCTOR )
 	end if
 
@@ -953,6 +965,7 @@ function astBuildImplicitCtorCall _
 	loop
 
 	is_ctorcall = TRUE
+	fbSemanticModelObjectOperationEnd(semantic_operation, procexpr, "built")
 	function = procexpr
 
 end function
@@ -983,7 +996,10 @@ function astBuildImplicitCtorCallEx _
 		if( symbGetSubtype( expr ) = subtype ) then
 			is_ctorcall = TRUE
 			'' remove the the anon/temp instance
-			return astCALLCTORToCALL( expr )
+			dim as ASTNODE ptr semantic_tree = astCALLCTORToCALL( expr )
+			dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("reused-construction", subtype, sym, semantic_tree->sym)
+			fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, "reused")
+			return semantic_tree
 		end if
 	end if
 

@@ -28,6 +28,7 @@
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-numeric-conversions.bi"
+#include once "tooling/semantic-temporaries.bi"
 #include once "support/hlp.bi"
 
 declare sub astReplaceSymbolOnCALL _
@@ -1168,6 +1169,7 @@ sub astDtorListAdd( byval sym as FBSYMBOL ptr )
 	end with
 
 	n->refcount = 0
+	fbSemanticModelTemporaryAdd(n)
 end sub
 
 sub astDtorListAddRef( byval sym as FBSYMBOL ptr )
@@ -1183,6 +1185,7 @@ sub astDtorListAddRef( byval sym as FBSYMBOL ptr )
 	while( i )
 		if( i->sym = sym ) then
 			i->refcount += 1
+			fbSemanticModelTemporaryReference(i, TRUE)
 			exit while
 		end if
 
@@ -1204,8 +1207,10 @@ sub astDtorListRemoveRef( byval sym as FBSYMBOL ptr )
 		if( i->sym = sym ) then
 			assert( i->refcount > 0 )
 			i->refcount -= 1
+			fbSemanticModelTemporaryReference(i, FALSE)
 
 			if( i->refcount <= 0 ) then
+				fbSemanticModelTemporaryRemove(i, "reference-release")
 				listDelNode( @ast.dtorlist, i )
 			end if
 
@@ -1216,9 +1221,12 @@ sub astDtorListRemoveRef( byval sym as FBSYMBOL ptr )
 	wend
 end sub
 
-function astDtorListFlush( byval cookie as integer ) as ASTNODE ptr
+function astDtorListFlush( byval cookie as integer, byval semantic_identity as longint ptr ) as ASTNODE ptr
 	dim as AST_DTORLIST_ITEM ptr n = any, p = any
 	dim as ASTNODE ptr t = any
+	dim as longint semantic_flush = fbSemanticModelTemporaryFlushBegin(cookie)
+	dim as integer semantic_actions = 0, semantic_removed = 0
+	if( semantic_identity <> NULL ) then *semantic_identity = semantic_flush
 
 	'' call the dtors in the reverse order
 	t = NULL
@@ -1240,6 +1248,8 @@ function astDtorListFlush( byval cookie as integer ) as ASTNODE ptr
 		'' Only flush dtors for the given cookie number
 		if( n->cookie = cookie ) then
 			dim as ASTNODE ptr dtorcall = astBuildVarDtorCall( n->sym )
+			fbSemanticModelTemporaryFlushAction(semantic_flush, n, dtorcall)
+			semantic_actions += 1
 			if( n->semantic_dependency >= 0 ) then
 				dim as FBSYMBOL ptr subtype = symbGetSubtype( n->sym )
 				dim as FBSYMBOL ptr dtor = NULL
@@ -1256,10 +1266,14 @@ function astDtorListFlush( byval cookie as integer ) as ASTNODE ptr
 				end if
 			end if
 			t = astNewLINK( t, dtorcall, AST_LINK_RETURN_NONE )
+			fbSemanticModelTemporaryRemove(n, "flush")
+			semantic_removed += 1
 			listDelNode( @ast.dtorlist, n )
 
 		'' or delete the cookie was marked for delete
 		elseif( n->cookie = -1 ) then
+			fbSemanticModelTemporaryRemove(n, "discard")
+			semantic_removed += 1
 			listDelNode( @ast.dtorlist, n )
 		end if
 
@@ -1269,6 +1283,7 @@ function astDtorListFlush( byval cookie as integer ) as ASTNODE ptr
 	if( cookie = 0 ) then
 		ast.dtorlistcookies = 0  '' Can aswell be reset
 	end if
+	fbSemanticModelTemporaryFlushEnd(semantic_flush, cookie, semantic_actions, semantic_removed)
 
 	function = t
 end function
@@ -1283,6 +1298,7 @@ sub astDtorListDel( byval sym as FBSYMBOL ptr )
 	n = listGetTail( @ast.dtorlist )
 	while( n )
 		if( n->sym = sym ) then
+			fbSemanticModelTemporaryRemove(n, "explicit-delete")
 			listDelNode( @ast.dtorlist, n )
 			exit while
 		end if
@@ -1295,6 +1311,7 @@ end sub
 '' If a "cookie" is given then that will be used to mark new entries, instead of
 '' allocating a new cookie.
 sub astDtorListScopeBegin( byval cookie as integer )
+	dim as integer semantic_allocated = (cookie = 0)
 	if( cookie = 0 ) then
 		'' Allocate new cookie
 		ast.dtorlistcookies += 1
@@ -1311,6 +1328,7 @@ sub astDtorListScopeBegin( byval cookie as integer )
 		.cookies[.count] = cookie
 		.count += 1
 	end with
+	fbSemanticModelTemporaryScopeBegin(cookie, semantic_allocated, ast.dtorlistscopes.count)
 end sub
 
 '' Closes the scope and returns its cookie number so it can be passed through
@@ -1321,6 +1339,7 @@ function astDtorListScopeEnd( ) as integer
 		assert( .count > 0 )
 		function = .cookies[.count-1]
 		.count -= 1
+		fbSemanticModelTemporaryScopeEnd(.cookies[.count], .count)
 	end with
 end function
 
@@ -1343,6 +1362,7 @@ private sub hastDtorListRescope( byval cookie as integer, byval newcookie as int
 	i = listGetTail( @ast.dtorlist )
 	while( i )
 		if( i->cookie = cookie ) then
+			fbSemanticModelTemporaryRescope(i, newcookie)
 			i->cookie = newcookie
 		end if
 		i = listGetPrev( i )

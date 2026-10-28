@@ -25,14 +25,119 @@
 private const DIAGNOSTIC_MAX_SOURCES = 5000
 private const DIAGNOSTIC_MAX_RECORDS = 100000
 private const DIAGNOSTIC_MAX_BYTES = 67108864
+private const DIAGNOSTIC_MAX_RECORD_BYTES = 1048576
 private dim shared as any ptr diagnostic_output
 private dim shared as integer diagnostic_failed, diagnostic_modules
+private dim shared as integer diagnostic_module_open
+private dim shared as longint diagnostic_model_count, diagnostic_model_errors
+private dim shared as longint diagnostic_model_warnings, diagnostic_model_promoted
 private dim shared as integer diagnostic_count, diagnostic_errors, diagnostic_bytes
 private dim shared as integer diagnostic_source_count
 private dim shared as string diagnostic_sources(0 to DIAGNOSTIC_MAX_SOURCES - 1)
 private dim shared as string diagnostic_context
 private dim shared as LEX_LOCATION diagnostic_point
 private dim shared as integer diagnostic_has_point
+
+'' Context is copied only after the native reporter accepts a diagnostic.
+'' No native symbol or parameter-name pointer survives the reporter callback.
+private const DIAGNOSTIC_PARAMETER_LIMIT = 4096
+private const DIAGNOSTIC_PARAMETER_BYTE_LIMIT = 1048576
+private type DIAGNOSTIC_PARAMETER
+	token as integer
+	parameter as integer
+	spelling as string
+	procedure_name as string
+	owner_name as string
+	kind as string
+end type
+private dim shared as DIAGNOSTIC_PARAMETER ptr diagnostic_parameters(0 to DIAGNOSTIC_PARAMETER_LIMIT - 1)
+private dim shared as integer diagnostic_parameter_count, diagnostic_parameter_bytes
+private dim shared as string diagnostic_policy
+private dim shared as integer diagnostic_initialized
+private dim shared as integer diagnostic_warning_level = -1
+
+private sub hDiagnosticContextClear( )
+	for index as integer = 0 to diagnostic_parameter_count - 1
+		delete diagnostic_parameters(index)
+		diagnostic_parameters(index) = NULL
+	next
+	diagnostic_parameter_count = 0
+	diagnostic_parameter_bytes = 0
+	diagnostic_policy = ""
+	diagnostic_initialized = FALSE
+	diagnostic_warning_level = -1
+end sub
+
+sub fbSemanticDiagnosticsPolicy( byval initialized as integer, byval options as integer, _
+	byval show_source as integer, byval error_count as integer, byval promoted as integer, byval warning_level as integer )
+	hDiagnosticContextClear( )
+	if( (diagnostic_output = NULL) and (fbSemanticModelEnabled( ) = FALSE) ) then exit sub
+	if( (warning_level < -1) or (warning_level = 0) or (warning_level > FB_WARNINGMSGS_HIGHEST_LEVEL) ) then
+		diagnostic_failed = TRUE
+		fbSemanticModelFailAt("invalid native warning catalog level")
+		exit sub
+	end if
+	if( promoted and fbSemanticModelEnabled( ) ) then diagnostic_model_promoted += 1
+	diagnostic_initialized = initialized <> FALSE
+	diagnostic_warning_level = warning_level
+	diagnostic_policy = fbSemanticModelNumber(abs(diagnostic_initialized)) + TABCHAR + fbSemanticModelNumber(options) + TABCHAR + _
+		fbSemanticModelNumber(abs(show_source <> FALSE)) + TABCHAR + fbSemanticModelNumber(error_count) + TABCHAR + _
+		fbSemanticModelNumber(env.clopt.warninglevel) + TABCHAR + fbSemanticModelNumber(env.clopt.maxerrors) + TABCHAR + _
+		fbSemanticModelNumber(abs(promoted <> FALSE))
+end sub
+
+sub fbSemanticDiagnosticsParameter( byval proc as FBSYMBOL ptr, byval token as integer, _
+	byval parameter as integer, byval spelling as const zstring ptr )
+	if( len(diagnostic_policy) = 0 ) then exit sub
+	if( diagnostic_parameter_count >= DIAGNOSTIC_PARAMETER_LIMIT ) then
+		diagnostic_failed = TRUE
+		fbSemanticModelFailAt("diagnostic parameter count exceeds its bound")
+		exit sub
+	end if
+	dim as DIAGNOSTIC_PARAMETER ptr item = new DIAGNOSTIC_PARAMETER
+	if( item = NULL ) then
+		diagnostic_failed = TRUE
+		fbSemanticModelFailAt("diagnostic parameter allocation failed")
+		exit sub
+	end if
+	item->token = token
+	item->parameter = parameter
+	if( spelling <> NULL ) then item->spelling = *spelling
+	item->kind = "none"
+	if( proc <> NULL ) then
+		if( proc->id.name <> NULL ) then item->procedure_name = *proc->id.name
+		if( proc->symtb <> NULL ) then
+			if( proc->symtb->owner <> NULL ) then
+				if( proc->symtb->owner->id.name <> NULL ) then item->owner_name = *proc->symtb->owner->id.name
+			end if
+		end if
+		item->kind = "unknown-symbol"
+		if( proc->class = FB_SYMBCLASS_PROC ) then
+			if( symbIsConstructor(proc) ) then
+				item->kind = "constructor"
+			elseif( symbIsDestructor0(proc) or symbIsDestructor1(proc) ) then
+				item->kind = "destructor"
+			elseif( symbIsOperator(proc) ) then
+				item->kind = "operator"
+			elseif( symbGetIsFuncPtr(proc) ) then
+				item->kind = "procedure-pointer"
+			else
+				item->kind = "procedure"
+			end if
+		end if
+	end if
+	dim as integer bytes = len(item->spelling) + len(item->procedure_name) + len(item->owner_name) + len(item->kind)
+	if( bytes > DIAGNOSTIC_PARAMETER_BYTE_LIMIT - diagnostic_parameter_bytes ) then
+		delete item
+		diagnostic_failed = TRUE
+		fbSemanticModelFailAt("diagnostic parameter text exceeds its bound")
+		exit sub
+	end if
+	diagnostic_parameters(diagnostic_parameter_count) = item
+	diagnostic_parameter_count += 1
+	diagnostic_parameter_bytes += bytes
+end sub
+
 '' The serial module owns these native identities. Only invalid retained
 '' headers occupy the array, so ordinary accepted declarations allocate nothing.
 '' A new accepted symbol at a reused address removes the former invalid entry.
@@ -157,7 +262,10 @@ end function
 
 private sub hDiagnosticWrite( byref record_text as const string )
 	if( (diagnostic_output = NULL) or diagnostic_failed ) then exit sub
-	if( len(record_text) >= DIAGNOSTIC_MAX_BYTES - diagnostic_bytes ) then
+	'' The independent reader has the same per-record bound. Escaping can
+	'' triple a copied byte string, even when its unescaped input was bounded.
+	if( (len(record_text) > DIAGNOSTIC_MAX_RECORD_BYTES) or _
+		(len(record_text) >= DIAGNOSTIC_MAX_BYTES - diagnostic_bytes) ) then
 		diagnostic_failed = TRUE
 		exit sub
 	end if
@@ -167,6 +275,27 @@ private sub hDiagnosticWrite( byref record_text as const string )
 	else
 		diagnostic_bytes += len(line_text)
 	end if
+end sub
+
+sub fbSemanticDiagnosticsFinishModule( byref outcome as const string, byval error_count as integer )
+	dim as integer valid = (((outcome = "accepted") or (outcome = "restarted")) and (error_count = 0)) or _
+		((outcome = "rejected") and (error_count > 0)) or ((outcome = "aborted") and (error_count = -1))
+	if( valid = FALSE ) then
+		diagnostic_failed = TRUE
+		fbSemanticModelFailAt("invalid diagnostic attempt outcome")
+		exit sub
+	end if
+	if( fbSemanticModelEnabled( ) ) then
+		fbSemanticModelAppendProvenance("K" + TABCHAR + "module" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + "reported-diagnostic-counts" + TABCHAR + _
+			fbSemanticModelEscape(fbSemanticModelNumber(diagnostic_model_count) + TABCHAR + _
+			fbSemanticModelNumber(diagnostic_model_errors) + TABCHAR + fbSemanticModelNumber(diagnostic_model_warnings) + TABCHAR + _
+			fbSemanticModelNumber(diagnostic_model_promoted) + TABCHAR + fbSemanticModelNumber(error_count) + TABCHAR + outcome))
+	end if
+	if( (diagnostic_output = NULL) or (diagnostic_module_open = FALSE) ) then exit sub
+	hDiagnosticWrite("ME" + TABCHAR + fbSemanticModelNumber(diagnostic_modules) + TABCHAR + _
+		outcome + TABCHAR + fbSemanticModelNumber(error_count))
+	diagnostic_module_open = FALSE
 end sub
 
 sub fbSemanticDiagnosticsProtectFile( byref filename as const string )
@@ -190,12 +319,20 @@ sub fbSemanticDiagnosticsSource( byref filename as const string )
 end sub
 
 sub fbSemanticDiagnosticsModule( byref filename as const string )
+	diagnostic_model_count = 0
+	diagnostic_model_errors = 0
+	diagnostic_model_warnings = 0
+	diagnostic_model_promoted = 0
 	if( (diagnostic_output = NULL) or diagnostic_failed ) then exit sub
+	'' The driver closes every normal attempt before releasing its symbols.
+	'' An interrupted caller must not silently give that attempt accepted status.
+	if( diagnostic_module_open ) then fbSemanticDiagnosticsFinishModule("aborted", -1)
 	if( diagnostic_modules >= DIAGNOSTIC_MAX_RECORDS ) then
 		diagnostic_failed = TRUE
 		exit sub
 	end if
 	diagnostic_modules += 1
+	diagnostic_module_open = TRUE
 	diagnostic_context = ""
 	diagnostic_has_point = FALSE
 	erase diagnostic_invalid_procedures
@@ -286,6 +423,7 @@ function fbSemanticDiagnosticsProcedureValid( byval proc as FBSYMBOL ptr ) as in
 end function
 
 function fbSemanticDiagnosticsBegin( byref filename as const string ) as integer
+	hDiagnosticContextClear( )
 	hDiagnosticVariablesClear( )
 	if( diagnostic_output <> NULL ) then
 		if( fbSemanticOutputFinish(diagnostic_output, FALSE) = 0 ) then
@@ -299,6 +437,7 @@ function fbSemanticDiagnosticsBegin( byref filename as const string ) as integer
 	next
 	diagnostic_source_count = 0
 	diagnostic_modules = 0
+	diagnostic_module_open = FALSE
 	diagnostic_count = 0
 	diagnostic_errors = 0
 	diagnostic_bytes = 0
@@ -312,12 +451,17 @@ function fbSemanticDiagnosticsBegin( byref filename as const string ) as integer
 	diagnostic_output = fbSemanticOutputOpen(strptr(filename))
 	if( diagnostic_output = NULL ) then return FALSE
 	hDiagnosticWrite("FBCDIA" + TABCHAR + "1" + TABCHAR + FB_VERSION)
+	hDiagnosticWrite("CAP" + TABCHAR + "0" + TABCHAR + "reported-diagnostic-contexts" + TABCHAR + "available")
+	hDiagnosticWrite("CAP" + TABCHAR + "0" + TABCHAR + "diagnostic-attempt-lifetimes" + TABCHAR + "available")
+	hDiagnosticWrite("CAP" + TABCHAR + "0" + TABCHAR + "reported-warning-levels" + TABCHAR + "available")
 	return diagnostic_failed = FALSE
 end function
 
 function fbSemanticDiagnosticsEnd( byval succeeded as integer ) as integer
+	hDiagnosticContextClear( )
 	hDiagnosticVariablesClear( )
 	if( diagnostic_output = NULL ) then return TRUE
+	if( diagnostic_module_open ) then fbSemanticDiagnosticsFinishModule("aborted", -1)
 	hDiagnosticWrite("END" + TABCHAR + "1" + TABCHAR + fbSemanticModelNumber(diagnostic_modules) + _
 		TABCHAR + fbSemanticModelNumber(diagnostic_source_count) + TABCHAR + fbSemanticModelNumber(diagnostic_count) + _
 		TABCHAR + fbSemanticModelNumber(diagnostic_errors) + TABCHAR + fbSemanticModelNumber(abs(succeeded <> FALSE)))
@@ -336,6 +480,27 @@ function fbSemanticDiagnosticsEnd( byval succeeded as integer ) as integer
 	return (published <> 0) and (diagnostic_failed = FALSE)
 end function
 
+private function hDiagnosticPolicyFields( ) as string
+	if( len(diagnostic_policy) = 0 ) then
+		'' A legacy direct observer call has no native reporter snapshot.
+		'' Its absent source/parameter context must not become a guessed one.
+		diagnostic_policy = "0" + TABCHAR + "0" + TABCHAR + "0" + TABCHAR + "0" + TABCHAR + "-1" + TABCHAR + "0" + TABCHAR + "0"
+	end if
+	return diagnostic_policy + TABCHAR + fbSemanticModelNumber(diagnostic_parameter_count) + TABCHAR + _
+		fbSemanticModelNumber(env.clopt.lang) + TABCHAR + fbSemanticModelNumber(env.clopt.backend) + TABCHAR + _
+		fbGetTargetId( ) + TABCHAR + fbSemanticModelNumber(abs(env.inited and (lex.ctx <> NULL))) + TABCHAR + _
+		fbSemanticModelNumber(diagnostic_warning_level)
+end function
+
+private function hDiagnosticParameterFields( byval index as integer ) as string
+	dim as DIAGNOSTIC_PARAMETER ptr item = diagnostic_parameters(index)
+	'' K has one outer field. Escape the three byte strings before joining
+	'' its inner fields, so a parameter spelling cannot supply a separator.
+	return fbSemanticModelNumber(index + 1) + TABCHAR + fbSemanticModelNumber(item->token) + TABCHAR + _
+		fbSemanticModelNumber(item->parameter) + TABCHAR + fbSemanticModelEscape(item->spelling) + TABCHAR + _
+		fbSemanticModelEscape(item->procedure_name) + TABCHAR + fbSemanticModelEscape(item->owner_name) + TABCHAR + item->kind
+end function
+
 private sub hDiagnosticObserve _
 	( byref severity as const string, byval code as integer, byval line_number as integer, _
 	  byref message_text as const string, byref detail_text as const string, byref custom_text as const string )
@@ -351,11 +516,23 @@ private sub hDiagnosticObserve _
 		kind_text = diagnostic_context
 		if( code = FB_ERRMSG_FORNEXTVARIABLEMISMATCH ) then kind_text = "for-next-variable-mismatch"
 	end if
-	fbSemanticDiagnosticsSource(env.inf.name)
-	dim as LEX_LOCATION token_point = lexGetLastLocation( )
-	if( diagnostic_has_point ) then token_point = diagnostic_point
+	dim as integer reported_module = iif(diagnostic_initialized, diagnostic_modules, 0)
+	dim as string reported_file
+	if( reported_module > 0 ) then
+		reported_file = env.inf.name
+		fbSemanticDiagnosticsSource(reported_file)
+	else
+		kind_text = ""
+	end if
+	dim as LEX_LOCATION token_point
+	'' Invocation diagnostics can run after lexEnd. Their absence of a source
+	'' context is already known, so do not inspect a retired lexer snapshot.
+	if( reported_module > 0 ) then
+		token_point = lexGetLastLocation( )
+		if( diagnostic_has_point ) then token_point = diagnostic_point
+	end if
 	dim as integer macro_origin = FALSE
-	if( token_point.is_physical = FALSE ) then
+	if( (reported_module > 0) and (token_point.is_physical = FALSE) ) then
 		dim as LEX_LOCATION invocation_point
 		if( fbSemanticModelMacroExpressionLocation(token_point, token_point, 0, 0, invocation_point) ) then
 			'' A warning may point at the observed invocation. This does not
@@ -370,19 +547,27 @@ private sub hDiagnosticObserve _
 	'' consumed token to agree with the displayed line. #line never supplies
 	'' the physical coordinates. A generated token can instead name its observed
 	'' invocation when the full model retained that original macro lineage.
-	if( (token_point.is_physical or macro_origin) and token_point.raw_valid and (token_point.source_file = env.inf.name) and _
+	if( (reported_module > 0) and (token_point.is_physical or macro_origin) and token_point.raw_valid and (token_point.source_file = env.inf.name) and _
 		((token_point.start_line = line_number) or diagnostic_has_point or macro_origin) and (token_point.raw_start_line > 0) and (token_point.raw_start_column >= 0) ) then
 		physical = TRUE
 		raw_line = token_point.raw_start_line
 		raw_column = token_point.raw_start_column
 	end if
 	hDiagnosticWrite("DI" + TABCHAR + fbSemanticModelNumber(diagnostic_count) + TABCHAR + _
-		fbSemanticModelNumber(diagnostic_modules) + TABCHAR + severity + TABCHAR + fbSemanticModelNumber(code) + _
-		TABCHAR + fbSemanticModelEscape(kind_text) + TABCHAR + fbSemanticModelEscape(env.inf.name) + _
+		fbSemanticModelNumber(reported_module) + TABCHAR + severity + TABCHAR + fbSemanticModelNumber(code) + _
+		TABCHAR + fbSemanticModelEscape(kind_text) + TABCHAR + fbSemanticModelEscape(reported_file) + _
 		TABCHAR + fbSemanticModelNumber(line_number) + TABCHAR + fbSemanticModelEscape(message_text) + _
 		TABCHAR + fbSemanticModelEscape(detail_text) + TABCHAR + fbSemanticModelEscape(custom_text) + _
 		TABCHAR + fbSemanticModelNumber(abs(physical)) + TABCHAR + fbSemanticModelNumber(raw_line) + _
 		TABCHAR + fbSemanticModelNumber(raw_column))
+	hDiagnosticWrite("DC" + TABCHAR + fbSemanticModelNumber(diagnostic_count) + TABCHAR + fbSemanticModelEscape(hDiagnosticPolicyFields( )))
+	for index as integer = 0 to diagnostic_parameter_count - 1
+		dim as DIAGNOSTIC_PARAMETER ptr item = diagnostic_parameters(index)
+		hDiagnosticWrite("DP" + TABCHAR + fbSemanticModelNumber(diagnostic_count) + TABCHAR + _
+			fbSemanticModelNumber(index + 1) + TABCHAR + fbSemanticModelNumber(item->token) + TABCHAR + _
+			fbSemanticModelNumber(item->parameter) + TABCHAR + fbSemanticModelEscape(item->spelling) + TABCHAR + _
+			fbSemanticModelEscape(item->procedure_name) + TABCHAR + fbSemanticModelEscape(item->owner_name) + TABCHAR + item->kind)
+	next
 end sub
 
 '' -------------------------------------------------------------------------
@@ -398,7 +583,16 @@ sub fbSemanticModelDiagnostic _
 	if( detail <> NULL ) then extra = *detail
 	if( custom_text <> NULL ) then custom = *custom_text
 	hDiagnosticObserve(severity, code, line_number, text, extra, custom)
-	if( fbSemanticModelEnabled( ) = FALSE ) then exit sub
+	if( fbSemanticModelEnabled( ) = FALSE ) then
+		hDiagnosticContextClear( )
+		exit sub
+	end if
+	diagnostic_model_count += 1
+	if( severity = "error" ) then
+		diagnostic_model_errors += 1
+	else
+		diagnostic_model_warnings += 1
+	end if
 	dim as longint identity = fbSemanticModelNextDetailIdentity( )
 	'' Reporting must not ask the lexer to scan another token. A diagnostic
 	'' point is informational, even when its line resembles a source range.
@@ -409,6 +603,13 @@ sub fbSemanticModelDiagnostic _
 		fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelSymbolId(parser.currproc)))
+	fbSemanticModelAppendProvenance("K" + TABCHAR + "diagnostic" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + _
+		"reported-context" + TABCHAR + fbSemanticModelEscape(hDiagnosticPolicyFields( )))
+	for index as integer = 0 to diagnostic_parameter_count - 1
+		fbSemanticModelAppendProvenance("K" + TABCHAR + "diagnostic" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + _
+			"reported-parameter:" + fbSemanticModelNumber(index + 1) + TABCHAR + fbSemanticModelEscape(hDiagnosticParameterFields(index)))
+	next
+	hDiagnosticContextClear( )
 end sub
 
 '' end of tooling/semantic-diagnostics.bas

@@ -480,7 +480,7 @@ dim shared as FB_RTL_PROCDEF ufuncdata(0 to ...) = _
 '' Intrinsic registration and conversion lowering
 '' -------------------------------------------------------------------------
 sub rtlUstringModInit( )
-	rtlAddIntrinsicProcs( @ufuncdata(0) )
+	rtlAddIntrinsicProcs( @ufuncdata(0), FALSE, FALSE, FB_RTL_DOMAIN_UNICODE )
 end sub
 
 function rtlToUstr( byval expr as ASTNODE ptr ) as ASTNODE ptr

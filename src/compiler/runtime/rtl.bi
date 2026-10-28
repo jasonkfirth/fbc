@@ -1210,6 +1210,48 @@ enum
 	FB_THREADCALL_PTR
 end enum
 
+'' Semantic contracts describe the selected runtime declaration only. The
+'' optimizer does not consult these fields; CANBECLONED retains its independent
+'' native meaning and is not a general purity guarantee.
+enum FB_RTL_SEMANTIC_DOMAIN
+	FB_RTL_DOMAIN_UNKNOWN = 0
+	FB_RTL_DOMAIN_MEMORY
+	FB_RTL_DOMAIN_MATH
+	FB_RTL_DOMAIN_STRING
+	FB_RTL_DOMAIN_UNICODE
+	FB_RTL_DOMAIN_ARRAY
+	FB_RTL_DOMAIN_FILE
+	FB_RTL_DOMAIN_PRINT
+	FB_RTL_DOMAIN_CONSOLE
+	FB_RTL_DOMAIN_GRAPHICS
+	FB_RTL_DOMAIN_SOUND
+	FB_RTL_DOMAIN_ERROR
+	FB_RTL_DOMAIN_PROFILE
+	FB_RTL_DOMAIN_SYSTEM
+	FB_RTL_DOMAIN_GOSUB
+	FB_RTL_DOMAIN_DATA
+	FB_RTL_DOMAIN_OBJECT
+	FB_RTL_DOMAIN_SERIALIZATION
+end enum
+
+enum FB_RTL_SEMANTIC_EFFECT
+	FB_RTL_EFFECT_UNKNOWN = &h00000001
+	FB_RTL_EFFECT_ALLOCATE = &h00000002
+	FB_RTL_EFFECT_RELEASE = &h00000004
+	FB_RTL_EFFECT_ARGUMENT_READ = &h00000008
+	FB_RTL_EFFECT_ARGUMENT_WRITE = &h00000010
+	FB_RTL_EFFECT_RUNTIME_READ = &h00000020
+	FB_RTL_EFFECT_RUNTIME_WRITE = &h00000040
+	FB_RTL_EFFECT_EXTERNAL_IO = &h00000080
+	FB_RTL_EFFECT_SYNCHRONIZATION = &h00000100
+	FB_RTL_EFFECT_ERROR_HANDLING = &h00000200
+	FB_RTL_EFFECT_PROFILING = &h00000400
+	FB_RTL_EFFECT_PROCESS_EXIT = &h00000800
+	FB_RTL_EFFECT_CODE_EXECUTION = &h00001000
+	FB_RTL_EFFECT_COMPUTATION = &h00002000
+	FB_RTL_EFFECT_CONTROL_TRANSFER = &h00004000
+end enum
+
 type FB_RTL_PARAMDEF
 	dtype       as FB_DATATYPE
 	mode        as FB_PARAMMODE
@@ -1249,8 +1291,12 @@ declare sub rtlAddIntrinsicProcs _
 	( _
 		byval procdef as const FB_RTL_PROCDEF ptr, _
 		byval is_sfxlib as integer = FALSE, _
-		byval is_gfxlib as integer = FALSE _
+		byval is_gfxlib as integer = FALSE, _
+		byval semantic_domain as FB_RTL_SEMANTIC_DOMAIN = FB_RTL_DOMAIN_UNKNOWN _
 	)
+
+declare function rtlSemanticEffects( byval domain as FB_RTL_SEMANTIC_DOMAIN, _
+	byval procdef as const FB_RTL_PROCDEF ptr ) as ulongint
 
 declare function rtlProcLookup _
 	( _

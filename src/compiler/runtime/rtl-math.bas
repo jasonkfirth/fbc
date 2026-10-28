@@ -348,7 +348,7 @@ declare function hRndCallback( byval sym as FBSYMBOL ptr ) as integer
 '':::::
 sub rtlMathModInit( )
 
-	rtlAddIntrinsicProcs( @funcdata(0) )
+	rtlAddIntrinsicProcs( @funcdata(0), FALSE, FALSE, FB_RTL_DOMAIN_MATH )
 
 end sub
 

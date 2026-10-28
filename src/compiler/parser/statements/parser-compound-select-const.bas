@@ -27,6 +27,7 @@
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-constructs.bi"
+#include once "tooling/semantic-recovery.bi"
 
 type SELECTCTX
 	base        as integer
@@ -72,7 +73,9 @@ sub cSelConstStmtBegin()
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/statements/parser-compound-select-const.bas", __LINE__)
 	end if
 
 	if( astGetDataClass( expr ) <> FB_DATACLASS_INTEGER ) then
@@ -94,7 +97,9 @@ sub cSelConstStmtBegin()
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/statements/parser-compound-select-const.bas", __LINE__)
 	end if
 
 	'' keep track of original data type

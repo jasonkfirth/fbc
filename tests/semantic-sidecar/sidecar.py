@@ -32,6 +32,21 @@ from semantic_frontend_abi import validate_frontend_abi
 from semantic_backend_abi import validate_backend_abi
 from semantic_call_abi import validate_call_abi
 from semantic_object_model import validate_object_model
+from semantic_object_operations import validate_object_operations
+from semantic_startup import validate_startup
+from semantic_accepted_declarations import validate_declarations
+from semantic_blocks import validate_blocks
+from semantic_lifetimes import validate_lifetimes
+from semantic_temporaries import validate_temporaries
+from semantic_loads import validate_loads
+from semantic_ir_flow import validate_ir_flow, validate_root_transfer_policies
+from semantic_effects import validate_effects
+from diagnostic_context import validate_diagnostic_contexts
+from semantic_recovery import validate_recovery
+from semantic_skips import validate_skips
+from semantic_declaration_recovery import validate_declaration_recovery
+from semantic_validity import validate_validity
+from semantic_load_payloads import validate_load_payloads, validate_load_assembly
 from semantic_datatypes import (NATIVE_PRIMITIVE_NAMES as PRIMITIVE_NAMES, STABLE_PRIMITIVE_NAMES,
                                 NUMERIC_NAMES, BOOLEAN_NUMERIC_NAMES, FLOAT_NAMES, primitive_name)
 from semantic_array_storage import validate_array_storage_inputs
@@ -346,6 +361,7 @@ class Model:
         self.types: dict[int, list[str]] = {}
         self.normalized_types: dict[tuple[str, int, str], list[str]] = {}
         self.diagnostics: dict[int, list[str]] = {}
+        self.recovered_modules: set[int] = set()
         self.nodes: dict[int, list[str]] = {}
         self.properties: dict[tuple[str, int], dict[str, str]] = defaultdict(dict)
         self.constants: dict[tuple[str, int], tuple[str, str]] = {}
@@ -455,9 +471,10 @@ class Model:
             if tag == "FBCSEM":
                 raise ValueError("Repeated header")
             parser_receipt = tag == "K" and row[1] == "expression" and is_parser_property(row[3])
-            if expressions_only and tag not in ("M", "D", "E", "R", "END", "RECOVERY") and tag not in PROVENANCE_TAGS and not parser_receipt:
+            diagnostic_receipt = tag == "K" and row[1] in ("diagnostic", "module")
+            if expressions_only and tag not in ("M", "D", "E", "R", "END", "RECOVERY") and tag not in PROVENANCE_TAGS and not parser_receipt and not diagnostic_receipt:
                 raise ValueError("Full-model fact in expression-only output")
-            if bindings_only and tag not in ("M", "D", "S", "B", "I", "END") and tag not in PROVENANCE_TAGS:
+            if bindings_only and tag not in ("M", "D", "S", "B", "I", "END") and tag not in PROVENANCE_TAGS and not diagnostic_receipt:
                 raise ValueError("Non-binding fact in bindings-only output")
             if tag in ("END", "RECOVERY"):
                 footer = row
@@ -469,6 +486,7 @@ class Model:
                 module_expressions = 0
                 self.contexts.append(None)
                 self.primitives.append({})
+                subject_modules["module", counts["M"]] = counts["M"]
             elif tag == "D":
                 if not row[1] or row[1] in dependencies:
                     raise ValueError("Empty or duplicate dependency")
@@ -576,8 +594,11 @@ class Model:
             elif tag == "R":
                 if not expressions_only or not allow_recovery or row[1] != SCHEMA:
                     raise ValueError("Recovered module in complete-only output")
+                if counts["M"] == 0 or counts["M"] in self.recovered_modules:
+                    raise ValueError("Missing or repeated recovered module identity")
                 if number(row[2], 0) != module_expressions:
                     raise ValueError("Recovered-module expression total mismatch")
+                self.recovered_modules.add(counts["M"])
             elif tag == "A":
                 reference("symbol", row[1], nullable=False)
                 array_record_modules[number(row[1], 1)] = counts["M"]
@@ -667,7 +688,7 @@ class Model:
                     number(value, 0)
                 self.layouts[int(row[1])] = row
             elif tag in ("C", "K", "H"):
-                domains = ("symbol", "node", "expression")
+                domains = ("symbol", "node", "expression", "diagnostic", "module") if tag == "K" else ("symbol", "node", "expression")
                 if row[1] not in domains:
                     raise ValueError("Invalid metadata identity domain")
                 reference(row[1], row[2], nullable=False)
@@ -889,6 +910,7 @@ class Model:
                     raise ValueError("Diagnostic statement is absent or from another module")
                 reference("symbol", row[11])
                 self.diagnostics[identity] = row
+                subject_modules["diagnostic", identity] = counts["M"]
             elif tag == "DCL":
                 identity = number(row[1], 1)
                 subject_modules["declaration", identity] = counts["M"]
@@ -1475,7 +1497,9 @@ class Model:
         for domain, identity in references:
             available = (self.symbols if domain == "symbol" else self.nodes if domain == "node" else
                          declaration_ids if domain == "declaration" else range(1, counts["B"] + 1)
-                         if domain == "binding" else self.statements if domain == "statement" else expression_ids)
+                         if domain == "binding" else self.statements if domain == "statement" else
+                         self.diagnostics if domain == "diagnostic" else range(1, counts["M"] + 1)
+                         if domain == "module" else expression_ids)
             if identity not in available:
                 raise ValueError(f"Dangling {domain} reference: {identity}")
         for subject, statement in self.statement_owners.items():
@@ -1522,6 +1546,11 @@ class Model:
         if set(self.nodes) != set(range(1, counts["N"] + 1)):
             raise ValueError("Node identity sequence has gaps")
         self.validate_source_ownership(subject_modules)
+        validate_diagnostic_contexts(self, number, subject_modules)
+        validate_recovery(self, number, unescape, NODE_KINDS)
+        validate_skips(self, number, unescape)
+        validate_declaration_recovery(self, number, unescape)
+        validate_validity(self, number)
         validate_driver_inputs(self, number, subject_modules)
         validate_data(self, number, unescape, subject_modules)
         validate_emission_names(self, number, unescape, subject_modules)
@@ -1534,6 +1563,18 @@ class Model:
         validate_backend_abi(self, number, subject_modules)
         validate_call_abi(self, number, subject_modules)
         validate_object_model(self, number, subject_modules)
+        validate_object_operations(self, number, subject_modules, NODE_KINDS)
+        validate_startup(self, number, subject_modules)
+        validate_declarations(self, number, subject_modules)
+        validate_blocks(self, number, subject_modules)
+        validate_lifetimes(self, number, subject_modules)
+        validate_temporaries(self, number, subject_modules)
+        validate_loads(self, number, subject_modules, NODE_KINDS)
+        validate_load_payloads(self, number, subject_modules, NODE_KINDS)
+        validate_load_assembly(self, number, subject_modules, NODE_KINDS)
+        validate_ir_flow(self, number, subject_modules)
+        validate_root_transfer_policies(self, number, subject_modules)
+        validate_effects(self, number, subject_modules)
         validate_parser_observations(self, number, unescape, subject_modules, parser_property_modules, len(NODE_KINDS))
         validate_comments(self, number, subject_modules)
         validate_variable_names(self, number, subject_modules)

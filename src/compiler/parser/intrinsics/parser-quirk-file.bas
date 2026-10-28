@@ -30,6 +30,7 @@
 #include once "tooling/semantic-diagnostics.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '':::::
 '' PrintStmt      =   (PRINT|'?') ('#' Expression ',')? (USING Expression{str} ';')? (Expression? ';'|"," )*
@@ -529,7 +530,9 @@ private function hFileClose _
 		'' A missing first file number means close all; later omissions are errors.
 		if( filenum = NULL and cnt <> 0 ) then
 			errReport( FB_ERRMSG_EXPECTEDFILENUMBEREXPRESSION )
-			filenum = astNewCONSTi( 0 )
+			filenum = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-file.bas", __LINE__)
 		end if
 
 		proc = rtlFileClose( filenum, isfunc )
@@ -598,7 +601,9 @@ private function hFilePut _
 		else
 			hSkipStmt( )
 		end if
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/intrinsics/parser-quirk-file.bas", __LINE__)
 	end if
 
 	isarray = FALSE
@@ -615,7 +620,9 @@ private function hFilePut _
 			else
 				hSkipStmt( )
 			end if
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-file.bas", __LINE__)
 		end if
 	end if
 
@@ -710,7 +717,9 @@ private function hFileGet _
 		else
 			hSkipStmt( )
 		end if
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/intrinsics/parser-quirk-file.bas", __LINE__)
 	end if
 
 	isarray = FALSE
@@ -727,7 +736,9 @@ private function hFileGet _
 			else
 				hSkipStmt( )
 			end if
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-file.bas", __LINE__)
 		end if
 	end if
 
@@ -1145,7 +1156,9 @@ private function hFileOpen _
 	if( hMatchIdOrKw( "LEN", LEXCHECK_POST_SUFFIX ) ) then
 		if( cAssignToken( ) = FALSE ) then
 			errReport( FB_ERRMSG_EXPECTEDEQ )
-			flen = astNewCONSTi( 0 )
+			flen = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-file.bas", __LINE__)
 		else
 			hMatchExpressionEx( flen, FB_DATATYPE_INTEGER )
 		end if

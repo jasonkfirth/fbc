@@ -29,6 +29,7 @@
 #include once "ast/ast.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-primitive-types.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare function fbSemanticModelExpressionCheckpoint( ) as longint
 declare sub fbSemanticModelUnevaluatedQuery(byval checkpoint as longint, byref query_kind as const string)
@@ -50,14 +51,18 @@ function cConstIntExpr _
 	'' bad expression? fake a constant value
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
-		expr = astNewCONSTi( 0, dtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0, dtype ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 	end if
 
 	'' not a CONST? delete the tree and fake a constant value
 	if( astIsCONST( expr ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDCONST )
 		astDelTree( expr )
-		expr = astNewCONSTi( 0, dtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0, dtype ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 	end if
 
 	'' flush the expr to the specified dtype.
@@ -150,14 +155,18 @@ function cConstIntExprRanged _
 	'' bad expression? fake a constant value
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
-		expr = astNewCONSTi( 0, todtype )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0, todtype ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 	end if
 
 	'' not a CONST? delete the tree and fake a longint constant value
 	if( astIsCONST( expr ) = FALSE ) then
 		errReport( FB_ERRMSG_EXPECTEDCONST )
 		astDelTree( expr )
-		expr = astNewCONSTi( 0, FB_DATATYPE_LONGINT )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0, FB_DATATYPE_LONGINT ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 	end if
 
 	'' save the dtype of the expression before we flush the ast to longint
@@ -215,7 +224,9 @@ private function cSymbolTypeFuncPtr( byval is_func as integer, byval semantic_sh
 		if( is_func ) then
 			errReport( FB_ERRMSG_EXPECTEDRESTYPE )
 			'' error recovery: fake a type
-			dtype = FB_DATATYPE_INTEGER
+			dtype = fbSemanticModelRecoveryType( _
+				FB_DATATYPE_INTEGER, "replacement", __FUNCTION__, _
+				"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 		else
 			dtype = FB_DATATYPE_VOID
 		end if
@@ -390,7 +401,9 @@ function cTypeOrExpression _
 		parser.nsprefix = NULL
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 	end if
 
 	'' Every expression parsed inside TYPEOF/SIZEOF is unevaluated, including
@@ -1124,7 +1137,9 @@ private function hParseSymbolType _
 			if( (options and FB_SYMBTYPEOPT_ALLOWFORWARD) = 0 ) then
 				errReport( FB_ERRMSG_INCOMPLETETYPE, TRUE )
 				'' error recovery: fake a type
-				dtype = typeAddrOf( FB_DATATYPE_VOID )
+				dtype = fbSemanticModelRecoveryType( _
+					typeAddrOf( FB_DATATYPE_VOID ), "pointer", __FUNCTION__, _
+					"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 				subtype = NULL
 			end if
 
@@ -1136,7 +1151,9 @@ private function hParseSymbolType _
 				if( (options and FB_SYMBTYPEOPT_CHECKSTRPTR) <> 0 ) then
 					errReport( FB_ERRMSG_EXPECTEDPOINTER )
 					'' error recovery: make pointer
-					dtype = typeAddrOf( dtype )
+					dtype = fbSemanticModelRecoveryType( _
+						typeAddrOf( dtype ), "pointer", __FUNCTION__, _
+						"parser/declarations/parser-decl-symbtype.bas", __LINE__)
 				end if
 				lgt = typeGetSize( dtype )
 			end select

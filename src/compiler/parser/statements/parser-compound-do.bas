@@ -26,6 +26,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '' DoStmtBegin  =  DO ((WHILE | UNTIL) Expression)? .
 sub cDoStmtBegin( )
@@ -64,7 +65,9 @@ sub cDoStmtBegin( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake a node
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/statements/parser-compound-do.bas", __LINE__)
 		end if
 
 		'' branch
@@ -144,7 +147,9 @@ sub cDoStmtEnd( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake a node
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/statements/parser-compound-do.bas", __LINE__)
 		end if
 
 		'' branch

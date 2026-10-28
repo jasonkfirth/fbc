@@ -224,16 +224,19 @@ private sub hCompileBas _
 		'' If there were any errors during parsing, just exit without
 		'' doing anything else.
 		if( errGetCount( ) > 0 ) then
+			fbSemanticDiagnosticsFinishModule("rejected", errGetCount( ))
 			fbSemanticModelFinishRecoveryModule( )
 			fbcEnd( 1 )
 		end if
 
 		'' Don't restart unless asked for
 		if( fbShouldRestart( ) = FALSE ) then
+			fbSemanticDiagnosticsFinishModule("accepted", 0)
 			fbSemanticModelFinishModule( TRUE )
 			exit do
 		end if
 
+		fbSemanticDiagnosticsFinishModule("restarted", 0)
 		fbSemanticModelFinishModule( FALSE )
 
 		'' Close the request to restart the parser

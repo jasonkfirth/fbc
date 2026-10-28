@@ -5,6 +5,7 @@
 '' This file intentionally does NOT contain: name resolution or source parsing.
 
 #include once "tooling/semantic-private.bi"
+#include once "tooling/semantic-effects.bi"
 #include once "tooling/semantic-object-model.bi"
 #include once "tooling/semantic-access.bi"
 #include once "tooling/semantic-flags.bi"
@@ -345,6 +346,7 @@ end sub
 private sub hExportWideLiteralPrefix(byval sym as FBSYMBOL ptr, byval symbolid as longint)
 
 	if( sym->var_.littextw = NULL ) then exit sub
+	if( fbSemanticModelClaimWideLiteralPrefix(sym) = FALSE ) then exit sub
 	select case env.clopt.backend
 	case FB_BACKEND_GAS, FB_BACKEND_GAS64
 		hExportAsmWideLiteralPrefix(sym, symbolid)
@@ -481,6 +483,7 @@ end sub
 
 private sub hExportProcedure(byval sym as FBSYMBOL ptr, byval symbolid as longint, _
 	byval variables_live as integer)
+	fbSemanticModelEffectDeclaration(sym, symbolid)
 	hExportProcedureObjectSymbol(sym, symbolid)
 	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
 		fbSemanticModelNumber(symbolid) + TABCHAR + "procedure-linkage" + TABCHAR + hProcedureLinkage(sym))
@@ -757,9 +760,12 @@ sub fbSemanticModelExportSymbolDetails(byval sym as FBSYMBOL ptr, byval variable
 				wend
 				hSymbolNumber(symbolid, "declared-field-count", field_count)
 			end if
-			'' udt.base is the compiler's hidden base FIELD, whose subtype is
-			'' the declared base type. Export that type, not the storage field.
-			if( sym->udt.base <> NULL ) then baseid = fbSemanticModelSymbolId(sym->udt.base->subtype)
+			'' U names the declared base type. The separate relation retains the
+			'' actual hidden FIELD used by construction and destruction lowering.
+			if( sym->udt.base <> NULL ) then
+				baseid = fbSemanticModelSymbolId(sym->udt.base->subtype)
+				fbSemanticModelExportRelation("symbol", symbolid, sym->udt.base, "base-field")
+			end if
 			alignment = sym->udt.natalign
 			if( sym->udt.align > 0 ) then alignment = sym->udt.align
 			unpadded = sym->udt.unpadlgt

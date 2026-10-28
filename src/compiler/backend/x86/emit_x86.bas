@@ -25,6 +25,7 @@
 ''       may/2008 boolean support added [jeffm]
 
 #include once "core/fb.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "core/fbint.bi"
 #include once "backend/x86/reg.bi"
 #include once "backend/ir.bi"
@@ -979,6 +980,9 @@ private sub hWriteCtor _
 				IR_SECTION_DESTRUCTOR ), _
 				symbGetProcPriority( proc_head->sym ) )
 			emitVARINIOFS( symbGetMangledName( proc_head->sym ), 0 )
+			fbSemanticModelStartupEmission(proc_head->sym, iif(is_ctor, "constructor", "destructor"), _
+				"gas", "section-request", str(symbGetProcPriority(proc_head->sym)), _
+				iif(is_ctor, "constructor-section", "destructor-section"), *symbGetMangledName(proc_head->sym))
 		end if
 
 		proc_head = proc_head->next

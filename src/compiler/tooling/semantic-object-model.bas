@@ -93,6 +93,10 @@ sub fbSemanticModelObjectSnapshot( byval udt as FBSYMBOL ptr, byval identity as 
 		fbSemanticModelFailAt("object model snapshot has another type class")
 		exit sub
 	end if
+	if( identity <= 0 ) then
+		fbSemanticModelFailAt("object model snapshot lacks its semantic identity")
+		exit sub
+	end if
 	dim as FBSYMBOL ptr table = NULL, rtti = NULL
 	dim as integer elements = 0, abstracts = 0, table_unused = FALSE, rtti_unused = FALSE
 	if( udt->udt.ext <> NULL ) then
@@ -100,6 +104,18 @@ sub fbSemanticModelObjectSnapshot( byval udt as FBSYMBOL ptr, byval identity as 
 		rtti = udt->udt.ext->rtti
 		elements = udt->udt.ext->vtableelements
 		abstracts = udt->udt.ext->abstractcount
+	end if
+	if( table <> NULL ) then
+		if( table->class <> FB_SYMBCLASS_VAR ) then
+			fbSemanticModelFailAt("object model table has another storage class")
+			exit sub
+		end if
+	end if
+	if( rtti <> NULL ) then
+		if( rtti->class <> FB_SYMBCLASS_VAR ) then
+			fbSemanticModelFailAt("object model RTTI has another storage class")
+			exit sub
+		end if
 	end if
 	if( table <> NULL ) then table_unused = symbGetIsUnusedVtable(table)
 	if( rtti <> NULL ) then rtti_unused = symbGetIsUnusedVtable(rtti)

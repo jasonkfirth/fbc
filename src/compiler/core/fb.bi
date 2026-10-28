@@ -372,7 +372,7 @@ type FBCMMLINEOPT
 	fpmode          as FB_FPMODE            '' precise or fast fp mode (SSE+ only)
 	vectorize       as FB_VECTORIZELEVEL    '' enable automatic vectorization
 	optlevel        as integer              '' -gen gcc optimization level (gcc -O<N>)
-	asmsyntax       as FB_ASMSYNTAX         '' asm syntax mode for -gen gcc
+	asmsyntax       as FB_ASMSYNTAX         '' inline asm dialect for x86 backends
 
 	'' parser -lang mode
 	lang            as FB_LANG              '' lang compatibility

@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare function fbSemanticModelEnabled( ) as integer
 declare function fbSemanticModelExpressionsOnlyEnabled( ) as integer
@@ -111,7 +112,9 @@ function cIIFFunct() as ASTNODE ptr
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/intrinsics/parser-quirk-iif.bas", __LINE__)
 	else
 		fbSemanticModelIifInputs(expr, semantic_condition, semantic_true, semantic_false, _
 			source_start, source_end, nonphysical_tokens_at_start, nonphysical_tokens_at_end)

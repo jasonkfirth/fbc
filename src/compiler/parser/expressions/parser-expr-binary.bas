@@ -52,6 +52,7 @@
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-recovery.bi"
 
 '' Capture typed operands before astNewBOP folds, promotes, or consumes them.
 '' The parser still owns the actual operation and its source token; tooling
@@ -289,6 +290,9 @@ function cBoolExpression( ) as ASTNODE ptr
 
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			logexpr = fbSemanticModelRecoveryNode( _
+				logexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -299,7 +303,9 @@ function cBoolExpression( ) as ASTNODE ptr
 		if( logexpr = NULL ) then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			logexpr = astNewCONSTi( 0 )
+			logexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
@@ -369,6 +375,9 @@ function cLogExpression _
 		expr = cLogOrExpression( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			logexpr = fbSemanticModelRecoveryNode( _
+				logexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -379,7 +388,9 @@ function cLogExpression _
 		if( logexpr = NULL ) then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			logexpr = astNewCONSTi( 0 )
+			logexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 
@@ -442,6 +453,9 @@ function cLogOrExpression _
 		expr = cLogAndExpression(  )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			logexpr = fbSemanticModelRecoveryNode( _
+				logexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -452,7 +466,9 @@ function cLogOrExpression _
 		if( logexpr = NULL ) then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			logexpr = astNewCONSTi( 0 )
+			logexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 
@@ -515,6 +531,9 @@ function cLogAndExpression _
 		expr = cRelExpression( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			logexpr = fbSemanticModelRecoveryNode( _
+				logexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -525,7 +544,9 @@ function cLogAndExpression _
 		if( logexpr = NULL ) then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			logexpr = astNewCONSTi( 0 )
+			logexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 
@@ -611,6 +632,9 @@ function cRelExpression _
 		expr = cIsExpression( @semantic_operator_override )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			relexpr = fbSemanticModelRecoveryNode( _
+				relexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -622,7 +646,9 @@ function cRelExpression _
 		if( relexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			relexpr = astNewCONSTi( 0 )
+			relexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
@@ -667,12 +693,16 @@ function cIsExpression _
 		if( symbGetHasRTTI( astGetSubtype( isexpr ) ) = FALSE ) then
 			errReport( FB_ERRMSG_TYPEHASNORTTI )
 			'' error recovery: fake a node
-			isexpr = astNewCONSTi( 0 )
+			isexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 	else
 		errReport( FB_ERRMSG_TYPEMUSTBEAUDT )
 		'' error recovery: fake a node
-		isexpr = astNewCONSTi( 0 )
+		isexpr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-binary.bas", __LINE__)
 	end if
 
 	'' IS
@@ -691,17 +721,23 @@ function cIsExpression _
 		if( symbGetHasRTTI( subtype ) = FALSE ) then
 			errReport( FB_ERRMSG_TYPEHASNORTTI )
 			'' error recovery: fake a node
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 
 		elseif( symbGetUDTBaseLevel( subtype, astGetSubtype( isexpr ) ) = 0 ) then
 			errReport( FB_ERRMSG_TYPESARENOTRELATED )
 			'' error recovery: fake a node
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 	else
 		errReport( FB_ERRMSG_TYPEMUSTBEAUDT )
 		'' error recovery: fake a node
-		return astNewCONSTi( 0 )
+		return fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-binary.bas", __LINE__)
 	end if
 
 	'' point to the RTTI table
@@ -713,7 +749,9 @@ function cIsExpression _
 	if( isexpr = NULL ) Then
 		errReport( FB_ERRMSG_TYPEMISMATCH )
 		'' error recovery: fake a node
-		isexpr = astNewCONSTi( 0 )
+		isexpr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-binary.bas", __LINE__)
 	elseif( semantic_operator <> NULL ) then
 		*semantic_operator = AST_OP_IS
 	end if
@@ -772,6 +810,9 @@ function cCatExpression _
 		expr = cAddExpression(  )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			catexpr = fbSemanticModelRecoveryNode( _
+				catexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -782,7 +823,9 @@ function cCatExpression _
 		if( catexpr = NULL ) then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a new node
-			catexpr = astNewCONSTstr( NULL )
+			catexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTstr( NULL ), "replacement-expression", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		semantic_operator_override = hSemanticModelLoweredBinaryOperator(catexpr, AST_OP_CONCAT)
 		if( export_semantics ) then semantic_operator_count += 1
@@ -860,6 +903,9 @@ function cAddExpression _
 		expr = cShiftExpression( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			addexpr = fbSemanticModelRecoveryNode( _
+				addexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -874,7 +920,9 @@ function cAddExpression _
 		if( addexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			addexpr = astNewCONSTi( 0 )
+			addexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		semantic_operator_override = hSemanticModelLoweredBinaryOperator(addexpr, op)
 		if( export_semantics ) then semantic_operator_count += 1
@@ -949,6 +997,9 @@ function cShiftExpression _
 		expr = cModExpression(  )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			shiftexpr = fbSemanticModelRecoveryNode( _
+				shiftexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -959,7 +1010,9 @@ function cShiftExpression _
 		if( shiftexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			shiftexpr = astNewCONSTi( 0 )
+			shiftexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
@@ -1021,6 +1074,9 @@ function cModExpression _
 		expr = cIntDivExpression( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			modexpr = fbSemanticModelRecoveryNode( _
+				modexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -1031,7 +1087,9 @@ function cModExpression _
 		if( modexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			modexpr = astNewCONSTi( 0 )
+			modexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
@@ -1093,6 +1151,9 @@ function cIntDivExpression _
 		expr = cMultExpression( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			idivexpr = fbSemanticModelRecoveryNode( _
+				idivexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -1103,7 +1164,9 @@ function cIntDivExpression _
 		if( idivexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			idivexpr = astNewCONSTi( 0 )
+			idivexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
@@ -1171,6 +1234,9 @@ function cMultExpression _
 		expr = cExpExpression(  )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			mulexpr = fbSemanticModelRecoveryNode( _
+				mulexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -1181,7 +1247,9 @@ function cMultExpression _
 		if( mulexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			mulexpr = astNewCONSTi( 0 )
+			mulexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		if( export_semantics ) then semantic_operator_count += 1
 	loop
@@ -1244,6 +1312,9 @@ function cExpExpression _
 		expr = cNegNotExpression(  )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
+			expexpr = fbSemanticModelRecoveryNode( _
+				expexpr, "retained-prefix", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 			exit do
 		end if
 
@@ -1254,7 +1325,9 @@ function cExpExpression _
 		if( expexpr = NULL ) Then
 			errReport( FB_ERRMSG_TYPEMISMATCH )
 			'' error recovery: fake a node
-			expexpr = astNewCONSTf( 0, FB_DATATYPE_DOUBLE )
+			expexpr = fbSemanticModelRecoveryNode( _
+				astNewCONSTf( 0, FB_DATATYPE_DOUBLE ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-binary.bas", __LINE__)
 		end if
 		semantic_operator_override = hSemanticModelLoweredBinaryOperator(expexpr, AST_OP_POW)
 		if( export_semantics ) then semantic_operator_count += 1

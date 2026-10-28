@@ -84,7 +84,7 @@ ast/ast.bi	AST_NODE_LABEL	flush	backend-detail			Label flush policy is an emissi
 ast/ast.bi	AST_NODE_LIT	*	exported	K		Compiler literal/comment text.
 ast/ast.bi	AST_NODE_ASM	*	missing	N,B	G25	Token-head payload is not traversed.
 ast/ast.bi	AST_NODE_OP	op	exported	N	G12	Raw AST opcode is present; source operation recognition is a separate coverage question.
-ast/ast.bi	AST_NODE_OP	options	missing		G24	Initialization, pointer arithmetic, inverse branch, and coercion flags are absent.
+ast/ast.bi	AST_NODE_OP	options	exported	K	G24	Initialized BOP/UOP/BRANCH options and named pointer-arithmetic/inverse flags are copied by the node serializer.
 ast/ast.bi	AST_NODE_OP	ex	partial	H	G24	Initialized BOP/UOP/BRANCH targets are exported; unused ADDROF union storage must never be read.
 ast/ast.bi	AST_NODE_OFFS	*	exported	K		Byte offset.
 ast/ast.bi	AST_NODE_JMPTB	*	exported	J,H,K		Unsigned normalized values, labels, default, bias, and span.
@@ -111,14 +111,35 @@ ast/ast.bi	AST_NODE_TYPEINI	lastscp	bookkeeping			Construction cursor; expose ac
 ast/ast.bi	AST_NODE_TYPEINISCOPE	*	missing	K	G26	Merged initializer scope offsets/bytes and scope-end data are absent.
 ast/ast.bi	AST_NODE_TYPEINISCOPE	is_array	partial	K	G26	Scope-begin array flag is present; scope-end does not repeat or link scope ownership.
 ast/ast.bi	AST_NODE_PROC	decl_last	bookkeeping			Insertion cursor for implicit declarations.
-ast/ast.bi	AST_NODE_BREAK	semantic_*	partial	I	G27,G33	Some scope cleanup gets source ranges; source exit identity and emitted node ownership are absent.
+ast/ast.bi	AST_NODE_BREAK	semantic_*	partial	K,I	G27,G33	Native exit identity and per-exit cleanup count are retained; existing physical ranges anchor selected implicit calls. Complete emitted cleanup-node and conditional temporary ownership remain separate work.
+ast/ast.bi	AST_NODE_OP	semantic_scope_exit	exported	K	G27	BRANCH-only original native scope exit ordinal; the branch constructor clears it before optional scope-exit association.
+ast/ast.bi	ASTNODE	semantic_exit_cleanup	exported	K	G27,G33	Actual root returned by native cleanup insertion is linked to its selected scope-exit cleanup; cloning copies the identity and astInitNode clears it on reuse.
+ast/ast.bi	ASTNODE	semantic_lexical_cleanup	exported	K	G33	Normal scope/procedure teardown root returned after native AST updating is linked to its selected storage/group; copied and cleared with other node metadata.
+ast/ast.bi	ASTNODE	semantic_temporary_cleanup	exported	K	G33	Retained temporary destructor roots and their clones carry selected flush-action provenance, with explicit per-action projection counts including zero.
+ast/ast.bi	ASTNODE	semantic_load_origin	exported	K	G30,G34,G41	Actual load intervals retain own and inherited snapshot provenance, including late-created nodes; clone provenance does not claim object identity.
+ast/ast.bi	ASTNODE	semantic_object_operation	exported	K	G32	Private immutable attachment head projects actual object-operation roots; copied by cloning and cleared on node-pool reuse.
+ast/ast.bi	AST_NODE_BLOCK	parent	exported	K	G27	Native scope snapshots copy the parent symbol; procedure blocks have no parent. No AST address is serialized.
+ast/ast.bi	AST_NODE_BLOCK	inistmt	exported	K	G27	Native procedure/scope interval begins are copied separately from accepted source declaration order.
+ast/ast.bi	AST_NODE_BLOCK	endstmt	exported	K	G27	Native procedure/scope interval ends are copied after native assignment.
+ast/ast.bi	AST_NODE_BLOCK	initlabel	exported	K	G27	Procedure entry label is retained; ordinary scopes do not initialize this procedure-only slot.
+ast/ast.bi	AST_NODE_BLOCK	exitlabel	exported	K,H	G27	Procedure exit label and its native relation are retained; ordinary scope union slots are not read.
+ast/ast.bi	AST_NODE_BLOCK	breaklist	bookkeeping	K	G27	Break-list contents are copied before consumption; list addresses are private traversal state.
+ast/ast.bi	AST_NODE_PROC	ismain	exported	K	G27	Copies the native procedure-construction flag independently of driver module/link roles.
+ast/ast.bi	AST_NODE_BREAK	parent	exported	K	G27	Origin scope/procedure is copied as a symbol identity before break-list consumption.
+ast/ast.bi	AST_NODE_BREAK	scope	exported	K	G27	Native depth at the scope exit is retained.
+ast/ast.bi	AST_NODE_BREAK	linenum	exported	K	G27	Native line is retained separately from an optional accepted source statement.
+ast/ast.bi	AST_NODE_BREAK	stmtnum	exported	K	G27	Native statement counter at the original scope exit is retained.
 ast/ast.bi	AST_BREAKLIST	*	bookkeeping		G27	Export source exits and their cleanup actions before this private list is consumed.
 ast/ast.bi	AST_SEMANTIC_SOURCE_RANGE	*	partial	E,I	G11,G31,G33	Physical range snapshots are not source-event or expression identities.
-ast/ast.bi	AST_DTORLIST_ITEM	*	partial	I	G33	Destructor selections/ranges exist; condition cookie, ownership, and ordered cleanup actions are absent.
-ast/ast.bi	AST_DTORLIST_ITEM	refcount	bookkeeping			Temporary-list lifetime bookkeeping.
+ast/ast.bi	AST_DTORLIST_ITEM	*	partial	K,I	G33	Native lifetime events retain registration generation, storage, cookie/ref transitions, selected flush order and cancellation; ranges remain in I. Final updated/lowered cleanup-node correspondence remains open.
+ast/ast.bi	AST_DTORLIST_ITEM	refcount	exported	K	G33	Actual post-increment/decrement reference counts and release removals are observed before recycling the list node.
+ast/ast.bi	AST_DTORLIST_ITEM	sym	exported	K	G33	Storage symbol identity and complete live metadata are captured at registration before canceled temporaries can be removed.
+ast/ast.bi	AST_DTORLIST_ITEM	cookie	exported	K	G33	Actual numeric cookie transitions and scope occurrences are retained without treating reused cookie integers as unique lifetimes.
+ast/ast.bi	AST_DTORLIST_ITEM	semantic_generation	exported	K	G33	Native generation distinguishes registrations before pool reuse; event IDs identify scope/flush occurrences.
 ast/ast.bi	AST_GLOBINST_CTX	*	partial	P,N,I	G22,G32,G33	Wrapper bodies are exported, but the registration/instance/wrapper relationship and lifetime order are not explicit.
 ast/ast.bi	AST_DATASTMT_CTX	*	partial	T,N,H,C	G28	Lowered DATA descriptor initializers exist; source item and label ownership are absent.
-ast/nodes/ast-node-proc.bas	FB_GLOBINSTANCE	*	partial	P,N,I	G22,G32,G33	Generated initialization/cleanup bodies exist without a normalized instance/action/registration link.
+ast/nodes/ast-node-proc.bas	FB_GLOBINSTANCE	*	partial	P,N,I,K	G22,G32,G33	Native global-instance identities, forward/reverse wrapper actions and initializer/cleanup intent are linked; complete lifetime/late-action acceptance remains separate.
+ast/nodes/ast-node-proc.bas	FB_GLOBINSTANCE	semantic_identity	bookkeeping	K		Module-local global-instance identity links native forward/reverse wrapper actions; no native address is exported.
 ast/ast.bi	AST_OPINFO	*	bookkeeping	N,O	G12,G17	Static operator registry; selected operation and a public vocabulary are the useful contract.
 symbols/*	*	*	bookkeeping			Pool lists, hash buckets, lookup cursors, mangling abbreviations, and static registration tables are private.
 symbols/symb.bi	FBSYMBOL	*	partial	S,T		Payload containers are assessed by their active symbol class below.
@@ -145,7 +166,7 @@ symbols/symb.bi	FB_SYMBID	mangled	missing		G21	Emitted link identity can be comp
 symbols/symb.bi	FBS_CONST	*	exported	C		Active named-constant value.
 symbols/symb.bi	FBS_CONST	hassuffix	missing		G23	Written suffix intent is absent.
 symbols/symb.bi	FBS_VAR	*	partial	T,A,K,H,C	G22,G23,G28	Variable payload includes separately assessed array, layout, initializer, literal, and declaration facts.
-symbols/symb.bi	FBS_VAR	stmtnum	missing		G22	Declaration statement order used by branch/lifetime checks is absent.
+symbols/symb.bi	FBS_VAR	stmtnum	exported	K	G22	Native variable declaration counters are retained separately from accepted declarator and cross-route source receipt order; whole-source integration remains open.
 symbols/symb.bi	FBS_VAR	align	exported	K		Variable/field alignment override.
 symbols/symb.bi	FBS_VAR	bitpos	exported	K		Field bit position.
 symbols/symb.bi	FBS_VAR	bits	exported	K		Field bit width.
@@ -185,7 +206,7 @@ symbols/symb.bi	FB_PROCOPOVL	*	exported	F		Procedure overload operation code.
 symbols/symb.bi	FB_PROCRTL	*	bookkeeping			Runtime registration callback address is not a semantic target; observe selected outcomes.
 symbols/symb.bi	FB_DTORWRAPPER	*	missing	P,N	G22,G33	Bodies exist without explicit wrapper-to-instance registration relationship.
 symbols/symb.bi	FBS_STRUCT	*	partial	U,H,T	G18,G19,G20	Base, size, selected alignment, options, return dtype, and special members exist; remaining fields require separate treatment.
-symbols/symb.bi	FBS_STRUCT	base	exported	U		Exported base type identity is the hidden base field's subtype.
+symbols/symb.bi	FBS_STRUCT	base	exported	U,H	G32	U retains the base type and the independent base-field relation retains the actual storage field used by construction/destruction lowering.
 symbols/symb.bi	FBS_STRUCT	anonparent	exported	H		Only initialized anonymous aggregate parents are read.
 symbols/symb.bi	FBS_STRUCT	natalign	partial	U	G18	Packing override replaces natural alignment in the single U alignment field.
 symbols/symb.bi	FBS_STRUCT	align	partial	U	G18	Chosen alignment exists but requested packing and natural alignment are conflated.
@@ -210,7 +231,7 @@ symbols/symb.bi	FBS_SCOPE	*	partial	T,U,N	G16,G27	Owner, debug line extent, and 
 symbols/symb.bi	FBS_SCOPE	emit	backend-detail			Physical frame emission state.
 symbols/symb.bi	FB_SCOPEDBG	*	partial	U,N	G09,G16,G27	Logical scope line range and label nodes are present without physical source identity and named scope edges.
 symbols/symb.bi	FB_SCOPEEMIT	*	backend-detail			Physical scope frame base offset.
-symbols/symb.bi	FBS_LABEL	*	missing	H	G22,G35	Declared/statement/GOSUB properties are absent.
+symbols/symb.bi	FBS_LABEL	*	exported	H,K	G22,G35	Declared flag is always retained; native statement counter, assembler GOSUB landing-pad flag and label scope are read only after native declaration initializes them.
 symbols/symb.bi	FBS_LABEL	parent	exported	H		Label scope relation, only after declaration initialized the pointer.
 symbols/symb.bi	FBS_NAMESPACE	*	partial	T,B	G16	Namespace identity/owner exist without reopening instances and ordered USING/import events.
 symbols/symb.bi	FBS_NAMESPACE	last_tail	bookkeeping			Namespace reopening cursor; export source occurrences rather than this pointer.
@@ -239,4 +260,16 @@ symbols/symb.bi	FB_GLOBCTORLIST	*	bookkeeping		G22	Export ordered registrations 
 symbols/symb.bi	FB_RTTICTX	*	partial	T	G20	Runtime OBJECT/RTTI symbols exist without all type/table ownership relationships.
 symbols/symb.bi	SYMB_OVLOP	head	derivable	F,H,T		Operator overload groups follow owner, operation code, and overload-next edges.
 symbols/symb.bi	SYMBDEFAULTMEMBERS	*	exported	H		Generated special member identities are related from their owning type.
+symbols/symb.bi	FB_PROCRTL	semantic_domain	exported	K	G37	Copied native runtime registration family; unknown for user procedures and function-pointer signatures.
+symbols/symb.bi	FB_PROCRTL	semantic_effects	exported	K	G37	Metadata-only potential effect mask, independent of native optimization flags and with explicit unknown remainder.
+symbols/symb.bi	FB_PROCRTL	semantic_options	exported	K	G37	Original native registration options retained separately from effect categories.
+diagnostics/error.bas	FB_ERRCTX	inited	exported	K,DC	G38	Copied reporter initialization state, independently of active lexer state.
+diagnostics/error.bas	FB_ERRCTX	cnt	exported	K,DC,ME	G38	Native counter before ordinary errors and after promoted warnings, plus attempt closure.
+diagnostics/error.bas	FB_ERRCTX	paramlocations	exported	K,DP	G38	Ordered copied parameter frames; list allocation state remains private.
+diagnostics/error.bas	ERRPARAMLOCATION	proc	partial	K,DP	G38,G41	Copied procedure kind/name and owner name; rejected-module frames do not publish authoritative symbol identities.
+diagnostics/error.bas	ERRPARAMLOCATION	tk	exported	K,DP	G38	Native parameter context token, including -1 when absent.
+diagnostics/error.bas	ERRPARAMLOCATION	paramnum	exported	K,DP	G38	Native user parameter ordinal after the reporter removes the hidden receiver.
+diagnostics/error.bas	ERRPARAMLOCATION	paramid	exported	K,DP	G38,G51	Provided parameter spelling copied while live and escaped independently within nested K groups.
+diagnostics/error.bas	FBWARNING	level	exported	K,DC	G38	The reporter copies its selected catalog warning level separately from the configured warning threshold.
+tooling/semantic-constructs.bas	SEMANTIC_SOURCE_STATEMENT	errors_at_begin	exported	K	G39,G40	Native error count at the observed statement opening; separate from the grammar caller comparison baseline and terminal status.
 # end of semantic-sidecar-field-coverage.rules.tsv

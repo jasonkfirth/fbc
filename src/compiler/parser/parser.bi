@@ -745,7 +745,8 @@ declare function cProcCall _
 		byval thisexpr as ASTNODE ptr = NULL, _
 		byval checkprnts as integer = FALSE, _
 		byval options as FB_PARSEROPT = 0, _
-		byval semantic_site as LEX_LOCATION ptr = NULL _
+		byval semantic_site as LEX_LOCATION ptr = NULL, _
+		byval semantic_object_operation as longint = 0 _
 	) as ASTNODE ptr
 
 declare function cMethodCall _

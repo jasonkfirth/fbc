@@ -33,6 +33,7 @@
 #include once "support/containers/list.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-loads.bi"
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-constructs.bi"
@@ -641,7 +642,15 @@ function astLoad( byval n as ASTNODE ptr ) as IRVREG ptr
 		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
 		return NULL
 	end if
-	return ast_loadcallbacks(n->class)( n )
+	dim as longint semantic_load = fbSemanticModelLoadBegin(n)
+	dim as integer semantic_emitted = ast.doemit
+	dim as IRVREG ptr semantic_result = ast_loadcallbacks(n->class)( n )
+	'' Some loaders leave their unused return value unspecified when the
+	'' procedure is not emitted. Do not inspect that carrier as an IR value.
+	dim as integer semantic_has_result = FALSE
+	if( semantic_emitted ) then semantic_has_result = (semantic_result <> NULL)
+	fbSemanticModelLoadEnd(semantic_load, semantic_has_result)
+	return semantic_result
 end function
 
 '' end of ast/ast.bas

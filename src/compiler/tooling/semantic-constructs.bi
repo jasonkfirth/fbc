@@ -10,6 +10,7 @@
 #include once "lexer/lex.bi"
 
 declare sub fbSemanticModelResetConstructs( )
+declare sub fbSemanticModelFinishSourceValidity( byval commit as integer )
 declare function fbSemanticModelStatementBegin( byref source as LEX_LOCATION, byval token as integer, byval token_class as integer ) as longint
 declare sub fbSemanticModelStatementEnd( byval identity as longint, byref route as const string, byref ending as LEX_LOCATION, byval errors_before as integer )
 declare function fbSemanticModelCurrentStatement( ) as longint

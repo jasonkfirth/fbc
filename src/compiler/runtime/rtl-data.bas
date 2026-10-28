@@ -189,7 +189,7 @@
 '':::::
 sub rtlDataModInit( )
 
-	rtlAddIntrinsicProcs( @funcdata(0) )
+	rtlAddIntrinsicProcs( @funcdata(0), FALSE, FALSE, FB_RTL_DOMAIN_DATA )
 
 end sub
 

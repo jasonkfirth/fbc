@@ -36,6 +36,7 @@ declare function fbSemanticModelMacroAccessBinding( ) as longint
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-diagnostics.bi"
 #include once "tooling/semantic-variable-names.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportCurrentMemberPrefix _
@@ -65,7 +66,9 @@ private function hIndexExpr( ) as ASTNODE ptr
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: faken an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-variable.bas", __LINE__)
 	end if
 
 	function = expr
@@ -82,14 +85,18 @@ private function hCheckIntegerIndex( byval expr as ASTNODE ptr ) as ASTNODE ptr
 		'' to integer fine, but we don't want to allow pointers as indices.
 		errReport( FB_ERRMSG_INVALIDARRAYINDEX, TRUE )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/expressions/parser-expr-variable.bas", __LINE__)
 
 	case else
 		expr = astNewCONV( FB_DATATYPE_INTEGER, NULL, expr )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_INVALIDARRAYINDEX, TRUE )
 			'' error recovery: fake an expr
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-variable.bas", __LINE__)
 		end if
 	end select
 
@@ -119,7 +126,9 @@ private function cFixedSizeArrayIndex _
 		if( dimension >= symbGetArrayDimensions( sym ) ) then
 			errReport( FB_ERRMSG_WRONGDIMENSIONS )
 			'' error recovery: fake an expr
-			return astNewCONSTi( 0 )
+			return fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-variable.bas", __LINE__)
 		end if
 
 		lower = symbArrayLbound( sym, dimension )
@@ -149,7 +158,9 @@ private function cFixedSizeArrayIndex _
 			if( dimexpr = NULL ) then
 				errReport( FB_ERRMSG_ARRAYOUTOFBOUNDS )
 				'' error recovery: fake an expr
-				dimexpr = astNewCONSTi( lower )
+				dimexpr = fbSemanticModelRecoveryNode( _
+					astNewCONSTi( lower ), "replacement-constant", __FUNCTION__, _
+					"parser/expressions/parser-expr-variable.bas", __LINE__)
 			end if
 		end if
 
@@ -1036,7 +1047,9 @@ function cFuncPtrOrMemberDeref _
 		else
 			errReport( FB_ERRMSG_SYNTAXERROR )
 			'' error recovery: fake an expr
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/expressions/parser-expr-variable.bas", __LINE__)
 		end if
 	end if
 

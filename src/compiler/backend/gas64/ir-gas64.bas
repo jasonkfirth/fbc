@@ -129,6 +129,7 @@ rbp-y -->  local vars
 '/
 
 #include once "core/fbint.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "support/containers/flist.bi"
 #include once "lexer/lex.bi"
 #include once "backend/ir-private.bi"
@@ -3297,6 +3298,7 @@ private function _emitbegin( ) as integer
 end function
 private sub hAddGlobalCtorDtor( byval proc as FBSYMBOL ptr )
 	const CTOR_DTOR_PRIORITY_MAX = 65535
+	dim as string semantic_placement, semantic_priority, semantic_name
 
 	if( symbGetIsFuncPtr( proc ) ) then
 		exit sub
@@ -3307,16 +3309,21 @@ private sub hAddGlobalCtorDtor( byval proc as FBSYMBOL ptr )
 			ctx.ctorcount += 1
 			asm_info("Constructor name/prio="+*symbGetMangledName( proc )+" / "+str( symbGetProcPriority( proc ) ))
 			if ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
-				asm_section(".init_array")
+				semantic_placement = ".init_array"
 			else
 				if symbGetProcPriority( proc )=0 then
-					asm_section(".ctors")
+					semantic_placement = ".ctors"
 				else
-					asm_section(".ctors."+str(CTOR_DTOR_PRIORITY_MAX-symbGetProcPriority( proc )))
+					semantic_priority = str(CTOR_DTOR_PRIORITY_MAX-symbGetProcPriority(proc))
+					semantic_placement = ".ctors." + semantic_priority
 				end if
 			end if
+			asm_section(semantic_placement)
 			asm_code(".align 8")
-			asm_code(".quad "+*symbGetMangledName( proc ))
+			semantic_name = *symbGetMangledName(proc)
+			asm_code(".quad "+semantic_name)
+			fbSemanticModelStartupEmission(proc, "constructor", "gas64", "section-entry", _
+				semantic_priority, semantic_placement, semantic_name)
 			asm_section(".text")
 		end if
 	elseif( symbGetIsGlobalDtor( proc ) ) then
@@ -3326,18 +3333,24 @@ private sub hAddGlobalCtorDtor( byval proc as FBSYMBOL ptr )
 			'' NetBSD walks finalizer arrays forwards, so reverse the priority.
 			dim as integer priority = symbGetProcPriority( proc )
 			if( priority = 0 ) then priority = CTOR_DTOR_PRIORITY_MAX
-			asm_section(".fini_array." + right("00000" + str(CTOR_DTOR_PRIORITY_MAX - priority), 5) + ",""aw"",@fini_array")
+			semantic_priority = right("00000" + str(CTOR_DTOR_PRIORITY_MAX - priority), 5)
+			semantic_placement = ".fini_array." + semantic_priority + ",""aw"",@fini_array"
 		elseif ctx.systemv=true andalso fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB then
-			asm_section(".fini_array")
+			semantic_placement = ".fini_array"
 		else
 			if symbGetProcPriority( proc )=0 then
-					asm_section(".dtors")
+				semantic_placement = ".dtors"
 				else
-					asm_section(".dtors."+str(CTOR_DTOR_PRIORITY_MAX-symbGetProcPriority( proc )))
+				semantic_priority = str(CTOR_DTOR_PRIORITY_MAX-symbGetProcPriority(proc))
+				semantic_placement = ".dtors." + semantic_priority
 			end if
 		end if
+		asm_section(semantic_placement)
 		asm_code(".align 8")
-		asm_code(".quad "+*symbGetMangledName( proc ))
+		semantic_name = *symbGetMangledName(proc)
+		asm_code(".quad "+semantic_name)
+		fbSemanticModelStartupEmission(proc, "destructor", "gas64", "section-entry", _
+			semantic_priority, semantic_placement, semantic_name)
 		asm_section(".text")
 	end if
 end sub

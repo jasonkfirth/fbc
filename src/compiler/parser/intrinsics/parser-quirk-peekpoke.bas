@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 ''
 '' (SymbolType ',')? Expression
@@ -45,7 +46,9 @@ private function hOptionalTypeAndFirstExpr _
 		case FB_DATATYPE_VOID, FB_DATATYPE_FIXSTR
 			errReport( FB_ERRMSG_INVALIDDATATYPES, TRUE )
 			'' error recovery: fake a type
-			dtype = FB_DATATYPE_UBYTE
+			dtype = fbSemanticModelRecoveryType( _
+				FB_DATATYPE_UBYTE, "replacement", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-peekpoke.bas", __LINE__)
 			subtype = NULL
 		end select
 
@@ -57,7 +60,9 @@ private function hOptionalTypeAndFirstExpr _
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake an expr
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/intrinsics/parser-quirk-peekpoke.bas", __LINE__)
 		end if
 	else
 		'' Expression (without a SymbolType in front of it)

@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "runtime/rtl.bi"
 #include once "ast/ast.bi"
+#include once "tooling/semantic-recovery.bi"
 
 const FBGFX_LINETYPE_LINE = 0
 const FBGFX_LINETYPE_B    = 1
@@ -177,7 +178,9 @@ private function hMaybeArrayAccess2Ptr _
 				if( astHasSideFx( expr ) ) then
 					errReport( FB_ERRMSG_EXPECTEDPOINTER, TRUE )
 					astDelTree( expr )
-					expr = astNewCONSTi( 0, typeAddrOf( FB_DATATYPE_VOID ) )
+					expr = fbSemanticModelRecoveryNode( _
+						astNewCONSTi( 0, typeAddrOf( FB_DATATYPE_VOID ) ), "replacement-constant", __FUNCTION__, _
+						"parser/intrinsics/parser-quirk-gfx.bas", __LINE__)
 				else
 					*pdescexpr = astNewNIDXARRAY( astCloneTree( expr ) )
 					expr = astNewADDROF( expr )

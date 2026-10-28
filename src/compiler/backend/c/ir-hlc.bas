@@ -122,6 +122,7 @@
 #include once "tooling/semantic-emission-names.bi"
 #include once "tooling/semantic-backend-abi.bi"
 #include once "tooling/semantic-call-abi.bi"
+#include once "tooling/semantic-startup.bi"
 #include once "backend/ir.bi"
 #include once "runtime/rtl.bi"
 #include once "support/containers/flist.bi"
@@ -871,6 +872,7 @@ private sub hAppendCtorAttrib _
 	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then exit sub
 
 	if( proc->stats and (FB_SYMBSTATS_GLOBALCTOR or FB_SYMBSTATS_GLOBALDTOR) ) then
+		dim as integer semantic_start = len(ln)
 		if( in_front = FALSE ) then
 			ln += " "
 		end if
@@ -890,6 +892,9 @@ private sub hAppendCtorAttrib _
 		if( in_front ) then
 			ln += " "
 		end if
+		fbSemanticModelStartupEmission(proc, iif(symbGetIsGlobalCtor(proc), "constructor", "destructor"), _
+			"c", iif(in_front, "definition-attribute", "declaration-attribute"), _
+			iif(priority = 0, "", str(priority)), "function-attribute", mid(ln, semantic_start + 1))
 	end if
 end sub
 
@@ -6316,8 +6321,11 @@ private sub _emitProcEnd _
 		if( priority = 0 ) then priority = maximum_priority
 		dim as string section_priority = right( "00000" + str( maximum_priority - priority ), 5 )
 		dim as string proc_name = hGetCId( proc )
-		hWriteLine( "static void (*fb_c_fini_" + proc_name + ")(void) " + _
-			"__attribute__((section("".fini_array." + section_priority + """), used)) = " + proc_name + ";", TRUE )
+		dim as string semantic_registration = "static void (*fb_c_fini_" + proc_name + ")(void) " + _
+			"__attribute__((section("".fini_array." + section_priority + """), used)) = " + proc_name + ";"
+		hWriteLine(semantic_registration, TRUE)
+		fbSemanticModelStartupEmission(proc, "destructor", "c", "array-entry", section_priority, _
+			".fini_array." + section_priority, semantic_registration)
 	end if
 
 	'' Forget any left-over expression nodes (unused function results)

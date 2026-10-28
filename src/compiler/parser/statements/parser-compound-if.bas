@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-recovery.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -158,7 +159,9 @@ sub cIfStmtBegin( )
 	if( expr = NULL ) then
 		errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 		'' error recovery: fake an expr
-		expr = astNewCONSTi( 0 )
+		expr = fbSemanticModelRecoveryNode( _
+			astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+			"parser/statements/parser-compound-if.bas", __LINE__)
 	else
 		fbSemanticModelIfCondition( expr )
 	end if
@@ -282,7 +285,9 @@ sub cIfStmtNext( )
 		if( expr = NULL ) then
 			errReport( FB_ERRMSG_EXPECTEDEXPRESSION )
 			'' error recovery: fake an expr
-			expr = astNewCONSTi( 0 )
+			expr = fbSemanticModelRecoveryNode( _
+				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
+				"parser/statements/parser-compound-if.bas", __LINE__)
 		else
 			fbSemanticModelIfCondition( expr )
 		end if

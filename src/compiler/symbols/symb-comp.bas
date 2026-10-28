@@ -25,6 +25,7 @@
 #include once "core/fbint.bi"
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-object-model.bi"
+#include once "tooling/semantic-object-operations.bi"
 
 declare function symbGetCompCopyCtor( byval sym as FBSYMBOL ptr ) as FBSYMBOL ptr
 
@@ -103,6 +104,10 @@ private function hDeclareProc _
 	'' Close the namespace again
 	symbNestEnd( TRUE )
 
+	if( proc <> NULL ) then
+		dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("generated-member-declaration", udt, proc, proc, pattrib, op)
+		fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "complete")
+	end if
 	function = proc
 end function
 
@@ -367,6 +372,7 @@ private sub hAddCtorBody _
 
 	'' The AST will add any implicit base/field construction/destruction
 	'' code automatically
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("generated-member-body", udt, proc, proc, abs(is_copyctor <> FALSE))
 	hProcBegin( udt, proc )
 
 	if( is_copyctor ) then
@@ -377,6 +383,7 @@ private sub hAddCtorBody _
 	end if
 
 	hProcEnd( )
+	fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "complete")
 
 	symbSetCantUndef( udt )
 end sub
@@ -496,6 +503,7 @@ private sub hAssignList _
 		end if
 	end if
 	if( const_source ) then srcdtype = typeSetIsConst( srcdtype )
+	fbSemanticModelObjectOperationChoice("copy-source", iif(const_source, "const", "mutable"))
 	src = symbAddTempVar( typeAddrOf( srcdtype ), subtype )
 
 	'' dst = @this.arrayfield(0)
@@ -530,12 +538,15 @@ private function hCopyUnionFields _
 	dim as FBSYMBOL ptr fld = any
 	dim as longint bytes = any, lgt = any, base_ofs = any
 
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("generated-union-copy", symbGetSubtype(this_), base_fld)
+
 	'' merge all union fields
 	fld = base_fld
 	bytes = 0
 	base_ofs = symbGetOfs( base_fld )
 
 	do
+		fbSemanticModelObjectOperationSymbolChoice("union-member", fld)
 		lgt = symbGetRealSize( fld ) + (symbGetOfs( fld ) - base_ofs)
 		if( lgt > bytes ) then
 			bytes = lgt
@@ -546,11 +557,13 @@ private function hCopyUnionFields _
 	loop while( fld andalso symbIsField( fld ) andalso symbGetIsUnionField( fld ) )
 
 	'' copy all them at once
-	astAdd( astNewMEM( AST_OP_MEMMOVE, _
+	fbSemanticModelObjectOperationNumberChoice("union-bytes", bytes)
+	dim as ASTNODE ptr semantic_tree = astAdd( astNewMEM( AST_OP_MEMMOVE, _
 				astBuildVarField( this_, base_fld ), _
 				astBuildVarField( rhs, base_fld ), _
 				bytes ) )
 
+	fbSemanticModelObjectOperationEnd(semantic_operation, semantic_tree, iif(semantic_tree = NULL, "empty", "built"))
 	function = fld
 end function
 
@@ -563,6 +576,7 @@ private sub hAddLetOpBody _
 	dim as FBSYMBOL ptr fld = any, this_ = any, rhs = any
 	dim as integer do_copy = any
 
+	dim as longint semantic_operation = fbSemanticModelObjectOperationBegin("generated-member-body", udt, letproc, letproc)
 	hProcBegin( udt, letproc )
 
 	this_ = symbGetParamVar( symbGetProcHeadParam( letproc ) )
@@ -598,23 +612,32 @@ private sub hAddLetOpBody _
 				continue while
 			end if
 
+			dim as longint semantic_field = fbSemanticModelObjectOperationBegin("generated-assignment-field", udt, fld)
 			'' Dynamic array field?
 			if( symbIsDynamic( fld ) ) then
+				fbSemanticModelObjectOperationChoice("copy-route", "dynamic-array")
 				hAssignDynamicArray( fld, this_, rhs )
 			else
 				if( symbGetArrayDimensions( fld ) = 0 ) then
+					fbSemanticModelObjectOperationChoice("copy-route", "scalar")
 					'' this.field = rhs.field
 					astAdd( astNewASSIGN( astBuildVarField( this_, fld ), astBuildVarField( rhs, fld ) ) )
 				else
+					fbSemanticModelObjectOperationChoice("copy-route", "fixed-array")
 					hAssignList( fld, this_, rhs )
 				end if
 			end if
+			fbSemanticModelObjectOperationEnd(semantic_field, NULL, "complete")
+		else
+			dim as longint semantic_field = fbSemanticModelObjectOperationBegin("field-exclusion", udt, fld, NULL, 2)
+			fbSemanticModelObjectOperationEnd(semantic_field, NULL, "skipped")
 		end if
 
 		fld = fld->next
 	wend
 
 	hProcEnd( )
+	fbSemanticModelObjectOperationEnd(semantic_operation, NULL, "complete")
 
 	symbSetCantUndef( udt )
 
