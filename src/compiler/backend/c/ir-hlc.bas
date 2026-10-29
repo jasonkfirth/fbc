@@ -276,6 +276,7 @@ type IRHLCCTX
 	anonstack               as TLIST  '' stack of nested anonymous structs/unions in a struct/union
 
 	varini                  as string
+	varinisym               as FBSYMBOL ptr '' Non-NULL while emitting a static initializer.
 	variniscopelevel        as integer
 	variniscopes            as CVARINISCOPE ptr
 	varinifailed            as integer
@@ -291,6 +292,7 @@ type IRHLCCTX
 	arraycallbackid         as uinteger
 	unalignedid             as uinteger '' Per-emission byte-copy temporary names, reset by _emitBegin().
 	localassertid           as uinteger '' Unique local enum names for pre-C11 layout checks.
+	codeptrid               as uinteger '' Typed representation-transfer temporaries.
 
 	globalvarpass           as integer  '' Global var emitting is done in 2 passes; this allows the callbacks to identify the current pass.
 	computedgotoaddress     as integer  '' A real label address or required entry reference has been emitted.
@@ -2526,6 +2528,8 @@ private function _emitBegin( ) as integer
 	ctx.usedbuiltins = 0
 	ctx.unalignedid = 0
 	ctx.localassertid = 0
+	ctx.codeptrid = 0
+	ctx.varinisym = NULL
 	ctx.globalvarpass = 0
 	hUpdateCurrentFileName( env.inf.name )
 
@@ -3959,6 +3963,36 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		hSym2Text( ctx.exprtext, n->sym )
 
 	case EXPRCLASS_CAST
+		if( (typeGetDtAndPtrOnly(n->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) andalso _
+		    typeIsPtr(n->l->dtype) andalso _
+		    (typeGetDtAndPtrOnly(n->l->dtype) <> typeAddrOf(FB_DATATYPE_FUNCTION)) andalso _
+		    sectionInsideProc() andalso (ctx.varinisym = NULL) ) then
+			'' BASIC library lookups carry native code addresses in ANY PTR.
+			'' Copy that ABI representation into the real procedure-pointer type
+			'' instead of relying on C's object/function pointer cast extension.
+			'' Different pointer sizes cannot satisfy this native ABI contract.
+			ctx.codeptrid += 1
+			if( ctx.codeptrid = 0 ) then
+				errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+				exit sub
+			end if
+			var inputname = "fb_c_codeptr_input_" + str(ctx.codeptrid)
+			var resultname = "fb_c_codeptr_result_" + str(ctx.codeptrid)
+			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->l->dtype), n->l->subtype, TRUE) + " " + inputname + ";" )
+			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE) + " " + resultname + ";" )
+			hWriteStaticAssert( "sizeof(" + inputname + ") == sizeof(" + resultname + ")" )
+
+			'' Keep evaluation at the original expression site, including inside
+			'' a lazy enclosing expression. The input is evaluated exactly once.
+			'' A null data pointer produces a typed null procedure pointer.
+			ctx.exprtext += "((void)(" + inputname + " = ("
+			hExprFlush( n->l, FALSE )
+			ctx.exprtext += ")), " + inputname + " == 0 ? (" + resultname + " = 0) : ("
+			ctx.exprtext += "(void)__builtin_memcpy(&" + resultname + ", &" + inputname + ", sizeof(" + resultname + ")), "
+			ctx.exprtext += resultname + "))"
+			exit sub
+		end if
+
 		'' Keep pointee qualifiers, including nested pointer constness, so
 		'' argument casts agree with the emitted C prototype. Top-level const
 		'' does not qualify the converted value and is unnecessary in a cast.
@@ -6171,6 +6205,7 @@ private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )
 	hVarIniDiscardScopes( )
 	ctx.varini = ""
 	ctx.varinifailed = FALSE
+	ctx.varinisym = sym
 end sub
 
 private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
@@ -6185,6 +6220,7 @@ private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
 	if( ctx.varinifailed = FALSE ) then hEmitVarDecl( FALSE, sym, ctx.varini )
 	hVarIniDiscardScopes( )
 	ctx.varini = ""
+	ctx.varinisym = NULL
 end sub
 
 private function hVarIniFieldPrefix( ) as string
