@@ -52,7 +52,6 @@ sub astGosubMarkTarget( byval label as FBSYMBOL ptr )
 end sub
 
 sub astGosubAddInit( byval proc as FBSYMBOL ptr )
-	dim as FBARRAYDIM dTB(0) = any
 	dim as FBSYMBOL ptr sym = any
 	dim as ASTNODE ptr var_decl = any
 	dim as integer dtype = any

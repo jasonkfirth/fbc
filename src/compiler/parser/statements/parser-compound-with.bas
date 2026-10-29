@@ -68,7 +68,6 @@ end function
 
 '' WithStmtBegin  =  WITH Variable .
 sub cWithStmtBegin( )
-	static as FBARRAYDIM dTB(0)
 	dim as FBSYMBOL ptr sym = any
 	dim as ASTNODE ptr expr = any
 	dim as integer is_ptr = any, options = any

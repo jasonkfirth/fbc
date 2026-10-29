@@ -2602,6 +2602,9 @@ function rtlWstrAssignWA _
 		exit function
 	end if
 
+	'' The runtime returns DST, but an assignment has no BASIC result value.
+	astSetType( proc, FB_DATATYPE_VOID, NULL )
+
 	function = proc
 
 end function
@@ -2646,6 +2649,9 @@ function rtlWstrAssignAW _
 	if( astNewARG( proc, astNewCONSTi( ddtype = FB_DATATYPE_FIXSTR ) ) = NULL ) then
 		exit function
 	end if
+
+	'' The runtime returns DST, but an assignment has no BASIC result value.
+	astSetType( proc, FB_DATATYPE_VOID, NULL )
 
 	function = proc
 
@@ -2810,6 +2816,9 @@ function rtlWstrAssign _
 	if( astNewARG( proc, src ) = NULL ) then
 		exit function
 	end if
+
+	'' The runtime returns DST, but an assignment has no BASIC result value.
+	astSetType( proc, FB_DATATYPE_VOID, NULL )
 
 	function = proc
 

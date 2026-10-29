@@ -2006,7 +2006,7 @@ function hStr2Args( byval txt as const zstring ptr, res() as string ) as integer
 					'' '"'
 					ReadChar(c)
 
-				elseif( c = CHAR_RSLASH ) then
+				elseif( (c = CHAR_RSLASH) andalso escaped ) then
 
 					c = PeekChar()
 					select case c
@@ -2170,7 +2170,7 @@ function hWStr2Args( byval txt as const wstring ptr, res() as DWSTRING ) as inte
 					'' '"'
 					ReadChar(c)
 
-				elseif( c = CHAR_RSLASH ) then
+				elseif( (c = CHAR_RSLASH) andalso escaped ) then
 
 					c = PeekChar()
 					select case c
