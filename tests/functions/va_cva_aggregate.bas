@@ -10,6 +10,16 @@
 #include once "crt/stdio.bi"
 #include once "crt/stdarg.bi"
 
+#ifdef __FB_WIN32__
+'' The Microsoft CRT reads %L floating arguments as Double. MinGW's ANSI
+'' formatter accepts the native CLongDouble value exercised by this test.
+Declare Function FormatLongDouble CDecl Alias "__mingw_snprintf" _
+    (ByVal buffer As ZString Ptr, ByVal capacity As size_t, _
+     ByVal format As ZString Ptr, ...) As Long
+#else
+#define FormatLongDouble snprintf
+#endif
+
 Type AggregateRR
     first_value As LongInt
     second_value As LongInt
@@ -148,7 +158,7 @@ If Cast(Double, cva_call_fbc_longdouble_export(fixed_input)) <> 2.25# Then End 8
 
 Dim As ZString * 32 formatted_value
 Dim As CLongDouble formatting_value = CLongDoubleFromDoubleValue(1.75#)
-Dim As Integer format_length = snprintf( _
+Dim As Integer format_length = FormatLongDouble( _
     @formatted_value, SizeOf(formatted_value), "%Lg", formatting_value)
 If format_length <> 4 OrElse formatted_value <> "1.75" Then End 9
 
