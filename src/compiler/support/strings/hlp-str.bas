@@ -1410,10 +1410,14 @@ function hEscapeW _
 
 		'' convert every char to octagonal form as GAS can't
 		'' handle unicode literal strings
-		if( (wcharlen = 2) and (char >= &h00010000ul) ) then
+		if( (wcharlen = 2) and (char >= &h00010000ul) and (char <= &h0010FFFFul) ) then
 			'' create surrogate pair
 			char -= &h00010000ul
 			hUnicodeCodePointCharToHex( (char shr 10) + &h0000D800ul, dst, wcharlen )
+			'' The output limit counts target code units, not input scalars.
+			'' A short fixed buffer may only have room for the first half.
+			n += 1
+			if( (maxlen > 0) andalso (n >= maxlen) ) then exit do
 			hUnicodeCodePointCharToHex( (char and &h000003FFul) + &h0000DC00ul, dst, wcharlen )
 		else
 			hUnicodeCodePointCharToHex( char, dst, wcharlen )

@@ -3821,11 +3821,9 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr )
 	'' String literal?
 	if( symbGetIsLiteral( sym ) ) then
 		if( symbGetType( sym ) = FB_DATATYPE_WCHAR ) then
-			if( fbTargetWcharIsUtf32( ) ) then
-				hBuildWstrLit( s, symbGetVarLitTextW( sym ), symbGetWstrLength( sym ) + 1 )
-			else
-				hBuildWstrLit( s, hUnescapeW( symbGetVarLitTextW( sym ) ), symbGetWstrLength( sym ) + 1 )
-			end if
+			'' hReadWstrChar() consumes the internal encoding in the builder.
+			'' Decoding here too would reinterpret a literal ESC as an escape.
+			hBuildWstrLit( s, symbGetVarLitTextW( sym ), symbGetWstrLength( sym ) + 1 )
 		else
 			hBuildStrLit( s, hUnescape( symbGetVarLitText( sym ) ), symbGetStrLength( sym ) + 1, 0 )
 		end if
@@ -6310,9 +6308,6 @@ private sub _emitVarIniWstr _
 	DZstrConcatAssign( initializer, "{ " )
 	wcharsize = fbGetTargetWcharSize( )
 	use_numeric = hUseNumericWstrLit( )
-	if( not fbTargetWcharIsUtf32( ) ) then
-		literal = hUnescapeW( literal )
-	end if
 
 	'' String literal too long?
 	if( litlength > varlength ) then
@@ -6322,12 +6317,12 @@ private sub _emitVarIniWstr _
 
 	src = literal
 	src_end = literal + len( *literal )
-	for i as integer = 0 to litlength - 1
-		if( src >= src_end ) then
-			exit for
-		end if
+	'' Keep the internal encoding until the reader consumes it once.
+	'' Fixed buffers count target code units, including both surrogate halves.
+	dim as longint emitted_units = 0
+	while( emitted_units < litlength ) andalso (src < src_end)
 
-		if( i > 0 ) then
+		if( emitted_units > 0 ) then
 			DZstrConcatAssign( initializer, ", " )
 		end if
 
@@ -6337,13 +6332,19 @@ private sub _emitVarIniWstr _
 			ch -= &h10000ul
 			hAppendWstrVarIniCodeUnit( initializer, (ch shr 10) + &hD800ul, _
 			                               wcharsize, use_numeric )
+			emitted_units += 1
+			if( emitted_units >= litlength ) then exit while
 			DZstrConcatAssign( initializer, ", " )
 			hAppendWstrVarIniCodeUnit( initializer, (ch and &h3FFul) + &hDC00ul, _
 			                               wcharsize, use_numeric )
 		else
 			hAppendWstrVarIniCodeUnit( initializer, ch, wcharsize, use_numeric )
 		end if
-	next
+		emitted_units += 1
+	wend
+
+	'' ISO C needs an element even when the literal has no data code units.
+	if( emitted_units = 0 ) then DZstrConcatAssign( initializer, "0" )
 
 	DZstrConcatAssign( initializer, " }" )
 	ctx.varini = *initializer.data
