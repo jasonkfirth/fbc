@@ -293,6 +293,7 @@ type IRHLCCTX
 	computedgotoaddress     as integer  '' A real label address or required entry reference has been emitted.
 	computedgotoentry       as integer  '' Only Clang needs an otherwise unreferenced entry address.
 	computedgotodispatch    as integer  '' One target slot and dispatch block per C activation.
+	computedgotoopaque      as integer  '' Raw text may expose labels without a symbol expression.
 	currproc                as FBSYMBOL ptr  '' Borrowed procedure symbol while emitting its body.
 	procentrylabel          as FBSYMBOL ptr  '' Borrowed from the procedure AST while emitting its body.
 	procentrysection        as integer
@@ -1791,6 +1792,7 @@ private sub hMarkReferencedLocalInTree( byval n as ASTNODE ptr )
 	case AST_NODECLASS_ASM, AST_NODECLASS_LIT
 		'' Raw text can name storage without an ordinary variable node.
 		c_local_refs_complete = FALSE
+		ctx.computedgotoopaque = TRUE
 	case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
 	     AST_NODECLASS_ADDROF, AST_NODECLASS_OFFSET
 
@@ -5411,18 +5413,12 @@ end sub
 
 private sub _emitJumpPtr( byval v1 as IRVREG ptr )
 	var jumptarget = exprFlush( exprNewVREG( v1 ), TRUE )
-	if( ctx.computedgotodispatch = FALSE ) then
-		'' This slot belongs to the C activation, including recursive calls.
-		'' Keep it in the procedure header so jumps from nested BASIC scopes
-		'' do not leave its declaration behind or bypass initialization.
-		var section = sectionGosub( 2 )
-		hWriteLine( "void* fb_c_jump_target = 0;" )
-		sectionReturn( section )
-		ctx.computedgotodispatch = TRUE
-	end if
-	hEmitComputedGotoAddress( )
-	hWriteLine( "fb_c_jump_target = " + jumptarget + ";" )
-	hWriteLine( "goto fb_c_jump_dispatch;" )
+	ctx.computedgotodispatch = TRUE
+	if( ctx.computedgotoopaque ) then hEmitComputedGotoAddress( )
+	'' The procedure-end pass has seen every real label address. Its local
+	'' macro selects the transfer form without buffering or evaluating this
+	'' expression again, including when the destination appears later.
+	hWriteLine( "fb_c_indirect_jump(" + jumptarget + ");" )
 end sub
 
 private sub _emitBranch( byval op as integer, byval label as FBSYMBOL ptr )
@@ -6597,6 +6593,7 @@ private sub _emitProcBegin _
 	)
 
 	ctx.currproc = proc
+	ctx.computedgotoopaque = symbIsNaked( proc )
 	hClearCStaticReferences( )
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
@@ -6754,19 +6751,35 @@ private sub _emitProcEnd _
 
 	hDropUnusedProcEntry( initlabel )
 	if( ctx.computedgotodispatch ) then
-		'' A checked operation can select a handler or resume destination.
-		'' Evaluate that operation once at its original position, then share
-		'' the indirect transfer without changing the legacy label ABI.
-		'' Preserve normal fallthrough for procedures without an explicit RET.
-		hWriteLine( "goto fb_c_jump_dispatch_end;" )
-		hWriteLine( "fb_c_jump_dispatch:;" )
-		hWriteLine( "goto *fb_c_jump_target;" )
-		hWriteLine( "fb_c_jump_dispatch_end:;" )
+		var section = sectionGosub( 2 )
+		if( ctx.computedgotoaddress or ctx.computedgotoopaque ) then
+			'' The slot belongs to this activation, including recursive calls.
+			'' Its header declaration also covers jumps from nested scopes.
+			hWriteLine( "void* fb_c_jump_target = 0;" )
+			hWriteLine( "#define fb_c_indirect_jump(value) do { fb_c_jump_target = (value); goto fb_c_jump_dispatch; } while(0)", TRUE )
+		else
+			'' A GNU indirect jump can only target a label in this C function.
+			'' With no label addresses or opaque text, error handling must either
+			'' terminate or unwind through an owned runtime frame. A returned
+			'' target cannot name a valid continuation here. Stop instead of
+			'' jumping into another activation with the wrong stack and locals.
+			'' Keep the legacy label ABI whenever real local targets exist.
+			hWriteLine( "#define fb_c_indirect_jump(value) do { (void)(value); __builtin_abort(); } while(0)", TRUE )
+		end if
+		sectionReturn( section )
+		if( ctx.computedgotoaddress or ctx.computedgotoopaque ) then
+			'' Preserve normal fallthrough without executing the dispatch block.
+			hWriteLine( "goto fb_c_jump_dispatch_end;" )
+			hWriteLine( "fb_c_jump_dispatch:;" )
+			hWriteLine( "goto *fb_c_jump_target;" )
+			hWriteLine( "fb_c_jump_dispatch_end:;" )
+		end if
 	end if
 	sectionEnd( )
 
 	sectionUnindent( )
 	hWriteLine( "}" )
+	if( ctx.computedgotodispatch ) then hWriteLine( "#undef fb_c_indirect_jump", TRUE )
 
 	sectionEnd( )
 	hCLeafEnd( )
