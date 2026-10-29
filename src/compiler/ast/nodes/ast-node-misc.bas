@@ -614,6 +614,8 @@ end function
 
 '' Assertions are independent of debug mode. Keep this local helper available
 '' to -eassert; release builds can omit it when the assertion is disabled.
+'' __FB_ERR__ bit 5 enables assertions independently of debug generation.
+#if (__FB_ERR__ and &h20)
 private function astCountBitfields( byval n as ASTNODE ptr ) as integer
 	dim as integer count = any
 
@@ -630,13 +632,16 @@ private function astCountBitfields( byval n as ASTNODE ptr ) as integer
 
 	function = count
 end function
+#endif
 
 '' Remove FIELD nodes that mark bitfield accesses/assignments and add the
 '' corresponding code instead. Non-bitfield FIELD nodes stay in,
 '' they're used by astProcVectorize().
 function astUpdateBitfields( byval n as ASTNODE ptr ) as ASTNODE ptr
 	'' Shouldn't miss any bitfields
+#if (__FB_ERR__ and &h20)
 	assert( astCountBitfields( n ) <= ast.bitfieldcount )
+#endif
 
 	if( ast.bitfieldcount <= 0 ) then
 		return n

@@ -1268,6 +1268,8 @@ private function hWalk _
 end function
 
 '' -eassert can enable this tree-count check without debug code generation.
+'' __FB_ERR__ bit 5 enables assertions independently of debug generation.
+#if (__FB_ERR__ and &h20)
 private function astCountTypeinis( byval n as ASTNODE ptr ) as integer
 	dim as integer count = any
 
@@ -1284,6 +1286,7 @@ private function astCountTypeinis( byval n as ASTNODE ptr ) as integer
 
 	function = count
 end function
+#endif
 
 function astTypeIniUpdate( byval tree as ASTNODE ptr ) as ASTNODE ptr
 	dim as ASTNODE ptr tempvarinitcode = any
@@ -1292,7 +1295,9 @@ function astTypeIniUpdate( byval tree as ASTNODE ptr ) as ASTNODE ptr
 	'' tree passed in here can be any kind of tree, not just TYPEINI
 
 	'' Shouldn't miss any TYPEINIs
+#if (__FB_ERR__ and &h20)
 	assert( astCountTypeinis( tree ) <= ast.typeinicount )
+#endif
 
 	'' Shortcut if there are no TYPEINIs
 	if( ast.typeinicount <= 0 ) then
