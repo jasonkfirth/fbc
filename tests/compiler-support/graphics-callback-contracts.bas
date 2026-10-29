@@ -7,6 +7,8 @@
 #lang "fb"
 #include once "fbgfx.bi"
 
+namespace graphics_contracts
+
 type CallbackData
 	calls as integer
 	mask as ulong
@@ -43,6 +45,8 @@ private function get_parameter( byval context as CallbackData ptr ) as CallbackD
 	context->parameter_reads += 1
 	return context
 end function
+
+sub runTests( )
 
 const SOURCE_COLOUR = &hFF112233ul
 const DESTINATION_COLOUR = &hFF445566ul
@@ -104,5 +108,10 @@ imagedestroy( source_image )
 imagedestroy( destination_image )
 screen 0
 print "GRAPHICS_CALLBACK_CONTRACTS_PASS"
+
+end sub
+end namespace
+
+graphics_contracts.runTests( )
 
 '' end of compiler-support/graphics-callback-contracts.bas

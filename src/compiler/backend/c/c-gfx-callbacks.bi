@@ -50,7 +50,8 @@ private function hGfxBlenderArgument _
 	  byref context_name as string ) as EXPRNODE ptr
 
 	var leaf = expr
-	do while( leaf <> NULL andalso leaf->class = EXPRCLASS_CAST )
+	do while( leaf <> NULL andalso leaf->class = EXPRCLASS_CAST andalso _
+	          typeGetDtAndPtrOnly(leaf->dtype) = typeAddrOf(FB_DATATYPE_VOID) )
 		leaf = leaf->l
 	loop
 	if( leaf = NULL ) then return expr

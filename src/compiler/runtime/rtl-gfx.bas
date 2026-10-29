@@ -1527,7 +1527,7 @@ declare function hPorts_cb _
 ''
 '' fb_gfx_private.h declares BLENDER as FBCALL and PUTTER as CDECL. They
 '' are function pointers, including the nested BLENDER parameter of PUTTER.
-'' Build these shared types after registering the intrinsics, rather than
+'' Build these shared types when graphics is used, rather than
 '' describing their addresses as data pointers in the fixed-size table.
 '' The anonymous types belong to the current symbol table and expire with it.
 private function hLookupGfxIntrinsic( byval pname as const zstring ptr ) as FBSYMBOL ptr
@@ -1560,6 +1560,11 @@ private sub hInitGfxCallbacks( )
 	var putter_proc = hLookupGfxIntrinsic( @FB_RTL_GFXPUTPSET )
 	if( putter_proc = NULL ) then exit sub
 
+	'' RTL declarations survive every local scope. These signatures contain
+	'' only native scalar/pointer types, so create them in the global table.
+	var nested = (symbGetCurrentNamespc( ) <> @symbGetGlobalNamespc( ))
+	if( nested ) then symbNestBegin( @symbGetGlobalNamespc( ) )
+
 	var signature = symbPreAddProc( NULL )
 	symbAddProcParam( signature, NULL, FB_DATATYPE_ULONG, NULL, 0, FB_PARAMMODE_BYVAL, 0, 0 )
 	symbAddProcParam( signature, NULL, FB_DATATYPE_ULONG, NULL, 0, FB_PARAMMODE_BYVAL, 0, 0 )
@@ -1583,13 +1588,13 @@ private sub hInitGfxCallbacks( )
 	hSetGfxCallback( proc, 9, putter )
 	proc = hLookupGfxIntrinsic( @FB_RTL_GFXDRAWSTRINGUSTR )
 	hSetGfxCallback( proc, 9, putter )
+	if( nested ) then symbNestEnd( )
 end sub
 
 '':::::
 sub rtlGfxModInit( )
 
 	rtlAddIntrinsicProcs( @funcdata(0), FALSE, TRUE, FB_RTL_DOMAIN_GRAPHICS )
-	hInitGfxCallbacks( )
 
 end sub
 
@@ -1623,6 +1628,14 @@ private function hPorts_cb _
 end function
 
 private function hGfxlib_cb( byval sym as FBSYMBOL ptr ) as integer
+	'' Unused graphics must not allocate anonymous signature names in every
+	'' translation unit. The call builder invokes this before adding arguments.
+	fbRestartableStaticVariable( integer, callbackTypesReady, FALSE )
+	if( callbackTypesReady = FALSE ) then
+		callbackTypesReady = TRUE
+		hInitGfxCallbacks( )
+	end if
+
 	if( symbIsDefineSet( @"__FB_GFXLIB3__" ) ) then
 		env.clopt.fbgfx = FB_GFXLIB_GFX3
 	elseif( env.clopt.fbgfx = FB_GFXLIB_NONE ) then
