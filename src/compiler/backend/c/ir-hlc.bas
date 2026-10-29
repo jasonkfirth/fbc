@@ -180,6 +180,7 @@ enum
 	EXPRCLASS_MEMBER
 	EXPRCLASS_INDEX
 	EXPRCLASS_ARRAYADDR
+	EXPRCLASS_VTABLE
 end enum
 
 const C_MEMBER_VIEW_VALUE = 1
@@ -276,6 +277,8 @@ type IRHLCCTX
 	anonstack               as TLIST  '' stack of nested anonymous structs/unions in a struct/union
 
 	varini                  as string
+	vtablemembers           as string  '' Typed C fields for the active compiler-owned vtable.
+	vtableelements          as integer
 	varinisym               as FBSYMBOL ptr '' Non-NULL while emitting a static initializer.
 	variniscopelevel        as integer
 	variniscopes            as CVARINISCOPE ptr
@@ -1703,6 +1706,30 @@ private sub hEmitVarDecl _
 
 	dim as string ln
 	dim as integer static_storage = FALSE
+	var is_vtable = ((sym->stats and FB_SYMBSTATS_VTABLE) <> 0)
+	dim as string vtabletag
+	if( is_vtable ) then
+		vtabletag = "fb_c_vtable_" + hGetCId( sym )
+		if( use_extern ) then
+			'' External tables need only an address, so their record can stay incomplete.
+			hWriteDeclaration( "struct " + vtabletag + ";" )
+		else
+			if( (ctx.varinisym <> sym) or (varini = NULL) or _
+			    (ctx.vtableelements <> symbGetArrayElements(sym)) ) then
+				errReportEx( FB_ERRMSG_INTERNAL, "invalid C virtual table initializer" )
+				exit sub
+			end if
+			'' The native ABI uses consecutive pointer-sized slots. A C record keeps
+			'' each method's real prototype without converting its address to void*.
+			hWriteDeclaration( "struct " + vtabletag + " { " + ctx.vtablemembers + " };" )
+			hWriteStaticAssert( "sizeof(struct " + vtabletag + ") == " + _
+				str(ctx.vtableelements) + " * sizeof(void*)" )
+			for i as integer = 0 to ctx.vtableelements - 1
+				hWriteStaticAssert( "__builtin_offsetof(struct " + vtabletag + _
+					", slot_" + str(i) + ") == " + str(i) + " * sizeof(void*)" )
+			next
+		end if
+	end if
 
 	if( use_extern ) then
 		ln += "extern "
@@ -1716,7 +1743,9 @@ private sub hEmitVarDecl _
 	dim subtype as FBSYMBOL ptr
 	symbGetRealType( sym, dtype, subtype )
 
-	if( use_extern and (typeGetPtrCnt(dtype) = 0) and _
+	if( is_vtable ) then
+		ln += "struct " + vtabletag
+	elseif( use_extern and (typeGetPtrCnt(dtype) = 0) and _
 	    (typeGet(dtype) = FB_DATATYPE_FWDREF) ) then
 		'' C allows an extern object declaration with an incomplete type.
 		'' The C backend only needs a concrete spelling to form its address;
@@ -1730,7 +1759,7 @@ private sub hEmitVarDecl _
 	var identifier = hGetCId( sym )
 	ln += " " + identifier
 	fbSemanticModelEmissionName(sym, "c", identifier)
-	ln += hEmitArrayDecl( sym )
+	if( is_vtable = FALSE ) then ln += hEmitArrayDecl( sym )
 	dim as string selected_object_name
 	if( sym->class = FB_SYMBCLASS_VAR andalso symbIsLocal(sym) = FALSE ) then
 		if( hCNameNeedsEncoding(symbGetMangledName(sym)) andalso _
@@ -3143,6 +3172,12 @@ private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 		n = exprNew( EXPRCLASS_SYM, typeAddrOf( FB_DATATYPE_FUNCTION ), sym )
 		n->sym = sym
 
+	elseif( (sym->stats and FB_SYMBSTATS_VTABLE) <> 0 ) then
+		'' Compiler-owned tables have typed C record storage. Keep their ABI
+		'' address opaque to the ordinary homogeneous-array index recovery.
+		n = exprNew( EXPRCLASS_VTABLE, typeAddrOf(symbGetFullType(sym)), symbGetSubtype(sym) )
+		n->sym = sym
+
 	'' Array? Add CAST to make it a pointer to the first element,
 	'' instead of a pointer to the array.
 	elseif( symbIsCArray( sym ) ) then
@@ -3954,6 +3989,10 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 	case EXPRCLASS_IMM
 		hImm2Text( ctx.exprtext, n )
 
+	case EXPRCLASS_VTABLE
+		ctx.exprtext += "(" + hEmitType(n->dtype, n->subtype) + ")&"
+		hSym2Text( ctx.exprtext, n->sym )
+
 	case EXPRCLASS_SYM
 		'' The symbol formatter also serves expression dumps. Only an address
 		'' flushed into C satisfies Clang's computed-goto requirement.
@@ -4177,7 +4216,7 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	case EXPRCLASS_IMM
 		hImm2Text( s, n )
 
-	case EXPRCLASS_SYM
+	case EXPRCLASS_SYM, EXPRCLASS_VTABLE
 		hSym2Text( s, n->sym )
 
 	case EXPRCLASS_CAST
@@ -4231,7 +4270,8 @@ private function exprNewOFFSET _
 	dim as EXPRNODE ptr l = any
 
 	l = exprNewSYM( sym )
-	if( memberdtype <> FB_DATATYPE_INVALID andalso symbIsCArray(sym) ) then
+	if( memberdtype <> FB_DATATYPE_INVALID andalso symbIsCArray(sym) andalso _
+	    ((sym->stats and FB_SYMBSTATS_VTABLE) = 0) ) then
 		dim as EXPRNODE ptr byte_index = NULL
 		var indexed = exprTryCArrayIndex(sym, byte_index, ofs, memberdtype, membersubtype, TRUE)
 		if( indexed <> NULL ) then
@@ -6206,6 +6246,8 @@ private sub _emitVarIniBegin( byval sym as FBSYMBOL ptr )
 	ctx.varini = ""
 	ctx.varinifailed = FALSE
 	ctx.varinisym = sym
+	ctx.vtablemembers = ""
+	ctx.vtableelements = 0
 end sub
 
 private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
@@ -6221,6 +6263,8 @@ private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
 	hVarIniDiscardScopes( )
 	ctx.varini = ""
 	ctx.varinisym = NULL
+	ctx.vtablemembers = ""
+	ctx.vtableelements = 0
 end sub
 
 private function hVarIniFieldPrefix( ) as string
@@ -6250,7 +6294,25 @@ private sub hVarIniSeparator( )
 	end if
 end sub
 
+private function hIsVtableInitializer( ) as integer
+	if( ctx.varinisym = NULL ) then return FALSE
+	return ((ctx.varinisym->stats and FB_SYMBSTATS_VTABLE) <> 0)
+end function
+
+private sub hAppendVtableSlot( byval dtype as integer, byval subtype as FBSYMBOL ptr )
+	ctx.vtablemembers += hEmitType( dtype, subtype ) + " slot_" + str(ctx.vtableelements) + "; "
+	ctx.vtableelements += 1
+end sub
+
 private sub _emitVarIniI( byval sym as FBSYMBOL ptr, byval value as longint )
+	if( hIsVtableInitializer( ) ) then
+		'' The ABI header and abstract slots use native null object pointers.
+		if( value <> 0 ) then
+			hVarIniFail( "nonzero integer in C virtual table" )
+			exit sub
+		end if
+		hAppendVtableSlot( typeAddrOf(FB_DATATYPE_VOID), NULL )
+	end if
 	var dtype = symbGetType( sym ) or typeGetConstMask( symbGetFullType( sym ) )
 
 	'' AST stores boolean true as -1, but we emit it as 1 for gcc compatibility
@@ -6312,6 +6374,22 @@ private sub _emitVarIniOfs _
 		byval rhs as FBSYMBOL ptr, _
 		byval ofs as longint _
 	)
+
+	if( hIsVtableInitializer( ) ) then
+		if( ofs <> 0 ) then
+			hVarIniFail( "nonzero address offset in C virtual table" )
+			exit sub
+		end if
+		if( symbIsProc(rhs) ) then
+			var signature = symbAddProcPtrFromFunction( rhs )
+			hAppendVtableSlot( typeAddrOf(FB_DATATYPE_FUNCTION), signature )
+		else
+			hAppendVtableSlot( typeAddrOf(symbGetFullType(rhs)), symbGetSubtype(rhs) )
+		end if
+		ctx.varini += exprFlush( exprNewOFFSET(rhs, 0) )
+		hVarIniSeparator( )
+		exit sub
+	end if
 
 	dim as EXPRNODE ptr l = any
 
