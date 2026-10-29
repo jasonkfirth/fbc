@@ -27,7 +27,7 @@
 #include once "ast/ast.bi"
 
 '' ProcDecl  =  DECLARE SUB|FUNCTION|OPERATOR ProcHeader .
-sub cProcDecl( )
+sub cProcDecl( byval attrib as FB_SYMBATTRIB, byval pattrib as FB_PROCATTRIB )
 	dim as integer tk = any
 
 	if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_DECL ) = FALSE ) then
@@ -46,7 +46,7 @@ sub cProcDecl( )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' ProcHeader
-		cProcHeader( 0, 0, FALSE, FB_PROCOPT_ISPROTO, tk, @declaration_start )
+		cProcHeader( attrib, pattrib, FALSE, FB_PROCOPT_ISPROTO, tk, @declaration_start )
 
 	case else
 		errReport( FB_ERRMSG_SYNTAXERROR )

@@ -713,8 +713,9 @@ private sub hUDTPassByval _
 		if( astIsCALL( t ) ) then
 			n->l = astRemoveNoConvCAST( n->l )
 			assert( astIsCALL( n->l ) )
-			if( symbProcReturnsOnStack( n->l->sym ) ) then
-				'' Returning on stack, access the temp result var
+			if( symbProcReturnsOnStack( n->l->sym ) orElse _
+			    symbIsGAS32CLongDoubleCAbiResult( n->l->sym ) ) then
+				'' Copy from the caller-owned result slot.
 				n->l = astBuildCallResultVar( n->l )
 				hByteByByte( param, n )
 			else

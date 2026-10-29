@@ -18,6 +18,117 @@ import subprocess
 import tempfile
 
 
+def check_i386_clongdouble_abi(root: Path, fbc: Path, working: Path,
+                               clang: str | None, llc: str | None) -> int:
+    """Run CLongDouble result and argument checks through i386 C ABIs."""
+    basic_source = working / "clongdouble-i386.bas"
+    basic_source.write_text(
+        '#include once "crt/longdouble.bi"\n'
+        'Declare Function c2fbLongDoubleSum CDecl Alias "c2fbLongDoubleSum" ( _\n'
+        '    ByVal lhs As CLongDouble, ByVal rhs As CLongDouble) As CLongDouble\n'
+        'Function c2fbLongDoubleCheck CDecl Alias "c2fbLongDoubleCheck" ( _\n'
+        '    ByVal lhs As CLongDouble, ByVal rhs As CLongDouble) As Integer\n'
+        '    Dim As CLongDouble result = c2fbLongDoubleSum(lhs, rhs)\n'
+        '    Return CInt(result = CLongDoubleFromDoubleValue(3.75#))\n'
+        'End Function\n'
+        'Function c2fbLongDoubleAdd CDecl Alias "c2fbLongDoubleAdd" ( _\n'
+        '    ByVal lhs As CLongDouble, ByVal rhs As CLongDouble) As CLongDouble\n'
+        '    Return lhs + rhs\n'
+        'End Function\n'
+        'Function c2fbLongDoubleForward CDecl Alias "c2fbLongDoubleForward" ( _\n'
+        '    ByVal value As CLongDouble) As CLongDouble\n'
+        '    Return c2fbLongDoubleSum( _\n'
+        '        value, CLongDoubleFromDoubleValue(0.5#))\n'
+        'End Function\n',
+        encoding="utf-8",
+    )
+    c_source = working / "clongdouble-i386.c"
+    c_source.write_text(
+        "long double c2fbLongDoubleSum(long double lhs, long double rhs) "
+        "{ return lhs + rhs; }\n"
+        "int c2fbLongDoubleCheck(long double lhs, long double rhs);\n"
+        "long double c2fbLongDoubleAdd(long double lhs, long double rhs);\n"
+        "long double c2fbLongDoubleForward(long double value);\n"
+        "int main(void) {\n"
+        "    if (c2fbLongDoubleCheck(1.25L, 2.5L) != -1) return 1;\n"
+        "    if (c2fbLongDoubleAdd(1.25L, 2.5L) != 3.75L) return 2;\n"
+        "    if (c2fbLongDoubleForward(1.25L) != 1.75L) return 3;\n"
+        "    return 0;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    gcc = os.environ.get("GCC") or "gcc"
+    helper_object = working / "longdouble_ops-i386.o"
+    c_object = working / "clongdouble-i386.o"
+    c_build = subprocess.run(
+        [gcc, "-m32", "-std=c99", "-Wall", "-Wextra", "-Werror",
+         "-fno-strict-aliasing", "-c", str(root / "src/rtlib/math/longdouble_ops.c"),
+         "-o", str(helper_object)],
+        cwd=working, text=True, capture_output=True, timeout=60, check=False,
+    )
+    if c_build.returncode:
+        print("GAS32 CLongDouble runtime helper compilation failed\n"
+              f"{c_build.stdout}{c_build.stderr}")
+        return 1
+    c_build = subprocess.run(
+        [gcc, "-m32", "-std=c99", "-Wall", "-Wextra", "-Werror", "-c",
+         str(c_source), "-o", str(c_object)],
+        cwd=working, text=True, capture_output=True, timeout=60, check=False,
+    )
+    if c_build.returncode:
+        print("GAS32 CLongDouble C driver compilation failed\n"
+              f"{c_build.stdout}{c_build.stderr}")
+        return 1
+
+    backends = [("gas", "gas"), ("gcc", "gcc")]
+    if llc is not None:
+        backends.append(("llvm", "llvm"))
+    for label, generator in backends:
+        object_file = working / f"clongdouble-i386-{label}.o"
+        environment = os.environ.copy()
+        assembler = shutil.which(os.environ.get("AS") or "as")
+        if assembler is not None:
+            environment["AS"] = assembler
+        environment["GCC"] = gcc
+        if clang is not None:
+            environment["CLANG"] = clang
+        if llc is not None:
+            environment["LLC"] = llc
+        emitted = subprocess.run(
+            [str(fbc.resolve()), "-prefix", str(root), "-i", str(root / "inc"),
+             "-target", "linux-x86", "-gen", generator, "-c",
+             str(basic_source), "-o", str(object_file)],
+            cwd=working, env=environment, text=True, capture_output=True,
+            timeout=120, check=False,
+        )
+        if emitted.returncode:
+            print(f"{label}/i386 CLongDouble emission failed\n"
+                  f"{emitted.stdout}{emitted.stderr}")
+            return 1
+
+        executable = working / f"clongdouble-i386-{label}"
+        linked = subprocess.run(
+            [gcc, "-m32", "-no-pie", str(c_object), str(object_file),
+             str(helper_object), "-lm", "-o", str(executable)],
+            cwd=working, text=True, capture_output=True, timeout=60, check=False,
+        )
+        if linked.returncode:
+            print(f"{label}/i386 CLongDouble link failed\n"
+                  f"{linked.stdout}{linked.stderr}")
+            return 1
+        executed = subprocess.run(
+            [str(executable)], cwd=working, text=True, capture_output=True,
+            timeout=30, check=False,
+        )
+        if executed.returncode:
+            print(f"{label}/i386 CLongDouble runtime failed\n"
+                  f"{executed.stdout}{executed.stderr}")
+            return 1
+        print(f"{label}/i386 CLongDouble result ABI passed")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -378,6 +489,10 @@ def main() -> int:
         print("incomplete external value operations: rejected")
 
         if system == "linux" and architecture == "x86_64":
+            if check_i386_clongdouble_abi(
+                    root, options.fbc.resolve(), working, clang, llc) != 0:
+                return 1
+
             source = root / "tests/compiler-support/integer128-c-i386.bas"
             gcc = os.environ.get("GCC") or "gcc"
             for backend, driver in (("gcc", gcc), ("clang", clang)):

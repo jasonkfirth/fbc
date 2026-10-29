@@ -830,4 +830,27 @@ literal guards, final link, active container count and native item order. Source
 fixtures independently check the reader's documented tag/count derivation,
 including wide/NUL/address and QB raw items, without creating DATA N records.
 
+The evaluation context families in `evaluations.py` cover copied callback
+arguments, actual converted lexer buffers, query retries and returned results.
+They distinguish nested macro invocation graphs from the sequential evaluation
+contexts the compiler actually enters. Narrow/wide inputs, four wide source
+encodings, host code units under a Windows cross target, compact omissions,
+datatype ABIs, binary/text transport, repeated modules and preprocessing-only
+output are checked. Runtime output and native diagnostics are compared with
+observation disabled.
+
+`semantic_evaluations.py` validates dense event/lifetime identities, source and
+configuration ownership, bounded peak depth, replay, buffer end markers and
+payload lengths. Corrected-count mutations cannot remove a prepared buffer or
+close the wrong context. Recovery tests preserve both parser error-count changes
+and callback error codes: a returned value and a zero callback error do not
+erase a diagnostic from the parser.
+
+`evaluation-capacity-guards.bas` receives the actual native capacity helper;
+`evaluation-observer-guards.bas` links a scratch copy of the BASIC observer.
+Their tests cover copied storage, initialized buffer selection, source heads,
+disabled/probe paths, declared bounds and fail-closed event exhaustion. Generated
+C and objects stay in test scratch. These context receipts do not complete the
+remaining compile-time AST/token association or general semantic-model scope.
+
 <!-- end of README.md -->

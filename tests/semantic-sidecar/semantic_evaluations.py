@@ -8,6 +8,7 @@ This file intentionally does NOT evaluate inputs or resolve queried symbols.
 from semantic_lookup import scalar, text_field
 
 FEATURE = "native-evaluation-contexts"
+BUFFER_FEATURE = "native-evaluation-lexer-buffers"
 PREFIX = "native-evaluation"
 
 
@@ -43,7 +44,8 @@ def validate_evaluations(model, number, unescape):
         module = scalar(row[2], number, 1)
         if row[1] != "module" or model.bindings_only or model.capabilities.get(module, {}).get(FEATURE) != "available":
             raise ValueError("Unavailable or unowned native evaluation receipt")
-        state = states.setdefault(module, {"stack": [], "begins": 0, "ends": 0, "pending": None})
+        state = states.setdefault(module, {"stack": [], "begins": 0, "ends": 0, "pending": None, "max_depth": 0})
+        buffers_available = model.capabilities[module].get(BUFFER_FEATURE) == "available"
         stream = events.setdefault(module, [])
         if row[3] == PREFIX + "-counts":
             fields = row[4].split("\t")
@@ -56,10 +58,12 @@ def validate_evaluations(model, number, unescape):
             raise ValueError("Evaluation receipts have gaps or follow their summary")
         fields = row[4].split("\t")
         kind = fields[0]
-        if kind not in ("begin", "end") or len(fields) != (20 if kind == "begin" else 10):
+        if kind not in ("begin", "end", "buffer") or len(fields) != {"begin": 20, "end": 10, "buffer": 6}[kind]:
             raise ValueError("Unknown or malformed evaluation event")
         identity = scalar(fields[1], number, 1, 1000000)
         if kind == "begin":
+            if buffers_available and state["stack"] and state["stack"][-1]["buffer_event"] is None:
+                raise ValueError("Nested evaluation precedes its parent's prepared buffer")
             state["begins"] += 1
             parent, replay = scalar(fields[2], number), scalar(fields[3], number)
             if identity != state["begins"] or parent != (state["stack"][-1]["id"] if state["stack"] else 0):
@@ -103,19 +107,40 @@ def validate_evaluations(model, number, unescape):
             elif previous is not None:
                 raise ValueError("Evaluation replay loses its replacement context")
             state["pending"] = None
-            scope = {"id": identity, "begin": fields, "input": copied, "end": None, "result": None}
+            scope = {"id": identity, "begin": fields, "input": copied, "buffer": None, "buffer_event": None,
+                     "end": None, "result": None, "native_error_observed": None}
             scopes[module, identity] = scope
             state["stack"].append(scope)
+            state["max_depth"] = max(state["max_depth"], len(state["stack"]))
+        elif kind == "buffer":
+            if not buffers_available or not state["stack"] or state["stack"][-1]["id"] != identity or state["pending"] is not None:
+                raise ValueError("Evaluation buffer has no available active context")
+            scope = state["stack"][-1]
+            if scope["buffer_event"] is not None:
+                raise ValueError("Evaluation buffer was copied more than once")
+            copied = payload(fields[2:6], number, unescape)
+            if not copied or copied[-1] != 10:
+                raise ValueError("Evaluation buffer loses its native end-of-expression marker")
+            replay = int(scope["begin"][3])
+            if replay and scopes[module, replay]["buffer"] != copied:
+                raise ValueError("Evaluation replay changes its actual lexer buffer")
+            scope["buffer"], scope["buffer_event"] = copied, fields
         else:
             if not state["stack"] or identity != state["stack"][-1]["id"] or state["pending"] is not None:
                 raise ValueError("Evaluation result has no active context")
             scope = state["stack"].pop()
+            if buffers_available and scope["buffer_event"] is None:
+                raise ValueError("Evaluation result precedes its prepared lexer buffer")
             reason = fields[2]
             if reason not in ("completed", "replay") or reason == "replay" and scope["begin"][4] != "symbol-query":
                 raise ValueError("Unknown or fabricated evaluation completion reason")
             error, before, after = [scalar(value, number, 0, 2147483647) for value in fields[3:6]]
             if after < before:
                 raise ValueError("Evaluation error counts go backwards")
+            # The parser can report an error and still return a folded node.
+            # Conversely the callback can return an error before its caller
+            # reports it. Preserve both channels without changing the result.
+            scope["native_error_observed"] = bool(error or after > before)
             scope["end"] = fields
             scope["result"] = payload(fields[6:10], number, unescape, absent=reason == "replay")
             if reason == "completed" and fields[6] != scope["begin"][9]:
@@ -125,13 +150,15 @@ def validate_evaluations(model, number, unescape):
             state["ends"] += 1
         stream.append(fields)
     for module, capabilities in model.capabilities.items():
+        if capabilities.get(BUFFER_FEATURE) == "available" and capabilities.get(FEATURE) != "available":
+            raise ValueError("Evaluation buffers lack their evaluation context capability")
         if capabilities.get(FEATURE) != "available":
             continue
-        state = states.get(module, {"stack": [], "begins": 0, "ends": 0, "pending": None})
+        state = states.get(module, {"stack": [], "begins": 0, "ends": 0, "pending": None, "max_depth": 0})
         summary = summaries.get(module)
         if summary is None or summary[:4] != [len(events.get(module, ())), state["begins"], state["ends"], len(state["stack"])]:
             raise ValueError("Native evaluation coverage is incomplete")
-        if not 1 <= summary[4] <= 1024 or len(state["stack"]) > summary[4]:
+        if not 1 <= summary[4] <= 1024 or state["max_depth"] > summary[4]:
             raise ValueError("Native evaluation depth exceeds its producer bound")
         if module not in model.recovered_modules and (state["stack"] or state["pending"]):
             raise ValueError("Accepted evaluation output retains an unfinished context")

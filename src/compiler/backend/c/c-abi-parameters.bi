@@ -115,6 +115,9 @@ private sub hCAbiDefinition _
 	if( first = NULL ) then exit sub
 	var entry = hCAbiGet(sym)
 	if( entry = NULL ) then exit sub
+	'' Distinct BASIC overloads can collapse to one C identifier. Keep only the
+	'' first ABI record so final emission cannot link the same entry to itself.
+	if( entry->header.data <> NULL ) then exit sub
 	assert(entry->header.data = NULL)
 	DZstrAssign(entry->header, strptr(header))
 	entry->parameters = first

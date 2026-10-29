@@ -397,7 +397,7 @@ declare function cIdentifierOrUDTMember _
 		byval chain_ as FBSYMCHAIN ptr = NULL _
 	) as FBSYMBOL ptr
 
-declare sub cProcDecl( )
+declare sub cProcDecl( byval attrib as FB_SYMBATTRIB, byval pattrib as FB_PROCATTRIB )
 
 declare function cProcHeader _
 	( _

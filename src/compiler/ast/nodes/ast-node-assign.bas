@@ -714,8 +714,9 @@ function astNewASSIGN _
 			return hShallowCopy( l, r, options )
 		end if
 
-		if( symbProcReturnsOnStack( tr->sym ) ) then
-			'' Returning on stack, copy from the temp result var
+		if( symbProcReturnsOnStack( tr->sym ) orElse _
+		    symbIsGAS32CLongDoubleCAbiResult( tr->sym ) ) then
+			'' Copy from the caller-owned result slot.
 			return hShallowCopy( l, astBuildCallResultVar( astRemoveNoConvCAST( r ) ), options )
 		end if
 

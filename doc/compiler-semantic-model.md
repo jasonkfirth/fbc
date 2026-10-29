@@ -5682,4 +5682,68 @@ nesting and does not need a public allocator identity.
 availability remains unchanged; generated or remapped source does not become
 editable merely because an inactive region has an owning branch.
 
+## Native evaluation contexts
+
+Capability `native-evaluation-contexts` describes temporary lexer contexts
+used by constant-expression callbacks and symbol queries. The BASIC observer
+copies each input before the callback can reset its storage and records
+the result before the context is popped. It does not call the evaluator,
+the query resolver or a callback again. The capability is available with typed
+expressions in full and expression output, and unavailable in bindings output.
+
+Module K keys `native-evaluation:N` preserve native event order. A `begin`
+contains the evaluation identity, enclosing evaluation identity, retired
+query identity when replaying, purpose, statement/configuration/source
+identities, native parent lexer kind, copied callback input, entry source
+anchor and available loader MI identity. Evaluation IDs are local to their
+module; a reused lexer slot receives a fresh identity. The parent lexer kind
+distinguishes root, include and evaluation buffers. Compact output preserves
+the evaluation receipts while keeping unavailable loader identities zero.
+
+A query retry records an `end` with reason `replay` and no returned payload,
+then a new `begin` referring to the retired context. It does not pretend that
+the failed identifier interpretation produced the later type-query result.
+An ordinary `end` records the actual result, callback error code and error
+counts. `completed` means the native context reached its pop operation; its
+error code can still be nonzero.
+
+The parser can also report an error and return a folded node while the
+callback error code remains zero. For example, `1 +` reports an expected
+expression error but can leave the callback result `1`. The reader's
+`native_error_observed` field combines a nonzero callback error with an
+increase in the captured parser error count. It preserves the native result
+and both original error channels. A false value describes those observations;
+it does not certify every fact in a recovered module.
+
+Input and result payloads distinguish byte strings from sequences of host
+wide code units. Their copied lengths and code-unit widths are explicit.
+The host width describes the callback buffer, independently of the selected
+cross target's WCHAR layout. Byte strings preserve zero bytes; wide units
+are preserved as units rather than silently normalized as Unicode text.
+The entry anchor does not make the copied evaluation input an editable
+physical source range.
+
+The mandatory `native-evaluation-counts` key closes event, begin, end and
+open-depth counts and declares the observer's bounded frame capacity. The
+reader rejects unknown event/purpose/encoding values, mismatched lengths,
+foreign owners, invented loader links, invalid nesting, orphaned replay and
+missing closure. Native behavior and source/transport tests are recorded
+separately from this contract; implementation alone is not a completion claim.
+
+The original callback argument and a transformed lexer buffer are distinct
+observations. Capability `native-evaluation-lexer-buffers` adds one `buffer`
+event per context after native conversion and LF insertion, before parsing.
+The buffer event contains the actual selected lexer union member's encoding,
+length, host code-unit width and copied text. A Z callback can therefore retain
+its byte argument and result while parsing a wide buffer. Replay copies the
+newly prepared buffer again; it does not reuse a pointer into the retired one.
+The reader requires a prepared buffer before a result or nested evaluation,
+checks its end marker and rejects omitted buffers even when event totals are
+repaired. Producers without this added capability retain the older explicit
+unavailability.
+
+These context/input/result receipts do not by themselves relate every
+compile-time AST operation to its evaluation context. Those phase relationships
+remain part of the open source/identity acceptance scope.
+
 <!-- end of compiler-semantic-model.md -->

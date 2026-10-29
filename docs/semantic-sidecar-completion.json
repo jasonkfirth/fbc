@@ -393,7 +393,7 @@
       "id": "G39",
       "title": "Attach validity and failure regions to provisional facts",
       "status": "in-progress",
-      "evidence": "v69 native attempt/count summaries distinguish accepted modules from explicit R recovery. Reader rejects missing/duplicate R markers and repaired complete footers, exposes per-module recovery and conservative per-expression provisional/recovery-affected states using OWN/STE. Actual 1 + recovery produces a typed constant, now explicitly recovery-affected to the consumer. Surrounding statements, invalid defaults, missing includes, multiple inputs and restart boundaries pass dedicated verification. Explicit placeholder-creation provenance and full failure-region/validity coverage remain. Native replacement/prefix-root observations now cover 53 actual binary/unary branch sites with copied native routes, datatype ABI, context ownership and dense counts. Native pointer, lexer probe, ordinary abstract-procedure null pointer, bounds, byte path, ABI, transport, reset and corrected-count controls pass. CAP168 is partial; declaration, statement, skip, type and remaining recovery routes are still required. v75 broadens actual root/prefix observations to 135 sites and passes a forty-source parser-family matrix. CAP169 adds actual shared-helper token skipping with exact requested delimiter, nesting, callback counts, stopping point/reason, consumption and context closure. Thirteen combined families pass, including native helper byte-for-byte extraction tests with independent expected counts. These skip receipts do not alone certify failure regions; type/symbol/default validity and other recovery routes remain. v76/v77 add copied selected type bits at 21 explicit fallback/discard/pointer sites and transient snapshots for four generated-name paths plus the real mock-parameter helper. Five dedicated and eight affected families pass; malformed choice/symbol/name producer guards pass v77. These snapshots intentionally do not establish source bindings. Coverage remains partial for all remaining recovery/validity routes. v78 publishes native statement validity and terminal stack counts, validated against ST/STE, BLK/BEND and diagnostic terminal counters. Reader failure regions preserve actual opening/ending points, unmatched/recovered states, unfinished boundaries and unscoped diagnostic loci without inventing physical extents. Three dedicated and ten affected families pass. Complete remaining recovery/phase validity scope is still open. v80 fixes an exporter-induced internal diagnostic for rejected QB roots carrying unresolved datatype bits. Both parser and metadata expression exporters test formatter preconditions, retain raw unformattable-type recovery observations and omit invented typed E records. Off/full/bindings/expression diagnostics now match on three backends; missing roots and forged replacement kinds are rejected.",
+      "evidence": "v69 native attempt/count summaries distinguish accepted modules from explicit R recovery. Reader rejects missing/duplicate R markers and repaired complete footers, exposes per-module recovery and conservative per-expression provisional/recovery-affected states using OWN/STE. Actual 1 + recovery produces a typed constant, now explicitly recovery-affected to the consumer. Surrounding statements, invalid defaults, missing includes, multiple inputs and restart boundaries pass dedicated verification. Explicit placeholder-creation provenance and full failure-region/validity coverage remain. Native replacement/prefix-root observations now cover 53 actual binary/unary branch sites with copied native routes, datatype ABI, context ownership and dense counts. Native pointer, lexer probe, ordinary abstract-procedure null pointer, bounds, byte path, ABI, transport, reset and corrected-count controls pass. CAP168 is partial; declaration, statement, skip, type and remaining recovery routes are still required. v75 broadens actual root/prefix observations to 135 sites and passes a forty-source parser-family matrix. CAP169 adds actual shared-helper token skipping with exact requested delimiter, nesting, callback counts, stopping point/reason, consumption and context closure. Thirteen combined families pass, including native helper byte-for-byte extraction tests with independent expected counts. These skip receipts do not alone certify failure regions; type/symbol/default validity and other recovery routes remain. v76/v77 add copied selected type bits at 21 explicit fallback/discard/pointer sites and transient snapshots for four generated-name paths plus the real mock-parameter helper. Five dedicated and eight affected families pass; malformed choice/symbol/name producer guards pass v77. These snapshots intentionally do not establish source bindings. Coverage remains partial for all remaining recovery/validity routes. v78 publishes native statement validity and terminal stack counts, validated against ST/STE, BLK/BEND and diagnostic terminal counters. Reader failure regions preserve actual opening/ending points, unmatched/recovered states, unfinished boundaries and unscoped diagnostic loci without inventing physical extents. Three dedicated and ten affected families pass. Complete remaining recovery/phase validity scope is still open. v80 fixes an exporter-induced internal diagnostic for rejected QB roots carrying unresolved datatype bits. Both parser and metadata expression exporters test formatter preconditions, retain raw unformattable-type recovery observations and omit invented typed E records. Off/full/bindings/expression diagnostics now match on three backends; missing roots and forged replacement kinds are rejected. Evaluation receipts distinguish native callback errors from parser error-count changes: malformed 1 + can report a diagnostic and return 1 with callback error zero. The reader exposes native_error_observed without rewriting the returned value or certifying recovered-module facts. Narrow/wide three-backend recovery coverage passes; the earlier assertion failure is retained as historical evidence.",
       "required_positive": "A bad middle statement with valid surrounding statements, multiple failed modules, restarts, missing includes, and recovered default expressions retain clear validity boundaries.",
       "required_negative": "Never present a compiler recovery placeholder as a proved user expression or an incomplete full model as semantically complete."
     },
@@ -409,7 +409,7 @@
       "id": "G41",
       "title": "Make snapshot phases, identity lifetimes, and cross-module ownership explicit",
       "status": "in-progress",
-      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains. Observation allocation IDs now remain unique independently of serialized record totals. A validated native parser phase separates successful grammar callbacks from full-only original/selected snapshots. Resolver contexts register S references while native symbols are alive and only copy already-existing argument E associations. Expression-only output retains subtype snapshots with unavailable S/B references zero; no native pointer is retained or used later to reconstruct a relation. Current field reconciliation retains literal-only evaluation/replay entry, exit and parent-context identity as an explicit open requirement, including evaluations that create no MI invocation.",
+      "evidence": "Declaration occurrence IDs, construction configuration identities and canonical names are retained. Complete source/symbol/type/phase/cross-module identity scheme remains. Observation allocation IDs now remain unique independently of serialized record totals. A validated native parser phase separates successful grammar callbacks from full-only original/selected snapshots. Resolver contexts register S references while native symbols are alive and only copy already-existing argument E associations. Expression-only output retains subtype snapshots with unavailable S/B references zero; no native pointer is retained or used later to reconstruct a relation. Current field reconciliation retains literal-only evaluation/replay entry, exit and parent-context identity as an explicit open requirement, including evaluations that create no MI invocation. CAP186/187 and the BASIC semantic-evaluations observer now preserve per-module evaluation lifetimes, retired/replayed query contexts, native parent lexer kinds, original callback arguments, converted lexer buffers and returned results. Sixteen focused families have passing evidence, including compact omissions, ABI/transport/reset, all three configured backends, source encodings, cross-target host code units, corrected-count corruption and production guards. Direct compile-time AST/token associations and the complete identity acceptance scope remain open.",
       "required_positive": "Multiple modules, prototype-to-body updates, forward patches, interned procptr formals, recycled symbols, and delayed/generated procedures preserve identity and phase ownership.",
       "required_negative": "Do not reuse a retired allocation identity, consume stale local pointers, conflate same-named external declarations across modules without linkage evidence, or promise stable IDs across different builds."
     },
@@ -923,6 +923,158 @@
       },
       "scope_note": "Field dispositions are not completion acceptance. Lexer kind remains partial for literal-only evaluation/replay identity. Private native recursion/numeric list storage is bookkeeping; selected semantic payload has separate producer receipts.",
       "structure": "353 documented files and 21 host source graphs pass; no tracked compiler C implementation."
+    },
+    "evaluation_buffers_v104": {
+      "state": "sixteen-evaluation-families-qualified-source-and-regressions-live",
+      "compiler": "out/semantic-goal-20261027/fbc-evaluation-buffers-v104",
+      "compiler_sha256": "cebf715884fae0efed7d10adf602b04bfc448b9ad569aed6534f4289328a4277",
+      "build": {
+        "session": 66802,
+        "result": "exit0",
+        "log": "out/semantic-goal-20261027/evaluation-build-v104.log",
+        "units": [
+          "symbols/symb-define.bas",
+          "tooling/semantic-evaluations.bas",
+          "tooling/semantic-model.bas"
+        ],
+        "dependency_note": "New declaration-only semantic-evaluations.bi suppressed as a blanket Make prerequisite; grep and make plan identify exactly these three consumers, all rebuilt. No shared layout ABI changed."
+      },
+      "observer_guard": {
+        "tests": 1,
+        "result": "OK",
+        "seconds": 62.381,
+        "compiler": "out/semantic-goal-20261027/fbc-pragmas-v98",
+        "log": "out/semantic-goal-20261027/evaluation-observer-guards-final-v104.log"
+      },
+      "primary_tests": {
+        "tests": 3,
+        "seconds": 228.646,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/evaluation-buffers-first-v104.log"
+      },
+      "remaining_tests": {
+        "session": 63385,
+        "methods": 11,
+        "log": "out/semantic-goal-20261027/evaluation-families-v104.log"
+      },
+      "pending": [
+        "Complete the live seven affected regressions and two independently frozen source qualifications without restarting their live processes.",
+        "Add direct evaluation-to-compile-time AST and consumed-token relationships; current receipts do not complete G11/G41.",
+        "Retain all original51 requirements, including remaining partial fields, source/route/class/target/fault acceptance and backend correspondence. No goal or requirement is marked complete."
+      ],
+      "snapshot": "out/semantic-goal-20261027/evaluations-work-v104-final",
+      "source_families": {
+        "tests": 11,
+        "passed": 10,
+        "failed": 1,
+        "seconds": 924.377,
+        "log": "out/semantic-goal-20261027/evaluation-families-v104.log",
+        "reason": "The original recovery assertion ignored a parser diagnostic when the native callback error remained zero. Raw receipts and compiler diagnostics were correct."
+      },
+      "recovery_final": {
+        "tests": 1,
+        "seconds": 12.811,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/evaluation-recovery-final-v104.log",
+        "scope": "Both error channels across GCC/Clang/LLVM and narrow/wide inputs; returned value is preserved rather than rewritten."
+      },
+      "capacity_guard": {
+        "tests": 1,
+        "seconds": 0.568,
+        "result": "OK",
+        "log": "out/semantic-goal-20261027/evaluation-capacity-v103.log",
+        "scope": "Production capacity helper is unchanged in v104; direct array-slot and include-depth boundaries, not a claimed reachable source overflow."
+      },
+      "qualified_method_count": 16,
+      "regressions": {
+        "session": 10711,
+        "tests": 7,
+        "log": "out/semantic-goal-20261027/evaluation-regressions-v104.log",
+        "state": "live",
+        "last_passed_methods": [
+          "test_macro_callback_outputs_and_argument_reuse_preserve_execution"
+        ],
+        "latest_log_line": "test_parser_consumed_tokens_exclude_inactive_preprocessor_and_probe_reads (test_sidecar.SidecarTests.test_parser_consumed_tokens_exclude_inactive_preprocessor_and_probe_reads) ... "
+      },
+      "source_qualification": {
+        "session": 71086,
+        "root_pid": 3850914,
+        "start_ticks": "9383255",
+        "output": "out/semantic-goal-20261027/self-evaluations-v104",
+        "log": "out/semantic-goal-20261027/self-evaluations-v104.log",
+        "cases": 9,
+        "jobs": 1,
+        "state": "live",
+        "last_passed": 1,
+        "latest_log_line": "1/9 gcc tooling/semantic-evaluations.bas: passed"
+      },
+      "older_v96_source_qualification": {
+        "session": 18120,
+        "root_pid": 3513082,
+        "start_ticks": "8280373",
+        "last_passed": 10,
+        "total": 42,
+        "state": "live"
+      },
+      "scope_notes": [
+        "Nested source macro invocations are expanded before these native evaluation contexts. Tests require sequential contexts instead of invented native nesting or resource exhaustion.",
+        "A zero native callback error does not erase a parser error. native_error_observed retains both channels without certifying other facts in a recovered module.",
+        "Native argument, converted lexer buffer, returned result, source anchor and loader identity are separate observations.",
+        "Native buffer code units describe the compiler host, including cross-target compilation; they are not reinterpreted as the target WCHAR layout."
+      ],
+      "field_audit": {
+        "fields": 1822,
+        "exported": 312,
+        "bookkeeping": 746,
+        "backend-detail": 448,
+        "partial": 301,
+        "derivable": 15
+      },
+      "structure": "Compiler structure: 355 documented files; 21 host source graphs checked",
+      "binary_contract": "SEMANTIC_BINARY_CONTRACT_MATCH",
+      "next_source_audit": {
+        "scope": "Complete evaluation-to-compile-time expression/token ownership within G11/G41; preserve all51 original requirements.",
+        "files": [
+          "src/compiler/tooling/semantic-evaluations.bas",
+          "src/compiler/tooling/semantic-expressions.bas",
+          "src/compiler/tooling/semantic-model.bas",
+          "src/compiler/tooling/semantic-tokens.bas"
+        ],
+        "notes": [
+          "Current context/argument/buffer/result receipts are qualified; do not equate nested macro calls with nested native evaluations.",
+          "fbSemanticModelOriginalExpression is full-only and uses an existing AST semantic_expression identity or exports one with checked source ranges.",
+          "fbSemanticModelExportExpression already records preprocessor-expression when fbGetIsPP is true. Inspect its attachment/deduplication before adding associations.",
+          "Full N tree export uses semantic_model_node_count + semantic_model_module_node_count as its allocator base. Never substitute NextDetailIdentity, which is a separate namespace.",
+          "Compiler-visible symbol/type query decisions and source conditional joins must remain explicit; a returned numeric string alone is not a binding explanation.",
+          "No new native implementation for these next associations has been made; investigate and test against authoritative source."
+        ]
+      },
+      "live_processes_last_verified": [
+        {
+          "pid": 3850914,
+          "parent": 3850913,
+          "start_ticks": "9383255",
+          "state": "S"
+        },
+        {
+          "pid": 3851955,
+          "parent": 3850914,
+          "start_ticks": "9387313",
+          "state": "S"
+        },
+        {
+          "pid": 3851963,
+          "parent": 3851955,
+          "start_ticks": "9387373",
+          "state": "S"
+        },
+        {
+          "pid": 3885516,
+          "parent": 3885514,
+          "start_ticks": "9496577",
+          "state": "R"
+        }
+      ]
     }
   },
   "working_tree": "/home/jkfirth/fbc",

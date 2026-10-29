@@ -4802,7 +4802,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
-	for capability as integer = 0 to 186
+	for capability as integer = 0 to 187
 		dim as string feature, coverage
 		select case capability
 		case 0: feature = "symbol-identities": coverage = iif(semantic_model_expressions_only, "unavailable", "available")
@@ -4984,6 +4984,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 		case 184: feature = "native-default-type-policy": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
 		case 185: feature = "native-pragma-history": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
 		case 186: feature = "native-evaluation-contexts": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
+		case 187: feature = "native-evaluation-lexer-buffers": coverage = iif(fbSemanticModelTypedExpressionsEnabled( ), "available", "unavailable")
 		case 121: feature = "string-subscript-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 122: feature = "selected-type-alias-inputs": coverage = iif(fbSemanticModelFullEnabled( ), "available", "unavailable")
 		case 123: feature = "type-alias-declaration-sites": coverage = iif(fbSemanticModelFullEnabled( ) and fbSemanticModelMacroProvenanceEnabled( ), "available", "unavailable")

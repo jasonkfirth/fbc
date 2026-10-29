@@ -60,6 +60,38 @@ class SidecarTests(unittest.TestCase):
         from evaluations import check_capacity
         check_capacity(self)
 
+    def test_evaluation_observer_guards_copy_storage_and_bound_events(self) -> None:
+        from evaluations import check_observer_guards
+        check_observer_guards(self)
+
+    def test_evaluation_wide_text_preserves_host_units_across_source_encodings(self) -> None:
+        from evaluations import check_wide_text
+        check_wide_text(self)
+
+    def test_evaluation_input_may_exceed_one_native_literal(self) -> None:
+        from evaluations import check_long_input
+        check_long_input(self)
+
+    def test_evaluation_preprocessor_preserves_selected_and_unselected_evaluations(self) -> None:
+        from evaluations import check_preprocessor
+        check_preprocessor(self)
+
+    def test_evaluation_contexts_distinguish_macro_nesting_and_peak_depth(self) -> None:
+        from evaluations import check_nesting
+        check_nesting(self)
+
+    def test_evaluation_deep_macros_do_not_invent_context_exhaustion(self) -> None:
+        from evaluations import check_deep_macros
+        check_deep_macros(self)
+
+    def test_evaluation_buffers_preserve_actual_conversion_and_replay(self) -> None:
+        from evaluations import check_buffers
+        check_buffers(self)
+
+    def test_evaluation_buffers_keep_host_units_for_a_cross_target(self) -> None:
+        from evaluations import check_cross_target_buffers
+        check_cross_target_buffers(self)
+
     root: Path
     compiler: Path
     toolchain_prefix: Path

@@ -23,6 +23,7 @@ private const EVALUATION_UNIT_LIMIT = 65536
 private type SEMANTIC_EVALUATION_FRAME
 	identity as longint
 	errors_before as integer
+	buffered as integer
 end type
 private dim shared as SEMANTIC_EVALUATION_FRAME evaluation_frames(0 to EVALUATION_DEPTH_LIMIT - 1)
 private dim shared as integer evaluation_depth
@@ -95,6 +96,10 @@ function fbSemanticModelEvaluationBegin _
 		fbSemanticModelFailAt("evaluation context bound or invalid entry")
 		return 0
 	end if
+	if( parent_ctx->head = NULL ) then
+		fbSemanticModelFailAt("evaluation parent has no initialized token head")
+		return 0
+	end if
 	dim as string payload = hPayload(value, units, wide)
 	if( len(payload) = 0 ) then return 0
 	dim as longint parent, loader
@@ -104,6 +109,7 @@ function fbSemanticModelEvaluationBegin _
 	dim as longint identity = evaluation_begins
 	evaluation_frames(evaluation_depth).identity = identity
 	evaluation_frames(evaluation_depth).errors_before = errGetCount( )
+	evaluation_frames(evaluation_depth).buffered = FALSE
 	evaluation_depth += 1
 	dim as LEX_LOCATION source = parent_ctx->head->source
 	hEvent("begin", identity, fbSemanticModelNumber(parent) + TABCHAR + fbSemanticModelNumber(replay_of) + TABCHAR + _
@@ -116,6 +122,29 @@ function fbSemanticModelEvaluationBegin _
 	return identity
 end function
 
+sub fbSemanticModelEvaluationBuffer( byval identity as longint )
+	if( identity = 0 or hEnabled( ) = FALSE ) then exit sub
+	if( evaluation_depth = 0 ) then fbSemanticModelFailAt("evaluation buffer has no context"): exit sub
+	if( evaluation_frames(evaluation_depth - 1).identity <> identity or _
+		evaluation_frames(evaluation_depth - 1).buffered or lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL ) then
+		fbSemanticModelFailAt("evaluation buffer has another context or was already copied")
+		exit sub
+	end if
+	'' hArgInsertArgA/W can convert the callback argument to the active file's
+	'' lexer representation. Copy the selected, initialized union member after
+	'' the native end-of-expression LF has been appended, not an inferred copy
+	'' of the argument. This also preserves Z callbacks used in wide files.
+	dim as string payload
+	if( env.inf.format = FBFILE_FORMAT_ASCII ) then
+		payload = hPayload(lex.ctx->deftext.data, lex.ctx->deftext.len, FALSE)
+	else
+		payload = hPayload(lex.ctx->deftextw.data, lex.ctx->deftextw.len, TRUE)
+	end if
+	if( len(payload) = 0 ) then exit sub
+	hEvent("buffer", identity, payload)
+	evaluation_frames(evaluation_depth - 1).buffered = TRUE
+end sub
+
 sub fbSemanticModelEvaluationEnd _
 	( byval identity as longint, byval value as const any ptr, byval units as integer, _
 	  byval wide as integer, byval error_code as integer, byref reason as const string )
@@ -123,6 +152,7 @@ sub fbSemanticModelEvaluationEnd _
 	if( identity = 0 or hEnabled( ) = FALSE ) then exit sub
 	if( evaluation_depth = 0 ) then fbSemanticModelFailAt("evaluation close has no context"): exit sub
 	if( evaluation_frames(evaluation_depth - 1).identity <> identity or error_code < 0 or _
+		evaluation_frames(evaluation_depth - 1).buffered = FALSE or _
 		(reason <> "completed" and reason <> "replay") ) then
 		fbSemanticModelFailAt("evaluation close disagrees with its context")
 		exit sub

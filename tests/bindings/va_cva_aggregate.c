@@ -123,7 +123,7 @@ void cva_write_longdouble_precision(void *destination)
     memcpy(destination, &value, sizeof(value));
 }
 
-#if defined(__linux__) && defined(__x86_64__)
+#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
 long double cva_longdouble_identity(long double value)
 {
     return value;
@@ -132,6 +132,11 @@ long double cva_longdouble_identity(long double value)
 long double cva_longdouble_transform(long double value)
 {
     return value * 2.0L + 0.5L;
+}
+
+long double cva_longdouble_add(long double lhs, long double rhs)
+{
+    return lhs + rhs;
 }
 
 long double fbc_cva_longdouble_export(long double value);

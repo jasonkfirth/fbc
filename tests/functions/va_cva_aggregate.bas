@@ -103,11 +103,14 @@ Declare Function cva_longdouble_register CDecl _
     Alias "cva_longdouble_register" () As Integer
 Declare Sub cva_write_longdouble_precision CDecl _
     Alias "cva_write_longdouble_precision" (ByVal destination As Any Ptr)
-#if defined( __FB_X86__ ) and defined( __FB_64BIT__ ) and defined( __FB_LINUX__ )
+#if defined( __FB_X86__ ) and defined( __FB_LINUX__ )
 Declare Function cva_longdouble_identity CDecl _
     Alias "cva_longdouble_identity" (ByVal value As CLongDouble) As CLongDouble
 Declare Function cva_longdouble_transform CDecl _
     Alias "cva_longdouble_transform" (ByVal value As CLongDouble) As CLongDouble
+Declare Function cva_longdouble_add CDecl _
+    Alias "cva_longdouble_add" (ByVal lhs As CLongDouble, _
+                                 ByVal rhs As CLongDouble) As CLongDouble
 Declare Function cva_call_fbc_longdouble_export CDecl _
     Alias "cva_call_fbc_longdouble_export" (ByVal value As CLongDouble) As CLongDouble
 #endif
@@ -154,9 +157,11 @@ If Cast(Long, CLongDoubleFromStringValue(StrPtr(!"-1.75"))) <> -1 Then End 13
 If Cast(ULong, fractional_value) <> 1 Then End 14
 
 Dim As CLongDouble fixed_input = CLongDoubleFromDoubleValue(1.75#)
-#if defined( __FB_X86__ ) and defined( __FB_64BIT__ ) and defined( __FB_LINUX__ )
+#if defined( __FB_X86__ ) and defined( __FB_LINUX__ )
 If Cast(Double, cva_longdouble_identity(fixed_input)) <> 1.75# Then End 6
 If Cast(Double, cva_longdouble_transform(fixed_input)) <> 4.0# Then End 7
+If Cast(Double, cva_longdouble_add( _
+    fixed_input, CLongDoubleFromDoubleValue(0.5#))) <> 2.25# Then End 15
 If Cast(Double, cva_call_fbc_longdouble_export(fixed_input)) <> 2.25# Then End 8
 #endif
 

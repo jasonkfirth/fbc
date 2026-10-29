@@ -528,6 +528,7 @@ private function hMacro_EvalZ( byval arg as zstring ptr, byval errnum as integer
 
 		hArgInsertArgA( arg )
 		hArgAppendLFCHAR()
+		fbSemanticModelEvaluationBuffer(semantic_evaluation)
 
 		dim expr as ASTNODE ptr = cExpression( )
 		var errmsg = FB_ERRMSG_OK
@@ -607,6 +608,7 @@ private function hMacro_EvalW( byval arg as wstring ptr, byval errnum as integer
 
 		hArgInsertArgW( arg )
 		hArgAppendLFCHAR()
+		fbSemanticModelEvaluationBuffer(semantic_evaluation)
 
 		dim expr as ASTNODE ptr = cExpression( )
 		var errmsg = FB_ERRMSG_OK
@@ -1443,6 +1445,7 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 
 			hArgInsertArgA( sexpr )
 			hArgAppendLFCHAR()
+			fbSemanticModelEvaluationBuffer(semantic_evaluation)
 
 			'' if filtervalue is zero then set the default methods to use for
 			'' look-up depending on what we are looking for
@@ -1537,6 +1540,7 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 
 					hArgInsertArgA( sexpr )
 					hArgAppendLFCHAR()
+					fbSemanticModelEvaluationBuffer(semantic_evaluation)
 				end if
 
 			end if

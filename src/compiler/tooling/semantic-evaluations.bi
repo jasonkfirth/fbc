@@ -12,6 +12,7 @@ declare function fbSemanticModelEvaluationBegin _
 	( byval parent_ctx as LEX_TKCTX ptr, byref purpose as const string, _
 	  byval value as const any ptr, byval units as integer, byval wide as integer, _
 	  byval replay_of as longint = 0 ) as longint
+declare sub fbSemanticModelEvaluationBuffer( byval identity as longint )
 declare sub fbSemanticModelEvaluationEnd _
 	( byval identity as longint, byval value as const any ptr, byval units as integer, _
 	  byval wide as integer, byval error_code as integer, byref reason as const string = "completed" )

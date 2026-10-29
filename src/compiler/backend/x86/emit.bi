@@ -107,6 +107,8 @@ enum EMIT_NODEOP
 	EMIT_OP_POPI, EMIT_OP_POPF, EMIT_OP_POPL
 	EMIT_OP_PUSHUDT
 	EMIT_OP_POPST0
+	EMIT_OP_LOADCLONGDOUBLEST0
+	EMIT_OP_STORECLONGDOUBLEST0
 
 	'' branch
 	EMIT_OP_CALL
@@ -504,6 +506,8 @@ declare function emitCALLPTR _
 		byval svreg as IRVREG ptr, _
 		byval bytestopop as integer _
 	) as EMIT_NODE ptr
+declare function emitStoreCLongDoubleST0( byval resultptr as IRVREG ptr ) as EMIT_NODE ptr
+declare function emitLoadCLongDoubleST0( byval source as IRVREG ptr ) as EMIT_NODE ptr
 
 declare function emitJUMP _
 	( _
