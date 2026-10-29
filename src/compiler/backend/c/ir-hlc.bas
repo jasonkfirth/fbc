@@ -290,6 +290,7 @@ type IRHLCCTX
 	arraycallbacks          as TLIST   '' CARRAYCALLBACK, owns C names for one emission unit.
 	arraycallbackid         as uinteger
 	unalignedid             as uinteger '' Per-emission byte-copy temporary names, reset by _emitBegin().
+	localassertid           as uinteger '' Unique local enum names for pre-C11 layout checks.
 
 	globalvarpass           as integer  '' Global var emitting is done in 2 passes; this allows the callbacks to identify the current pass.
 	computedgotoaddress     as integer  '' A real label address or required entry reference has been emitted.
@@ -653,6 +654,24 @@ end sub
 
 private sub hWriteStaticAssert( byref expr as string )
 	dim as integer section = any
+
+	if( sectionInsideProc( ) ) then
+		'' A block-scope extern object is diagnosed as an unused variable.
+		'' Keep the ABI check as a real C11 assertion. Older C dialects use
+		'' an enum constraint, which reserves no storage or external symbol.
+		ctx.localassertid += 1
+		if( ctx.localassertid = 0 ) then
+			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+			exit sub
+		end if
+		hWriteLine( "#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)", TRUE )
+		hWriteLine( "_Static_assert( (" + expr + "), ""FreeBASIC ABI mismatch"" );" )
+		hWriteLine( "#else", TRUE )
+		hWriteLine( "enum { fb_c_local_assert_" + str(ctx.localassertid) + _
+		            " = 1 / ((" + expr + ") ? 1 : 0) };" )
+		hWriteLine( "#endif", TRUE )
+		exit sub
+	end if
 
 	if( (ctx.usedbuiltins and BUILTIN_STATICASSERT) = 0 ) then
 		ctx.usedbuiltins or= BUILTIN_STATICASSERT
@@ -2506,6 +2525,7 @@ private function _emitBegin( ) as integer
 	ctx.linenum = 0
 	ctx.usedbuiltins = 0
 	ctx.unalignedid = 0
+	ctx.localassertid = 0
 	ctx.globalvarpass = 0
 	hUpdateCurrentFileName( env.inf.name )
 
