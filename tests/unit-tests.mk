@@ -292,7 +292,7 @@ endif
 #
 
 %.o : %.bas
-	$(FBC) $(FBC_CFLAGS) $^
+	$(FBC) $(FBC_CFLAGS) $<
 
 ifeq ($(TESTS_TARGET_OS),riscos)
 ./numbers/infnan.o: ./riscos/numbers/infnan.bas
@@ -332,10 +332,18 @@ endif
 .PHONY: all
 all : make_fbcunit $(UNIT_TESTS_OBJ_LST) build_tests run_tests
 
+# Framework declarations affect both source types and mangled names. Cached
+# consumers must be rebuilt when either public include changes.
+$(OBJLIST): $(wildcard $(FBCU_INC)/*.bi)
+
 .PHONY: make_fbcunit
 make_fbcunit : $(FBCU_BIN)
 
-$(FBCU_BIN) :
+# Delegate freshness checks to the framework even when its archive exists.
+.PHONY: check_fbcunit
+check_fbcunit:
+
+$(FBCU_BIN) : check_fbcunit
 	+$(FBCU_MAKE) -C $(FBCU_DIR) FBC="$(FBC)" FPU=$(FPU) ARCH=$(ARCH) TARGET=$(TARGET) DOS_THREAD_PROVIDER="$(DOS_THREAD_PROVIDER)" DOS_TCP_PROVIDER="$(DOS_TCP_PROVIDER)"
 ifeq ($(HOST),dos)
 	@$(ECHO) dos > $(FBCU_DOS_TARGET_STAMP)
