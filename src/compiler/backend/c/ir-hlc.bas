@@ -347,12 +347,12 @@ declare sub exprDump( byval n as EXPRNODE ptr )
 dim shared as IRHLCCTX ctx
 
 
-'' Coverage of the current procedure AST for automatic scalar declarations.
+'' Coverage of the current procedure AST for local storage declarations.
 '' Reset at procedure entry; debug, opaque assembly and naked procedures keep locals.
 dim shared as integer c_local_refs_complete
-'' Borrowed static array/descriptor symbols for one optimized procedure AST. The pool is
-'' reused between procedures and never owns the symbols it records.
-dim shared as TLIST c_local_static_refs
+'' Each procedure owns a pointer-keyed reference index, separate from the parser's
+'' historical ACCESSED flags. Keys are owned; local symbols are only borrowed.
+dim shared as THASH c_local_refs
 '' Minimum-alignment pointee typedefs own their spellings for one C output.
 '' Record definitions keep their natural fields, including recursive pointers.
 dim shared as TLIST c_pointer_views
@@ -411,7 +411,6 @@ private sub _init( )
 	irhlInit( )
 	listInit( @c_pointer_views, 8, sizeof(CPOINTERVIEW), LIST_FLAGS_CLEAR )
 	listInit(@c_auto_descriptors, 8, sizeof(CAUTODESC), LIST_FLAGS_CLEAR)
-	listInit( @c_local_static_refs, 8, sizeof(FBSYMBOL ptr), LIST_FLAGS_NOCLEAR ) '' Small reusable reference blocks.
 	listInit( @ctx.anonstack, 8, sizeof( FBSYMBOL ptr ), LIST_FLAGS_NOCLEAR )
 	listInit( @ctx.exprnodes, 32, sizeof( EXPRNODE ), LIST_FLAGS_CLEAR )
 	listInit( @ctx.exprcache, 8, sizeof( EXPRCACHENODE ), LIST_FLAGS_NOCLEAR )
@@ -435,7 +434,7 @@ private sub _end( )
 	listEnd(@c_pointer_views)
 	hCAutoDescClear()
 	listEnd(@c_auto_descriptors)
-	listEnd( @c_local_static_refs )
+	if( c_local_refs.list <> NULL ) then hashEnd(@c_local_refs)
 	''
 	'' Section buffers are retained while the compiler processes input modules so
 	'' later modules can reuse their capacity.  The backend owns these allocations
@@ -1818,62 +1817,80 @@ private sub hEmitVarDecl _
 	end if
 end sub
 
-private function hHasCStaticReference( byval sym as FBSYMBOL ptr ) as integer
-	var entry = cptr(FBSYMBOL ptr ptr, listGetHead(@c_local_static_refs))
-	while( entry <> NULL )
-		if( *entry = sym ) then return TRUE
-		entry = listGetNext(entry)
-	wend
-	return FALSE
+private function hHasCLocalReference( byval sym as FBSYMBOL ptr ) as integer
+	if( c_local_refs.list = NULL ) then return FALSE
+	var key = str(culngint(sym))
+	return (hashLookup(@c_local_refs, strptr(key)) <> NULL)
 end function
 
-private sub hClearCStaticReferences( )
-	do
-		var entry = listGetHead(@c_local_static_refs)
-		if( entry = NULL ) then exit do
-		listDelNode(@c_local_static_refs, entry)
-	loop
+private sub hRememberCLocalReference( byval sym as FBSYMBOL ptr )
+	if( sym = NULL ) then exit sub
+	if( symbIsVar(sym) = FALSE orelse symbIsLocal(sym) = FALSE ) then exit sub
+	symbSetIsAccessed(sym)
+	var key = str(culngint(sym))
+	if( hashLookup(@c_local_refs, strptr(key)) = NULL ) then
+		hashAdd(@c_local_refs, ZstrDup(strptr(key)), sym, hashHash(strptr(key)))
+	end if
+end sub
+
+private sub hClearCLocalReferences( )
+	if( c_local_refs.list <> NULL ) then hashEnd(@c_local_refs)
 end sub
 
 private sub hMarkReferencedLocalInTree( byval n as ASTNODE ptr )
-	if( n = NULL ) then
-		exit sub
-	end if
+	if( n = NULL ) then exit sub
 
-	select case as const n->class
-	case AST_NODECLASS_ASM, AST_NODECLASS_LIT
-		'' Raw text can name storage without an ordinary variable node.
+	'' LIT nodes load as comments; only assembler text can hide storage uses.
+	if( n->class = AST_NODECLASS_ASM ) then
+		'' Assembly can name storage without an ordinary variable node.
 		c_local_refs_complete = FALSE
 		ctx.computedgotoopaque = TRUE
-	case AST_NODECLASS_VAR, AST_NODECLASS_IDX, _
-	     AST_NODECLASS_ADDROF, AST_NODECLASS_OFFSET
+	elseif( n->class <> AST_NODECLASS_DECL ) then
+		'' A declaration alone does not use storage. Its initialization children
+		'' still do, including constructor calls and runtime clearing.
+		hRememberCLocalReference(n->sym)
+	end if
 
-		dim as FBSYMBOL ptr sym = astGetSymbol( n )
-		if( sym <> NULL ) then
-			if( symbIsVar( sym ) andalso symbIsLocal( sym ) ) then
-				symbSetIsAccessed( sym )
-				if( c_local_refs_complete andalso symbIsStatic(sym) andalso _
-				    (symbIsDescriptor(sym) orelse (symbGetArrayDimensions(sym) > 0)) ) then
-					if( hHasCStaticReference(sym) = FALSE ) then
-						var entry = cptr(FBSYMBOL ptr ptr, listNewNode(@c_local_static_refs))
-						*entry = sym
-					end if
-				end if
-			end if
-		end if
-	end select
+	if( n->class = AST_NODECLASS_CALL ) then
+		'' The loader materializes these addresses outside the ordinary L/R
+		'' trees: hidden ABI return slots, string copyback and profiling calls.
+		hRememberCLocalReference(n->call.tmpres)
+		var item = n->call.strtail
+		while( item <> NULL )
+			hRememberCLocalReference(item->sym)
+			hMarkReferencedLocalInTree(item->srctree)
+			item = item->prev
+		wend
+		hMarkReferencedLocalInTree(n->call.profbegin)
+		hMarkReferencedLocalInTree(n->call.profend)
+	end if
 
-	''
-	'' NEXT links roots in the procedure statement list.  It is not part
-	'' of an expression tree and must not be followed recursively here.
-	''
-	hMarkReferencedLocalInTree( n->l )
-	hMarkReferencedLocalInTree( n->r )
+	'' NEXT links statement roots; only the caller walks that list.
+	hMarkReferencedLocalInTree(n->l)
+	hMarkReferencedLocalInTree(n->r)
+end sub
+
+private sub hMarkReferencedCStatement( byval n as ASTNODE ptr, byref fallthrough as integer )
+	if( n = NULL ) then exit sub
+	if( n->class = AST_NODECLASS_LINK ) then
+		hMarkReferencedCStatement(n->l, fallthrough)
+		hMarkReferencedCStatement(n->r, fallthrough)
+		exit sub
+	end if
+	if( n->class = AST_NODECLASS_LABEL ) then
+		if( symbGetIsAccessed(n->sym) ) then fallthrough = TRUE
+	end if
+	'' C flushing discards executable children of unreachable declarations.
+	'' Only their lexical scope survives, so those children cannot keep storage.
+	if( fallthrough = FALSE ) then exit sub
+	hMarkReferencedLocalInTree(n)
+	if( astCStatementEndsFlow(n) ) then fallthrough = FALSE
 end sub
 
 private sub hMarkReferencedLocals( byval n as ASTNODE ptr )
+	dim as integer fallthrough = TRUE
 	while( n <> NULL )
-		hMarkReferencedLocalInTree( n )
+		hMarkReferencedCStatement(n, fallthrough)
 		n = n->next
 	wend
 end sub
@@ -1906,7 +1923,7 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 		    (symbHasCtor(backing) = FALSE) andalso (symbHasDtor(backing) = FALSE) ) then
 			'' Keep dormant data/descriptor pairs until all initializer dependencies
 			'' can be proved. Removing just their descriptor would strand data.
-			if( hHasCStaticReference(backing) andalso (hHasCStaticReference(sym) = FALSE) ) then
+			if( hHasCLocalReference(backing) andalso (hHasCLocalReference(sym) = FALSE) ) then
 				'' Keep descriptor type declarations and their ABI assertions;
 				'' only this unreferenced storage declaration is omitted.
 				hEmitUDT( symbGetSubtype(sym), FALSE )
@@ -1924,18 +1941,16 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 		exit sub
 	end if
 
-	'' Limit this omission to scalars of at most 64 bits. Aggregate and
-	'' wider ABI return temporaries keep their existing storage lowering.
-	'' Ordinary scalar declarations without any optimized AST reference have
-	'' no storage users. Runtime initialization and stores remain AST nodes,
-	'' so their references keep the declaration and all evaluation effects.
+	'' Only surviving storage references keep automatic locals. Parser access
+	'' flags can still describe expressions that have since been lowered away.
+	'' Initialization, destruction and hidden call storage are indexed above;
+	'' function result variables keep their ABI role even without a VAR node.
 	if( c_local_refs_complete andalso (symbIsStatic(sym) = FALSE) andalso _
-	    (symbGetIsAccessed(sym) = FALSE) andalso _
+	    (hHasCLocalReference(sym) = FALSE) andalso _
 	    (symbGetTypeIniTree(sym) = NULL) andalso _
 	    ((symbGetAttrib(sym) and FB_SYMBATTRIB_FUNCRESULT) = 0) andalso _
-	    (symbGetArrayDimensions(sym) = 0) andalso _
-	    hIsScalarLoadType(symbGetFullType(sym)) andalso _
-	    (typeGetSize(symbGetFullType(sym)) <= 8) ) then
+	    (symbGetArrayDimensions(sym) = 0) ) then
+		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
 		exit sub
 	end if
 
@@ -6764,16 +6779,17 @@ private sub _emitProcBegin _
 
 	ctx.currproc = proc
 	ctx.computedgotoopaque = symbIsNaked( proc )
-	hClearCStaticReferences( )
-	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
-	hMarkReferencedLocals( astGetProc()->l )
-	hCAutoDescBegin(astGetProc()->l)
-	hAsmBeginNames( proc )
 	if( not symbIsNaked( proc ) ) then
 		if( astProcMayReturn( astGetProc( ) ) = FALSE ) then
 			symbSetProcIsNoReturn( proc )
 		end if
 	end if
+	hClearCLocalReferences( )
+	hashInit(@c_local_refs, 256, TRUE) '' Fixed buckets; chains admit larger local sets.
+	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
+	hMarkReferencedLocals( astGetProc()->l )
+	hCAutoDescBegin(astGetProc()->l)
+	hAsmBeginNames( proc )
 	ctx.computedgotoaddress = FALSE
 	ctx.computedgotoentry = FALSE
 	ctx.computedgotodispatch = FALSE
@@ -6984,7 +7000,8 @@ private sub _emitProcEnd _
 	assert( listGetHead( @ctx.exprcache ) = NULL )
 	assert( listGetHead( @ctx.exprnodes ) = NULL )
 
-	hClearCStaticReferences( )
+	'' Static local descriptors are finalized after PROCEND. Keep their
+	'' borrowed reference keys until the next procedure begins.
 	irhlEmitProcEnd( )
 
 end sub

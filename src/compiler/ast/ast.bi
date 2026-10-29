@@ -557,6 +557,9 @@ declare function astIsConstant( byval expr as ASTNODE ptr ) as integer
 
 declare sub astProcBegin( byval proc as FBSYMBOL ptr, byval ismain as integer )
 declare function astProcEnd( byval callrtexit as integer ) as integer
+'' Shared C statement termination rule for reachability and storage liveness.
+declare function astCStatementEndsFlow( byval n as ASTNODE ptr ) as integer
+
 declare function astProcMayReturn( byval proc as ASTNODE ptr ) as integer
 
 declare sub astProcVectorize _

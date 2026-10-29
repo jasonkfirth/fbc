@@ -187,7 +187,7 @@ private sub hResetCLabelReferences( byval n as ASTNODE ptr )
 	hResetCLabelReferences( n->r )
 end sub
 
-private function hCStatementEndsFlow( byval n as ASTNODE ptr ) as integer
+function astCStatementEndsFlow( byval n as ASTNODE ptr ) as integer
 	function = FALSE
 	select case( n->class )
 	case AST_NODECLASS_CALL
@@ -227,7 +227,7 @@ private sub hCheckCLabelReferences _
 	end if
 	if( fallthrough = FALSE ) then exit sub
 	changed or= hMarkCLabelReferences( n, TRUE )
-	if( hCStatementEndsFlow( n ) ) then fallthrough = FALSE
+	if( astCStatementEndsFlow( n ) ) then fallthrough = FALSE
 end sub
 
 private sub hCheckCReturn _
@@ -251,7 +251,7 @@ private sub hCheckCReturn _
 	elseif( n->class = AST_NODECLASS_BRANCH ) then
 		if( n->op.op = AST_OP_RET ) then returns = TRUE
 	end if
-	if( hCStatementEndsFlow( n ) ) then fallthrough = FALSE
+	if( astCStatementEndsFlow( n ) ) then fallthrough = FALSE
 end sub
 
 function astProcMayReturn( byval proc as ASTNODE ptr ) as integer
@@ -330,7 +330,7 @@ private sub hFlushCStatement( byval n as ASTNODE ptr, byref fallthrough as integ
 		end if
 	end select
 
-	var terminates = hCStatementEndsFlow( n )
+	var terminates = astCStatementEndsFlow( n )
 	astLoad( n )
 	astDelNode( n )
 	if( terminates ) then fallthrough = FALSE
