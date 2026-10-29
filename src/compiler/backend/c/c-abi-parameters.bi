@@ -115,6 +115,13 @@ private sub hCAbiDefinition _
 	if( first = NULL ) then exit sub
 	var entry = hCAbiGet(sym)
 	if( entry = NULL ) then exit sub
+	'' Different BASIC signatures can have the same C name. Keep the first
+	'' optional annotation record; linking it again would cycle the list.
+	'' The unchanged definitions still reach the C compiler for diagnosis.
+	if( entry->header.data <> NULL ) then
+		if( semantic_signature <> 0 ) then fbSemanticModelBackendAbiEnd(semantic_signature, header)
+		exit sub
+	end if
 	assert(entry->header.data = NULL)
 	DZstrAssign(entry->header, strptr(header))
 	entry->parameters = first
