@@ -721,7 +721,9 @@ declare function    hThreadCall_cb      ( byval sym as FBSYMBOL ptr ) as integer
 '':::::
 sub rtlSystemModInit( )
 	for i as integer = lbound( funcdata ) to ubound( funcdata )
-		if( funcdata(i).name = @FB_RTL_TLSGETVAR ) then
+		'' Intrinsic names are text keys. C need not merge identical literals.
+		'' The final table row has a NULL name.
+		if( (funcdata(i).name <> NULL) andalso (*funcdata(i).name = FB_RTL_TLSGETVAR) ) then
 			funcdata(i).paramTb(3).dtype = _
 				iif( env.pointersize = 8, FB_DATATYPE_ULONGINT, FB_DATATYPE_ULONG )
 			exit for
