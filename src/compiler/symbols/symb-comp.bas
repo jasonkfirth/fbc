@@ -1572,8 +1572,9 @@ sub symbCompRTTIInit( )
 	'' stdlibvtable as any ptr
 	symbAddField( rttitype, "stdlibvtable", 0, dTB(), typeAddrOf( FB_DATATYPE_VOID ), NULL, 0, 0, 0 )
 
-	'' dim id as zstring ptr
-	symbAddField( rttitype, "id", 0, dTB(), typeAddrOf( FB_DATATYPE_CHAR ), NULL, 0, 0, 0 )
+	'' RTTI names are immutable literals. Match FB_RTTI.id in fb_oop.h so
+	'' generated C keeps that contract without casting away const.
+	symbAddField( rttitype, "id", 0, dTB(), typeAddrOf( typeSetIsConst( FB_DATATYPE_CHAR ) ), NULL, 0, 0, 0 )
 
 	'' dim rttibase as fb_RTTI$ ptr
 	symbAddField( rttitype, "rttibase", 0, dTB(), typeAddrOf( FB_DATATYPE_STRUCT ), rttitype, 0, 0, 0 )
