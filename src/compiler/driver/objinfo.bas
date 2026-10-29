@@ -411,7 +411,8 @@ private sub hLoadFbctinfFrom##ELF_H( byval ELF_MACHINE as integer )
 	end if
 
 	'' index of .shstrtab's section header
-	if( (h->e_shstrndx < 0) or (h->e_shstrndx >= h->e_shnum) ) then
+	'' The ELF field is unsigned; its upper bound is the validity check.
+	if( h->e_shstrndx >= h->e_shnum ) then
 		INFO( "elf: invalid e_shstrndx" )
 		exit sub
 	end if

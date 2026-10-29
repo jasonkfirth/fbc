@@ -375,11 +375,16 @@ function symbGetConstStrAsStr( byval s as FBSYMBOL ptr ) as zstring ptr
 		dim text as wstring ptr = hUnescapeW( symbGetVarLitTextW( s ), textlen )
 		DZStrConcatAssign( res, "!" + QUOTE )
 		for i as integer = 0 to textlen - 1
+			'' Only a UTF-32 host code unit can require the eight-digit form.
+			#if sizeof(wstring) = 4
 			if( cast( ulong, (*text)[i] ) >= &h10000ul ) then
 				DZStrConcatAssign( res, $"\U" & hex( cast( ulong, (*text)[i] ), 8 ) )
 			else
+			#endif
 				DZStrConcatAssign( res, $"\u" & hex( cast( ulong, (*text)[i] ), 4 ) )
+			#if sizeof(wstring) = 4
 			end if
+			#endif
 		next
 		DZStrConcatAssign( res, QUOTE )
 	end if
@@ -404,11 +409,15 @@ function symbGetConstStrAsWstr( byval s as FBSYMBOL ptr ) as wstring ptr
 		if( len(*text) <> textlen ) then
 			DWStrConcatAssign( res, "!" + QUOTE )
 			for i as integer = 0 to textlen - 1
+				#if sizeof(wstring) = 4
 				if( cast( ulong, (*text)[i] ) >= &h10000ul ) then
 					DWStrConcatAssign( res, $"\U" & hex( cast( ulong, (*text)[i] ), 8 ) )
 				else
+				#endif
 					DWStrConcatAssign( res, $"\u" & hex( cast( ulong, (*text)[i] ), 4 ) )
+				#if sizeof(wstring) = 4
 				end if
+				#endif
 			next
 		else
 			DWStrConcatAssign( res, "$" + QUOTE )
@@ -422,11 +431,8 @@ function symbGetConstStrAsWstr( byval s as FBSYMBOL ptr ) as wstring ptr
 		dim text as zstring ptr = hUnescape( symbGetVarLitText( s ), textlen )
 		DWStrConcatAssign( res, "!" + QUOTE )
 		for i as integer = 0 to textlen - 1
-			if( cast( ulong, (*text)[i] ) >= &h10000ul ) then
-				DWStrConcatAssign( res, $"\U" & hex( cast( ulong, (*text)[i] ), 8 ) )
-			else
-				DWStrConcatAssign( res, $"\u" & hex( cast( ulong, (*text)[i] ), 4 ) )
-			end if
+			'' A narrow source byte always fits in a four-digit escape.
+			DWStrConcatAssign( res, $"\u" & hex( cast( ulong, (*text)[i] ), 4 ) )
 		next
 		DWStrConcatAssign( res, QUOTE )
 	end if
