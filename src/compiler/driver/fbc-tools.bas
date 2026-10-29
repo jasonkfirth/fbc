@@ -337,7 +337,7 @@ sub fbcAddDefLibPath(byref path as string)
 end sub
 
 #ifndef ENABLE_STANDALONE
-sub fbcAddLibPathFor( byval libname as zstring ptr )
+sub fbcAddLibPathFor( byval libname as const zstring ptr )
 	dim as string path
 	path = hStripFilename( fbcBuildPathToLibFile( libname ) )
 	path = pathStripDiv( path )

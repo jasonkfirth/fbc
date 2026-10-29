@@ -268,7 +268,7 @@ declare function fbcFindLibFile( byval file as const zstring ptr ) as string
 
 declare sub fbcAddDefLibPath(byref path as string)
 
-declare sub fbcAddLibPathFor( byval libname as zstring ptr )
+declare sub fbcAddLibPathFor( byval libname as const zstring ptr )
 
 declare sub fbcFindBin _
 	( _
