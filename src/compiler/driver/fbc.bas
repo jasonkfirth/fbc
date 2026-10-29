@@ -199,7 +199,9 @@ end sub
 
 	do
 		fbcDeterminePrefix( )
-		fbcPlatformAdjustPrefix( fbc.prefix )
+		#ifdef __FB_AROS__
+			fbcPlatformAdjustPrefix( fbc.prefix )
+		#endif
 		fbcSetupCompilerPaths( )
 
 		if( fbc.verbose ) then

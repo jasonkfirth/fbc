@@ -419,8 +419,7 @@ end function
 private function hShallowCopy _
 	( _
 		byval l as ASTNODE ptr, _
-		byval r as ASTNODE ptr, _
-		byval options as integer _
+		byval r as ASTNODE ptr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr t = any
@@ -456,8 +455,6 @@ private function hShallowCopy _
 		'' never happens in practice because OBJECT has a copy
 		'' constructor that is supposed to be used instead, and that
 		'' should cause all derived types to have one too.
-		assert( (options and AST_OPOPT_ISINI) = 0 )
-
 		assert( bytestocopy >= env.pointersize )
 		bytestocopy -= env.pointersize
 
@@ -711,12 +708,14 @@ function astNewASSIGN _
 
 		if( astIsCALL( tr ) = FALSE ) then
 			'' Not a CALL, it must be an UDT in memory, copy from that
-			return hShallowCopy( l, r, options )
+			assert( (symbGetHasRTTI(l->subtype) = FALSE) or ((options and AST_OPOPT_ISINI) = 0) )
+			return hShallowCopy( l, r )
 		end if
 
 		if( symbProcReturnsOnStack( tr->sym ) ) then
 			'' Returning on stack, copy from the temp result var
-			return hShallowCopy( l, astBuildCallResultVar( astRemoveNoConvCAST( r ) ), options )
+			assert( (symbGetHasRTTI(l->subtype) = FALSE) or ((options and AST_OPOPT_ISINI) = 0) )
+			return hShallowCopy( l, astBuildCallResultVar( astRemoveNoConvCAST( r ) ) )
 		end if
 
 		'' Returning in registers, patch the types to integer and then

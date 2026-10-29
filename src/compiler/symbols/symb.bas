@@ -2789,8 +2789,6 @@ end function
 
 private function hSymbCheckConstAssignFuncPtr _
 	( _
-		byval ldtype as FB_DATATYPE, _
-		byval rdtype as FB_DATATYPE, _
 		byval lsubtype as FBSYMBOL ptr, _
 		byval rsubtype as FBSYMBOL ptr, _
 		byref wrnmsg as FB_WARNINGMSG = 0 _
@@ -2802,8 +2800,6 @@ private function hSymbCheckConstAssignFuncPtr _
 
 	function = FALSE
 
-	assert( typeGetDtOnly( ldType ) = FB_DATATYPE_FUNCTION )
-	assert( typeGetDtOnly( rdType ) = FB_DATATYPE_FUNCTION )
 	assert( symbIsProc( lsubtype ) )
 	assert( symbIsProc( rsubtype ) )
 
@@ -2896,7 +2892,7 @@ function symbCheckConstAssign _
 	if( ret ) then
 		'' both types function pointer?
 		if( ( typeGetDtOnly( ldType ) = FB_DATATYPE_FUNCTION ) and ( typeGetDtOnly( rdType ) = FB_DATATYPE_FUNCTION ) ) then
-			ret and= hSymbCheckConstAssignFuncPtr( ldtype, rdtype, lsubtype, rsubtype, wrnmsg )
+			ret and= hSymbCheckConstAssignFuncPtr( lsubtype, rsubtype, wrnmsg )
 		end if
 	end if
 

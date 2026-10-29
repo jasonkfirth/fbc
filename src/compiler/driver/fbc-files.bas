@@ -180,11 +180,11 @@ function fbcDriverCreateFbctinfDirectory( ) as integer
 	function = FALSE
 end function
 
-private sub hUseTemporaryObjfile _
-	( _
-		byval module as FBCIOFILE ptr, _
-		byval sequence as integer _
-	)
+#ifdef __FB_DOS__
+private sub hUseTemporaryObjfile( byval module as FBCIOFILE ptr, byval sequence as integer )
+#else
+private sub hUseTemporaryObjfile( byval module as FBCIOFILE ptr )
+#endif
 
 	if( module->is_custom_objfile ) then
 		exit sub
@@ -211,23 +211,37 @@ sub fbcDriverUseTemporaryObjfiles( )
 		exit sub
 	end if
 
-	dim as integer sequence = 0
+	#ifdef __FB_DOS__
+		dim as integer sequence = 0
+	#endif
 	dim as FBCIOFILE ptr module = listGetHead( @fbc.modules )
 	while( module )
-		hUseTemporaryObjfile( module, sequence )
-		sequence += 1
+		#ifdef __FB_DOS__
+			hUseTemporaryObjfile( module, sequence )
+			sequence += 1
+		#else
+			hUseTemporaryObjfile( module )
+		#endif
 		module = listGetNext( module )
 	wend
 
 	dim as FBCIOFILE ptr rc = listGetHead( @fbc.rcs )
 	while( rc )
-		hUseTemporaryObjfile( rc, sequence )
-		sequence += 1
+		#ifdef __FB_DOS__
+			hUseTemporaryObjfile( rc, sequence )
+			sequence += 1
+		#else
+			hUseTemporaryObjfile( rc )
+		#endif
 		rc = listGetNext( rc )
 	wend
 
 	if( len( fbc.xpm.srcfile ) > 0 ) then
-		hUseTemporaryObjfile( @fbc.xpm, sequence )
+		#ifdef __FB_DOS__
+			hUseTemporaryObjfile( @fbc.xpm, sequence )
+		#else
+			hUseTemporaryObjfile( @fbc.xpm )
+		#endif
 	end if
 end sub
 

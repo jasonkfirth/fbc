@@ -11,11 +11,14 @@
 #include once "crt/stdio.bi"
 #include once "crt/stdlib.bi"
 
-private sub hLinkTrace( byref phase as const string, byref detail as const string )
 #ifdef SEMANTIC_LINK_TRACE
+private sub hLinkTrace( byref phase as const string, byref detail as const string )
 	print "semantic-link trace: "; phase; " "; detail
-#endif
 end sub
+#else
+	'' Disabled tracing must not allocate temporary diagnostic strings.
+	#define hLinkTrace(phase, detail)
+#endif
 
 extern "c"
 declare function fb_hGetExeName( byval buffer as zstring ptr, byval bytes as integer ) as zstring ptr

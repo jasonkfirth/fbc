@@ -342,7 +342,6 @@ end sub
 
 private sub hCheckByrefParam _
 	( _
-		byval proc as FBSYMBOL ptr, _
 		byval param as FBSYMBOL ptr, _
 		byval n as ASTNODE ptr, _
 		byval is_byref_void as boolean _
@@ -373,7 +372,6 @@ private sub hCheckByrefParam _
 	'' value and then pass the temp var byref.
 	if( astCanTakeAddrOf( t ) = FALSE ) then
 		assert( param->class = FB_SYMBCLASS_PARAM )
-		assert( symbIsProc( proc ) )
 
 		''
 		'' Show warning for suspicious cases where using the temp var was probably not intended.
@@ -633,7 +631,8 @@ private sub hCheckVoidParam _
 	end if
 
 	'' pass BYREF, check if a temp param isn't needed
-	hCheckByrefParam( parent->sym, param, n, TRUE )
+	assert( symbIsProc( parent->sym ) )
+	hCheckByrefParam( param, n, TRUE )
 end sub
 
 private function hCheckStrParam _
@@ -1149,7 +1148,8 @@ private function hCheckParam _
 
 	'' byref arg? check if a temp param isn't needed
 	if( symbGetParamMode( param ) = FB_PARAMMODE_BYREF ) then
-		hCheckByrefParam( parent->sym, param, n, FALSE )
+		assert( symbIsProc( parent->sym ) )
+		hCheckByrefParam( param, n, FALSE )
 		'' it's an implicit pointer
 	end if
 

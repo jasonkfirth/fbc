@@ -143,13 +143,6 @@ end sub
 #include once "driver/platforms/aros/fbc-platform.bi"
 #include once "driver/platforms/amiga/fbc-platform.bi"
 
-sub fbcPlatformAdjustPrefix( byref prefix as string )
-	select case as const fbGetOption( FB_COMPOPT_TARGET )
-	case FB_COMPTARGET_AROS
-		fbcArosPlatformAdjustPrefix( prefix )
-	end select
-end sub
-
 '' must be same order as enum FB_COMPTARGET
 static shared as FBC_PLATFORM_HOOKS fbcplatforms(0 to FB_COMPTARGETS-1) = _
 { _

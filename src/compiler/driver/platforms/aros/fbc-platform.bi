@@ -59,24 +59,24 @@ private function fbcArosPlatformIsSelected( ) as integer
 	function = (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_AROS)
 end function
 
-private sub fbcArosPlatformAdjustPrefix( byref prefix as string )
-	#if defined( __FB_AROS__ )
-		if( fbcArosPlatformIsSelected( ) = FALSE ) then
-			exit sub
-		end if
+#if defined( __FB_AROS__ )
+sub fbcPlatformAdjustPrefix( byref prefix as string )
+	if( fbcArosPlatformIsSelected( ) = FALSE ) then
+		exit sub
+	end if
 
-		'' Native packages install fbc below <root>/bin.  AmigaDOS accepts
-		'' slashes below a volume or assign, but does not resolve the Unix-style
-		'' bin/../lib path produced by the generic non-standalone layout.  Strip
-		'' the bin component explicitly so every later tool, include, and library
-		'' path begins at the canonical package root.
-		dim as string bindir = pathStripDiv( exepath( ) )
-		dim as string root = hStripFilename( bindir )
-		if( len( root ) > 0 ) then
-			prefix = root
-		end if
-	#endif
+	'' Native packages install fbc below <root>/bin.  AmigaDOS accepts
+	'' slashes below a volume or assign, but does not resolve the Unix-style
+	'' bin/../lib path produced by the generic non-standalone layout.  Strip
+	'' the bin component explicitly so every later tool, include, and library
+	'' path begins at the canonical package root.
+	dim as string bindir = pathStripDiv( exepath( ) )
+	dim as string root = hStripFilename( bindir )
+	if( len( root ) > 0 ) then
+		prefix = root
+	end if
 end sub
+#endif
 
 private sub fbcArosPlatformAddDefaultIncludePaths( byref incpath as string )
 	if( fbcArosPlatformIsSelected( ) = FALSE ) then

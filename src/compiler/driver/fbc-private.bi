@@ -341,7 +341,9 @@ declare sub fbcDriverPrintVersion( byval verbose as integer )
 '' fbc-platform.bas
 '' -------------------------------------------------------------------------
 
-declare sub fbcPlatformAdjustPrefix( byref prefix as string )
+#ifdef __FB_AROS__
+	declare sub fbcPlatformAdjustPrefix( byref prefix as string )
+#endif
 
 declare function fbcPlatformGetLinkerTool( ) as integer
 
