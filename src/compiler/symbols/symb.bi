@@ -1262,7 +1262,7 @@ declare function symbAddFwdRef _
 
 declare function symbAddTypedef _
 	( _
-		byval id as zstring ptr, _
+		byval id as const zstring ptr, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval lgt as longint _

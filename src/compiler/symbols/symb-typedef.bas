@@ -217,9 +217,11 @@ sub symbCheckFwdRef _
 end sub
 
 '':::::
+'' symbNewSymbol() copies the name into its own pool before returning.
+'' The caller's spelling is borrowed read-only during this operation.
 function symbAddTypedef _
 	( _
-		byval id as zstring ptr, _
+		byval id as const zstring ptr, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval lgt as longint _

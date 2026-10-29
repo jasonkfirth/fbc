@@ -472,7 +472,7 @@ end sub
 '':::::
 private sub hAddValistTypedef _
 	( _
-		byval pid as zstring ptr, _
+		byval pid as const zstring ptr, _
 		byval s as FBSYMBOL ptr, _
 		byval valisttype as integer _
 	)
@@ -488,7 +488,7 @@ end sub
 sub symbKeywordTypeInit( )
 
 	dim as FBSYMBOL ptr s = any
-	dim pid as zstring ptr = any
+	dim pid as const zstring ptr = any
 	dim dtype as integer = any
 
 
