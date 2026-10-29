@@ -199,7 +199,7 @@ declare function hPorts_cb _
 			) '/ _
 		( _
 			@FB_RTL_GFXDRAWSTRING, NULL, _
-			FB_DATATYPE_INTEGER, FB_FUNCMODE_FBCALL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
 			@hGfxlib_cb, FB_RTL_OPT_ERROR or FB_RTL_OPT_UTF8ARGS, _
 			11, _
 			{ _
@@ -218,7 +218,7 @@ declare function hPorts_cb _
 		), _
 		( _
 			@FB_RTL_GFXDRAWSTRINGUSTR, NULL, _
-			FB_DATATYPE_INTEGER, FB_FUNCMODE_FBCALL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
 			@hGfxlib_cb, FB_RTL_OPT_ERROR or FB_RTL_OPT_UTF8ARGS, _
 			11, _
 			{ _
@@ -1229,7 +1229,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutTrans cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1245,7 +1245,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1258,7 +1258,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutPSet cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1274,7 +1274,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1287,7 +1287,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutPReset cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1303,7 +1303,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1316,7 +1316,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutAnd cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1332,7 +1332,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1345,7 +1345,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutOr cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1361,7 +1361,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1374,7 +1374,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutXor cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1390,7 +1390,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1403,7 +1403,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutAlpha cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1419,7 +1419,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1432,7 +1432,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutBlend cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1448,7 +1448,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1461,7 +1461,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutAdd cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1477,7 +1477,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1490,7 +1490,7 @@ declare function hPorts_cb _
 		), _
 		/' sub fb_hPutCustom cdecl _
 			( _
-				byval src as const ubyte ptr, _
+				byval src as ubyte ptr, _
 				byval dest as ubyte ptr, _
 				byval w as const long, _
 				byval h as const long, _
@@ -1506,7 +1506,7 @@ declare function hPorts_cb _
 			@hGfxlib_cb, FB_RTL_OPT_NONE, _
 			9, _
 			{ _
-				( typeAddrOf( typeSetIsConst( FB_DATATYPE_UBYTE ) ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeAddrOf( FB_DATATYPE_UBYTE ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
@@ -1523,10 +1523,73 @@ declare function hPorts_cb _
 		) _
 	}
 
+'' Native graphics callbacks
+''
+'' fb_gfx_private.h declares BLENDER as FBCALL and PUTTER as CDECL. They
+'' are function pointers, including the nested BLENDER parameter of PUTTER.
+'' Build these shared types after registering the intrinsics, rather than
+'' describing their addresses as data pointers in the fixed-size table.
+'' The anonymous types belong to the current symbol table and expire with it.
+private function hLookupGfxIntrinsic( byval pname as const zstring ptr ) as FBSYMBOL ptr
+	dim as string identifier = *pname
+	if( fbLangIsSet( FB_LANG_QB ) ) then identifier = "__" + identifier
+	var chain_ = symbLookupAt( @symbGetGlobalNamespc( ), strptr(identifier), FALSE, FALSE )
+	if( chain_ = NULL ) then return NULL
+	if( symbIsProc(chain_->sym) = FALSE orelse symbGetIsRTL(chain_->sym) = FALSE ) then return NULL
+	return chain_->sym
+end function
+
+private sub hSetGfxCallback _
+	( byval proc as FBSYMBOL ptr, byval ordinal as integer, byval callbacktype as FBSYMBOL ptr )
+
+	if( proc = NULL ) then exit sub
+	if( ordinal < 1 orelse ordinal > symbGetProcParams(proc) ) then
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+		exit sub
+	end if
+	var param = symbGetProcHeadParam( proc )
+	for i as integer = 1 to ordinal - 1
+		param = param->next
+	next
+	symbSetType( param, typeAddrOf(FB_DATATYPE_FUNCTION), callbacktype )
+end sub
+
+private sub hInitGfxCallbacks( )
+	'' Direct lookup leaves the lazy RTL cache untouched. In particular,
+	'' FB_NO_GFXLIB may still remove these symbols before parsing user code.
+	var putter_proc = hLookupGfxIntrinsic( @FB_RTL_GFXPUTPSET )
+	if( putter_proc = NULL ) then exit sub
+
+	var signature = symbPreAddProc( NULL )
+	symbAddProcParam( signature, NULL, FB_DATATYPE_ULONG, NULL, 0, FB_PARAMMODE_BYVAL, 0, 0 )
+	symbAddProcParam( signature, NULL, FB_DATATYPE_ULONG, NULL, 0, FB_PARAMMODE_BYVAL, 0, 0 )
+	symbAddProcParam( signature, NULL, typeAddrOf(FB_DATATYPE_VOID), NULL, 0, FB_PARAMMODE_BYVAL, 0, 0 )
+	var blender = symbAddProcPtr( signature, FB_DATATYPE_ULONG, NULL, 0, 0, env.target.fbcall )
+
+	static as const zstring ptr putters(0 to 9) = { _
+		@FB_RTL_GFXPUTTRANS, @FB_RTL_GFXPUTPSET, @FB_RTL_GFXPUTPRESET, _
+		@FB_RTL_GFXPUTAND, @FB_RTL_GFXPUTOR, @FB_RTL_GFXPUTXOR, _
+		@FB_RTL_GFXPUTALPHA, @FB_RTL_GFXPUTBLEND, @FB_RTL_GFXPUTADD, @FB_RTL_GFXPUTCUSTOM }
+	for i as integer = lbound(putters) to ubound(putters)
+		hSetGfxCallback( hLookupGfxIntrinsic(putters(i)), 8, blender )
+	next
+	var putter = symbAddProcPtrFromFunction( putter_proc )
+
+	'' Public blender inputs retain the language's typed user-data support.
+	'' The C backend adapts them to BLENDER without a function-type cast.
+	var proc = hLookupGfxIntrinsic( @FB_RTL_GFXPUT )
+	hSetGfxCallback( proc, 11, putter )
+	proc = hLookupGfxIntrinsic( @FB_RTL_GFXDRAWSTRING )
+	hSetGfxCallback( proc, 9, putter )
+	proc = hLookupGfxIntrinsic( @FB_RTL_GFXDRAWSTRINGUSTR )
+	hSetGfxCallback( proc, 9, putter )
+end sub
+
 '':::::
 sub rtlGfxModInit( )
 
 	rtlAddIntrinsicProcs( @funcdata(0), FALSE, TRUE, FB_RTL_DOMAIN_GRAPHICS )
+	hInitGfxCallbacks( )
 
 end sub
 

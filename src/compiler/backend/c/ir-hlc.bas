@@ -233,6 +233,13 @@ type CPOINTERVIEW
 	section    as integer
 end type
 
+type CGFXBLENDER
+	function_type as DZSTRING
+	parameter_type as DZSTRING
+	identifier as uinteger
+	reverse_args as integer
+end type
+
 type CARRAYCALLBACK
 	target_name as DZSTRING
 	target_type as DZSTRING
@@ -293,6 +300,9 @@ type IRHLCCTX
 	alignmentviews          as TLIST   '' CALIGNVIEW, owned until backend shutdown.
 	arraycallbacks          as TLIST   '' CARRAYCALLBACK, owns C names for one emission unit.
 	arraycallbackid         as uinteger
+	gfxblenders             as TLIST   '' CGFXBLENDER, owns adapter type spellings per C output.
+	gfxblenderid            as uinteger
+	gfxcontextid            as uinteger
 	unalignedid             as uinteger '' Per-emission byte-copy temporary names, reset by _emitBegin().
 	localassertid           as uinteger '' Unique local enum names for pre-C11 layout checks.
 	codeptrid               as uinteger '' Typed representation-transfer temporaries.
@@ -339,6 +349,9 @@ declare sub exprFreeNode( byval n as EXPRNODE ptr )
 declare function hIsArrayCallbackParam( byval proc as FBSYMBOL ptr, byval param_index as integer ) as integer
 declare sub hEmitArrayCallbackDefinitions( )
 declare sub hClearArrayCallbacks( )
+declare function hGfxBlenderType( byval proc as FBSYMBOL ptr, byval param_index as integer ) as FBSYMBOL ptr
+declare sub hEmitGfxBlenderDefinitions( )
+declare sub hClearGfxBlenders( )
 #if __FB_DEBUG__
 declare sub exprDump( byval n as EXPRNODE ptr )
 #endif
@@ -416,6 +429,7 @@ private sub _init( )
 	listInit( @ctx.exprcache, 8, sizeof( EXPRCACHENODE ), LIST_FLAGS_NOCLEAR )
 	listInit( @ctx.alignmentviews, 8, sizeof(CALIGNVIEW), LIST_FLAGS_CLEAR )
 	listInit( @ctx.arraycallbacks, 8, sizeof(CARRAYCALLBACK), LIST_FLAGS_CLEAR )
+	listInit( @ctx.gfxblenders, 8, sizeof(CGFXBLENDER), LIST_FLAGS_CLEAR )
 	irSetOption( IR_OPT_FPUIMMEDIATES or IR_OPT_MISSINGOPS )
 
 	if( fbIs64bit( ) ) then
@@ -454,6 +468,8 @@ private sub _end( )
 
 	hClearArrayCallbacks( )
 	listEnd( @ctx.arraycallbacks )
+	hClearGfxBlenders( )
+	listEnd( @ctx.gfxblenders )
 	listEnd( @ctx.alignmentviews )
 	listEnd( @ctx.exprcache )
 	listEnd( @ctx.exprnodes )
@@ -1435,6 +1451,8 @@ private function hEmitProcHeader _
 				dim as FBSYMBOL ptr semantic_original_subtype = subtype
 				if( (options and EMITPROC_ISPROTO) <> 0 ) then
 					dim as string libc_procptr = hEmitLibcProcPtrParam( mangled, param_index )
+					var gfx_blender = hGfxBlenderType(proc, param_index)
+					if( gfx_blender <> NULL ) then libc_procptr = hEmitType(typeAddrOf(FB_DATATYPE_FUNCTION), gfx_blender, TRUE)
 					if( hIsArrayCallbackParam( proc, param_index ) ) then
 						libc_procptr = "void (*)( void* )"
 					end if
@@ -2566,6 +2584,9 @@ private function _emitBegin( ) as integer
 	loop
 	hClearArrayCallbacks( )
 	ctx.arraycallbackid = 0
+	hClearGfxBlenders( )
+	ctx.gfxblenderid = 0
+	ctx.gfxcontextid = 0
 	ctx.section = -1
 	ctx.sectiongosublevel = 0
 	ctx.linenum = 0
@@ -2667,6 +2688,7 @@ private sub _emitEnd( )
 	symbForEachGlobal( FB_SYMBCLASS_PROC, @hMaybeEmitProcProto )
 	'' Callback bodies follow the original typed procedure prototypes.
 	hEmitArrayCallbackDefinitions( )
+	hEmitGfxBlenderDefinitions( )
 
 	''
 	'' Emit global vars based on the order they were added to the global
@@ -5340,6 +5362,7 @@ private sub _emitAddr _
 end sub
 
 #include once "backend/c/c-array-callbacks.bi"
+#include once "backend/c/c-gfx-callbacks.bi"
 
 private function hCAllocationArgument( byval value as EXPRNODE ptr ) as EXPRNODE ptr
 	'' FB accepts const object pointers for DEALLOCATE and REALLOCATE.
@@ -5387,6 +5410,10 @@ private sub hDoCall _
 	dim as longint semantic_call = fbSemanticModelCallAbiBegin(proc, "c", indirect, vr <> NULL, _
 		semantic_result_dtype, semantic_result_subtype, "", "", level, bytestopop)
 
+	dim as CGFXBLENDER ptr gfx_adapter = NULL
+	dim as string gfx_callback, gfx_context
+	dim as integer gfx_userdata_index = -1
+
 	'' Flush argument list
 	s += "( "
 	arg = listGetTail( @irhl.callargs )
@@ -5416,7 +5443,12 @@ private sub hDoCall _
 			'' be known later, or never)
 			symbGetRealParamDtype( arg->param, dtype, subtype )
 			var param_proc = symbGetParent( arg->param )
-			if( hIsArrayCallbackParam( param_proc, param_index ) ) then
+			var gfx_blender = hGfxBlenderType(param_proc, param_index)
+			if( gfx_blender <> NULL ) then
+				expr = hGfxBlenderArgument(expr, gfx_blender, gfx_adapter, gfx_callback, gfx_context)
+				if( gfx_adapter <> NULL ) then gfx_userdata_index = param_index + 1
+				semantic_kind = "graphics-blender"
+			elseif( hIsArrayCallbackParam( param_proc, param_index ) ) then
 				expr = hArrayCallbackArgument( expr )
 				semantic_kind = "array-callback"
 			else
@@ -5460,6 +5492,15 @@ private sub hDoCall _
 			semantic_selected_subtype = NULL
 		else
 			semantic_value = exprFlush( expr )
+			if( gfx_adapter <> NULL andalso param_index - 1 = gfx_userdata_index ) then
+				hWriteLine("struct " + hGfxContextType(gfx_adapter) + " " + gfx_context + _
+					" = { " + gfx_callback + ", " + semantic_value + " };")
+				semantic_value = "&" + gfx_context
+				semantic_kind = "graphics-blender-context"
+				semantic_selected_dtype = FB_DATATYPE_INVALID
+				semantic_selected_subtype = NULL
+				gfx_adapter = NULL
+			end if
 		end if
 		fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, semantic_kind, _
 			semantic_input_dtype, semantic_input_subtype, semantic_selected_dtype, semantic_selected_subtype, "", "", semantic_value)
