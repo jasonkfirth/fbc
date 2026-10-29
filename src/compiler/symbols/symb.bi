@@ -1723,7 +1723,7 @@ declare function symbAllocStrConst _
 
 declare function symbAllocWstrConst _
 	( _
-		byval sname as wstring ptr, _
+		byval sname as const wstring ptr, _
 		byval lgt as integer _
 	) as FBSYMBOL ptr
 

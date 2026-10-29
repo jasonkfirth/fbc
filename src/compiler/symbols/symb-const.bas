@@ -253,7 +253,7 @@ end function
 
 function symbAllocWStrConst _
 	( _
-		byval sname as wstring ptr, _
+		byval sname as const wstring ptr, _
 		byval strlength as integer _
 	) as FBSYMBOL ptr
 

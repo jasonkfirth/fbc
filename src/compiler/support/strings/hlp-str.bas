@@ -1500,19 +1500,24 @@ end function
 '':::::
 function hUnescapeW _
 	( _
-		byval text as wstring ptr, _
+		byval text as const wstring ptr, _
 		byref textlen as integer = 0 _
 	) as wstring ptr static
 
 	static as DWSTRING res
+	static as wstring * 1 empty_result
 	dim as integer char, lgt, i
-	dim as wstring ptr src, dst, src_end
+	dim as const wstring ptr src, src_end
+	dim as wstring ptr dst
 
 	textlen = 0
 
 	lgt = len( *text )
 	if( lgt = 0 ) then
-		return text
+		'' Keep mutable scratch results separate from read-only input.
+		'' An empty decode must not reallocate a previous nonempty result.
+		empty_result[0] = 0
+		return @empty_result
 	end if
 
 	DWstrAllocate( res, lgt )
@@ -1683,7 +1688,7 @@ end function
 '' compiler's LEN() whenever a cross compiler bridges UTF-16 and UTF-32.
 function hGetTargetWstrLength _
 	( _
-		byval text as wstring ptr _
+		byval text as const wstring ptr _
 	) as integer
 
 	const UTF16_HIGH_MIN = &hD800ul

@@ -115,7 +115,7 @@ declare function hUnescape _
 
 declare function hUnescapeW _
 	( _
-		byval text as wstring ptr, _
+		byval text as const wstring ptr, _
 		byref textlen as integer = 0 _
 	) as wstring ptr
 
@@ -125,7 +125,7 @@ declare function hReadWstrChar _
 
 declare function hGetTargetWstrLength _
 	( _
-		byval text as wstring ptr _
+		byval text as const wstring ptr _
 	) as integer
 
 declare function hHasEscape _
