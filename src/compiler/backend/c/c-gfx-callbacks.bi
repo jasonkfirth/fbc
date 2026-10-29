@@ -65,7 +65,11 @@ private function hGfxBlenderArgument _
 	end if
 	if( source_type = NULL orelse symbIsProc(source_type) = FALSE ) then return expr
 	if( symbGetProcParams(source_type) <> 3 ) then return expr
-	var parameter = symbGetProcHeadParam( source_type )->next->next
+	'' Inspect the same physical parameter order used by hEmitProcHeader.
+	'' The graphics parser already accounts for Pascal's reversed formals.
+	var parameter = symbGetProcLastParam( source_type )
+	parameter = symbGetProcPrevParam( source_type, parameter )
+	parameter = symbGetProcPrevParam( source_type, parameter )
 	dim as integer parameter_dtype
 	dim as FBSYMBOL ptr parameter_subtype
 	symbGetRealParamDtype( parameter, parameter_dtype, parameter_subtype )
@@ -90,19 +94,16 @@ private function hGfxBlenderArgument _
 	'' the native callback converts the data pointer and makes a typed call.
 	var function_type = hEmitType( typeAddrOf(FB_DATATYPE_FUNCTION), source_type, TRUE )
 	var parameter_type = hEmitType( parameter_dtype, parameter_subtype, TRUE )
-	var reverse_args = (symbGetProcMode(source_type) = FB_FUNCMODE_PASCAL)
 	adapter = listGetHead( @ctx.gfxblenders )
 	do while( adapter <> NULL )
 		if( *adapter->function_type.data = function_type andalso _
-		    *adapter->parameter_type.data = parameter_type andalso _
-		    adapter->reverse_args = reverse_args ) then exit do
+		    *adapter->parameter_type.data = parameter_type ) then exit do
 		adapter = listGetNext( adapter )
 	loop
 	if( adapter = NULL ) then
 		adapter = listNewNode( @ctx.gfxblenders )
 		ctx.gfxblenderid += 1
 		adapter->identifier = ctx.gfxblenderid
-		adapter->reverse_args = reverse_args
 		DZstrAssign( adapter->function_type, strptr(function_type) )
 		DZstrAssign( adapter->parameter_type, strptr(parameter_type) )
 	end if
@@ -141,11 +142,7 @@ private sub hEmitGfxBlenderDefinitions( )
 		hWriteLine( "struct " + hGfxContextType(entry) + "* context = (struct " + _
 			hGfxContextType(entry) + "*)parameter;", TRUE )
 		var argument = "(" + *entry->parameter_type.data + ")context->parameter"
-		if( entry->reverse_args ) then
-			hWriteLine( "return context->callback( " + argument + ", destination, source );", TRUE )
-		else
-			hWriteLine( "return context->callback( source, destination, " + argument + " );", TRUE )
-		end if
+		hWriteLine( "return context->callback( source, destination, " + argument + " );", TRUE )
 		sectionUnindent( )
 		hWriteLine( "}", TRUE )
 		entry = listGetNext( entry )

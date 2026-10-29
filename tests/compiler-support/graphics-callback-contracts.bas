@@ -41,6 +41,17 @@ private function typed_blend cdecl _
 	return source_pixel xor destination_pixel xor context->mask
 end function
 
+'' Pascal graphics callbacks declare the data pointer first. Their emitted
+'' C signature already follows native stack order, with that pointer last.
+private function pascal_blend pascal _
+	( byval context as CallbackData ptr, byval destination_pixel as ulong, _
+	  byval source_pixel as ulong ) as ulong
+
+	if( context = 0 ) then return 0
+	context->calls += 1
+	return source_pixel xor destination_pixel xor context->mask
+end function
+
 private function get_parameter( byval context as CallbackData ptr ) as CallbackData ptr
 	context->parameter_reads += 1
 	return context
@@ -99,6 +110,14 @@ require( context.parameter_reads = 1, @"user-data expression evaluated once" )
 require( culng(point(1, 1, destination_image)) = _
 	(SOURCE_COLOUR xor DESTINATION_COLOUR xor context.mask), @"typed callback pixels" )
 print "TYPED CUSTOM "; hex(culng(point(1, 1, destination_image)), 8)
+
+line destination_image, (0, 0)-(3, 3), DESTINATION_COLOUR, bf
+context.calls = 0
+put destination_image, (1, 1), source_image, custom, @pascal_blend, @context
+require( context.calls = 4, @"Pascal callback data and order" )
+require( culng(point(1, 1, destination_image)) = _
+	(SOURCE_COLOUR xor DESTINATION_COLOUR xor context.mask), @"Pascal callback pixels" )
+print "PASCAL CUSTOM "; hex(culng(point(1, 1, destination_image)), 8)
 
 '' Both text entry points use the same putter contract and a C int result.
 draw string destination_image, (0, 0), "A", SOURCE_COLOUR

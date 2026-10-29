@@ -237,7 +237,6 @@ type CGFXBLENDER
 	function_type as DZSTRING
 	parameter_type as DZSTRING
 	identifier as uinteger
-	reverse_args as integer
 end type
 
 type CARRAYCALLBACK
