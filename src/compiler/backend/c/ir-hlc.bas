@@ -291,6 +291,8 @@ type IRHLCCTX
 
 	globalvarpass           as integer  '' Global var emitting is done in 2 passes; this allows the callbacks to identify the current pass.
 	computedgotoaddress     as integer  '' A real label address or required entry reference has been emitted.
+	computedgotoentry       as integer  '' Only Clang needs an otherwise unreferenced entry address.
+	computedgotodispatch    as integer  '' One target slot and dispatch block per C activation.
 	currproc                as FBSYMBOL ptr  '' Borrowed procedure symbol while emitting its body.
 	procentrylabel          as FBSYMBOL ptr  '' Borrowed from the procedure AST while emitting its body.
 	procentrysection        as integer
@@ -3829,6 +3831,7 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr )
 		end if
 	else
 		if( symbIsLabel( sym ) ) then
+			if( sym = ctx.procentrylabel ) then symbSetIsAccessed( sym )
 			s += "&&"
 		elseif( symbIsProc( sym ) ) then
 			hCAbiAddress(sym)
@@ -5398,16 +5401,28 @@ private sub hEmitComputedGotoAddress( )
 		'' Emscripten cannot lower blockaddress expressions, so the JavaScript
 		'' target must continue to omit this workaround.
 		assert( ctx.procentrylabel <> NULL )
-		symbSetIsAccessed( ctx.procentrylabel )
+		hWriteLine( "#if defined(__clang__)", TRUE )
 		hWriteLine( "(void)&&" + hGetCId( ctx.procentrylabel ) + ";" )
+		hWriteLine( "#endif", TRUE )
+		ctx.computedgotoentry = TRUE
 		ctx.computedgotoaddress = TRUE
 	end if
 end sub
 
 private sub _emitJumpPtr( byval v1 as IRVREG ptr )
 	var jumptarget = exprFlush( exprNewVREG( v1 ), TRUE )
+	if( ctx.computedgotodispatch = FALSE ) then
+		'' This slot belongs to the C activation, including recursive calls.
+		'' Keep it in the procedure header so jumps from nested BASIC scopes
+		'' do not leave its declaration behind or bypass initialization.
+		var section = sectionGosub( 2 )
+		hWriteLine( "void* fb_c_jump_target = 0;" )
+		sectionReturn( section )
+		ctx.computedgotodispatch = TRUE
+	end if
 	hEmitComputedGotoAddress( )
-	hWriteLine( "goto *" + jumptarget + ";" )
+	hWriteLine( "fb_c_jump_target = " + jumptarget + ";" )
+	hWriteLine( "goto fb_c_jump_dispatch;" )
 end sub
 
 private sub _emitBranch( byval op as integer, byval label as FBSYMBOL ptr )
@@ -6593,6 +6608,8 @@ private sub _emitProcBegin _
 		end if
 	end if
 	ctx.computedgotoaddress = FALSE
+	ctx.computedgotoentry = FALSE
+	ctx.computedgotodispatch = FALSE
 	ctx.procentrylabel = initlabel
 	ctx.procentrysection = -1
 	ctx.procentryoffset = 0
@@ -6683,6 +6700,26 @@ private sub hDropUnusedProcEntry( byval label as FBSYMBOL ptr )
 	end if
 
 	var tailbytes = e->bufferlen - ctx.procentryoffset - ctx.procentrybytes
+	if( ctx.computedgotoentry ) then
+		'' The synthetic entry address is a Clang workaround. GCC needs
+		'' neither that address nor its otherwise unused label. Real entry
+		'' references were retained by the ACCESSED check above.
+		dim as string prefix = "#if defined(__clang__)" + NEWLINE
+		dim as string suffix = "#endif" + NEWLINE
+		dim as string extra = prefix + suffix
+		var previouslen = e->bufferlen
+		sectionAppend( e, strptr(extra), len(extra) )
+		if( e->bufferlen - previouslen <> len(extra) ) then exit sub
+		memmove( e->buffer + ctx.procentryoffset + ctx.procentrybytes + len(extra), _
+		         e->buffer + ctx.procentryoffset + ctx.procentrybytes, tailbytes )
+		memmove( e->buffer + ctx.procentryoffset + len(prefix), _
+		         e->buffer + ctx.procentryoffset, ctx.procentrybytes )
+		memcpy( e->buffer + ctx.procentryoffset, strptr(prefix), len(prefix) )
+		memcpy( e->buffer + ctx.procentryoffset + len(prefix) + ctx.procentrybytes, _
+		        strptr(suffix), len(suffix) )
+		ctx.procentrybytes = 0
+		exit sub
+	end if
 	if( tailbytes > 0 ) then
 		memmove( e->buffer + ctx.procentryoffset, _
 		         e->buffer + ctx.procentryoffset + ctx.procentrybytes, tailbytes )
@@ -6716,6 +6753,16 @@ private sub _emitProcEnd _
 	end if
 
 	hDropUnusedProcEntry( initlabel )
+	if( ctx.computedgotodispatch ) then
+		'' A checked operation can select a handler or resume destination.
+		'' Evaluate that operation once at its original position, then share
+		'' the indirect transfer without changing the legacy label ABI.
+		'' Preserve normal fallthrough for procedures without an explicit RET.
+		hWriteLine( "goto fb_c_jump_dispatch_end;" )
+		hWriteLine( "fb_c_jump_dispatch:;" )
+		hWriteLine( "goto *fb_c_jump_target;" )
+		hWriteLine( "fb_c_jump_dispatch_end:;" )
+	end if
 	sectionEnd( )
 
 	sectionUnindent( )
