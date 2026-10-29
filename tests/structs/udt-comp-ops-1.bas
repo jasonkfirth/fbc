@@ -1,3 +1,8 @@
+'' FreeBASIC tests: UDT comparison conversion priorities
+'' File: udt-comp-ops-1.bas
+'' Check constructor/cast precedence and the order of comparison temporaries.
+'' This file contains test fixtures and assertions, not overload resolution code.
+
 #include once "fbcunit.bi"
 
 '' tests comst combinations of constructor / cast with udt / string
@@ -434,11 +439,13 @@ SUITE( fbc_tests.structs.udt_comp_ops_1 )
 		gen_test_3()
 		gen_test_4()
 		sub check()
+			'' CAST() returns LONG here. Its exact constructor match must
+			'' outrank widening that result to INTEGER for the comparison.
 			do_test1()
 			CU_ASSERT_EQUAL( id_UDT_constructor                   , 1 )
 			CU_ASSERT_EQUAL( id_UDT_destructor                    , 6 )
-			CU_ASSERT_EQUAL( id_UDT_ctor_from_integer             , 3 )
-			CU_ASSERT_EQUAL( id_UDT_ctor_from_long                , 0 )
+			CU_ASSERT_EQUAL( id_UDT_ctor_from_integer             , 0 )
+			CU_ASSERT_EQUAL( id_UDT_ctor_from_long                , 3 )
 			CU_ASSERT_EQUAL( id_UDT_cast_to_integer               , 0 )
 			CU_ASSERT_EQUAL( id_UDT_cast_to_long                  , 2 )
 			CU_ASSERT_EQUAL( id_inequality_between_UDT_and_UDT    , 0 )
@@ -447,8 +454,8 @@ SUITE( fbc_tests.structs.udt_comp_ops_1 )
 			do_test2()
 			CU_ASSERT_EQUAL( id_UDT_constructor                   , 1 )
 			CU_ASSERT_EQUAL( id_UDT_destructor                    , 6 )
-			CU_ASSERT_EQUAL( id_UDT_ctor_from_integer             , 3 )
-			CU_ASSERT_EQUAL( id_UDT_ctor_from_long                , 0 )
+			CU_ASSERT_EQUAL( id_UDT_ctor_from_integer             , 0 )
+			CU_ASSERT_EQUAL( id_UDT_ctor_from_long                , 3 )
 			CU_ASSERT_EQUAL( id_UDT_cast_to_integer               , 0 )
 			CU_ASSERT_EQUAL( id_UDT_cast_to_long                  , 2 )
 			CU_ASSERT_EQUAL( id_inequality_between_UDT_and_UDT    , 0 )
@@ -492,3 +499,5 @@ SUITE( fbc_tests.structs.udt_comp_ops_1 )
 	END_TEST
 
 END_SUITE
+
+'' end of udt-comp-ops-1.bas

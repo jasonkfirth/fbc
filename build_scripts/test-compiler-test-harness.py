@@ -226,9 +226,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--fbc", type=Path, required=True)
+    parser.add_argument("--toolchain-prefix", type=Path,
+                        help="Use runtime libraries from a separate native build")
     parser.add_argument("--make", default=shutil.which("gmake") or shutil.which("make") or "make")
     options = parser.parse_args()
     root = options.root.resolve()
+    toolchain_prefix = (options.toolchain_prefix or root).resolve()
     with tempfile.TemporaryDirectory(prefix="fbc-log-harness-") as temporary:
         if not test_haiku_grep(root, Path(temporary) / "grep"):
             return 1
@@ -248,7 +251,7 @@ def main() -> int:
         # This value is a shell command inside Make, rather than a subprocess
         # argument vector. Forward slashes keep MSYS timeout from consuming
         # Windows path separators; shell quoting also preserves spaces.
-        fbc = shlex.join([options.fbc.resolve().as_posix(), "-prefix", root.as_posix(),
+        fbc = shlex.join([options.fbc.resolve().as_posix(), "-prefix", toolchain_prefix.as_posix(),
                           "-i", (root / "inc").as_posix()])
         command = [options.make, "--no-print-directory", "-s", "-f", "log-tests.mk",
                    "FB_LANG=fb", "FBC=" + fbc, "rootdir=" + root.as_posix()]

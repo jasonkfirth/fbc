@@ -6,7 +6,9 @@ This file intentionally does NOT recode compiler output or duplicate type loweri
 """
 
 from driver_inputs import text_rows
+from semantic_contexts import DEFAULT_FEATURE
 from semantic_datatypes import NATIVE_PRIMITIVE_NAMES, STABLE_PRIMITIVE_NAMES
+from semantic_default_types import PREFIX as DEFAULT_PREFIX
 from sidecar import Model, unescape
 
 FIXTURES = ("types.bas", "primitive-type-inputs.bas", "scalar-for-steps.bas", "parsed-string-intrinsics.bas",
@@ -37,6 +39,10 @@ def check_matrix(test):
                     else:
                         test.assertEqual(model.normalized_types, normalized)
                         test.assertEqual(code, emission)
+                    # Every consumer above has finished with this wire file.
+                    # Keeping the matrix's 84 models until method teardown
+                    # needlessly multiplies temporary disk use.
+                    artifact.unlink()
 
 
 def check_modes(test):
@@ -94,9 +100,19 @@ def check_legacy_reduced(test):
                 test.assertFalse(model.records["Y"])
                 rows = [row.copy() for row in model.rows if not (row[0] == "CAP" and row[2] in
                         ("stable-primitive-type-abi-v1", "extended-integer-type-abi"))]
+                if model.default_type_initial:
+                    # A modern DEF receipt needs its explicit wire encoding.
+                    # Keep this inconsistent mutation as a separate rejection.
+                    with test.assertRaisesRegex(ValueError, "DEF policy has no explicit datatype ABI"):
+                        Model(text_rows(rows), bindings_only=mode == "bindings", expressions_only=mode == "expressions")
+                # The older producer also predates native DEF-table receipts.
+                # Omit their capability and facts together, leaving S intact.
+                rows = [row for row in rows if not (row[0] == "CAP" and row[2] == DEFAULT_FEATURE)
+                        and not (row[0] == "K" and row[3].startswith(DEFAULT_PREFIX))]
                 legacy = Model(text_rows(rows), bindings_only=mode == "bindings", expressions_only=mode == "expressions")
                 test.assertEqual(legacy.datatype_abis, {1: "unavailable"})
                 test.assertEqual(legacy.records["S"], model.records["S"])
+                test.assertFalse(legacy.default_type_initial)
 
 
 def check_binary(test):

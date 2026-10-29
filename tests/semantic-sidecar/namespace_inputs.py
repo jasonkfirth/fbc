@@ -94,5 +94,8 @@ def check_namespace_inputs(test):
                                 (row[0] == 'CAP' and row[2] == FEATURE or
                                  row[0] == 'K' and row[3].startswith(PREFIX))]
                     Model(serialized(old_rows))
+                # Each case has consumed its model, including mutation reads.
+                # The next case needs neither these bytes nor this pathname.
+                artifact.unlink()
 
 # end of namespace_inputs.py

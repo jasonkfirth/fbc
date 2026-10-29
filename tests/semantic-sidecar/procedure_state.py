@@ -110,10 +110,11 @@ def check_exclusions(test):
 
 
 def check_assembly(test):
-    if not test.native_host.endswith("-x86_64"):
-        test.skipTest("The gas64 GOSUB implementation requires an x86_64 host")
     source = test.source(GOSUB, "procedure-state-gosub-assembly.bas")
-    for extra, expected in (((), "call-ret"), (("-z", "gosub-setjmp"), "setjmp")):
+    # This is emission-only: select the required target instead of assuming
+    # that the host name includes its CPU or that a target SDK is installed.
+    for options, expected in (((), "call-ret"), (("-z", "gosub-setjmp"), "setjmp")):
+        extra = ("-target", "linux-x86_64", *options)
         baseline, _ = test.invoke([source], mode="off", backend="gas64", extra=extra)
         emission = test.emission_path(source.stem, "gas64").read_bytes()
         result, path = test.invoke([source], backend="gas64", extra=extra)

@@ -110,16 +110,18 @@ MODE_PRIORITY = {
 }
 
 
-def read_test_sources(root: Path) -> tuple[set[Path], dict[Path, set[str]], list[str]]:
+def read_test_sources(root: Path, inventory_dir: Path | None = None
+                      ) -> tuple[set[Path], dict[Path, set[str]], list[str]]:
     tests_dir = root / "tests"
-    missing = [name for name in INVENTORY_FILES if not (tests_dir / name).is_file()]
+    inventory_dir = inventory_dir or tests_dir
+    missing = [name for name in INVENTORY_FILES if not (inventory_dir / name).is_file()]
     if missing:
         return set(), {}, missing
 
     sources: set[Path] = set()
     modes: dict[Path, set[str]] = {}
     for inventory in INVENTORY_FILES:
-        for line in (tests_dir / inventory).read_text(encoding="utf-8").splitlines():
+        for line in (inventory_dir / inventory).read_text(encoding="utf-8").splitlines():
             match = INVENTORY_ENTRY.search(line)
             if not match:
                 continue
@@ -204,12 +206,14 @@ def find_witness(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--inventory-dir", type=Path,
+                        help="Read generated inventories from an isolated test run")
     parser.add_argument("--strict", action="store_true", help="return failure for uncovered tokens")
     parser.add_argument("--output", type=Path, help="write language-feature-to-test witness TSV")
     args = parser.parse_args()
     root = args.root.resolve()
 
-    sources, source_modes, missing_inventories = read_test_sources(root)
+    sources, source_modes, missing_inventories = read_test_sources(root, args.inventory_dir)
     if missing_inventories:
         names = ", ".join(missing_inventories)
         print(f"Missing generated test inventory: {names}", file=sys.stderr)

@@ -570,6 +570,13 @@ class SidecarTests(unittest.TestCase):
             self.assertTrue(self.compiler_paths[path], "cygpath returned an empty path")
         return self.compiler_paths[path]
 
+    def compiler_input_path(self, path: Path) -> str:
+        # Driver receipts retain argument spelling. FILE/SRC and include
+        # locations use compiler_path() after the compiler opens the file.
+        if self.native_windows and os.name != "nt":
+            return self.compiler_path(path)
+        return str(path)
+
     def create_symlink(self, target: str, destination: Path) -> None:
         if self.native_windows and sys.platform == "cygwin":
             # MSYS2's default symlink mode copies the target. Start ln with
@@ -649,8 +656,12 @@ class SidecarTests(unittest.TestCase):
     def compile(self, source: Path, *, mode: str = "full", backend: str = "gcc",
                 extra: tuple[str, ...] = ()) -> Model:
         _, path = self.invoke([source], mode=mode, backend=backend, extra=extra)
-        return Model.read(path, expressions_only=mode == "expressions",
-                          bindings_only=mode == "bindings")
+        model = Model.read(path, expressions_only=mode == "expressions",
+                           bindings_only=mode == "bindings")
+        # Model.read owns all decoded rows. Callers needing the original file
+        # use invoke(), which returns its path and preserves that fixture.
+        path.unlink()
+        return model
 
     def one(self, model: Model, name: str, kind: str | None = None) -> int:
         identities = model.named(name, kind)
@@ -787,7 +798,17 @@ End Function
         self.assertTrue(model.records["I"])
         for tag in ("P", "V", "N", "E"):
             self.assertFalse(model.records[tag], tag)
-        self.assertFalse(any(model.records[tag] for tag in DETAIL_TAGS - PROVENANCE_TAGS))
+        for tag in DETAIL_TAGS - PROVENANCE_TAGS - {"K"}:
+            self.assertFalse(model.records[tag], tag)
+        # Reduced models retain parser validity and diagnostic receipts.
+        # Generic property records must still exclude expression/AST scopes.
+        for row in model.records["K"]:
+            self.assertIn(row[1], ("diagnostic", "module"), row)
+        from driver_inputs import text_rows
+        changed = [row.copy() for row in model.rows]
+        next(row for row in changed if row[0] == "K")[1] = "expression"
+        with self.assertRaisesRegex(ValueError, "Non-binding fact in bindings-only output"):
+            Model(text_rows(changed), bindings_only=True)
         self.assertTrue(model.records["FILE"])
         self.assertTrue(model.records["SRC"])
         self.assertTrue(model.records["SRE"])
@@ -1112,7 +1133,16 @@ End Function
                 self.assertFalse(model.records["B"])
                 self.assertFalse(any(model.records[tag] for tag in DETAIL_TAGS - PROVENANCE_TAGS - {"K"}))
                 from semantic_parser_observations import is_parser_property
-                self.assertTrue(all(row[1] == "expression" and is_parser_property(row[3]) for row in model.records["K"]))
+                for row in model.records["K"]:
+                    if row[1] == "expression":
+                        self.assertTrue(is_parser_property(row[3]), row)
+                    else:
+                        self.assertIn(row[1], ("diagnostic", "module"), row)
+                from driver_inputs import text_rows
+                changed = [row.copy() for row in model.rows]
+                next(row for row in changed if row[:2] == ["K", "module"])[1] = "symbol"
+                with self.assertRaisesRegex(ValueError, "Full-model fact in expression-only output"):
+                    Model(text_rows(changed), expressions_only=True)
                 self.assertTrue(model.records["FILE"])
                 self.assertTrue(all(row[13:15] == ["0", "0"] for row in model.records["E"]))
 
@@ -2511,7 +2541,15 @@ WithDefault()
         rows = [line.split("\t") for line in path.read_text().splitlines()]
         phase = next(row for row in rows if row[0] == "PH")
         foreign = next(row for row in rows if row[0] == "PH" and row[2] != phase[2])
+        owners = {row[2] for row in rows if row[0] == "PH"}
+        original_owner = phase[2]
         phase[2] = foreign[2]
+        with self.assertRaisesRegex(ValueError, "Procedure block snapshots differ from exported body phases"):
+            Model("\n".join("\t".join(row) for row in rows) + "\n")
+        # Keep the exported procedure set complete so the second mutation
+        # reaches the independent root-ownership check.
+        foreign[2] = original_owner
+        self.assertEqual({row[2] for row in rows if row[0] == "PH"}, owners)
         with self.assertRaisesRegex(ValueError, "Phase root belongs to another procedure"):
             Model("\n".join("\t".join(row) for row in rows) + "\n")
 
@@ -2571,7 +2609,11 @@ WithDefault()
                     rows.insert(-1, duplicate)
                     rows[-1][12] = str(int(rows[-1][12]) + 1)
                 else:
-                    next(row for row in rows if row[0] == "F" and row[1] == receipt[2])[11] = "0"
+                    # Repeated snapshots are legal; the final signature owns
+                    # the completed base-method decision.
+                    signature = next(row for row in reversed(rows) if row[0] == "F" and row[1] == receipt[2])
+                    self.assertNotEqual(signature[11], "0")
+                    signature[11] = "0"
                 with self.assertRaises(ValueError):
                     Model("\n".join("\t".join(row) for row in rows) + "\n")
 
@@ -5131,9 +5173,11 @@ Delete Allocated
                     if mode == "bindings":
                         # Expression-only export does not promise a declaration
                         # inventory. Bindings mode must retain written VAR names.
-                        reduced_variables = [identity for identity, row in reduced.symbols.items() if row[2] in declared]
-                        self.assertEqual(len(reduced_variables), len(declared))
-                        self.assertTrue(any(row[1] == str(variables["INFERREDGLOBAL"]) and row[2] == "declaration"
+                        # Symbol IDs belong to their own export. Full output
+                        # can allocate additional IDs before these declarations.
+                        reduced_variables = {row[2]: identity for identity, row in reduced.symbols.items() if row[2] in declared}
+                        self.assertEqual(set(reduced_variables), declared)
+                        self.assertTrue(any(row[1] == str(reduced_variables["INFERREDGLOBAL"]) and row[2] == "declaration"
                                             for row in reduced.records["B"]))
 
     def test_target_wide_literal_prefixes_follow_selected_backend_bytes(self) -> None:

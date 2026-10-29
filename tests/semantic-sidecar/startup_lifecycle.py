@@ -235,16 +235,35 @@ def check_legacy_order_and_shared(test):
             test.assertTrue(any(values.get("gosub-used") == "1" for (domain, _), values in model.properties.items() if domain == "symbol"))
             test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
     shared = test.fixture("startup-lifecycle.bas")
-    for backend in (*test.backends, "gas64"):
-        with test.subTest(backend=backend, route="shared"):
-            extra = ("-dll",)
+    shared_choices = [(backend, ()) for backend in test.backends]
+    shared_choices += [("gas64", ("-target", "win64")), ("gas64", ("-target", "linux-x86_64"))]
+    for backend, target in shared_choices:
+        with test.subTest(backend=backend, route="shared", target=target):
+            extra = ("-dll", *target)
             test.invoke([shared], mode="off", backend=backend, extra=extra)
             emission = test.emission_path(shared.stem, backend).read_bytes()
             model = test.compile(shared, backend=backend, extra=extra)
             entries = model.startup_lifecycles[1]["startup-emission"]
             test.assertTrue(entries)
             if backend == "gas64":
-                test.assertTrue(all(row[6] in (".init_array", ".fini_array") for row in entries.values()))
+                sections = {line.strip() for line in emission.decode().splitlines() if line.startswith(".section ")}
+                for row in entries.values():
+                    test.assertIn(row[1], ("constructor", "destructor"))
+                    if "win64" in target:
+                        # GNU PE constructor/destructor suffixes invert the
+                        # requested priority in the unsigned 16-bit range.
+                        maximum_priority = 65535
+                        priority = int(row[4])
+                        encoded = str(maximum_priority - priority) if priority else ""
+                        section = ".ctors" if row[1] == "constructor" else ".dtors"
+                        if encoded:
+                            section += "." + encoded
+                    else:
+                        encoded = ""
+                        section = ".init_array" if row[1] == "constructor" else ".fini_array"
+                    test.assertEqual(row[5], encoded)
+                    test.assertEqual(row[6], section)
+                    test.assertIn(".section " + section, sections)
             test.assertEqual(test.emission_path(shared.stem, backend).read_bytes(), emission)
 
 

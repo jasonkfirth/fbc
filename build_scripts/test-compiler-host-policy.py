@@ -21,9 +21,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--fbc", type=Path, required=True)
+    parser.add_argument("--toolchain-prefix", type=Path,
+                        help="Use runtime libraries from a separate native build")
     parser.add_argument("--backend", choices=("gcc", "llvm", "clang"), action="append")
     options = parser.parse_args()
     root = options.root.resolve()
+    toolchain_prefix = (options.toolchain_prefix or root).resolve()
     compiler = root / "src/compiler"
     backends = options.backend or ["gcc"]
     if options.backend is None:
@@ -42,7 +45,7 @@ def main() -> int:
             for name, arithmetic, bits, defines in policies:
                 executable = working / (backend + "-" + name)
                 # ASSERT requires -g; runtime error checks alone omit assertions.
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [str(options.fbc.resolve()), "-prefix", str(toolchain_prefix),
                            "-i", str(root / "inc"), "-i", str(compiler), "-gen", backend,
                            "-g", "-exx", "-m", "host-float-policy", "-x", str(executable),
                            *defines, str(root / "tests/compiler-support/host-float-policy.bas"),

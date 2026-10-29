@@ -204,7 +204,7 @@ end extern
     test.assertGreater(int(begins[0][17]), 0)
     test.assertEqual(begins[0][16], "0")
     test.assertEqual(model.source_contexts[int(begins[1][7])][5], "include")
-    test.assertEqual(begins[1][11], str(include))
+    test.assertEqual(begins[1][11], test.compiler_path(include))
     test.assertEqual(begins[2][11], "logical-extern.bas")
     test.assertEqual(begins[2][16], "0")
     test.assertFalse(model.named("InactiveProcedure"))

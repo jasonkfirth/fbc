@@ -51,16 +51,16 @@ def check_inputs(test):
             test.assertEqual(facts["driver-role"], "secondary")
             test.assertEqual(facts["driver-main"], "0")
             test.assertEqual(facts["driver-ordinal"], "1")
-            test.assertEqual(facts["driver-source"], test.compiler_path(source))
+            test.assertEqual(facts["driver-source"], test.compiler_input_path(source))
             test.assertEqual(facts["producer-version"], model.rows[0][2])
             test.assertRegex(facts["producer-build-date"], r"^\d{4}-\d{2}-\d{2}$")
-            for kind, value in (("predefine", "DriverValue=7"), ("preinclude", test.compiler_path(preinclude)),
-                                ("source-input", test.compiler_path(source)), ("object-input", test.compiler_path(object_file)),
-                                ("archive-input", test.compiler_path(archive)), ("library-input", "CommandRequested"),
-                                ("excluded-library", "ExcludedRequested"), ("library-path", test.compiler_path(library_path))):
+            for kind, value in (("predefine", "DriverValue=7"), ("preinclude", test.compiler_input_path(preinclude)),
+                                ("source-input", test.compiler_input_path(source)), ("object-input", test.compiler_input_path(object_file)),
+                                ("archive-input", test.compiler_input_path(archive)), ("library-input", "CommandRequested"),
+                                ("excluded-library", "ExcludedRequested"), ("library-path", test.compiler_input_path(library_path))):
                 test.assertIn((kind, value), inputs)
             paths = [value for kind, value in inputs if kind == "include-path"]
-            wanted = [test.compiler_path(path) for path in (include_a, include_b, include_a)]
+            wanted = [test.compiler_input_path(path) for path in (include_a, include_b, include_a)]
             test.assertTrue(any(paths[index:index + 3] == wanted for index in range(len(paths))), paths)
             count = int(facts["driver-module-library-count"])
             libraries = [facts[f"driver-module-library-{index}"] for index in range(count)]
@@ -151,18 +151,21 @@ def check_generated(test):
     generated = model.driver_inputs[2]["properties"]
     test.assertEqual(generated["driver-ordinal"], "-1")
     icon = test.source('/* XPM */\nstatic char * icon[] = {\n"1 1 1 1",\n"a c #ffffff",\n"a"\n};\n', "icon.xpm")
+    # XPM is a Unix resource format. Emission needs no Linux SDK and must
+    # exercise resource metadata even when this test runs on Windows.
+    target = ("-target", "linux-x86_64")
     for mode in ("full", "bindings", "expressions"):
         with test.subTest(mode=mode):
-            observed = test.compile(icon, mode=mode)
+            observed = test.compile(icon, mode=mode, extra=target)
             if mode == "full":
                 test.assertEqual(observed.driver_inputs[1]["properties"]["driver-role"], "resource")
-                test.assertIn(("resource-input", test.compiler_path(icon)), observed.driver_inputs[1]["inputs"])
+                test.assertIn(("resource-input", test.compiler_input_path(icon)), observed.driver_inputs[1]["inputs"])
             test.assertTrue(observed.records["B"] or observed.records["E"])
             test.assertTrue(all(row[3] == "0" for row in observed.records["B"]))
             test.assertTrue(all(row[2] == "0" for row in observed.records["E"]))
     before = icon.read_bytes()
     command = [str(test.compiler), "-prefix", str(test.toolchain_prefix), "-i", str(test.root / "inc"),
-               "-r", "-semantic-model", str(icon), str(icon)]
+               "-r", *target, "-semantic-model", str(icon), str(icon)]
     result = subprocess.run(command, cwd=test.working, text=True, capture_output=True, timeout=60)
     test.assertEqual(result.returncode, 1, result.stdout + result.stderr)
     test.assertEqual(icon.read_bytes(), before)
@@ -217,6 +220,12 @@ def check_enum_promotions(test):
             rows = [row.copy() for row in model.rows]
             changed = next(row for row in rows if row[:2] == ["E", original[1]])
             changed[14] = str(next(identity for identity, row in model.symbols.items() if row[3] == "3"))
+            with test.assertRaisesRegex(ValueError, "Normalized type disagrees with native type identity"):
+                Model(text_rows(rows))
+            # Keep the native/normalized snapshots consistent so the second
+            # mutation reaches the enum-specific ownership check.
+            normalized = next(row for row in rows if row[:4] == ["NT", "expression", original[1], "value"])
+            normalized[5] = changed[14]
             with test.assertRaisesRegex(ValueError, "nominal enum identity"):
                 Model(text_rows(rows))
 

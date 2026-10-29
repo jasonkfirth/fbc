@@ -52,7 +52,7 @@ end function
 function symbMethodToStr( byval proc as FBSYMBOL ptr ) as string
 	return "selected-method"
 end function
-sub ZstrAssign( byval destination as zstring ptr ptr, byval source as zstring ptr )
+sub ZstrAssign( byval destination as zstring ptr ptr, byval source as const zstring ptr )
 	if( *destination <> NULL ) then deallocate(*destination)
 	*destination = NULL
 	if( source = NULL ) then exit sub

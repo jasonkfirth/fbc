@@ -22,9 +22,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--fbc", type=Path, required=True)
+    parser.add_argument("--toolchain-prefix", type=Path,
+                        help="Use runtime libraries from a separate native build")
     parser.add_argument("--backend", choices=("gcc", "llvm", "clang"), action="append")
     options = parser.parse_args()
     root = options.root.resolve()
+    toolchain_prefix = (options.toolchain_prefix or root).resolve()
+    compiler_args = [str(options.fbc.resolve()), "-prefix", str(toolchain_prefix)]
     backends = options.backend or ["gcc"]
     clang = shutil.which(os.environ.get("CLANG") or "clang")
     llc = shutil.which(os.environ.get("LLC") or "llc")
@@ -47,20 +51,24 @@ def main() -> int:
         # Emission checks that host-width references match the fixed-width state
         # without requiring the target's assembler, linker, or runtime libraries.
         for target in ("win32", "linux-mips32", "riscos"):
-            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+            output = working / ("ir-gas64-" + target + ".c")
+            command = [*compiler_args, "-r",
                        "-gen", "gcc", "-target", target, "-m", "fbc",
                        "-i", str(root / "src/compiler"), "-i", str(root / "inc"),
                        str(root / "src/compiler/backend/gas64/ir-gas64.bas"),
-                       "-o", str(working / ("ir-gas64-" + target + ".c"))]
+                       "-o", str(output)]
             emitted = subprocess.run(command, cwd=working, text=True,
                                      capture_output=True, timeout=120, check=False)
             if emitted.returncode:
                 print(f"GAS64/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print(f"GAS64/{target}: emission passed")
+            # Later checks do not consume these large cross-target emissions.
+            # Close each passed fixture before producing the next one.
+            output.unlink()
         # GAS32 sees pointer-index operands without a backing symbol while
         # compiling this module. TLS operand checks must accept those operands.
-        command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+        command = [*compiler_args, "-r",
                    "-gen", "gas", "-target", "win32", "-m", "fbc", "-e",
                    "-i", str(root / "src/compiler"), "-i", str(root / "inc"),
                    str(root / "src/compiler/backend/gas64/ir-gas64.bas"),
@@ -76,7 +84,7 @@ def main() -> int:
         # integer globals and layout checks through each CE C target.
         for target in ("wince-arm", "wince-mips"):
             output = working / ("integer128-" + target + ".c")
-            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+            command = [*compiler_args, "-r",
                        "-gen", "gcc", "-target", target,
                        "-i", str(root / "inc/wince"), "-i", str(root / "inc"),
                        "-i", str(root / "tests/fbcunit/inc"),
@@ -104,7 +112,7 @@ def main() -> int:
         )
         for target in crt_targets:
             target_headers = root / "inc" / target.split("-", 1)[0]
-            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+            command = [*compiler_args, "-r",
                        "-gen", "gcc", "-target", target]
             if target_headers.is_dir():
                 command += ["-i", str(target_headers)]
@@ -128,7 +136,7 @@ def main() -> int:
         # Compile the actual Unicode fixture on the previously failing targets.
         for target in ("riscos", "freebsd", "netbsd", "openbsd", "aros", "amiga", "wince-arm"):
             target_headers = root / "inc" / target.split("-", 1)[0]
-            command = [str(options.fbc.resolve()), "-prefix", str(root), "-r",
+            command = [*compiler_args, "-r",
                        "-gen", "gcc", "-target", target]
             if target_headers.is_dir():
                 command += ["-i", str(target_headers)]
@@ -150,7 +158,7 @@ def main() -> int:
             source = working / "llvm-aarch64.bas"
             source.write_text('function increment( byval value as longint ) as longint\n'
                               '    return value + 1\nend function\n', encoding="utf-8")
-            command = [str(options.fbc.resolve()), "-prefix", str(root), "-rr",
+            command = [*compiler_args, "-rr",
                        "-gen", "llvm", "-target", "win32", "-arch", "aarch64",
                        str(source)]
             try:
@@ -174,7 +182,7 @@ def main() -> int:
                 # (0x8664), independently of the compiler host architecture.
                 for architecture, machine in (("686", 0x14C), ("x86_64", 0x8664)):
                     obj = working / ("llvm-win32-" + architecture + ".o")
-                    command = [str(options.fbc.resolve()), "-prefix", str(root), "-c",
+                    command = [*compiler_args, "-c",
                                "-gen", "llvm", "-target", "win32", "-arch", architecture,
                                str(source), "-o", str(obj)]
                     try:
@@ -289,7 +297,7 @@ def main() -> int:
                     shutil.copy2(root / source, input_source)
                 # The suite runs from a temporary directory, so resolve sibling
                 # includes from the fixture's source directory explicitly.
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-i", str((root / source).parent),
                            "-gen", backend, "-v",
                            str(input_source), "-x", str(executable)]
@@ -367,7 +375,7 @@ def main() -> int:
         invalid_source = root / "tests/compiler-support/incomplete-extern-invalid-value.bas"
         invalid_output = working / "incomplete-extern-invalid-value.o"
         invalid_build = subprocess.run(
-            [str(options.fbc.resolve()), "-prefix", str(root), "-c",
+            [*compiler_args, "-c",
              str(invalid_source), "-o", str(invalid_output)], cwd=working,
             text=True, capture_output=True, timeout=60, check=False)
         invalid_diagnostic = invalid_build.stdout + invalid_build.stderr
@@ -384,7 +392,7 @@ def main() -> int:
                 if driver is None:
                     continue
                 generated = working / ("integer128-c-i386-" + backend + ".c")
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-gen", backend,
                            "-target", "linux", "-arch", "686", "-r",
                            str(source), "-o", str(generated)]
@@ -437,7 +445,7 @@ def main() -> int:
 
             gas_source = root / "tests/compiler-support/integer128-gas32.bas"
             gas_assembly = working / "integer128-gas32-runtime.asm"
-            gas_emit_command = [str(options.fbc.resolve()), "-prefix", str(root),
+            gas_emit_command = [*compiler_args,
                                 "-i", str(root / "inc"), "-target", "linux-x86",
                                 "-gen", "gas", "-r", str(gas_source),
                                 "-o", str(gas_assembly)]
@@ -488,7 +496,7 @@ def main() -> int:
 
             incomplete_gas_assembly = working / "incomplete-extern-gas32.asm"
             emitted = subprocess.run(
-                [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                [*compiler_args, "-i",
                  str(root / "inc"), "-target", "linux-x86", "-gen", "gas",
                  "-r", str(incomplete_source), "-o", str(incomplete_gas_assembly)],
                 cwd=working, text=True, capture_output=True, timeout=120, check=False)
@@ -528,7 +536,7 @@ def main() -> int:
                     continue
                 generated = working / ("incomplete-extern-i386-" + backend + ".c")
                 emitted = subprocess.run(
-                    [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                    [*compiler_args, "-i",
                      str(root / "inc"), "-target", "linux", "-arch", "686",
                      "-gen", backend, "-r", str(incomplete_source), "-o",
                      str(generated)], cwd=working, text=True,
@@ -560,7 +568,7 @@ def main() -> int:
             if llc is not None:
                 incomplete_ir = working / "incomplete-extern-llvm-i386.ll"
                 emitted = subprocess.run(
-                    [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                    [*compiler_args, "-i",
                      str(root / "inc"), "-target", "linux-x86", "-gen", "llvm",
                      "-r", str(incomplete_source), "-o", str(incomplete_ir)],
                     cwd=working, text=True, capture_output=True, timeout=120, check=False)
@@ -600,7 +608,7 @@ def main() -> int:
             gas_c_abi_source = root / "tests/compiler-support/integer128-gas32-c-abi.bas"
             gas_c_abi_assembly = working / "integer128-gas32-c-abi.asm"
             emitted = subprocess.run(
-                [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                [*compiler_args, "-i",
                  str(root / "inc"), "-target", "linux-x86", "-gen", "gas",
                  "-r", str(gas_c_abi_source), "-o", str(gas_c_abi_assembly)],
                 cwd=working, text=True, capture_output=True, timeout=120, check=False)
@@ -642,7 +650,7 @@ def main() -> int:
             c_i386_abi_source = root / "tests/compiler-support/integer128-gas32-c-abi.bas"
             c_i386_abi_output = working / "integer128-gcc-i386-c-abi.c"
             c_i386_abi_emit = subprocess.run(
-                [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                [*compiler_args, "-i",
                  str(root / "inc"), "-target", "linux", "-arch", "686",
                  "-gen", "gcc", "-r", str(c_i386_abi_source), "-o",
                  str(c_i386_abi_output)], cwd=working, text=True,
@@ -676,7 +684,7 @@ def main() -> int:
                 # assemble both 32-bit outputs into COFF without a Windows SDK.
                 gas_win32_assembly = working / "integer128-gas32-win32.asm"
                 emitted = subprocess.run(
-                    [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                    [*compiler_args, "-i",
                      str(root / "inc"), "-target", "win32", "-gen", "gas",
                      "-r", str(root / "tests/compiler-support/integer128-gas32.bas"),
                      "-o", str(gas_win32_assembly)], cwd=working, text=True,
@@ -700,7 +708,7 @@ def main() -> int:
 
                 gcc_win32_source = working / "integer128-gcc-i386-win32.c"
                 emitted = subprocess.run(
-                    [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                    [*compiler_args, "-i",
                      str(root / "inc"), "-target", "win32", "-arch", "686",
                      "-gen", "gcc", "-r",
                      str(root / "tests/compiler-support/integer128-c-i386.bas"),
@@ -728,7 +736,7 @@ def main() -> int:
                 llvm_source = root / "tests/compiler-support/integer128-gas32.bas"
                 llvm_ir = working / "integer128-llvm-i386.ll"
                 llvm_emit = subprocess.run(
-                    [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                    [*compiler_args, "-i",
                      str(root / "inc"), "-target", "linux-x86", "-gen", "llvm",
                      "-r", str(llvm_source), "-o", str(llvm_ir)],
                     cwd=working, text=True, capture_output=True, timeout=120, check=False)
@@ -767,7 +775,7 @@ def main() -> int:
                 llvm_c_abi_source = root / "tests/compiler-support/integer128-gas32-c-abi.bas"
                 llvm_c_abi_ir = working / "integer128-llvm-i386-c-abi.ll"
                 emitted = subprocess.run(
-                    [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                    [*compiler_args, "-i",
                      str(root / "inc"), "-target", "linux-x86", "-gen", "llvm",
                      "-r", str(llvm_c_abi_source), "-o", str(llvm_c_abi_ir)],
                     cwd=working, text=True, capture_output=True, timeout=120, check=False)
@@ -808,7 +816,7 @@ def main() -> int:
 
                 llvm_win32_ir = working / "integer128-llvm-win32-i386.ll"
                 emitted = subprocess.run(
-                    [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                    [*compiler_args, "-i",
                      str(root / "inc"), "-target", "win32", "-arch", "686",
                      "-gen", "llvm", "-r", str(llvm_source), "-o", str(llvm_win32_ir)],
                     cwd=working, text=True, capture_output=True, timeout=120, check=False)
@@ -831,7 +839,7 @@ def main() -> int:
             windows_source = root / "tests/compiler-support/integer128-gas64-windows.bas"
             windows_assembly = working / "integer128-gas64-windows.asm"
             windows_emit = subprocess.run(
-                [str(options.fbc.resolve()), "-prefix", str(root), "-i",
+                [*compiler_args, "-i",
                  str(root / "inc"), "-target", "win64", "-gen", "gas64",
                  "-r", str(windows_source), "-o", str(windows_assembly)],
                 cwd=working, text=True, capture_output=True, timeout=120, check=False)
@@ -859,7 +867,7 @@ def main() -> int:
         if architecture == "x86_64" and system != "darwin":
             source = root / "tests/compiler-support/integer128-layout.bas"
             executable = working / "gas64-int128-layout"
-            command = [str(options.fbc.resolve()), "-prefix", str(root),
+            command = [*compiler_args,
                        "-i", str(root / "inc"), "-gen", "gas64",
                        str(source), "-x", str(executable)]
             try:
@@ -881,7 +889,7 @@ def main() -> int:
             if incomplete_extern_object is not None:
                 source = root / "tests/compiler-support/incomplete-extern.bas"
                 executable = working / "gas64-incomplete-extern"
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-gen", "gas64",
                            str(source), str(incomplete_extern_object),
                            "-x", str(executable)]
@@ -906,7 +914,7 @@ def main() -> int:
 
             source = root / "tests/compiler-support/integer128-layout-gas32.bas"
             assembly = working / "gas-int128-layout.asm"
-            command = [str(options.fbc.resolve()), "-prefix", str(root),
+            command = [*compiler_args,
                        "-i", str(root / "inc"), "-target", "linux-x86",
                        "-gen", "gas", "-r", str(source), "-o", str(assembly)]
             try:
@@ -928,7 +936,7 @@ def main() -> int:
 
             source = root / "tests/compiler-support/integer128-arithmetic.bas"
             executable = working / "gas64-int128-arithmetic"
-            command = [str(options.fbc.resolve()), "-prefix", str(root),
+            command = [*compiler_args,
                        "-i", str(root / "inc"), "-gen", "gas64",
                        str(source), "-x", str(executable)]
             try:
@@ -950,7 +958,7 @@ def main() -> int:
             if int128_input_object is not None:
                 source = root / "tests/compiler-support/integer128-abi-input.bas"
                 executable = working / "gas64-int128-abi-input"
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-gen", "gas64",
                            str(source), str(int128_input_object), "-x", str(executable)]
                 try:
@@ -972,7 +980,7 @@ def main() -> int:
             if int128_object is not None:
                 source = root / "tests/compiler-support/integer128-abi.bas"
                 executable = working / "gas64-int128-abi"
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-gen", "gas64",
                            str(source), str(int128_object), "-x", str(executable)]
                 try:
@@ -993,7 +1001,7 @@ def main() -> int:
 
             source = root / "tests/compiler-support/integer128-arithmetic.bas"
             assembly = working / "gas-int128-arithmetic.asm"
-            command = [str(options.fbc.resolve()), "-prefix", str(root),
+            command = [*compiler_args,
                        "-i", str(root / "inc"), "-target", "linux-x86",
                        "-gen", "gas", "-r", str(source), "-o", str(assembly)]
             try:
@@ -1016,7 +1024,7 @@ def main() -> int:
 
             thread_local_source = root / "tests/compiler-support/thread-local.bas"
             executable = working / "gas64-thread-local"
-            command = [str(options.fbc.resolve()), "-prefix", str(root),
+            command = [*compiler_args,
                        "-i", str(root / "inc"), "-gen", "gas64", "-mt",
                        str(thread_local_source), "-x", str(executable)]
             try:
@@ -1038,7 +1046,7 @@ def main() -> int:
             if thread_local_extern_object is not None:
                 source = root / "tests/compiler-support/thread-local-extern.bas"
                 executable = working / "gas64-thread-local-extern"
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-gen", "gas64", "-mt",
                            str(source), str(thread_local_extern_object),
                            "-x", str(executable)]
@@ -1062,7 +1070,7 @@ def main() -> int:
                     return 1
                 print("gas64/thread-local-extern: passed")
 
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-dylib", "-gen", "gas64",
                            "-mt", str(source), str(thread_local_extern_object),
                            "-x", str(working / "gas64-thread-local-extern-dll")]
@@ -1082,7 +1090,7 @@ def main() -> int:
                 print("gas64/thread-local-extern-dll: safely rejected")
 
             source = root / "tests/compiler-support/thread-local-managed.bas"
-            command = [str(options.fbc.resolve()), "-prefix", str(root),
+            command = [*compiler_args,
                        "-i", str(root / "inc"), "-gen", "gas64", "-mt", "-c",
                        str(source), "-o", str(working / "gas64-thread-local-managed.o")]
             try:
@@ -1099,7 +1107,7 @@ def main() -> int:
                 return 1
             print("gas64/thread-local-managed: safely rejected")
 
-            command = [str(options.fbc.resolve()), "-prefix", str(root),
+            command = [*compiler_args,
                        "-i", str(root / "inc"), "-target", "linux-x86",
                        "-gen", "gas", "-mt", "-r", str(thread_local_source),
                        "-o", str(working / "gas-thread-local.asm")]
@@ -1117,7 +1125,7 @@ def main() -> int:
             if thread_local_extern_object is not None:
                 thread_local_extern_source = root / "tests/compiler-support/thread-local-extern.bas"
                 assembly = working / "gas-thread-local-extern.asm"
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-target", "linux-x86",
                            "-gen", "gas", "-mt", "-r",
                            str(thread_local_extern_source),
@@ -1173,7 +1181,7 @@ def main() -> int:
             )
             for backend, target, arch, triple in targets:
                 label = f"{backend}/{target}-{arch}"
-                command = [str(options.fbc.resolve()), "-prefix", str(root),
+                command = [*compiler_args,
                            "-i", str(root / "inc"), "-gen", backend, "-r",
                            "-target", target, "-arch", arch, str(source)]
                 try:
