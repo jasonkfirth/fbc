@@ -321,6 +321,7 @@ end function
 '' just the toplevel node, except if there are LINKs involved which return
 '' either their lhs or rhs.
 function astGetEffectiveNode( byval n as ASTNODE ptr ) as ASTNODE ptr
+	if( n = NULL ) then return NULL
 	if( n->class = AST_NODECLASS_LINK ) then
 		select case n->link.ret
 		case AST_LINK_RETURN_LEFT
@@ -338,7 +339,10 @@ end function
 '' Determine the AST_NODECLASS_* of the given expression, while transparently
 '' handling LINKs.
 function astGetEffectiveClass( byval n as ASTNODE ptr ) as integer
-	function = astGetEffectiveNode( n )->class
+	'' A side-effect-only LINK has no effective value, just like an empty tree.
+	var effective = astGetEffectiveNode( n )
+	if( effective = NULL ) then return AST_NODECLASS_NOP
+	return effective->class
 end function
 
 ''

@@ -927,7 +927,7 @@ function astBuildBranch _
 		'' Skip LINK nodes, if any
 		n = expr
 		parentlink = NULL
-		while( n->class = AST_NODECLASS_LINK )
+		while( (n <> NULL) andalso (n->class = AST_NODECLASS_LINK) )
 			parentlink = n
 			select case n->link.ret
 			case AST_LINK_RETURN_LEFT
@@ -938,6 +938,14 @@ function astBuildBranch _
 				n = NULL
 			end select
 		wend
+
+		'' A branch needs a value. Do not dereference an empty LINK result
+		'' left by lowering or error recovery, even with assertions disabled.
+		if( n = NULL ) then
+			if( errGetCount( ) = 0 ) then errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+			astDelTree( expr )
+			return NULL
+		end if
 
 		assert( n )
 
