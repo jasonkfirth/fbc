@@ -82,37 +82,39 @@ private enum FB_CLONGDOUBLE_CMP
 	FB_CLONGDOUBLE_CMP_GE
 end enum
 
+'' The C runtime signatures use fixed-width C int types. FreeBASIC Integer is
+'' target-sized, so declare those parameters with 32-bit Long and ULong.
 declare sub fb_LongDoubleBop cdecl alias "fb_LongDoubleBop" _
 	(byval destination as any ptr, byval lhs as const any ptr, _
-	 byval rhs as const any ptr, byval operation as integer, _
-	 byval storage_size as uinteger)
+	 byval rhs as const any ptr, byval operation as long, _
+	 byval storage_size as ulong)
 declare sub fb_LongDoubleUop cdecl alias "fb_LongDoubleUop" _
 	(byval destination as any ptr, byval source as const any ptr, _
-	 byval operation as integer, byval storage_size as uinteger)
+	 byval operation as long, byval storage_size as ulong)
 declare function fb_LongDoubleCompare cdecl alias "fb_LongDoubleCompare" _
 	(byval lhs as const any ptr, byval rhs as const any ptr, _
-	 byval operation as integer, byval storage_size as uinteger) as integer
+	 byval operation as long, byval storage_size as ulong) as long
 declare sub fb_LongDoubleFromSigned cdecl alias "fb_LongDoubleFromSigned" _
 	(byval destination as any ptr, byval value as longint, _
-	 byval storage_size as uinteger)
+	 byval storage_size as ulong)
 declare sub fb_LongDoubleFromUnsigned cdecl alias "fb_LongDoubleFromUnsigned" _
 	(byval destination as any ptr, byval value as ulongint, _
-	 byval storage_size as uinteger)
+	 byval storage_size as ulong)
 declare sub fb_LongDoubleFromDouble cdecl alias "fb_LongDoubleFromDouble" _
 	(byval destination as any ptr, byval value as double, _
-	 byval storage_size as uinteger)
+	 byval storage_size as ulong)
 declare sub fb_LongDoubleFromString cdecl alias "fb_LongDoubleFromString" _
 	(byval destination as any ptr, byval value as const zstring ptr, _
-	 byval storage_size as uinteger)
+	 byval storage_size as ulong)
 declare function fb_LongDoubleToSigned cdecl alias "fb_LongDoubleToSigned" _
-	(byval source as const any ptr, byval storage_size as uinteger) as longint
+	(byval source as const any ptr, byval storage_size as ulong) as longint
 declare function fb_LongDoubleToUnsigned cdecl alias "fb_LongDoubleToUnsigned" _
-	(byval source as const any ptr, byval storage_size as uinteger) as ulongint
+	(byval source as const any ptr, byval storage_size as ulong) as ulongint
 declare function fb_LongDoubleToDouble cdecl alias "fb_LongDoubleToDouble" _
-	(byval source as const any ptr, byval storage_size as uinteger) as double
+	(byval source as const any ptr, byval storage_size as ulong) as double
 '' CLongDouble is byte-backed, so the C runtime must consume its native ABI slot.
 declare sub fb_LongDoubleVaArgCopy cdecl alias "fb_LongDoubleVaArgCopy" _
-	(byval destination as any ptr, byval storage_size as uinteger, _
+	(byval destination as any ptr, byval storage_size as ulong, _
 	 byval arguments as Cva_List)
 
 private function fb_LongDoubleVaArg _
