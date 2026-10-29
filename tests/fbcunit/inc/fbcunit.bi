@@ -1,10 +1,16 @@
+'' Project: FreeBASIC compiler unit testing
+'' File: fbcunit.bi
+'' Purpose: Declare unit-test registration and assertion interfaces.
+'' Responsibilities: Test macros, dialect adapters and borrowed readonly text inputs.
+'' This file intentionally does NOT contain: Test execution or platform output implementations.
+
 #ifndef __FBCUNIT_BI_INCLUDE__
 #define __FBCUNIT_BI_INCLUDE__ 1
 
 ''  fbcunit - FreeBASIC Compiler Unit Testing Component
 ''	Copyright (C) 2017-2020 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
-''  License: GNU Lesser General Public License 
+''  License: GNU Lesser General Public License
 ''           version 2.1 (or any later version) plus
 ''           linking exception, see license.txt
 
@@ -499,6 +505,9 @@
 #endif '' (FBCU_ENABLE_MACROS<>0)
 
 
+'' Registration names and assertion text may come from literals. Callers keep
+'' ownership; the implementation copies text that must outlive the call.
+
 /'--------------------------
 | fbcunit api for -lang qb |
 --------------------------'/
@@ -507,12 +516,12 @@
 
 	declare function fbcu.find_suite alias "fbcu_find_suite_qb" _
 		( _
-			byval suite_name as __zstring __ptr = FBCU_NULL _
+			byval suite_name as const __zstring __ptr = FBCU_NULL _
 		) as long
 
 	declare sub fbcu.add_suite alias "fbcu_add_suite_qb" _
 		( _
-			byval suite_name as __zstring __ptr = FBCU_NULL, _
+			byval suite_name as const __zstring __ptr = FBCU_NULL, _
 			byval init_proc as function cdecl ( ) as long = FBCU_NULL, _
 			byval term_proc as function cdecl ( ) as long = FBCU_NULL _
 		)
@@ -523,8 +532,8 @@
 
 	declare sub fbcu.add_test alias "fbcu_add_test_qb" _
 		( _
-			byval suite_name as __zstring __ptr = FBCU_NULL, _
-			byval test_name as __zstring __ptr = FBCU_NULL, _
+			byval suite_name as const __zstring __ptr = FBCU_NULL, _
+			byval test_name as const __zstring __ptr = FBCU_NULL, _
 			byval test_proc as sub cdecl ( ) = FBCU_NULL, _
 			byval is_global as __boolean = __false _
 		)
@@ -635,19 +644,19 @@
 	declare sub fbcu.CU_ASSERT_ alias "fbcu_CU_ASSERT_qb_" _
 		( _
 			byval value as __boolean, _
-			byval fil as __zstring __ptr, _
+			byval fil as const __zstring __ptr, _
 			byval lin as long, _
-			byval fun as __zstring __ptr, _
-			byval msg as __zstring __ptr _
+			byval fun as const __zstring __ptr, _
+			byval msg as const __zstring __ptr _
 		)
 
 	declare sub fbcu.CU_ASSERT_FATAL_ alias "fbcu_CU_ASSERT_FATAL_qb_" _
 		( _
 			byval value as __boolean, _
-			byval fil as __zstring __ptr, _
+			byval fil as const __zstring __ptr, _
 			byval lin as long, _
-			byval fun as __zstring __ptr, _
-			byval msg as __zstring __ptr _
+			byval fun as const __zstring __ptr, _
+			byval msg as const __zstring __ptr _
 		)
 
 #endif '' ( __FB_LANG__ = "qb" )
@@ -663,12 +672,12 @@ namespace fbcu
 
 	declare function find_suite _
 		( _
-			byval suite_name as zstring ptr = FBCU_NULL _
+			byval suite_name as const zstring ptr = FBCU_NULL _
 		) as long
 
 	declare sub add_suite _
 		( _
-			byval suite_name as zstring ptr = FBCU_NULL, _
+			byval suite_name as const zstring ptr = FBCU_NULL, _
 			byval init_proc as function cdecl ( ) as long = FBCU_NULL, _
 			byval term_proc as function cdecl ( ) as long = FBCU_NULL _
 		)
@@ -679,8 +688,8 @@ namespace fbcu
 
 	declare sub add_test _
 		( _
-			byval suite_name as zstring ptr = FBCU_NULL, _
-			byval test_name as zstring ptr = FBCU_NULL, _
+			byval suite_name as const zstring ptr = FBCU_NULL, _
+			byval test_name as const zstring ptr = FBCU_NULL, _
 			byval test_proc as sub cdecl ( ) = FBCU_NULL, _
 			byval is_global as boolean = false _
 		)
@@ -791,19 +800,19 @@ namespace fbcu
 	declare sub CU_ASSERT_ _
 		( _
 			byval value as boolean, _
-			byval fil as zstring ptr, _
+			byval fil as const zstring ptr, _
 			byval lin as long, _
-			byval fun as zstring ptr, _
-			byval msg as zstring ptr _
+			byval fun as const zstring ptr, _
+			byval msg as const zstring ptr _
 		)
 
 	declare sub CU_ASSERT_FATAL_ _
 		( _
 			byval value as boolean, _
-			byval fil as zstring ptr, _
+			byval fil as const zstring ptr, _
 			byval lin as long, _
-			byval fun as zstring ptr, _
-			byval msg as zstring ptr _
+			byval fun as const zstring ptr, _
+			byval msg as const zstring ptr _
 		)
 
 end namespace
@@ -811,3 +820,5 @@ end namespace
 #endif '' ( __FB_LANG__ <> "qb" )
 
 #endif
+
+'' end of fbcunit.bi

@@ -1,3 +1,9 @@
+'' Project: FreeBASIC compiler unit testing
+'' File: fbcunit.bas
+'' Purpose: Manage registered suites, tests and assertion results.
+'' Responsibilities: Suite lookup, result ownership and unit-test execution.
+'' This file intentionally does NOT contain: Platform console drawing or external test cases.
+
 ''  fbcunit - FreeBASIC Compiler Unit Testing Component
 ''	Copyright (C) 2017-2020 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
@@ -105,7 +111,7 @@ declare function hash_add ( byval s as const zstring ptr, byval suite_index as c
 
 '' NB: hash() table is zero based
 
-#define INVALID_HASH_INDEX -1
+#define INVALID_HASH_INDEX (-1)
 
 redim shared hash() as integer
 dim shared hash_size as integer = 0
@@ -186,7 +192,7 @@ namespace fbcu
 	''
 	function find_suite _
 		( _
-			byval suite_name as zstring ptr = FBCU_NULL _
+			byval suite_name as const zstring ptr = FBCU_NULL _
 		) as long
 
 		if( suite_name = FBCU_NULL ) then
@@ -207,7 +213,7 @@ namespace fbcu
 	''
 	sub add_suite _
 		( _
-			byval suite_name as zstring ptr = FBCU_NULL, _
+			byval suite_name as const zstring ptr = FBCU_NULL, _
 			byval init_proc as function cdecl ( ) as long = FBCU_NULL, _
 			byval term_proc as function cdecl ( ) as long = FBCU_NULL _
 		)
@@ -283,8 +289,8 @@ namespace fbcu
 	''
 	sub add_test _
 		( _
-			byval suite_name as zstring ptr, _
-			byval test_name as zstring ptr, _
+			byval suite_name as const zstring ptr, _
+			byval test_name as const zstring ptr, _
 			byval test_proc as sub cdecl ( ), _
 			byval is_global as boolean = false _
 		)
@@ -351,10 +357,10 @@ namespace fbcu
 	sub add_case _
 		( _
 			byval value as boolean, _
-			byval fil as zstring ptr, _
+			byval fil as const zstring ptr, _
 			byval lin as long, _
-			byval fun as zstring ptr, _
-			byval msg as zstring ptr _
+			byval fun as const zstring ptr, _
+			byval msg as const zstring ptr _
 		)
 
 		if( fbcu_suite_index = INVALID_INDEX ) then
@@ -978,10 +984,10 @@ namespace fbcu
 	sub CU_ASSERT_ _
 		( _
 			byval value as boolean, _
-			byval fil as zstring ptr, _
+			byval fil as const zstring ptr, _
 			byval lin as long, _
-			byval fun as zstring ptr, _
-			byval msg as zstring ptr _
+			byval fun as const zstring ptr, _
+			byval msg as const zstring ptr _
 		)
 
 		if( value = false ) then
@@ -998,10 +1004,10 @@ namespace fbcu
 	sub CU_ASSERT_FATAL_ _
 		( _
 			byval value as boolean, _
-			byval fil as zstring ptr, _
+			byval fil as const zstring ptr, _
 			byval lin as long, _
-			byval fun as zstring ptr, _
-			byval msg as zstring ptr _
+			byval fun as const zstring ptr, _
+			byval msg as const zstring ptr _
 		)
 
 		CU_ASSERT_( value, fil, lin, fun, msg )
@@ -1011,3 +1017,5 @@ namespace fbcu
 	end sub
 
 end namespace
+
+'' end of fbcunit.bas

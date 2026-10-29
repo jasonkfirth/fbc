@@ -1,7 +1,13 @@
+'' Project: FreeBASIC compiler unit testing
+'' File: fbcunit_qb.bas
+'' Purpose: Adapt the QB-facing unit-test entry points.
+'' Responsibilities: Preserve fixed aliases and forward readonly test text.
+'' This file intentionally does NOT contain: Suite storage or platform output implementations.
+
 ''  fbcunit - FreeBASIC Compiler Unit Testing Component
 ''	Copyright (C) 2017-2020 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
-''  License: GNU Lesser General Public License 
+''  License: GNU Lesser General Public License
 ''           version 2.1 (or any later version) plus
 ''           linking exception, see license.txt
 
@@ -14,7 +20,7 @@
 ''
 function fbcu_find_suite_qb alias "fbcu_find_suite_qb" _
 	( _
-		byval suite_name as zstring ptr = FBCU_NULL _
+		byval suite_name as const zstring ptr = FBCU_NULL _
 	) as long
 
 	function = fbcu.find_suite( suite_name )
@@ -24,7 +30,7 @@ end function
 ''
 sub fbcu_add_suite_qb alias "fbcu_add_suite_qb" _
 	( _
-		byval suite_name as zstring ptr = FBCU_NULL, _
+		byval suite_name as const zstring ptr = FBCU_NULL, _
 		byval init_proc as function cdecl ( ) as long = FBCU_NULL, _
 		byval term_proc as function cdecl ( ) as long = FBCU_NULL _
 	)
@@ -45,12 +51,12 @@ end function
 ''
 sub fbcu_add_test_qb alias "fbcu_add_test_qb" _
 	( _
-		byval suite_name as zstring ptr = FBCU_NULL, _
-		byval test_name as zstring ptr = FBCU_NULL, _
+		byval suite_name as const zstring ptr = FBCU_NULL, _
+		byval test_name as const zstring ptr = FBCU_NULL, _
 		byval test_proc as sub cdecl ( ) = FBCU_NULL, _
 		byval is_global as boolean = false _
 	)
-	
+
 	fbcu.add_test( suite_name, test_name, test_proc, is_global )
 
 end sub
@@ -262,10 +268,10 @@ end function
 sub fbcu_CU_ASSERT_qb_ alias "fbcu_CU_ASSERT_qb_" _
 	( _
 		byval value as boolean, _
-		byval fil as zstring ptr, _
+		byval fil as const zstring ptr, _
 		byval lin as long, _
-		byval fun as zstring ptr, _
-		byval msg as zstring ptr _
+		byval fun as const zstring ptr, _
+		byval msg as const zstring ptr _
 	)
 
 	fbcu.CU_ASSERT_( value, fil, lin, fun, msg )
@@ -276,12 +282,14 @@ end sub
 sub fbcu_CU_ASSERT_FATAL_qb_ alias "fbcu_CU_ASSERT_FATAL_qb_" _
 	( _
 		byval value as boolean, _
-		byval fil as zstring ptr, _
+		byval fil as const zstring ptr, _
 		byval lin as long, _
-		byval fun as zstring ptr, _
-		byval msg as zstring ptr _
+		byval fun as const zstring ptr, _
+		byval msg as const zstring ptr _
 	)
 
 	fbcu.CU_ASSERT_FATAL_( value, fil, lin, fun, msg )
 
 end sub
+
+'' end of fbcunit_qb.bas
