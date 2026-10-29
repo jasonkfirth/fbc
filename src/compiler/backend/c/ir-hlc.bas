@@ -260,6 +260,8 @@ enum
 	BUILTIN_F2U128        = (1 shl 8)
 	BUILTIN_D2I128        = (1 shl 9)
 	BUILTIN_D2U128        = (1 shl 10)
+	BUILTIN_F32_EQUAL     = (1 shl 11)
+	BUILTIN_F64_EQUAL     = (1 shl 12)
 end enum
 
 type IRHLCCTX
@@ -2545,6 +2547,18 @@ private function _emitBegin( ) as integer
 	function = TRUE
 end function
 
+private sub hWriteFloatEqual( byref suffix as string, byval dtype as integer )
+	var typename = hEmitType( dtype, NULL )
+	hWriteLine( "static inline int fb_c_" + suffix + "_equal(" + typename + " left, " + typename + " right)", TRUE )
+	hWriteLine( "{", TRUE )
+	'' Exact BASIC equality is quiet for quiet NaNs and equates signed zero.
+	'' These type-generic predicates preserve that unordered behavior. The
+	'' typed arguments evaluate each operand once, including volatile reads.
+	'' A pair of ordinary ordered comparisons would raise on quiet NaNs.
+	hWriteLine( "return !__builtin_islessgreater(left, right) && !__builtin_isunordered(left, right);", TRUE )
+	hWriteLine( "}", TRUE )
+end sub
+
 private sub _emitEnd( )
 	hAsmEndNames( )
 	dim as integer section = any
@@ -2573,6 +2587,8 @@ private sub _emitEnd( )
 	if( ctx.usedbuiltins and BUILTIN_F2U128 ) then hWriteF2I( "F2U128", FB_DATATYPE_UINTEGER128, FB_DATATYPE_SINGLE )
 	if( ctx.usedbuiltins and BUILTIN_D2I128 ) then hWriteF2I( "D2I128", FB_DATATYPE_INTEGER128, FB_DATATYPE_DOUBLE )
 	if( ctx.usedbuiltins and BUILTIN_D2U128 ) then hWriteF2I( "D2U128", FB_DATATYPE_UINTEGER128, FB_DATATYPE_DOUBLE )
+	if( ctx.usedbuiltins and BUILTIN_F32_EQUAL ) then hWriteFloatEqual( "f32", FB_DATATYPE_SINGLE )
+	if( ctx.usedbuiltins and BUILTIN_F64_EQUAL ) then hWriteFloatEqual( "f64", FB_DATATYPE_DOUBLE )
 
 	'' Append global declarations to the header of the toplevel section.
 	'' This must be done during _emitEnd() instead of _emitBegin() because
@@ -4001,6 +4017,25 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			hExprFlush( n->r, FALSE )
 			ctx.exprtext += ")"
 		case else
+			var left_type = typeGetDtAndPtrOnly( n->l->dtype )
+			var right_type = typeGetDtAndPtrOnly( n->r->dtype )
+			if( ((n->op = AST_OP_EQ) or (n->op = AST_OP_NE)) andalso _
+			    ((left_type = FB_DATATYPE_SINGLE) or (left_type = FB_DATATYPE_DOUBLE) or _
+			     (right_type = FB_DATATYPE_SINGLE) or (right_type = FB_DATATYPE_DOUBLE)) ) then
+				if( n->op = AST_OP_NE ) then ctx.exprtext += "!"
+				if( (left_type = FB_DATATYPE_DOUBLE) or (right_type = FB_DATATYPE_DOUBLE) ) then
+					ctx.exprtext += "fb_c_f64_equal("
+					ctx.usedbuiltins or= BUILTIN_F64_EQUAL
+				else
+					ctx.exprtext += "fb_c_f32_equal("
+					ctx.usedbuiltins or= BUILTIN_F32_EQUAL
+				end if
+				hExprFlush( n->l, FALSE )
+				ctx.exprtext += ", "
+				hExprFlush( n->r, FALSE )
+				ctx.exprtext += ")"
+				exit select
+			end if
 			'' Add parentheses around BOPs if the parent needs it
 			'' (looks like parentheses are unnecessary for all the other
 			'' expressions though, CAST/UOP should work fine without
