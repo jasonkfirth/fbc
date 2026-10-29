@@ -20,14 +20,14 @@ private function NameRecord(byval tag as ulong, byref value as const string) as 
 end function
 
 private sub Rejected(byref wire as const string)
-	dim section as ubyte ptr = cptr(ubyte ptr, 1)
+	dim section as const ubyte ptr = cptr(const ubyte ptr, 1)
 	dim count as integer = 123
 	if objinfoLoadHunk(cptr(const ubyte ptr, strptr(wire)), len(wire), section, count) then end 1
 	if section <> 0 or count <> 0 then end 2
 end sub
 
 private sub Accepted(byref wire as const string, byref payload as const string)
-	dim section as ubyte ptr, count as integer
+	dim section as const ubyte ptr, count as integer
 	if not objinfoLoadHunk(cptr(const ubyte ptr, strptr(wire)), len(wire), section, count) then end 3
 	if section = 0 or count <> len(payload) then end 4
 	for index as integer = 0 to count - 1
@@ -81,7 +81,7 @@ next
 for index as integer = 1 to len(code) - 3
 	dim damaged as string = LongWord(999) + LongWord(0) + code + metadata
 	mid(damaged, 8 + index, 4) = LongWord(&hffffffff)
-	dim section as ubyte ptr, count as integer
+	dim section as const ubyte ptr, count as integer
 	'' Some replacements affect opaque code/debug bytes and remain valid.
 	'' Every call must nevertheless stay within the supplied buffer.
 	if objinfoLoadHunk(cptr(const ubyte ptr, strptr(damaged)), len(damaged), section, count) then

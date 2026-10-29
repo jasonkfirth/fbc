@@ -133,11 +133,17 @@ type DATABUFFER
 	size    as integer
 end type
 
-'' Module state: hLoadFile() fills these buffers and hResetBuffers() releases them.
-dim shared as DATABUFFER _
-	ardata, _   '' current .a file content (if any)
-	objdata, _  '' current .o file content (can point into ardata)
-	fbctinf     '' .fbctinf section content, points into objdata
+type DATABUFFERVIEW
+	p       as const ubyte ptr
+	size    as integer
+end type
+
+'' Module state: ardata owns the archive allocation. objdata owns a standalone
+'' object allocation or borrows a span from ardata. objinfoReadEnd() frees the owner.
+dim shared as DATABUFFER ardata, objdata
+
+'' Metadata is a read-only view into objdata until objinfoReadEnd().
+dim shared as DATABUFFERVIEW fbctinf
 
 enum
 	FB_INFOSEC_EOL = 0

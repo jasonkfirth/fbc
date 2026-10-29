@@ -77,7 +77,7 @@ end function
 
 function objinfoLoadHunk _
 	( byval buffer as const ubyte ptr, byval byte_count as integer, _
-	  byref section_data as ubyte ptr, byref section_size as integer ) as integer
+	  byref section_data as const ubyte ptr, byref section_size as integer ) as integer
 	section_data = 0
 	section_size = 0
 	if( (buffer = 0) or (byte_count < 8) ) then return FALSE
@@ -141,7 +141,7 @@ function objinfoLoadHunk _
 			if( hSkipLongs(byte_count, position, count) = FALSE ) then return FALSE
 		case 1010 '' HUNK_END closes the current section
 			if( metadata_start >= 0 ) then
-				section_data = cptr(ubyte ptr, buffer + metadata_start)
+				section_data = buffer + metadata_start
 				section_size = metadata_bytes
 				return TRUE
 			end if

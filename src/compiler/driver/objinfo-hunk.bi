@@ -6,6 +6,6 @@
 
 declare function objinfoLoadHunk _
 	( byval buffer as const ubyte ptr, byval byte_count as integer, _
-	  byref section_data as ubyte ptr, byref section_size as integer ) as integer
+	  byref section_data as const ubyte ptr, byref section_size as integer ) as integer
 
 '' end of driver/objinfo-hunk.bi
