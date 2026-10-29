@@ -2166,7 +2166,14 @@ function astLoadBOP( byval n as ASTNODE ptr ) as IRVREG ptr
 				'' Self-BOPs: Always re-use the lhs vreg to store the result,
 				'' that way no assignment is needed anymore,
 				'' at least from the x86 ASM backend's point of view.
-				vr = irAllocVREG( astGetDataType( n ), n->subtype )
+				'' Keep pointed-to qualifiers on address arithmetic temporaries.
+				'' The C backend needs them when the result is consumed directly;
+				'' dropping them forces a cast to a mutable pointer between reads.
+				dim as integer result_dtype = astGetDataType( n )
+				if( typeIsPtr( result_dtype ) ) then
+					result_dtype = typeUnsetIsConst( astGetFullType( n ) )
+				end if
+				vr = irAllocVREG( result_dtype, n->subtype )
 				vr->vector = n->vector
 			else
 				'' Normal BOPs: The result must be stored into a newly allocated vreg,

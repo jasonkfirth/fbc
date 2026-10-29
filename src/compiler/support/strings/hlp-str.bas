@@ -481,12 +481,12 @@ end function
 
 '':::::
 ''
-'' The cursor is advanced by reference. Keep the pointer itself non-const here:
-'' generated C cannot safely pass a T ** cursor to a const T ** parameter, and
-'' recent GCC versions reject that mismatch while compiling bootstrap sources.
+'' Read through a value copy so callers retain their own cursor type.
+'' A mutable T ** cursor cannot be passed safely as const T **.
+'' Each decoder advances its own cursor after consuming the requested digits.
 private function hUnicodeHexToCodePointW _
 	( _
-		byref src as wstring ptr, _
+		byval src as const wstring ptr, _
 		byval digits as integer _
 	) as uinteger static
 
@@ -1325,7 +1325,7 @@ function hEscapeW _
 	static as DZSTRING res
 	dim as uinteger char
 	dim as integer lgt, i, wcharlen, n
-	dim as wstring ptr src, src_end
+	dim as const wstring ptr src, src_end
 	dim as zstring ptr dst
 
 	'' convert the internal escape sequences to GAS format
@@ -1356,7 +1356,7 @@ function hEscapeW _
 		return NULL
 	end if
 
-	src = cast( wstring ptr, text )
+	src = text
 	dst = res.data
 
 	src_end = src + lgt
@@ -1392,11 +1392,13 @@ function hEscapeW _
 				if( char = asc( "u" ) ) then
 					if( src + 4 > src_end ) then exit do
 					char = hUnicodeHexToCodePointW( src, 4 )
+					src += 4
 
 				'' CHAR_UUPP
 				elseif( char = asc( "U" ) ) then
 					if( src + 8 > src_end ) then exit do
 					char = hUnicodeHexToCodePointW( src, 8 )
+					src += 8
 
 				'' remap char as they will become a octagonal seq
 				else
@@ -1548,11 +1550,13 @@ function hUnescapeW _
 				if( char = asc( "u" ) ) then
 					if( src + 4 > src_end ) then exit do
 					char = hUnicodeHexToCodePointW( src, 4 )
+					src += 4
 
 				'' CHAR_UUPP
 				elseif( char = asc( "U" ) ) then
 					if( src + 8 > src_end ) then exit do
 					char = hUnicodeHexToCodePointW( src, 8 )
+					src += 8
 
 				'' remap char as they will become a octagonal seq
 				else
