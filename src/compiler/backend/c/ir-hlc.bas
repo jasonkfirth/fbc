@@ -4192,7 +4192,7 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	'' Indentation
 	s += space( (level - 1) * 4 )
 
-	static names(0 to ...) as zstring ptr => { _
+	static names(0 to ...) as const zstring ptr => { _
 		@"TEXT", _ '' EXPRCLASS_TEXT
 		@"IMM" , _ '' EXPRCLASS_IMM
 		@"SYM" , _ '' EXPRCLASS_SYM
@@ -4202,7 +4202,8 @@ private sub exprDump( byval n as EXPRNODE ptr )
 		@"MACRO", _ '' EXPRCLASS_MACRO
 		@"MEMBER", _ '' EXPRCLASS_MEMBER
 		@"INDEX", _ '' EXPRCLASS_INDEX
-		@"ARRAYADDR" _ '' EXPRCLASS_ARRAYADDR
+		@"ARRAYADDR", _ '' EXPRCLASS_ARRAYADDR
+		@"VTABLE" _ '' EXPRCLASS_VTABLE
 	}
 
 	s += *names(n->class)
