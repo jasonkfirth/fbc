@@ -376,6 +376,7 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/c-abi-parameters.bi"
 #include once "backend/c/c-auto-descriptors.bi"
 #include once "backend/c/c-unused-scalar-stores.bi"
+#include once "backend/c/c-readonly-locals.bi"
 #include once "backend/c/c-integer-ranges.bi"
 
 declare sub hBuildStrLit( byref ln as string, byval z as zstring ptr, _
@@ -448,6 +449,7 @@ private sub _init( )
 end sub
 
 private sub _end( )
+	hCReadOnlyLocalsFinish()
 	hCLeafFinish( )
 	hCAbiFinish( )
 	hCReadOnlyFinish()
@@ -1812,6 +1814,7 @@ private sub hEmitVarDecl _
 	else
 		'' C permits the pointee of a local pointer to remain const even though
 		'' top-level const on the BASIC variable itself is not emitted here.
+		dtype = hCReadOnlyLocalType(sym, dtype)
 		ln += hEmitType( typeUnsetIsConst( dtype ), sym->subtype, TRUE )
 	end if
 	var identifier = hGetCId( sym )
@@ -2605,6 +2608,7 @@ private sub hMaybeEmitProcExport( byval proc as FBSYMBOL ptr )
 end sub
 
 private function _emitBegin( ) as integer
+	hCReadOnlyLocalsInit()
 	hCEvaluatedValuesInit()
 	if( hFileExists( env.outf.name ) ) then
 		if( kill( env.outf.name ) <> 0 ) then
@@ -2804,6 +2808,7 @@ private sub _emitEnd( )
 	end if
 	hCAbiFinish( )
 	hCReadOnlyFinish()
+	hCReadOnlyLocalsFinish()
 	sectionEnd( )
 
 	if( close( #env.outf.num ) <> 0 ) then
@@ -5029,6 +5034,10 @@ private sub exprSTORE _
 	static as string ln, tempvar
 	dim as EXPRNODE ptr l = NULL
 	dim as EXPRNODE ptr addr = NULL
+	dim as integer store_dtype = vr->dtype
+	if( vr->typ = IR_VREGTYPE_VAR andalso vr->ofs = 0 andalso vr->vidx = NULL ) then
+		store_dtype = hCReadOnlyLocalType(vr->sym, store_dtype)
+	end if
 
 	if( vr->typ = IR_VREGTYPE_VAR andalso hCScalarStoreUnusedValue(vr->sym) andalso _
 	    (vr->ofs = 0) andalso (vr->vidx = NULL) andalso _
@@ -5104,9 +5113,10 @@ private sub exprSTORE _
 		'' lhs, but C does not, the rhs should be casted here instead,
 		'' although it probably doesn't matter much either way.
 		'' 1st to the desired vreg type
-		r = exprNewCAST( vr->dtype, vr->subtype, r )
+		r = exprNewCAST( store_dtype, vr->subtype, r )
 
 		l = exprNewVREG( vr, TRUE )
+		if( store_dtype <> vr->dtype ) then l->dtype = store_dtype
 		addr = hGetUnalignedLvalueAddr( vr, l )
 		if( addr <> NULL ) then
 			hEmitUnalignedStore( vr, addr, r )
@@ -6930,6 +6940,7 @@ private sub _emitProcBegin _
 		hMarkReferencedLocals(astGetProc()->l)
 	end if
 	hAsmBeginNames( proc )
+	hCReadOnlyLocalsBegin(astGetProc()->l)
 	ctx.computedgotoaddress = FALSE
 	ctx.computedgotoentry = FALSE
 	ctx.computedgotodispatch = FALSE
@@ -7118,6 +7129,7 @@ private sub _emitProcEnd _
 	hCLeafEnd( )
 	hCAutoDescClear()
 	hCScalarStoresClear()
+	hCReadOnlyLocalsClear()
 	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
 	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then
 		'' NetBSD walks .fini_array forwards, including in shared libraries.
