@@ -376,6 +376,7 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/c-abi-parameters.bi"
 #include once "backend/c/c-auto-descriptors.bi"
 #include once "backend/c/c-unused-scalar-stores.bi"
+#include once "backend/c/c-integer-ranges.bi"
 
 declare sub hBuildStrLit( byref ln as string, byval z as zstring ptr, _
 	byval length as longint, byval paddedlength as longint )
@@ -6880,6 +6881,12 @@ private sub _emitProcBegin _
 	hashInit(@c_local_refs, 256, TRUE) '' Fixed buckets; chains admit larger local sets.
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
+	if( hCIntegerRangesBegin(astGetProc()->l) ) then
+		'' Recompute storage uses after comparisons lose their value operands.
+		hClearCLocalReferences()
+		hashInit(@c_local_refs, 256, TRUE)
+		hMarkReferencedLocals(astGetProc()->l)
+	end if
 	var locals_changed = hCScalarStoresBegin(astGetProc()->l)
 	locals_changed or= hCAutoDescBegin(astGetProc()->l)
 	if( locals_changed ) then
