@@ -76,13 +76,25 @@ end function
 
 private function hCScalarStoreCandidate(byval sym as FBSYMBOL ptr) as integer
 	if( sym = NULL orelse symbIsVar(sym) = FALSE ) then return FALSE
-	if( symbIsLocal(sym) = FALSE orelse symbIsParamVar(sym) or symbIsRef(sym) ) then return FALSE
+	if( symbIsLocal(sym) = FALSE orelse symbIsParamVar(sym) ) then return FALSE
 	if( (sym->attrib and (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED or _
 	    FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN or _
 	    FB_SYMBATTRIB_IMPORT or FB_SYMBATTRIB_FUNCRESULT or FB_SYMBATTRIB_DESCRIPTOR)) <> 0 ) then return FALSE
-	if( symbGetArrayDimensions(sym) <> 0 orelse symbGetTypeIniTree(sym) <> NULL ) then return FALSE
+	if( symbGetArrayDimensions(sym) <> 0 ) then return FALSE
+	'' A local reference owns its pointer binding, not the referred object.
+	'' Writes through that reference have a DEREF target and are not candidates.
+	if( symbIsRef(sym) ) then return TRUE
+	if( symbGetTypeIniTree(sym) <> NULL ) then return FALSE
 	if( hCScalarStoreHasLifetime(sym) ) then return FALSE
 	return hCScalarStoreType(symbGetFullType(sym))
+end function
+
+private function hCScalarStoreUnusedBinding(byval sym as FBSYMBOL ptr) as integer
+	if( sym = NULL orelse symbIsRef(sym) = FALSE ) then return FALSE
+	var entry = hCScalarStoreGet(sym)
+	'' A reference retains its initializer tree for parser reference resolution.
+	'' That metadata is not another evaluation or an owned object initializer.
+	return (entry <> NULL) andalso (entry->referenced = FALSE)
 end function
 
 private sub hCScalarStoreCollect(byval n as ASTNODE ptr)
@@ -109,7 +121,21 @@ private function hCScalarStoreDiscardable(byval n as ASTNODE ptr) as integer
 		'' Do not alter string/UDT temporary-reference lifetime accounting.
 		if( typeGetClass(n->dtype) <> FB_DATACLASS_INTEGER ) then return FALSE
 		if( n->sym = NULL orelse symbIsVar(n->sym) = FALSE ) then return FALSE
+		if( symbIsRef(n->sym) ) then
+			return (typeGetDtAndPtrOnly(n->dtype) = typeGetDtAndPtrOnly(typeAddrOf(symbGetFullType(n->sym)))) and _
+			       (n->subtype = symbGetSubtype(n->sym))
+		end if
 		return (hCScalarStoreHasLifetime(n->sym) = FALSE)
+	case AST_NODECLASS_ADDROF, AST_NODECLASS_OFFSET
+		'' Loading the address of existing storage does not construct, destroy,
+		'' or read that object. More complex designators keep their evaluation.
+		if( n->r <> NULL orelse n->l = NULL ) then return FALSE
+		if( n->l->class <> AST_NODECLASS_VAR ) then return FALSE
+		var sym = n->l->sym
+		if( sym = NULL orelse symbIsVar(sym) = FALSE ) then return FALSE
+		'' A TLS address may invoke an allocation/initialization helper.
+		if( symbIsThreadLocal(sym) or symbIsThreadLocalC(sym) or symbIsImport(sym) ) then return FALSE
+		return TRUE
 	case AST_NODECLASS_CALL
 		'' Keep the original call and status/error policy. The result alone
 		'' can disappear; hidden aggregate result storage has a separate owner.
@@ -169,9 +195,16 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	if( target = NULL orelse target->class <> AST_NODECLASS_VAR ) then return NULL
 	var entry = hCScalarStoreGet(target->sym)
 	if( entry = NULL orelse target->var_.ofs <> 0 ) then return NULL
+	if( symbIsRef(entry->sym) ) then
+		'' Only the physical pointer slot is owned here. A semantic value store
+		'' must not become dead merely because the reference name is unread.
+		if( typeGetDtAndPtrOnly(target->dtype) <> typeGetDtAndPtrOnly(typeAddrOf(symbGetFullType(entry->sym))) ) then return NULL
+		if( target->subtype <> symbGetSubtype(entry->sym) ) then return NULL
+	end if
 	var bytes = clngint(typeGetSize(target->dtype))
 	if( n->class = AST_NODECLASS_MEM ) then bytes = astConstGetInt(n->r)
-	if( bytes <= 0 orelse bytes <> symbGetSizeOf(entry->sym) ) then return NULL
+	var storage_bytes = iif(symbIsRef(entry->sym), clngint(env.pointersize), symbGetSizeOf(entry->sym))
+	if( bytes <= 0 orelse bytes <> storage_bytes ) then return NULL
 	return entry
 end function
 
@@ -255,6 +288,23 @@ private sub hCScalarStoreReferences(byval n as ASTNODE ptr, byval value_used as 
 	hCScalarStoreReferences(n->r, TRUE)
 end sub
 
+private sub hCScalarStoreStatementReferences(byval n as ASTNODE ptr, byref fallthrough as integer)
+	if( n = NULL ) then exit sub
+	if( n->class = AST_NODECLASS_LINK ) then
+		hCScalarStoreStatementReferences(n->l, fallthrough)
+		hCScalarStoreStatementReferences(n->r, fallthrough)
+		exit sub
+	end if
+	if( n->class = AST_NODECLASS_LABEL ) then
+		if( symbGetIsAccessed(n->sym) ) then fallthrough = TRUE
+	end if
+	'' Match the C statement loader: an unreachable loop increment cannot keep
+	'' an otherwise unread counter alive. Declaration scope itself still exists.
+	if( fallthrough = FALSE ) then exit sub
+	hCScalarStoreReferences(n, FALSE)
+	if( astCStatementEndsFlow(n) ) then fallthrough = FALSE
+end sub
+
 private function hCScalarStoreDiscardValue(byval n as ASTNODE ptr) as ASTNODE ptr
 	if( n = NULL ) then return NULL
 	select case as const n->class
@@ -321,6 +371,21 @@ private function hCScalarStorePrune(byval n as ASTNODE ptr, byval value_used as 
 	return hCScalarStorePrune(n->r, TRUE) or changed
 end function
 
+private function hCScalarStorePruneStatement(byval n as ASTNODE ptr, byref fallthrough as integer) as integer
+	if( n = NULL ) then return FALSE
+	if( n->class = AST_NODECLASS_LINK ) then
+		var changed = hCScalarStorePruneStatement(n->l, fallthrough)
+		return hCScalarStorePruneStatement(n->r, fallthrough) or changed
+	end if
+	if( n->class = AST_NODECLASS_LABEL ) then
+		if( symbGetIsAccessed(n->sym) ) then fallthrough = TRUE
+	end if
+	if( fallthrough = FALSE ) then return FALSE
+	var changed = hCScalarStorePrune(n, FALSE)
+	if( astCStatementEndsFlow(n) ) then fallthrough = FALSE
+	return changed
+end function
+
 private function hCScalarStoresBegin(byval first as ASTNODE ptr) as integer
 	hCScalarStoresClear()
 	if( c_local_refs_complete = FALSE ) then return FALSE
@@ -330,9 +395,10 @@ private function hCScalarStoresBegin(byval first as ASTNODE ptr) as integer
 		n = n->next
 	wend
 	if( c_scalar_store_index.list = NULL ) then return FALSE
+	dim as integer fallthrough = TRUE
 	n = first
 	while( n <> NULL )
-		hCScalarStoreReferences(n, FALSE)
+		hCScalarStoreStatementReferences(n, fallthrough)
 		n = n->next
 	wend
 	'' Close liveness over assignment dependencies before deleting any store.
@@ -348,9 +414,10 @@ private function hCScalarStoresBegin(byval first as ASTNODE ptr) as integer
 		wend
 	wend
 	dim as integer changed = FALSE
+	fallthrough = TRUE
 	n = first
 	while( n <> NULL )
-		changed or= hCScalarStorePrune(n, FALSE)
+		changed or= hCScalarStorePruneStatement(n, fallthrough)
 		n = n->next
 	wend
 	return changed

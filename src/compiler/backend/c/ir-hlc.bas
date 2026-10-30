@@ -2004,7 +2004,7 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	'' function result variables keep their ABI role even without a VAR node.
 	if( c_local_refs_complete andalso (symbIsStatic(sym) = FALSE) andalso _
 	    (hHasCLocalReference(sym) = FALSE) andalso _
-	    (symbGetTypeIniTree(sym) = NULL) andalso _
+	    ((symbGetTypeIniTree(sym) = NULL) orelse hCScalarStoreUnusedBinding(sym)) andalso _
 	    ((symbGetAttrib(sym) and FB_SYMBATTRIB_FUNCRESULT) = 0) andalso _
 	    (symbGetArrayDimensions(sym) = 0) ) then
 		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
