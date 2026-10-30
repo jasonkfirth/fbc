@@ -1,7 +1,7 @@
 /'
 	Project: FreeBASIC C backend
 	File: backend/c/c-static-array-storage.bi
-	Purpose: Omit unobserved private static fixed-array storage and metadata.
+	Purpose: Omit unobserved private static storage and fixed-array metadata.
 	Responsibilities: Retain initializer dependencies before AST loading consumes
 	them, and preserve arrays with lifetime, address or descriptor uses.
 	This file intentionally does NOT contain: Runtime initializer removal, source
@@ -40,8 +40,24 @@ private function hCStaticArrayBacking(byval sym as FBSYMBOL ptr) as FBSYMBOL ptr
 	return backing
 end function
 
+private function hCStaticScalarCandidate(byval sym as FBSYMBOL ptr) as integer
+	if( hCStaticArrayPrivate(sym) = FALSE ) then return FALSE
+	if( symbGetArrayDimensions(sym) <> 0 or symbIsDescriptor(sym) ) then return FALSE
+	if( symbGetIsTemporary(sym) or symbIsDataDesc(sym) ) then return FALSE
+	if( (sym->attrib and FB_SYMBATTRIB_FUNCRESULT) <> 0 ) then return FALSE
+	if( symbHasCtor(sym) or symbHasDtor(sym) ) then return FALSE
+	if( symbGetTypeIniTree(sym) <> NULL ) then return FALSE
+	select case as const symbGetType(sym)
+	case FB_DATATYPE_STRING, FB_DATATYPE_USTRING
+		return FALSE
+	end select
+	return TRUE
+end function
+
 private sub hCStaticArrayReference(byval sym as FBSYMBOL ptr)
-	if( hCStaticArrayBacking(sym) <> NULL ) then hRememberCLocalReference(sym)
+	if( hCStaticArrayBacking(sym) <> NULL orelse hCStaticScalarCandidate(sym) ) then
+		hRememberCLocalReference(sym)
+	end if
 end sub
 
 private sub hCStaticInitializerPush(byref work as TLIST, byval n as ASTNODE ptr)
@@ -127,6 +143,15 @@ private function hCStaticArrayStorageUnused(byval sym as FBSYMBOL ptr) as intege
 	'' direction is unnecessary: direct array indexing needs only the data.
 	if( sym = backing ) then return (hHasCLocalReference(symbGetArrayDescriptor(backing)) = FALSE)
 	return TRUE
+end function
+
+private function hCStaticScalarStorageUnused(byval sym as FBSYMBOL ptr) as integer
+	if( c_local_refs_complete = FALSE ) then return FALSE
+	if( hCStaticScalarCandidate(sym) = FALSE ) then return FALSE
+	'' A folded address comparison no longer needs the object's storage.
+	'' Pending static initializers were scanned before declarations consume
+	'' them, so a retained pointer initializer still keeps its target alive.
+	return hHasCLocalReference(sym) = FALSE
 end function
 
 /' end of backend/c/c-static-array-storage.bi '/

@@ -378,6 +378,8 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/c-unused-scalar-stores.bi"
 #include once "backend/c/c-readonly-locals.bi"
 #include once "backend/c/c-integer-ranges.bi"
+#include once "backend/c/c-address-comparisons.bi"
+#include once "backend/c/c-comparison-folding.bi"
 
 declare sub hBuildStrLit( byref ln as string, byval z as zstring ptr, _
 	byval length as longint, byval paddedlength as longint )
@@ -1972,7 +1974,7 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 		exit sub
 	end if
 
-	if( hCStaticArrayStorageUnused(sym) ) then
+	if( hCStaticArrayStorageUnused(sym) or hCStaticScalarStorageUnused(sym) ) then
 		'' Keep type declarations and ABI assertions when only storage is omitted.
 		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
 		exit sub
@@ -6959,7 +6961,7 @@ private sub _emitProcBegin _
 	hashInit(@c_local_refs, 256, TRUE) '' Fixed buckets; chains admit larger local sets.
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
-	if( hCIntegerRangesBegin(astGetProc()->l) ) then
+	if( hCComparisonsBegin(astGetProc()->l) ) then
 		'' Recompute storage uses after comparisons lose their value operands.
 		hClearCLocalReferences()
 		hashInit(@c_local_refs, 256, TRUE)
