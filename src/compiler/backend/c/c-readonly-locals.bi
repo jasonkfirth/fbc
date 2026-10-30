@@ -1,9 +1,9 @@
 /'
 	Project: FreeBASIC C backend
 	File: backend/c/c-readonly-locals.bi
-	Purpose: Retain pointed-to const on private pointer bindings used as values.
+	Purpose: Retain pointed-to const on private pointer values and pointee reads.
 	Responsibilities: Inspect the complete optimized body before loading deletes
-	AST nodes, and keep escaped bindings and pointee accesses unchanged.
+	AST nodes, rejecting escaped bindings, pointee writes and mutable calls.
 	This file intentionally does NOT contain: BASIC type changes, ABI changes,
 	pointee immutability assumptions or native diagnostic suppression.
 '/
@@ -107,19 +107,33 @@ private function hCReadOnlyLocalCheck(byval n as ASTNODE ptr, byval sym as FBSYM
 	case AST_NODECLASS_VAR
 		if( n->sym = sym ) then return value_read
 	case AST_NODECLASS_ARG
+		var read_argument = hCReadOnlyArgument(n->sym)
 		'' BYREF may expose a pointer slot without an explicit ADDROF node.
 		'' The loader can also materialize that slot for a converted actual.
 		var byref_argument = n->arg.mode = FB_PARAMMODE_BYREF
 		if( n->sym <> NULL andalso n->sym->class = FB_SYMBCLASS_PARAM ) then
 			byref_argument or= symbGetParamMode(n->sym) = FB_PARAMMODE_BYREF
 		end if
-		if( byref_argument andalso hCReadOnlyLocalContains(n->l, sym) ) then return FALSE
+		if( hCReadOnlyLocalContains(n->l, sym) ) then
+			if( byref_argument ) then
+				if( read_argument = FALSE ) then return FALSE
+				'' BYREF of a pointer slot is not a read of its pointee. An
+				'' explicit BYVAL actual passes the pointer value instead.
+				if( n->arg.mode = FB_PARAMMODE_BYREF ) then
+					if( n->l = NULL orelse n->l->class <> AST_NODECLASS_DEREF ) then return FALSE
+				end if
+			elseif( n->l <> NULL andalso typeIsPtr(n->l->dtype) andalso read_argument = FALSE ) then
+				return FALSE
+			end if
+		end if
+		return hCReadOnlyLocalCheck(n->l, sym, read_argument) andalso hCReadOnlyLocalCheck(n->r, sym)
 	case AST_NODECLASS_ASSIGN
 		if( n->l <> NULL andalso n->l->class = AST_NODECLASS_VAR andalso n->l->sym = sym ) then
 			if( n->l->var_.ofs <> 0 ) then return FALSE
 			if( typeGetDtAndPtrOnly(n->l->dtype) <> typeGetDtAndPtrOnly(symbGetFullType(sym)) ) then return FALSE
 			return hCReadOnlyLocalCheck(n->r, sym, TRUE)
 		end if
+		if( hCReadOnlyLocalContains(n->l, sym) ) then return FALSE
 	case AST_NODECLASS_MEM
 		'' A default clear initializes the pointer slot, not its pointee.
 		if( n->mem.op = AST_OP_MEMFILL andalso n->l <> NULL andalso _
@@ -129,12 +143,29 @@ private function hCReadOnlyLocalCheck(byval n as ASTNODE ptr, byval sym as FBSYM
 		    n->r->class = AST_NODECLASS_CONST ) then
 			return astConstGetInt(n->r) = env.pointersize
 		end if
+		if( hCReadOnlyLocalContains(n->l, sym) ) then return FALSE
+	case AST_NODECLASS_DEREF
+		return hCReadOnlyLocalCheck(n->l, sym, TRUE) andalso hCReadOnlyLocalCheck(n->r, sym)
+	case AST_NODECLASS_ADDROF
+		if( hCReadOnlyLocalContains(n, sym) ) then
+			if( value_read = FALSE orelse n->l = NULL ) then return FALSE
+			if( n->l->class <> AST_NODECLASS_DEREF ) then return FALSE
+			return hCReadOnlyLocalCheck(n->l->l, sym, TRUE)
+		end if
 	case AST_NODECLASS_BOP
 		if( astOpIsRelational(n->op.op) ) then
 			return hCReadOnlyLocalCheck(n->l, sym, TRUE) andalso hCReadOnlyLocalCheck(n->r, sym, TRUE)
 		end if
+		if( value_read andalso typeIsPtr(n->dtype) andalso _
+		    (n->op.op = AST_OP_ADD or n->op.op = AST_OP_SUB) ) then
+			return hCReadOnlyLocalCheck(n->l, sym, TRUE) andalso hCReadOnlyLocalCheck(n->r, sym, TRUE)
+		end if
 	case AST_NODECLASS_CONV
 		if( typeGetClass(n->dtype) = FB_DATACLASS_INTEGER andalso typeIsPtr(n->dtype) = FALSE ) then
+			return hCReadOnlyLocalCheck(n->l, sym, TRUE)
+		end if
+		if( value_read andalso typeGetPtrCnt(n->dtype) = 1 andalso n->l <> NULL andalso _
+		    typeGetPtrCnt(n->l->dtype) = 1 andalso typeGetDtOnly(n->dtype) <> FB_DATATYPE_FUNCTION ) then
 			return hCReadOnlyLocalCheck(n->l, sym, TRUE)
 		end if
 	case AST_NODECLASS_CALL

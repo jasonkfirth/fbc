@@ -352,6 +352,7 @@ declare function hGfxBlenderType( byval proc as FBSYMBOL ptr, byval param_index 
 declare sub hEmitGfxBlenderDefinitions( )
 declare sub hClearGfxBlenders( )
 declare sub hCReadOnlyFinish()
+declare sub hCReadOnlyLocalsFinish()
 #if __FB_DEBUG__
 declare sub exprDump( byval n as EXPRNODE ptr )
 #endif
@@ -376,7 +377,6 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/c-abi-parameters.bi"
 #include once "backend/c/c-auto-descriptors.bi"
 #include once "backend/c/c-unused-scalar-stores.bi"
-#include once "backend/c/c-readonly-locals.bi"
 #include once "backend/c/c-integer-ranges.bi"
 #include once "backend/c/c-address-comparisons.bi"
 #include once "backend/c/c-comparison-folding.bi"
@@ -1326,6 +1326,7 @@ private function hCLongDoubleToNativeExpression _
 end function
 
 #include once "backend/c/c-readonly-parameters.bi"
+#include once "backend/c/c-readonly-locals.bi"
 
 private function hEmitProcHeader _
 	( _
@@ -3318,6 +3319,7 @@ private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 
 	else
 		symbGetRealType( sym, dtype, subtype )
+		dtype = hCReadOnlyLocalType(sym, dtype)
 
 		n = exprNew( EXPRCLASS_SYM, dtype, subtype )
 		n->sym = sym
@@ -4889,7 +4891,11 @@ private function exprNewVREG _
 		if( vreg->typ = IR_VREGTYPE_REG ) then
 			l = exprNewValueCAST( vreg->dtype, vreg->subtype, l )
 		else
-			l = exprNewCAST( vreg->dtype, vreg->subtype, l )
+			dtype = vreg->dtype
+			if( vreg->typ = IR_VREGTYPE_VAR andalso vreg->ofs = 0 andalso vreg->vidx = NULL ) then
+				dtype = hCReadOnlyLocalType(vreg->sym, dtype)
+			end if
+			l = exprNewCAST( dtype, vreg->subtype, l )
 		end if
 	end if
 

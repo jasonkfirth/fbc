@@ -70,6 +70,25 @@ private function hCReadOnlyParam(byval entry as CREADONLYPROC ptr, byval param a
 	return FALSE
 end function
 
+private function hCReadOnlyArgument(byval argument as FBSYMBOL ptr) as integer
+	if( argument = NULL orelse argument->class <> FB_SYMBCLASS_PARAM ) then return FALSE
+	if( symbGetParamMode(argument) = FB_PARAMMODE_VARARG ) then return FALSE
+	dim as integer dtype = FB_DATATYPE_INVALID
+	dim as FBSYMBOL ptr subtype = NULL
+	symbGetRealParamDtype(argument, dtype, subtype)
+	var proc = symbGetParent(argument)
+	var mangled = *symbGetMangledName(proc)
+	dim as integer param_index = 0
+	var param = symbGetProcLastParam(proc)
+	while( param <> NULL andalso param <> argument )
+		param_index += 1
+		param = symbGetProcPrevParam(proc, param)
+	wend
+	hAdjustCParamType(mangled, param_index, dtype, subtype)
+	if( typeGetPtrCnt(dtype) = 1 andalso typeIsConstAt(dtype, 1) ) then return TRUE
+	return hCReadOnlyParam(hCReadOnlyFind(proc), argument)
+end function
+
 private function hCReadOnlyContains(byval n as ASTNODE ptr, byval storage as FBSYMBOL ptr) as integer
 	if( n = NULL ) then return FALSE
 	if( n->sym = storage ) then return TRUE
@@ -104,21 +123,7 @@ private function hCReadOnlyCheck(byval n as ASTNODE ptr, byval storage as FBSYMB
 		'' Neither the pointer binding nor any addressed storage may be written.
 		if( hCReadOnlyContains(n->l, storage) ) then return FALSE
 	case AST_NODECLASS_ARG
-		dim as integer dtype = FB_DATATYPE_INVALID, read_argument = FALSE
-		dim as FBSYMBOL ptr subtype = NULL
-		if( n->sym <> NULL andalso symbGetParamMode(n->sym) <> FB_PARAMMODE_VARARG ) then
-			symbGetRealParamDtype(n->sym, dtype, subtype)
-			var mangled = *symbGetMangledName(symbGetParent(n->sym))
-			dim as integer param_index = 0
-			var param = symbGetProcLastParam(symbGetParent(n->sym))
-			while( param <> NULL andalso param <> n->sym )
-				param_index += 1
-				param = symbGetProcPrevParam(symbGetParent(n->sym), param)
-			wend
-			hAdjustCParamType(mangled, param_index, dtype, subtype)
-			read_argument = typeGetPtrCnt(dtype) = 1 andalso typeIsConstAt(dtype, 1)
-			if( hCReadOnlyParam(hCReadOnlyFind(symbGetParent(n->sym)), n->sym) ) then read_argument = TRUE
-		end if
+		var read_argument = hCReadOnlyArgument(n->sym)
 		if( hCReadOnlyCheck(n->l, storage, seen, read_argument) = FALSE ) then return FALSE
 		return hCReadOnlyCheck(n->r, storage, seen)
 	case AST_NODECLASS_DEREF
