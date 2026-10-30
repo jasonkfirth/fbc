@@ -57,6 +57,7 @@ end function
 private sub hCStaticArrayReference(byval sym as FBSYMBOL ptr)
 	if( hCStaticArrayBacking(sym) <> NULL orelse hCStaticScalarCandidate(sym) ) then
 		hRememberCLocalReference(sym)
+		hCScalarStoreRemember(sym)
 	end if
 end sub
 
@@ -109,7 +110,7 @@ private sub hCStaticInitializerSymbols(byval sym as FBSYMBOL ptr, byref work as 
 				var backing = hCStaticArrayBacking(sym)
 				if( close_descriptors ) then
 					if( backing <> NULL andalso symbIsDescriptor(sym) andalso hHasCLocalReference(sym) ) then
-						hRememberCLocalReference(backing)
+						hCStaticArrayReference(backing)
 					end if
 				elseif( backing = NULL orelse symbIsDescriptor(sym) = FALSE ) then
 					'' An implicit fixed descriptor only points to its own backing
@@ -138,6 +139,7 @@ private function hCStaticArrayStorageUnused(byval sym as FBSYMBOL ptr) as intege
 	if( c_local_refs_complete = FALSE ) then return FALSE
 	var backing = hCStaticArrayBacking(sym)
 	if( backing = NULL ) then return FALSE
+	if( hCScalarStoreUnusedValue(backing) ) then return TRUE
 	if( hHasCLocalReference(sym) ) then return FALSE
 	'' A referenced descriptor keeps the data address it contains. The other
 	'' direction is unnecessary: direct array indexing needs only the data.
@@ -151,7 +153,7 @@ private function hCStaticScalarStorageUnused(byval sym as FBSYMBOL ptr) as integ
 	'' A folded address comparison no longer needs the object's storage.
 	'' Pending static initializers were scanned before declarations consume
 	'' them, so a retained pointer initializer still keeps its target alive.
-	return hHasCLocalReference(sym) = FALSE
+	return (hHasCLocalReference(sym) = FALSE) or hCScalarStoreUnusedValue(sym)
 end function
 
 /' end of backend/c/c-static-array-storage.bi '/

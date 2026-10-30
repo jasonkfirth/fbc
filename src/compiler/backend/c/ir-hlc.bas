@@ -377,6 +377,9 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/c-generated-leaves.bi"
 #include once "backend/c/c-abi-parameters.bi"
 #include once "backend/c/c-auto-descriptors.bi"
+declare function hCStaticArrayBacking(byval sym as FBSYMBOL ptr) as FBSYMBOL ptr
+declare function hCStaticScalarCandidate(byval sym as FBSYMBOL ptr) as integer
+declare sub hCStaticArrayInitializers(byval proc as FBSYMBOL ptr)
 #include once "backend/c/c-unused-scalar-stores.bi"
 #include once "backend/c/c-integer-ranges.bi"
 #include once "backend/c/c-address-comparisons.bi"
@@ -6991,7 +6994,7 @@ private sub _emitProcBegin _
 		hashInit(@c_local_refs, 256, TRUE)
 		hMarkReferencedLocals(astGetProc()->l)
 	end if
-	var locals_changed = hCScalarStoresBegin(astGetProc()->l)
+	var locals_changed = hCScalarStoresBegin(proc, astGetProc()->l)
 	locals_changed or= hCAutoDescBegin(astGetProc()->l)
 	if( locals_changed ) then
 		'' Rebuild the storage index after removing unobserved stores.

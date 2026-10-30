@@ -1,9 +1,10 @@
 /'
 	Project: FreeBASIC C backend
 	File: backend/c/c-unused-scalar-stores.bi
-	Purpose: Discard unobserved scalar stores without discarding required calls.
+	Purpose: Discard unobserved private stores without discarding required calls.
 	Responsibilities: Prove private storage is unread, retain address escapes and
 	hidden loader references, and preserve evaluation of scalar call results.
+	Private static storage also requires initializer and address-escape checks.
 	This file intentionally does NOT contain: interprocedural analysis, string or
 	UDT lifetime changes, or native diagnostic suppression.
 '/
@@ -78,9 +79,18 @@ end function
 private function hCScalarStoreCandidate(byval sym as FBSYMBOL ptr) as integer
 	if( sym = NULL orelse symbIsVar(sym) = FALSE ) then return FALSE
 	if( symbIsLocal(sym) = FALSE orelse symbIsParamVar(sym) ) then return FALSE
-	if( (sym->attrib and (FB_SYMBATTRIB_STATIC or FB_SYMBATTRIB_SHARED or _
+	if( (sym->attrib and (FB_SYMBATTRIB_SHARED or _
 	    FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN or _
 	    FB_SYMBATTRIB_IMPORT or FB_SYMBATTRIB_FUNCRESULT or FB_SYMBATTRIB_DESCRIPTOR)) <> 0 ) then return FALSE
+	if( symbIsStatic(sym) ) then
+		'' Persistent storage may disappear only when it has no lifetime,
+		'' explicit initializer, external identity or surviving value read.
+		'' Floating static stores retain their existing evaluation contract.
+		if( hCScalarStoreType(symbGetFullType(sym)) = FALSE ) then return FALSE
+		if( typeGetClass(symbGetFullType(sym)) <> FB_DATACLASS_INTEGER ) then return FALSE
+		if( symbGetArrayDimensions(sym) <> 0 ) then return (hCStaticArrayBacking(sym) = sym)
+		return hCStaticScalarCandidate(sym)
+	end if
 	if( symbGetArrayDimensions(sym) <> 0 ) then return FALSE
 	'' A local reference owns its pointer binding, not the referred object.
 	'' Writes through that reference have a DEREF target and are not candidates.
@@ -192,6 +202,21 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	var target = n->l
 	dim as integer value_context = FALSE
 	if( target = NULL ) then return NULL
+	if( n->class = AST_NODECLASS_ASSIGN andalso target->class = AST_NODECLASS_IDX ) then
+		var entry = hCScalarStoreGet(target->sym)
+		if( entry = NULL orelse symbGetArrayDimensions(entry->sym) <= 0 ) then return NULL
+		if( target->r = NULL orelse target->r->class <> AST_NODECLASS_VAR ) then return NULL
+		if( target->r->sym <> entry->sym orelse target->r->var_.ofs <> 0 ) then return NULL
+		if( target->dtype <> symbGetFullType(entry->sym) orelse target->subtype <> symbGetSubtype(entry->sym) ) then return NULL
+		'' Removing the destination must not remove an index call, bounds check,
+		'' floating conversion or trapping integer operation. Keep uncertain
+		'' designators intact rather than changing their evaluation order.
+		if( target->l <> NULL ) then
+			if( astHasSideFx(target->l) orelse hCScalarStoreDiscardable(target->l) = FALSE ) then return NULL
+		end if
+		if( hCScalarStoreDiscardable(n->r) = FALSE ) then return NULL
+		return entry
+	end if
 	select case as const n->class
 	case AST_NODECLASS_ASSIGN
 		if( n->r = NULL ) then return NULL
@@ -213,6 +238,8 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	if( target = NULL orelse target->class <> AST_NODECLASS_VAR ) then return NULL
 	var entry = hCScalarStoreGet(target->sym)
 	if( entry = NULL orelse target->var_.ofs <> 0 ) then return NULL
+	'' Whole-array clearing and address operations have their own owners.
+	if( symbGetArrayDimensions(entry->sym) <> 0 ) then return NULL
 	if( symbIsRef(entry->sym) ) then
 		'' Only the physical pointer slot is owned here. A semantic value store
 		'' must not become dead merely because the reference name is unread.
@@ -430,7 +457,7 @@ private function hCScalarStorePruneStatement(byval n as ASTNODE ptr, byref fallt
 	return changed
 end function
 
-private function hCScalarStoresBegin(byval first as ASTNODE ptr) as integer
+private function hCScalarStoresBegin(byval proc as FBSYMBOL ptr, byval first as ASTNODE ptr) as integer
 	hCScalarStoresClear()
 	if( c_local_refs_complete = FALSE ) then return FALSE
 	var n = first
@@ -438,6 +465,9 @@ private function hCScalarStoresBegin(byval first as ASTNODE ptr) as integer
 		hCScalarStoreCollect(n)
 		n = n->next
 	wend
+	'' Initializers can retain private static addresses without an executable
+	'' VAR read. Root those dependencies before considering any write dead.
+	hCStaticArrayInitializers(proc)
 	'' Discarded RTL call results also occur without any scalar binding.
 	dim as integer fallthrough = TRUE
 	n = first
