@@ -34,7 +34,10 @@ dim shared as integer c_leaf_ready, c_leaf_opaque
 dim shared as CPROCLEAF ptr c_leaf_current, c_leaf_bodies, c_leaf_body_tail
 dim shared as CPROCLEAF ptr c_leaf_protos, c_leaf_proto_tail
 
+#include once "backend/c/c-generated-storage.bi"
+
 private sub hCLeafFinish( )
+	hCGlobalStorageFinish()
 	if( c_leaf_ready = FALSE ) then exit sub
 	listEnd(@c_leaf_edges)
 	hashEnd(@c_leaf_names)
@@ -59,6 +62,7 @@ private sub hCLeafInit( )
 	hashInit(@c_leaf_names, 128, FALSE) '' Chained buckets do not limit procedure count.
 	c_leaf_ready = TRUE
 	c_leaf_opaque = FALSE
+	hCGlobalStorageInit()
 end sub
 
 private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
@@ -147,6 +151,7 @@ private sub hCLeafReference( byval sym as FBSYMBOL ptr )
 		end if
 	elseif( symbIsVar(sym) andalso (symbGetIsLiteral(sym) = FALSE) ) then
 		if( (symbIsLocal(sym) = FALSE) or symbIsStatic(sym) ) then
+			hCGlobalStorageReference(sym)
 			'' Global and hoisted static declarations remain in the output.
 			'' Retain their users so omission cannot create unused storage.
 			if( c_leaf_current <> NULL ) then c_leaf_current->must_keep = TRUE

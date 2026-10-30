@@ -2050,6 +2050,8 @@ private sub hMaybeEmitGlobalVar( byval sym as FBSYMBOL ptr )
 		exit sub
 	end if
 
+	if( hCGlobalStorageNeeded(sym) = FALSE ) then exit sub
+
 	select case( ctx.globalvarpass )
 	case 1
 		if( symbGetAttrib( sym ) and (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN) ) then
@@ -2755,6 +2757,7 @@ private sub _emitEnd( )
 	'' order than the declaration order.
 	''
 
+	hCGlobalStoragePrepare()
 	ctx.globalvarpass = 1
 	symbForEachGlobal( FB_SYMBCLASS_VAR, @hMaybeEmitGlobalVarExceptDataStmt )
 	irForEachDataStmt( @hMaybeEmitGlobalVar )
