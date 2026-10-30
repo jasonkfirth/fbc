@@ -1957,6 +1957,8 @@ private sub hMarkReferencedLocals( byval n as ASTNODE ptr )
 	wend
 end sub
 
+#include once "backend/c/c-static-array-storage.bi"
+
 private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	assert( symbIsLocal( sym ) )
 
@@ -1966,6 +1968,12 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	end if
 
 	if( hCAutoDescUnused(sym) or hCAutoDescUnusedData(sym) ) then
+		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
+		exit sub
+	end if
+
+	if( hCStaticArrayStorageUnused(sym) ) then
+		'' Keep type declarations and ABI assertions when only storage is omitted.
 		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
 		exit sub
 	end if
@@ -6939,6 +6947,7 @@ private sub _emitProcBegin _
 		hashInit(@c_local_refs, 256, TRUE)
 		hMarkReferencedLocals(astGetProc()->l)
 	end if
+	hCStaticArrayInitializers(proc)
 	hAsmBeginNames( proc )
 	hCReadOnlyLocalsBegin(astGetProc()->l)
 	ctx.computedgotoaddress = FALSE
