@@ -188,14 +188,30 @@ private function hCReadOnlyPrepare(byval proc as FBSYMBOL ptr, byval body as AST
 	'' Calls in position-independent code may be interposed by another object.
 	'' Keep their public symbol as the actual call target.
 	if( env.clopt.pic ) then return NULL
-	if( env.clopt.debuginfo or symbIsNaked(proc) or symbIsMethod(proc) ) then return NULL
+	if( env.clopt.debuginfo or symbIsNaked(proc) ) then return NULL
+	'' Public methods keep their ABI entry while direct calls use the const
+	'' implementation. Private method wrappers retain their linkage owner.
+	if( symbIsMethod(proc) andalso symbIsPrivate(proc) ) then return NULL
 	if( symbIsPrivate(proc) andalso (proc->attrib and FB_SYMBATTRIB_INTERNAL) ) then return NULL
-	if( symbProcReturnsOnStack(proc) or hUsesCLongDoubleCABI(proc) ) then return NULL
+	if( symbProcReturnsOnStack(proc) ) then return NULL
+	var native_cabi = hUsesCLongDoubleCABI(proc)
+	'' The wrapper forwards BASIC parameter names. Native long-double carriers
+	'' have different names and conversions, so they keep their existing owner.
+	if( native_cabi ) then
+		if( symbIsPrivate(proc) ) then return NULL
+		if( hIsCLongDoubleType(symbGetProcRealType(proc), symbGetProcRealSubtype(proc)) ) then return NULL
+	end if
 	if( symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or symbGetIsModLevelProc(proc) ) then return NULL
 	var param = symbGetProcLastParam(proc)
 	dim as integer candidates = 0
 	while( param <> NULL )
 		if( symbGetParamMode(param) = FB_PARAMMODE_VARARG ) then return NULL
+		if( native_cabi ) then
+			dim as integer dtype = any
+			dim as FBSYMBOL ptr subtype = any
+			symbGetRealParamDtype(param, dtype, subtype)
+			if( hIsCLongDoubleType(dtype, subtype) ) then return NULL
+		end if
 		if( hCReadOnlyUsed(body, symbGetParamVar(param)) = FALSE ) then return NULL
 		if( hCReadOnlyCandidate(param, body) ) then candidates += 1
 		param = symbGetProcPrevParam(proc, param)
