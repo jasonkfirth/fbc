@@ -1920,8 +1920,8 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 		exit sub
 	end if
 
-	if( hCAutoDescUnused(sym) ) then
-		hEmitUDT(symbGetSubtype(sym), FALSE)
+	if( hCAutoDescUnused(sym) or hCAutoDescUnusedData(sym) ) then
+		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
 		exit sub
 	end if
 
@@ -6828,7 +6828,12 @@ private sub _emitProcBegin _
 	hashInit(@c_local_refs, 256, TRUE) '' Fixed buckets; chains admit larger local sets.
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
-	hCAutoDescBegin(astGetProc()->l)
+	if( hCAutoDescBegin(astGetProc()->l) ) then
+		'' Descriptor initialization may have been the data array's only use.
+		hClearCLocalReferences()
+		hashInit(@c_local_refs, 256, TRUE)
+		hMarkReferencedLocals(astGetProc()->l)
+	end if
 	hAsmBeginNames( proc )
 	ctx.computedgotoaddress = FALSE
 	ctx.computedgotoentry = FALSE

@@ -43,6 +43,46 @@ private sub change_text(byref value as string)
 	value = "changed"
 end sub
 
+/'
+	Unused fixed arrays can carry more metadata than data. Removing their
+	pure initialization must not affect arrays passed by descriptor, pointer
+	aliases, string copyback, or constructor/destructor accounting.
+'/
+private sub check_unused_arrays()
+	dim dead_plain(-2 to 1) as long
+	dim dead_constants(0 to 2) as long = { 3, 5, 7 }
+	dim dead_uninitialized(0 to 1) as long = any
+	dim dead_records(0 to 1) as Payload
+end sub
+
+private function sum_array(values() as long) as long
+	dim total as long
+	for i as integer = lbound(values) to ubound(values)
+		total += values(i)
+	next
+	return total
+end function
+
+private sub check_live_arrays()
+	dim values(-1 to 1) as long = { 3, 5, 7 }
+	if sum_array(values()) <> 15 then end 10
+	dim alias_data as long ptr = @values(-1)
+	alias_data[1] = 9
+	if sum_array(values()) <> 19 then end 11
+
+	dim objects(0 to 1) as Counted
+	if living <> 2 then end 12
+
+	dim texts(0 to 1) as string * 16
+	change_text(texts(1))
+	if rtrim(texts(1)) <> "changed" then end 13
+
+	dim dynamic_values() as long
+	redim dynamic_values(-1 to 1)
+	dynamic_values(0) = 23
+	if sum_array(dynamic_values()) <> 23 then end 14
+end sub
+
 private sub check_dead_scope()
 	goto continued
 	scope
@@ -80,5 +120,8 @@ if rtrim(fixed_text) <> "changed" then end 7
 static numbers(0 to 2) as long
 numbers(1) = 42
 if numbers(1) <> 42 then end 8
+check_unused_arrays()
+check_live_arrays()
+if living <> 0 then end 15
 print "C_UNUSED_LOCAL_STORAGE_PASS"
 '' end of c-unused-local-storage.bas
