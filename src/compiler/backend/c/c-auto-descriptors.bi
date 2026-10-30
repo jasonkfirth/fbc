@@ -11,6 +11,7 @@ type CAUTODESC
 	sym as FBSYMBOL ptr
 	referenced as integer
 	backing_used as integer
+	preserve_data as integer
 end type
 
 '' Symbols are borrowed only while the current procedure is being emitted.
@@ -48,7 +49,7 @@ private function hCAutoDescCandidate(byval sym as FBSYMBOL ptr) as integer
 	    FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) <> 0 ) then return FALSE
 	if( symbIsParamVar(backing) ) then return FALSE
 	if( symbGetArrayDimensions(backing) <= 0 ) then return FALSE
-	return (symbHasCtor(backing) = FALSE) and (symbHasDtor(backing) = FALSE)
+	return TRUE
 end function
 
 private sub hCAutoDescCollect(byval n as ASTNODE ptr)
@@ -57,6 +58,10 @@ private sub hCAutoDescCollect(byval n as ASTNODE ptr)
 		if( hCAutoDescGet(n->sym) = NULL ) then
 			var entry = cptr(CAUTODESC ptr, listNewNode(@c_auto_descriptors))
 			entry->sym = n->sym
+			var backing = n->sym->var_.desc.array
+			'' Element lifetime belongs to the backing array. Pure descriptor
+			'' stores may disappear without changing that array's initialization.
+			entry->preserve_data = symbHasCtor(backing) or symbHasDtor(backing)
 			'' A default constructor or clearing operation has a separate owner.
 			entry->referenced = (n->l <> NULL)
 		end if
@@ -123,7 +128,7 @@ private function hCAutoDescDataInitializer(byval n as ASTNODE ptr) as CAUTODESC 
 		if( target->sym = entry->sym->var_.desc.array ) then exit while
 		entry = listGetNext(entry)
 	wend
-	if( entry = NULL ) then return NULL
+	if( entry = NULL orelse entry->preserve_data ) then return NULL
 	var bytes = clngint(typeGetSize(target->dtype))
 	if( n->class = AST_NODECLASS_MEM ) then bytes = astConstGetInt(n->r)
 	var size = symbGetRealSize(target->sym)
@@ -230,7 +235,7 @@ private function hCAutoDescUnusedData(byval sym as FBSYMBOL ptr) as integer
 	var entry = cptr(CAUTODESC ptr, listGetHead(@c_auto_descriptors))
 	while( entry <> NULL )
 		if( sym = entry->sym->var_.desc.array ) then
-			return (entry->referenced = FALSE) and (entry->backing_used = FALSE)
+			return (entry->referenced = FALSE) and (entry->backing_used = FALSE) and (entry->preserve_data = FALSE)
 		end if
 		entry = listGetNext(entry)
 	wend
