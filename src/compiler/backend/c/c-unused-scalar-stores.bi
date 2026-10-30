@@ -89,6 +89,11 @@ private function hCScalarStoreCandidate(byval sym as FBSYMBOL ptr) as integer
 	return hCScalarStoreType(symbGetFullType(sym))
 end function
 
+private function hCScalarStoreUnusedValue(byval sym as FBSYMBOL ptr) as integer
+	var entry = hCScalarStoreGet(sym)
+	return (entry <> NULL) andalso (entry->referenced = FALSE)
+end function
+
 private function hCScalarStoreUnusedBinding(byval sym as FBSYMBOL ptr) as integer
 	if( sym = NULL orelse symbIsRef(sym) = FALSE ) then return FALSE
 	var entry = hCScalarStoreGet(sym)
@@ -117,9 +122,9 @@ private function hCScalarStoreDiscardable(byval n as ASTNODE ptr) as integer
 	case AST_NODECLASS_CONST
 		return TRUE
 	case AST_NODECLASS_VAR
-		'' Ordinary integer loads have no volatile qualifier in this AST.
+		'' Ordinary scalar loads have no volatile qualifier in this AST.
+		'' Copying a floating value adds no arithmetic or conversion.
 		'' Do not alter string/UDT temporary-reference lifetime accounting.
-		if( typeGetClass(n->dtype) <> FB_DATACLASS_INTEGER ) then return FALSE
 		if( n->sym = NULL orelse symbIsVar(n->sym) = FALSE ) then return FALSE
 		if( symbIsRef(n->sym) ) then
 			return (typeGetDtAndPtrOnly(n->dtype) = typeGetDtAndPtrOnly(typeAddrOf(symbGetFullType(n->sym)))) and _
@@ -147,10 +152,9 @@ private function hCScalarStoreDiscardable(byval n as ASTNODE ptr) as integer
 		    typeGetClass(n->l->dtype) <> FB_DATACLASS_INTEGER ) then return FALSE
 		return hCScalarStoreDiscardable(n->l)
 	case AST_NODECLASS_DEREF, AST_NODECLASS_FIELD
-		if( typeGetClass(n->dtype) <> FB_DATACLASS_INTEGER orelse n->r <> NULL ) then return FALSE
+		if( n->r <> NULL ) then return FALSE
 		return hCScalarStoreDiscardable(n->l)
 	case AST_NODECLASS_IDX
-		if( typeGetClass(n->dtype) <> FB_DATACLASS_INTEGER ) then return FALSE
 		if( n->r = NULL orelse n->r->class <> AST_NODECLASS_VAR ) then return FALSE
 		if( n->r->sym = NULL ) then return FALSE
 		if( hCScalarStoreHasLifetime(n->r->sym) ) then return FALSE
@@ -183,7 +187,23 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	if( target = NULL ) then return NULL
 	select case as const n->class
 	case AST_NODECLASS_ASSIGN
-		if( hCScalarStoreDiscardable(n->r) = FALSE ) then return NULL
+		if( n->r = NULL ) then return NULL
+		if( hCScalarStoreDiscardable(n->r) = FALSE ) then
+			'' An integer conversion has a real rounding-helper call in C.
+			'' Discarding that call's result retains the original evaluation.
+			'' A bare floating expression can disappear even at -O0 when C
+			'' discards its value, so keep its destination until that contract
+			'' has a separate floating-environment-preserving lowering.
+			if( n->r->class <> AST_NODECLASS_CONV ) then return NULL
+			if( n->r->l = NULL ) then return NULL
+			if( typeGetClass(n->r->dtype) <> FB_DATACLASS_INTEGER orelse _
+			    typeGetClass(n->r->l->dtype) <> FB_DATACLASS_FPOINT ) then return NULL
+			'' Boolean comparisons and wide/unsigned conversion macros contain
+			'' C casts whose evaluation can be lost with an ignored result.
+			if( typeGetDtAndPtrOnly(n->r->dtype) = FB_DATATYPE_BOOLEAN ) then return NULL
+			if( typeGetSize(n->r->dtype) > 8 ) then return NULL
+			if( (typeGetSize(n->r->dtype) > 4) andalso (typeIsSigned(n->r->dtype) = FALSE) ) then return NULL
+		end if
 	case AST_NODECLASS_MEM
 		if( n->mem.op <> AST_OP_MEMFILL ) then return NULL
 		if( n->r = NULL orelse n->r->class <> AST_NODECLASS_CONST ) then return NULL
@@ -266,9 +286,16 @@ private sub hCScalarStoreReferences(byval n as ASTNODE ptr, byval value_used as 
 			'' Its result is observable even without a separate VAR read.
 			hCScalarStoreRemember(entry->sym)
 		else
-			'' Preserve arguments and hidden loader data of retained calls.
-			hCScalarStoreReferences(n->r, TRUE, TRUE)
-			hCScalarStoreReferences(n->r, TRUE, FALSE, entry)
+			if( hCScalarStoreDiscardable(n->r) ) then
+				'' Calls remain effect roots; other reads depend on this value.
+				hCScalarStoreReferences(n->r, TRUE, TRUE)
+				hCScalarStoreReferences(n->r, TRUE, FALSE, entry)
+			else
+				'' A floating conversion or arithmetic operation can change the
+				'' floating environment. Keep its complete evaluation and inputs
+				'' even when the destination's private storage is unread.
+				hCScalarStoreReferences(n->r, TRUE)
+			end if
 			exit sub
 		end if
 	end if
@@ -337,6 +364,11 @@ private function hCScalarStorePrune(byval n as ASTNODE ptr, byval value_used as 
 	if( n = NULL ) then return FALSE
 	var entry = hCScalarStoreTarget(n)
 	if( value_used = FALSE andalso entry <> NULL andalso entry->referenced = FALSE ) then
+		if( n->class = AST_NODECLASS_ASSIGN andalso hCScalarStoreDiscardable(n->r) = FALSE ) then
+			'' The C store owner will emit this value as an evaluated expression.
+			'' Keeping the AST assignment preserves loader and call ownership.
+			return FALSE
+		end if
 		astDelTree(n->l)
 		n->l = NULL
 		dim as ASTNODE ptr retained_effects = NULL

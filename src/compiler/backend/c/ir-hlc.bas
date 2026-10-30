@@ -2003,7 +2003,7 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	'' Initialization, destruction and hidden call storage are indexed above;
 	'' function result variables keep their ABI role even without a VAR node.
 	if( c_local_refs_complete andalso (symbIsStatic(sym) = FALSE) andalso _
-	    (hHasCLocalReference(sym) = FALSE) andalso _
+	    ((hHasCLocalReference(sym) = FALSE) orelse hCScalarStoreUnusedValue(sym)) andalso _
 	    ((symbGetTypeIniTree(sym) = NULL) orelse hCScalarStoreUnusedBinding(sym)) andalso _
 	    ((symbGetAttrib(sym) and FB_SYMBATTRIB_FUNCRESULT) = 0) andalso _
 	    (symbGetArrayDimensions(sym) = 0) ) then
@@ -5016,6 +5016,17 @@ private sub exprSTORE _
 	static as string ln, tempvar
 	dim as EXPRNODE ptr l = NULL
 	dim as EXPRNODE ptr addr = NULL
+
+	if( vr->typ = IR_VREGTYPE_VAR andalso hCScalarStoreUnusedValue(vr->sym) andalso _
+	    (vr->ofs = 0) andalso (vr->vidx = NULL) andalso _
+	    (clngint(typeGetSize(vr->dtype)) = symbGetRealSize(vr->sym)) ) then
+		'' An unread scalar destination does not own the evaluation. In
+		'' particular, floating conversions still use the original helpers
+		'' and retain their rounding and floating-environment behaviour.
+		r = exprNewCAST( vr->dtype, vr->subtype, r )
+		hWriteLine( "(void)(" + exprFlush(r) + ");" )
+		exit sub
+	end if
 
 	if( vr->typ = IR_VREGTYPE_VAR andalso hCAutoDescUnused(vr->sym) ) then
 		'' Only pure, unread descriptor initialization can reach this path.
