@@ -10,10 +10,12 @@
 
 type CREADONLYLOCAL
 	sym as FBSYMBOL ptr
+	identifier as zstring ptr
 	readonly_value as integer
 end type
 
-'' Entries borrow local symbols only through the current procedure emission.
+'' Entries retain symbol addresses and own their copied C identities. Loading
+'' can recycle temporary symbol slots, so both must match during emission.
 '' Qualification permits other aliases to write; it does not imply restrict.
 dim shared as TLIST c_readonly_locals
 dim shared as integer c_readonly_locals_ready
@@ -21,14 +23,16 @@ dim shared as integer c_readonly_locals_ready
 private sub hCReadOnlyLocalsClear()
 	if( c_readonly_locals_ready = FALSE ) then exit sub
 	do
-		var entry = listGetHead(@c_readonly_locals)
+		var entry = cptr(CREADONLYLOCAL ptr, listGetHead(@c_readonly_locals))
 		if( entry = NULL ) then exit do
+		ZstrFree(entry->identifier)
 		listDelNode(@c_readonly_locals, entry)
 	loop
 end sub
 
 private sub hCReadOnlyLocalsFinish()
 	if( c_readonly_locals_ready = FALSE ) then exit sub
+	hCReadOnlyLocalsClear()
 	listEnd(@c_readonly_locals)
 	c_readonly_locals_ready = FALSE
 end sub
@@ -40,10 +44,10 @@ private sub hCReadOnlyLocalsInit()
 end sub
 
 private function hCReadOnlyLocalFind(byval sym as FBSYMBOL ptr) as CREADONLYLOCAL ptr
-	if( c_readonly_locals_ready = FALSE ) then return NULL
+	if( sym = NULL or c_readonly_locals_ready = FALSE ) then return NULL
 	var entry = cptr(CREADONLYLOCAL ptr, listGetHead(@c_readonly_locals))
 	while( entry <> NULL )
-		if( entry->sym = sym ) then return entry
+		if( entry->sym = sym andalso *entry->identifier = hGetCId(sym) ) then return entry
 		entry = listGetNext(entry)
 	wend
 	return NULL
@@ -72,10 +76,27 @@ private sub hCReadOnlyLocalCollect(byval n as ASTNODE ptr)
 	if( hCReadOnlyLocalCandidate(n->sym) andalso hCReadOnlyLocalFind(n->sym) = NULL ) then
 		var entry = cptr(CREADONLYLOCAL ptr, listNewNode(@c_readonly_locals))
 		entry->sym = n->sym
+		var identifier = hGetCId(n->sym)
+		entry->identifier = ZstrDup(strptr(identifier))
 	end if
 	hCReadOnlyLocalCollect(n->l)
 	hCReadOnlyLocalCollect(n->r)
 end sub
+
+private function hCReadOnlyLocalContains(byval n as ASTNODE ptr, byval sym as FBSYMBOL ptr) as integer
+	if( n = NULL ) then return FALSE
+	if( n->sym = sym ) then return TRUE
+	if( hCReadOnlyLocalContains(n->l, sym) or hCReadOnlyLocalContains(n->r, sym) ) then return TRUE
+	if( n->class = AST_NODECLASS_CALL ) then
+		if( n->call.tmpres = sym ) then return TRUE
+		var item = n->call.strtail
+		while( item <> NULL )
+			if( item->sym = sym or hCReadOnlyLocalContains(item->srctree, sym) ) then return TRUE
+			item = item->prev
+		wend
+	end if
+	return FALSE
+end function
 
 private function hCReadOnlyLocalCheck(byval n as ASTNODE ptr, byval sym as FBSYMBOL ptr, _
 	byval value_read as integer = FALSE) as integer
@@ -85,6 +106,14 @@ private function hCReadOnlyLocalCheck(byval n as ASTNODE ptr, byval sym as FBSYM
 		return FALSE
 	case AST_NODECLASS_VAR
 		if( n->sym = sym ) then return value_read
+	case AST_NODECLASS_ARG
+		'' BYREF may expose a pointer slot without an explicit ADDROF node.
+		'' The loader can also materialize that slot for a converted actual.
+		var byref_argument = n->arg.mode = FB_PARAMMODE_BYREF
+		if( n->sym <> NULL andalso n->sym->class = FB_SYMBCLASS_PARAM ) then
+			byref_argument or= symbGetParamMode(n->sym) = FB_PARAMMODE_BYREF
+		end if
+		if( byref_argument andalso hCReadOnlyLocalContains(n->l, sym) ) then return FALSE
 	case AST_NODECLASS_ASSIGN
 		if( n->l <> NULL andalso n->l->class = AST_NODECLASS_VAR andalso n->l->sym = sym ) then
 			if( n->l->var_.ofs <> 0 ) then return FALSE

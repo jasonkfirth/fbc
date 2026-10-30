@@ -25,6 +25,10 @@ sub Rebind(byref value as wstring ptr)
 	value = @rebound_buffer
 end sub
 
+function SlotPresent(byref value as zstring ptr) as long
+	return value <> 0
+end function
+
 private sub CompareAddresses()
 	dim as wstring ptr first_value, second_value
 	first_value = @wstr("first")
@@ -60,12 +64,14 @@ private sub EscapedBinding()
 	dim as wstring * 32 buffer = "before"
 	dim as wstring ptr value = @buffer
 	Rebind(value)
-	VERIFY(*value = "rebound")
+	VERIFY(value = @rebound_buffer)
 end sub
 
 CompareAddresses()
 MutableAliases()
 EscapedBinding()
+dim as zstring * 32 slot_buffer = "slot"
+VERIFY(SlotPresent(slot_buffer))
 print "C_READONLY_LOCAL_POINTERS_PASS"
 
 /' end of c-readonly-local-pointers.bas '/
