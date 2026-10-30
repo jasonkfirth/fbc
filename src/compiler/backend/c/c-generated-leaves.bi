@@ -1,24 +1,20 @@
 /'
 	Project: FreeBASIC C backend
 	File: backend/c/c-generated-leaves.bi
-	Purpose: Omit unreachable compiler-generated procedures from C.
+	Purpose: Omit unreachable private procedure bodies and their C declarations.
 	Responsibilities: Own per-output C-name records, observe actual references,
 	trace private dependencies, retain roots, and compact checked spans.
 	This file intentionally does NOT contain: BASIC access flag, ABI or source diagnostic changes.
 '/
 
 type CPROCLEAFEDGE as CPROCLEAFEDGE_
+type CPROCLEAFSPAN as CPROCLEAFSPAN_
 
 type CPROCLEAF
 	name as zstring ptr
 	referenced as integer
 	must_keep as integer
-	body_first as uinteger
-	body_last as uinteger
-	proto_first as uinteger
-	proto_last as uinteger
-	body_next as CPROCLEAF ptr
-	proto_next as CPROCLEAF ptr
+	body_span as CPROCLEAFSPAN ptr
 	dependencies as CPROCLEAFEDGE ptr
 	work_next as CPROCLEAF ptr
 end type
@@ -28,17 +24,26 @@ type CPROCLEAFEDGE_
 	next_edge as CPROCLEAFEDGE ptr
 end type
 
-dim shared as TLIST c_leaf_nodes, c_leaf_edges
+type CPROCLEAFSPAN_
+	owner as CPROCLEAF ptr
+	first as uinteger
+	last as uinteger
+	next_span as CPROCLEAFSPAN ptr
+end type
+
+dim shared as TLIST c_leaf_nodes, c_leaf_edges, c_leaf_spans
 dim shared as THASH c_leaf_names
 dim shared as integer c_leaf_ready, c_leaf_opaque
-dim shared as CPROCLEAF ptr c_leaf_current, c_leaf_bodies, c_leaf_body_tail
-dim shared as CPROCLEAF ptr c_leaf_protos, c_leaf_proto_tail
+dim shared as CPROCLEAF ptr c_leaf_current
+dim shared as CPROCLEAFSPAN ptr c_leaf_bodies, c_leaf_body_tail
+dim shared as CPROCLEAFSPAN ptr c_leaf_protos, c_leaf_proto_tail
 
 #include once "backend/c/c-generated-storage.bi"
 
 private sub hCLeafFinish( )
 	hCGlobalStorageFinish()
 	if( c_leaf_ready = FALSE ) then exit sub
+	listEnd(@c_leaf_spans)
 	listEnd(@c_leaf_edges)
 	hashEnd(@c_leaf_names)
 	var entry = cptr(CPROCLEAF ptr, listGetHead(@c_leaf_nodes))
@@ -59,6 +64,7 @@ private sub hCLeafInit( )
 	hCLeafFinish( )
 	listInit(@c_leaf_nodes, 32, sizeof(CPROCLEAF), LIST_FLAGS_CLEAR) '' Match expression-pool block sizing.
 	listInit(@c_leaf_edges, 32, sizeof(CPROCLEAFEDGE), LIST_FLAGS_CLEAR)
+	listInit(@c_leaf_spans, 32, sizeof(CPROCLEAFSPAN), LIST_FLAGS_CLEAR)
 	hashInit(@c_leaf_names, 128, FALSE) '' Chained buckets do not limit procedure count.
 	c_leaf_ready = TRUE
 	c_leaf_opaque = FALSE
@@ -74,10 +80,9 @@ private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
 		entry = listNewNode(@c_leaf_nodes)
 		entry->name = ZstrDup(strptr(identifier))
 		hashAdd(@c_leaf_names, entry->name, entry, hashHash(entry->name))
-		'' Explicit procedures retain their established emission behavior.
-		'' Only compiler-generated internal bodies can be omitted here.
-		entry->must_keep = ((proc->attrib and FB_SYMBATTRIB_INTERNAL) = 0) or _
-			symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
+		'' Private visibility supplies no external C entry point. Startup,
+		'' exported and virtual entries still have callers outside this graph.
+		entry->must_keep = symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
 			symbGetIsModLevelProc(proc) or symbIsExport(proc) or symbIsVirtual(proc)
 	end if
 	return entry
@@ -107,6 +112,7 @@ private sub hCLeafReachable( )
 	dim as CPROCLEAF ptr first = NULL, last = NULL
 	var entry = cptr(CPROCLEAF ptr, listGetHead(@c_leaf_nodes))
 	while( entry <> NULL )
+		entry->work_next = NULL
 		if( entry->referenced or entry->must_keep ) then
 			entry->referenced = TRUE
 			if( last <> NULL ) then
@@ -142,6 +148,13 @@ private sub hCLeafReachable( )
 	wend
 end sub
 
+private function hCLeafNeeded(byval proc as FBSYMBOL ptr) as integer
+	if( c_leaf_ready = FALSE or c_leaf_opaque or env.clopt.debuginfo ) then return TRUE
+	var entry = hCLeafGet(proc)
+	if( entry = NULL ) then return TRUE
+	return entry->referenced or entry->must_keep
+end function
+
 private sub hCLeafReference( byval sym as FBSYMBOL ptr )
 	if( c_leaf_ready = FALSE ) then exit sub
 	if( symbIsProc(sym) ) then
@@ -166,6 +179,30 @@ private sub hCLeafCallback( byval target as FBSYMBOL ptr )
 	if( c_leaf_current <> NULL ) then c_leaf_current->must_keep = TRUE
 end sub
 
+private function hCLeafSpan(byval entry as CPROCLEAF ptr, byval is_header as integer, _
+	byval first as uinteger, byval last as uinteger) as CPROCLEAFSPAN ptr
+	var span = cptr(CPROCLEAFSPAN ptr, listNewNode(@c_leaf_spans))
+	span->owner = entry
+	span->first = first
+	span->last = last
+	if( is_header ) then
+		if( c_leaf_proto_tail <> NULL ) then
+			c_leaf_proto_tail->next_span = span
+		else
+			c_leaf_protos = span
+		end if
+		c_leaf_proto_tail = span
+	else
+		if( c_leaf_body_tail <> NULL ) then
+			c_leaf_body_tail->next_span = span
+		else
+			c_leaf_bodies = span
+		end if
+		c_leaf_body_tail = span
+	end if
+	return span
+end function
+
 private sub hCLeafBegin( byval proc as FBSYMBOL ptr )
 	c_leaf_current = NULL
 	if( symbIsNaked(proc) ) then
@@ -174,63 +211,58 @@ private sub hCLeafBegin( byval proc as FBSYMBOL ptr )
 	end if
 	var entry = hCLeafGet(proc)
 	if( entry = NULL ) then exit sub
-	assert(entry->body_last = 0)
-	entry->body_first = ctx.sections(1).bufferlen
-	if( c_leaf_body_tail <> NULL ) then
-		c_leaf_body_tail->body_next = entry
-	else
-		c_leaf_bodies = entry
-	end if
-	c_leaf_body_tail = entry
+	assert(entry->body_span = NULL)
+	entry->body_span = hCLeafSpan(entry, FALSE, ctx.sections(1).bufferlen, 0)
 	c_leaf_current = entry
 end sub
 
 private sub hCLeafEnd( )
-	if( c_leaf_current <> NULL ) then c_leaf_current->body_last = ctx.sections(1).bufferlen
+	if( c_leaf_current <> NULL ) then c_leaf_current->body_span->last = ctx.sections(1).bufferlen
 	c_leaf_current = NULL
+end sub
+
+private sub hCLeafAuxPrototype(byval proc as FBSYMBOL ptr, byval first as uinteger)
+	var entry = hCLeafGet(proc)
+	if( entry = NULL ) then exit sub
+	'' A read-only implementation can be declared before its body. Every
+	'' declaration owns a separate ordered span, including the later ABI one.
+	hCLeafSpan(entry, TRUE, first, ctx.sections(0).bufferlen)
 end sub
 
 private sub hCLeafPrototype( byval proc as FBSYMBOL ptr, byval first as uinteger )
 	var entry = hCLeafGet(proc)
-	if( entry = NULL orelse entry->body_last = 0 ) then exit sub
-	assert(entry->proto_last = 0)
-	entry->proto_first = first
-	entry->proto_last = ctx.sections(0).bufferlen
-	if( c_leaf_proto_tail <> NULL ) then
-		c_leaf_proto_tail->proto_next = entry
-	else
-		c_leaf_protos = entry
-	end if
-	c_leaf_proto_tail = entry
+	if( entry = NULL orelse entry->body_span = NULL ) then exit sub
+	hCLeafAuxPrototype(proc, first)
 end sub
 
 private function hCLeafRangesValid( byval is_header as integer, byref section_entry as const SECTIONENTRY ) as integer
-	var entry = iif(is_header, c_leaf_protos, c_leaf_bodies)
+	var span = iif(is_header, c_leaf_protos, c_leaf_bodies)
 	dim as uinteger previous_last = 0
-	while( entry <> NULL )
-		var first = iif(is_header, entry->proto_first, entry->body_first)
-		var last = iif(is_header, entry->proto_last, entry->body_last)
+	while( span <> NULL )
+		var first = span->first
+		var last = span->last
 		if( (first < previous_last) or (last < first) or _
 			(last > section_entry.bufferlen) ) then return FALSE
 		previous_last = last
-		entry = iif(is_header, entry->proto_next, entry->body_next)
+		span = span->next_span
 	wend
 	return TRUE
 end function
 
 private sub hCLeafCompact( byval is_header as integer, byref section_entry as SECTIONENTRY )
-	var entry = iif(is_header, c_leaf_protos, c_leaf_bodies)
+	var span = iif(is_header, c_leaf_protos, c_leaf_bodies)
 	dim as uinteger read_position = 0, write_position = 0
-	while( entry <> NULL )
+	while( span <> NULL )
+		var entry = span->owner
 		if( (entry->referenced = FALSE) and (entry->must_keep = FALSE) ) then
-			var first = iif(is_header, entry->proto_first, entry->body_first)
-			var last = iif(is_header, entry->proto_last, entry->body_last)
+			var first = span->first
+			var last = span->last
 			var bytes = first - read_position
 			if( bytes > 0 ) then memmove(section_entry.buffer + write_position, section_entry.buffer + read_position, bytes)
 			write_position += bytes
 			read_position = last
 		end if
-		entry = iif(is_header, entry->proto_next, entry->body_next)
+		span = span->next_span
 	wend
 	var bytes = section_entry.bufferlen - read_position
 	if( bytes > 0 ) then memmove(section_entry.buffer + write_position, section_entry.buffer + read_position, bytes)
@@ -241,14 +273,15 @@ private sub hCLeafPrune( )
 	'' Opaque assembly can name procedures without typed IR references.
 	'' Adapter targets and callers are retained when the adapter is requested.
 	'' Numeric conversion helpers use reserved names and only system builtins;
-	'' they cannot refer to a compiler-generated BASIC procedure.
+	'' they cannot refer to a private BASIC procedure.
 	'' Debug line directives still depend on the original output ordering.
 	if( c_leaf_opaque or env.clopt.debuginfo ) then exit sub
 	if( (hCLeafRangesValid(TRUE, ctx.sections(0)) = FALSE) or (hCLeafRangesValid(FALSE, ctx.sections(1)) = FALSE) ) then
 		errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
 		exit sub
 	end if
-	hCLeafReachable( )
+	'' Reachability was closed after global initializers and before deferred
+	'' private ABI wrappers. Unreachable wrappers were never emitted.
 	'' Each byte is moved at most once. Buffers retain their allocated capacity.
 	hCLeafCompact(TRUE, ctx.sections(0))
 	hCLeafCompact(FALSE, ctx.sections(1))

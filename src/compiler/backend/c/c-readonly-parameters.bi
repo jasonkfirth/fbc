@@ -262,8 +262,8 @@ private sub hCReadOnlyWriteWrapper(byval entry as CREADONLYPROC ptr)
 	if( entry->private_proc andalso entry->external_call ) then
 		'' Direct calls already use the implementation. This generated ABI
 		'' forwarder should inline when an address-taken call permits it.
-		'' With no call from another body, keep an ordinary definition so a
-		'' source procedure used only by itself retains its unused diagnostic.
+		'' An observed ABI entry without a direct caller keeps an ordinary
+		'' definition. Unobserved private entries are filtered before this step.
 		assert(left(header, 7) = "static ")
 		if( c_leaf_opaque ) then
 			'' An assembly operand may name this entry point without a C use.
@@ -301,7 +301,7 @@ end sub
 private sub hCReadOnlyWritePrivateWrappers()
 	var entry = cptr(CREADONLYPROC ptr, listGetHead(@c_readonly_procs))
 	while( entry <> NULL )
-		if( entry->deferred_wrapper ) then hCReadOnlyWriteWrapper(entry)
+		if( entry->deferred_wrapper andalso hCLeafNeeded(entry->proc) ) then hCReadOnlyWriteWrapper(entry)
 		entry = listGetNext(entry)
 	wend
 end sub

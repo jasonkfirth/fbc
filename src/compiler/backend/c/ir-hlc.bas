@@ -1572,7 +1572,9 @@ private function hCReadOnlyCallee(byval proc as FBSYMBOL ptr) as CREADONLYPROC p
 	'' A caller may be emitted before the definition, including module-level
 	'' code. Place the internal prototype in the enclosing output section.
 	var section = sectionGosub(0)
+	var first = ctx.sections(0).bufferlen
 	hWriteLine(hEmitProcHeader(proc, EMITPROC_ISPROTO, entry) + ";")
+	hCLeafAuxPrototype(proc, first)
 	sectionReturn(section)
 	return entry
 end function
@@ -2803,6 +2805,9 @@ private sub _emitEnd( )
 		ctx.exports = ""
 	end if
 
+	'' Global initializer addresses are roots too. Close the private graph
+	'' before deciding which deferred ABI entry points need definitions.
+	hCLeafReachable()
 	hCReadOnlyWritePrivateWrappers()
 	hCLeafPrune( )
 	hCLeafFinish( )
