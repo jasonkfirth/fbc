@@ -351,6 +351,7 @@ declare sub hClearArrayCallbacks( )
 declare function hGfxBlenderType( byval proc as FBSYMBOL ptr, byval param_index as integer ) as FBSYMBOL ptr
 declare sub hEmitGfxBlenderDefinitions( )
 declare sub hClearGfxBlenders( )
+declare sub hCReadOnlyFinish()
 #if __FB_DEBUG__
 declare sub exprDump( byval n as EXPRNODE ptr )
 #endif
@@ -446,6 +447,7 @@ end sub
 private sub _end( )
 	hCLeafFinish( )
 	hCAbiFinish( )
+	hCReadOnlyFinish()
 	hCClearPointerViews(0)
 	listEnd(@c_pointer_views)
 	hCAutoDescClear()
@@ -1314,10 +1316,13 @@ private function hCLongDoubleToNativeExpression _
 		str( subtype->lgt ) + "u ); })"
 end function
 
+#include once "backend/c/c-readonly-parameters.bi"
+
 private function hEmitProcHeader _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval options as EMITPROC_OPTIONS _
+		byval options as EMITPROC_OPTIONS, _
+		byval readonly_variant as CREADONLYPROC ptr = NULL _
 	) as string
 
 	dim as string ln, mangled
@@ -1333,7 +1338,7 @@ private function hEmitProcHeader _
 	end if
 
 	if( (options and EMITPROC_ISPROCPTR) = 0 ) then
-		if( symbIsPrivate( proc ) ) then
+		if( symbIsPrivate(proc) or readonly_variant <> NULL ) then
 			ln += "static "
 		end if
 	end if
@@ -1383,7 +1388,8 @@ private function hEmitProcHeader _
 	ln += semantic_convention
 	semantic_role = iif((options and EMITPROC_ISPROCPTR) <> 0, "pointer-type", _
 		iif((options and EMITPROC_ISPROTO) <> 0, "declaration", "definition"))
-	dim as longint semantic_signature = fbSemanticModelBackendAbiBegin(proc, "c", semantic_role, semantic_result, semantic_convention)
+	dim as longint semantic_signature = 0
+	if( readonly_variant = NULL ) then semantic_signature = fbSemanticModelBackendAbiBegin(proc, "c", semantic_role, semantic_result, semantic_convention)
 
 	if( (options and EMITPROC_ISPROCPTR) = 0 ) then
 		if( hProcDoesNotReturn( proc ) ) then ln += " __attribute__((noreturn))"
@@ -1398,9 +1404,10 @@ private function hEmitProcHeader _
 		ln += hGetCId( proc )
 		ln += ")"
 	else
-		var identifier = hGetCId( proc )
+		var identifier = hGetCId(proc)
+		if( readonly_variant <> NULL ) then identifier = *readonly_variant->identifier
 		ln += identifier
-		fbSemanticModelEmissionName(proc, "c", identifier)
+		if( readonly_variant = NULL ) then fbSemanticModelEmissionName(proc, "c", identifier)
 	end if
 
 	'' Parameter list
@@ -1452,6 +1459,7 @@ private function hEmitProcHeader _
 				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, "argv", "char**")
 			else
 				symbGetRealParamDtype( param, dtype, subtype )
+			if( hCReadOnlyParam(readonly_variant, param) ) then dtype = typeAddrOf(typeSetIsConst(typeDeref(dtype)))
 				dim as integer semantic_original_dtype = dtype
 				dim as FBSYMBOL ptr semantic_original_subtype = subtype
 				if( (options and EMITPROC_ISPROTO) <> 0 ) then
@@ -1495,7 +1503,7 @@ private function hEmitProcHeader _
 					parameter_identifier = "fb_c_native_" + parameter_identifier
 				end if
 				DZstrConcatAssign( params, " " + parameter_identifier )
-				if( options = 0 ) then hCAbiParameter(abi_first, abi_last, param, len(*params.data))
+				if( options = 0 andalso readonly_variant = NULL ) then hCAbiParameter(abi_first, abi_last, param, len(*params.data))
 			end if
 		end if
 
@@ -1513,13 +1521,13 @@ private function hEmitProcHeader _
 	DZstrAllocate( params, 0 )
 
 	ln += " )"
-	if( (options and EMITPROC_ISPROCPTR) = 0 ) then hObserveProcObjectName(proc, mangled)
+	if( (options and EMITPROC_ISPROCPTR) = 0 andalso readonly_variant = NULL ) then hObserveProcObjectName(proc, mangled)
 
 	if( ((options and EMITPROC_ISPROCPTR) = 0) and _
 	    ((options and EMITPROC_ISPROTO) <> 0)        ) then
 		'' Add asm("mangledname") alias if needed.
 		'' asm() can only be be used on prototypes.
-		if( hNeedAlias( proc ) ) then
+		if( hNeedAlias(proc) andalso readonly_variant = NULL ) then
 			var object_name = hGetProcObjectName( proc, mangled )
 			hAppendCObjectAlias( ln, object_name )
 		end if
@@ -1536,6 +1544,29 @@ private function hEmitProcHeader _
 	end if
 	function = ln
 end function
+
+private function hCReadOnlyCallee(byval proc as FBSYMBOL ptr) as CREADONLYPROC ptr
+	var entry = hCReadOnlyFind(proc)
+	if( entry <> NULL ) then return entry
+	'' The current AST is being consumed. Its complete proof ran at entry;
+	'' never infer a contract from only the unconsumed suffix of a body.
+	if( proc = ctx.currproc ) then return NULL
+	var body = ast.proc.head
+	while( body <> NULL )
+		if( body->sym = proc ) then exit while
+		body = body->next
+	wend
+	if( body = NULL ) then return NULL
+	entry = hCReadOnlyPrepare(proc, body->l)
+	if( entry = NULL ) then return NULL
+	'' A caller may be emitted before the definition, including module-level
+	'' code. Place the internal prototype in the enclosing output section.
+	var section = sectionGosub(0)
+	hWriteLine(hEmitProcHeader(proc, EMITPROC_ISPROTO, entry) + ";")
+	sectionReturn(section)
+	return entry
+end function
+
 
 private function hGetUdtTag( byval sym as FBSYMBOL ptr ) as string
 	if( symbIsStruct( sym ) ) then
@@ -2580,6 +2611,7 @@ private function _emitBegin( ) as integer
 
 	hCLeafInit( )
 	hCAbiInit( )
+	hCReadOnlyInit()
 	hCClearPointerViews(0)
 	c_pointer_view_id = 0
 	c_pointer_raw_types = 0
@@ -2761,6 +2793,7 @@ private sub _emitEnd( )
 		end if
 	end if
 	hCAbiFinish( )
+	hCReadOnlyFinish()
 	sectionEnd( )
 
 	if( close( #env.outf.num ) <> 0 ) then
@@ -5400,6 +5433,11 @@ private sub hDoCall _
 		byval level as integer _
 	)
 
+	dim as CREADONLYPROC ptr readonly_variant = NULL
+	if( indirect = FALSE ) then
+		readonly_variant = hCReadOnlyCallee(proc)
+		if( readonly_variant <> NULL ) then s = *readonly_variant->identifier
+	end if
 	dim as IRCALLARG ptr arg = any
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
@@ -5466,6 +5504,10 @@ private sub hDoCall _
 					hAdjustCParamType( mangled, param_index, dtype, subtype )
 				end if
 				if( (dtype <> semantic_original_dtype) or (subtype <> semantic_original_subtype) ) then semantic_kind = "libc-adjusted"
+				if( hCReadOnlyParam(readonly_variant, arg->param) ) then
+					dtype = typeAddrOf(typeSetIsConst(typeDeref(dtype)))
+					semantic_kind = "readonly-implementation"
+				end if
 				is_longdouble_cabi_argument = _
 					hUsesCLongDoubleCABI( proc ) andalso _
 					hIsCLongDoubleType( dtype, subtype )
@@ -6886,7 +6928,13 @@ private sub _emitProcBegin _
 		hWriteLine( hEmitProcHeader( proc, EMITPROC_ISPROTO ) + ";" )
 	end if
 
-	hWriteLine( hEmitProcHeader( proc, 0 ) )
+	var original_header = hEmitProcHeader(proc, 0)
+	var readonly_variant = hCReadOnlyBegin(proc, original_header)
+	if( readonly_variant = NULL ) then
+		hWriteLine(original_header)
+	else
+		hWriteLine(hEmitProcHeader(proc, 0, readonly_variant))
+	end if
 
 	hWriteLine( "{" )
 	sectionIndent( )
@@ -7021,6 +7069,7 @@ private sub _emitProcEnd _
 	if( ctx.computedgotodispatch ) then hWriteLine( "#undef fb_c_indirect_jump", TRUE )
 
 	sectionEnd( )
+	hCReadOnlyEnd(proc)
 	hCLeafEnd( )
 	hCAutoDescClear()
 	hCScalarStoresClear()
