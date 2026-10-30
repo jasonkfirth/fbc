@@ -388,7 +388,9 @@ private sub hAppendCObjectAlias( byref ln as string, byref object_name as string
 end sub
 
 
-'' same order as FB_DATATYPE
+'' Same order as FB_DATATYPE. The C frontends provide native 128-bit typedefs
+'' without system headers. Their signedness, layout and calling convention are
+'' the native ABI; hEmitType selects the two-word representation on 32-bit CPUs.
 dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
 { _
 	@"void"     , _ '' void
@@ -406,8 +408,8 @@ dim shared as const zstring ptr dtypeName(0 to FB_DATATYPES-1) = _
 	@"uint32"   , _ '' ulong
 	@"int64"    , _ '' longint
 	@"uint64"   , _ '' ulongint
-	@"__int128" , _ '' integer128
-	@"unsigned __int128", _ '' uinteger128
+	@"__int128_t", _ '' integer128
+	@"__uint128_t", _ '' uinteger128
 	@"float"    , _ '' single
 	@"double"   , _ '' double
 	@"FBSTRING" , _ '' string
@@ -6455,12 +6457,18 @@ end function
 private sub _emitVarIni128( byval sym as FBSYMBOL ptr, byval low as longint, byval high as longint )
 	dim as string value
 	if( fbGetBits( ) = 32 ) then
-		value = "((FB_INT128){ 0x" + hEmitInt128Word( low ) + _
-			"ull, 0x" + hEmitInt128Word( high ) + "ull })"
+		'' This is a static initializer, not an aggregate-valued expression.
+		'' Braces keep file-scope and nested two-word values constant in C11.
+		value = "{ 0x" + hEmitInt128Word( low ) + _
+			"ull, 0x" + hEmitInt128Word( high ) + "ull }"
 	else
-		value = "((unsigned __int128)0x" + hEmitInt128Word( high ) + _
-			"ull << 64) | (unsigned __int128)0x" + hEmitInt128Word( low ) + "ull"
-		if( typeIsSigned( symbGetType( sym ) ) ) then value = "((__int128)(" + value + "))"
+		'' Initializers must use the same native types as declarations.
+		var unsignedtype = *dtypeName(FB_DATATYPE_UINTEGER128)
+		value = "((" + unsignedtype + ")0x" + hEmitInt128Word( high ) + _
+			"ull << 64) | (" + unsignedtype + ")0x" + hEmitInt128Word( low ) + "ull"
+		if( typeIsSigned( symbGetType( sym ) ) ) then
+			value = "((" + *dtypeName(FB_DATATYPE_INTEGER128) + ")(" + value + "))"
+		end if
 	end if
 	ctx.varini += hVarIniFieldPrefix( ) + value
 	hVarIniSeparator( )

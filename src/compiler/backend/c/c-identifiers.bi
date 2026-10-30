@@ -30,10 +30,11 @@ private function hCNameNeedsEncoding( byval rawname as const zstring ptr ) as in
 			return TRUE
 		end select
 	next
-	'' GNU C11 has additional keyword spellings beyond ISO C's core set.
+	'' GNU C11 also provides keywords and builtin type names beyond ISO C's core.
 	select case *rawname
 	case "boolean", "int8", "uint8", "int16", "uint16", "int32", "uint32", _
 	     "int64", "uint64", "FBSTRING", "__builtin_va_list", "__int128", _
+	     "__int128_t", "__uint128_t", _
 	     "__float128", "_Float16", "_Float32", "_Float32x", "_Float64", _
 	     "_Float64x", "_Float128", "_Float128x", "_Decimal32", "_Decimal64", "_Decimal128"
 		return TRUE
