@@ -1,7 +1,7 @@
 """Project: FreeBASIC C backend regression tests.
 
 File: c-code-pointer-load.py
-Purpose: Exercise native callback addresses returned through an opaque API.
+Purpose: Exercise typed callback addresses carried through an opaque API.
 Responsibilities: Build both C generators, verify imported calls and nulls,
     and clean the private products after checking the observers.
 This file intentionally does NOT call mismatched function signatures.
@@ -63,7 +63,9 @@ def main():
                 run([args.fbc, '-prefix', args.prefix, str(obj), str(observer),
                      '-x', str(executable)])
                 output = run([str(executable)])
-                if 'CODE_POINTER_LOAD_PASS calls=3 single_evaluation=1 lazy=1 null=1' not in output:
+                if ('CODE_POINTER_LOAD_PASS calls=3 single_evaluation=1 lazy=1 null=1' not in output
+                        or 'CODE_POINTER_ERASURE_PASS calls=4 single_evaluation=1 lazy=1 null=1' not in output
+                        or 'CODE_POINTER_SIGNATURES_PASS byref=1 stdcall=1 calls=8' not in output):
                     raise RuntimeError('callback observer did not finish')
         print('C_CODE_POINTER_LOAD_PASS runs=' + str(2 * len(tools)))
     finally:

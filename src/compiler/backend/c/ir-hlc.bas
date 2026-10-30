@@ -4081,12 +4081,12 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		hSym2Text( ctx.exprtext, n->sym )
 
 	case EXPRCLASS_CAST
-		if( (typeGetDtAndPtrOnly(n->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) andalso _
-		    typeIsPtr(n->l->dtype) andalso _
-		    (typeGetDtAndPtrOnly(n->l->dtype) <> typeAddrOf(FB_DATATYPE_FUNCTION)) andalso _
+		if( typeIsPtr(n->dtype) andalso typeIsPtr(n->l->dtype) andalso _
+		    ((typeGetDtAndPtrOnly(n->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) xor _
+		     (typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION))) andalso _
 		    sectionInsideProc() andalso (ctx.varinisym = NULL) ) then
-			'' BASIC library lookups carry native code addresses in ANY PTR.
-			'' Copy that ABI representation into the real procedure-pointer type
+			'' BASIC library lookups and callback APIs carry native code addresses
+			'' in ANY PTR. Copy the representation between the exact declared types
 			'' instead of relying on C's object/function pointer cast extension.
 			'' Different pointer sizes cannot satisfy this native ABI contract.
 			ctx.codeptrid += 1
@@ -4096,13 +4096,20 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			end if
 			var inputname = "fb_c_codeptr_input_" + str(ctx.codeptrid)
 			var resultname = "fb_c_codeptr_result_" + str(ctx.codeptrid)
-			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->l->dtype), n->l->subtype, TRUE) + " " + inputname + ";" )
+			var inputsubtype = n->l->subtype
+			if( typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION) ) then
+				'' A direct procedure address names the procedure symbol, not
+				'' a procedure-pointer typedef. Intern its complete signature
+				'' before declaring the source representation carrier.
+				inputsubtype = symbAddProcPtrFromFunction(inputsubtype)
+			end if
+			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->l->dtype), inputsubtype, TRUE) + " " + inputname + ";" )
 			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE) + " " + resultname + ";" )
 			hWriteStaticAssert( "sizeof(" + inputname + ") == sizeof(" + resultname + ")" )
 
 			'' Keep evaluation at the original expression site, including inside
 			'' a lazy enclosing expression. The input is evaluated exactly once.
-			'' A null data pointer produces a typed null procedure pointer.
+			'' Each null pointer maps to a typed null of the destination kind.
 			ctx.exprtext += "((void)(" + inputname + " = ("
 			hExprFlush( n->l, FALSE )
 			ctx.exprtext += ")), " + inputname + " == 0 ? (" + resultname + " = 0) : ("
