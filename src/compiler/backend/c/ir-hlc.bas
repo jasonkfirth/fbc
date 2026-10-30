@@ -374,6 +374,7 @@ dim shared as integer c_pointer_view_id, c_pointer_raw_types
 #include once "backend/c/c-generated-leaves.bi"
 #include once "backend/c/c-abi-parameters.bi"
 #include once "backend/c/c-auto-descriptors.bi"
+#include once "backend/c/c-unused-scalar-stores.bi"
 
 declare sub hBuildStrLit( byref ln as string, byval z as zstring ptr, _
 	byval length as longint, byval paddedlength as longint )
@@ -423,6 +424,8 @@ private sub _init( )
 	irhlInit( )
 	listInit( @c_pointer_views, 8, sizeof(CPOINTERVIEW), LIST_FLAGS_CLEAR )
 	listInit(@c_auto_descriptors, 8, sizeof(CAUTODESC), LIST_FLAGS_CLEAR)
+	listInit(@c_scalar_stores, 32, sizeof(CSCALARSTORE), LIST_FLAGS_CLEAR)
+	listInit(@c_scalar_dependencies, 32, sizeof(CSCALARDEPENDENCY), LIST_FLAGS_CLEAR)
 	listInit( @ctx.anonstack, 8, sizeof( FBSYMBOL ptr ), LIST_FLAGS_NOCLEAR )
 	listInit( @ctx.exprnodes, 32, sizeof( EXPRNODE ), LIST_FLAGS_CLEAR )
 	listInit( @ctx.exprcache, 8, sizeof( EXPRCACHENODE ), LIST_FLAGS_NOCLEAR )
@@ -447,6 +450,9 @@ private sub _end( )
 	listEnd(@c_pointer_views)
 	hCAutoDescClear()
 	listEnd(@c_auto_descriptors)
+	hCScalarStoresClear()
+	listEnd(@c_scalar_dependencies)
+	listEnd(@c_scalar_stores)
 	if( c_local_refs.list <> NULL ) then hashEnd(@c_local_refs)
 	''
 	'' Section buffers are retained while the compiler processes input modules so
@@ -6828,8 +6834,10 @@ private sub _emitProcBegin _
 	hashInit(@c_local_refs, 256, TRUE) '' Fixed buckets; chains admit larger local sets.
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
-	if( hCAutoDescBegin(astGetProc()->l) ) then
-		'' Descriptor initialization may have been the data array's only use.
+	var locals_changed = hCScalarStoresBegin(astGetProc()->l)
+	locals_changed or= hCAutoDescBegin(astGetProc()->l)
+	if( locals_changed ) then
+		'' Rebuild the storage index after removing unobserved stores.
 		hClearCLocalReferences()
 		hashInit(@c_local_refs, 256, TRUE)
 		hMarkReferencedLocals(astGetProc()->l)
@@ -7015,6 +7023,7 @@ private sub _emitProcEnd _
 	sectionEnd( )
 	hCLeafEnd( )
 	hCAutoDescClear()
+	hCScalarStoresClear()
 	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
 	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then
 		'' NetBSD walks .fini_array forwards, including in shared libraries.
