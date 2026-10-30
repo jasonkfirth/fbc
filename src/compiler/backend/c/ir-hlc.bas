@@ -353,6 +353,7 @@ declare sub hEmitGfxBlenderDefinitions( )
 declare sub hClearGfxBlenders( )
 declare sub hCReadOnlyFinish()
 declare sub hCReadOnlyLocalsFinish()
+declare sub hCUnobservedFinish()
 #if __FB_DEBUG__
 declare sub exprDump( byval n as EXPRNODE ptr )
 #endif
@@ -455,6 +456,7 @@ private sub _end( )
 	hCLeafFinish( )
 	hCAbiFinish( )
 	hCReadOnlyFinish()
+	hCUnobservedFinish()
 	hCClearPointerViews(0)
 	listEnd(@c_pointer_views)
 	hCAutoDescClear()
@@ -1327,6 +1329,7 @@ end function
 
 #include once "backend/c/c-readonly-parameters.bi"
 #include once "backend/c/c-readonly-locals.bi"
+#include once "backend/c/c-unobserved-arguments.bi"
 
 private function hEmitProcHeader _
 	( _
@@ -2637,6 +2640,7 @@ private function _emitBegin( ) as integer
 	hCLeafInit( )
 	hCAbiInit( )
 	hCReadOnlyInit()
+	hCUnobservedInit()
 	hCClearPointerViews(0)
 	c_pointer_view_id = 0
 	c_pointer_raw_types = 0
@@ -2824,6 +2828,7 @@ private sub _emitEnd( )
 	end if
 	hCAbiFinish( )
 	hCReadOnlyFinish()
+	hCUnobservedFinish()
 	hCReadOnlyLocalsFinish()
 	sectionEnd( )
 
@@ -5601,6 +5606,14 @@ private sub hDoCall _
 				is_longdouble_cabi_argument = _
 					hUsesCLongDoubleCABI( proc ) andalso _
 					hIsCLongDoubleType( dtype, subtype )
+				'' A fixed ABI still needs an operand for an unobserved parameter.
+				'' A pure literal address can be replaced without evaluating a
+				'' mutable cast or changing argument evaluation elsewhere.
+				if( indirect = FALSE andalso hCUnobservedLiteral(arg->param, expr) ) then
+					exprFreeTree(expr)
+					expr = exprNewIMMi(0)
+					'' Value selection retains the existing fixed-argument ABI kind.
+				end if
 				if( allocation_argument ) then
 					expr = hCAllocationArgument(expr)
 				else
@@ -6989,6 +7002,7 @@ private sub _emitProcBegin _
 	hCStaticArrayInitializers(proc)
 	hAsmBeginNames( proc )
 	hCReadOnlyLocalsBegin(astGetProc()->l)
+	hCUnobservedBegin(proc, astGetProc()->l)
 	ctx.computedgotoaddress = FALSE
 	ctx.computedgotoentry = FALSE
 	ctx.computedgotodispatch = FALSE
