@@ -678,6 +678,8 @@ private sub hWriteDeclaration( byref s as string )
 	end if
 end sub
 
+#include once "backend/c/c-evaluated-values.bi"
+
 private sub hUpdateCurrentFileName( byval filename as zstring ptr )
 	ctx.escapedinputfilename = hReplace( filename, "\", $"\\" )
 end sub
@@ -2603,6 +2605,7 @@ private sub hMaybeEmitProcExport( byval proc as FBSYMBOL ptr )
 end sub
 
 private function _emitBegin( ) as integer
+	hCEvaluatedValuesInit()
 	if( hFileExists( env.outf.name ) ) then
 		if( kill( env.outf.name ) <> 0 ) then
 			return FALSE
@@ -5034,7 +5037,9 @@ private sub exprSTORE _
 		'' particular, floating conversions still use the original helpers
 		'' and retain their rounding and floating-environment behaviour.
 		r = exprNewCAST( vr->dtype, vr->subtype, r )
-		hWriteLine( "(void)(" + exprFlush(r) + ");" )
+		var value = exprFlush(r)
+		if( hCScalarStoreValueContext(vr->sym) ) then value = hCEvaluatedScalar(vr->dtype, value)
+		hWriteLine( "(void)(" + value + ");" )
 		exit sub
 	end if
 

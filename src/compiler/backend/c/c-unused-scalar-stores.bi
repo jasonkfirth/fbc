@@ -16,6 +16,7 @@ end type
 type CSCALARSTORE
 	sym as FBSYMBOL ptr
 	referenced as integer
+	value_context as integer
 	dependencies as CSCALARDEPENDENCY ptr
 	next_pending as CSCALARSTORE ptr
 end type
@@ -102,6 +103,11 @@ private function hCScalarStoreUnusedBinding(byval sym as FBSYMBOL ptr) as intege
 	return (entry <> NULL) andalso (entry->referenced = FALSE)
 end function
 
+private function hCScalarStoreValueContext(byval sym as FBSYMBOL ptr) as integer
+	var entry = hCScalarStoreGet(sym)
+	return (entry <> NULL) andalso entry->value_context
+end function
+
 private sub hCScalarStoreCollect(byval n as ASTNODE ptr)
 	if( n = NULL ) then exit sub
 	if( hCScalarStoreCandidate(n->sym) andalso hCScalarStoreGet(n->sym) = NULL ) then
@@ -184,25 +190,17 @@ end function
 
 private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	var target = n->l
+	dim as integer value_context = FALSE
 	if( target = NULL ) then return NULL
 	select case as const n->class
 	case AST_NODECLASS_ASSIGN
 		if( n->r = NULL ) then return NULL
 		if( hCScalarStoreDiscardable(n->r) = FALSE ) then
-			'' An integer conversion has a real rounding-helper call in C.
-			'' Discarding that call's result retains the original evaluation.
-			'' A bare floating expression can disappear even at -O0 when C
-			'' discards its value, so keep its destination until that contract
-			'' has a separate floating-environment-preserving lowering.
-			if( n->r->class <> AST_NODECLASS_CONV ) then return NULL
-			if( n->r->l = NULL ) then return NULL
-			if( typeGetClass(n->r->dtype) <> FB_DATACLASS_INTEGER orelse _
-			    typeGetClass(n->r->l->dtype) <> FB_DATACLASS_FPOINT ) then return NULL
-			'' Boolean comparisons and wide/unsigned conversion macros contain
-			'' C casts whose evaluation can be lost with an ignored result.
-			if( typeGetDtAndPtrOnly(n->r->dtype) = FB_DATATYPE_BOOLEAN ) then return NULL
-			if( typeGetSize(n->r->dtype) > 8 ) then return NULL
-			if( (typeGetSize(n->r->dtype) > 4) andalso (typeIsSigned(n->r->dtype) = FALSE) ) then return NULL
+			'' Keep the complete AST and its loader/lifetime ownership. The C
+			'' store owner discards only the destination, in a typed value context.
+			if( typeIsPtr(target->dtype) ) then return NULL
+			if( hCScalarStoreType(target->dtype) = FALSE ) then return NULL
+			value_context = TRUE
 		end if
 	case AST_NODECLASS_MEM
 		if( n->mem.op <> AST_OP_MEMFILL ) then return NULL
@@ -225,6 +223,7 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	if( n->class = AST_NODECLASS_MEM ) then bytes = astConstGetInt(n->r)
 	var storage_bytes = iif(symbIsRef(entry->sym), clngint(env.pointersize), symbGetSizeOf(entry->sym))
 	if( bytes <= 0 orelse bytes <> storage_bytes ) then return NULL
+	entry->value_context or= value_context
 	return entry
 end function
 
