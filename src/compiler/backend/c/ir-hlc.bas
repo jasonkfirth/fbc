@@ -3227,6 +3227,28 @@ private function exprNewCAST _
 	function = n
 end function
 
+private function exprNewValueCAST _
+	( _
+		byval dtype as integer, _
+		byval subtype as FBSYMBOL ptr, _
+		byval value as EXPRNODE ptr _
+	) as EXPRNODE ptr
+
+	'' Cached IR values have no addressable C binding. Keep a qualified
+	'' object pointer qualified while it flows through arithmetic and other
+	'' values; its eventual store or call still owns any mutable conversion.
+	'' Nested pointers and changes of pointee type retain their usual casts.
+	if( typeGetPtrCnt(dtype) = 1 andalso typeGetPtrCnt(value->dtype) = 1 ) then
+		if( typeGetDtAndPtrOnly(dtype) = typeGetDtAndPtrOnly(value->dtype) andalso _
+		    subtype = value->subtype andalso typeIsConstAt(value->dtype, 1) ) then
+			if( typeGetDtOnly(dtype) <> FB_DATATYPE_FUNCTION ) then
+				dtype = typeAddrOf(typeSetIsConst(typeDeref(dtype)))
+			end if
+		end if
+	end if
+	return exprNewCAST(dtype, subtype, value)
+end function
+
 private function exprNewMACRO _
 	( _
 		byval op as AST_OP, _
@@ -4862,7 +4884,11 @@ private function exprNewVREG _
 	end select
 
 	if( is_lvalue = FALSE ) then
-		l = exprNewCAST( vreg->dtype, vreg->subtype, l )
+		if( vreg->typ = IR_VREGTYPE_REG ) then
+			l = exprNewValueCAST( vreg->dtype, vreg->subtype, l )
+		else
+			l = exprNewCAST( vreg->dtype, vreg->subtype, l )
+		end if
 	end if
 
 	if( is_lvalue = FALSE andalso typeIsPtr(l->dtype) andalso l->class = EXPRCLASS_MEMBER ) then
@@ -5107,7 +5133,7 @@ private sub exprSTORE _
 
 			r = exprNewTEXT( vr->dtype, vr->subtype, tempvar )
 		else
-			r = exprNewCAST( vr->dtype, vr->subtype, r )
+			r = exprNewValueCAST( vr->dtype, vr->subtype, r )
 		end if
 
 		'' Put the expression on hold, it'll be used in the following
