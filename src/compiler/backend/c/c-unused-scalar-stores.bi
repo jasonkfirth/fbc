@@ -361,6 +361,19 @@ end function
 
 private function hCScalarStorePrune(byval n as ASTNODE ptr, byval value_used as integer) as integer
 	if( n = NULL ) then return FALSE
+	if( value_used = FALSE andalso n->class = AST_NODECLASS_CALL ) then
+		'' Late RTL lowering can leave a value-producing call in a statement
+		'' LINK. Keep its evaluation and arguments without an unread register.
+		'' Throwing calls and owned results retain their existing handling.
+		if( typeIsPtr(n->dtype) = FALSE andalso hCScalarStoreType(n->dtype) andalso _
+		    typeGetClass(n->dtype) = FB_DATACLASS_INTEGER andalso _
+		    n->call.tmpres = NULL andalso n->sym <> NULL andalso _
+		    symbGetIsThrowable(n->sym) = FALSE ) then
+			var ignored = astIgnoreCallResult(n)
+			assert(ignored = n)
+			return TRUE
+		end if
+	end if
 	var entry = hCScalarStoreTarget(n)
 	if( value_used = FALSE andalso entry <> NULL andalso entry->referenced = FALSE ) then
 		if( n->class = AST_NODECLASS_ASSIGN andalso hCScalarStoreDiscardable(n->r) = FALSE ) then
@@ -425,7 +438,7 @@ private function hCScalarStoresBegin(byval first as ASTNODE ptr) as integer
 		hCScalarStoreCollect(n)
 		n = n->next
 	wend
-	if( c_scalar_store_index.list = NULL ) then return FALSE
+	'' Discarded RTL call results also occur without any scalar binding.
 	dim as integer fallthrough = TRUE
 	n = first
 	while( n <> NULL )
