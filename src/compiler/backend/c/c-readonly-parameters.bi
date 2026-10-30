@@ -3,7 +3,7 @@
 	File: backend/c/c-readonly-parameters.bi
 	Purpose: Give proven read-only pointer arguments an internal C contract.
 	Responsibilities: Check procedure bodies, own variant names and signatures,
-	and preserve the original public entry point through one forwarding wrapper.
+	and preserve original entry points through forwarding wrappers.
 	This file intentionally does NOT contain: BASIC type changes, ABI changes,
 	call-result changes, or assumptions about uninspected procedure bodies.
 '/
@@ -19,6 +19,10 @@ type CREADONLYPROC
 	header as DZSTRING
 	arguments as DZSTRING
 	parameters as CREADONLYPARAM ptr
+	private_proc as integer
+	returns_void as integer
+	external_call as integer
+	deferred_wrapper as integer
 end type
 
 '' Procedure and PARAM symbols outlive IR flushing. Local parameter variables
@@ -113,6 +117,7 @@ private function hCReadOnlyCheck(byval n as ASTNODE ptr, byval storage as FBSYMB
 			wend
 			hAdjustCParamType(mangled, param_index, dtype, subtype)
 			read_argument = typeGetPtrCnt(dtype) = 1 andalso typeIsConstAt(dtype, 1)
+			if( hCReadOnlyParam(hCReadOnlyFind(symbGetParent(n->sym)), n->sym) ) then read_argument = TRUE
 		end if
 		if( hCReadOnlyCheck(n->l, storage, seen, read_argument) = FALSE ) then return FALSE
 		return hCReadOnlyCheck(n->r, storage, seen)
@@ -146,8 +151,11 @@ private function hCReadOnlyCheck(byval n as ASTNODE ptr, byval storage as FBSYMB
 end function
 
 private function hCReadOnlyCandidate(byval param as FBSYMBOL ptr, byval body as ASTNODE ptr) as integer
-	if( symbGetParamMode(param) <> FB_PARAMMODE_BYVAL ) then return FALSE
-	var dtype = symbGetFullType(param)
+	if( (symbGetParamMode(param) <> FB_PARAMMODE_BYVAL) and _
+	    (symbGetParamMode(param) <> FB_PARAMMODE_BYREF) ) then return FALSE
+	dim as integer dtype = any
+	dim as FBSYMBOL ptr subtype = any
+	symbGetRealParamDtype(param, dtype, subtype)
 	if( typeGetPtrCnt(dtype) <> 1 orelse typeIsConstAt(dtype, 1) ) then return FALSE
 	select case as const typeGetDtOnly(dtype)
 	case FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR, FB_DATATYPE_BYTE, FB_DATATYPE_UBYTE
@@ -175,12 +183,13 @@ end function
 '' A const C contract permits reads without promising that aliased memory is
 '' globally immutable. Keep the BASIC signature and the public C entry point;
 '' the internal variant owns the body, including its single set of statics.
-'' Private procedure pruning and optional ABI thunks retain their current owner.
+'' Compiler-generated private bodies retain their existing pruning owner.
 private function hCReadOnlyPrepare(byval proc as FBSYMBOL ptr, byval body as ASTNODE ptr) as CREADONLYPROC ptr
 	'' Calls in position-independent code may be interposed by another object.
 	'' Keep their public symbol as the actual call target.
 	if( env.clopt.pic ) then return NULL
-	if( env.clopt.debuginfo or symbIsNaked(proc) or symbIsPrivate(proc) or symbIsMethod(proc) ) then return NULL
+	if( env.clopt.debuginfo or symbIsNaked(proc) or symbIsMethod(proc) ) then return NULL
+	if( symbIsPrivate(proc) andalso (proc->attrib and FB_SYMBATTRIB_INTERNAL) ) then return NULL
 	if( symbProcReturnsOnStack(proc) or hUsesCLongDoubleCABI(proc) ) then return NULL
 	if( symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or symbGetIsModLevelProc(proc) ) then return NULL
 	var param = symbGetProcLastParam(proc)
@@ -194,6 +203,8 @@ private function hCReadOnlyPrepare(byval proc as FBSYMBOL ptr, byval body as AST
 	if( candidates = 0 ) then return NULL
 	var entry = cptr(CREADONLYPROC ptr, listNewNode(@c_readonly_procs))
 	entry->proc = proc
+	entry->private_proc = symbIsPrivate(proc)
+	entry->returns_void = (symbGetProcRealType(proc) = FB_DATATYPE_VOID)
 	var implementation = hCUnalignedTempName() + "_readonly"
 	entry->identifier = ZstrDup(strptr(implementation))
 	param = symbGetProcLastParam(proc)
@@ -225,19 +236,53 @@ private function hCReadOnlyBegin(byval proc as FBSYMBOL ptr, byref header as str
 	return entry
 end function
 
-private sub hCReadOnlyEnd(byval proc as FBSYMBOL ptr)
-	var entry = hCReadOnlyFind(proc)
-	if( entry = NULL ) then exit sub
+private sub hCReadOnlyWriteWrapper(byval entry as CREADONLYPROC ptr)
+	var header = *entry->header.data
+	if( entry->private_proc andalso entry->external_call ) then
+		'' Direct calls already use the implementation. This generated ABI
+		'' forwarder should inline when an address-taken call permits it.
+		'' With no call from another body, keep an ordinary definition so a
+		'' source procedure used only by itself retains its unused diagnostic.
+		assert(left(header, 7) = "static ")
+		if( c_leaf_opaque ) then
+			'' An assembly operand may name this entry point without a C use.
+			'' Keep its out-of-line ABI symbol even when all visible calls use
+			'' the implementation. A real caller established source reachability.
+			header = "static __attribute__((used)) " + mid(header, 8)
+		else
+			header = "static inline " + mid(header, 8)
+		end if
+	end if
 	sectionBegin()
-	hWriteLine(*entry->header.data)
+	hWriteLine(header)
 	hWriteLine("{")
 	sectionIndent()
 	var statement = *entry->identifier + "( " + *entry->arguments.data + " );"
-	if( symbGetProcRealType(proc) <> FB_DATATYPE_VOID ) then statement = "return " + statement
+	if( entry->returns_void = FALSE ) then statement = "return " + statement
 	hWriteLine(statement)
 	sectionUnindent()
 	hWriteLine("}")
 	sectionEnd()
+end sub
+
+private sub hCReadOnlyEnd(byval proc as FBSYMBOL ptr)
+	var entry = hCReadOnlyFind(proc)
+	if( entry = NULL ) then exit sub
+	if( entry->private_proc ) then
+		'' Later bodies can still call this implementation or take the original
+		'' procedure's address. The ordinary prototype keeps that ABI available.
+		entry->deferred_wrapper = TRUE
+	else
+		hCReadOnlyWriteWrapper(entry)
+	end if
+end sub
+
+private sub hCReadOnlyWritePrivateWrappers()
+	var entry = cptr(CREADONLYPROC ptr, listGetHead(@c_readonly_procs))
+	while( entry <> NULL )
+		if( entry->deferred_wrapper ) then hCReadOnlyWriteWrapper(entry)
+		entry = listGetNext(entry)
+	wend
 end sub
 
 '' end of backend/c/c-readonly-parameters.bi

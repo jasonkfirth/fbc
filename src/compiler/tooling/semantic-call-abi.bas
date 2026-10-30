@@ -173,13 +173,13 @@ sub fbSemanticModelCallAbiArgument( byval identity as longint, byval param as FB
 			(selected_dtype = FB_DATATYPE_ULONGINT) and (selected_subtype = NULL) and (len(attributes) = 0)
 	case "readonly-implementation"
 		'' Only the pointee qualifier changes in this internal C call. The
-		'' original public signature and procedure-pointer contract stay mutable.
+		'' original entry-point signature and procedure-pointer contract stay mutable.
 		valid = (active_stage = "c") and (param <> NULL) and (part = 0) and (parts = 1)
 		if( valid ) then
 			dim as integer original_dtype = any
 			dim as FBSYMBOL ptr original_subtype = any
 			symbGetRealParamDtype(param, original_dtype, original_subtype)
-			valid = (param->param.mode = FB_PARAMMODE_BYVAL) and _
+			valid = ((param->param.mode = FB_PARAMMODE_BYVAL) or (param->param.mode = FB_PARAMMODE_BYREF)) and _
 				(typeGetPtrCnt(original_dtype) = 1) and (typeIsConstAt(original_dtype, 1) = FALSE) and _
 				(selected_subtype = original_subtype) and _
 				(selected_dtype = typeAddrOf(typeSetIsConst(typeDeref(original_dtype))))

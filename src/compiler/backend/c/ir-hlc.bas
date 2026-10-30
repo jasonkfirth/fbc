@@ -2779,6 +2779,7 @@ private sub _emitEnd( )
 		ctx.exports = ""
 	end if
 
+	hCReadOnlyWritePrivateWrappers()
 	hCLeafPrune( )
 	hCLeafFinish( )
 
@@ -5436,7 +5437,10 @@ private sub hDoCall _
 	dim as CREADONLYPROC ptr readonly_variant = NULL
 	if( indirect = FALSE ) then
 		readonly_variant = hCReadOnlyCallee(proc)
-		if( readonly_variant <> NULL ) then s = *readonly_variant->identifier
+		if( readonly_variant <> NULL ) then
+			s = *readonly_variant->identifier
+			if( proc <> ctx.currproc ) then readonly_variant->external_call = TRUE
+		end if
 	end if
 	dim as IRCALLARG ptr arg = any
 	dim as integer dtype = any
