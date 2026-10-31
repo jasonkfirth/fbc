@@ -269,6 +269,14 @@ enum
 	BUILTIN_D2U128        = (1 shl 10)
 	BUILTIN_F32_EQUAL     = (1 shl 11)
 	BUILTIN_F64_EQUAL     = (1 shl 12)
+	BUILTIN_ABS_I8        = (1 shl 13)
+	BUILTIN_ABS_U8        = (1 shl 14)
+	BUILTIN_ABS_I16       = (1 shl 15)
+	BUILTIN_ABS_U16       = (1 shl 16)
+	BUILTIN_ABS_I32       = (1 shl 17)
+	BUILTIN_ABS_U32       = (1 shl 18)
+	BUILTIN_ABS_I64       = (1 shl 19)
+	BUILTIN_ABS_U64       = (1 shl 20)
 end enum
 
 type IRHLCCTX
@@ -2721,6 +2729,8 @@ private sub hWriteFloatEqual( byref suffix as string, byval dtype as integer )
 	hWriteLine( "}", TRUE )
 end sub
 
+#include once "backend/c/c-integer-abs.bi"
+
 private sub _emitEnd( )
 	hAsmEndNames( )
 	dim as integer section = any
@@ -2751,6 +2761,14 @@ private sub _emitEnd( )
 	if( ctx.usedbuiltins and BUILTIN_D2U128 ) then hWriteF2I( "D2U128", FB_DATATYPE_UINTEGER128, FB_DATATYPE_DOUBLE )
 	if( ctx.usedbuiltins and BUILTIN_F32_EQUAL ) then hWriteFloatEqual( "f32", FB_DATATYPE_SINGLE )
 	if( ctx.usedbuiltins and BUILTIN_F64_EQUAL ) then hWriteFloatEqual( "f64", FB_DATATYPE_DOUBLE )
+	if( ctx.usedbuiltins and BUILTIN_ABS_I8 ) then hWriteIntegerAbs(FB_DATATYPE_BYTE)
+	if( ctx.usedbuiltins and BUILTIN_ABS_U8 ) then hWriteIntegerAbs(FB_DATATYPE_UBYTE)
+	if( ctx.usedbuiltins and BUILTIN_ABS_I16 ) then hWriteIntegerAbs(FB_DATATYPE_SHORT)
+	if( ctx.usedbuiltins and BUILTIN_ABS_U16 ) then hWriteIntegerAbs(FB_DATATYPE_USHORT)
+	if( ctx.usedbuiltins and BUILTIN_ABS_I32 ) then hWriteIntegerAbs(FB_DATATYPE_LONG)
+	if( ctx.usedbuiltins and BUILTIN_ABS_U32 ) then hWriteIntegerAbs(FB_DATATYPE_ULONG)
+	if( ctx.usedbuiltins and BUILTIN_ABS_I64 ) then hWriteIntegerAbs(FB_DATATYPE_LONGINT)
+	if( ctx.usedbuiltins and BUILTIN_ABS_U64 ) then hWriteIntegerAbs(FB_DATATYPE_ULONGINT)
 
 	'' Append global declarations to the header of the toplevel section.
 	'' This must be done during _emitEnd() instead of _emitBegin() because
@@ -4010,6 +4028,8 @@ private function hUopToStr _
 
 	case AST_OP_ABS
 		is_builtin = TRUE
+		var integer_name = hCIntegerAbsName(dtype)
+		if( integer_name <> NULL ) then return integer_name
 
 		select case as const( typeGetSizeType( dtype ) )
 		case FB_SIZETYPE_FLOAT32
