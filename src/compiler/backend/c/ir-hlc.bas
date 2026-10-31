@@ -5998,6 +5998,8 @@ private sub _emitMem _
 
 end sub
 
+#include once "backend/c/c-va-pointer-cursors.bi"
+
 private sub _emitMacro _
 	( _
 		byval op as integer, _
@@ -6007,30 +6009,35 @@ private sub _emitMacro _
 	)
 
 	dim as EXPRNODE ptr l = any, r = any
+	dim as CVAPOINTERCURSOR left_cursor, right_cursor
 
 	select case op
 	case AST_OP_VA_START
-		l = exprNewVREG( v1, TRUE /' mutable va_list '/ )
+		l = hCVaPointerOperand(v1, left_cursor, (op <> AST_OP_VA_START), TRUE)
 		r = exprNewVREG( v2 )
 		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, r ) ) + ";" )
 
 	case AST_OP_VA_END
-		l = exprNewVREG( v1, TRUE /' mutable va_list '/ )
+		'' va_end invalidates the native cursor. Its representation must not
+		'' be read or copied back after this operation.
+		l = hCVaPointerOperand(v1, left_cursor, TRUE, FALSE)
 		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, NULL ) ) + ";" )
 
 	case AST_OP_VA_ARG
-		l = exprNewVREG( v1, TRUE /' mutable va_list '/ )
+		l = hCVaPointerOperand(v1, left_cursor, (op <> AST_OP_VA_START), TRUE)
 		l = exprNewMACRO( op, vr->dtype, vr->subtype, l, NULL )
 		'' Struct va_arg results are rvalues in C. Store one into a temporary so
-		'' aggregate-copy emission can take its address safely.
-		exprSTORE( vr, l, typeGetDtAndPtrOnly( vr->dtype ) = FB_DATATYPE_STRUCT )
+		'' aggregate-copy emission can take its address safely. A bridged scalar
+		'' must also execute before the updated cursor is copied back.
+		exprSTORE( vr, l, (len(left_cursor.address_name) <> 0) or (typeGetDtAndPtrOnly(vr->dtype) = FB_DATATYPE_STRUCT) )
 
 	case AST_OP_VA_COPY
-		l = exprNewVREG( v1, TRUE /' destination va_list '/ )
-		r = exprNewVREG( v2, TRUE /' source va_list object '/ )
+		l = hCVaPointerOperand(v1, left_cursor, FALSE, TRUE)
+		r = hCVaPointerOperand(v2, right_cursor, TRUE, FALSE)
 		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, r ) ) + ";" )
 
 	end select
+	hCVaPointerWriteback(left_cursor)
 
 end sub
 
