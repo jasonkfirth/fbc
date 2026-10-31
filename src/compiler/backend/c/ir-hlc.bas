@@ -3635,6 +3635,7 @@ private function exprNewBOP _
 end function
 
 #include once "backend/c/c-array-index.bi"
+#include once "backend/c/c-bulk-memory.bi"
 
 '' Add expression root node to cache list, with the corresponding vreg id,
 '' allowing it to be looked up later (when the AST accesses that vreg).
@@ -5966,13 +5967,18 @@ private sub _emitMem _
 	'' BASIC type. Clang otherwise checks/assumes record alignment even for
 	'' a builtin memcpy destination. A checked write needs a mutable byte view;
 	'' only the source retains its pointee qualifiers.
-	var destination = exprNewVREG(v1)
+	dim as longint extent = bytes
+	if( op = AST_OP_MEMFILL ) then
+		extent = 0
+		if( v2->typ = IR_VREGTYPE_IMM andalso typeGetClass(v2->dtype) = FB_DATACLASS_INTEGER ) then extent = v2->value.i
+	end if
+	var destination = hCBulkMemoryAddress(exprNewVREG(v1), extent)
 	destination = hCMutablePointerArgument(typeAddrOf(FB_DATATYPE_UBYTE), NULL, destination)
 	select case op
 	case AST_OP_MEMFILL
 		hWriteLine("__builtin_memset( " + exprFlush(destination) + ", " + str(fillchar) + ", " + exprFlush( exprNewVREG( v2 ) ) + " );" )
 	case AST_OP_MEMMOVE
-		var source = exprNewVREG(v2)
+		var source = hCBulkMemoryAddress(exprNewVREG(v2), bytes)
 		'' memcpy never writes its source. A recovered member can expose
 		'' constness that was absent from the intermediate IR pointer type.
 		source = exprNewCAST(hCBytePointerType(source->dtype, TRUE), NULL, source)
