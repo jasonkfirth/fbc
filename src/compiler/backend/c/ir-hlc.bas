@@ -1188,6 +1188,22 @@ private sub hAdjustCParamType _
 	elseif( hEmitLibcSizeParam( mangled, param_index ) ) then
 		dtype = hGetLibcSizeDtype( )
 		subtype = NULL
+	elseif( mangled = "atexit" andalso param_index = 0 ) then
+		'' The runtime intrinsic accepts ANY PTR in BASIC, while libc owns a
+		'' void cdecl(void) callback. Keep the source type and select that exact
+		'' native signature for the C argument, matching its emitted prototype.
+		var callback = symbPreAddProc(NULL)
+		if( callback = NULL ) then
+			errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
+			exit sub
+		end if
+		var callback_type = symbAddProcPtr(callback, FB_DATATYPE_VOID, NULL, 0, 0, FB_FUNCMODE_CDECL)
+		if( callback_type = NULL ) then
+			errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
+			exit sub
+		end if
+		dtype = typeAddrOf(FB_DATATYPE_FUNCTION)
+		subtype = callback_type
 	elseif( mangled = "fb_ArrayRedimTo" andalso param_index = 1 ) then
 		'' fb_array.h and array_redimto.c both take const FBARRAY*. The
 		'' intrinsic's source descriptor must retain that same C contract.
@@ -1202,7 +1218,7 @@ end sub
 
 private function hEmitLibcProcPtrParam _
 	( _
-		byref mangled as string, _
+		byval proc as FBSYMBOL ptr, _
 		byval param_index as integer _
 	) as string
 
@@ -1215,7 +1231,7 @@ private function hEmitLibcProcPtrParam _
 	'' Match the C library prototype.  Some hosted libc headers are included
 	'' by the generated-C smoke harness, and gcc diagnoses a conflicting
 	'' atexit(void *) declaration before it gets to the BASIC test body.
-	select case( mangled )
+	select case( hGetMangledNameForASM(proc, FALSE) )
 	case "atexit"
 		function = "void (*)( void )"
 	end select
@@ -1490,7 +1506,7 @@ private function hEmitProcHeader _
 				dim as integer semantic_original_dtype = dtype
 				dim as FBSYMBOL ptr semantic_original_subtype = subtype
 				if( (options and EMITPROC_ISPROTO) <> 0 ) then
-					dim as string libc_procptr = hEmitLibcProcPtrParam( mangled, param_index )
+					dim as string libc_procptr = hEmitLibcProcPtrParam( proc, param_index )
 					var gfx_blender = hGfxBlenderType(proc, param_index)
 					if( gfx_blender <> NULL ) then libc_procptr = hEmitType(typeAddrOf(FB_DATATYPE_FUNCTION), gfx_blender, TRUE)
 					if( hIsArrayCallbackParam( proc, param_index ) ) then
@@ -5664,6 +5680,9 @@ private sub hDoCall _
 				var allocation_argument = FALSE
 				if( param_proc <> NULL ) then
 					var mangled = *symbGetMangledName( param_proc )
+					'' A BASIC alias can have a private C identifier while still
+					'' naming libc's atexit symbol. Match the native declaration.
+					if( param_index = 0 andalso hGetMangledNameForASM(param_proc, FALSE) = "atexit" ) then mangled = "atexit"
 					allocation_argument = hEmitMutableLibcPtrParam(mangled, param_index)
 					hAdjustCParamType( mangled, param_index, dtype, subtype )
 				end if
