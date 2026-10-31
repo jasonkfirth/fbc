@@ -440,7 +440,10 @@ function astLoadUOP _
 
 	if( ast.doemit ) then
 		if( (n->op.options and AST_OPOPT_ALLOCRES) <> 0 ) then
-			vr = irAllocVREG( astGetFullType( o ), o->subtype )
+			'' Negation and SGN can produce a signed result from an unsigned
+			'' operand. Preserve the operator's type at the IR boundary so
+			'' consumers do not recover the operand's unsigned arithmetic.
+			vr = irAllocVREG( astGetFullType( n ), n->subtype )
 			v1->vector = n->vector
 			vr->vector = n->vector
 		else
