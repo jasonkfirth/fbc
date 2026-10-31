@@ -4655,9 +4655,13 @@ assembler spelling. The `object` stage is separate because an encoded C token
 or quoted LLVM identifier is not an object symbol.
 
 State `selected` requires a nonempty spelling and an empty reason. State `none`
-has an empty spelling and reason `automatic-storage`, describing a local
-variable without a separate object symbol. State `unavailable` has an empty
-spelling and one of these reasons:
+has an empty spelling. Reason `automatic-storage` describes a local variable
+without a separate object symbol. Reason `c-constant-static-value` describes
+a C backend elimination of a local static object-pointer binding whose
+procedure-address value is constant and whose storage is unobserved. The
+source symbol retains its declared type and static/local attributes. Debug,
+opaque, mutable, escaped and public storage keep their ordinary observations.
+State `unavailable` has an empty spelling and one of these reasons:
 
 | Reason | Meaning |
 | --- | --- |

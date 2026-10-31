@@ -363,6 +363,7 @@ declare sub hEmitGfxBlenderDefinitions( )
 declare sub hClearGfxBlenders( )
 declare sub hCReadOnlyFinish()
 declare sub hCReadOnlyLocalsFinish()
+declare sub hCStaticCodeFinish()
 declare sub hCUnobservedFinish()
 declare sub hCLiteralStorageInit()
 declare sub hCLiteralStorageFinish()
@@ -469,6 +470,7 @@ end sub
 
 private sub _end( )
 	hCReadOnlyLocalsFinish()
+	hCStaticCodeFinish()
 	hCLeafFinish( )
 	hCAbiFinish( )
 	hCReadOnlyFinish()
@@ -1361,6 +1363,7 @@ end function
 
 #include once "backend/c/c-readonly-parameters.bi"
 #include once "backend/c/c-readonly-locals.bi"
+#include once "backend/c/c-static-code-values.bi"
 #include once "backend/c/c-unobserved-arguments.bi"
 
 private function hEmitProcHeader _
@@ -1804,6 +1807,10 @@ private sub hEmitVarDecl _
 		byval varini as zstring ptr _
 	)
 
+	if( hCStaticCodeFind(sym) <> NULL ) then
+		fbSemanticModelEmissionName(sym, "object", "", "none", "c-constant-static-value")
+		exit sub
+	end if
 	dim as string ln
 	dim as integer static_storage = FALSE
 	var is_vtable = ((sym->stats and FB_SYMBSTATS_VTABLE) <> 0)
@@ -2662,6 +2669,7 @@ end sub
 
 private function _emitBegin( ) as integer
 	hCReadOnlyLocalsInit()
+	hCStaticCodeInit()
 	hCEvaluatedValuesInit()
 	hCLiteralStorageInit()
 	if( hFileExists( env.outf.name ) ) then
@@ -2879,6 +2887,7 @@ private sub _emitEnd( )
 	hCReadOnlyFinish()
 	hCUnobservedFinish()
 	hCReadOnlyLocalsFinish()
+	hCStaticCodeFinish()
 	hCLiteralStorageFinish()
 	sectionEnd( )
 
@@ -3378,6 +3387,8 @@ private function exprNewSYM( byval sym as FBSYMBOL ptr ) as EXPRNODE ptr
 		n->sym = sym
 
 	else
+		var constant_value = hCStaticCodeFind(sym)
+		if( constant_value <> NULL ) then return exprNewSYM(constant_value->target)
 		symbGetRealType( sym, dtype, subtype )
 		dtype = hCReadOnlyLocalType(sym, dtype)
 
@@ -6725,6 +6736,8 @@ private sub _emitVarIniOfs _
 		byval ofs as longint _
 	)
 
+	if( hCStaticCodeFind(sym) <> NULL ) then exit sub
+
 	if( hIsVtableInitializer( ) ) then
 		if( ofs <> 0 ) then
 			hVarIniFail( "nonzero address offset in C virtual table" )
@@ -7164,6 +7177,7 @@ private sub _emitProcBegin _
 	hCStaticArrayInitializers(proc)
 	hAsmBeginNames( proc )
 	hCReadOnlyLocalsBegin(astGetProc()->l)
+	hCStaticCodeBegin(proc, astGetProc()->l)
 	hCUnobservedBegin(proc, astGetProc()->l)
 	ctx.computedgotoaddress = FALSE
 	ctx.computedgotoentry = FALSE
@@ -7354,6 +7368,7 @@ private sub _emitProcEnd _
 	hCAutoDescClear()
 	hCScalarStoresClear()
 	hCReadOnlyLocalsClear()
+	hCStaticCodeClear()
 	if( (env.clopt.target = FB_COMPTARGET_NETBSD) and _
 	    (proc->stats and FB_SYMBSTATS_GLOBALDTOR) ) then
 		'' NetBSD walks .fini_array forwards, including in shared libraries.

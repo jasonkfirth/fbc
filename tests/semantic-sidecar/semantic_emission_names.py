@@ -13,7 +13,7 @@ CLOSURE = "emission-name-count:"
 LIMIT = 1000000
 NAME_BYTES = 65536
 REASONS = {"automatic-storage", "backend-tls", "c-local-static", "llvm-private",
-           "backend-intrinsic", "assembler-quoted"}
+           "backend-intrinsic", "assembler-quoted", "c-constant-static-value"}
 
 
 def validate_emission_names(model, number, unescape, subject_modules):
@@ -65,8 +65,16 @@ def validate_emission_names(model, number, unescape, subject_modules):
         if (state == "selected" and (not spelling or reason)
                 or state != "selected" and (spelling or reason not in REASONS or stage != "object")):
             raise ValueError("Emission name state disagrees with its spelling or reason")
-        if state == "none" and (reason != "automatic-storage" or symbol[3] != "1"):
-            raise ValueError("Non-object emission state does not describe automatic storage")
+        if state == "none" and (reason not in ("automatic-storage", "c-constant-static-value") or symbol[3] != "1"):
+            raise ValueError("Non-object emission state does not describe variable storage")
+        # Storage elimination is a C backend fact. The original source symbol
+        # remains a local static pointer, with its declared type and flags.
+        if reason == "c-constant-static-value":
+            attributes = number(symbol[7], 0)
+            if (state != "none" or expected_stage != "c" or symbol[3] != "1"
+                    or attributes & 0x82 != 0x82 or attributes & 0x6000339
+                    or number(symbol[4], 0) & 0x1e0 == 0):
+                raise ValueError("Constant static value contradicts its source storage or backend")
         if state == "unavailable":
             if (reason == "automatic-storage" or reason in ("backend-tls", "c-local-static") and symbol[3] != "1"
                     or reason == "c-local-static" and expected_stage != "c"

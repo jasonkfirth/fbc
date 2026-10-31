@@ -28,7 +28,14 @@ private sub LocalWork()
     local_value = retained
     print local_value
 end sub
+private sub StaticTarget()
+end sub
+private function ConstantCodeValue() as any ptr
+    static constant_code as any ptr = @StaticTarget
+    return constant_code
+end function
 LocalWork()
+print ConstantCodeValue()
 print BoundC(1), BoundCpp(2), AliasedBasic(3), public_data, foreign_tls
 ''')
 
@@ -58,6 +65,8 @@ def check_names(test):
             if backend in ("gcc", "clang"):
                 test.assertEqual(names_for(model, "RETAINED")["object"], ("unavailable", "", "c-local-static"))
                 test.assertEqual(names_for(model, "LOCAL_VALUE")["object"], ("none", "", "automatic-storage"))
+                test.assertEqual(names_for(model, "CONSTANT_CODE")["object"],
+                                 ("none", "", "c-constant-static-value"))
             elif backend == "llvm":
                 test.assertEqual(names_for(model, "RETAINED")["object"], ("unavailable", "", "llvm-private"))
                 test.assertEqual(names_for(model, "LOCALWORK")["object"], ("unavailable", "", "llvm-private"))
@@ -179,6 +188,28 @@ def check_rejection(test):
                 else: fields[1:] = ["none", "", "automatic-storage"]
                 row[4] = "\t".join(fields)
             Model(text_rows(rows))
+
+    constant = next(row for row in model.records["K"] if row[3].startswith(PREFIX)
+                    and row[4] == "object\tnone\t\tc-constant-static-value")
+    for mutation in ("unavailable", "automatic", "global", "public", "scalar", "backend"):
+        with test.subTest(constant_static=mutation), test.assertRaises(ValueError):
+            rows = [row.copy() for row in model.rows]
+            row = next(item for item in rows if item == constant)
+            symbol = next(item for item in rows if item[:2] == ["S", row[2]])
+            if mutation == "unavailable":
+                row[4] = "object\tunavailable\t\tc-constant-static-value"
+            elif mutation in ("automatic", "global", "public"):
+                attributes = int(symbol[7])
+                if mutation == "automatic": attributes &= ~2
+                elif mutation == "global": attributes &= ~128
+                else: attributes |= 32
+                symbol[7] = str(attributes)
+            elif mutation == "scalar":
+                symbol[4] = str(int(symbol[4]) & ~0x1e0)
+            else:
+                next(item for item in rows if item[0] == "Q")[5] = "llvm"
+            Model(text_rows(rows))
+
 
 
 def check_target_decoration(test):
