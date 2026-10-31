@@ -345,6 +345,7 @@ declare sub _emitDBG _
 	)
 
 declare function hCUnalignedTempName() as string
+declare function hCMutablePointerArgument(byval dtype as integer, byval subtype as FBSYMBOL ptr, byval value as EXPRNODE ptr) as EXPRNODE ptr
 declare function exprTryCRecordArrayAddress(byval dtype as integer, byval subtype as FBSYMBOL ptr, byval value as EXPRNODE ptr) as EXPRNODE ptr
 declare function hIsScalarLoadType(byval dtype as integer) as integer
 
@@ -4190,6 +4191,31 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 
 	case EXPRCLASS_CAST
 		hCLiteralMutableCast(n->dtype, n->l)
+		if( typeGetPtrCnt(n->dtype) = 1 andalso typeGetPtrCnt(n->l->dtype) = 1 andalso _
+		    (typeIsConstAt(n->dtype, 1) = FALSE) andalso typeIsConstAt(n->l->dtype, 1) andalso _
+		    typeGetDtOnly(n->dtype) <> FB_DATATYPE_FUNCTION andalso _
+		    typeGetDtOnly(n->l->dtype) <> FB_DATATYPE_FUNCTION andalso _
+		    sectionInsideProc() andalso (ctx.varinisym = NULL) ) then
+			'' The frontend permits this value conversion, including lifecycle
+			'' writes through a qualified object pointer. Retain const while
+			'' selecting the destination's object view, then transfer the pointer
+			'' representation to its unqualified version (C11 6.2.5p28).
+			'' The pointed-to storage and its qualifiers are not changed here.
+			var qualified_dtype = typeAddrOf(typeSetIsConst(typeDeref(n->dtype)))
+			var inputname = hCUnalignedTempName()
+			var resultname = hCUnalignedTempName()
+			hWriteDeclaration(hEmitType(qualified_dtype, n->subtype, TRUE) + " " + inputname + ";")
+			hWriteDeclaration(hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE) + " " + resultname + ";")
+			hWriteStaticAssert("sizeof(" + inputname + ") == sizeof(" + resultname + ")")
+
+			'' Keep the conversion at its expression site. Hoisted bindings must
+			'' not evaluate a skipped branch or duplicate an effectful operand.
+			ctx.exprtext += "((void)(" + inputname + " = (" + hEmitType(qualified_dtype, n->subtype, TRUE) + ") ("
+			hExprFlush(n->l, FALSE)
+			ctx.exprtext += ")), (void)__builtin_memcpy(&" + resultname + ", &" + inputname + ", sizeof(" + resultname + ")), "
+			ctx.exprtext += resultname + ")"
+			exit sub
+		end if
 		if( typeIsPtr(n->dtype) andalso typeIsPtr(n->l->dtype) andalso _
 		    ((typeGetDtAndPtrOnly(n->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) xor _
 		     (typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION))) andalso _
@@ -5102,7 +5128,13 @@ private sub hEmitUnalignedStore _
 	var tempname = hCUnalignedTempName()
 	var member = exprTryCMember( addr, 0, vreg->dtype, vreg->subtype, TRUE )
 	if( member <> NULL ) then addr = exprNewCAddress( member )
-	addrtext = exprFlush( hCUnalignedAddress(addr) )
+	'' Removing alignment-only casts must not discard a qualified pointer's
+	'' explicit write conversion. The AST has already authorized this store.
+	addr = hCUnalignedAddress(addr)
+	if( typeGetPtrCnt(addr->dtype) = 1 andalso typeIsConstAt(addr->dtype, 1) ) then
+		addr = hCMutablePointerArgument(typeAddrOf(FB_DATATYPE_VOID), NULL, addr)
+	end if
+	addrtext = exprFlush(addr)
 	valuetext = exprFlush( r )
 
 	s = "__extension__ ({ "
