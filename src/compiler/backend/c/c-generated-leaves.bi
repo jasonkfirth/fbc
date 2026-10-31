@@ -92,6 +92,12 @@ private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
 	'' exported and virtual entries still have callers outside this graph.
 	entry->must_keep or= symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
 		symbGetIsModLevelProc(proc) or symbIsExport(proc) or symbIsVirtual(proc)
+	'' Debuggers may inspect source-defined private bodies even without a
+	'' C call. Generated default members have no independent source body;
+	'' retain those only through real calls, addresses and required roots.
+	if( env.clopt.debuginfo andalso ((proc->attrib and FB_SYMBATTRIB_INTERNAL) = 0) ) then
+		entry->must_keep = TRUE
+	end if
 	return entry
 end function
 
@@ -161,7 +167,7 @@ private sub hCLeafReachable( )
 end sub
 
 private function hCLeafNeeded(byval proc as FBSYMBOL ptr) as integer
-	if( c_leaf_ready = FALSE or c_leaf_opaque or env.clopt.debuginfo ) then return TRUE
+	if( c_leaf_ready = FALSE or c_leaf_opaque ) then return TRUE
 	var entry = hCLeafGet(proc)
 	if( entry = NULL ) then return TRUE
 	return entry->referenced or entry->must_keep
@@ -304,8 +310,10 @@ private sub hCLeafPrune( )
 	'' procedures. Reachability retains shared adapters and their typed targets.
 	'' Numeric conversion helpers use reserved names and only system builtins;
 	'' they cannot refer to a private BASIC procedure.
-	'' Debug line directives still depend on the original output ordering.
-	if( c_leaf_opaque or env.clopt.debuginfo ) then exit sub
+	'' hWriteLine emits an explicit #line before each mapped C line. Removing
+	'' a complete generated body preserves the mappings of retained lines.
+	'' Source-defined debug bodies remain roots in hCLeafGet.
+	if( c_leaf_opaque ) then exit sub
 	if( (hCLeafRangesValid(TRUE, ctx.sections(0)) = FALSE) or (hCLeafRangesValid(FALSE, ctx.sections(1)) = FALSE) ) then
 		errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
 		exit sub
