@@ -78,6 +78,32 @@ sub symbProcFreeExt( byval proc as FBSYMBOL ptr )
 	end if
 end sub
 
+function symbIsGAS32CLongDoubleCAbiResult( byval proc as FBSYMBOL ptr ) as integer
+	dim as FBSYMBOL ptr subtype
+
+	if( (proc = NULL) orElse (symbIsReturnByRef( proc )) ) then
+		exit function
+	end if
+	if( (env.clopt.backend <> FB_BACKEND_GAS) orElse _
+	    (fbGetCpuFamily( ) <> FB_CPUFAMILY_X86) orElse _
+	    (fbGetBits( ) <> 32) orElse _
+	    (symbGetProcMode( proc ) <> FB_FUNCMODE_CDECL) ) then
+		exit function
+	end if
+	'' Use the declared result type here. The real type may already be the
+	'' hidden pointer form used by the ordinary UDT return ABI.
+	if( symbGetType( proc ) <> FB_DATATYPE_STRUCT ) then
+		exit function
+	end if
+
+	subtype = symbGetSubType( proc )
+	if( subtype = NULL ) then
+		exit function
+	end if
+
+	function = (ucase( *symbGetName( subtype ) ) = "CLONGDOUBLE")
+end function
+
 function symbProcReturnsOnStack( byval proc as FBSYMBOL ptr ) as integer
 	assert( symbIsProc( proc ) )
 
@@ -98,6 +124,12 @@ function symbProcReturnsOnStack( byval proc as FBSYMBOL ptr ) as integer
 		        ((env.target.options and FB_TARGETOPT_GAS64_SYSV_ABI) = 0) ) then
 			return TRUE
 		end if
+	end if
+
+	'' The i386 C ABI returns native long double in x87 ST(0), not through
+	'' FreeBASIC's hidden result pointer used for ordinary UDT values.
+	if( symbIsGAS32CLongDoubleCAbiResult( proc ) ) then
+		exit function
 	end if
 
 	'' BYREF result never is on stack, instead it's always a pointer,

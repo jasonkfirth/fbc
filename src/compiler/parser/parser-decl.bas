@@ -62,7 +62,7 @@ function cDeclaration _
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 	case FB_TK_DECLARE
-		cProcDecl( )
+		cProcDecl( FB_SYMBATTRIB_NONE, FB_PROCATTRIB_NONE )
 		return TRUE
 
 	case FB_TK_DEFBYTE, FB_TK_DEFUBYTE, FB_TK_DEFSHORT, FB_TK_DEFUSHORT, _
@@ -119,6 +119,12 @@ function cDeclaration _
 				function = TRUE
 			end select
 		end if
+
+	case FB_TK_DECLARE
+		'' A visibility prefix applies to a matching Private/Public prototype
+		'' just as it does to the procedure definition that follows.
+		cProcDecl( attrib, pattrib )
+		function = TRUE
 
 	case FB_TK_CONSTRUCTOR
 		if( attrib <> FB_SYMBATTRIB_NONE ) then

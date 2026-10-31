@@ -28,6 +28,70 @@ from sidecar import (SCHEMA, DETAIL_TAGS, PROVENANCE_TAGS, IMPLICIT_KINDS,
 
 
 class SidecarTests(unittest.TestCase):
+    def test_evaluation_contexts_copy_native_inputs_results_and_wide_units(self) -> None:
+        from evaluations import check_constants
+        check_constants(self)
+
+    def test_evaluation_queries_preserve_actual_retry_lifetimes(self) -> None:
+        from evaluations import check_queries
+        check_queries(self)
+
+    def test_evaluation_context_modes_transport_compact_and_reset(self) -> None:
+        from evaluations import check_modes
+        check_modes(self)
+
+    def test_evaluation_sources_skip_inactive_and_preserve_remaps(self) -> None:
+        from evaluations import check_sources
+        check_sources(self)
+
+    def test_evaluation_failures_preserve_native_diagnostics_and_results(self) -> None:
+        from evaluations import check_recovery
+        check_recovery(self)
+
+    def test_evaluation_reader_rejects_fabricated_lifetimes_and_payloads(self) -> None:
+        from evaluations import check_corruption
+        check_corruption(self)
+
+    def test_evaluation_observation_preserves_runtime_execution(self) -> None:
+        from evaluations import check_runtime
+        check_runtime(self)
+
+    def test_evaluation_capacity_uses_actual_lexer_slots(self) -> None:
+        from evaluations import check_capacity
+        check_capacity(self)
+
+    def test_evaluation_observer_guards_copy_storage_and_bound_events(self) -> None:
+        from evaluations import check_observer_guards
+        check_observer_guards(self)
+
+    def test_evaluation_wide_text_preserves_host_units_across_source_encodings(self) -> None:
+        from evaluations import check_wide_text
+        check_wide_text(self)
+
+    def test_evaluation_input_may_exceed_one_native_literal(self) -> None:
+        from evaluations import check_long_input
+        check_long_input(self)
+
+    def test_evaluation_preprocessor_preserves_selected_and_unselected_evaluations(self) -> None:
+        from evaluations import check_preprocessor
+        check_preprocessor(self)
+
+    def test_evaluation_contexts_distinguish_macro_nesting_and_peak_depth(self) -> None:
+        from evaluations import check_nesting
+        check_nesting(self)
+
+    def test_evaluation_deep_macros_do_not_invent_context_exhaustion(self) -> None:
+        from evaluations import check_deep_macros
+        check_deep_macros(self)
+
+    def test_evaluation_buffers_preserve_actual_conversion_and_replay(self) -> None:
+        from evaluations import check_buffers
+        check_buffers(self)
+
+    def test_evaluation_buffers_keep_host_units_for_a_cross_target(self) -> None:
+        from evaluations import check_cross_target_buffers
+        check_cross_target_buffers(self)
+
     root: Path
     compiler: Path
     toolchain_prefix: Path
@@ -101,6 +165,10 @@ class SidecarTests(unittest.TestCase):
     def test_data_source_items_native_descriptors_and_restore_targets(self) -> None:
         from data_streams import check_streams
         check_streams(self)
+
+    def test_data_native_constructors_initialize_active_union_payloads_and_counts(self) -> None:
+        from data_streams import check_native_nodes
+        check_native_nodes(self)
 
     def test_data_qb_raw_items_module_resets_and_omissions(self) -> None:
         from data_streams import check_qb_and_modules
@@ -2664,6 +2732,38 @@ WithDefault()
         from default_types import check_directives
         check_directives(self)
 
+    def test_pragma_history_preserves_all_native_scalar_groups_and_stacks(self) -> None:
+        from pragmas import check_scalars
+        check_scalars(self)
+
+    def test_pragma_history_preserves_once_and_each_reservation_action(self) -> None:
+        from pragmas import check_callbacks
+        check_callbacks(self)
+
+    def test_pragma_history_distinguishes_stack_failures_and_actual_applied_settings(self) -> None:
+        from pragmas import check_recovery
+        check_recovery(self)
+
+    def test_pragma_history_preserves_modes_abis_transport_and_module_reset(self) -> None:
+        from pragmas import check_modes
+        check_modes(self)
+
+    def test_pragma_history_preserves_macro_include_remap_and_inactive_origins(self) -> None:
+        from pragmas import check_origins
+        check_origins(self)
+
+    def test_pragma_history_rejects_missing_or_fabricated_actions_with_repaired_counts(self) -> None:
+        from pragmas import check_corruption
+        check_corruption(self)
+
+    def test_pragma_history_preserves_runtime_behavior_in_all_export_modes(self) -> None:
+        from pragmas import check_runtime
+        check_runtime(self)
+
+    def test_pragma_history_production_helpers_preserve_native_bounds_and_exclusions(self) -> None:
+        from pragmas import check_guards
+        check_guards(self)
+
     def test_default_type_policy_preserves_clamping_reversal_repetition_and_contexts(self) -> None:
         from default_types import check_ranges
         check_ranges(self)
@@ -3172,6 +3272,16 @@ dim selected_string as long
                     actual = {int(branch[10]): tuple(model.conditional_decisions[identity][2:5])
                               for identity, branch in model.conditional_branches.items()}
                     self.assertEqual(actual, expected)
+                    states = {int(branch[10]): model.conditional_states[identity]
+                              for identity, branch in model.conditional_branches.items()}
+                    self.assertEqual(states[6]["native_istrue"], -1)
+                    self.assertEqual(states[6]["native_elsecnt"], 0)
+                    self.assertEqual(states[8]["native_istrue"], 0)
+                    self.assertEqual(states[8]["native_elsecnt"], 1)
+                    self.assertEqual(states[12]["source_depth"], 2)
+                    self.assertEqual(states[14]["native_istrue"], -1)
+                    self.assertEqual(states[24]["native_istrue"], -1)
+                    self.assertEqual(states[24]["native_elsecnt"], 1)
                     self.assertEqual({row[7] for row in model.records["PPB"]},
                                      {"if", "ifdef", "ifndef", "elseif", "elseifdef", "elseifndef", "else"} - {"ifdef"})
                     nested = [row for row in model.records["PPB"] if int(row[10]) in (12, 14, 16, 18)]
@@ -3226,6 +3336,10 @@ __FB_UNIQUEID_POP__(KEPT)
                     for line in (4, 6, 7):
                         self.assertEqual(model.conditional_decisions[int(branches[line][1])][2:5],
                                          ["parent-inactive", "", "0"])
+                        state = model.conditional_states[int(branches[line][1])]
+                        self.assertEqual(state["availability"], "parent-inactive")
+                        self.assertIsNone(state["native_istrue"])
+                        self.assertIsNone(state["native_elsecnt"])
                     self.assertEqual(model.conditional_decisions[int(branches[14][1])][2:5],
                                      ["evaluated", "1", "0"])
                     self.assertFalse(any(row[5] == "NEVER_QUERIED" for row in model.records["PPT"]))
@@ -3452,6 +3566,15 @@ print SEM_EMPTY joined3
                             outcomes.setdefault(name, []).append(value)
                         self.assertEqual(outcomes["SEM_JOIN"], ["joined3"])
                         self.assertEqual(outcomes["SEM_STRINGIFY"], ['$"hello"'])
+                        stringify_arguments = [row for row in model.records["MA"]
+                                               if model.macro_definitions[int(model.macro_invocations[int(row[1])][3])][5] == "SEM_STRINGIFY"]
+                        self.assertEqual(len(stringify_arguments), 1)
+                        argument = stringify_arguments[0]
+                        expected_units = b"hello" if encoding == "ascii" else tuple(map(ord, "hello"))
+                        self.assertEqual(model.macro_units(argument[3], argument[4]), expected_units)
+                        self.assertEqual(argument[5:7], ["1", "1"])
+                        self.assertEqual(argument[7], str(source))
+                        self.assertGreater((int(argument[10]), int(argument[11])), (int(argument[8]), int(argument[9])))
                         self.assertEqual(outcomes["SEM_EMPTY"], [""])
                         self.assertEqual(outcomes["SEM_COUNT"], ["__FB_ARG_COUNT__(1,2,3)"])
                         self.assertEqual(outcomes["__FB_ARG_COUNT__"], ["3"])
@@ -5745,6 +5868,10 @@ Next
     def test_native_startup_lists_global_actions_static_guards_and_status(self) -> None:
         from startup_lifecycle import check_lists_and_instances
         check_lists_and_instances(self)
+
+    def test_native_startup_keeps_wrapper_membership_without_emitted_parent_body(self) -> None:
+        from startup_lifecycle import check_unemitted_membership
+        check_unemitted_membership(self)
 
     def test_native_startup_emissions_keep_selected_priorities_and_placement(self) -> None:
         from startup_lifecycle import check_backend_priorities

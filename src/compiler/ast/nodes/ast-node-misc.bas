@@ -396,8 +396,15 @@ function astLoadLOAD( byval n as ASTNODE ptr ) as IRVREG ptr
 
 	if( ast.doemit ) then
 		if( n->lod.isres ) then
-			vr = irAllocVREG( v1->dtype, v1->subtype )
-			irEmitLOADRES( v1, vr )
+			if( (ast.proc.curr <> NULL) andalso _
+			    symbIsGAS32CLongDoubleCAbiResult( ast.proc.curr->sym ) andalso _
+			    (v1->sym = symbGetProcResult( ast.proc.curr->sym )) ) then
+				'' The x87 return value must stay in ST(0) until the epilogue.
+				irEmitLOADRES( v1, NULL )
+			else
+				vr = irAllocVREG( v1->dtype, v1->subtype )
+				irEmitLOADRES( v1, vr )
+			end if
 		else
 			irEmitLOAD( v1 )
 		end if

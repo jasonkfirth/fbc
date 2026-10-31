@@ -1499,6 +1499,78 @@ private sub _emitCALLPTR _
 
 end sub
 
+private sub _emitSTORECLONGDOUBLEST0 _
+	( _
+		byval resultptr as IRVREG ptr, _
+		byval unused as integer _
+	)
+	dim as string pointer_value
+	dim as integer storage_size = 12
+
+	if( resultptr = NULL ) then
+		outp( "fstp st(0)" )
+		exit sub
+	end if
+
+	if( resultptr->subtype <> NULL ) then
+		storage_size = resultptr->subtype->lgt
+	end if
+
+	'' The result pointer is kept live across the C call. It may be in a
+	'' preserved register or spilled to a pointer-sized stack temporary.
+	select case resultptr->typ
+	case IR_VREGTYPE_REG
+		hPrepOperand( resultptr, pointer_value, FB_DATATYPE_INTEGER, 0, FALSE, FALSE )
+		if( pointer_value <> "eax" ) then
+			outp( "mov eax, " + pointer_value )
+		end if
+	case IR_VREGTYPE_OFS
+		hPrepOperand( resultptr, pointer_value, FB_DATATYPE_INTEGER, 0, FALSE, FALSE )
+		outp( "mov eax, " + pointer_value )
+	case else
+		hPrepOperand( resultptr, pointer_value, FB_DATATYPE_INTEGER, 0, FALSE, FALSE )
+		outp( "mov eax, dword ptr " + pointer_value )
+	end select
+
+	'' x87 stores ten value bytes. Zero CLongDouble's target padding before storing.
+	for byte_offset as integer = 8 to storage_size - 1 step 4
+		if( byte_offset + 4 <= storage_size ) then
+			outp( "mov dword ptr [eax+" + str( byte_offset ) + "], 0" )
+		end if
+	next
+
+	if( storage_size = 8 ) then
+		outp( "fstp qword ptr [eax]" )
+	else
+		outp( "fstp tbyte ptr [eax]" )
+	end if
+end sub
+
+private sub _emitLOADCLONGDOUBLEST0 _
+	( _
+		byval source as IRVREG ptr, _
+		byval unused as integer _
+	)
+	dim as string source_operand
+	dim as integer storage_size = 12
+
+	assert( source <> NULL )
+	if( source = NULL ) then
+		exit sub
+	end if
+
+	if( source->subtype <> NULL ) then
+		storage_size = source->subtype->lgt
+	end if
+
+	hPrepOperand( source, source_operand, FB_DATATYPE_UBYTE, 0, FALSE, FALSE )
+	if( storage_size = 8 ) then
+		outp( "fld qword ptr " + source_operand )
+	else
+		outp( "fld tbyte ptr " + source_operand )
+	end if
+end sub
+
 '':::::
 private sub _emitBRANCH _
 	( _
@@ -6083,7 +6155,13 @@ private sub _emitPUSHI( byval svreg as IRVREG ptr, byval unused as integer )
 			'' mov tmp, [src]
 			'' (zero-extending, because e.g. &hFF should become
 			'' &h000000FF, and not &hFFFFFFFF)
-			outp( "movzx " + tmp32 + ", " + src )
+			if( sdsize = 1 ) then
+				hPrepOperand( svreg, src, FB_DATATYPE_BYTE, 0, FALSE, FALSE )
+				outp( "movzx " + tmp32 + ", byte ptr " + src )
+			else
+				hPrepOperand( svreg, src, FB_DATATYPE_SHORT, 0, FALSE, FALSE )
+				outp( "movzx " + tmp32 + ", word ptr " + src )
+			end if
 
 			'' push tmp
 			outp( "push " + tmp32 )
@@ -6203,8 +6281,13 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 
 			'' 1. load 3rd byte:
 			''        &h00000033 <- byte ptr [src + length - 1]
-			hPrepOperand( svreg, src, FB_DATATYPE_BYTE, sdsize - UDT_PUSH_ONE_BYTE_REMAINDER )
-			outp( "movzx " + tmp32 + ", " + src )
+			hPrepOperand( svreg, src, FB_DATATYPE_BYTE, _
+			              sdsize - UDT_PUSH_ONE_BYTE_REMAINDER, FALSE, FALSE )
+			if( irIsREG( svreg ) ) then
+				outp( "movzx " + tmp32 + ", " + src )
+			else
+				outp( "movzx " + tmp32 + ", byte ptr " + src )
+			end if
 
 			'' 2. shl
 			''        &h00330000 <- &h00000033 shl 16
@@ -6215,8 +6298,13 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 			''        &h00002211 <- word ptr [src + length - 3]
 			''        &h00332211 <- &h00330000, &h00002211
 			tmp16 = *hGetRegName( FB_DATATYPE_SHORT, tmpreg )
-			hPrepOperand( svreg, src, FB_DATATYPE_SHORT, sdsize - UDT_PUSH_THREE_BYTE_REMAINDER )
-			outp( "mov " + tmp16 + ", " + src )
+			hPrepOperand( svreg, src, FB_DATATYPE_SHORT, _
+			              sdsize - UDT_PUSH_THREE_BYTE_REMAINDER, FALSE, FALSE )
+			if( irIsREG( svreg ) ) then
+				outp( "mov " + tmp16 + ", " + src )
+			else
+				outp( "mov " + tmp16 + ", word ptr " + src )
+			end if
 
 			'' 4. push
 			''        push &h00332211
@@ -6228,15 +6316,23 @@ private sub _emitPUSHUDT( byval svreg as IRVREG ptr, byval sdsize as integer )
 			'' (zero-extending, because e.g. &hFFFF should become
 			'' &h0000FFFF, and not &hFFFFFFFF)
 			ofs = sdsize - STACK_WORD_BYTES
-			hPrepOperand( svreg, src, FB_DATATYPE_SHORT, ofs )
-			outp( "movzx " + tmp32 + ", " + src )
+			hPrepOperand( svreg, src, FB_DATATYPE_SHORT, ofs, FALSE, FALSE )
+			if( irIsREG( svreg ) ) then
+				outp( "movzx " + tmp32 + ", " + src )
+			else
+				outp( "movzx " + tmp32 + ", word ptr " + src )
+			end if
 
 		case UDT_PUSH_ONE_BYTE_REMAINDER
 			'' mov tmp, byte ptr [src + length - 1]
 			'' (zero-extending, ditto)
 			ofs = sdsize - UDT_PUSH_ONE_BYTE_REMAINDER
-			hPrepOperand( svreg, src, FB_DATATYPE_BYTE, ofs )
-			outp( "movzx " + tmp32 + ", " + src )
+			hPrepOperand( svreg, src, FB_DATATYPE_BYTE, ofs, FALSE, FALSE )
+			if( irIsREG( svreg ) ) then
+				outp( "movzx " + tmp32 + ", " + src )
+			else
+				outp( "movzx " + tmp32 + ", byte ptr " + src )
+			end if
 
 		end select
 
@@ -7722,6 +7818,8 @@ end sub
 		EMIT_CBENTRY(POPI), EMIT_CBENTRY(POPF), EMIT_CBENTRY(POPL), _
 		EMIT_CBENTRY(PUSHUDT), _
 		EMIT_CBENTRY(POPST0), _
+		EMIT_CBENTRY(LOADCLONGDOUBLEST0), _
+		EMIT_CBENTRY(STORECLONGDOUBLEST0), _
 		_
 		EMIT_CBENTRY(CALL), _
 		EMIT_CBENTRY(CALLPTR), _

@@ -55,6 +55,8 @@ from semantic_qualified_filters import validate_qualified_filters
 from semantic_contexts import validate_contexts
 from semantic_extern import validate_extern
 from semantic_default_types import validate_default_types
+from semantic_pragmas import validate_pragmas
+from semantic_evaluations import validate_evaluations
 from semantic_procedure_state import validate_procedure_state
 from semantic_tokens import validate_tokens
 from semantic_prototypes import validate_prototypes
@@ -1569,6 +1571,8 @@ class Model:
         validate_contexts(self, number)
         validate_extern(self, number, unescape)
         validate_default_types(self, number, unescape)
+        validate_pragmas(self, number, unescape, subject_modules)
+        validate_evaluations(self, number, unescape)
         validate_procedure_state(self, number, subject_modules)
         validate_lookup(self, number, unescape, subject_modules)
         validate_tokens(self, number, unescape)
@@ -2897,21 +2901,46 @@ class Model:
 
     def validate_conditionals(self) -> None:
         """Check selection separately from evaluation; neither implies the other."""
+        self.conditional_states = {}
         for members in self.conditional_groups.values():
             selected = False
+            native_truth, else_count = False, 0
             for identity in members:
+                branch = self.conditional_branches[identity]
+                parent = int(branch[2])
+                source_depth = self.conditional_states[parent]["source_depth"] + 1 if parent else 1
                 if identity not in self.conditional_decisions:
+                    self.conditional_states[identity] = {"source_depth": source_depth, "native_istrue": None,
+                                                         "native_elsecnt": None, "availability": "unfinished"}
                     continue  # A recovery artifact may end during a condition.
                 decision = self.conditional_decisions[identity]
                 if decision[2] == "parent-inactive":
-                    parent = int(self.conditional_branches[identity][2])
                     if parent == 0 or parent not in self.conditional_decisions or self.conditional_decisions[parent][4] != "0":
                         raise ValueError("Inactive condition has no unselected parent")
                 elif decision[2] in ("evaluated", "unconditional"):
                     expected = not selected and (decision[2] == "unconditional" or decision[3] == "1")
                     if (decision[4] == "1") != expected:
                         raise ValueError("Conditional selection contradicts its result or prior selection")
+                if decision[2] == "parent-inactive":
+                    # ppSkip scans these directives without allocating a
+                    # native conditional table entry. Source topology exists,
+                    # but a false native payload would be an invented fact.
+                    self.conditional_states[identity] = {"source_depth": source_depth, "native_istrue": None,
+                                                         "native_elsecnt": None, "availability": "parent-inactive"}
+                else:
+                    if branch[7] == "else":
+                        native_truth = not native_truth
+                        else_count += 1
+                    else:
+                        # An ELSEIF after a selected branch is still evaluated
+                        # by the native parser, while its stored true state
+                        # remains set. This differs from selected=False.
+                        native_truth |= decision[4] == "1"
+                    self.conditional_states[identity] = {"source_depth": source_depth,
+                                                         "native_istrue": -int(native_truth), "native_elsecnt": else_count,
+                                                         "availability": "observed"}
                 selected |= decision[4] == "1"
+        self.conditional_skipped_regions = tuple(tuple(row) for row in self.records["PPS"])
         for row in self.records["PPS"]:
             branch = int(row[2])
             if branch not in self.conditional_decisions or self.conditional_decisions[branch][4] != "0":

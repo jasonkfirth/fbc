@@ -26,6 +26,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-evaluations.bi"
 
 '' These inputs cannot be replayed from a source-content hash. Report actual
 '' expansion, including expansion through another macro, to the model owner.
@@ -491,13 +492,22 @@ private sub hArgInsertArgW( byval arg as wstring ptr )
 end sub
 
 
+private function hCanPushEvalCtx( ) as integer
+	'' Evaluation pushes share the include context array, but do not increase
+	'' env.includerec. Checking only named include depth misses nested callback
+	'' evaluations at the last allocated slot. Equality also remains defined
+	'' when the current lexer is an isolated token probe outside that array.
+	return (env.includerec < FB_MAXINCRECLEVEL) and _
+		(lex.ctx <> @lex.ctxTB(FB_MAXINCRECLEVEL))
+end function
+
 private function hMacro_EvalZ( byval arg as zstring ptr, byval errnum as integer ptr ) as string
 
 	'' the expression should have already been handled in hLoadMacro|hLoadMacroW
 	'' so, if we do get here, just pass the argument back as-is
 	dim as string res = ""
 
-	if( env.includerec >= FB_MAXINCRECLEVEL ) then
+	if( hCanPushEvalCtx( ) = FALSE ) then
 		*errnum = FB_ERRMSG_RECLEVELTOODEEP
 		return res
 	end if
@@ -509,6 +519,7 @@ private function hMacro_EvalZ( byval arg as zstring ptr, byval errnum as integer
 		'' - text to expand is to be loaded in LEX.CTX->DEFTEXT[W]
 		'' - use the parser to build an AST for the literal result
 
+		dim as longint semantic_evaluation = fbSemanticModelEvaluationBegin(lex.ctx, "constant-expression", arg, len(*arg), FALSE)
 		lexPushCtx( )
 		lexInit( LEX_TKCTX_CONTEXT_EVAL )
 
@@ -517,6 +528,7 @@ private function hMacro_EvalZ( byval arg as zstring ptr, byval errnum as integer
 
 		hArgInsertArgA( arg )
 		hArgAppendLFCHAR()
+		fbSemanticModelEvaluationBuffer(semantic_evaluation)
 
 		dim expr as ASTNODE ptr = cExpression( )
 		var errmsg = FB_ERRMSG_OK
@@ -549,6 +561,7 @@ private function hMacro_EvalZ( byval arg as zstring ptr, byval errnum as integer
 
 		lex.ctx->reclevel -= 1
 
+		fbSemanticModelEvaluationEnd(semantic_evaluation, strptr(res), len(res), FALSE, errmsg)
 		lexPopCtx( )
 
 		if( errmsg <> FB_ERRMSG_OK ) then
@@ -574,7 +587,7 @@ private function hMacro_EvalW( byval arg as wstring ptr, byval errnum as integer
 	static as DWSTRING res
 	DWStrAssign( res, NULL )
 
-	if( env.includerec >= FB_MAXINCRECLEVEL ) then
+	if( hCanPushEvalCtx( ) = FALSE ) then
 		*errnum = FB_ERRMSG_RECLEVELTOODEEP
 		return res.data
 	end if
@@ -586,6 +599,7 @@ private function hMacro_EvalW( byval arg as wstring ptr, byval errnum as integer
 		'' - text to expand is to be loaded in LEX.CTX->DEFTEXT[W]
 		'' - use the parser to build an AST for the literal result
 
+		dim as longint semantic_evaluation = fbSemanticModelEvaluationBegin(lex.ctx, "constant-expression", arg, len(*arg), TRUE)
 		lexPushCtx( )
 		lexInit( LEX_TKCTX_CONTEXT_EVAL )
 
@@ -594,6 +608,7 @@ private function hMacro_EvalW( byval arg as wstring ptr, byval errnum as integer
 
 		hArgInsertArgW( arg )
 		hArgAppendLFCHAR()
+		fbSemanticModelEvaluationBuffer(semantic_evaluation)
 
 		dim expr as ASTNODE ptr = cExpression( )
 		var errmsg = FB_ERRMSG_OK
@@ -626,6 +641,7 @@ private function hMacro_EvalW( byval arg as wstring ptr, byval errnum as integer
 
 		lex.ctx->reclevel -= 1
 
+		fbSemanticModelEvaluationEnd(semantic_evaluation, res.data, res.len, TRUE, errmsg)
 		lexPopCtx( )
 
 		if( errmsg <> FB_ERRMSG_OK ) then
@@ -1398,7 +1414,7 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 
 	var res = ""
 
-	if( env.includerec >= FB_MAXINCRECLEVEL ) then
+	if( hCanPushEvalCtx( ) = FALSE ) then
 		*errnum = FB_ERRMSG_RECLEVELTOODEEP
 		return res
 	end if
@@ -1420,6 +1436,7 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 			dim as long filtervalue = whatvalue and FB_QUERY_SYMBOL.filtermask
 
 			'' create a lightweight context push
+			dim as longint semantic_evaluation = fbSemanticModelEvaluationBegin(lex.ctx, "symbol-query", sexpr, len(*sexpr), FALSE)
 			lexPushCtx( )
 			lexInit( LEX_TKCTX_CONTEXT_EVAL )
 
@@ -1428,6 +1445,7 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 
 			hArgInsertArgA( sexpr )
 			hArgAppendLFCHAR()
+			fbSemanticModelEvaluationBuffer(semantic_evaluation)
 
 			'' if filtervalue is zero then set the default methods to use for
 			'' look-up depending on what we are looking for
@@ -1516,10 +1534,13 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 					sym = NULL
 
 					'' reset the current lexer context and refresh the text to parse.
+					fbSemanticModelEvaluationEnd(semantic_evaluation, NULL, 0, FALSE, *errnum, "replay")
 					lexReinitEvalCtx( )
+					semantic_evaluation = fbSemanticModelEvaluationBegin(lex.ctx - 1, "symbol-query", sexpr, len(*sexpr), FALSE, semantic_evaluation)
 
 					hArgInsertArgA( sexpr )
 					hArgAppendLFCHAR()
+					fbSemanticModelEvaluationBuffer(semantic_evaluation)
 				end if
 
 			end if
@@ -1590,6 +1611,7 @@ private function hDefQuerySymZ_cb( byval argtb as LEXPP_ARGTB ptr, byval errnum 
 
 			lex.ctx->reclevel -= 1
 
+			fbSemanticModelEvaluationEnd(semantic_evaluation, strptr(res), len(res), FALSE, *errnum)
 			lexPopCtx( )
 
 		else

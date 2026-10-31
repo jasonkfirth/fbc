@@ -712,8 +712,10 @@ function astNewASSIGN _
 			return hShallowCopy( l, r )
 		end if
 
-		if( symbProcReturnsOnStack( tr->sym ) ) then
-			'' Returning on stack, copy from the temp result var
+		if( symbProcReturnsOnStack( tr->sym ) orElse _
+		    symbIsGAS32CLongDoubleCAbiResult( tr->sym ) ) then
+			'' Copy from the caller-owned result slot, preserving the local
+			'' shallow-copy contract and its initialization invariant.
 			assert( (symbGetHasRTTI(l->subtype) = FALSE) or ((options and AST_OPOPT_ISINI) = 0) )
 			return hShallowCopy( l, astBuildCallResultVar( astRemoveNoConvCAST( r ) ) )
 		end if

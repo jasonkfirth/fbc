@@ -1486,6 +1486,14 @@ function emitPOPST0( ) as EMIT_NODE ptr
 	function = hNewSTK( EMIT_OP_POPST0, NULL )
 end function
 
+function emitLoadCLongDoubleST0( byval source as IRVREG ptr ) as EMIT_NODE ptr
+	function = hNewSTK( EMIT_OP_LOADCLONGDOUBLEST0, source )
+end function
+
+function emitStoreCLongDoubleST0( byval resultptr as IRVREG ptr ) as EMIT_NODE ptr
+	function = hNewSTK( EMIT_OP_STORECLONGDOUBLEST0, resultptr )
+end function
+
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 '' MISC
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

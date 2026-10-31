@@ -560,7 +560,9 @@ function cAssignmentOrPtrCall _
 
 	'' proc call?
 	if( astIsCALL( expr ) ) then
-		expr = astBuildCallResultUdt( expr )
+		if( symbIsGAS32CLongDoubleCAbiResult( expr->sym ) = FALSE ) then
+			expr = astBuildCallResultUdt( expr )
+		end if
 	end if
 
 	dim as FBSYMBOL ptr tmp = NULL

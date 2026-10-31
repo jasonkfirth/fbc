@@ -121,11 +121,20 @@ function astNewCALL _
 	n->call.argtail = NULL
 	n->call.strtail = NULL
 
-	'' Allocate temp struct result if needed
-	if( symbProcReturnsOnStack( sym ) ) then
-		'' The result slot may be a structure or an extended scalar.
-		n->call.tmpres = symbAddTempVar( symbGetFullType( sym ), _
-		                                 symbGetSubtype( sym ) )
+	'' Allocate temp result storage for stack-returned values and the i386
+	'' CLongDouble ABI, which returns through x87 rather than a hidden pointer.
+	if( symbProcReturnsOnStack( sym ) orElse _
+	    symbIsGAS32CLongDoubleCAbiResult( sym ) ) then
+		'' The C long-double prototype's full type may already be its ABI
+		'' pointer form, but the temporary must hold the declared value.
+		if( symbIsGAS32CLongDoubleCAbiResult( sym ) ) then
+			n->call.tmpres = symbAddTempVar( symbGetType( sym ), _
+			                                 symbGetSubType( sym ) )
+		else
+			'' The result slot may be a structure or an extended scalar.
+			n->call.tmpres = symbAddTempVar( symbGetFullType( sym ), _
+			                                 symbGetSubtype( sym ) )
+		end if
 		astDtorListAdd( n->call.tmpres )
 	else
 		n->call.tmpres = NULL
@@ -355,7 +364,11 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 						TRUE ) )
 			end if
 
-			if( symbProcReturnsOnStack( proc ) andalso _
+			if( symbIsGAS32CLongDoubleCAbiResult( proc ) ) then
+				'' The result pointer is carried as backend metadata, not as a
+				'' C argument. The GAS32 emitter stores ST(0) into this slot.
+				vr = NULL
+			elseif( symbProcReturnsOnStack( proc ) andalso _
 			    typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then
 				'' The hidden result slot already contains the full scalar value.
 				vr = NULL
@@ -388,6 +401,13 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	end if
 
 	if( ast.doemit ) then
+		if( symbIsGAS32CLongDoubleCAbiResult( proc ) ) then
+			l = astNewVAR( n->call.tmpres )
+			l = astNewADDROF( l )
+			vr = astLoad( l )
+			astDelNode( l )
+		end if
+
 		if( regarg_count > 0 ) then
 			'' Profiling and function-pointer evaluation happen after the
 			'' arguments.  Preserve any values they leave live before ECX and
@@ -420,7 +440,11 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 		end if
 		fbSemanticModelCallAbiContext(NULL, NULL)
 
-		if( symbProcReturnsOnStack( proc ) andalso _
+		if( symbIsGAS32CLongDoubleCAbiResult( proc ) ) then
+			'' The parser exposes the caller-owned slot through
+			'' astBuildCallResultVar(), as it does for stack-returned UDTs.
+			vr = NULL
+		elseif( symbProcReturnsOnStack( proc ) andalso _
 		    typeIsInteger128Scalar( symbGetFullType( proc ) ) ) then
 			'' Expose the caller-owned result slot as the scalar expression value.
 			l = astNewVAR( n->call.tmpres )
@@ -582,7 +606,8 @@ end sub
 '' For accessing the temp result var allocated by CALLs that return on stack
 function astBuildCallResultVar( byval expr as ASTNODE ptr ) as ASTNODE ptr
 	assert( astIsCALL( expr ) )
-	assert( symbProcReturnsOnStack( expr->sym ) )
+	assert( symbProcReturnsOnStack( expr->sym ) orElse _
+	        symbIsGAS32CLongDoubleCAbiResult( expr->sym ) )
 
 	'' CALL first, but return the VAR
 	function = astNewLINK( expr, _
@@ -598,7 +623,8 @@ function astBuildCallResultUdt( byval expr as ASTNODE ptr ) as ASTNODE ptr
 	assert( astGetDataType( expr ) = FB_DATATYPE_STRUCT )
 	assert( symbIsReturnByRef( expr->sym ) = FALSE )
 
-	if( symbProcReturnsOnStack( expr->sym ) ) then
+	if( symbProcReturnsOnStack( expr->sym ) orElse _
+	    symbIsGAS32CLongDoubleCAbiResult( expr->sym ) ) then
 		'' UDT returned in temp var already, just access that one
 		function = astBuildCallResultVar( expr )
 	else

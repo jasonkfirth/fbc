@@ -3,6 +3,7 @@
 '' FB does not have a built-in data type corresponding to C's long double,
 '' so this provides the extra declarations for use by bindings.
 #include once "crt/stdarg.bi"
+'' C int bindings use Long; Integer can be target-sized and is a distinct type.
 #if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
 	'' Most 64-bit GCC targets use a 16-byte long double.
 	type clongdouble
@@ -13,6 +14,8 @@
 		declare operator cast( ) as ushort
 		declare operator cast( ) as integer
 		declare operator cast( ) as uinteger
+		declare operator cast( ) as long
+		declare operator cast( ) as ulong
 		declare operator cast( ) as longint
 		declare operator cast( ) as ulongint
 		declare operator cast( ) as single
@@ -29,6 +32,8 @@
 		declare operator cast( ) as ushort
 		declare operator cast( ) as integer
 		declare operator cast( ) as uinteger
+		declare operator cast( ) as long
+		declare operator cast( ) as ulong
 		declare operator cast( ) as longint
 		declare operator cast( ) as ulongint
 		declare operator cast( ) as single
@@ -45,6 +50,8 @@
 		declare operator cast( ) as ushort
 		declare operator cast( ) as integer
 		declare operator cast( ) as uinteger
+		declare operator cast( ) as long
+		declare operator cast( ) as ulong
 		declare operator cast( ) as longint
 		declare operator cast( ) as ulongint
 		declare operator cast( ) as single
@@ -75,34 +82,39 @@ private enum FB_CLONGDOUBLE_CMP
 	FB_CLONGDOUBLE_CMP_GE
 end enum
 
+'' The C runtime signatures use fixed-width C int types. FreeBASIC Integer is
+'' target-sized, so declare those parameters with 32-bit Long and ULong.
 declare sub fb_LongDoubleBop cdecl alias "fb_LongDoubleBop" _
 	(byval destination as any ptr, byval lhs as const any ptr, _
-	 byval rhs as const any ptr, byval operation as integer, _
-	 byval storage_size as uinteger)
+	 byval rhs as const any ptr, byval operation as long, _
+	 byval storage_size as ulong)
 declare sub fb_LongDoubleUop cdecl alias "fb_LongDoubleUop" _
 	(byval destination as any ptr, byval source as const any ptr, _
-	 byval operation as integer, byval storage_size as uinteger)
+	 byval operation as long, byval storage_size as ulong)
 declare function fb_LongDoubleCompare cdecl alias "fb_LongDoubleCompare" _
 	(byval lhs as const any ptr, byval rhs as const any ptr, _
-	 byval operation as integer, byval storage_size as uinteger) as integer
+	 byval operation as long, byval storage_size as ulong) as long
 declare sub fb_LongDoubleFromSigned cdecl alias "fb_LongDoubleFromSigned" _
 	(byval destination as any ptr, byval value as longint, _
-	 byval storage_size as uinteger)
+	 byval storage_size as ulong)
 declare sub fb_LongDoubleFromUnsigned cdecl alias "fb_LongDoubleFromUnsigned" _
 	(byval destination as any ptr, byval value as ulongint, _
-	 byval storage_size as uinteger)
+	 byval storage_size as ulong)
 declare sub fb_LongDoubleFromDouble cdecl alias "fb_LongDoubleFromDouble" _
 	(byval destination as any ptr, byval value as double, _
-	 byval storage_size as uinteger)
+	 byval storage_size as ulong)
+declare sub fb_LongDoubleFromString cdecl alias "fb_LongDoubleFromString" _
+	(byval destination as any ptr, byval value as const zstring ptr, _
+	 byval storage_size as ulong)
 declare function fb_LongDoubleToSigned cdecl alias "fb_LongDoubleToSigned" _
-	(byval source as const any ptr, byval storage_size as uinteger) as longint
+	(byval source as const any ptr, byval storage_size as ulong) as longint
 declare function fb_LongDoubleToUnsigned cdecl alias "fb_LongDoubleToUnsigned" _
-	(byval source as const any ptr, byval storage_size as uinteger) as ulongint
+	(byval source as const any ptr, byval storage_size as ulong) as ulongint
 declare function fb_LongDoubleToDouble cdecl alias "fb_LongDoubleToDouble" _
-	(byval source as const any ptr, byval storage_size as uinteger) as double
+	(byval source as const any ptr, byval storage_size as ulong) as double
 '' CLongDouble is byte-backed, so the C runtime must consume its native ABI slot.
 declare sub fb_LongDoubleVaArgCopy cdecl alias "fb_LongDoubleVaArgCopy" _
-	(byval destination as any ptr, byval storage_size as uinteger, _
+	(byval destination as any ptr, byval storage_size as ulong, _
 	 byval arguments as Cva_List)
 
 private function fb_LongDoubleVaArg _
@@ -134,6 +146,14 @@ end operator
 
 private operator clongdouble.cast( ) as uinteger
 	return cast( uinteger, fb_LongDoubleToUnsigned( @this, sizeof( clongdouble ) ) )
+end operator
+
+private operator clongdouble.cast( ) as long
+	return cast( long, fb_LongDoubleToSigned( @this, sizeof( clongdouble ) ) )
+end operator
+
+private operator clongdouble.cast( ) as ulong
+	return cast( ulong, fb_LongDoubleToUnsigned( @this, sizeof( clongdouble ) ) )
 end operator
 
 private operator clongdouble.cast( ) as longint
@@ -170,6 +190,13 @@ private function CLongDoubleFromDoubleValue( byval rhs as double ) as clongdoubl
 	return result
 end function
 
+private function CLongDoubleFromStringValue _
+	(byval value as const zstring ptr) as clongdouble
+	dim result as clongdouble
+	fb_LongDoubleFromString( @result, value, sizeof( clongdouble ) )
+	return result
+end function
+
 private function CLongDoubleBopWithDouble _
 	(byref lhs as clongdouble, byval rhs as double, byval operation as integer) as clongdouble
 	dim converted as clongdouble
@@ -198,6 +225,11 @@ private function CLongLongCompareWithLongDouble _
 	dim converted as clongdouble
 	fb_LongDoubleFromSigned( @converted, lhs, sizeof( clongdouble ) )
 	return fb_LongDoubleCompare( @converted, @rhs, operation, sizeof( clongdouble ) )
+end function
+
+private function CLongDoubleBooleanResult( byval comparison as integer ) as integer
+	'' FreeBASIC comparisons use -1 for true, unlike the C helper's 1/0 result.
+	return iif( comparison <> 0, -1, 0 )
 end function
 
 private operator +( byref lhs as clongdouble, byref rhs as clongdouble ) as clongdouble
@@ -247,59 +279,73 @@ private operator -( byref rhs as clongdouble ) as clongdouble
 end operator
 
 private operator =( byref lhs as clongdouble, byref rhs as clongdouble ) as integer
-	return fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_EQ, sizeof( clongdouble ) )
+	return CLongDoubleBooleanResult( _
+		fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_EQ, sizeof( clongdouble ) ) )
 end operator
 
 private operator =( byref lhs as clongdouble, byval rhs as double ) as integer
-	return CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_EQ )
+	return CLongDoubleBooleanResult( _
+		CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_EQ ) )
 end operator
 
 private operator <>( byref lhs as clongdouble, byref rhs as clongdouble ) as integer
-	return fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_NE, sizeof( clongdouble ) )
+	return CLongDoubleBooleanResult( _
+		fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_NE, sizeof( clongdouble ) ) )
 end operator
 
 private operator <>( byref lhs as clongdouble, byval rhs as double ) as integer
-	return CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_NE )
+	return CLongDoubleBooleanResult( _
+		CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_NE ) )
 end operator
 
 private operator >( byref lhs as clongdouble, byref rhs as clongdouble ) as integer
-	return fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_GT, sizeof( clongdouble ) )
+	return CLongDoubleBooleanResult( _
+		fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_GT, sizeof( clongdouble ) ) )
 end operator
 
 private operator >( byref lhs as clongdouble, byval rhs as double ) as integer
-	return CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_GT )
+	return CLongDoubleBooleanResult( _
+		CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_GT ) )
 end operator
 
 private operator <( byref lhs as clongdouble, byref rhs as clongdouble ) as integer
-	return fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_LT, sizeof( clongdouble ) )
+	return CLongDoubleBooleanResult( _
+		fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_LT, sizeof( clongdouble ) ) )
 end operator
 
 private operator <( byref lhs as clongdouble, byval rhs as double ) as integer
-	return CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_LT )
+	return CLongDoubleBooleanResult( _
+		CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_LT ) )
 end operator
 
 private operator <( byref lhs as clongdouble, byval rhs as integer ) as integer
-	return CLongDoubleCompareWithInteger( lhs, rhs, FB_CLONGDOUBLE_CMP_LT )
+	return CLongDoubleBooleanResult( _
+		CLongDoubleCompareWithInteger( lhs, rhs, FB_CLONGDOUBLE_CMP_LT ) )
 end operator
 
 private operator <( byval lhs as longint, byref rhs as clongdouble ) as integer
-	return CLongLongCompareWithLongDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_LT )
+	return CLongDoubleBooleanResult( _
+		CLongLongCompareWithLongDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_LT ) )
 end operator
 
 private operator <=( byref lhs as clongdouble, byref rhs as clongdouble ) as integer
-	return fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_LE, sizeof( clongdouble ) )
+	return CLongDoubleBooleanResult( _
+		fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_LE, sizeof( clongdouble ) ) )
 end operator
 
 private operator <=( byref lhs as clongdouble, byval rhs as double ) as integer
-	return CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_LE )
+	return CLongDoubleBooleanResult( _
+		CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_LE ) )
 end operator
 
 private operator >=( byref lhs as clongdouble, byref rhs as clongdouble ) as integer
-	return fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_GE, sizeof( clongdouble ) )
+	return CLongDoubleBooleanResult( _
+		fb_LongDoubleCompare( @lhs, @rhs, FB_CLONGDOUBLE_CMP_GE, sizeof( clongdouble ) ) )
 end operator
 
 private operator >=( byref lhs as clongdouble, byval rhs as double ) as integer
-	return CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_GE )
+	return CLongDoubleBooleanResult( _
+		CLongDoubleCompareWithDouble( lhs, rhs, FB_CLONGDOUBLE_CMP_GE ) )
 end operator
 
 '' end of crt/longdouble.bi

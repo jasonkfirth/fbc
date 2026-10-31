@@ -98,7 +98,9 @@ def validate(root: Path, make: str = "make") -> tuple[int, int]:
                       "This file intentionally does NOT contain:"):
             if field not in header:
                 failures.append(relative + ": header missing " + field)
-        if not text.rstrip().endswith("'' end of " + relative):
+        # Both native FreeBASIC comment forms can identify the owning file.
+        footers = ("'' end of " + relative, "/' end of " + relative + " '/")
+        if not text.rstrip().endswith(footers):
             failures.append(relative + ": missing identifying footer")
         if path.parent == compiler:
             failures.append(relative + ": source has no owning subsystem")

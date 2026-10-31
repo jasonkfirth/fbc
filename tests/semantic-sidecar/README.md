@@ -816,4 +816,41 @@ transport/reset, runtime parity and repaired-count corruptions have explicit
 checks. The production guard compiles the native getter/setter bodies with the
 actual observer, verifying unchanged native table behavior and the event bound.
 
+Pragma tests exercise every scalar group and callback, nested/interleaved option
+stacks, overflow/underflow followed by actual setters, partial reservation
+success, rejected routes and malformed closures. Full/expression/binding
+availability, ABIs, transport, reset, source origins, noninterference and
+repaired-count action omissions have dedicated checks. A production guard
+compiles actual native push/pop bodies with the collector and tests copied
+lifetime, exclusions and both bounds without reimplementing stack behavior.
+
+Transient DATA payload checks compile the actual container/item constructors
+against a bounded poisoned allocation arena. They verify every live leaf tag,
+literal guards, final link, active container count and native item order. Source
+fixtures independently check the reader's documented tag/count derivation,
+including wide/NUL/address and QB raw items, without creating DATA N records.
+
+The evaluation context families in `evaluations.py` cover copied callback
+arguments, actual converted lexer buffers, query retries and returned results.
+They distinguish nested macro invocation graphs from the sequential evaluation
+contexts the compiler actually enters. Narrow/wide inputs, four wide source
+encodings, host code units under a Windows cross target, compact omissions,
+datatype ABIs, binary/text transport, repeated modules and preprocessing-only
+output are checked. Runtime output and native diagnostics are compared with
+observation disabled.
+
+`semantic_evaluations.py` validates dense event/lifetime identities, source and
+configuration ownership, bounded peak depth, replay, buffer end markers and
+payload lengths. Corrected-count mutations cannot remove a prepared buffer or
+close the wrong context. Recovery tests preserve both parser error-count changes
+and callback error codes: a returned value and a zero callback error do not
+erase a diagnostic from the parser.
+
+`evaluation-capacity-guards.bas` receives the actual native capacity helper;
+`evaluation-observer-guards.bas` links a scratch copy of the BASIC observer.
+Their tests cover copied storage, initialized buffer selection, source heads,
+disabled/probe paths, declared bounds and fail-closed event exhaustion. Generated
+C and objects stay in test scratch. These context receipts do not complete the
+remaining compile-time AST/token association or general semantic-model scope.
+
 <!-- end of README.md -->

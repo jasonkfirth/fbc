@@ -1781,6 +1781,34 @@ private sub hFlushCALL _
 		byval vr as IRVREG ptr _
 	)
 
+	if( symbIsGAS32CLongDoubleCAbiResult( proc ) ) then
+		'' GAS32 CDecl long-double results arrive in x87 ST(0). Keep the
+		'' caller-owned result address live across the call, then store ST(0).
+		if( (vr <> NULL) andalso irIsREG( vr ) ) then
+			if( hPreserveReg( vr ) = FALSE ) then
+				irStoreVR( vr, NULL )
+			end if
+		end if
+
+		select case( op )
+		case AST_OP_CALLFUNCT
+			hPreserveRegs( )
+			emitCALL( proc, bytestopop )
+		case AST_OP_CALLPTR
+			hPreserveRegs( v1 )
+			hLoadPointer( v1 )
+			emitCALLPTR( v1, bytestopop )
+			hFreeREG( v1 )
+		case else
+			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
+			exit sub
+		end select
+
+		emitStoreCLongDoubleST0( vr )
+		if( vr <> NULL ) then hFreeREG( vr, TRUE )
+		exit sub
+	end if
+
 	select case( op )
 	case AST_OP_CALLFUNCT
 		'' save used registers and free the FPU stack
@@ -2309,6 +2337,15 @@ private sub hFlushLOAD _
 		regTB(v1_dclass)->ensure( regTB(v1_dclass), v1, NULL, typeGetSize( v1_dtype ) )
 
 	case AST_OP_LOADRES
+		if( (ast.proc.curr <> NULL) andalso _
+		    symbIsGAS32CLongDoubleCAbiResult( ast.proc.curr->sym ) andalso _
+		    (v1->sym = symbGetProcResult( ast.proc.curr->sym )) ) then
+			'' A CDecl CLongDouble body returns its local result via ST(0).
+			emitLoadCLongDoubleST0( v1 )
+			hFreeREG( v1 )
+			exit sub
+		end if
+
 		if( v1_typ = IR_VREGTYPE_REG ) then
 			'' handle longint
 			if( ISLONGINT( v1_dtype ) ) then
