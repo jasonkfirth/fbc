@@ -86,6 +86,15 @@ private sub FloatingValues()
 	VERIFY(calls = 17)
 end sub
 
+private sub ConvertedValues()
+	dim as single small_value = csng(abs(SignedValue(-17)))
+	dim as double wide_value = cdbl(abs(SignedValue(-33)))
+	VERIFY(small_value = 17.0!)
+	VERIFY(wide_value = 33.0)
+	VERIFY(cdbl(abs(SignedValue(-41))) + cdbl(abs(UnsignedValue(&hffffffffffffffffull))) = 42.0)
+	VERIFY(calls = 21)
+end sub
+
 #ifdef CHECK_OPAQUE
 	asm
 		nop
@@ -95,6 +104,7 @@ end sub
 IntegerValues()
 PromotedValues()
 FloatingValues()
+ConvertedValues()
 print "C_INTEGER_ABS_PASS"
 
 /' end of c-integer-abs.bas '/

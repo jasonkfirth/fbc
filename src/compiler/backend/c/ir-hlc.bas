@@ -5366,6 +5366,14 @@ end sub
 '' v1 = cast( <v1's dtype>, v2 )
 private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	var r = exprNewVREG( v2 )
+	if( irIsREG(v2) andalso (r->class = EXPRCLASS_UOP) andalso _
+	    (r->op = AST_OP_ABS) andalso (typeGetClass(r->dtype) = FB_DATACLASS_INTEGER) ) then
+		'' Integer ABS is a typed C call. Preserve that result in its own
+		'' binding before conversion, as for calls loaded directly by the IR.
+		'' The destination cast then applies to a value of the declared type.
+		exprSTORE(v2, r, TRUE)
+		r = exprNewVREG(v2)
+	end if
 	'' A read through a pointer can carry const qualification even when the
 	'' value being converted is a Boolean. Ignore qualifiers here, while
 	'' retaining pointer levels so a Boolean pointer is never treated as one.
