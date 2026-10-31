@@ -4,10 +4,16 @@
 	Purpose: Discard unobserved private stores without discarding required calls.
 	Responsibilities: Prove private storage is unread, retain address escapes and
 	hidden loader references, and preserve evaluation of scalar call results.
+	Address-only evaluation retains constructor wrappers and index effects without
+	reading the designated object or taking ownership of its lifetime.
 	Private static storage also requires initializer and address-escape checks.
 	This file intentionally does NOT contain: interprocedural analysis, string or
 	UDT lifetime changes, or native diagnostic suppression.
 '/
+
+'' -------------------------------------------------------------------------
+'' Private storage and dependency ownership
+'' -------------------------------------------------------------------------
 
 type CSCALARDEPENDENCY
 	sym as FBSYMBOL ptr
@@ -131,9 +137,45 @@ private sub hCScalarStoreCollect(byval n as ASTNODE ptr)
 	hCScalarStoreCollect(n->r)
 end sub
 
-private function hCScalarStoreDiscardable(byval n as ASTNODE ptr) as integer
-	if( n = NULL orelse hCScalarStoreType(n->dtype) = FALSE ) then return FALSE
+'' -------------------------------------------------------------------------
+'' Value and address evaluation
+'' -------------------------------------------------------------------------
+
+private function hCScalarStoreDiscardable(byval n as ASTNODE ptr, byval address_only as integer = FALSE) as integer
+	if( n = NULL ) then return FALSE
 	if( n->vector <> 0 ) then return FALSE
+	if( address_only ) then
+		select case as const n->class
+		case AST_NODECLASS_VAR
+			var sym = n->sym
+			if( sym = NULL ) then return FALSE
+			if( symbIsProc(sym) ) then return (symbIsImport(sym) = FALSE)
+			if( symbIsVar(sym) = FALSE ) then return FALSE
+			'' TLS and imported storage may need a loader call for its address.
+			if( symbIsThreadLocal(sym) or symbIsThreadLocalC(sym) or symbIsImport(sym) ) then return FALSE
+			return (symbIsTemp(sym) = FALSE) orelse (hCScalarStoreHasLifetime(sym) = FALSE)
+		case AST_NODECLASS_IDX
+			if( n->r = NULL orelse n->r->class <> AST_NODECLASS_VAR ) then return FALSE
+			if( hCScalarStoreDiscardable(n->r, TRUE) = FALSE ) then return FALSE
+			return (n->l = NULL) orelse hCScalarStoreDiscardable(n->l)
+		case AST_NODECLASS_FIELD
+			if( n->r <> NULL ) then return FALSE
+			return hCScalarStoreDiscardable(n->l, TRUE)
+		case AST_NODECLASS_DEREF
+			if( n->r <> NULL ) then return FALSE
+			return hCScalarStoreDiscardable(n->l)
+		case AST_NODECLASS_CALLCTOR
+			'' A whole constructor result can remain as a statement. Keep its
+			'' CALLCTOR and result VAR intact, including temporary dtor references.
+			if( typeGetDtAndPtrOnly(n->dtype) <> FB_DATATYPE_STRUCT ) then return FALSE
+			if( n->l = NULL orelse n->l->class <> AST_NODECLASS_CALL ) then return FALSE
+			if( n->l->sym = NULL orelse symbIsConstructor(n->l->sym) = FALSE ) then return FALSE
+			if( n->r = NULL orelse n->r->class <> AST_NODECLASS_VAR ) then return FALSE
+			return (n->r->var_.ofs = 0) andalso (typeGetDtAndPtrOnly(n->r->dtype) = FB_DATATYPE_STRUCT)
+		end select
+		return FALSE
+	end if
+	if( hCScalarStoreType(n->dtype) = FALSE ) then return FALSE
 	select case as const n->class
 	case AST_NODECLASS_CONST
 		return TRUE
@@ -148,15 +190,9 @@ private function hCScalarStoreDiscardable(byval n as ASTNODE ptr) as integer
 		end if
 		return (hCScalarStoreHasLifetime(n->sym) = FALSE)
 	case AST_NODECLASS_ADDROF, AST_NODECLASS_OFFSET
-		'' Loading the address of existing storage does not construct, destroy,
-		'' or read that object. More complex designators keep their evaluation.
+		'' Address designators have different effects from object value reads.
 		if( n->r <> NULL orelse n->l = NULL ) then return FALSE
-		if( n->l->class <> AST_NODECLASS_VAR ) then return FALSE
-		var sym = n->l->sym
-		if( sym = NULL orelse symbIsVar(sym) = FALSE ) then return FALSE
-		'' A TLS address may invoke an allocation/initialization helper.
-		if( symbIsThreadLocal(sym) or symbIsThreadLocalC(sym) or symbIsImport(sym) ) then return FALSE
-		return TRUE
+		return hCScalarStoreDiscardable(n->l, TRUE)
 	case AST_NODECLASS_CALL
 		'' Keep the original call and status/error policy. The result alone
 		'' can disappear; hidden aggregate result storage has a separate owner.
@@ -197,6 +233,10 @@ private function hCScalarStoreDiscardable(byval n as ASTNODE ptr) as integer
 	end select
 	return FALSE
 end function
+
+'' -------------------------------------------------------------------------
+'' Store ownership and liveness
+'' -------------------------------------------------------------------------
 
 private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	var target = n->l
@@ -358,8 +398,34 @@ private sub hCScalarStoreStatementReferences(byval n as ASTNODE ptr, byref fallt
 	if( astCStatementEndsFlow(n) ) then fallthrough = FALSE
 end sub
 
-private function hCScalarStoreDiscardValue(byval n as ASTNODE ptr) as ASTNODE ptr
+'' -------------------------------------------------------------------------
+'' Effect extraction and statement pruning
+'' -------------------------------------------------------------------------
+
+private function hCScalarStoreDiscardValue(byval n as ASTNODE ptr, byval address_only as integer = FALSE) as ASTNODE ptr
 	if( n = NULL ) then return NULL
+	if( address_only ) then
+		select case as const n->class
+		case AST_NODECLASS_CALLCTOR
+			'' Do not unwrap the constructor or delete its result VAR. Lowering
+			'' this statement still initializes the same object and consumes the
+			'' same lifetime references; only the enclosing address is unobserved.
+			return n
+		case AST_NODECLASS_FIELD
+			var designator = n->l
+			n->l = NULL
+			astDelNode(n)
+			return hCScalarStoreDiscardValue(designator, TRUE)
+		end select
+	else
+		select case as const n->class
+		case AST_NODECLASS_ADDROF, AST_NODECLASS_OFFSET
+			var designator = n->l
+			n->l = NULL
+			astDelNode(n)
+			return hCScalarStoreDiscardValue(designator, TRUE)
+		end select
+	end if
 	select case as const n->class
 	case AST_NODECLASS_CALL
 		'' astIgnoreCallResult() may introduce RTL error checking. A value that
@@ -392,6 +458,16 @@ private function hCScalarStorePrune(byval n as ASTNODE ptr, byval value_used as 
 		'' Late RTL lowering can leave a value-producing call in a statement
 		'' LINK. Keep its evaluation and arguments without an unread register.
 		'' Throwing calls and owned results retain their existing handling.
+		if( n->call.tmpres = NULL andalso n->sym <> NULL andalso _
+		    symbGetIsThrowable(n->sym) = FALSE andalso symbGetIsRTL(n->sym) ) then
+			if( typeGetDtAndPtrOnly(n->dtype) = FB_DATATYPE_STRING andalso _
+			    *symbGetMangledName(n->sym) = FB_RTL_STRCONCATBYREF ) then
+				'' This RTL entry returns its destination descriptor, not an owned
+				'' temporary. astIgnoreCallResult() would add temporary-string cleanup.
+				astSetType(n, FB_DATATYPE_VOID, NULL)
+				return TRUE
+			end if
+		end if
 		if( typeIsPtr(n->dtype) = FALSE andalso hCScalarStoreType(n->dtype) andalso _
 		    typeGetClass(n->dtype) = FB_DATACLASS_INTEGER andalso _
 		    n->call.tmpres = NULL andalso n->sym <> NULL andalso _
