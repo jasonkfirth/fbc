@@ -110,7 +110,9 @@ private function hGfxBlenderArgument _
 	ctx.gfxcontextid += 1
 	context_name = "fb_c_gfx_context_" + str(ctx.gfxcontextid)
 	callback_value = exprFlush( expr )
-	return exprNewTEXT( typeAddrOf(FB_DATATYPE_FUNCTION), native_type, hGfxAdapterName(adapter) )
+	var adapter_name = hGfxAdapterName(adapter)
+	hCLeafNativeReference(adapter_name)
+	return exprNewTEXT( typeAddrOf(FB_DATATYPE_FUNCTION), native_type, adapter_name )
 end function
 
 private sub hEmitGfxBlenderDefinitions( )
@@ -126,15 +128,19 @@ private sub hEmitGfxBlenderDefinitions( )
 	end if
 	var entry = cptr(CGFXBLENDER ptr, listGetHead(@ctx.gfxblenders))
 	do while( entry <> NULL )
+		var first = ctx.sections(0).bufferlen
 		hWriteLine( "struct " + hGfxContextType(entry) + " { " + _
 			*entry->function_type.data + " callback; void* parameter; };", TRUE )
 		hWriteLine( "static uint32 " + convention + hGfxAdapterName(entry) + _
 			"( uint32, uint32, void* );", TRUE )
+		var adapter_name = hGfxAdapterName(entry)
+		hCLeafNativeSpan(adapter_name, TRUE, first, ctx.sections(0).bufferlen)
 		entry = listGetNext( entry )
 	loop
 	var section = sectionGosub( 1 )
 	entry = listGetHead( @ctx.gfxblenders )
 	do while( entry <> NULL )
+		var first = ctx.sections(1).bufferlen
 		hWriteLine( "static uint32 " + convention + hGfxAdapterName(entry) + _
 			"( uint32 source, uint32 destination, void* parameter )", TRUE )
 		hWriteLine( "{", TRUE )
@@ -145,6 +151,8 @@ private sub hEmitGfxBlenderDefinitions( )
 		hWriteLine( "return context->callback( source, destination, " + argument + " );", TRUE )
 		sectionUnindent( )
 		hWriteLine( "}", TRUE )
+		var adapter_name = hGfxAdapterName(entry)
+		hCLeafNativeSpan(adapter_name, FALSE, first, ctx.sections(1).bufferlen)
 		entry = listGetNext( entry )
 	loop
 	sectionReturn( section )

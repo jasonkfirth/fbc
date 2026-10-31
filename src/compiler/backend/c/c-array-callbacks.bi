@@ -56,9 +56,6 @@ private function hArrayCallbackArgument( byval expr as EXPRNODE ptr ) as EXPRNOD
 			dim as FBSYMBOL ptr subtype = NULL
 			if( param <> NULL ) then symbGetRealParamDtype( param, dtype, subtype )
 			if( typeIsPtr(dtype) ) then
-				'' Record the typed call before replacing its symbol expression with
-				'' an adapter name. The output pruner cannot recover that edge later.
-				hCLeafCallback(target)
 				var target_name = hGetCId( target )
 				var entry = cptr(CARRAYCALLBACK ptr, listGetHead(@ctx.arraycallbacks))
 				do while( entry <> NULL )
@@ -73,8 +70,13 @@ private function hArrayCallbackArgument( byval expr as EXPRNODE ptr ) as EXPRNOD
 					var target_type = hEmitType( dtype, subtype, TRUE )
 					DZstrAssign( entry->target_type, strptr(target_type) )
 				end if
+				'' The adapter may be shared by several procedures. Keep each
+				'' caller edge and the adapter's typed target before erasing the
+				'' symbol expression; the deferred body contains only owned names.
+				var callback_name = hArrayCallbackName(entry)
+				hCLeafCallback(target, callback_name)
 				exprFreeTree( expr )
-				return exprNewTEXT( typeAddrOf(FB_DATATYPE_VOID), NULL, hArrayCallbackName(entry) )
+				return exprNewTEXT( typeAddrOf(FB_DATATYPE_VOID), NULL, callback_name )
 			end if
 		end if
 	end if
@@ -91,18 +93,24 @@ private sub hEmitArrayCallbackDefinitions( )
 	'' Stored C names remain valid after a local symbol table is released.
 	var entry = cptr(CARRAYCALLBACK ptr, listGetHead(@ctx.arraycallbacks))
 	do while( entry <> NULL )
+		var first = ctx.sections(0).bufferlen
 		hWriteLine( "static void " + hArrayCallbackName(entry) + "( void* );", TRUE )
+		var callback_name = hArrayCallbackName(entry)
+		hCLeafNativeSpan(callback_name, TRUE, first, ctx.sections(0).bufferlen)
 		entry = listGetNext( entry )
 	loop
 	var section = sectionGosub( 1 )
 	entry = listGetHead( @ctx.arraycallbacks )
 	do while( entry <> NULL )
+		var first = ctx.sections(1).bufferlen
 		hWriteLine( "static void " + hArrayCallbackName(entry) + "( void* fb_c_array_element )", TRUE )
 		hWriteLine( "{", TRUE )
 		sectionIndent( )
 		hWriteLine( *entry->target_name.data + "( (" + *entry->target_type.data + ")fb_c_array_element );", TRUE )
 		sectionUnindent( )
 		hWriteLine( "}", TRUE )
+		var callback_name = hArrayCallbackName(entry)
+		hCLeafNativeSpan(callback_name, FALSE, first, ctx.sections(1).bufferlen)
 		entry = listGetNext( entry )
 	loop
 	sectionReturn( section )

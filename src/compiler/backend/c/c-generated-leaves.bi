@@ -3,7 +3,7 @@
 	File: backend/c/c-generated-leaves.bi
 	Purpose: Omit unreachable private procedure bodies and their C declarations.
 	Responsibilities: Own per-output C-name records, observe actual references,
-	trace private dependencies, retain roots, and compact checked spans.
+	trace private and adapter dependencies, retain roots, and compact checked spans.
 	This file intentionally does NOT contain: BASIC access flag, ABI or source diagnostic changes.
 '/
 
@@ -71,39 +71,51 @@ private sub hCLeafInit( )
 	hCGlobalStorageInit()
 end sub
 
-private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
-	if( symbIsPrivate(proc) = FALSE ) then return NULL
-	var identifier = hGetCId(proc)
+private function hCLeafGetName( byref identifier as string ) as CPROCLEAF ptr
+	if( c_leaf_ready = FALSE ) then return NULL
 	if( len(identifier) = 0 ) then return NULL
 	var entry = cptr(CPROCLEAF ptr, hashLookup(@c_leaf_names, strptr(identifier)))
 	if( entry = NULL ) then
 		entry = listNewNode(@c_leaf_nodes)
 		entry->name = ZstrDup(strptr(identifier))
 		hashAdd(@c_leaf_names, entry->name, entry, hashHash(entry->name))
-		'' Private visibility supplies no external C entry point. Startup,
-		'' exported and virtual entries still have callers outside this graph.
-		entry->must_keep = symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
-			symbGetIsModLevelProc(proc) or symbIsExport(proc) or symbIsVirtual(proc)
 	end if
 	return entry
 end function
 
-private sub hCLeafDependency( byval target as CPROCLEAF ptr )
-	if( c_leaf_current = NULL ) then
+private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
+	if( symbIsPrivate(proc) = FALSE ) then return NULL
+	var identifier = hGetCId(proc)
+	var entry = hCLeafGetName(identifier)
+	if( entry = NULL ) then return NULL
+	'' Private visibility supplies no external C entry point. Startup,
+	'' exported and virtual entries still have callers outside this graph.
+	entry->must_keep or= symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
+		symbGetIsModLevelProc(proc) or symbIsExport(proc) or symbIsVirtual(proc)
+	return entry
+end function
+
+private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF ptr )
+	if( target = NULL ) then exit sub
+	if( owner = NULL ) then
 		'' Public bodies and global initializers are roots outside private spans.
 		target->referenced = TRUE
 		exit sub
 	end if
-	if( target = c_leaf_current ) then exit sub
-	var edge = c_leaf_current->dependencies
+	if( target = owner ) then exit sub
+	var edge = owner->dependencies
 	while( edge <> NULL )
 		if( edge->target = target ) then exit sub
 		edge = edge->next_edge
 	wend
 	edge = listNewNode(@c_leaf_edges)
 	edge->target = target
-	edge->next_edge = c_leaf_current->dependencies
-	c_leaf_current->dependencies = edge
+	edge->next_edge = owner->dependencies
+	owner->dependencies = edge
+end sub
+
+private sub hCLeafDependency( byval target as CPROCLEAF ptr )
+	hCLeafLink(c_leaf_current, target)
 end sub
 
 '' The output owns every node and edge until pruning finishes. Edges borrow
@@ -172,11 +184,17 @@ private sub hCLeafReference( byval sym as FBSYMBOL ptr )
 	end if
 end sub
 
-private sub hCLeafCallback( byval target as FBSYMBOL ptr )
-	hCLeafReference(target)
-	'' Adapter bodies live outside procedure spans. Retain their caller even
-	'' for public targets, so pruning cannot leave an unused adapter behind.
-	if( c_leaf_current <> NULL ) then c_leaf_current->must_keep = TRUE
+private sub hCLeafNativeReference( byref identifier as string )
+	hCLeafDependency(hCLeafGetName(identifier))
+end sub
+
+private sub hCLeafCallback( byval target as FBSYMBOL ptr, byref identifier as string )
+	if( c_leaf_ready = FALSE ) then exit sub
+	var adapter = hCLeafGetName(identifier)
+	'' A typed adapter belongs to its callers, not to the output as a whole.
+	'' Its original target is retained only when the adapter is reachable.
+	hCLeafDependency(adapter)
+	if( symbIsPrivate(target) ) then hCLeafLink(adapter, hCLeafGet(target))
 end sub
 
 private function hCLeafSpan(byval entry as CPROCLEAF ptr, byval is_header as integer, _
@@ -202,6 +220,17 @@ private function hCLeafSpan(byval entry as CPROCLEAF ptr, byval is_header as int
 	end if
 	return span
 end function
+
+private sub hCLeafNativeSpan(byref identifier as string, byval is_header as integer, _
+	byval first as uinteger, byval last as uinteger)
+	var entry = hCLeafGetName(identifier)
+	if( entry = NULL ) then exit sub
+	var span = hCLeafSpan(entry, is_header, first, last)
+	if( is_header = FALSE ) then
+		assert(entry->body_span = NULL)
+		entry->body_span = span
+	end if
+end sub
 
 private sub hCLeafBegin( byval proc as FBSYMBOL ptr )
 	c_leaf_current = NULL
@@ -271,7 +300,8 @@ end sub
 
 private sub hCLeafPrune( )
 	'' Opaque assembly can name procedures without typed IR references.
-	'' Adapter targets and callers are retained when the adapter is requested.
+	'' Adapter declarations and bodies have the same checked spans as BASIC
+	'' procedures. Reachability retains shared adapters and their typed targets.
 	'' Numeric conversion helpers use reserved names and only system builtins;
 	'' they cannot refer to a private BASIC procedure.
 	'' Debug line directives still depend on the original output ordering.

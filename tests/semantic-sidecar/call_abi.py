@@ -79,6 +79,43 @@ def check_choices(test):
                 test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
 
 
+def check_graphics_choices(test):
+    source = test.fixture("graphics-call-abi.bas")
+    for backend in (value for value in test.backends if value in ("gcc", "clang")):
+        for target in ("linux-x86", "linux-x86_64", "win32-x86", "win32-x86_64"):
+            with test.subTest(backend=backend, target=target):
+                extra = ("-target", target)
+                test.invoke([source], mode="off", backend=backend, extra=extra)
+                emission = test.emission_path(source.stem, backend).read_bytes()
+                model = test.compile(source, backend=backend, extra=extra)
+                selected = model.selected_call_abi[1]["argument"].values()
+                callbacks = [row for row in selected if row[5] == "graphics-blender"]
+                contexts = [row for row in selected if row[5] == "graphics-blender-context"]
+                test.assertEqual(len(callbacks), 2)
+                test.assertEqual(len(contexts), 1)
+                test.assertTrue(all(int(row[8]) & POINTER_MASK for row in callbacks))
+                test.assertEqual(contexts[0][8:10], ("", ""))
+                test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
+                for mutation in ("callback-scalar", "callback-subtype", "context-type", "context-kind"):
+                    with test.subTest(mutation=mutation), test.assertRaises(ValueError):
+                        rows = [row.copy() for row in model.rows]
+                        kind = "graphics-blender" if mutation.startswith("callback-") else "graphics-blender-context"
+                        row = next(row for row in rows if row[0] == "K"
+                                   and row[3].startswith("emitted-abi-argument:")
+                                   and row[4].split("\t")[5] == kind)
+                        fields = row[4].split("\t")
+                        if mutation == "callback-scalar":
+                            fields[8] = str(int(fields[8]) & ~POINTER_MASK)
+                        elif mutation == "callback-subtype":
+                            fields[9] = "0"
+                        elif mutation == "context-type":
+                            fields[8:10] = fields[6:8]
+                        else:
+                            fields[5] = "graphics-blender"
+                        row[4] = "\t".join(fields)
+                        Model(text_rows(rows))
+
+
 def check_omissions(test):
     source = test.fixture("call-abi.bas")
     for backend in test.backends:

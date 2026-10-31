@@ -1546,7 +1546,11 @@ retain their capture-phase meaning; they describe no final machine location.
 
 Kinds include `value`, `variadic-value`, `hidden-result`, `unmapped-value`,
 `i386-int128-low`, `i386-int128-high`, `memory-byval`, `va-list-decay`,
-`array-callback` and `libc-adjusted`. Variadic values carry their actual promoted
+`array-callback`, `libc-adjusted`, `graphics-blender` and
+`graphics-blender-context`. A graphics blender retains its selected procedure
+pointer type. Its caller-owned generated C context has no invented BASIC type;
+both graphics components retain their actual by-value formals and C stage.
+Variadic values carry their actual promoted
 types and share the declaration's variadic marker symbol. Hidden result
 storage has no source formal. An argument emitted without a formal or carried
 hidden-result context remains `unmapped-value`. Split values keep adjacent

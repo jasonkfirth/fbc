@@ -5658,6 +5658,10 @@ Next
         from call_abi import check_omissions
         check_omissions(self)
 
+    def test_selected_c_graphics_callbacks_preserve_types_and_context(self) -> None:
+        from call_abi import check_graphics_choices
+        check_graphics_choices(self)
+
     def test_selected_call_abi_transport_and_module_reset(self) -> None:
         from call_abi import check_transport
         check_transport(self)

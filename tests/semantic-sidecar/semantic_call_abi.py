@@ -16,7 +16,8 @@ POINTER_MASK = 0x1e0
 PREFIXES = ("emitted-abi-call:", "emitted-abi-argument:", "emitted-abi-call-end:", "emitted-abi-call-counts:",
             "emitted-abi-builtin:", "emitted-abi-builtin-count:")
 KINDS = frozenset(("value", "variadic-value", "hidden-result", "unmapped-value", "i386-int128-low",
-                   "i386-int128-high", "memory-byval", "va-list-decay", "array-callback", "libc-adjusted"))
+                   "i386-int128-high", "memory-byval", "va-list-decay", "array-callback", "libc-adjusted",
+                   "graphics-blender", "graphics-blender-context"))
 
 
 def validate_call_abi(model, number, subject_modules):
@@ -158,7 +159,7 @@ def validate_call_abi(model, number, subject_modules):
             if position != len(components) or kind not in KINDS:
                 raise ValueError("Selected call ABI component order or kind is invalid")
             native_type(*fields[6:8])
-            dtype = native_type(*fields[8:10], optional=kind == "array-callback")
+            dtype = native_type(*fields[8:10], optional=kind in ("array-callback", "graphics-blender-context"))
             spelling, attributes, value = fields[10:13]
             text(spelling, empty=call[1] == "c")
             text(attributes, empty=True)
@@ -187,10 +188,20 @@ def validate_call_abi(model, number, subject_modules):
                     raise ValueError("LLVM call memory/va_list argument loses its selected pointer")
             if kind == "memory-byval" and re.fullmatch(r" byval\(.+\) align ([1-9][0-9]*)", attributes) is None:
                 raise ValueError("LLVM call memory argument loses its actual byval attributes")
-            if kind in ("array-callback", "libc-adjusted") and call[1] != "c":
+            if kind in ("array-callback", "libc-adjusted", "graphics-blender", "graphics-blender-context") and call[1] != "c":
                 raise ValueError("C call adaptation appears in another backend")
             if kind == "array-callback" and dtype is not None:
                 raise ValueError("C callback adaptation invents a BASIC selected type")
+            if kind in ("graphics-blender", "graphics-blender-context"):
+                if mode != "byval":
+                    raise ValueError("C graphics adaptation loses its by-value formal")
+                if kind == "graphics-blender-context":
+                    if dtype is not None:
+                        raise ValueError("C graphics context invents a BASIC selected type")
+                elif (dtype is None or dtype & POINTER_MASK != 32
+                        or model.primitives[module - 1][dtype & 31][2] != "function"
+                        or symbol(fields[9], "3") not in model.signatures):
+                    raise ValueError("C graphics callback loses its selected procedure-pointer type")
             if attributes and kind not in ("hidden-result", "memory-byval"):
                 raise ValueError("Selected call argument invents unsupported attributes")
             arguments[module][identity] = tuple(fields)

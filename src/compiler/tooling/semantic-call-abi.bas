@@ -189,6 +189,21 @@ sub fbSemanticModelCallAbiArgument( byval identity as longint, byval param as FB
 				valid = FALSE
 			end select
 		end if
+	case "graphics-blender", "graphics-blender-context"
+		valid = (active_stage = "c") and (param <> NULL) and (part = 0) and (parts = 1)
+		if( valid ) then valid = (param->param.mode = FB_PARAMMODE_BYVAL)
+		if( selected_kind = "graphics-blender" ) then
+			'' The selected callback keeps its real procedure-pointer type.
+			'' Its caller-owned context is a generated C record, not a BASIC UDT.
+			valid and= (typeGetDtAndPtrOnly(selected_dtype) = typeAddrOf(FB_DATATYPE_FUNCTION))
+			if( selected_subtype = NULL ) then
+				valid = FALSE
+			elseif( symbIsProc(selected_subtype) = FALSE ) then
+				valid = FALSE
+			end if
+		else
+			valid and= (selected_dtype = FB_DATATYPE_INVALID) and (selected_subtype = NULL)
+		end if
 	case "value", "variadic-value", "memory-byval", "va-list-decay", "array-callback", "libc-adjusted"
 		valid = (param <> NULL) and (part = 0) and (parts = 1)
 		if( (selected_kind = "memory-byval") or (selected_kind = "va-list-decay") ) then valid and= (active_stage = "llvm")
@@ -196,7 +211,7 @@ sub fbSemanticModelCallAbiArgument( byval identity as longint, byval param as FB
 	case else
 		valid = FALSE
 	end select
-	if( selected_kind = "array-callback" ) then
+	if( (selected_kind = "array-callback") or (selected_kind = "graphics-blender-context") ) then
 		valid and= (selected_dtype = FB_DATATYPE_INVALID)
 	else
 		valid and= (selected_dtype <> FB_DATATYPE_INVALID)

@@ -51,6 +51,16 @@ function fbSemanticModelSymbolId( byval sym as FBSYMBOL ptr ) as longint
 	end 10
 end function
 
+sub symbGetRealParamDtype overload _
+	(byval param as FBSYMBOL ptr, byref dtype as integer, byref subtype as FBSYMBOL ptr)
+	'' This fixture supplies only by-value scalar formals. Copy their declared
+	'' types; other parameter modes require the real compiler's ABI lowering.
+	if param = NULL orelse param->class <> FB_SYMBCLASS_PARAM then end 11
+	if param->param.mode <> FB_PARAMMODE_BYVAL then end 11
+	dtype = symbGetFullType(param)
+	subtype = symbGetSubtype(param)
+end sub
+
 private sub fresh( )
 	fbSemanticModelResetCallAbi( )
 	captured = ""
@@ -153,6 +163,24 @@ if identity <> 1 then end 7
 fbSemanticModelCallAbiEnd(identity, "example()")
 fbSemanticModelFinishCallAbi(TRUE)
 if failures or instr(captured, "emitted-abi-call-counts:1" + chr(9) + "1" + chr(9) + "0") = 0 then end 7
+
+fresh( )
+identity = fbSemanticModelCallAbiBegin(@procedure_symbol, "c", FALSE, FALSE, FB_DATATYPE_INVALID, NULL, "", "", 0, 0)
+previous_capture = captured
+fbSemanticModelCallAbiArgument(identity, @parameter_symbol, 0, 1, "graphics-blender", FB_DATATYPE_LONG, NULL, FB_DATATYPE_LONG, NULL, "", "", "callback")
+fbSemanticModelCallAbiArgument(identity, @parameter_symbol, 0, 1, "graphics-blender", FB_DATATYPE_LONG, NULL, typeAddrOf(FB_DATATYPE_FUNCTION), NULL, "", "", "callback")
+fbSemanticModelCallAbiArgument(identity, @parameter_symbol, 0, 1, "graphics-blender", FB_DATATYPE_LONG, NULL, typeAddrOf(FB_DATATYPE_FUNCTION), @parameter_symbol, "", "", "callback")
+fbSemanticModelCallAbiArgument(identity, @parameter_symbol, 0, 1, "graphics-blender-context", FB_DATATYPE_LONG, NULL, typeAddrOf(FB_DATATYPE_VOID), NULL, "", "", "context")
+parameter_symbol.param.mode = FB_PARAMMODE_BYREF
+fbSemanticModelCallAbiArgument(identity, @parameter_symbol, 0, 1, "graphics-blender-context", FB_DATATYPE_LONG, NULL, FB_DATATYPE_INVALID, NULL, "", "", "context")
+parameter_symbol.param.mode = FB_PARAMMODE_BYVAL
+if failures <> 5 or captured <> previous_capture then end 12
+failures = 0
+fbSemanticModelCallAbiArgument(identity, @parameter_symbol, 0, 1, "graphics-blender", FB_DATATYPE_LONG, NULL, typeAddrOf(FB_DATATYPE_FUNCTION), @static_target, "", "", "callback")
+fbSemanticModelCallAbiArgument(identity, @parameter_symbol, 0, 1, "graphics-blender-context", FB_DATATYPE_LONG, NULL, FB_DATATYPE_INVALID, NULL, "", "", "context")
+fbSemanticModelCallAbiEnd(identity, "graphics(callback, context)")
+fbSemanticModelFinishCallAbi(TRUE)
+if failures then end 12
 
 fresh( )
 observing = FALSE
