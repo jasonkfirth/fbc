@@ -40,6 +40,7 @@ extern const int __fb_app_mode_gui_enabled FB_ANDROID_WEAK;
 void fb_AllocateMainFBThread(void) FB_ANDROID_WEAK;
 void fb_hAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
 void fb_hNotifyAndroidSetActivity(ANativeActivity *activity) FB_ANDROID_WEAK;
+void fb_hAndroidSetAppFilesPath(const char *path) FB_ANDROID_WEAK;
 void fb_hAndroidSetKeyboardEnabled(int enabled) FB_ANDROID_WEAK;
 void fb_hAndroidSetWindow(ANativeWindow *window) FB_ANDROID_WEAK;
 void fb_hAndroidTouch(float x, float y, int action) FB_ANDROID_WEAK;
@@ -320,6 +321,14 @@ static void fb_android_prepare_files_dir(FB_ANDROID_APP *app)
 
 	if (app->activity->assetManager)
 		fb_android_extract_asset_manifest(app->activity->assetManager, files_dir);
+
+	/* NativeActivity runs under app_process, whose executable directory is
+	 * /system/bin. Assets and user preferences belong to the app sandbox.
+	 * Publish both paths before BASIC starts any application-owned threads. */
+	if (fb_hAndroidSetAppFilesPath)
+		fb_hAndroidSetAppFilesPath(files_dir);
+	if (setenv("HOME", files_dir, 1) != 0)
+		fb_android_log("FreeBASIC Android could not set the private HOME directory");
 }
 
 static void fb_android_set_nonblock(int fd)

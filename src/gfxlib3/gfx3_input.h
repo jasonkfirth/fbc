@@ -30,7 +30,12 @@
 #include "../rtlib/fb_drop.h"
 
 #define FB_GFX3_INPUT_KEY_COUNT 128u
+/* Mobile IMEs can commit a complete word between two BASIC input polls. */
+#if defined(HOST_ANDROID) || defined(HOST_JS)
+#define FB_GFX3_INPUT_KEY_BUFFER_LENGTH 256u
+#else
 #define FB_GFX3_INPUT_KEY_BUFFER_LENGTH 16u
+#endif
 #define FB_GFX3_INPUT_TOUCH_MAX 16u
 #define FB_GFX3_INPUT_GAMEPAD_MAX 16u
 #define FB_GFX3_INPUT_GAMEPAD_AXIS_COUNT 8u

@@ -66,10 +66,13 @@ static void fb_fs_init_console(void)
 		//emscripten_set_wheel_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hMouseWheelEventHandler );
 
 		// touch
-		emscripten_set_touchstart_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
-		emscripten_set_touchmove_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
-		emscripten_set_touchend_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
-		emscripten_set_touchcancel_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, fb_hTouchEventHandler );
+		/* The graphics IME bridge focuses during trusted touch capture. Deliver
+		 * raw touch at window bubble so cancelling its default action does
+		 * not preempt that trusted editor activation on Android browsers. */
+		emscripten_set_touchstart_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 0, fb_hTouchEventHandler );
+		emscripten_set_touchmove_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 0, fb_hTouchEventHandler );
+		emscripten_set_touchend_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 0, fb_hTouchEventHandler );
+		emscripten_set_touchcancel_callback( EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 0, fb_hTouchEventHandler );
 	}
 }
 

@@ -30,6 +30,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputConnectionWrapper;
 import android.widget.EditText;
@@ -37,6 +38,25 @@ import android.widget.EditText;
 public class FreeBasicInputView extends EditText {
     private static final int MAX_DELETE_COUNT = 16;
     private boolean clearingForwardedText;
+    private boolean changingComposition;
+
+    /* InputConnection and TextWatcher callbacks belong to Android's UI thread.
+     * Preedit text stays in this helper until the IME commits it. Forwarding
+     * each composing prefix would append i, im, ime for one typed word. */
+    boolean hasComposingText() {
+        Editable text = getText();
+        return text != null && BaseInputConnection.getComposingSpanStart(text) >= 0;
+    }
+
+    private void clearForwardedText() {
+        clearingForwardedText = true;
+        try {
+            Editable text = getText();
+            if (text != null) text.clear();
+        } finally {
+            clearingForwardedText = false;
+        }
+    }
 
     public FreeBasicInputView(Context context) {
         super(context);
@@ -61,14 +81,13 @@ public class FreeBasicInputView extends EditText {
 
             @Override
             public void afterTextChanged(Editable text) {
-                if (clearingForwardedText || text == null || text.length() == 0) {
+                if (clearingForwardedText || changingComposition ||
+                    text == null || text.length() == 0 || hasComposingText()) {
                     return;
                 }
 
                 dispatchCommittedText(text);
-                clearingForwardedText = true;
-                text.clear();
-                clearingForwardedText = false;
+                clearForwardedText();
             }
         });
     }
@@ -135,7 +154,9 @@ public class FreeBasicInputView extends EditText {
         char ch;
         boolean handled = false;
 
-        if (text == null) {
+        // Match the browser commit bound. Decline oversized commits as a whole
+        // rather than forwarding only the suffix that fits the native queue.
+        if (text == null || text.length() > 128) {
             return false;
         }
 
@@ -168,7 +189,7 @@ public class FreeBasicInputView extends EditText {
             reliably receive that event, so catch it here before EditText
             handles it internally.
         */
-        if (dispatchNativeKeyEvent(event)) {
+        if (!hasComposingText() && dispatchNativeKeyEvent(event)) {
             return true;
         }
 
@@ -187,7 +208,7 @@ public class FreeBasicInputView extends EditText {
         return new InputConnectionWrapper(base, true) {
             @Override
             public boolean sendKeyEvent(KeyEvent event) {
-                if (dispatchNativeKeyEvent(event)) {
+                if (!hasComposingText() && dispatchNativeKeyEvent(event)) {
                     return true;
                 }
 
@@ -196,6 +217,9 @@ public class FreeBasicInputView extends EditText {
 
             @Override
             public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+                if (hasComposingText()) {
+                    return super.deleteSurroundingText(beforeLength, afterLength);
+                }
                 if (dispatchSyntheticBackspaces(beforeLength)) {
                     return true;
                 }
@@ -206,10 +230,31 @@ public class FreeBasicInputView extends EditText {
             @Override
             public boolean commitText(CharSequence text, int newCursorPosition) {
                 if (dispatchCommittedText(text)) {
+                    clearForwardedText();
                     return true;
                 }
 
                 return super.commitText(text, newCursorPosition);
+            }
+
+            @Override
+            public boolean setComposingText(CharSequence text, int newCursorPosition) {
+                changingComposition = true;
+                try {
+                    return super.setComposingText(text, newCursorPosition);
+                } finally {
+                    changingComposition = false;
+                }
+            }
+
+            @Override
+            public boolean finishComposingText() {
+                String pending = hasComposingText() ? getText().toString() : "";
+                boolean result = super.finishComposingText();
+                if (pending.length() != 0 && dispatchCommittedText(pending)) {
+                    clearForwardedText();
+                }
+                return result;
             }
         };
     }

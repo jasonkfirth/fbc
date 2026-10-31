@@ -29,6 +29,10 @@
 #include "../gfx3_joystick.h"
 #include "../gfx3_platform.h"
 #include "../gfx3_screenlist.h"
+#include "../../gfxlib2/drivers/mobile_control.h"
+#ifdef HOST_WIN32
+#include "../../gfxlib2/drivers/win32/gfx_metrics.h"
+#endif
 
 FBCALL void fb_GfxSetWindowTitle(FBSTRING *title);
 
@@ -1021,6 +1025,30 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 		parameter3 = &ignored3;
 	if (parameter4 == NULL)
 		parameter4 = &ignored4;
+	if ((what == GET_WINDOW_METRICS) || (what == GET_SOFT_KEYBOARD) ||
+	    (what == SET_SOFT_KEYBOARD) || (what == SET_SOFT_KEYBOARD_REGION) ||
+	    (what == CLEAR_SOFT_KEYBOARD_REGIONS)) {
+#if defined(HOST_ANDROID)
+		fb_hMobileControl(what, parameter1, parameter2, parameter3, parameter4);
+#else
+		if (what == GET_WINDOW_METRICS) {
+			/* SCREENINFO also works before opening a graphics mode. */
+			ssize_t depth, bpp, pitch, refresh;
+			fb_GfxScreenInfo(parameter1, parameter2, &depth, &bpp, &pitch,
+				&refresh, NULL);
+			*parameter3 = 96;
+#ifdef HOST_WIN32
+			ssize_t native_window = 0;
+			fb_GfxControl_i(FB_GFX3_GET_WINDOW_HANDLE, &native_window, NULL, NULL, NULL);
+			*parameter3 = fb_hWindowDpi(native_window);
+#endif
+			*parameter4 = 0;
+		} else if (what == GET_SOFT_KEYBOARD) {
+			*parameter1 = *parameter2 = *parameter3 = *parameter4 = 0;
+		}
+#endif
+		return;
+	}
 	FB_GRAPHICS_LOCK();
 	if (query_compat_control_set(what, *parameter1)) {
 		FB_GRAPHICS_UNLOCK();

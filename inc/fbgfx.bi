@@ -148,6 +148,8 @@ namespace FB
 		GET_HIGH_PRIORITY           = 16, _
 		GET_SCANLINE_SIZE           = 17, _
 		GET_X86_MMX_ENABLED         = 18, _
+		GET_WINDOW_METRICS          = 19, _
+		GET_SOFT_KEYBOARD           = 20, _
 		_
 		GET_GL_COLOR_BITS           = 37, _
 		GET_GL_COLOR_RED_BITS       = 38, _
@@ -188,13 +190,25 @@ namespace FB
 		SET_GL_ACCUM_ALPHA_BITS     = 116, _
 		SET_GL_NUM_SAMPLES          = 117, _
 		SET_X86_MMX_ENABLED         = 118, _
+		SET_SOFT_KEYBOARD           = 119, _
+		SET_SOFT_KEYBOARD_REGION    = 120, _
 		_
 		SET_GL_2D_MODE              = 150, _
 		SET_GL_SCALE                = 151
 
 	'' Commands:
 	const as integer _
-		POLL_EVENTS                 = 200
+		POLL_EVENTS                 = 200, _
+		CLEAR_SOFT_KEYBOARD_REGIONS  = 201
+
+	'' GET_WINDOW_METRICS: usable width, height, layout DPI, rotation (degrees).
+	'' Browser dimensions are CSS pixels; Android uses native pixels and 160-DPI
+	'' layout density. Desktop backends without metrics use the current screen.
+	'' GET_SOFT_KEYBOARD: observed visibility (-1/0, -2 unknown), availability.
+	'' SET_SOFT_KEYBOARD: nonzero requests show, zero requests hide. Desktop no-op.
+	'' Browser focus needs a user gesture. Publish editable canvas rectangles with
+	'' SET_SOFT_KEYBOARD_REGION (x,y,w,h), clearing them before each layout pass.
+	'' This lets a trusted pointer event focus an IME target on the first tap.
 
 
 	'' Color values for transparency

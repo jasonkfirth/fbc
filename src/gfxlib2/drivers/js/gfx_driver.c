@@ -1,4 +1,9 @@
-/* asmjs fbgfx driver */
+/*
+ * FreeBASIC gfxlib2: js/gfx_driver.c
+ * Purpose: Present gfxlib software pages through the browser SDL canvas.
+ * Responsibilities: Mode creation, presentation, input hooks and display size.
+ * This file does not own widgets or application layout.
+ */
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_js.h"
@@ -387,8 +392,8 @@ const GFXDRIVER *__fb_gfx_drivers_list[] = {
 
 void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh)
 {
-	*width = 512;
-	*height = 512;
+	*width = EM_ASM_INT({ return typeof screen !== 'undefined' ? screen.width : 0; });
+	*height = EM_ASM_INT({ return typeof screen !== 'undefined' ? screen.height : 0; });
 	*depth = 32;
 	*refresh = GFX_JS_FPS;
 }
@@ -460,3 +465,5 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 
 	return fb_ErrorSetNum(FB_RTERROR_OK);
 }
+
+/* end of gfx_driver.c */

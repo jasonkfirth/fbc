@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Project: FreeBASIC Android tools; File: fbc-android.
+# Purpose: Compile BASIC modules and package a NativeActivity application.
+# Responsibilities: ABI selection, native linking, Java glue and APK assets.
+# This file does not install SDKs or replace applications unless explicitly run.
 
 set -euo pipefail
 
@@ -24,6 +28,7 @@ Options:
   --targets LIST         Build APK native libraries for a comma/space-separated
                          target list (default: android-arm,android-aarch64,android-x86_64)
   --assets DIR           Add all files from DIR as current-directory APK assets
+  --link-object FILE     Link a native prerequisite object (one ABI target only)
   --env NAME=VALUE       Set an environment variable before the program starts
   --package NAME         Android application package name
   --label TEXT           Android application label
@@ -416,6 +421,8 @@ keyboard_button="true"
 screen_orientation="unspecified"
 fbc_args=()
 project_sources=()
+native_objects=()
+project_pids=()
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -438,6 +445,12 @@ while [ $# -gt 0 ]; do
 		--landscape) screen_orientation="landscape"; shift ;;
 		--assets)
 			asset_dir="$2"
+			shift 2
+			;;
+		--link-object)
+			[ $# -ge 2 ] || die "--link-object requires a file"
+			[ -f "$2" ] || die "native prerequisite object not found: $2"
+			native_objects+=("$2")
 			shift 2
 			;;
 		--env)
@@ -566,6 +579,11 @@ done
 
 [ "${#target_keys[@]}" -gt 0 ] || die "no Android targets selected"
 
+if [ "${#native_objects[@]}" -gt 0 ]; then
+	[ "${#target_keys[@]}" -eq 1 ] || die "--link-object requires exactly one Android target"
+	[ "$mode" != "obj" ] || die "--link-object requires APK or shared-library output"
+fi
+
 if [ "$mode" != "apk" ] && [ "${#target_keys[@]}" -ne 1 ]; then
 	die "--emit-so and --emit-obj require exactly one Android target; use --target TARGET"
 fi
@@ -667,11 +685,20 @@ ranlib="$prebuilt/bin/llvm-ranlib"
 [ -x "$ar" ] || die "NDK llvm-ar not found: $ar"
 [ -x "$ranlib" ] || die "NDK llvm-ranlib not found: $ranlib"
 
-tmp="${TMPDIR:-/tmp}/fbc-android.$$"
-mkdir -p "$tmp"
+tmp_root="$(cd "${TMPDIR:-/tmp}" && pwd -P)"
+tmp="$(mktemp -d "$tmp_root/fbc-android.XXXXXX")"
 cleanup() {
+	local project_pid
+	# A failed compiler must not erase another child's active C input.
+	# Drain the bounded pair before retiring this invocation's private directory.
+	for project_pid in "${project_pids[@]}"; do
+		wait "$project_pid" || true
+	done
 	if [ "$keep_temp" -eq 0 ]; then
-		rm -rf "$tmp"
+		case "$tmp" in
+			"$tmp_root"/fbc-android.*) rm -rf "$tmp" ;;
+			*) echo "fbc-android: refusing unexpected cleanup path: $tmp" >&2 ;;
+		esac
 	else
 		echo "fbc-android: kept temporary directory: $tmp" >&2
 	fi
@@ -769,10 +796,13 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 	# -r mode and leaves unresolved BASIC symbols in the shared library.
 	project_objects=()
 	project_pids=()
+	project_index=0
 	for project_source in "${project_sources[@]}"; do
 		project_name="${project_source##*/}"
 		project_name="${project_name%.*}"
-		project_module="$(sanitize_module "$project_source")"
+		project_index=$((project_index + 1))
+		# Different source directories commonly contain the same basename.
+		project_module="fb_project_${project_index}_$(sanitize_module "$project_source")"
 		project_cfile="$target_tmp/$project_module.c"
 		project_objfile="$target_tmp/$project_module.o"
 
@@ -808,6 +838,7 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 	for project_pid in "${project_pids[@]}"; do
 		wait "$project_pid"
 	done
+	project_pids=()
 
 	if [ "$mode" = "obj" ]; then
 		[ "${#project_objects[@]}" -eq 0 ] || \
@@ -885,12 +916,17 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 	[ -z "$envobj" ] || link_objects+=("$envobj")
 	link_objects+=("$startup" "$objfile")
 	link_objects+=("${project_objects[@]}")
+	# These are application prerequisites, kept outside the compiler runtime.
+	# The linker also rejects objects whose machine type differs from this ABI.
+	link_objects+=("${native_objects[@]}")
 	android_graphics_libraries=()
 	if [ "$use_gfx3" -eq 1 ]; then
 		android_graphics_libraries=(-lEGL -lGLESv3)
 	fi
 
-	"$cc" -shared -Wl,-soname,libfreebasicapp.so -o "$sofile" \
+	# Refuse unresolved program symbols here, rather than shipping an APK which
+	# fails during System.loadLibrary before the application can report an error.
+	"$cc" -shared -Wl,-z,defs -Wl,-soname,libfreebasicapp.so -o "$sofile" \
 		"${link_objects[@]}" \
 		-Wl,--start-group "${runtime_group[@]}" -Wl,--end-group \
 		-Wl,--wrap=exit \
@@ -1092,3 +1128,4 @@ if [ "$run_on_phone" -eq 1 ]; then
 fi
 
 echo "$output"
+# end of fbc-android

@@ -31,6 +31,7 @@
 #include "../../gfx3_platform.h"
 #include "../../gfx3_protocol.h"
 #include "../../gfx3_resource.h"
+#include "gfx3_android_viewport.h"
 
 #if (defined(HOST_ANDROID) || defined(HOST_LINUX)) && \
 	!defined(DISABLE_OPENGL)
@@ -4114,6 +4115,8 @@ static int gles_present_handle(FB_GFX3_GLES_STATE *state,
 	FB_GFX3_ANDROID_KEYBOARD_OVERLAY keyboard_overlay;
 	uint32_t width;
 	uint32_t height;
+	uint32_t viewport_width;
+	uint32_t viewport_height;
 	int keyboard_state = 0;
 	int result;
 
@@ -4129,7 +4132,15 @@ static int gles_present_handle(FB_GFX3_GLES_STATE *state,
 	state->keyboard_overlay_state = keyboard_state;
 	state->keyboard_overlay_known = TRUE;
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+	viewport_width = width;
+	viewport_height = height;
+#ifdef HOST_ANDROID
+	fb_gfx3_android_usable_viewport(surface->width, surface->height,
+		&viewport_width, &viewport_height);
+#endif
+	/* GLES has a bottom-left origin; the usable Android area begins at top. */
+	glViewport(0, (GLint)(height - viewport_height), (GLsizei)viewport_width,
+		(GLsizei)viewport_height);
 	glDisable(GL_SCISSOR_TEST);
 	glUseProgram(state->present_program);
 	glActiveTexture(GL_TEXTURE0);

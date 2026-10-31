@@ -26,6 +26,7 @@
 */
 
 #include "../../gfx3_platform.h"
+#include "gfx3_android_viewport.h"
 
 #include <string.h>
 
@@ -91,6 +92,33 @@ static int android_keyboard_button_pointer_id = -1;
 
 static int android_request_keyboard_visibility(ANativeActivity *activity,
 	int visible);
+#include "../../../gfxlib2/drivers/android/mobile_metrics.h"
+
+void fb_gfx3_android_usable_viewport(uint32_t source_width, uint32_t source_height,
+	uint32_t *width, uint32_t *height)
+{
+	int usable_width, usable_height;
+	if (!width || !height || *width > 32767 || *height > 32767)
+		return;
+	usable_width = (int)*width;
+	usable_height = (int)*height;
+	android_mobile_viewport((int)source_width, (int)source_height,
+		&usable_width, &usable_height);
+	*width = (uint32_t)usable_width;
+	*height = (uint32_t)usable_height;
+}
+
+static void android_request_soft_keyboard(int visible)
+{
+	ANativeActivity *activity;
+	pthread_mutex_lock(&android_window_mutex);
+	activity = android_activity;
+	pthread_mutex_unlock(&android_window_mutex);
+	/* The Java method marshals to the UI thread. Do not hold the window lock
+	 * while entering ART: layout may call nativeWindowMetrics immediately. */
+	android_request_keyboard_visibility(activity, visible);
+}
+
 static int android_keyboard_button_rect_locked(int window_width,
 	int window_height, int *x0, int *y0, int *x1, int *y1);
 
@@ -436,6 +464,8 @@ void fb_hAndroidTouch(float x, float y, int action)
 		ANativeWindow_getWidth(android_window) : (int)android_input->width;
 	window_height = (android_window != NULL) ?
 		ANativeWindow_getHeight(android_window) : (int)android_input->height;
+	android_mobile_viewport((int)android_input->width, (int)android_input->height,
+		&window_width, &window_height);
 	logical_x = (window_width > 0) ?
 		(int)(x * (float)android_input->width / (float)window_width) : (int)x;
 	logical_y = (window_height > 0) ?
@@ -517,6 +547,8 @@ void fb_hAndroidTouchEvent(const AInputEvent *event)
 		(int)android_input->width;
 	window_height = (android_window != NULL) ? ANativeWindow_getHeight(android_window) :
 		(int)android_input->height;
+	android_mobile_viewport((int)android_input->width, (int)android_input->height,
+		&window_width, &window_height);
 	if (action != AMOTION_EVENT_ACTION_CANCEL) {
 		for (i = 0; (i < pointer_count) &&
 		     (contact_count < (int)FB_GFX3_INPUT_TOUCH_MAX); ++i) {

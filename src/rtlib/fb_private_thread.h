@@ -61,10 +61,12 @@
 // small minimum stacks that are not sufficient for resolver calls made by
 // threaded TCP programs. illumos has the same issue in ordinary BASIC thread
 // examples. Linux targets using musl can expose it too.
+// Android's 16 KiB minimum also overflows ordinary TLS certificate and JNI
+// call chains. Use the same reserve as the other supported POSIX targets.
 // 8192 KiB seems about alright (jeffm)
 // see https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=234775
 */
-#if defined( HOST_LINUX ) || defined( HOST_FREEBSD ) || defined( HOST_DRAGONFLY ) || defined( HOST_OPENBSD ) || defined( HOST_NETBSD ) || defined( HOST_HAIKU ) || defined( HOST_SOLARIS )
+#if defined( HOST_LINUX ) || defined( HOST_ANDROID ) || defined( HOST_FREEBSD ) || defined( HOST_DRAGONFLY ) || defined( HOST_OPENBSD ) || defined( HOST_NETBSD ) || defined( HOST_HAIKU ) || defined( HOST_SOLARIS )
 	#define FBTHREAD_STACK_MIN (8192 * 1024)
 #else
 	#define FBTHREAD_STACK_MIN PTHREAD_STACK_MIN

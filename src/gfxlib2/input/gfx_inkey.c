@@ -9,7 +9,12 @@
 
 #include "../fb_gfx.h"
 
+/* An IME commits a word in one callback, before BASIC can drain INKEY. */
+#if defined(HOST_ANDROID) || defined(HOST_JS)
+#define KEY_BUFFER_LEN		256
+#else
 #define KEY_BUFFER_LEN		16
+#endif
 
 static int key_buffer[KEY_BUFFER_LEN], key_head = 0, key_tail = 0;
 static int key_buffer_changed = FALSE;

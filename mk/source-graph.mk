@@ -436,7 +436,10 @@ $(wildcard $(GFX2_DRIVER_DIR)/*/*.inc) \
 $(wildcard $(srcdir)/gfxlib2/*.inc)
 LIBFBGFX3_H := $(wildcard $(srcdir)/gfxlib3/*.h) $(wildcard $(srcdir)/gfxlib3/*/*.h) \
 $(wildcard $(GFX3_DRIVER_DIR)/*/*.h) \
-$(srcdir)/gfxlib2/gfx_font.h $(srcdir)/gfxlib2/gfx_paint_pattern.h
+$(srcdir)/gfxlib2/gfx_font.h $(srcdir)/gfxlib2/gfx_paint_pattern.h \
+$(GFX2_DRIVER_DIR)/mobile_control.h \
+$(GFX2_DRIVER_DIR)/android/mobile_metrics.h \
+$(GFX2_DRIVER_DIR)/win32/gfx_metrics.h
 LIBSFX_H := $(wildcard $(srcdir)/sfxlib/*.h) $(wildcard $(srcdir)/sfxlib/*/*.h)
 
 ##############################################################################

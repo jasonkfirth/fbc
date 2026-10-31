@@ -315,6 +315,14 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
 	static unsigned int scancode;
 	static unsigned int keycode;
 
+	/* The editable IME bridge commits text through input/composition events.
+	 * Feeding the same key through these window callbacks would duplicate it. */
+	if (EM_ASM_INT({
+		var state = Module['fbSoftKeyboard'];
+		return !!(state && state.input && document.activeElement === state.input);
+	}))
+		return 0;
+
 	switch( eventType )
 	{
         case EMSCRIPTEN_EVENT_KEYDOWN:
@@ -384,6 +392,24 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
         {
             return 0;
         }
+	}
+}
+
+/* Called only by the graphics IME bridge on the browser main thread. */
+EMSCRIPTEN_KEEPALIVE void fb_hJsTextInput(int key)
+{
+	EVENT event = { 0 };
+	if ((key <= 0) || (key > 255))
+		return;
+	js_key_buffer_add((unsigned int)key);
+	if (__fb_ctx.hooks.posteventproc != NULL) {
+		event.type = EVENT_KEY_PRESS;
+		event.ascii = key;
+		if (key == 8) event.scancode = SC_BACKSPACE;
+		if (key == 13) event.scancode = SC_ENTER;
+		if (key == 9) event.scancode = SC_TAB;
+		if (key == 27) event.scancode = SC_ESCAPE;
+		__fb_ctx.hooks.posteventproc(&event);
 	}
 }
 
@@ -490,6 +516,30 @@ static int js_touch_first(int *x, int *y)
 	return 0;
 }
 
+/*
+ * Emscripten leaves the deprecated canvasX/canvasY fields unset when legacy
+ * event-target lookup is disabled. Convert current client coordinates through
+ * the canvas rectangle instead. Both contact polling and mouse compatibility
+ * must use this transform, including CSS-scaled or offset canvases.
+ */
+EM_JS(int, js_canvas_point, (int client_x, int client_y, int *x_out, int *y_out), {
+    const canvas = Module['canvas'];
+    if (!canvas) return 0;
+    const rect = canvas.getBoundingClientRect();
+    if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
+        rect.width <= 0 || rect.height <= 0 || canvas.width <= 0 || canvas.height <= 0)
+        return 0;
+    const x = (client_x - rect.left) * canvas.width / rect.width;
+    const y = (client_y - rect.top) * canvas.height / rect.height;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return 0;
+    // Preserve out-of-canvas drag positions within the C signed-int range.
+    const largest = 0x7fffffff;
+    const smallest = -largest - 1;
+    HEAP32[x_out >> 2] = Math.max(smallest, Math.min(largest, x));
+    HEAP32[y_out >> 2] = Math.max(smallest, Math.min(largest, y));
+    return 1;
+});
+
 static void update_touch_contacts(const EmscriptenTouchEvent *touchEvent, int buttons)
 {
 	int index;
@@ -502,7 +552,9 @@ static void update_touch_contacts(const EmscriptenTouchEvent *touchEvent, int bu
 		for( index = 0; index < touchEvent->numTouches; index++ )
 		{
 			const EmscriptenTouchPoint *touch = &touchEvent->touches[index];
-			js_touch_set(touch->identifier, touch->canvasX, touch->canvasY);
+			int x, y;
+			if( js_canvas_point(touch->clientX, touch->clientY, &x, &y) )
+				js_touch_set(touch->identifier, x, y);
 		}
 	}
 	else
@@ -548,9 +600,8 @@ static void update_touch_mouse(const EmscriptenTouchEvent *touchEvent, int butto
 	if( selected >= 0 ) {
 		const EmscriptenTouchPoint *touch = &touchEvent->touches[selected];
 
-		touch_valid = 1;
-		touch_x = touch->canvasX;
-		touch_y = touch->canvasY;
+		if( js_canvas_point(touch->clientX, touch->clientY, &touch_x, &touch_y) )
+			touch_valid = 1;
 	}
 
 	update_touch_contacts(touchEvent, buttons);

@@ -1,3 +1,10 @@
+/*
+ * FreeBASIC gfxlib2: android/gfx_android.c
+ * Purpose: Bind software graphics and input to the NativeActivity surface.
+ * Responsibilities: Surface lifetime, presentation, input and IME requests.
+ * This file does not own application widgets or compiler syntax.
+ * Native callbacks and the application thread share state under fb_android.mutex.
+ */
 #include "fb_gfx_android.h"
 
 #include <android/api-level.h>
@@ -125,6 +132,7 @@ typedef struct FB_ANDROID_GFX_STATE
 	int display_locked;
 	jobject input_view;
 	char *input_text;
+	int managed_input;
 	FB_ANDROID_TOUCH_STATE touch[FB_ANDROID_TOUCH_MAX];
 	FB_ANDROID_GAMEPAD_STATE gamepad[FB_ANDROID_GAMEPAD_MAX];
 } FB_ANDROID_GFX_STATE;
@@ -243,6 +251,27 @@ static void android_release_jni_env(ANativeActivity *activity, int attached)
 {
 	if (attached && activity && activity->vm)
 		(*activity->vm)->DetachCurrentThread(activity->vm);
+}
+
+static int android_activity_owns_input(ANativeActivity *activity)
+{
+	JNIEnv *env;
+	jclass activity_class;
+	int attached = 0;
+	int managed = 0;
+	env = android_get_jni_env(activity, &attached);
+	if (!env)
+		return 0;
+	activity_class = (*env)->GetObjectClass(env, activity->clazz);
+	if (activity_class) {
+		managed = (*env)->GetMethodID(env, activity_class,
+			"setKeyboardVisibleFromNative", "(Z)V") != NULL;
+		(*env)->DeleteLocalRef(env, activity_class);
+	}
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionClear(env);
+	android_release_jni_env(activity, attached);
+	return managed;
 }
 
 static void update_window_size_locked(void)
@@ -697,6 +726,25 @@ static int android_toggle_soft_input_jni(ANativeActivity *activity, int show, in
 	if (!activity_class)
 		goto cleanup;
 
+	/* Current APKs own the editable target on Java's UI thread. Prefer that
+	 * bridge; the view-tree fallback below keeps older package templates usable. */
+	{
+		jmethodID request_visibility = (*env)->GetMethodID(env, activity_class,
+			"setKeyboardVisibleFromNative", "(Z)V");
+		if (request_visibility) {
+			(*env)->CallVoidMethod(env, activity->clazz, request_visibility,
+				show ? JNI_TRUE : JNI_FALSE);
+			if (!(*env)->ExceptionCheck(env)) {
+				pthread_mutex_lock(&fb_android.mutex);
+				fb_android.managed_input = 1;
+				pthread_mutex_unlock(&fb_android.mutex);
+				result = 1;
+				goto cleanup;
+			}
+		}
+		(*env)->ExceptionClear(env);
+	}
+
 	get_system_service = (*env)->GetMethodID(env, activity_class, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
 	if (!get_system_service)
 	{
@@ -966,6 +1014,20 @@ cleanup:
 	android_release_jni_env(activity, attached);
 
 	return result;
+}
+
+#include "mobile_metrics.h"
+static int fb_hAndroidApplyPendingKeyboardVisibility(void);
+
+static void android_request_soft_keyboard(int visible)
+{
+	pthread_mutex_lock(&fb_android.mutex);
+	/* Explicit application requests remain available when the optional KB
+	 * overlay was disabled by packaging metadata. */
+	fb_android.pending_keyboard_visible = visible;
+	pthread_mutex_unlock(&fb_android.mutex);
+	/* An explicit command must work even when SLEEP skips event processing. */
+	fb_hAndroidApplyPendingKeyboardVisibility();
 }
 
 static int android_show_keyboard_jni(ANativeActivity *activity)
@@ -1363,7 +1425,9 @@ void fb_hAndroidSetActivity(ANativeActivity *activity)
 	keyboard_enabled = fb_android.keyboard_enabled;
 	pthread_mutex_unlock(&fb_android.mutex);
 
-	if (activity && keyboard_enabled)
+	/* Current activities own one FreeBasicInputView on the UI thread. Keep
+	 * the legacy snapshot poller separate from managed key-event delivery. */
+	if (activity && keyboard_enabled && !android_activity_owns_input(activity))
 		new_input_view = android_install_input_view_jni(activity);
 
 	pthread_mutex_lock(&fb_android.mutex);
@@ -1371,6 +1435,7 @@ void fb_hAndroidSetActivity(ANativeActivity *activity)
 	old_input_view = fb_android.input_view;
 	fb_android.activity = activity;
 	fb_android.input_view = new_input_view;
+	fb_android.managed_input = 0;
 	android_reset_input_text_locked();
 	if (activity)
 	{
@@ -1906,13 +1971,20 @@ static int fb_hAndroidPollTextInput(void)
 	jobject input_view;
 	char *text;
 	int changed;
+	int managed;
 
 	pthread_mutex_lock(&fb_android.mutex);
 	activity = fb_android.activity;
 	input_view = fb_android.input_view;
+	managed = fb_android.managed_input;
 	pthread_mutex_unlock(&fb_android.mutex);
+	/* Java's ready notification survives ScreenRes driver recreation. A
+	 * managed view sends keys directly; polling its text would send them twice. */
+	pthread_mutex_lock(&mobile_metrics_mutex);
+	managed = managed || mobile_managed_input;
+	pthread_mutex_unlock(&mobile_metrics_mutex);
 
-	if (!activity || !input_view)
+	if (managed || !activity || !input_view)
 		return 0;
 
 	text = android_get_input_text_jni(activity, input_view);
@@ -2058,6 +2130,7 @@ static int framebuffer_viewport_locked(int dst_w, int dst_h, int *scale, int *sk
 
 	if (src_w <= 0 || src_h <= 0 || dst_w <= 0 || dst_h <= 0)
 		return 0;
+	android_mobile_viewport(src_w, src_h, &dst_w, &dst_h);
 
 #ifdef GFXLIB_NEVERSCALE
 	*scale = 1;
@@ -2642,9 +2715,30 @@ void fb_hAndroidConsoleWrite(const char *text, size_t length)
 	fb_hAndroidConsoleRender();
 }
 
-void fb_hAndroidTouch(float x, float y, int action)
+/*
+ * EVENT stores mouse position and button bits in the same union. Publish the
+ * position separately before a button transition so a first tap has a usable
+ * location and its button mask is not overwritten by the x coordinate.
+ */
+static void android_post_pointer_event(int type, int x, int y)
 {
 	EVENT e;
+	memset(&e, 0, sizeof(e));
+	e.type = EVENT_MOUSE_MOVE;
+	e.x = x;
+	e.y = y;
+	fb_hPostEvent(&e);
+	if (type == EVENT_MOUSE_MOVE)
+		return;
+	memset(&e, 0, sizeof(e));
+	e.type = type;
+	e.button = BUTTON_LEFT;
+	fb_hPostEvent(&e);
+}
+
+void fb_hAndroidTouch(float x, float y, int action)
+{
+	int event_type;
 	int mapped_x, mapped_y;
 	int x0, y0, x1, y1;
 	int toggle_keyboard = 0;
@@ -2733,35 +2827,19 @@ void fb_hAndroidTouch(float x, float y, int action)
 	}
 	pthread_mutex_unlock(&fb_android.mutex);
 
-	memset(&e, 0, sizeof(e));
 	if (action == AMOTION_EVENT_ACTION_MOVE)
-	{
-		e.type = EVENT_MOUSE_MOVE;
-		e.x = mapped_x;
-		e.y = mapped_y;
-	}
+		event_type = EVENT_MOUSE_MOVE;
 	else if (action == AMOTION_EVENT_ACTION_DOWN)
-	{
-		e.type = EVENT_MOUSE_BUTTON_PRESS;
-		e.button = BUTTON_LEFT;
-		e.x = mapped_x;
-		e.y = mapped_y;
-	}
-	else if (action == AMOTION_EVENT_ACTION_UP)
-	{
-		e.type = EVENT_MOUSE_BUTTON_RELEASE;
-		e.button = BUTTON_LEFT;
-		e.x = mapped_x;
-		e.y = mapped_y;
-	}
+		event_type = EVENT_MOUSE_BUTTON_PRESS;
+	else if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL)
+		event_type = EVENT_MOUSE_BUTTON_RELEASE;
 	else
 		return;
-	fb_hPostEvent(&e);
+	android_post_pointer_event(event_type, mapped_x, mapped_y);
 }
 
 void fb_hAndroidTouchEvent(const AInputEvent *event)
 {
-	EVENT e;
 	int action_full;
 	int action;
 	int action_index;
@@ -2899,22 +2977,20 @@ void fb_hAndroidTouchEvent(const AInputEvent *event)
 	if (!can_post || !event_type || (action_x < 0) || (action_y < 0))
 		return;
 
-	memset(&e, 0, sizeof(e));
-	e.type = event_type;
-	e.x = action_x;
-	e.y = action_y;
-	if ((event_type == EVENT_MOUSE_BUTTON_PRESS) ||
-	    (event_type == EVENT_MOUSE_BUTTON_RELEASE))
-	{
-		e.button = BUTTON_LEFT;
-	}
-	fb_hPostEvent(&e);
+	android_post_pointer_event(event_type, action_x, action_y);
 }
 
 static int android_key_to_scancode(int32_t keycode)
 {
+	/* Android letters are alphabetical; PC/FreeBASIC scan codes follow the
+	 * physical keyboard rows. Arithmetic from SC_A gives incorrect chords. */
+	static const int letters[26] = {
+		SC_A, SC_B, SC_C, SC_D, SC_E, SC_F, SC_G, SC_H, SC_I,
+		SC_J, SC_K, SC_L, SC_M, SC_N, SC_O, SC_P, SC_Q, SC_R,
+		SC_S, SC_T, SC_U, SC_V, SC_W, SC_X, SC_Y, SC_Z
+	};
 	if (keycode >= AKEYCODE_A && keycode <= AKEYCODE_Z)
-		return SC_A + (keycode - AKEYCODE_A);
+		return letters[keycode - AKEYCODE_A];
 	if (keycode >= AKEYCODE_1 && keycode <= AKEYCODE_9)
 		return SC_1 + (keycode - AKEYCODE_1);
 	if (keycode == AKEYCODE_0)
@@ -2942,6 +3018,18 @@ static int android_key_to_scancode(int32_t keycode)
 	case AKEYCODE_DPAD_RIGHT: return SC_RIGHT;
 	case AKEYCODE_DPAD_UP: return SC_UP;
 	case AKEYCODE_DPAD_DOWN: return SC_DOWN;
+	case AKEYCODE_MOVE_HOME: return SC_HOME;
+	case AKEYCODE_MOVE_END: return SC_END;
+	case AKEYCODE_FORWARD_DEL: return SC_DELETE;
+	case AKEYCODE_PAGE_UP: return SC_PAGEUP;
+	case AKEYCODE_PAGE_DOWN: return SC_PAGEDOWN;
+	case AKEYCODE_INSERT: return SC_INSERT;
+	case AKEYCODE_CTRL_LEFT:
+	case AKEYCODE_CTRL_RIGHT: return SC_CONTROL;
+	case AKEYCODE_ALT_LEFT:
+	case AKEYCODE_ALT_RIGHT: return SC_ALT;
+	case AKEYCODE_SHIFT_LEFT: return SC_LSHIFT;
+	case AKEYCODE_SHIFT_RIGHT: return SC_RSHIFT;
 	default: return 0;
 	}
 }
@@ -3194,3 +3282,5 @@ ANativeWindow *fb_hAndroidAcquireWindow(unsigned *generation, int *renderable)
 
 	return window;
 }
+
+/* end of gfx_android.c */

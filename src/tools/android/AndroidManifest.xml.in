@@ -18,9 +18,11 @@
         android:hasCode="true"
         android:label="@LABEL@"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+        <!-- A density change can also change the normal/large screen class.
+             Handle screenLayout together with density to preserve BASIC state. -->
         <activity
             android:name="org.freebasic.android.FreeBasicNativeActivity"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|density"
             android:screenOrientation="@SCREEN_ORIENTATION@"
             android:windowSoftInputMode="@SOFT_INPUT_MODE@"
             android:exported="true">

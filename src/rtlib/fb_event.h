@@ -47,7 +47,13 @@ typedef struct _EVENT EVENT;
 #define EVENT_WINDOW_RESIZE			15
 #define EVENT_DROP                    16
 
+/* A mobile text commit can produce 128 press/release pairs at once. Keep
+   room for those pairs and nearby pointer events in the bounded ring. */
+#if defined(HOST_ANDROID) || defined(HOST_JS)
+#define MAX_EVENTS					512
+#else
 #define MAX_EVENTS					128
+#endif
 
 #define BUTTON_LEFT					0x1
 #define BUTTON_RIGHT					0x2

@@ -193,7 +193,9 @@ void fb_gfx3_input_platform_mouse_move(FB_GFX3_INPUT_STATE *input,
 			event.dx = x - old_x;
 			event.dy = y - old_y;
 		}
-		if ((event.dx != 0) || (event.dy != 0))
+		/* The first contact has no previous position and thus no delta.
+		 * Publish its coordinates before a following button event anyway. */
+		if ((old_x != x) || (old_y != y))
 			input_post_event_locked(input, &event);
 	}
 	fb_MutexUnlock(input->mutex);

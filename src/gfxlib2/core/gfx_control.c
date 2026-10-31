@@ -9,6 +9,10 @@
 
 #include "../fb_gfx.h"
 #include "../fb_gfx_gl.h"
+#include "../drivers/mobile_control.h"
+#ifdef HOST_WIN32
+#include "../drivers/win32/gfx_metrics.h"
+#endif
 
 FBCALL void fb_GfxControl_s( int what, FBSTRING *param )
 {
@@ -75,6 +79,34 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 	if (!param2) param2 = &temp2;
 	if (!param3) param3 = &temp3;
 	if (!param4) param4 = &temp4;
+
+	if ((what == GET_WINDOW_METRICS) || (what == GET_SOFT_KEYBOARD) ||
+	    (what == SET_SOFT_KEYBOARD) || (what == SET_SOFT_KEYBOARD_REGION) ||
+	    (what == CLEAR_SOFT_KEYBOARD_REGIONS)) {
+#if defined(HOST_JS) || defined(HOST_ANDROID)
+		fb_hMobileControl(what, param1, param2, param3, param4);
+#else
+		if (what == GET_WINDOW_METRICS) {
+			FB_GRAPHICS_LOCK();
+			fb_hApplyPendingResize();
+			if (__fb_gfx) {
+				*param1 = __fb_gfx->w;
+				*param2 = __fb_gfx->h;
+			} else {
+				fb_hScreenInfo(param1, param2, &res3, &res4);
+			}
+			*param3 = 96;
+#ifdef HOST_WIN32
+			*param3 = fb_hWindowDpi(__fb_gfx ? fb_hGetWindowHandle() : 0);
+#endif
+			*param4 = 0;
+			FB_GRAPHICS_UNLOCK();
+		} else if (what == GET_SOFT_KEYBOARD) {
+			*param1 = *param2 = *param3 = *param4 = 0;
+		}
+#endif
+		return;
+	}
 
 	FB_GRAPHICS_LOCK( );
 

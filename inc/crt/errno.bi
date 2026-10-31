@@ -110,6 +110,25 @@
         #define EILSEQ 42
 #endif
 
+#ifdef __FB_ANDROID__
+        '' Bionic uses Linux kernel error numbers, which differ from the
+        '' legacy generic table above for these higher POSIX errors.
+        #undef EDEADLOCK
+        #undef EDEADLK
+        #undef ENAMETOOLONG
+        #undef ENOLCK
+        #undef ENOSYS
+        #undef ENOTEMPTY
+        #undef EILSEQ
+        #define EDEADLOCK 35
+        #define EDEADLK 35
+        #define ENAMETOOLONG 36
+        #define ENOLCK 37
+        #define ENOSYS 38
+        #define ENOTEMPTY 39
+        #define EILSEQ 84
+#endif
+
 extern "C"
 
 #ifdef __FB_WIN32__
@@ -119,6 +138,10 @@ extern "C"
 	'' DragonFly exports this accessor for language bindings to TLS errno.
 	declare function __errno_location() as long ptr
 	#define errno (*__errno_location())
+#elseif defined( __FB_ANDROID__ )
+	'' Bionic exposes thread-local errno through __errno(), not a data symbol.
+	declare function __errno() as long ptr
+	#define errno (*__errno())
 #elseif defined( __FB_DARWIN__ ) or defined( __FB_FREEBSD__ )
         declare function __error() as long ptr
         #define errno (*__error())

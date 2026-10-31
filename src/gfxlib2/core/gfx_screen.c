@@ -707,8 +707,14 @@ static int set_mode
 		if (!__fb_gfx->dirty || !__fb_gfx->device_palette ||
 		    !__fb_gfx->palette || !__fb_gfx->color_association ||
 		    !__fb_gfx->key || !__fb_gfx->event_queue ||
-		    !__fb_gfx->event_mutex || !__fb_color_conv_16to32)
+#ifndef HOST_JS
+		    !__fb_gfx->event_mutex ||
+#endif
+		    !__fb_color_conv_16to32)
 			goto allocation_failed;
+		/* The cooperative JavaScript runtime implements mutex operations as
+		 * no-ops and intentionally returns NULL from MutexCreate. That token
+		 * is valid here; native threaded drivers still require a real lock. */
 
 		if (flags != DRIVER_NULL) {
 			if (flags & DRIVER_ALPHA_PRIMITIVES) {

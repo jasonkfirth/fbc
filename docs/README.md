@@ -8,6 +8,10 @@ language reference.
 
 ## Start here
 
+- [Window metrics and software keyboards](../doc/window-keyboard.md) documents
+  browser and Android usable geometry, density, rotation, IME requests and
+  observation, including the shared gfxlib2/gfxlib3 `ScreenControl` contract.
+
 - [C emitter diagnostic audit](c-emitter-audit.md) describes unsuppressed GCC
   and Clang checks, structural analysis, reproducible receipts, emitter repairs,
   DATA/READ checks, termination contracts, public prototypes, label targets,

@@ -30,12 +30,17 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.ViewGroup;
+import android.view.View;
+import android.view.ViewTreeObserver;
+import android.graphics.Rect;
+import android.util.DisplayMetrics;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.text.InputType;
@@ -54,6 +59,60 @@ public class FreeBasicNativeActivity extends NativeActivity {
 
     private static native boolean nativeDispatchImeKey(int keyCode, int action, int unicodeChar);
     private static native void nativeSetKeyboardButtonVisible(boolean visible);
+    private static native void nativeWindowMetrics(int width, int height,
+        int dpi, int rotation, int keyboardVisible);
+    private static native void nativeInputViewReady(boolean ready);
+
+    /* The Java UI thread observes actual layout, including Back dismissal and
+     * rotation. A native show request is not evidence that an IME is visible.
+     * API-30 IME queries use reflection to retain the API-23 compile contract. */
+    private void publishWindowMetrics() {
+        View decor = getWindow().getDecorView();
+        Rect frame = new Rect();
+        Rect content = new Rect();
+        decor.getWindowVisibleDisplayFrame(frame);
+        if (!decor.getGlobalVisibleRect(content) || !content.intersect(frame)) content.setEmpty();
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        int visible = -2;
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                Object insets = View.class.getMethod("getRootWindowInsets").invoke(decor);
+                Class<?> types = Class.forName("android.view.WindowInsets$Type");
+                int ime = ((Integer)types.getMethod("ime").invoke(null)).intValue();
+                if (insets != null) {
+                    visible = ((Boolean)insets.getClass().getMethod("isVisible", int.class)
+                        .invoke(insets, ime)).booleanValue() ? -1 : 0;
+                }
+            } catch (ReflectiveOperationException error) {
+                visible = -2;
+            }
+        } else {
+            // Older APIs cannot detect a floating IME. Report unknown when
+            // focus exists without a substantial occluded area.
+            int obscured = decor.getRootView().getHeight() - frame.bottom;
+            if (obscured > 100 * metrics.density) visible = -1;
+            else if (keyboardInputView == null || !keyboardInputView.hasFocus()) visible = 0;
+        }
+        try {
+            nativeWindowMetrics(content.width(), content.height(), metrics.densityDpi,
+                getWindowManager().getDefaultDisplay().getRotation() * 90, visible);
+        } catch (UnsatisfiedLinkError error) {
+            // Older runtime libraries can still use this APK template.
+        }
+    }
+
+    private final ViewTreeObserver.OnGlobalLayoutListener metricsListener =
+        new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override public void onGlobalLayout() { publishWindowMetrics(); }
+        };
+
+    @Override
+    public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        getWindow().getDecorView().post(new Runnable() {
+            @Override public void run() { if (!notificationsDestroyed) publishWindowMetrics(); }
+        });
+    }
 
     static boolean dispatchImeKey(int keyCode, int action, int unicodeChar) {
         return nativeDispatchImeKey(keyCode, action, unicodeChar);
@@ -102,7 +161,14 @@ public class FreeBasicNativeActivity extends NativeActivity {
 			return;
 		}
 
-		keyboardInputView = new FreeBasicInputView(this);
+		/* A legacy native startup may have installed this reserved helper
+		 * before onCreate resumed. Adopt it so one view owns IME delivery. */
+		View existing = content.findViewById(INPUT_VIEW_ID);
+		if (existing instanceof FreeBasicInputView) {
+			keyboardInputView = (FreeBasicInputView)existing;
+		} else {
+			keyboardInputView = new FreeBasicInputView(this);
+		}
 		keyboardInputView.setId(INPUT_VIEW_ID);
 		/*
 			Do not let this one-pixel helper win Android's initial focus search.
@@ -113,8 +179,14 @@ public class FreeBasicNativeActivity extends NativeActivity {
 		keyboardInputView.setFocusableInTouchMode(false);
 		keyboardInputView.setBackgroundColor(0);
 		keyboardInputView.setAlpha(0.01f);
+		/* INKEY exposes committed text, without a separate preedit surface.
+		 * Ask the IME for raw visible text. NO_SUGGESTIONS alone still lets
+		 * the AOSP keyboard retain a whole unfinished word in this hidden
+		 * editor, so nothing appears in the real BASIC field until Space.
+		 * This is an IME hint; replacement IMEs may still use composition. */
 		keyboardInputView.setInputType(
 			InputType.TYPE_CLASS_TEXT |
+			InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD |
 			InputType.TYPE_TEXT_FLAG_MULTI_LINE |
 			InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
 		);
@@ -125,7 +197,14 @@ public class FreeBasicNativeActivity extends NativeActivity {
 		keyboardInputView.setCursorVisible(false);
 		keyboardInputView.setTextColor(0);
 		FreeBasicInputBridge.attach(keyboardInputView);
-		content.addView(keyboardInputView, new ViewGroup.LayoutParams(1, 1));
+		if (keyboardInputView.getParent() == null) {
+			content.addView(keyboardInputView, new ViewGroup.LayoutParams(1, 1));
+		}
+		try {
+			nativeInputViewReady(true);
+		} catch (UnsatisfiedLinkError error) {
+			/* Older runtimes retain their native text polling adapter. */
+		}
 	}
 
 	/*
@@ -168,6 +247,11 @@ public class FreeBasicNativeActivity extends NativeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 		installKeyboardInputView();
+		getWindow().getDecorView().getViewTreeObserver()
+			.addOnGlobalLayoutListener(metricsListener);
+		getWindow().getDecorView().post(new Runnable() {
+			@Override public void run() { if (!notificationsDestroyed) publishWindowMetrics(); }
+		});
 
         try {
             nativeSetKeyboardButtonVisible(readKeyboardButtonVisible());
@@ -308,6 +392,10 @@ public class FreeBasicNativeActivity extends NativeActivity {
 	@Override
 	protected void onDestroy() {
 		notificationsDestroyed = true;
+		getWindow().getDecorView().getViewTreeObserver()
+			.removeOnGlobalLayoutListener(metricsListener);
+		try { nativeWindowMetrics(0, 0, 160, 0, 0); nativeInputViewReady(false); }
+		catch (UnsatisfiedLinkError error) { /* Older native runtime. */ }
 		super.onDestroy();
 	}
 
@@ -320,6 +408,9 @@ public class FreeBasicNativeActivity extends NativeActivity {
         }
 
         keyCode = event.getKeyCode();
+        if (keyboardInputView != null && keyboardInputView.hasComposingText()) {
+            return super.dispatchKeyEvent(event);
+        }
 
         /*
             Some keyboards deliver printable keys through the Java dispatch
