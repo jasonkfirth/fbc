@@ -181,6 +181,7 @@ enum
 	EXPRCLASS_INDEX
 	EXPRCLASS_ARRAYADDR
 	EXPRCLASS_VTABLE
+	EXPRCLASS_CALL
 end enum
 
 const C_MEMBER_VIEW_VALUE = 1
@@ -199,7 +200,7 @@ type EXPRNODE
 	member_view as integer      '' MEMBER uses an alignment-one record view; an empty path dereferences it.
 
 	union
-		text    as zstring ptr  '' TEXT
+		text    as zstring ptr  '' TEXT/MEMBER/CALL
 		val     as FBVALUE      '' IMM
 		sym     as FBSYMBOL ptr '' SYM
 		op      as integer      '' UOP/BOP
@@ -2590,10 +2591,6 @@ private sub hWriteGenericF2I _
 		'' code away from target libm/fenv paths that may not be module-safe.
 		hWriteLine( hEmitType( ptype, NULL ) + " " + callname + "( " + hEmitType( ptype, NULL ) + " );", TRUE )
 		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")" + callname + "( value ))", TRUE )
-	elseif( (rtype = FB_DATATYPE_INTEGER128) or (rtype = FB_DATATYPE_UINTEGER128) ) then
-		'' Native 128-bit types have a separate C extension and ABI contract.
-		'' Keep their existing single-cast form outside the 32/64-bit helpers.
-		hWriteLine( "#define fb_" + fname +  "( value ) ((" + hEmitType( rtype, NULL ) + ")__builtin_" + callname + "( value ))", TRUE )
 	else
 		'' Keep the floating result typed until the integer conversion.
 		'' The input is evaluated once; nearbyint retains the active rounding mode.
@@ -2602,6 +2599,14 @@ private sub hWriteGenericF2I _
 		hWriteLine( "{", TRUE )
 		sectionIndent( )
 			hWriteLine( hEmitType( ptype, NULL ) + " rounded = __builtin_" + callname + "( value );", TRUE )
+			if( (rtype = FB_DATATYPE_INTEGER128) or (rtype = FB_DATATYPE_UINTEGER128) ) then
+				'' A native C cast is defined only when the rounded value fits.
+				'' Reject invalid inputs as the runtime fallback does. Compare in
+				'' double precision because 2^128 cannot be represented in SINGLE.
+				var lower_bound = iif(typeIsSigned(rtype), "-0x1p+127", "0x0p+0")
+				var upper_bound = iif(typeIsSigned(rtype), "0x1p+127", "0x1p+128")
+				hWriteLine("if( !((double)rounded >= " + lower_bound + " && (double)rounded < " + upper_bound + ") ) __builtin_abort();", TRUE)
+			end if
 			hWriteLine( "return (" + hEmitType( rtype, NULL ) + ")rounded;", TRUE )
 		sectionUnindent( )
 		hWriteLine( "}", TRUE )
@@ -3132,7 +3137,7 @@ private function exprNew _
 end function
 
 private sub exprFreeNode( byval n as EXPRNODE ptr )
-	if( (n->class = EXPRCLASS_TEXT) or (n->class = EXPRCLASS_MEMBER) ) then
+	if( (n->class = EXPRCLASS_TEXT) or (n->class = EXPRCLASS_MEMBER) or (n->class = EXPRCLASS_CALL) ) then
 		ZstrFree( n->text )
 	end if
 	listDelNode( @ctx.exprnodes, n )
@@ -4104,7 +4109,7 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 	dim as integer is_builtin = any
 
 	select case as const( n->class )
-	case EXPRCLASS_TEXT
+	case EXPRCLASS_TEXT, EXPRCLASS_CALL
 		ctx.exprtext += *n->text
 
 	case EXPRCLASS_MEMBER
@@ -4392,7 +4397,8 @@ private sub exprDump( byval n as EXPRNODE ptr )
 		@"MEMBER", _ '' EXPRCLASS_MEMBER
 		@"INDEX", _ '' EXPRCLASS_INDEX
 		@"ARRAYADDR", _ '' EXPRCLASS_ARRAYADDR
-		@"VTABLE" _ '' EXPRCLASS_VTABLE
+		@"VTABLE", _ '' EXPRCLASS_VTABLE
+		@"CALL" _ '' EXPRCLASS_CALL
 	}
 
 	s += *names(n->class)
@@ -4400,7 +4406,7 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	s += " "
 
 	select case as const( n->class )
-	case EXPRCLASS_TEXT, EXPRCLASS_MEMBER
+	case EXPRCLASS_TEXT, EXPRCLASS_MEMBER, EXPRCLASS_CALL
 		s += *n->text
 
 	case EXPRCLASS_IMM
@@ -5382,11 +5388,13 @@ end sub
 '' v1 = cast( <v1's dtype>, v2 )
 private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	var r = exprNewVREG( v2 )
-	if( irIsREG(v2) andalso (r->class = EXPRCLASS_UOP) andalso _
-	    (r->op = AST_OP_ABS) andalso (typeGetClass(r->dtype) = FB_DATACLASS_INTEGER) ) then
-		'' Integer ABS is a typed C call. Preserve that result in its own
-		'' binding before conversion, as for calls loaded directly by the IR.
-		'' The destination cast then applies to a value of the declared type.
+	if( irIsREG(v2) andalso _
+	    ((r->class = EXPRCLASS_CALL) orelse _
+	     ((r->class = EXPRCLASS_UOP) andalso (r->op = AST_OP_ABS) andalso _
+	      (typeGetClass(r->dtype) = FB_DATACLASS_INTEGER))) ) then
+		'' Preserve a deferred C call's declared result before another cast,
+		'' as for calls loaded directly by the IR. CALL remains distinct from
+		'' TEXT bindings so an already materialized vreg is not stored twice.
 		exprSTORE(v2, r, TRUE)
 		r = exprNewVREG(v2)
 	end if
@@ -5471,6 +5479,7 @@ private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 		end select
 		s += "( " + exprFlush( r ) + " )"
 		r = exprNewTEXT( tempdtype, NULL, s )
+		r->class = EXPRCLASS_CALL
 	end if
 
 	exprSTORE( v1, r )
