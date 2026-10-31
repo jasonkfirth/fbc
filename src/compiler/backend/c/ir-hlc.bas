@@ -2028,11 +2028,12 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 		    (symbGetArrayDimensions(backing) > 0) andalso _
 		    ((backing->attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN or _
 		      FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_COMMON)) = 0) andalso _
-		    ((sym->stats and FB_SYMBSTATS_IMPLICIT) <> 0) andalso _
-		    (symbHasCtor(backing) = FALSE) andalso (symbHasDtor(backing) = FALSE) ) then
+		    ((sym->stats and FB_SYMBSTATS_IMPLICIT) <> 0) ) then
 			'' Keep dormant data/descriptor pairs until all initializer dependencies
 			'' can be proved. Removing just their descriptor would strand data.
 			if( hHasCLocalReference(backing) andalso (hHasCLocalReference(sym) = FALSE) ) then
+				'' Element lifetime belongs to the referenced data, not this
+				'' constant descriptor. Constructors and cleanup keep their AST uses.
 				'' Keep descriptor type declarations and their ABI assertions;
 				'' only this unreferenced storage declaration is omitted.
 				hEmitUDT( symbGetSubtype(sym), FALSE )

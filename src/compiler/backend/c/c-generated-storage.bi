@@ -53,13 +53,17 @@ private function hCGlobalStorageCandidate(byval sym as FBSYMBOL ptr) as integer
 	if( (sym->attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_COMMON or _
 	    FB_SYMBATTRIB_EXTERN or FB_SYMBATTRIB_IMPORT)) <> 0 ) then return FALSE
 	if( symbIsExport(sym) or symbIsThreadLocal(sym) or symbIsThreadLocalC(sym) ) then return FALSE
-	if( symbIsDataDesc(sym) or symbHasCtor(sym) or symbHasDtor(sym) ) then return FALSE
+	if( symbIsDataDesc(sym) ) then return FALSE
 	select case as const symbGetType(sym)
 	case FB_DATATYPE_STRING, FB_DATATYPE_USTRING
-		return FALSE
+		'' Default string storage starts empty and owns no allocation. Actual
+		'' assignment and cleanup references retain it through this index;
+		'' an explicit initializer remains an ownership root.
+		return (symbGetTypeIniTree(sym) = NULL)
 	case typeAddrOf(FB_DATATYPE_WCHAR)
 		if( symbGetIsTemporary(sym) ) then return FALSE
 	end select
+	if( symbHasCtor(sym) or symbHasDtor(sym) ) then return FALSE
 	return TRUE
 end function
 
