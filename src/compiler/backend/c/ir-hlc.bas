@@ -5527,6 +5527,35 @@ private function hCAllocationArgument( byval value as EXPRNODE ptr ) as EXPRNODE
 	return exprNewTEXT(typeAddrOf(FB_DATATYPE_VOID), NULL, text)
 end function
 
+private function hCMutablePointerArgument _
+	(byval dtype as integer, byval subtype as FBSYMBOL ptr, byval value as EXPRNODE ptr) as EXPRNODE ptr
+	if( typeGetPtrCnt(dtype) <> 1 orelse typeGetPtrCnt(value->dtype) <> 1 ) then
+		return exprNewCAST(dtype, subtype, value)
+	end if
+	if( typeIsConstAt(dtype, 1) or (typeIsConstAt(value->dtype, 1) = FALSE) ) then
+		return exprNewCAST(dtype, subtype, value)
+	end if
+	if( typeGetDtOnly(dtype) = FB_DATATYPE_FUNCTION or typeGetDtOnly(value->dtype) = FB_DATATYPE_FUNCTION ) then
+		return exprNewCAST(dtype, subtype, value)
+	end if
+	'' The frontend has selected a mutable ABI argument or an initialization
+	'' write. Keep the original qualified expression and the callee's actual
+	'' type. C guarantees identical representation for pointers to qualified
+	'' and unqualified versions of the same type (C11 6.2.5p28).
+	'' First retain const while converting the object-pointer view, then copy
+	'' that pointer value once. The pointed-to bytes are neither read nor copied.
+	hCLiteralMutableCast(dtype, value)
+	var qualified_dtype = typeAddrOf(typeSetIsConst(typeDeref(dtype)))
+	var input_name = hCUnalignedTempName()
+	var output_name = hCUnalignedTempName()
+	var text = "__extension__ ({ " + hEmitType(qualified_dtype, subtype, TRUE) + " " + input_name + " = "
+	text += exprFlush(exprNewCAST(qualified_dtype, subtype, value)) + "; "
+	text += hEmitType(typeUnsetIsConst(dtype), subtype, TRUE) + " " + output_name + "; "
+	text += "__builtin_memcpy( &" + output_name + ", &" + input_name + ", sizeof(" + output_name + ") ); "
+	text += output_name + "; })"
+	return exprNewTEXT(dtype, subtype, text)
+end function
+
 private sub hDoCall _
 	( _
 		byref s as string, _
@@ -5629,7 +5658,7 @@ private sub hDoCall _
 				if( allocation_argument ) then
 					expr = hCAllocationArgument(expr)
 				else
-					expr = exprNewCAST( dtype, subtype, expr )
+					expr = hCMutablePointerArgument( dtype, subtype, expr )
 				end if
 			end if
 		end if
@@ -5846,9 +5875,10 @@ private sub _emitMem _
 
 	'' These operations promise byte access, not alignment of the pointed-to
 	'' BASIC type. Clang otherwise checks/assumes record alignment even for
-	'' a builtin memcpy destination. Preserve pointee constness in byte views.
+	'' a builtin memcpy destination. A checked write needs a mutable byte view;
+	'' only the source retains its pointee qualifiers.
 	var destination = exprNewVREG(v1)
-	destination = exprNewCAST(hCBytePointerType(destination->dtype), NULL, destination)
+	destination = hCMutablePointerArgument(typeAddrOf(FB_DATATYPE_UBYTE), NULL, destination)
 	select case op
 	case AST_OP_MEMFILL
 		hWriteLine("__builtin_memset( " + exprFlush(destination) + ", " + str(fillchar) + ", " + exprFlush( exprNewVREG( v2 ) ) + " );" )

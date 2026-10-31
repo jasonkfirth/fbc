@@ -222,6 +222,12 @@ private function exprTryCMember _
 	end if
 	if( is_pointer and len(path) > 0 ) then path = "->" + mid(path, 2)
 	var result = exprNew(EXPRCLASS_MEMBER, actualdtype, actualsubtype)
+	'' A const record view also qualifies its field lvalue. Preserve the type
+	'' actually printed in C so a later mutable ABI argument cannot mistake
+	'' this address for an already compatible, unqualified pointer.
+	if( is_pointer andalso (write_value = FALSE) andalso typeIsConstAt(dtype, 0) ) then
+		result->dtype = typeSetIsConst(result->dtype)
+	end if
 	result->text = ZstrDup(strptr(path))
 	if( is_pointer ) then
 		if( write_value ) then
