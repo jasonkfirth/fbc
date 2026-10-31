@@ -6724,8 +6724,18 @@ private sub _emitVarIniStr _
 		byval noterm as integer _
 	)
 
-	'' Simple fixed-length string initialized from string literal
-	'' "..."
+	if( varlength < 0 or litlength < 0 or literal = NULL ) then
+		hVarIniFail("invalid C string initializer length or literal")
+		exit sub
+	end if
+	if( noterm andalso varlength = 0 ) then
+		hVarIniFail("empty C fixed-length string storage")
+		exit sub
+	end if
+
+	dim as integer decodedlength
+	var decoded = hUnescape(literal, decodedlength)
+	if( litlength > decodedlength ) then litlength = decodedlength
 	ctx.varini += hVarIniFieldPrefix( )
 
 	'' String literal too long? (GCC would show a warning)
@@ -6735,9 +6745,24 @@ private sub _emitVarIniStr _
 	end if
 
 	if( noterm ) then
-		hBuildStrLit( ctx.varini, hUnescape( literal ), litlength + 1, varlength + 1 )
+		'' STRING * N owns exactly N bytes, including padding, with no extra
+		'' terminator. A byte list expresses that storage directly in C and
+		'' preserves data after an embedded zero without adding a C string.
+		dim as DZSTRING initializer
+		DZstrZero(initializer)
+		DZstrAssign(initializer, strptr(ctx.varini))
+		DZstrConcatAssign(initializer, "{ ")
+		for i as longint = 0 to varlength - 1
+			if( i > 0 ) then DZstrConcatAssign(initializer, ", ")
+			dim as uinteger ch = asc(" ")
+			if( i < litlength ) then ch = cptr(ubyte ptr, decoded)[i]
+			DZstrConcatAssign(initializer, hEmitInt(FB_DATATYPE_UBYTE, ch))
+		next
+		DZstrConcatAssign(initializer, " }")
+		ctx.varini = *initializer.data
+		DZstrAllocate(initializer, 0)
 	else
-		hBuildStrLit( ctx.varini, hUnescape( literal ), litlength + 1, 0 )
+		hBuildStrLit( ctx.varini, decoded, litlength + 1, 0 )
 	end if
 
 	hVarIniSeparator( )
