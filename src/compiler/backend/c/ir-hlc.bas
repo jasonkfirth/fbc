@@ -5274,10 +5274,19 @@ private sub exprSTORE _
 			exit sub
 		end if
 
-		if( typeIsPtr( l->dtype ) or typeIsPtr( r->dtype ) or _
+		var signedness_view = FALSE
+		if( typeGetClass(l->dtype) = FB_DATACLASS_INTEGER andalso _
+		    typeGetClass(r->dtype) = FB_DATACLASS_INTEGER andalso _
+		    typeIsPtr(l->dtype) = FALSE andalso typeIsPtr(r->dtype) = FALSE ) then
+			signedness_view = (typeGetSize(l->dtype) = typeGetSize(r->dtype)) and _
+			                  (typeIsSigned(l->dtype) <> typeIsSigned(r->dtype))
+		end if
+		if( typeIsPtr( l->dtype ) or typeIsPtr( r->dtype ) or signedness_view or _
 		    (typeGetDtAndPtrOnly(l->dtype) = FB_DATATYPE_CHAR) ) then
-			'' Match the physical C lvalue after the BASIC value conversion.
-			'' A char store preserves byte bits even on signed-char targets.
+			'' A no-conversion cast on a BASIC lvalue can select unsigned
+			'' arithmetic while the C object retains its signed declaration.
+			'' Keep that arithmetic, then explicitly convert to the physical
+			'' storage type. A char store likewise preserves byte bits.
 			r = exprNewCAST( l->dtype, l->subtype, r )
 		end if
 
