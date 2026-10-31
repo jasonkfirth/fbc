@@ -3,10 +3,12 @@
  File: backend/c/c-comparison-folding.bi
  Purpose: Apply proven comparison facts before local storage analysis.
  Responsibilities: Share expression, branch and label rewriting between integer
- range and object-address proofs, retaining BASIC boolean conventions.
+ range, object-address and repeatable-operand proofs, retaining BASIC booleans.
  This file intentionally does NOT contain: Value proofs, storage ownership,
  source access flag changes or native diagnostic suppression.
 '/
+
+#include once "backend/c/c-self-comparisons.bi"
 
 '' -------------------------------------------------------------------------
 '' Tree rewriting before local storage analysis
@@ -70,7 +72,9 @@ private function hCComparisonFold(byval n as ASTNODE ptr, byval removed as THASH
 	if( astOpIsRelational(n->op.op) = FALSE ) then return changed
 	dim as integer truth
 	if( hCRangeTruth(n, truth) = FALSE ) then
-		if( hCAddressTruth(n, truth) = FALSE ) then return changed
+		if( hCAddressTruth(n, truth) = FALSE ) then
+			if( hCSelfTruth(n, truth) = FALSE ) then return changed
+		end if
 	end if
 	astDelTree(n->l)
 	astDelTree(n->r)
