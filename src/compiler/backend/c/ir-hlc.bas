@@ -1336,6 +1336,17 @@ private function hUsesCLongDoubleCABI( byval proc as FBSYMBOL ptr ) as integer
 	return (symbGetProcMode( proc ) = FB_FUNCMODE_CDECL)
 end function
 
+private function hCNativeParameterName _
+	( byval proc as FBSYMBOL ptr, byval param as FBSYMBOL ptr, _
+	  byval dtype as integer, byval subtype as FBSYMBOL ptr ) as string
+
+	var identifier = hGetCId(symbGetParamVar(param))
+	if( hUsesCLongDoubleCABI(proc) andalso hIsCLongDoubleType(dtype, subtype) ) then
+		identifier = "fb_c_native_" + identifier
+	end if
+	return identifier
+end function
+
 private function hCLongDoubleFromNativeExpression _
 	( byref native_expression as string, byval subtype as FBSYMBOL ptr ) as string
 
@@ -1545,11 +1556,7 @@ private function hEmitProcHeader _
 			end if
 
 			if( (options and EMITPROC_ISPROTO) = 0 ) then
-				var parameter_identifier = hGetCId( symbGetParamVar( param ) )
-				if( hUsesCLongDoubleCABI( proc ) andalso _
-				    hIsCLongDoubleType( dtype, subtype ) ) then
-					parameter_identifier = "fb_c_native_" + parameter_identifier
-				end if
+				var parameter_identifier = hCNativeParameterName(proc, param, dtype, subtype)
 				DZstrConcatAssign( params, " " + parameter_identifier )
 				if( options = 0 andalso readonly_variant = NULL ) then hCAbiParameter(abi_first, abi_last, param, len(*params.data))
 			end if
@@ -6007,6 +6014,28 @@ private sub _emitMem _
 
 end sub
 
+private function hCVaStartParameter( byval operand as IRVREG ptr ) as EXPRNODE ptr
+	'' The parser checks the final BASIC parameter before constructing this
+	'' macro. C requires the named incoming parameter, not its referent or a
+	'' local copy. Share the header's identifier for native long double too.
+	var proc = ctx.currproc
+	if( proc <> NULL ) then
+		var param = symbGetProcTailParam(proc)
+		if( param <> NULL andalso symbGetParamMode(param) = FB_PARAMMODE_VARARG ) then
+			param = param->prev
+			if( param <> NULL andalso symbGetParamVar(param) <> NULL ) then
+				dim as integer dtype = any
+				dim as FBSYMBOL ptr subtype = any
+				symbGetRealParamDtype(param, dtype, subtype)
+				return exprNewTEXT(dtype, subtype, hCNativeParameterName(proc, param, dtype, subtype))
+			end if
+		end if
+	end if
+	'' Unexpected IR owners retain their original operand and native
+	'' diagnostic instead of inventing a parameter in another activation.
+	return exprNewVREG(operand)
+end function
+
 #include once "backend/c/c-va-pointer-cursors.bi"
 
 private sub _emitMacro _
@@ -6023,7 +6052,7 @@ private sub _emitMacro _
 	select case op
 	case AST_OP_VA_START
 		l = hCVaPointerOperand(v1, left_cursor, (op <> AST_OP_VA_START), TRUE)
-		r = exprNewVREG( v2 )
+		r = hCVaStartParameter(v2)
 		hWriteLine( exprFlush( exprNewMACRO( op, FB_DATATYPE_INVALID, NULL, l, r ) ) + ";" )
 
 	case AST_OP_VA_END
@@ -7268,7 +7297,7 @@ private sub _emitProcBegin _
 			if( hUsesCLongDoubleCABI( proc ) andalso _
 			    hIsCLongDoubleType( dtype, subtype ) ) then
 				var local_identifier = hGetCId( symbGetParamVar( param ) )
-				var native_identifier = "fb_c_native_" + local_identifier
+				var native_identifier = hCNativeParameterName(proc, param, dtype, subtype)
 				var type_name = hEmitType( typeUnsetIsConst( dtype ), subtype, TRUE )
 				hWriteLine( type_name + " " + local_identifier + ";" )
 				hWriteLine( "__builtin_memset( (void*)&" + local_identifier + _

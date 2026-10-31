@@ -99,6 +99,14 @@ function astLoadMACRO _
 	select case op
 	case AST_OP_VA_START
 		v1 = astLoad( n->l )
+		'' va_start identifies the last parameter. A non-indexed array
+		'' wrapper denotes its BYDESC parameter, not an array value.
+		if( n->r->class = AST_NODECLASS_NIDXARRAY ) then
+			var array_operand = n->r
+			n->r = array_operand->l
+			array_operand->l = NULL
+			astDelNode(array_operand)
+		end if
 		v2 = astLoad( n->r )
 		vr = NULL
 
