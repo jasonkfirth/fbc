@@ -7166,8 +7166,15 @@ private sub _emitProcBegin _
 		hashInit(@c_local_refs, 256, TRUE)
 		hMarkReferencedLocals(astGetProc()->l)
 	end if
-	var locals_changed = hCScalarStoresBegin(proc, astGetProc()->l)
-	locals_changed or= hCAutoDescBegin(astGetProc()->l)
+	dim as integer locals_changed = FALSE
+	'' Descriptor initialization can be the only apparent address escape of an
+	'' automatic array. One bounded rescan handles stores released by that proof.
+	for pass as integer = 0 to 1
+		locals_changed or= hCScalarStoresBegin(proc, astGetProc()->l)
+		var descriptors_changed = hCAutoDescBegin(astGetProc()->l)
+		locals_changed or= descriptors_changed
+		if( descriptors_changed = FALSE ) then exit for
+	next
 	if( locals_changed ) then
 		'' Rebuild the storage index after removing unobserved stores.
 		hClearCLocalReferences()

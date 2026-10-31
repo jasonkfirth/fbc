@@ -97,12 +97,19 @@ private function hCScalarStoreCandidate(byval sym as FBSYMBOL ptr) as integer
 		if( symbGetArrayDimensions(sym) <> 0 ) then return (hCStaticArrayBacking(sym) = sym)
 		return hCStaticScalarCandidate(sym)
 	end if
-	if( symbGetArrayDimensions(sym) <> 0 ) then return FALSE
+	if( symbGetArrayDimensions(sym) <> 0 ) then
+		'' Fixed automatic scalar elements have no owned lifetime. Descriptor
+		'' uses remain roots until the descriptor pass proves them unobserved.
+		if( symbIsDynamic(sym) or hCScalarStoreHasLifetime(sym) ) then return FALSE
+		if( symbGetTypeIniTree(sym) <> NULL ) then return FALSE
+		return hCScalarStoreType(symbGetFullType(sym))
+	end if
 	'' A local reference owns its pointer binding, not the referred object.
 	'' Writes through that reference have a DEREF target and are not candidates.
 	if( symbIsRef(sym) ) then return TRUE
 	if( symbGetTypeIniTree(sym) <> NULL ) then return FALSE
 	if( hCScalarStoreHasLifetime(sym) ) then return FALSE
+	if( typeGetDtAndPtrOnly(symbGetFullType(sym)) = FB_DATATYPE_STRUCT ) then return TRUE
 	return hCScalarStoreType(symbGetFullType(sym))
 end function
 
@@ -184,7 +191,9 @@ private function hCScalarStoreDiscardable(byval n as ASTNODE ptr, byval address_
 		'' Copying a floating value adds no arithmetic or conversion.
 		'' Do not alter string/UDT temporary-reference lifetime accounting.
 		if( n->sym = NULL orelse symbIsVar(n->sym) = FALSE ) then return FALSE
-		if( symbIsRef(n->sym) ) then
+		if( symbIsRef(n->sym) or symbIsParamVarByRef(n->sym) ) then
+			'' This VAR loads the physical reference carrier. A BYREF parameter
+			'' does not own the referred aggregate's constructor/destructor.
 			return (typeGetDtAndPtrOnly(n->dtype) = typeGetDtAndPtrOnly(typeAddrOf(symbGetFullType(n->sym)))) and _
 			       (n->subtype = symbGetSubtype(n->sym))
 		end if
@@ -240,7 +249,7 @@ end function
 
 private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	var target = n->l
-	dim as integer value_context = FALSE
+	dim as integer value_context = FALSE, record_field = FALSE
 	if( target = NULL ) then return NULL
 	if( n->class = AST_NODECLASS_ASSIGN andalso target->class = AST_NODECLASS_IDX ) then
 		var entry = hCScalarStoreGet(target->sym)
@@ -260,6 +269,19 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	select case as const n->class
 	case AST_NODECLASS_ASSIGN
 		if( n->r = NULL ) then return NULL
+		if( target->class = AST_NODECLASS_FIELD ) then
+			if( target->sym = NULL orelse symbFieldIsBitfield(target->sym) ) then return NULL
+			if( target->r <> NULL or target->l = NULL ) then return NULL
+			if( target->l->class <> AST_NODECLASS_VAR ) then return NULL
+			if( target->l->sym = NULL ) then return NULL
+			if( typeGetDtAndPtrOnly(symbGetFullType(target->l->sym)) <> FB_DATATYPE_STRUCT ) then return NULL
+			'' Only ordinary bounded scalar member stores are owned here.
+			'' Pointer fields, bitfields and effectful values keep their record.
+			if( typeIsPtr(target->dtype) or hCScalarStoreType(target->dtype) = FALSE ) then return NULL
+			if( hCScalarStoreDiscardable(n->r) = FALSE ) then return NULL
+			record_field = TRUE
+			target = target->l
+		end if
 		if( hCScalarStoreDiscardable(n->r) = FALSE ) then
 			'' Keep the complete AST and its loader/lifetime ownership. The C
 			'' store owner discards only the destination, in a typed value context.
@@ -277,9 +299,10 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	end select
 	if( target = NULL orelse target->class <> AST_NODECLASS_VAR ) then return NULL
 	var entry = hCScalarStoreGet(target->sym)
-	if( entry = NULL orelse target->var_.ofs <> 0 ) then return NULL
-	'' Whole-array clearing and address operations have their own owners.
-	if( symbGetArrayDimensions(entry->sym) <> 0 ) then return NULL
+	if( entry = NULL ) then return NULL
+	if( record_field = FALSE and target->var_.ofs <> 0 ) then return NULL
+	'' Static backing clears retain their separate initializer owner.
+	if( symbGetArrayDimensions(entry->sym) <> 0 and symbIsStatic(entry->sym) ) then return NULL
 	if( symbIsRef(entry->sym) ) then
 		'' Only the physical pointer slot is owned here. A semantic value store
 		'' must not become dead merely because the reference name is unread.
@@ -288,8 +311,15 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 	end if
 	var bytes = clngint(typeGetSize(target->dtype))
 	if( n->class = AST_NODECLASS_MEM ) then bytes = astConstGetInt(n->r)
-	var storage_bytes = iif(symbIsRef(entry->sym), clngint(env.pointersize), symbGetSizeOf(entry->sym))
-	if( bytes <= 0 orelse bytes <> storage_bytes ) then return NULL
+	var storage_bytes = iif(symbIsRef(entry->sym), clngint(env.pointersize), symbGetRealSize(entry->sym))
+	if( record_field ) then
+		'' Subtraction avoids overflow when checking the selected field span.
+		if( target->var_.ofs < 0 or bytes <= 0 ) then return NULL
+		if( target->var_.ofs > storage_bytes ) then return NULL
+		if( bytes > storage_bytes - target->var_.ofs ) then return NULL
+	else
+		if( bytes <= 0 orelse bytes <> storage_bytes ) then return NULL
+	end if
 	entry->value_context or= value_context
 	return entry
 end function
@@ -352,6 +382,11 @@ private sub hCScalarStoreReferences(byval n as ASTNODE ptr, byval value_used as 
 			'' Its result is observable even without a separate VAR read.
 			hCScalarStoreRemember(entry->sym)
 		else
+			if( n->class = AST_NODECLASS_ASSIGN andalso n->l->class = AST_NODECLASS_IDX ) then
+				'' A dead destination discards its pure index. A live array still
+				'' needs that index, even when it has no independent value read.
+				hCScalarStoreReferences(n->l->l, TRUE, FALSE, entry)
+			end if
 			if( hCScalarStoreDiscardable(n->r) ) then
 				'' Calls remain effect roots; other reads depend on this value.
 				hCScalarStoreReferences(n->r, TRUE, TRUE)
