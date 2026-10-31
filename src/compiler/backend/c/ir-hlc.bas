@@ -354,6 +354,9 @@ declare sub hClearGfxBlenders( )
 declare sub hCReadOnlyFinish()
 declare sub hCReadOnlyLocalsFinish()
 declare sub hCUnobservedFinish()
+declare sub hCLiteralStorageInit()
+declare sub hCLiteralStorageFinish()
+declare sub hCLiteralStoragePrepare(byval buffer as ubyte ptr, byval bytes as uinteger)
 #if __FB_DEBUG__
 declare sub exprDump( byval n as EXPRNODE ptr )
 #endif
@@ -2629,6 +2632,7 @@ end sub
 private function _emitBegin( ) as integer
 	hCReadOnlyLocalsInit()
 	hCEvaluatedValuesInit()
+	hCLiteralStorageInit()
 	if( hFileExists( env.outf.name ) ) then
 		if( kill( env.outf.name ) <> 0 ) then
 			return FALSE
@@ -2825,6 +2829,7 @@ private sub _emitEnd( )
 	'' Emit & close the main section
 	if( (ctx.sections(0).old = FALSE) andalso _
 	    (ctx.sections(0).bufferlen > 0) ) then
+		hCLiteralStoragePrepare(ctx.sections(0).buffer, ctx.sections(0).bufferlen)
 		if( hCAbiWriteOutput(ctx.sections(0).buffer, ctx.sections(0).bufferlen, c_leaf_opaque) = FALSE ) then
 			output_error = TRUE
 		end if
@@ -2833,6 +2838,7 @@ private sub _emitEnd( )
 	hCReadOnlyFinish()
 	hCUnobservedFinish()
 	hCReadOnlyLocalsFinish()
+	hCLiteralStorageFinish()
 	sectionEnd( )
 
 	if( close( #env.outf.num ) <> 0 ) then
@@ -4032,16 +4038,18 @@ private sub hImm2Text( byref s as string, byval n as EXPRNODE ptr )
 	end if
 end sub
 
-private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr )
+#include once "backend/c/c-literal-storage.bi"
+
+private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr, byval native_storage as integer = FALSE )
 	hCLeafReference( sym )
 	'' String literal?
 	if( symbGetIsLiteral( sym ) ) then
-		if( symbGetType( sym ) = FB_DATATYPE_WCHAR ) then
-			'' hReadWstrChar() consumes the internal encoding in the builder.
-			'' Decoding here too would reinterpret a literal ESC as an escape.
-			hBuildWstrLit( s, symbGetVarLitTextW( sym ), symbGetWstrLength( sym ) + 1 )
+		if( native_storage ) then
+			s += hCLiteralStorageName(sym)
+		elseif( symbGetType(sym) = FB_DATATYPE_WCHAR ) then
+			hBuildWstrLit(s, symbGetVarLitTextW(sym), symbGetWstrLength(sym) + 1)
 		else
-			hBuildStrLit( s, hUnescape( symbGetVarLitText( sym ) ), symbGetStrLength( sym ) + 1, 0 )
+			hBuildStrLit(s, hUnescape(symbGetVarLitText(sym)), symbGetStrLength(sym) + 1, 0)
 		end if
 	else
 		if( symbIsLabel( sym ) ) then
@@ -4128,7 +4136,7 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 
 	case EXPRCLASS_VTABLE
 		ctx.exprtext += "(" + hEmitType(n->dtype, n->subtype) + ")&"
-		hSym2Text( ctx.exprtext, n->sym )
+		hSym2Text( ctx.exprtext, n->sym, TRUE )
 
 	case EXPRCLASS_SYM
 		'' The symbol formatter also serves expression dumps. Only an address
@@ -4136,9 +4144,10 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		if( symbIsLabel( n->sym ) and sectionInsideProc( ) ) then
 			ctx.computedgotoaddress = TRUE
 		end if
-		hSym2Text( ctx.exprtext, n->sym )
+		hSym2Text( ctx.exprtext, n->sym, TRUE )
 
 	case EXPRCLASS_CAST
+		hCLiteralMutableCast(n->dtype, n->l)
 		if( typeIsPtr(n->dtype) andalso typeIsPtr(n->l->dtype) andalso _
 		    ((typeGetDtAndPtrOnly(n->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) xor _
 		     (typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION))) andalso _
