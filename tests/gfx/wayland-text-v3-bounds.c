@@ -43,7 +43,10 @@ int main(void)
 		size_t copied = length < FB_WAYLAND_TEXT_V3_COMMIT_BYTES ?
 			length : FB_WAYLAND_TEXT_V3_COMMIT_BYTES;
 		char *text = (char *)malloc(length + 1u);
-		require(text != NULL, "allocation failed");
+		if (text == NULL) {
+			fputs("wayland-text-v3-bounds: allocation failed\n", stderr);
+			return EXIT_FAILURE;
+		}
 		memset(text, 'x', length);
 		text[length] = '\0';
 		fb_hWaylandTextV3SetCommit(&pending, text);

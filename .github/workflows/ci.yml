@@ -68,6 +68,9 @@ jobs:
       - name: Lint all first-party C and C++ sources
         run: bash build_scripts/lint-c-sources.sh
 
+      - name: Check analyzer and platform contracts
+        run: python3 -B build_scripts/test-ci-platform-contracts.py
+
       - name: Upload C/C++ lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v7

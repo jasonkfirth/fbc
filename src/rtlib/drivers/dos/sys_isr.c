@@ -83,6 +83,8 @@ _my_es(void)
 {
     unsigned short result;
     __asm__("movw %%es,%0" : "=r" (result));
+    /* The GNU output operand defines result; Cppcheck 2.13 cannot model it. */
+    /* cppcheck-suppress uninitvar */
     return result;
 }
 
@@ -91,6 +93,8 @@ _my_fs(void)
 {
     unsigned short result;
     __asm__("movw %%fs,%0" : "=r" (result));
+    /* The GNU output operand defines result; Cppcheck 2.13 cannot model it. */
+    /* cppcheck-suppress uninitvar */
     return result;
 }
 
@@ -99,6 +103,8 @@ _my_gs(void)
 {
     unsigned short result;
     __asm__("movw %%gs,%0" : "=r" (result));
+    /* The GNU output operand defines result; Cppcheck 2.13 cannot model it. */
+    /* cppcheck-suppress uninitvar */
     return result;
 }
 

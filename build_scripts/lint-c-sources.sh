@@ -123,13 +123,24 @@ done
 # Ubuntu 24.04 ships Cppcheck 2.13, while developer machines may use newer
 # releases.  Some parser limitations have different diagnostic identifiers
 # between those versions, so both narrow names are retained where necessary.
+# The three alloca uses are intentional CRT extensions in target-specific Exec
+# providers and the bounded, heap-fallback wide-file writer. The ISO-C portability
+# advice does not apply to those implementations; other checks remain enabled.
+# Cppcheck also cannot parse initialized objects with GNU asm labels in the
+# three ABI fixtures. Their labels are checked by native compiler/link tests.
 if ! cppcheck \
     --enable=warning,performance,portability \
     --error-exitcode=1 \
     --inline-suppr \
     --max-configs=1 \
     --quiet \
+    --platform=unix64 \
+    -DFB_CPPCHECK_ANALYSIS=1 \
+    --include="$repo_root/build_scripts/cppcheck-platform-model.h" \
     --suppress=missingIncludeSystem \
+    --suppress='allocaCalled:src/rtlib/devices/dev_file_write_wstr.c' \
+    --suppress='allocaCalled:src/rtlib/drivers/dos/sys_execex.c' \
+    --suppress='allocaCalled:src/rtlib/drivers/win32/sys_execex.c' \
     --suppress='*:src/sfxlib/third_party/*' \
     --suppress='uninitMemberVarNoCtor:src/gfxlib2/drivers/haiku/*' \
     --suppress='uninitMemberVarNoCtor:src/rtlib/fb_file.h' \
@@ -165,6 +176,9 @@ if ! cppcheck \
     --suppress='syntaxError:src/sfxlib/js/sfx_driver_webaudio.c' \
     --suppress='syntaxError:build_scripts/wince/mips-toolchain/crt0.c' \
     --suppress='syntaxError:contrib/djgpp/libc/crt0/_main.c' \
+    --suppress='syntaxError:tests/compiler-support/c23-keyword-helper.c' \
+    --suppress='syntaxError:tests/compiler-support/c23-keyword-variables-helper.c' \
+    --suppress='syntaxError:tests/compiler-support/reserved-abi-helper.c' \
     --suppress='unknownMacro:src/rtlib/drivers/aros/static/fbrt0.c' \
     --suppress='unknownMacro:src/rtlib/drivers/aros/static/fbrt1.c' \
     --suppress='unknownMacro:src/rtlib/drivers/aros/static/fbrt2.c' \

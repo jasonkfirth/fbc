@@ -435,6 +435,12 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- compiler/C backend: preserve ordinary AROS emulated-TLS identifiers without GNU asm labels, and check both C producers with an emulated-TLS object regression.
+- rtlib/long double: use scoped POSIX thread locales where strtold_l is unavailable, preserve borrowed locale ownership, and support the Windows CE CRT without locale.h or silent precision loss.
+- build/CI: model Emscripten signatures and standalone fixture configuration for Cppcheck, keep GNU-asm parser limits narrow, retain uninitialized-value controls, and correct actual buffer bounds and mock pointer contracts.
+- rtlib/Xbox: match the x87 control-word object to its 16-bit memory operand.
+- build/MIPS: fetch the existing checksum-pinned ncurses release from the GNU mirror with bounded retries.
+- compiler/lexer: keep the identifier-ending preservation flag native-sized independently of the 64-bit semantic literal counter, restoring 32-bit compiler bootstrap emission.
 - compiler/C backend: omit unreferenced compiler-generated scoped variables and private static fixed-array descriptors under debug, preserving named source storage, array debugger types and bounds, implicit user declarations, passed descriptors and reachable string lifetimes.
 - compiler/C backend: remove unread compiler scratch stores in debug output while retaining named BASIC variables, parameter bindings, opaque assembly and required evaluations; remove ten GCC and ten Clang unused-store observations and qualify complete queues plus native/debug controls.
 - compiler: warn about impossible integer-range comparisons and provably null memory accesses before code generation; add -w all advisories for unread named parameters and scalar variables, retaining declaration locations and excluding implicit storage.

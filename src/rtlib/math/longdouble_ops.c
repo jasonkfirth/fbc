@@ -26,7 +26,10 @@
 #define _GNU_SOURCE 1
 #endif
 #include <math.h>
+#include <float.h>
+#if !defined(_WIN32_WCE)
 #include <locale.h>
+#endif
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -164,7 +167,14 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 	long double value;
 
 	if (text == NULL) abort();
-#if defined(__MINGW32__) && defined(_UCRT)
+#if defined(_WIN32_WCE)
+	/* CE's minimal CRT has no locale header or locale objects. Its numeric
+	 * conversion uses the C format, and ARM CE has no wider long double. */
+#if LDBL_MANT_DIG != DBL_MANT_DIG || LDBL_MAX_EXP != DBL_MAX_EXP
+#error Windows CE long double conversion requires the native double format
+#endif
+	value = (long double)strtod(text, &end);
+#elif defined(__MINGW32__) && defined(_UCRT)
 	/* UCRT has no locale-taking extended-precision strtold. MinGW's
 	 * strtold retains x87 precision; isolate its numeric locale to this
 	 * thread, then restore both the category and its previous locale mode. */
@@ -192,8 +202,18 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 	_free_locale(c_locale);
 #elif defined(__unix__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__)
 	locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+	locale_t previous_locale;
 	if (c_locale == (locale_t)0) abort();
-	value = strtold_l(text, &end, c_locale);
+	/* strtold_l is not exposed by every BSD/Haiku CRT. POSIX thread locales
+	 * give strtold the same C-locale interpretation without changing another
+	 * thread's numeric locale. The previous locale is borrowed, not owned. */
+	previous_locale = uselocale(c_locale);
+	if (previous_locale == (locale_t)0) {
+		freelocale(c_locale);
+		abort();
+	}
+	value = strtold(text, &end);
+	if (uselocale(previous_locale) == (locale_t)0) abort();
 	freelocale(c_locale);
 #else
 	/* Older targets without locale-specific conversion stay correct in C locale. */

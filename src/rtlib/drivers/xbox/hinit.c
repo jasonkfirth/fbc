@@ -126,7 +126,7 @@ FBCALL void fb_ProfileUnlock( void ) { fb_XboxLockLeave( &__fb_profile_mutex ); 
 
 void fb_hInit( void )
 {
-	unsigned int control_word;
+	unsigned short control_word;
 
 	fb_XboxMountWritableDrive();
 	fb_XboxMountDiscDrive();
@@ -135,7 +135,9 @@ void fb_hInit( void )
 	/* Get FPU control word */
 	__asm__ __volatile__( "fstcw %0" : "=m" (control_word) : );
 	/* Set 64-bit and round to nearest */
-	control_word = (control_word & 0xF0FF) | 0x300;
+	/* FSTCW writes the 16-bit output; Cppcheck 2.13 cannot model it. */
+	/* cppcheck-suppress uninitvar */
+	control_word = (unsigned short)((control_word & 0xF0FFu) | 0x300u);
 	/* Write back FPU control word */
 	__asm__ __volatile__( "fldcw %0" : : "m" (control_word) );
 

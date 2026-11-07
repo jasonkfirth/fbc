@@ -418,6 +418,37 @@ def main() -> int:
                 print(f"Unicode/{target}: emission failed\n{emitted.stdout}{emitted.stderr}")
                 return 1
             print(f"Unicode/{target}: emission passed")
+        # AROS uses emulated TLS. An asm label on an ordinary dollar-mangled
+        # name can leak GCC's internal '*' marker into its descriptor name.
+        for producer in ("gcc", "clang"):
+            generated = working / ("aros-tls-" + producer + ".c")
+            command = [*compiler_args, "-r", "-gen", producer, "-target", "aros",
+                       str(root / "tests/quirk/c-wince-tls-names.bas"),
+                       "-o", str(generated)]
+            emitted = subprocess.run(command, cwd=working, text=True,
+                                     capture_output=True, timeout=120, check=False)
+            if emitted.returncode:
+                print(f"TLS/aros/{producer}: emission failed\n{emitted.stdout}{emitted.stderr}")
+                return 1
+            declarations = [line for line in generated.read_text(encoding="utf-8").splitlines()
+                            if "__thread" in line]
+            if (len(declarations) != 3 or
+                    any("__asm__" in line for line in declarations) or
+                    not any("fbcTlsValue$" in line for line in declarations)):
+                print(f"TLS/aros/{producer}: incorrect descriptor name declarations")
+                return 1
+            if clang:
+                # No target SDK is needed: emitted C declares its own ABI types.
+                compiled = subprocess.run(
+                    [clang, "--target=i386-unknown-linux-gnu", "-femulated-tls",
+                     "-nostdinc", "-Wall", "-Wextra", "-Werror", "-c", str(generated),
+                     "-o", str(working / ("aros-tls-" + producer + ".o"))],
+                    cwd=working, text=True, capture_output=True, timeout=120, check=False)
+                if compiled.returncode:
+                    print(f"TLS/aros/{producer}: emulated TLS compilation failed\n"
+                          f"{compiled.stdout}{compiled.stderr}")
+                    return 1
+            print(f"TLS/aros/{producer}: passed")
         if "llvm" in backends:
             if llc is None:
                 print("llvm: configured compiler is unavailable")

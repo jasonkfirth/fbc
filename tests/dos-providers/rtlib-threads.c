@@ -66,6 +66,8 @@ static void handoff( void *argument )
 		__atomic_store_n( &turn, 1 - id, __ATOMIC_RELEASE );
 	}
 	__asm__ __volatile__( "fstpl %0; fnstcw %1" : "=m"(actual), "=m"(observed) : : "st" );
+	/* Both values are output operands, not uninitialized C storage. */
+	/* cppcheck-suppress uninitvar */
 	if( actual != original || observed != control || errno != 200 + (int)id ||
 	    fb_ErrorGetNum() != 100 + (int)id || fb_ThreadSelf() != self )
 		__atomic_store_n( &failed, 1, __ATOMIC_RELEASE );
@@ -144,6 +146,8 @@ int main( int argc, char **argv )
 	for( i = 0; i < 2; i++ )
 		fb_ThreadWait( workers[i] );
 	__asm__ __volatile__( "fnstcw %0" : "=m"(observed) );
+	/* control and observed are initialized by FNSTCW output operands. */
+	/* cppcheck-suppress uninitvar */
 	if( completed[0] != 16 || completed[1] != 16 || failed ||
 	    observed != control || fb_ErrorGetNum() != 333 || fb_ThreadSelf() != main_thread ) {
 		puts( "FAIL preemption, FPU, errno or TLS" );

@@ -37,6 +37,10 @@ int test_snprintf(char *buffer, size_t size, const char *format, ...)
 FB_ERRHANDLER fb_ErrorThrowMsg(int errnum, int linenum, const char *filename,
     const char *message, void *resume, void *resume_next)
 {
+    if (message == NULL) {
+        valid_dispatch = 0;
+        return NULL;
+    }
     const char *end = memchr(message, '\0', FB_ERRMSG_SIZE);
     observed_error = errnum;
     if (end == NULL || linenum != 42 || filename == NULL ||

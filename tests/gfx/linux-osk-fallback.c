@@ -121,6 +121,7 @@ static int test_pthread_create(pthread_t *thread, const pthread_attr_t *attribut
 
 int fb_hLinuxMaliitQueryKeyboard(int *visible)
 {
+	if (visible == NULL) return 0;
 	test_maliit_queries++;
 	*visible = test_maliit_visible;
 	return test_maliit_available;
@@ -128,6 +129,7 @@ int fb_hLinuxMaliitQueryKeyboard(int *visible)
 
 int fb_hLinuxKwinQueryKeyboard(int *visible)
 {
+	if (visible == NULL) return 0;
 	test_kwin_queries++;
 	*visible = test_kwin_visible;
 	return test_kwin_available;

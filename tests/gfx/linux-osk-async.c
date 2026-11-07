@@ -87,12 +87,14 @@ static int test_system(const char *command)
 
 int fb_hLinuxMaliitQueryKeyboard(int *visible)
 {
+	if (visible == NULL) return 0;
 	*visible = -2;
 	return 0;
 }
 
 int fb_hLinuxKwinQueryKeyboard(int *visible)
 {
+	if (visible == NULL) return 0;
 	*visible = -2;
 	return 0;
 }

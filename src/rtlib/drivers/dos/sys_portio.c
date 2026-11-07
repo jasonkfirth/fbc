@@ -12,6 +12,8 @@ int fb_hIn( unsigned short port )
 {
 	unsigned char value;
 	__asm__ volatile ("inb %1, %0" : "=a" (value) : "d" (port));
+	/* The GNU output operand defines value; Cppcheck 2.13 cannot model it. */
+	/* cppcheck-suppress uninitvar */
 	return (int)value;
 }
 

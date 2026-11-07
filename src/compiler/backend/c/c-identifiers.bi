@@ -109,6 +109,7 @@ private function hCUseEmulatedTlsName( byval sym as FBSYMBOL ptr, byval rawname 
 	if( (env.clopt.target <> FB_COMPTARGET_WINCE) and _
 	    (env.clopt.target <> FB_COMPTARGET_WIN32) and _
 	    (env.clopt.target <> FB_COMPTARGET_OPENBSD) and _
+	    (env.clopt.target <> FB_COMPTARGET_AROS) and _
 	    (env.clopt.target <> FB_COMPTARGET_RISCOS) ) then return FALSE
 	if( (sym = NULL) or (rawname = NULL) ) then return FALSE
 	if( sym->class <> FB_SYMBCLASS_VAR ) then return FALSE

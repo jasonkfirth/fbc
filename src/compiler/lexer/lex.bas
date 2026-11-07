@@ -2323,7 +2323,8 @@ sub lexNextToken _
 
 	dim as uinteger char = any
 	dim as integer reread = any, readchar = any
-	dim as longint semantic_literal_start_units, preserve_ending = any
+	dim as longint semantic_literal_start_units
+	dim as integer preserve_ending = any
 
 	t->after_space = lex.ctx->after_space
 	lex.ctx->after_space = FALSE

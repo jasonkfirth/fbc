@@ -43,7 +43,8 @@ int main( int argc, char **argv )
     CHECK( bytes == 3 && memcmp( data, "abc", 3 ) == 0 && data[3] == 'Q' );
 
     CHECK( fb_FileGetStrLargeIOB( 1, 1, data, 4, &bytes ) == FB_RTERROR_OK );
-    CHECK( bytes == 3 && strcmp( data, "abc" ) == 0 );
+    /* A missing terminator must fail the test without an unbounded read. */
+    CHECK( bytes == 3 && memcmp( data, "abc", 4 ) == 0 );
     data[3] = 'Q';
     CHECK( fb_FileGetStrIOB( 1, 1, &descriptor, FB_STRSIZEVARLEN, &bytes ) == FB_RTERROR_OK );
     CHECK( bytes == 3 && data[3] == '\0' && descriptor.len == 3 );

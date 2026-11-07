@@ -195,7 +195,9 @@ extern "C" {
 #endif
 
 /* CPU-dependent macros and inline functions */
-#ifdef HOST_X86
+/* Cppcheck cannot interpret extended-asm outputs. Analyze the existing C
+ * implementations instead; native x86 builds retain the optimized helpers. */
+#if defined(HOST_X86) && !defined(FB_CPPCHECK_ANALYSIS)
     static __inline__ int FB_MEMCMP( const void *p1, const void *p2, size_t len )
     {
         int res;

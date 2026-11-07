@@ -37,7 +37,8 @@ int fb_FileGetDataEx( FB_FILE *handle, fb_off_t position, void *data,
     requested = length;
     ++reads;
     memset( data, 'Z', count );
-    *bytesread = count;
+    if( bytesread != NULL )
+        *bytesread = count;
     return FB_RTERROR_OK;
 }
 

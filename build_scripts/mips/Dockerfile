@@ -99,8 +99,8 @@ RUN curl -fsSL \
 # The cross compilers otherwise find the host curses headers while lacking a
 # target libtinfo. Install target headers and static libraries together so the
 # console ABI and final link are both self-consistent.
-RUN curl -fsSL \
-        "https://invisible-island.net/archives/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" \
+RUN curl -fsSL --retry 3 \
+        "https://ftp.gnu.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" \
         -o /tmp/ncurses.tar.gz \
     && printf '%s  %s\n' "${NCURSES_SHA256}" /tmp/ncurses.tar.gz \
         | sha256sum -c - \
