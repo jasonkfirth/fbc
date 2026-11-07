@@ -1,6 +1,6 @@
 '' FreeBASIC runtime tests: android-poll.bas
 '' Purpose: Exercise native notifications and an idle worker on a real device.
-'' Responsibilities: Checked JNI calls, Unicode, denied policy and finite polling.
+'' Responsibilities: Checked JNI calls, Unicode, denied policy, safe stacks and finite polling.
 '' This fixture does not install a service or change the device's power policy.
 '' Threading: Each context has one owner. Only the counter crosses threads,
 '' under its mutex; joining ends all worker access before main-thread cleanup.
@@ -119,8 +119,14 @@ dim small_stack_status as long
 dim small_worker as any ptr = threadcreate(@small_stack_worker, @small_stack_status, 65536)
 require(small_worker <> 0, "small worker")
 threadwait small_worker
-require(small_stack_status = FB.SERVICE_UNAVAILABLE, "small stack refusal")
-record_result("ANDROID_SMALL_STACK_REFUSAL=PASS")
+'' POSIX thread creation may raise a small request to FBTHREAD_STACK_MIN.
+'' The notification backend refuses only when the actual stack remains too small.
+if small_stack_status = FB.SERVICE_UNAVAILABLE then
+	record_result("ANDROID_SMALL_STACK_REFUSAL=PASS")
+else
+	require(small_stack_status = FB.SERVICE_OK, "small stack result")
+	record_result("ANDROID_SMALL_STACK_RAISED=PASS")
+end if
 '' The Java VM needs more stack than BASIC's default polling-only thread.
 dim worker as any ptr = threadcreate(@poll_worker, @work, 1024 * 1024)
 require(worker <> 0, "worker")

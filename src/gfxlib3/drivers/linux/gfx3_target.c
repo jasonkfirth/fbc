@@ -10,6 +10,7 @@
 
     Responsibilities:
 
+        - prefer OpenGL ES in compositor-managed Wayland sessions
         - prefer OpenGL ES on native DRM/KMS handheld displays
         - retain desktop OpenGL and Vulkan preferences under X11
         - reject resizable requests on KMSDRM fullscreen displays
@@ -28,6 +29,7 @@
 #include "../../gfx3_backend_opengl.h"
 #include "../../gfx3_backend_vulkan.h"
 #include "gfx3_platform_drm.h"
+#include "gfx3_platform_wayland.h"
 
 #define FB_GFX3_SCREEN_RESIZABLE 0x00000400u
 
@@ -51,9 +53,12 @@ size_t fb_gfx3_target_backend_default_list(
 
 	if ((backends == NULL) || (capacity == 0u))
 		return 0u;
-	if (fb_gfx3_platform_drm_should_default()) {
+	if (fb_gfx3_platform_wayland_should_default() ||
+	    fb_gfx3_platform_drm_should_default()) {
 		preferred[0] = &__fb_gfx3_backend_gles;
-		preferred_count = 1u;
+		preferred[1] = &__fb_gfx3_backend_opengl;
+		preferred[2] = &__fb_gfx3_backend_vulkan;
+		preferred_count = sizeof(preferred) / sizeof(preferred[0]);
 	} else {
 		preferred[0] = &__fb_gfx3_backend_opengl;
 		preferred[1] = &__fb_gfx3_backend_vulkan;
@@ -67,7 +72,8 @@ size_t fb_gfx3_target_backend_default_list(
 
 const FB_GFX3_BACKEND_VTABLE *fb_gfx3_target_opengl_backend(void)
 {
-	if (fb_gfx3_platform_drm_should_default())
+	if (fb_gfx3_platform_wayland_should_default() ||
+	    fb_gfx3_platform_drm_should_default())
 		return &__fb_gfx3_backend_gles;
 	return &__fb_gfx3_backend_opengl;
 }

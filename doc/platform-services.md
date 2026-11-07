@@ -38,6 +38,14 @@ Unix notification bodies are escaped when the desktop service advertises
 markup support; plain-text servers receive the original text. Android uses
 ordinary text rather than HTML.
 
+Unix desktop notifications include the `desktop-entry` identity hint. Set
+`APP_ID` to the installed desktop filename without its `.desktop` suffix
+before creating the context, for example `APP_ID=templari`. If it is absent
+or invalid, the application name is used. The value is captured at context
+creation and follows the application-name UTF-8 and byte limits. Both libnotify
+and the GIO fallback use it; Plasma Mobile may hide otherwise unidentified
+notifications even when the D-Bus post succeeds.
+
 | Result | Meaning |
 | --- | --- |
 | `FB.SERVICE_OK` | Operation accepted. A send does not prove that a person saw it. |
@@ -272,6 +280,49 @@ Android 13+ permission prompts, Doze, process restart or whole-project
 regression/release qualification. Background device checks cover a running
 process while its activity is stopped; they do not install an OS job. Receipts
 record actual exits, source/tool hashes and these boundaries. Private test
-archives do not replace the installed SDK, and no Templari integration is made.
+archives did not replace the installed SDK. That original batch did not include
+Templari integration.
+
+## Linux mobile follow-up, 2026-11-02
+
+The existing native APIs were exercised in the Ubuntu Touch 20.04 Lomiri VM and
+on a physical AArch64/musl postmarketOS 26.06 phone. Each passed 37 assertions:
+bounded idle timing, callback stop and reentry refusal, notification ownership,
+invalid payload refusal and cleanup. A 40-second graphics/service loop produced
+39 callbacks on each target in the final run while preserving injected keyboard
+input. Both displayed real notifications; session-bus captures verified initial
+posts, replacement IDs, close requests and server close signals.
+
+Lomiri's focus service confirmed that the test process was unfocused while idle
+callbacks continued. Phosh's overview capture and callback progression provided
+the corresponding phone evidence. Native graphics focus-event delivery alone
+did not establish focus transitions in these runs. These are cooperative process
+callbacks, not an OS background job or a guarantee during process suspension.
+
+Templari's previously Android-only adapter now enables these same runtime calls
+on Linux. Its adapter and focused fixture compiled against the existing private
+SDKs, and both full clients were relinked and passed normal GUI/worker shutdown.
+No installed SDK or notification policy was replaced. Templari's
+`docs/mobile-linux.md` and `work/mobile-linux-20261102/services-qualification.json`
+record current image hashes, native receipts and visible captures. The service
+fixture uses the GUI backend's framebuffer-clear path.
+
+The separate apparent `CLS` stall was traced to cached `VIEW PRINT` rows exceeding
+the resized framebuffer. `src/rtlib/console/io_viewhlp.c` now clips graphics ranges
+and preserves their bottom anchoring through size changes, while leaving native
+console caching intact. The production helper passed 44 assertions on each
+architecture; its pre-fix control failed check 12. Native gfxlib2 and gfxlib3
+clear modes and pixel readback passed on both targets. One runtime object was
+replaced in each private archive, and linked-symbol/archive checks verified it
+in both final clients and service fixtures. Both clients displayed and exited
+normally. Templari's `cls-qualification.json` and `completion-audit.json` under
+the same work directory record this follow-up and its limits.
+
+The subsequent Templari GUI check corrected its Linux handheld density baseline
+and logical-to-surface text-input rectangles. After rebuilding the GUI owner on
+both targets, the phone's actual chat controls fit, an OSK-entered draft survived
+landscape/portrait rotation, and both full clients displayed and closed normally.
+`layout-qualification.json` records those final consumer images separately from
+the service/viewport-stage image hashes.
 
 <!-- end of platform-services.md -->

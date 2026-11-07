@@ -17,23 +17,23 @@ FB_WCHAR *fb_FloatExToWstr( double val, FB_WCHAR *buffer, int digits, int mask )
 	else
 		p = buffer;
 
-	swprintf( p, 16+8+1, _LC("%.*g"), digits, val );
+	swprintf( p, 16+8+1, FB_WCHAR_LITERAL("%.*g"), digits, val );
 
 	len = fb_wstr_Len( p );
 
 	if( len > 0 )
 	{
 		/* skip the dot at end if any */
-		if( p[len-1] == _LC('.') )
-			p[len-1] = _LC('\0');
+		if( p[len-1] == FB_WCHAR_LITERAL('.') )
+			p[len-1] = FB_WCHAR_LITERAL('\0');
 	}
 
 	/* */
 	if( (mask & FB_F2A_ADDBLANK) > 0 )
 	{
-		if( *p != _LC('-') )
+		if( *p != FB_WCHAR_LITERAL('-') )
 		{
-			*buffer = _LC(' ');
+			*buffer = FB_WCHAR_LITERAL(' ');
 			return buffer;
 		}
 		else

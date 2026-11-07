@@ -15,6 +15,10 @@ static int mobile_width, mobile_height, mobile_dpi, mobile_rotation;
 static int mobile_keyboard_visible = -2;
 static int mobile_available;
 static int mobile_managed_input;
+/* Presentation observes the native buffer separately from Java's usable area.
+ * Both snapshots use mobile_metrics_mutex; no driver lock is acquired here. */
+static int mobile_surface_width, mobile_surface_height;
+static int mobile_source_width, mobile_source_height;
 
 JNIEXPORT void JNICALL
 Java_org_freebasic_android_FreeBasicNativeActivity_nativeInputViewReady(
@@ -38,7 +42,13 @@ static void android_request_soft_keyboard(int visible);
 static void android_mobile_viewport(int source_width, int source_height,
 	int *width, int *height)
 {
+	if (!width || !height)
+		return;
 	pthread_mutex_lock(&mobile_metrics_mutex);
+	mobile_surface_width = (*width > 0 && *width <= 32767) ? *width : 0;
+	mobile_surface_height = (*height > 0 && *height <= 32767) ? *height : 0;
+	mobile_source_width = (source_width > 0 && source_width <= 32767) ? source_width : 0;
+	mobile_source_height = (source_height > 0 && source_height <= 32767) ? source_height : 0;
 	if (mobile_available && source_width == mobile_width &&
 	    source_height == mobile_height && mobile_width <= *width &&
 	    mobile_height <= *height) {
@@ -61,16 +71,26 @@ Java_org_freebasic_android_FreeBasicNativeActivity_nativeWindowMetrics(
 	mobile_dpi = (dpi >= 72 && dpi <= 1920) ? dpi : 160;
 	mobile_rotation = (rotation >= 0 && rotation < 360) ? rotation : 0;
 	mobile_keyboard_visible = keyboard_visible;
-	mobile_available = width > 0 && height > 0;
+	mobile_available = mobile_width > 0 && mobile_height > 0;
 	pthread_mutex_unlock(&mobile_metrics_mutex);
 }
 
 void fb_hMobileControl(int what, ssize_t *p1, ssize_t *p2,
 	ssize_t *p3, ssize_t *p4)
 {
+	if (what == GET_DEVICE_CLASS) {
+		*p1 = FB_GFX_DEVICE_CLASS_HANDHELD;
+		*p2 = *p3 = *p4 = 0;
+		return;
+	}
 	if (what == SET_SOFT_KEYBOARD) {
 		if (*p1 != (ssize_t)0x80000000)
 			android_request_soft_keyboard(*p1 != 0);
+		return;
+	}
+	if (what == GET_TOUCH_CAPABILITY) {
+		*p1 = -2;
+		*p2 = *p3 = *p4 = 0;
 		return;
 	}
 	if (what != GET_WINDOW_METRICS && what != GET_SOFT_KEYBOARD)
@@ -83,6 +103,22 @@ void fb_hMobileControl(int what, ssize_t *p1, ssize_t *p2,
 		*p1 = mobile_keyboard_visible;
 		*p2 = mobile_available ? -1 : 0;
 		*p3 = *p4 = 0;
+		/* Fullscreen Android can retain its native buffer behind a docked IME.
+		 * Report its measured overlap even on the first show, before consumers
+		 * have an unoccluded baseline. A page already resized to the usable
+		 * height has an empty overlap at its end, confirming reservation.
+		 * Require the same 100-dp gap used by legacy Java observation so shell
+		 * chrome or a floating IME does not become a guessed keyboard bound. */
+		if (mobile_available && mobile_width > 0 && mobile_height > 0 &&
+		    mobile_keyboard_visible == -1 &&
+		    mobile_surface_width == mobile_width &&
+		    mobile_source_width == mobile_width && mobile_source_height > 0 &&
+		    (mobile_source_height == mobile_height ||
+		     mobile_source_height == mobile_surface_height) &&
+		    mobile_surface_height - mobile_height > (100 * mobile_dpi) / 160) {
+			*p3 = mobile_height < mobile_source_height ? mobile_height : mobile_source_height;
+			*p4 = mobile_source_height - *p3;
+		}
 	}
 	pthread_mutex_unlock(&mobile_metrics_mutex);
 }

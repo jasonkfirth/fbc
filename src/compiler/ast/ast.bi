@@ -555,6 +555,8 @@ declare function astIsEqualParamInit _
 
 declare function astIsConstant( byval expr as ASTNODE ptr ) as integer
 
+declare sub astWarnDeclareVariable(byval sym as FBSYMBOL ptr)
+
 declare sub astProcBegin( byval proc as FBSYMBOL ptr, byval ismain as integer )
 declare function astProcEnd( byval callrtexit as integer ) as integer
 '' Shared C statement termination rule for reachability and storage liveness.
@@ -1333,7 +1335,7 @@ declare function astBuildCall _
 declare function astBuildVtableLookup _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval thisexpr as ASTNODE ptr _
+		byref thisexpr as ASTNODE ptr _
 	) as ASTNODE ptr
 
 declare function astBuildCtorCall _

@@ -10,9 +10,9 @@
 
 char *fb_hGetExePath( char *dst, ssize_t maxlen )
 {
-	const char *p = strrchr( __fb_ctx.argv[0], '/' );
+	const char *p = strrchr( fb_ctx.argv[0], '/' );
 	if( p ) {
-		ssize_t len = p - __fb_ctx.argv[0];
+		ssize_t len = p - fb_ctx.argv[0];
 		if( len > maxlen ) {
 			len = maxlen;
 		}
@@ -21,11 +21,11 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 			len = 1;
 		}
 
-		memcpy( dst, __fb_ctx.argv[0], len );
+		memcpy( dst, fb_ctx.argv[0], len );
 		dst[len] = '\0';
 	} else {
 		const char *path = getenv( "PATH" );
-		size_t argv_len = strlen( __fb_ctx.argv[0] );
+		size_t argv_len = strlen( fb_ctx.argv[0] );
 
 		while( path && *path ) {
 			char candidate[MAX_PATH+1];
@@ -40,7 +40,7 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 			if( path_len + 1 + argv_len < sizeof( candidate ) ) {
 				memcpy( candidate, path, path_len );
 				candidate[path_len] = '/';
-				memcpy( candidate + path_len + 1, __fb_ctx.argv[0], argv_len + 1 );
+				memcpy( candidate + path_len + 1, fb_ctx.argv[0], argv_len + 1 );
 
 				if( access( candidate, X_OK ) == 0 ) {
 					p = strrchr( candidate, '/' );

@@ -1,6 +1,6 @@
 '' Project: FreeBASIC compiler - semantic comment observations
 '' File: tooling/semantic-comments.bi
-'' Purpose: Preserve comment markers accepted by the parser or preprocessor.
+'' Purpose: Preserve accepted comment markers and native block ranges.
 '' Responsibilities: Define the serial, non-owning observation interface.
 '' This file intentionally does NOT contain: comment parsing or lint policy.
 
@@ -11,6 +11,9 @@
 
 declare sub fbSemanticModelAcceptComment _
 	( byval token as integer, byref source as LEX_LOCATION )
+declare sub fbSemanticModelAcceptBlockComment _
+	( byref first as LEX_LOCATION, byref last as LEX_LOCATION )
+
 declare sub fbSemanticModelResetComments( )
 declare sub fbSemanticModelFinishComments( )
 

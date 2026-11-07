@@ -5,7 +5,7 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
-typedef enum _FB_RND_ALGORITHMS {
+typedef enum FB_RND_ALGORITHMS_ {
 	FB_RND_AUTO = 0,
 	FB_RND_CRT,
 	FB_RND_FAST,
@@ -21,7 +21,7 @@ FBCALL uint32_t     fb_Rnd32            ( void );
 
 #define FB_RND_MAX_STATE 624
 
-typedef struct _FB_RNDSTATE {
+typedef struct FB_RNDSTATE_ {
 	uint32_t algorithm;        /* see FB_RND_ALGORITHMS */
 	uint32_t length;           /* length of state vector (# of uint32_t) */
 
@@ -44,15 +44,6 @@ FBCALL FB_RNDSTATE *fb_RndGetState ( void );
 /* Constants from 'Numerical recipes in C' chapter 7.1 */
 #define FBRNDFAST32(arg) ( ( (arg) * 1664525 ) + 1013904223 )
 
-static __inline__ void hRnd_FillFAST32 ( uint32_t *buffer, uint32_t length32, uint32_t iseed32 )
-{
-	uint32_t i;
-	buffer[0] = iseed32;
-	for( i = 1; i < length32; i++ ) {
-		buffer[i] = FBRNDFAST32( buffer[i - 1] );
-	}
-}
-
 FBCALL int          fb_SGNSingle        ( float x );
 FBCALL int          fb_SGNDouble        ( double x );
 FBCALL float        fb_FIXSingle        ( float x );
@@ -65,5 +56,12 @@ FBCALL long long    fb_CVLONGINTFROMD   ( double d );
 
 FBCALL int fb_IntLog10_32 ( unsigned int x );
 FBCALL int fb_IntLog10_64 ( unsigned long long x );
+
+/* Scalar wrappers retain their exact C argument and result types. */
+FBCALL float fb_FRACf( float x );
+FBCALL double fb_FRACd( double x );
+FBCALL int fb_SGNb ( char x );
+FBCALL int fb_SGNi ( int x );
+FBCALL int fb_SGNl ( long long int x );
 
 /* end of fb_math.h */

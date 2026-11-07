@@ -24,17 +24,21 @@
 */
 
 #include "../gfx3_api_internal.h"
+#include "../gfx3_backend_null.h"
 #include "../gfx3_backend_select.h"
 #include "../gfx3_compat.h"
 #include "../gfx3_joystick.h"
 #include "../gfx3_platform.h"
 #include "../gfx3_screenlist.h"
 #include "../../gfxlib2/drivers/mobile_control.h"
+#ifdef HOST_LINUX
+#include "../drivers/linux/gfx3_mobile.h"
+#endif
 #ifdef HOST_WIN32
 #include "../../gfxlib2/drivers/win32/gfx_metrics.h"
 #endif
 
-FBCALL void fb_GfxSetWindowTitle(FBSTRING *title);
+FBCALL void fb_GfxSetWindowTitle(FBSTRING_ACCESS *title);
 
 enum FB_GFX3_CONTROL_ID {
 	FB_GFX3_GET_WINDOW_POS = 0,
@@ -150,9 +154,9 @@ static const char *query_driver_name(const FB_GFX3_MODE *mode)
 	return backend->name;
 }
 
-static void query_assign_string(FBSTRING *destination, const char *value)
+static void query_assign_string(FBSTRING_ACCESS *destination, const char *value)
 {
-	FBSTRING *source;
+	FBSTRING_ACCESS *source;
 	size_t length;
 
 	if ((destination == NULL) || (value == NULL))
@@ -346,7 +350,7 @@ static void query_desktop_info(ssize_t *width, ssize_t *height,
 
 FBCALL void fb_GfxScreenInfo(ssize_t *width, ssize_t *height,
 	ssize_t *depth, ssize_t *bytes_per_pixel, ssize_t *pitch,
-	ssize_t *refresh, FBSTRING *driver)
+	ssize_t *refresh, FBSTRING_ACCESS *driver)
 {
 	FB_GFX3_DRAW_STATE *state;
 	const char *driver_name = "";
@@ -387,7 +391,7 @@ FBCALL void fb_GfxScreenInfo(ssize_t *width, ssize_t *height,
 }
 
 FBCALL void fb_GfxScreenInfo32(int *width, int *height, int *depth,
-	int *bytes_per_pixel, int *pitch, int *refresh, FBSTRING *driver)
+	int *bytes_per_pixel, int *pitch, int *refresh, FBSTRING_ACCESS *driver)
 {
 	ssize_t native_width = 0;
 	ssize_t native_height = 0;
@@ -414,7 +418,7 @@ FBCALL void fb_GfxScreenInfo32(int *width, int *height, int *depth,
 
 FBCALL void fb_GfxScreenInfo64(long long *width, long long *height,
 	long long *depth, long long *bytes_per_pixel, long long *pitch,
-	long long *refresh, FBSTRING *driver)
+	long long *refresh, FBSTRING_ACCESS *driver)
 {
 	ssize_t native_width = 0;
 	ssize_t native_height = 0;
@@ -955,7 +959,7 @@ FBCALL int fb_GfxWaitVSync(void)
 /* SCREENCONTROL and empty event queue                                       */
 /* ------------------------------------------------------------------------- */
 
-FBCALL void fb_GfxControl_s(int what, FBSTRING *parameter)
+FBCALL void fb_GfxControl_s(int what, FBSTRING_ACCESS *parameter)
 {
 	FB_GFX3_DRAW_STATE *state;
 	const FB_GFX3_BACKEND_GL_INFO *gl_info;
@@ -1004,6 +1008,31 @@ FBCALL void fb_GfxControl_s(int what, FBSTRING *parameter)
 	FB_GRAPHICS_UNLOCK();
 }
 
+#ifdef HOST_LINUX
+/*
+ * The published mode is enough to identify the input target; no drawing
+ * state or graphics lock is needed while contacting the input method. Mode
+ * teardown waits for this lease before freeing input.
+ */
+void fb_gfx3_linux_control_mode(int what, ssize_t *p1, ssize_t *p2,
+	ssize_t *p3, ssize_t *p4)
+{
+	FB_GFX3_MODE *mode;
+	int displayed = FALSE;
+
+	mode = fb_gfx3_linux_mode_acquire();
+	if ((mode != NULL) &&
+	    (mode->context.renderer.backend_vtable != NULL) &&
+	    (mode->context.renderer.backend_vtable != &__fb_gfx3_backend_null))
+		displayed = TRUE;
+	if (displayed)
+		fb_gfx3_linux_mobile_control(what, p1, p2, p3, p4, &mode->input);
+	else if (what == GET_SOFT_KEYBOARD)
+		*p1 = *p2 = *p3 = *p4 = 0;
+	fb_gfx3_linux_mode_release();
+}
+#endif
+
 FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 	ssize_t *parameter2, ssize_t *parameter3, ssize_t *parameter4)
 {
@@ -1026,10 +1055,78 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 	if (parameter4 == NULL)
 		parameter4 = &ignored4;
 	if ((what == GET_WINDOW_METRICS) || (what == GET_SOFT_KEYBOARD) ||
+	    (what == GET_TOUCH_CAPABILITY) || (what == GET_DEVICE_CLASS) ||
 	    (what == SET_SOFT_KEYBOARD) || (what == SET_SOFT_KEYBOARD_REGION) ||
 	    (what == CLEAR_SOFT_KEYBOARD_REGIONS)) {
+		if (what == GET_DEVICE_CLASS) {
+			*parameter1 = FB_GFX_DEVICE_CLASS_UNKNOWN;
+			*parameter2 = *parameter3 = *parameter4 = 0;
+		}
+#if !defined(HOST_LINUX)
+		if (what != GET_WINDOW_METRICS && what != GET_TOUCH_CAPABILITY &&
+		    what != GET_DEVICE_CLASS) {
+			FB_GFX3_DRAW_STATE *mobile_state;
+			int has_displayed_mode = 0;
+
+			/* Headless rendering has no surface where the session OSK can type. */
+			FB_GRAPHICS_LOCK();
+			mobile_state = fb_gfx3_api_get_draw_state_locked();
+			if ((mobile_state != NULL) && (mobile_state->mode != NULL) &&
+			    (mobile_state->mode->context.renderer.backend_vtable != NULL) &&
+			    (mobile_state->mode->context.renderer.backend_vtable !=
+			     &__fb_gfx3_backend_null))
+				has_displayed_mode = 1;
+			FB_GRAPHICS_UNLOCK();
+			if (!has_displayed_mode) {
+				if (what == GET_SOFT_KEYBOARD)
+					*parameter1 = *parameter2 = *parameter3 = *parameter4 = 0;
+				return;
+			}
+		}
+#endif
 #if defined(HOST_ANDROID)
 		fb_hMobileControl(what, parameter1, parameter2, parameter3, parameter4);
+#elif defined(HOST_LINUX)
+		if (what == GET_WINDOW_METRICS) {
+			FB_GFX3_DRAW_STATE *mobile_state;
+			FB_GFX3_MODE *mobile_mode;
+			ssize_t depth, bpp, pitch, refresh;
+			ssize_t active_width = 0;
+			ssize_t active_height = 0;
+			int have_active_mode = FALSE;
+
+			/*
+				SCREENINFO describes the desktop output. Once a gfxlib3 mode is
+				active, report its drawable dimensions so callers can lay out UI
+				inside the application window instead of the whole display.
+			*/
+			FB_GRAPHICS_LOCK();
+			mobile_mode = fb_gfx3_linux_mode_acquire();
+			mobile_state = mobile_mode ? fb_gfx3_api_get_draw_state_locked() : NULL;
+			if ((mobile_state != NULL) && (mobile_state->mode == mobile_mode)) {
+				active_width = mobile_state->mode->width;
+				active_height = mobile_state->mode->height;
+				have_active_mode = (active_width > 0) && (active_height > 0);
+			}
+			fb_gfx3_linux_mode_release();
+			FB_GRAPHICS_UNLOCK();
+
+			if (!fb_gfx3_linux_initial_window_metrics(parameter1, parameter2,
+				parameter3, parameter4)) {
+				fb_GfxScreenInfo(parameter1, parameter2, &depth, &bpp, &pitch,
+					&refresh, NULL);
+				fb_gfx3_linux_display_metrics(parameter3, parameter4);
+			}
+			if (have_active_mode) {
+				*parameter1 = active_width;
+				*parameter2 = active_height;
+			}
+		} else if (what == GET_TOUCH_CAPABILITY || what == GET_DEVICE_CLASS) {
+			fb_gfx3_linux_mobile_control(what, parameter1, parameter2,
+				parameter3, parameter4, NULL);
+		} else
+			fb_gfx3_linux_control_mode(what, parameter1, parameter2,
+				parameter3, parameter4);
 #else
 		if (what == GET_WINDOW_METRICS) {
 			/* SCREENINFO also works before opening a graphics mode. */
@@ -1045,6 +1142,11 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 			*parameter4 = 0;
 		} else if (what == GET_SOFT_KEYBOARD) {
 			*parameter1 = *parameter2 = *parameter3 = *parameter4 = 0;
+		} else if (what == GET_TOUCH_CAPABILITY) {
+			*parameter1 = -2;
+			*parameter2 = *parameter3 = *parameter4 = 0;
+		} else if (what == GET_DEVICE_CLASS) {
+			*parameter2 = *parameter3 = *parameter4 = 0;
 		}
 #endif
 		return;

@@ -114,8 +114,8 @@ int fb_sfxInit(void)
     /* initialize debugging system */
     fb_sfxDebugInit();
 
-    if (__fb_ctx.exit_sfxlib == NULL)
-        __fb_ctx.exit_sfxlib = fb_sfxExit;
+    if (fb_ctx.exit_sfxlib == NULL)
+        fb_ctx.exit_sfxlib = fb_sfxExit;
 
     SFX_DEBUG("sfx_init: starting sound subsystem");
 
@@ -130,8 +130,8 @@ int fb_sfxInit(void)
         return -1;
     }
 
-    if (__fb_ctx.idle_sfxlib == NULL)
-        __fb_ctx.idle_sfxlib = fb_sfxCooperativeDelay;
+    if (fb_ctx.idle_sfxlib == NULL)
+        fb_ctx.idle_sfxlib = fb_sfxCooperativeDelay;
 
     SFX_DEBUG("sfx_init: sound subsystem ready");
 

@@ -154,7 +154,7 @@ static void fb_nuttx_tcp_prepare_loopback(void)
 
     fb_nuttx_tcp_loopback_ready = 1;
 }
-static int fb_nuttx_tcp_parse_options(const FBSTRING *text,
+static int fb_nuttx_tcp_parse_options(const FBSTRING_ACCESS *text,
     FB_NUTTX_TCP_OPTIONS *options)
 {
     char *copy;
@@ -810,7 +810,7 @@ static int fb_nuttx_tcp_connect_with_timeout(int sock,
 
     return 0;
 }
-int32 fb_FileOpenTcpServer(const FBSTRING *text, const uint32 mode,
+int32 fb_FileOpenTcpServer(const FBSTRING_ACCESS *text, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 len, const char *encoding)
 {
@@ -872,7 +872,7 @@ int32 fb_FileOpenTcpServer(const FBSTRING *text, const uint32 mode,
     return 0;
 }
 
-int32 fb_FileOpenTcp(const FBSTRING *text, const uint32 mode,
+int32 fb_FileOpenTcp(const FBSTRING_ACCESS *text, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 len, const char *encoding)
 {

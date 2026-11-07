@@ -8,7 +8,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL int fb_DatePart( FBSTRING *interval, double serial, int first_day_of_week, int first_day_of_year )
+FBCALL int fb_DatePart( FBSTRING_ACCESS *interval, double serial, int first_day_of_week, int first_day_of_year )
 {
     int result = 0;
     int year, month, day, hour, minute, second;

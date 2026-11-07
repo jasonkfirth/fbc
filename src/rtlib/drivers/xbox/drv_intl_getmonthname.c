@@ -7,7 +7,7 @@
  */
 #include "../../fb.h"
 
-FBSTRING *fb_DrvIntlGetMonthName( int month, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetMonthName( int month, int short_names )
 {
     /* No localized month name available */
     return NULL;

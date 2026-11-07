@@ -24,6 +24,7 @@
 
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
+#include once "ast/nodes/c-procedure-reachability.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
 
@@ -61,6 +62,13 @@ private function astNewOFFSET( byval l as ASTNODE ptr ) as ASTNODE ptr
 	'' because the var initializers used with static strings
 	if( l->sym <> NULL ) then
 		symbSetIsAccessed( l->sym )
+		'' Initializers can outlive their AST. Remember a procedure address
+		'' even if the expression is folded before reachability is checked.
+		if( (env.clopt.backend = FB_BACKEND_GCC) or (env.clopt.backend = FB_BACKEND_CLANG) ) then
+			if( symbGetClass( l->sym ) = FB_SYMBCLASS_PROC ) then
+				astCProcRecordAddress( l->sym )
+			end if
+		end if
 	end if
 
 	function = n

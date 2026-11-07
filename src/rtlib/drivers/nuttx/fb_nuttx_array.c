@@ -336,7 +336,7 @@ int32 fb_ArrayUBound(FB_NUTTX_ARRAY *array, const int32 dimension)
 
 void fb_hArrayDtorStr(FB_NUTTX_ARRAY *array, void *dtor, size_t keep_idx)
 {
-    FBSTRING *element;
+    FBSTRING_ACCESS *element;
     size_t elements;
 
     (void)dtor;
@@ -354,7 +354,7 @@ void fb_hArrayDtorStr(FB_NUTTX_ARRAY *array, void *dtor, size_t keep_idx)
         This matches the shared rtlib behaviour and avoids surprises for
         future object-like string storage.
     */
-    element = ((FBSTRING *)array->ptr) + (elements - 1);
+    element = ((FBSTRING_ACCESS *)array->ptr) + (elements - 1);
 
     while (elements > keep_idx) {
         if (element->data != NULL)

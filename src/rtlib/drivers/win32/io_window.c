@@ -14,7 +14,7 @@ static __inline__ void hReadConsoleRect( SMALL_RECT *pRect, int GetRealWindow )
 {
     CONSOLE_SCREEN_BUFFER_INFO info;
 
-    if( GetConsoleScreenBufferInfo( __fb_out_handle, &info )==0 ) {
+    if( GetConsoleScreenBufferInfo( FB_CONSOLE_OUTPUT_HANDLE, &info )==0 ) {
         memset( pRect, 0, sizeof(SMALL_RECT) );
     } else {
         if( GetRealWindow ) {
@@ -100,7 +100,7 @@ FBCALL void fb_hRestoreConsoleWindow( void )
 
 void fb_ConsoleGetMaxWindowSize( int *cols, int *rows )
 {
-    COORD max = GetLargestConsoleWindowSize( __fb_out_handle );
+    COORD max = GetLargestConsoleWindowSize( FB_CONSOLE_OUTPUT_HANDLE );
     if( cols != NULL )
         *cols = (max.X==0 ? FB_SCRN_DEFAULT_WIDTH : max.X);
     if( rows != NULL )

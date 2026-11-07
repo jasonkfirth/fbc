@@ -581,13 +581,11 @@ private function hCheckVarargParam _
 			hStrArgToStrPtrParam( parent, n, FALSE )
 
 		case else
-			'' if < sizeof(int), convert to int (C ABI)
-			'' Even for 64bit, varargs are promoted to 32bit int.
+			'' C promotes every integer type narrower than int to int when all
+			'' its values fit. These targets use a 32-bit C int, so both signed
+			'' and unsigned 8- and 16-bit arguments fit without changing value.
 			if( typeGetSize( arg_dtype ) < 4 ) then
-				n->l = astNewCONV( iif( typeIsSigned( arg_dtype ), _
-							FB_DATATYPE_LONG, _
-							FB_DATATYPE_ULONG ), _
-						NULL, n->l )
+				n->l = astNewCONV( FB_DATATYPE_LONG, NULL, n->l )
 			end if
 		end select
 

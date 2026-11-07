@@ -5,21 +5,25 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
-typedef struct _FBARRAYDIM {
+typedef struct FBARRAYDIM_ {
 	size_t elements;
 	ssize_t lbound;
 	ssize_t ubound;
 } FBARRAYDIM;
 
-typedef enum _FBARRAY_FLAGS {
+typedef enum FBARRAY_FLAGS_ {
 	FBARRAY_FLAGS_DIMENSIONS = 0x0000000f,
 	FBARRAY_FLAGS_FIXED_DIM  = 0x00000010,
 	FBARRAY_FLAGS_FIXED_LEN  = 0x00000020,
 	FBARRAY_FLAGS_RESERVED   = 0xffffffc0
 } FBARRAY_FLAGS;
 
-typedef struct _FBARRAY {
-	void           *data;        /* ptr + diff, must be at ofs 0! */
+/* DATA stores the native address bits for the virtual zero-index origin.
+   It can lie outside the allocation, so form and adjust it through
+   uintptr_t, not C pointer arithmetic. PTR owns the physical storage.
+   DATA remains the first word for generated code and existing modules. */
+typedef struct FBARRAY_ {
+	void           *data;        /* encoded ptr + diff, must be at ofs 0! */
 	void           *ptr;
 	size_t          size;
 	size_t          element_len;
@@ -28,8 +32,13 @@ typedef struct _FBARRAY {
 	FBARRAYDIM      dimTB[1];    /* dimtb[dimensions] */
 } FBARRAY;
 
+/* Access views preserve packed BASIC descriptor addresses without
+   lowering the alignment of public or by-value storage. */
+typedef FBARRAY FBARRAY_ACCESS __attribute__((aligned(1)));
+typedef FBARRAYDIM FBARRAYDIM_ACCESS __attribute__((aligned(1)));
+
 typedef void (*FB_DEFCTOR)( void *this_ );
-typedef void (*FB_DTORMULT) ( FBARRAY *array, FB_DEFCTOR dtor, size_t base_idx );
+typedef void (*FB_DTORMULT) ( FBARRAY_ACCESS *array, FB_DEFCTOR dtor, size_t base_idx );
 
 FBCALL void *fb_ArrayBoundChkEx
 	(
@@ -53,7 +62,7 @@ FBCALL void *fb_ArraySngBoundChkEx
 FBCALL void *fb_ArrayDimensionChk
 	(
 		ssize_t dimensions,
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		int linenum,
 		const char *filename,
 		const char *variablename
@@ -77,34 +86,34 @@ FBCALL void *fb_ArraySngBoundChk
 		const char *filename
 	);
 
-FBCALL size_t     fb_ArrayLen          ( FBARRAY *array );
-FBCALL size_t     fb_ArraySize         ( FBARRAY *array );
-       void       fb_hArrayCtorObj     ( FBARRAY *array, FB_DEFCTOR ctor );
-       void       fb_hArrayDtorObj     ( FBARRAY *array, FB_DEFCTOR dtor, size_t keep_idx );
-       void       fb_hArrayDtorStr     ( FBARRAY *array, FB_DEFCTOR dtor, size_t keep_idx );
-FBCALL void       fb_ArrayDestructObj  ( FBARRAY *array, FB_DEFCTOR dtor );
-FBCALL void       fb_ArrayDestructStr  ( FBARRAY *array );
-FBCALL int        fb_ArrayClear        ( FBARRAY *array );
-FBCALL int        fb_ArrayClearObj     ( FBARRAY *array, FB_DEFCTOR ctor, FB_DEFCTOR dtor );
-FBCALL int        fb_ArrayErase        ( FBARRAY *array );
-FBCALL int        fb_ArrayEraseObj     ( FBARRAY *array, FB_DEFCTOR ctor, FB_DEFCTOR dtor );
-FBCALL int        fb_ArrayFill         ( FBARRAY *array, int fillchar );
-FBCALL FBARRAY   *fb_ArrayGetDesc      ( FBARRAY *array );
-FBCALL void       fb_ArrayStrErase     ( FBARRAY *array );
-       int        fb_ArrayRedimEx      ( FBARRAY *array, size_t element_len, int doclear, int isvarlen, size_t dimensions, ... );
-       int        fb_ArrayRedimObj     ( FBARRAY *array, size_t element_len, FB_DEFCTOR ctor, FB_DEFCTOR dtor, size_t dimensions, ... );
-       int        fb_ArrayRedimPresvEx ( FBARRAY *array, size_t element_len, int doclear, int isvarlen, size_t dimensions, ... );
-       int        fb_ArrayRedimPresvObj( FBARRAY *array, size_t element_len, FB_DEFCTOR ctor, FB_DEFCTOR dtor, size_t dimensions, ... );
-FBCALL int        fb_ArrayRedimTo      ( FBARRAY *dest, const FBARRAY *source, int isvarlen, FB_DEFCTOR ctor, FB_DEFCTOR dtor );
-FBCALL void       fb_ArrayResetDesc    ( FBARRAY *array );
-FBCALL ssize_t    fb_ArrayLBound       ( FBARRAY *array, ssize_t dimension );
-FBCALL ssize_t    fb_ArrayUBound       ( FBARRAY *array, ssize_t dimension );
+FBCALL size_t     fb_ArrayLen          ( FBARRAY_ACCESS *array );
+FBCALL size_t     fb_ArraySize         ( FBARRAY_ACCESS *array );
+       void       fb_hArrayCtorObj     ( FBARRAY_ACCESS *array, FB_DEFCTOR ctor );
+       void       fb_hArrayDtorObj     ( FBARRAY_ACCESS *array, FB_DEFCTOR dtor, size_t keep_idx );
+       void       fb_hArrayDtorStr     ( FBARRAY_ACCESS *array, FB_DEFCTOR dtor, size_t keep_idx );
+FBCALL void       fb_ArrayDestructObj  ( FBARRAY_ACCESS *array, FB_DEFCTOR dtor );
+FBCALL void       fb_ArrayDestructStr  ( FBARRAY_ACCESS *array );
+FBCALL int        fb_ArrayClear        ( FBARRAY_ACCESS *array );
+FBCALL int        fb_ArrayClearObj     ( FBARRAY_ACCESS *array, FB_DEFCTOR ctor, FB_DEFCTOR dtor );
+FBCALL int        fb_ArrayErase        ( FBARRAY_ACCESS *array );
+FBCALL int        fb_ArrayEraseObj     ( FBARRAY_ACCESS *array, FB_DEFCTOR ctor, FB_DEFCTOR dtor );
+FBCALL int        fb_ArrayFill         ( FBARRAY_ACCESS *array, int fillchar );
+FBCALL FBARRAY_ACCESS   *fb_ArrayGetDesc      ( FBARRAY_ACCESS *array );
+FBCALL void       fb_ArrayStrErase     ( FBARRAY_ACCESS *array );
+       int        fb_ArrayRedimEx      ( FBARRAY_ACCESS *array, size_t element_len, int doclear, int isvarlen, size_t dimensions, ... );
+       int        fb_ArrayRedimObj     ( FBARRAY_ACCESS *array, size_t element_len, FB_DEFCTOR ctor, FB_DEFCTOR dtor, size_t dimensions, ... );
+       int        fb_ArrayRedimPresvEx ( FBARRAY_ACCESS *array, size_t element_len, int doclear, int isvarlen, size_t dimensions, ... );
+       int        fb_ArrayRedimPresvObj( FBARRAY_ACCESS *array, size_t element_len, FB_DEFCTOR ctor, FB_DEFCTOR dtor, size_t dimensions, ... );
+FBCALL int        fb_ArrayRedimTo      ( FBARRAY_ACCESS *dest, const FBARRAY_ACCESS *source, int isvarlen, FB_DEFCTOR ctor, FB_DEFCTOR dtor );
+FBCALL void       fb_ArrayResetDesc    ( FBARRAY_ACCESS *array );
+FBCALL ssize_t    fb_ArrayLBound       ( FBARRAY_ACCESS *array, ssize_t dimension );
+FBCALL ssize_t    fb_ArrayUBound       ( FBARRAY_ACCESS *array, ssize_t dimension );
        size_t     fb_hArrayCalcElements( size_t dimensions, const ssize_t *lboundTB, const ssize_t *uboundTB );
        ssize_t    fb_hArrayCalcDiff    ( size_t dimensions, const ssize_t *lboundTB, const ssize_t *uboundTB );
 
 int fb_hArrayAlloc
 	(
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		size_t element_len,
 		int doclear,
 		FB_DEFCTOR ctor,
@@ -114,7 +123,7 @@ int fb_hArrayAlloc
 
 int fb_hArrayRealloc
 	(
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		size_t element_len,
 		int doclear,
 		FB_DEFCTOR ctor,

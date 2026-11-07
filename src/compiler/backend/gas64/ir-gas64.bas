@@ -358,6 +358,7 @@ type ASM64_CONTEXT
 	profile_str  as string
 	profile_dat  as string
 	currproc     as FBSYMBOL ptr
+	error_setter_label as string
 	argcptmax    as integer
 	arginteg     as integer
 	argfloat     as integer
@@ -4867,6 +4868,12 @@ private sub hBopPrepareIntegerOperands _
 	elseif( v1->typ = IR_VREGTYPE_OFS ) then
 		vrreg2 = reg_findtemp( )
 		hBopMaterializeOperand( v1, dtype, vrreg2, op1 )
+		if( v2->typ = IR_VREGTYPE_OFS ) then
+			'' Both operands denote addresses. Leaving the right offset as
+			'' memory would compare against the bytes stored at that address.
+			var right_reg = reg_findtemp()
+			hBopMaterializeOperand(v2, dtype, right_reg, op2)
+		end if
 	elseif( (op = AST_OP_MUL) andalso _
 	        (v1->typ <> IR_VREGTYPE_REG) ) then
 		vr = irhlAllocVreg( FB_DATATYPE_INTEGER, NULL )
@@ -5047,7 +5054,8 @@ private sub hBopEmitCompare _
 	)
 
 	dim as integer is_unsigned
-	is_unsigned = (v1->dtype = FB_DATATYPE_UINT) or _
+	is_unsigned = typeIsPtr(v1->dtype) or typeIsPtr(v2->dtype) or _
+	              (v1->dtype = FB_DATATYPE_UINT) or _
 	              (v1->dtype = FB_DATATYPE_ULONGINT) or _
 	              (v2->dtype = FB_DATATYPE_UINT) or _
 	              (v2->dtype = FB_DATATYPE_ULONGINT)
@@ -5946,6 +5954,16 @@ private function hConvertCanonicalDtype _
 	end select
 end function
 
+private sub hConvertReuseValue(byval destination as IRVREG ptr, byval source as IRVREG ptr)
+	'' Sharing storage does not change the requested value type. Later
+	'' operations choose signedness and pointer behavior from this view.
+	var target_dtype = destination->dtype
+	var target_subtype = destination->subtype
+	*destination = *source
+	destination->dtype = target_dtype
+	destination->subtype = target_subtype
+end sub
+
 private function hConvertInitialize _
 	( _
 		byval v1 as IRVREG ptr, _
@@ -5963,7 +5981,7 @@ private function hConvertInitialize _
 
 	if( typeIsPtr( v1dtype ) andalso typeIsPtr( v2dtype ) ) then
 		asm_info( "pointer2 -> pointer1" )
-		*v1 = *v2
+		hConvertReuseValue(v1, v2)
 		return TRUE
 	end if
 
@@ -5985,7 +6003,7 @@ private function hConvertInitialize _
 	    ((v1dtype = FB_DATATYPE_ULONGINT) andalso _
 	     (v2dtype = FB_DATATYPE_ULONGINT)) ) then
 		asm_info( "no convert as exactly same datatype" )
-		*v1 = *v2
+		hConvertReuseValue(v1, v2)
 		return TRUE
 	end if
 
@@ -5994,9 +6012,7 @@ private function hConvertInitialize _
 	    ((v2dtype = FB_DATATYPE_LONGINT) andalso _
 	     (v1dtype = FB_DATATYPE_ULONGINT)) ) then
 		asm_info( "no convert as INTEGER/UINT" )
-		dim as FB_DATATYPE original_dtype = v1->dtype
-		*v1 = *v2
-		v1->dtype = original_dtype
+		hConvertReuseValue(v1, v2)
 		return TRUE
 	end if
 
@@ -8400,7 +8416,15 @@ private sub _emitcall _
 			variadic=true ''need to mov also the float parameter into register
 		end if
 	end if
-	hDoCall(proc,*symbGetMangledName( proc ),,vr, level,variadic,false)
+	var target = *symbGetMangledName(proc)
+	if( ctx.target = FB_COMPTARGET_WIN32 andalso symbIsNaked(ctx.currproc) = FALSE andalso _
+	    symbGetIsRTL(proc) andalso target = "fb_ErrorSetHandler" ) then
+		'' This private leaf retains the setter's one-argument source ABI.
+		'' Its exact outgoing size is known only after all calls are emitted.
+		if( len(ctx.error_setter_label) = 0 ) then ctx.error_setter_label = *symbUniqueLabel()
+		target = ctx.error_setter_label
+	end if
+	hDoCall(proc, target,, vr, level, variadic, FALSE)
 end sub
 private sub _emitcallptr _
 	( _
@@ -9017,6 +9041,7 @@ private sub _emitprocbegin(byval proc as FBSYMBOL ptr,byval initlabel as FBSYMBO
 
 	irhlEmitProcBegin( ) ''just : irhl.regcount = 0
 	ctx.currproc = proc
+	ctx.error_setter_label = ""
 
 	ctx.prolog_txt=""
 	ctx.epilog_txt=""
@@ -9476,6 +9501,20 @@ private sub _emitprocend _
 		asm_code(lname+":")
 	end if
 
+	if( len(ctx.error_setter_label) > 0 ) then
+		'' Only the argument area is needed on the alternate handler stack;
+		'' locals and BYVAL object copies continue to use the owner's RBP.
+		dim as longint outgoing = GAS64_WINDOWS_SHADOW_SPACE_BYTES
+		if( ctx.argcptmax > GAS64_WINDOWS_ARG_REGISTERS ) then outgoing = clngint(ctx.argcptmax) * GAS64_QWORD_BYTES
+		asm_code(".p2align 4")
+		cfi_windows_asm_code(".seh_proc " + ctx.error_setter_label)
+		asm_code(ctx.error_setter_label + ":")
+		cfi_windows_asm_code(".seh_endprologue")
+		asm_code("mov rdx, rbp", KNOALL)
+		asm_code("mov r8, " + str(outgoing), KNOALL)
+		asm_code("jmp fb_ErrorSetNativeHandlerSized", KNOALL)
+		cfi_windows_asm_code(".seh_endproc")
+	end if
 	asm_info("===== End of proc =====")
 
 	flistReset( @ctx.spillvregs )

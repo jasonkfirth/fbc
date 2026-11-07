@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL unsigned int fb_ASC( FBSTRING *str, ssize_t pos )
+FBCALL unsigned int fb_ASC( FBSTRING_ACCESS *str, ssize_t pos )
 {
     unsigned int a;
 	ssize_t len;

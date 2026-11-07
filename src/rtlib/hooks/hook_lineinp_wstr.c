@@ -19,7 +19,7 @@ FBCALL int fb_LineInputWstr
     FB_LINEINPUTWPROC fn;
 
     FB_LOCK();
-    fn = __fb_ctx.hooks.lineinputwproc;
+    fn = fb_ctx.hooks.lineinputwproc;
     FB_UNLOCK();
 
     if( fn )

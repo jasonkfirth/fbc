@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-int fb_DevFileReadLineEncod( FB_FILE *handle, FBSTRING *dst )
+int fb_DevFileReadLineEncod( FB_FILE *handle, FBSTRING_ACCESS *dst )
 {
 	int res;
 

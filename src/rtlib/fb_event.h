@@ -5,7 +5,7 @@
  * File: fb_event.h
  * This file intentionally does NOT contain: unrelated runtime subsystems.
  */
-struct _EVENT {
+struct FB_EVENT_ {
 	int type;
 	union {
 		struct {			/* keyboard events */
@@ -28,7 +28,7 @@ struct _EVENT {
 	};
 } FBPACKED;
 
-typedef struct _EVENT EVENT;
+typedef struct FB_EVENT_ EVENT;
 
 #define EVENT_KEY_PRESS				1
 #define EVENT_KEY_RELEASE			2
@@ -47,9 +47,9 @@ typedef struct _EVENT EVENT;
 #define EVENT_WINDOW_RESIZE			15
 #define EVENT_DROP                    16
 
-/* A mobile text commit can produce 128 press/release pairs at once. Keep
-   room for those pairs and nearby pointer events in the bounded ring. */
-#if defined(HOST_ANDROID) || defined(HOST_JS)
+/* A mobile text commit can produce many press/release pairs at once. Keep
+   room for a bounded batch and nearby pointer events in the ring. */
+#if defined(HOST_ANDROID) || defined(HOST_JS) || defined(HOST_LINUX)
 #define MAX_EVENTS					512
 #else
 #define MAX_EVENTS					128

@@ -14,8 +14,8 @@ FBCALL unsigned int fb_Color( unsigned int fc, unsigned int bc, int flags )
 
 	FB_LOCK();
 
-	if( __fb_ctx.hooks.colorproc )
-		cur = __fb_ctx.hooks.colorproc( fc, bc, flags );
+	if( fb_ctx.hooks.colorproc )
+		cur = fb_ctx.hooks.colorproc( fc, bc, flags );
 	else
 		cur = fb_ConsoleColor( fc, bc, flags );
 

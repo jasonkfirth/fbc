@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL void fb_ArrayStrErase( FBARRAY *array )
+FBCALL void fb_ArrayStrErase( FBARRAY_ACCESS *array )
 {
 	fb_ArrayDestructStr( array );
 

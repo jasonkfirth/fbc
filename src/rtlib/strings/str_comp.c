@@ -73,9 +73,9 @@ FBCALL int fb_StrCompare
 
 	/* delete temps? */
 	if( str1_size == FB_STRSIZEVARLEN )
-		fb_hStrDelTemp_NoLock( (FBSTRING *)str1 );
+		fb_hStrDelTemp_NoLock( (FBSTRING_ACCESS *)str1 );
 	if( str2_size == FB_STRSIZEVARLEN )
-		fb_hStrDelTemp_NoLock( (FBSTRING *)str2 );
+		fb_hStrDelTemp_NoLock( (FBSTRING_ACCESS *)str2 );
 
 	FB_STRUNLOCK();
 

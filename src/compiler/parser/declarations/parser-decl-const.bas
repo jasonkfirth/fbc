@@ -149,7 +149,8 @@ private sub cConstAssign _
 	'' compiler-registered intrinsics that are not keyword tokens.
 	dim as FB_TOKEN lookup_tk = any
 	dim as FB_TKCLASS lookup_class = any
-	dim as FBSYMCHAIN ptr chain_ = symbLookup( @id, lookup_tk, lookup_class )
+	dim as FBSYMCHAIN ptr chain_ = fbSemanticModelNamespaceLookupApplied( _
+		symbLookup( @id, lookup_tk, lookup_class ), "constant-name" )
 	if( chain_ <> NULL ) then
 		redefinition = chain_->sym
 	end if

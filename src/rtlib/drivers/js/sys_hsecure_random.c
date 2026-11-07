@@ -1,8 +1,9 @@
 /*
- * FreeBASIC runtime: js/sys_hsecure_random.c
+ * Project: FreeBASIC runtime library
+ * File: drivers/js/sys_hsecure_random.c
  * Purpose: Obtain checked system randomness from browser Web Crypto.
  * Responsibilities: Bounded heap writes, quota-sized requests and failure status.
- * This file does not validate the public API or substitute a user-seeded PRNG.
+ * This file intentionally does NOT contain: public API validation or a user-seeded PRNG.
  * Threading: Each call owns scratch storage; the current browser/worker owns its heap.
  */
 #include "../../fb.h"
@@ -45,4 +46,4 @@ int fb_hSecureRandom( void *destination, size_t byte_count )
 	return FB_SECURE_RANDOM_IO_ERROR;
 }
 
-/* end of js/sys_hsecure_random.c */
+/* end of drivers/js/sys_hsecure_random.c */

@@ -9,7 +9,7 @@
 
 #include "../fb_gfx.h"
 
-static int gfx_get(void *target, float fx1, float fy1, float fx2, float fy2, unsigned char *dest, int coord_type, FBARRAY *array, int usenewheader )
+static int gfx_get(void *target, float fx1, float fy1, float fx2, float fy2, unsigned char *dest, int coord_type, FBARRAY_ACCESS *array, int usenewheader )
 {
 	FB_GFXCTX *context;
 	PUT_HEADER *header;
@@ -81,12 +81,12 @@ static int gfx_get(void *target, float fx1, float fy1, float fx2, float fy2, uns
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-FBCALL int fb_GfxGet(void *target, float fx1, float fy1, float fx2, float fy2, unsigned char *dest, int coord_type, FBARRAY *array)
+FBCALL int fb_GfxGet(void *target, float fx1, float fy1, float fx2, float fy2, unsigned char *dest, int coord_type, FBARRAY_ACCESS *array)
 {
 	return gfx_get( target, fx1, fy1, fx2, fy2, dest, coord_type, array, TRUE );
 }
 
-FBCALL int fb_GfxGetQB(void *target, float fx1, float fy1, float fx2, float fy2, unsigned char *dest, int coord_type, FBARRAY *array)
+FBCALL int fb_GfxGetQB(void *target, float fx1, float fy1, float fx2, float fy2, unsigned char *dest, int coord_type, FBARRAY_ACCESS *array)
 {
 	return gfx_get( target, fx1, fy1, fx2, fy2, dest, coord_type, array, FALSE );
 }

@@ -5,20 +5,20 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
-    typedef struct _fb_Rect {
+    typedef struct fb_Rect_ {
         int Left, Top, Right, Bottom;
     } fb_Rect;
 
-    typedef struct _fb_Coord {
+    typedef struct fb_Coord_ {
         int X, Y;
     } fb_Coord;
 
-    struct _fb_ConHooks;
+    struct fb_ConHooks_;
 
-    typedef void (*fb_fnHookConScroll)( struct _fb_ConHooks *handle, int x1, int y1, int x2, int y2, int rows );
-    typedef int  (*fb_fnHookConWrite )( struct _fb_ConHooks *handle, const void *buffer, size_t length );
+    typedef void (*fb_fnHookConScroll)( struct fb_ConHooks_ *handle, int x1, int y1, int x2, int y2, int rows );
+    typedef int  (*fb_fnHookConWrite )( struct fb_ConHooks_ *handle, const void *buffer, size_t length );
 
-    typedef struct _fb_ConHooks {
+    typedef struct fb_ConHooks_ {
         void                     *Opaque;
 
         fb_fnHookConScroll        Scroll;
@@ -75,7 +75,7 @@ FBCALL int          fb_ConsoleView      ( int toprow, int botrow );
        void         fb_ConsoleScroll    ( int nrows );
 
        int          fb_ConsoleGetkey    ( void );
-       FBSTRING    *fb_ConsoleInkey     ( void );
+       FBSTRING_ACCESS    *fb_ConsoleInkey     ( void );
        int          fb_ConsoleKeyHit    ( void );
 
        int          fb_ConsoleMultikey  ( int scancode );
@@ -100,12 +100,16 @@ FBCALL int          fb_ConsoleView      ( int toprow, int botrow );
        int          fb_ConsolePageCopy  ( int src, int dst );
        int          fb_ConsolePageSet   ( int active, int visible );
 
-FBCALL FBSTRING    *fb_ConReadLine      ( int soft_cursor );
+FBCALL FBSTRING_ACCESS    *fb_ConReadLine      ( int soft_cursor );
 
-FBCALL int          fb_ConsoleInput     ( FBSTRING *text, int addquestion, int addnewline );
-       int          fb_ConsoleLineInput ( FBSTRING *text, void *dst, ssize_t dst_len, int fillrem, int addquestion, int addnewline );
+FBCALL int          fb_ConsoleInput     ( FBSTRING_ACCESS *text, int addquestion, int addnewline );
+       int          fb_ConsoleLineInput ( FBSTRING_ACCESS *text, void *dst, ssize_t dst_len, int fillrem, int addquestion, int addnewline );
        int          fb_ConsoleLineInputWstr( const FB_WCHAR *text, FB_WCHAR *dst, ssize_t max_chars, int addquestion, int addnewline );
 
        int          fb_hConsoleInputBufferChanged( void );
+
+/* Raw console coordinates are an internal backend interface, separate
+   from the language-visible cursor operations. */
+void fb_ConsoleGetRawXY( int *col, int *row );
 
 /* end of fb_console.h */

@@ -145,6 +145,11 @@ endif
 GFX_SRC_TARGET := \
 $(wildcard $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/*.c)
 
+ifeq ($(SOURCE_OS),linux)
+GFX_SRC_TARGET += \
+$(wildcard $(srcdir)/gfxlib2/drivers/linux/protocols/*.c)
+endif
+
 ifneq ($(USE_RUNTIME_CXX),)
 GFX_SRC_TARGET += $(wildcard $(srcdir)/gfxlib2/drivers/$(SOURCE_OS)/*.cpp)
 endif
@@ -228,12 +233,33 @@ ifneq ($(filter $(SOURCE_OS),$(GFXLIB3_PLATFORM_OS)),)
 GFX3_SRC_TARGET := $(wildcard $(srcdir)/gfxlib3/drivers/$(SOURCE_OS)/*.c)
 endif
 
+ifeq ($(SOURCE_OS),linux)
+# gfxlib3's mobile control queries share the dynamic Wayland output, framebuffer
+# display metrics and Linux device-profile helpers with gfxlib2. Keep them local
+# to each archive so -gfx3 works without a gfxlib2 caller.
+GFX3_SRC_TARGET += \
+	$(srcdir)/gfxlib2/drivers/linux/fb_linux_device.c \
+	$(srcdir)/gfxlib2/drivers/linux/fb_linux_display.c \
+	$(srcdir)/gfxlib2/drivers/linux/fb_linux_maliit.c \
+	$(srcdir)/gfxlib2/drivers/linux/fb_wayland_client.c \
+	$(srcdir)/gfxlib2/drivers/linux/fb_wayland_webos.c \
+	$(srcdir)/gfxlib2/drivers/linux/fb_wayland_display.c \
+	$(wildcard $(srcdir)/gfxlib2/drivers/linux/protocols/*.c)
+endif
+
 GFX3_BASE_TARGET := $(notdir $(GFX3_SRC_TARGET))
 GFX3_SRC_GENERIC := $(filter-out \
 $(foreach filename,$(GFX3_BASE_TARGET),%/$(filename)), \
 $(GFX3_SRC_GENERIC))
 
-GFX3_SRC := $(GFX3_SRC_TARGET) $(GFX3_SRC_GENERIC)
+GFX3_SRC_SHARED :=
+ifeq ($(SOURCE_OS),linux)
+GFX3_SRC_SHARED := $(filter $(srcdir)/gfxlib2/drivers/linux/%,\
+	$(GFX3_SRC_TARGET))
+GFX3_SRC_TARGET := $(filter-out $(GFX3_SRC_SHARED),$(GFX3_SRC_TARGET))
+endif
+
+GFX3_SRC := $(GFX3_SRC_TARGET) $(GFX3_SRC_GENERIC) $(GFX3_SRC_SHARED)
 
 # ar stores member basenames even though objects retain their source paths.
 # Reject duplicate selected names rather than silently replacing an archive
@@ -384,7 +410,11 @@ GFX_OBJ := \
 $(patsubst $(srcdir)/gfxlib2/%.c,$(libfbgfxobjdir)/%.o,$(GFX_SRC_C)) \
 $(patsubst $(srcdir)/gfxlib2/%.cpp,$(libfbgfxobjdir)/%.o,$(GFX_SRC_CPP)) \
 $(patsubst $(srcdir)/gfxlib2/%.s,$(libfbgfxobjdir)/%.o,$(GFX_SRC_ASM))
-GFX3_OBJ := $(patsubst $(srcdir)/gfxlib3/%.c,$(libfbgfx3objdir)/%.o,$(GFX3_SRC))
+GFX3_OBJ := \
+$(patsubst $(srcdir)/gfxlib3/%.c,$(libfbgfx3objdir)/%.o,\
+	$(filter $(srcdir)/gfxlib3/%.c,$(GFX3_SRC))) \
+$(patsubst $(srcdir)/gfxlib2/%.c,$(libfbgfx3objdir)/shared/%.o,\
+	$(GFX3_SRC_SHARED))
 SFX_SRC_C := $(filter %.c,$(SFX_SRC))
 SFX_SRC_CPP := $(filter %.cpp,$(SFX_SRC))
 SFX_OBJ := \

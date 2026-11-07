@@ -218,7 +218,7 @@ static int fb_hArosExecute( const char *program, char **argv, int argument_count
 	return child_result.result;
 }
 
-FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
+FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork )
 {
 	char buffer[MAX_PATH];
 	char empty_arguments[] = "";

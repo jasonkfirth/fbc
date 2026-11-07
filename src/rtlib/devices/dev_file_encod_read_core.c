@@ -11,8 +11,8 @@
 
 #include "fb.h"
 
-extern const unsigned char __fb_utf8_trailingTb[256];
-extern const UTF_32 __fb_utf8_offsetsTb[6];
+/* Use the shared declarations so readers keep the same ABI labels. */
+
 
 #define FB_UTF8_MAX_TRAILING_BYTES 5
 
@@ -33,7 +33,7 @@ static ssize_t hReadUTF8ToChar( FILE *fp, char *dst, ssize_t max_chars )
 		if( fread( &c[0], 1, 1, fp ) != 1 )
 			break;
 
-		extbytes = __fb_utf8_trailingTb[c[0]];
+		extbytes = fb_utf8_trailingTb[c[0]];
 
 		if( extbytes > FB_UTF8_MAX_TRAILING_BYTES ) {
 			*dst++ = '?';
@@ -73,7 +73,7 @@ static ssize_t hReadUTF8ToChar( FILE *fp, char *dst, ssize_t max_chars )
 				wc += *p++;
 		}
 
-		wc -= __fb_utf8_offsetsTb[extbytes];
+		wc -= fb_utf8_offsetsTb[extbytes];
 
 		if( wc > 255 )
 			wc = '?';
@@ -174,7 +174,7 @@ static ssize_t hUTF8ToUTF16( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 		if( fread( &c[0], 1, 1, fp ) != 1 )
 			break;
 
-		extbytes = __fb_utf8_trailingTb[c[0]];
+		extbytes = fb_utf8_trailingTb[c[0]];
 
 		if( extbytes > FB_UTF8_MAX_TRAILING_BYTES ) {
 			*dst++ = '?';
@@ -214,7 +214,7 @@ static ssize_t hUTF8ToUTF16( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 				wc += *p++;
 		}
 
-		wc -= __fb_utf8_offsetsTb[extbytes];
+		wc -= fb_utf8_offsetsTb[extbytes];
 
 		if( wc <= UTF16_MAX_BMP )
 		{
@@ -250,7 +250,7 @@ static ssize_t hUTF8ToUTF32( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 		if( fread( &c[0], 1, 1, fp ) != 1 )
 			break;
 
-		extbytes = __fb_utf8_trailingTb[c[0]];
+		extbytes = fb_utf8_trailingTb[c[0]];
 
 		if( extbytes > FB_UTF8_MAX_TRAILING_BYTES ) {
 			*dst++ = '?';
@@ -290,7 +290,7 @@ static ssize_t hUTF8ToUTF32( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 				wc += *p++;
 		}
 
-		wc -= __fb_utf8_offsetsTb[extbytes];
+		wc -= fb_utf8_offsetsTb[extbytes];
 
 		*dst++ = wc;
 		--chars;

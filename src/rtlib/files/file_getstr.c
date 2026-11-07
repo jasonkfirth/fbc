@@ -11,6 +11,7 @@ int fb_FileGetStrEx( FB_FILE *handle, fb_off_t pos, void *str, ssize_t str_len, 
 {
     int res;
     int is_fixed_len;
+    ssize_t capacity;
     size_t len;
 	char *data;
 
@@ -23,7 +24,9 @@ int fb_FileGetStrEx( FB_FILE *handle, fb_off_t pos, void *str, ssize_t str_len, 
     /* get string len */
 	is_fixed_len = (str_len != FB_STRSIZEVARLEN) &&
 	               ((str_len & FB_STRISFIXED) != 0);
-	FB_STRSETUP_DYN( str, str_len, data, len );
+	FB_STRSETUP_DYN( str, str_len, data, capacity );
+	/* String lengths use ssize_t; the file API counts nonnegative bytes. */
+	len = (size_t)capacity;
 
 	/* perform call ... but only if there's data ... */
     if( (data != NULL) && (len > 0) ) {
@@ -45,7 +48,7 @@ int fb_FileGetStrEx( FB_FILE *handle, fb_off_t pos, void *str, ssize_t str_len, 
 
 	/* del if temp */
 	if( str_len == -1 )
-		fb_hStrDelTemp( (FBSTRING *)str );		/* will free the temp desc if fix-len passed */
+		fb_hStrDelTemp( (FBSTRING_ACCESS *)str );		/* will free the temp desc if fix-len passed */
 
 	return res;
 }

@@ -9,7 +9,7 @@
 #include "fb.h"
 #include "strings/str_vb_private.h"
 
-FBCALL int fb_StrComp( FBSTRING *str1, FBSTRING *str2, int compare )
+FBCALL int fb_StrComp( FBSTRING_ACCESS *str1, FBSTRING_ACCESS *str2, int compare )
 {
 	ssize_t len1, len2, len;
 	int result = 0, error = FB_RTERROR_OK;

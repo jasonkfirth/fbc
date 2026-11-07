@@ -422,7 +422,9 @@ void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused)
 	android_resumed = resumed != FALSE;
 	android_focused = focused != FALSE;
 	if (android_input != NULL)
-		fb_gfx3_input_platform_focus(android_input, focused != FALSE);
+		/* Pause can precede the separate window-focus callback. */
+		fb_gfx3_input_platform_focus(android_input,
+			android_started && android_resumed && android_focused);
 	pthread_mutex_unlock(&android_window_mutex);
 }
 
@@ -888,7 +890,8 @@ static int android_allocate_platform(void **platform, void *input,
 		gfxlib3 input state.  Apply the saved lifecycle value here so GetMouse and
 		GetTouch do not reject valid contacts until another focus transition occurs.
 	*/
-	fb_gfx3_input_platform_focus(android_input, android_focused);
+	fb_gfx3_input_platform_focus(android_input,
+		android_started && android_resumed && android_focused);
 	pthread_mutex_unlock(&android_window_mutex);
 	*platform = state;
 	*created = state;

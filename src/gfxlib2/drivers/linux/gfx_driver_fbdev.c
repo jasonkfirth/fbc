@@ -27,6 +27,7 @@
 
 #ifndef DISABLE_FBDEV
 
+#include "fb_linux_maliit.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -946,6 +947,8 @@ static void driver_exit(void)
 {
 	int join_thread = FALSE;
 
+	/* Drain input callbacks before the driver lock and mode are destroyed. */
+	fb_hLinuxMaliitCancelPending();
 	/* Stop and join the renderer before unmapping its framebuffer. */
 	if (sync_initialized) {
 		pthread_mutex_lock(&mutex);

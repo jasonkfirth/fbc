@@ -10,9 +10,9 @@
 	#include <windows.h>
 #endif
 
-FBCALL FBSTRING *fb_ExePath ( void )
+FBCALL FBSTRING_ACCESS *fb_ExePath ( void )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	char		*p;
 	char		tmp[MAX_PATH+1];
 	ssize_t len;
@@ -29,10 +29,10 @@ FBCALL FBSTRING *fb_ExePath ( void )
 			fb_hStrCopy( dst->data, tmp, len );
 		}
 		else
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }

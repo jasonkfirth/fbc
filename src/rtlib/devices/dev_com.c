@@ -412,7 +412,7 @@ int fb_DevSerialSetWidth( const char *pszDevice, int width, int default_width )
          i<FB_MAX_FILES;
          ++i )
     {
-        FB_FILE *tmp_handle = __fb_ctx.fileTB + i;
+        FB_FILE *tmp_handle = fb_ctx.fileTB + i;
         if( tmp_handle->hooks==&hooks_dev_com
             && tmp_handle->redirection_to==NULL )
         {

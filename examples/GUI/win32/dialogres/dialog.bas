@@ -1,3 +1,9 @@
+'' Project: FreeBASIC Win32 examples
+'' File: dialog.bas
+'' Purpose: Show a resource dialog and handle its messages.
+'' Responsibilities: Create the dialog and process its close/button commands.
+'' This file contains no resource compiler or window-manager implementation.
+'' DLGPROC returns pointer-sized INT_PTR, including on Win64.
 ''
 '' Dialog Example, by fsw
 ''
@@ -9,7 +15,7 @@
 #include once "windows.bi"
 #include "dialog.bi"
 
-declare function DlgProc (byval hwnd as HWND, byval umsg as UINT, byval wparam as WPARAM, byval lparam as LPARAM) as BOOL
+declare function DlgProc stdcall (byval hwnd as HWND, byval umsg as UINT, byval wparam as WPARAM, byval lparam as LPARAM) as INT_PTR
 
 
 '''
@@ -33,7 +39,7 @@ declare function DlgProc (byval hwnd as HWND, byval umsg as UINT, byval wparam a
 
 
 
-function DlgProc (byval hwnd as HWND, byval umsg as UINT, byval wparam as WPARAM, byval lparam as LPARAM) as BOOL
+function DlgProc stdcall (byval hwnd as HWND, byval umsg as UINT, byval wparam as WPARAM, byval lparam as LPARAM) as INT_PTR
     dim as long id, event
 
     ''
@@ -64,3 +70,5 @@ function DlgProc (byval hwnd as HWND, byval umsg as UINT, byval wparam as WPARAM
 
     return TRUE
 end function
+
+'' end of dialog.bas

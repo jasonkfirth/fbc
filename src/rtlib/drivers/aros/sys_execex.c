@@ -33,7 +33,7 @@
 #include <proto/dos.h>
 #include <unistd.h>
 
-FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
+FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork )
 {
 	char buffer[MAX_PATH];
 	char *command;

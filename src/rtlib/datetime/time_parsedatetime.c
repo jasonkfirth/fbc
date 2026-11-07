@@ -9,7 +9,7 @@
 #include <ctype.h>
 
 /*:::::*/
-FBCALL int fb_DateTimeParse( FBSTRING *s,
+FBCALL int fb_DateTimeParse( FBSTRING_ACCESS *s,
                              int *pDay, int *pMonth, int *pYear,
                              int *pHour, int *pMinute, int *pSecond,
                              int want_date, int want_time)
@@ -76,7 +76,7 @@ FBCALL int fb_DateTimeParse( FBSTRING *s,
 }
 
 /*:::::*/
-FBCALL int fb_DateParse( FBSTRING *s, int *pDay, int *pMonth, int *pYear )
+FBCALL int fb_DateParse( FBSTRING_ACCESS *s, int *pDay, int *pMonth, int *pYear )
 {
     return fb_DateTimeParse( s,
                              pDay, pMonth, pYear,
@@ -85,7 +85,7 @@ FBCALL int fb_DateParse( FBSTRING *s, int *pDay, int *pMonth, int *pYear )
 }
 
 /*:::::*/
-FBCALL int fb_TimeParse( FBSTRING *s, int *pHour, int *pMinute, int *pSecond )
+FBCALL int fb_TimeParse( FBSTRING_ACCESS *s, int *pHour, int *pMinute, int *pSecond )
 {
     return fb_DateTimeParse( s,
                              NULL, NULL, NULL,

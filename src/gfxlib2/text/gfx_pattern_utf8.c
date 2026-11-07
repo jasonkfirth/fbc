@@ -12,7 +12,7 @@ FBCALL int fb_GfxPaintPatternWstr( void *target, float x, float y,
 	const FB_WCHAR *pattern, unsigned int foreground, unsigned int background,
 	unsigned int border, int relative )
 {
-	FBSTRING *bytes;
+	FBSTRING_ACCESS *bytes;
 	/* A pattern is binary: one encoded byte per row. UTF-8 conversion gives
 	   wide and USTRING callers the same bytes without a locale dependency. */
 	FB_STRLOCK();

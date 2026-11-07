@@ -9,8 +9,8 @@
 
 FBCALL int fb_ArrayRedimTo
 	(
-		FBARRAY *dest,
-		const FBARRAY *source,
+		FBARRAY_ACCESS *dest,
+		const FBARRAY_ACCESS *source,
 		int isvarlen,
 		FB_DEFCTOR ctor,
 		FB_DEFCTOR dtor
@@ -32,12 +32,7 @@ FBCALL int fb_ArrayRedimTo
 	   destructors run, preserving the original callback ordering. */
 	diff = 0;
 	if( source->size != 0 ) {
-		if( source->ptr > source->data ) {
-			diff = ((size_t)source->ptr) - ((size_t)source->data);
-			diff = -diff;
-		} else {
-			diff = ((size_t)source->data) - ((size_t)source->ptr);
-		}
+		diff = (ssize_t)((uintptr_t)source->data - (uintptr_t)source->ptr);
 	}
 
 	/* free old */
@@ -79,7 +74,7 @@ FBCALL int fb_ArrayRedimTo
 		fb_ArrayResetDesc( dest );
 		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 	}
-	dest->data = ((unsigned char *)dest->ptr) + diff;
+	dest->data = (void *)((uintptr_t)dest->ptr + (uintptr_t)diff);
 
 	/* Call ctor for each element */
 	if( ctor ) {

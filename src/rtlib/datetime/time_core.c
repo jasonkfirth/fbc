@@ -84,7 +84,7 @@ void fb_hNormalizeDate( int *pDay, int *pMonth, int *pYear )
 }
 
 /*:::::*/
-int fb_hTimeGetIntervalType( FBSTRING *interval )
+int fb_hTimeGetIntervalType( FBSTRING_ACCESS *interval )
 {
     int result = FB_TIME_INTERVAL_INVALID;
 

@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL int fb_Shell( FBSTRING *program )
+FBCALL int fb_Shell( FBSTRING_ACCESS *program )
 {
 	int errcode = -1;
 

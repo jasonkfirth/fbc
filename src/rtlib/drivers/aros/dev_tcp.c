@@ -175,7 +175,7 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 static int fb_DevTcpClose( FB_FILE *handle );
 static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen );
 static int fb_DevTcpReadWstr( FB_FILE *handle, FB_WCHAR *value, size_t *pValuelen );
-static int fb_DevTcpReadLine( FB_FILE *handle, FBSTRING *dst );
+static int fb_DevTcpReadLine( FB_FILE *handle, FBSTRING_ACCESS *dst );
 static int fb_DevTcpReadLineWstr( FB_FILE *handle, FB_WCHAR *dst, ssize_t dst_chars );
 static int fb_DevTcpWrite( FB_FILE *handle, const void *value, size_t valuelen );
 static int fb_DevTcpWriteWstr( FB_FILE *handle, const FB_WCHAR *value, size_t valuelen );
@@ -1313,9 +1313,9 @@ static int fb_hDevTcpReadByte( FB_FILE *handle, DEV_TCP_INFO *info, char *ch, si
 	return FB_RTERROR_OK;
 }
 
-static void fb_hDevTcpAppendChunk( FBSTRING *dst, const char *buffer, ssize_t len )
+static void fb_hDevTcpAppendChunk( FBSTRING_ACCESS *dst, const char *buffer, ssize_t len )
 {
-	FBSTRING *src;
+	FBSTRING_ACCESS *src;
 
 	if( len <= 0 )
 		return;
@@ -1328,7 +1328,7 @@ static void fb_hDevTcpAppendChunk( FBSTRING *dst, const char *buffer, ssize_t le
 	}
 }
 
-static int fb_DevTcpReadLine( FB_FILE *handle, FBSTRING *dst )
+static int fb_DevTcpReadLine( FB_FILE *handle, FBSTRING_ACCESS *dst )
 {
 	DEV_TCP_INFO *info = (DEV_TCP_INFO*)handle->opaque;
 	char buffer[1024];

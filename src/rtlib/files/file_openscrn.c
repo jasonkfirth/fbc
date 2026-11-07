@@ -8,7 +8,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL int fb_FileOpenScrn ( FBSTRING *str_filename, unsigned int mode,
+FBCALL int fb_FileOpenScrn ( FBSTRING_ACCESS *str_filename, unsigned int mode,
                              unsigned int access, unsigned int lock,
                              int fnum, int len, const char *encoding )
 {

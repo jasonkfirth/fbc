@@ -63,6 +63,13 @@
 #include once "tooling/semantic-numeric-conversions.bi"
 #include once "tooling/semantic-preprocessor.bi"
 #include once "tooling/semantic-macros.bi"
+declare sub fbSemanticModelNumberLiteralCounts()
+declare sub fbSemanticModelConstantAtomCounts()
+declare sub fbSemanticModelGroupInputCounts()
+declare sub fbSemanticModelPointerAddressCounts()
+declare sub fbSemanticModelStringInputCounts()
+#include once "tooling/semantic-math-constant.bi"
+declare sub fbSemanticModelMacroReplacementCounts()
 #include once "tooling/semantic-coordinates.bi"
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-expressions.bi"
@@ -109,6 +116,7 @@ declare sub fbSemanticModelCaptureMacroAccess(byval reference as longint, byval 
 #include once "tooling/semantic-variable-names.bi"
 #include once "tooling/semantic-primitive-types.bi"
 #include once "tooling/semantic-member-names.bi"
+#include once "tooling/semantic-string-search.bi"
 #include once "fbc-semantic-binary.bi"
 #undef FBC_SEMANTIC_BINARY_WRITER_ONLY
 '' -------------------------------------------------------------------------
@@ -172,6 +180,7 @@ private type SEMANTIC_MODEL_SYMBOL
 	alias_needs_formal_point as integer
 	initializerid as longint
 	wide_prefix_exported as integer
+	procedure_exported as integer
 	declaration_name as zstring ptr
 end type
 
@@ -262,6 +271,7 @@ private dim shared as integer semantic_model_memory_context_depth
 private dim shared as SEMANTIC_MODEL_MEMORY_CONTEXT _
 	semantic_model_memory_contexts(0 to SEMANTIC_MODEL_MAX_MEMORY_CONTEXT_DEPTH - 1)
 dim shared as longint semantic_model_module_node_count
+dim shared as longint semantic_model_argument_input_count, semantic_model_call_target_input_count
 dim shared as integer semantic_model_proc_count
 dim shared as integer semantic_model_total_symbol_count
 dim shared as integer semantic_model_total_type_fact_count
@@ -980,6 +990,7 @@ private function hSemanticModelSymbolId(byval sym as FBSYMBOL ptr) as longint
 		semantic_model_symbols[index].alias_needs_formal_point = 0
 		semantic_model_symbols[index].initializerid = 0
 		semantic_model_symbols[index].wide_prefix_exported = FALSE
+		semantic_model_symbols[index].procedure_exported = FALSE
 		semantic_model_symbols[index].declaration_name = NULL
 		semantic_model_symbol_count += 1
 
@@ -1335,6 +1346,70 @@ function fbSemanticModelDeclarationGroup(byval token as integer, byref owner as 
 		fbSemanticModelEscape(fbSemanticModelNumber(statement) + TABCHAR + kind))
 	return groupid
 end function
+
+'' Project: FreeBASIC compiler - declaration initializer provenance
+'' File: declaration-initializer.fragment.bas
+'' Purpose: Preserve parser-owned initializer expression intervals and roots.
+'' Responsibilities: Exact copy/reference mode, subject, source and ownership.
+'' This file intentionally does NOT classify shadows or add executable reads.
+
+function fbSemanticModelInitializerDetailCheckpoint() as longint
+    '' Macro reference roles use their own dense occurrence identities.
+    '' The initializer interval must use that counter, not detail row IDs.
+    return semantic_model_macro_reference_count
+end function
+
+sub fbSemanticModelDeclarationInitializer(byval subject as FBSYMBOL ptr, byref kind as const string, _
+    byval first_checkpoint as longint, byval last_checkpoint as longint, byval root_expression as longint, _
+    byval first_binding as longint, byval last_binding as longint, byval first_detail as longint, byval last_detail as longint)
+    if( fbSemanticModelFullEnabled() = FALSE ) then exit sub
+    if( fbSemanticModelMacroProvenanceEnabled() = FALSE ) then exit sub
+    if( lex.ctx->semantic_probe or (subject = NULL) ) then exit sub
+    if( subject->class <> FB_SYMBCLASS_VAR ) then exit sub
+    if( fbSemanticModelSymbolOrigin(subject) <> "source" ) then exit sub
+    if( (kind <> "copy") and (kind <> "reference") ) then
+        fbSemanticModelFailAt("unknown declaration initializer kind"): exit sub
+    end if
+    '' Expression identities are issued in parser order. The checkpoints
+    '' enclose one initializer, not its DIM bounds or another declarator.
+    if( (first_checkpoint < semantic_model_expression_count) or _
+        (last_checkpoint < first_checkpoint) or _
+        (last_checkpoint > fbSemanticModelExpressionCheckpoint()) ) then
+        fbSemanticModelFailAt("declaration initializer expression interval is invalid"): exit sub
+    end if
+    if( (first_binding < semantic_model_binding_count) or (last_binding < first_binding) or _
+        (last_binding > fbSemanticModelBindingCount()) or (first_detail < 0) or _
+        (last_detail < first_detail) or (last_detail > fbSemanticModelInitializerDetailCheckpoint()) ) then
+        fbSemanticModelFailAt("declaration initializer reference interval is invalid"): exit sub
+    end if
+    dim as longint binding_begin, binding_end, detail_begin, detail_end
+    if( last_binding > first_binding ) then binding_begin = first_binding + 1: binding_end = last_binding
+    if( last_detail > first_detail ) then detail_begin = first_detail + 1: detail_end = last_detail
+    dim as longint first_expression, last_expression
+    if( last_checkpoint > first_checkpoint ) then
+        first_expression = first_checkpoint + 1: last_expression = last_checkpoint
+    end if
+    if( (root_expression <> 0) and _
+        ((root_expression < first_expression) or (root_expression > last_expression)) ) then
+        fbSemanticModelFailAt("declaration initializer root is outside its interval"): exit sub
+    end if
+    dim as longint identity = fbSemanticModelSymbolId(subject)
+    dim as longint owner = fbSemanticModelSymbolId(@symbGetGlobalNamespc())
+    dim as longint statement = fbSemanticModelCurrentStatement(), source = fbSemanticModelCurrentSource()
+    if( (identity <= 0) or (owner <= 0) or (statement <= 0) or (source <= 0) ) then
+        fbSemanticModelFailAt("declaration initializer subject or owner is unavailable"): exit sub
+    end if
+    dim as string payload = kind + TABCHAR + fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(source) + _
+        TABCHAR + fbSemanticModelNumber(first_expression) + TABCHAR + fbSemanticModelNumber(last_expression) + _
+        TABCHAR + fbSemanticModelNumber(root_expression) + TABCHAR + fbSemanticModelNumber(binding_begin) + _
+        TABCHAR + fbSemanticModelNumber(binding_end) + TABCHAR + fbSemanticModelNumber(detail_begin) + TABCHAR + fbSemanticModelNumber(detail_end)
+    fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(identity) + _
+        TABCHAR + "declaration-initializer" + TABCHAR + fbSemanticModelEscape(payload))
+    fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(owner) + _
+        TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + "declaration-initializer" + TABCHAR + "0")
+end sub
+'' end of declaration-initializer.fragment.bas
+
 
 '' Project: FreeBASIC compiler - written type structure
 '' File: type-shape-observer.fragment.bas
@@ -1859,6 +1934,39 @@ sub fbSemanticModelProcedureTyping(byval proc as FBSYMBOL ptr, byval tk as integ
 		TABCHAR + result_form + TABCHAR + fbSemanticModelNumber(abs((symbGetAttrib(proc) and FB_SYMBATTRIB_EXPORT) <> 0))
 	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
 		TABCHAR + "procedure-typing-input:" + fbSemanticModelNumber(identity) + TABCHAR + fbSemanticModelEscape(payload))
+	'' A definition can rename a prototype's parameter symbols. Snapshot each
+	'' header now, rather than projecting the final shared G/T inventory back
+	'' onto an earlier declaration. Implicit THIS is not a written parameter.
+	dim as integer ordinal, skip_instance = symbIsMethod(proc)
+	dim as FBSYMBOL ptr parameter = symbGetProcHeadParam(proc)
+	while( parameter <> NULL )
+		if( skip_instance ) then
+			skip_instance = FALSE
+		else
+			dim as string parameter_name, parameter_mode
+			'' Prototypes may clear the live symbol name after parsing. The
+			'' compiler's retained declaration spelling is the native fallback.
+			parameter_name = fbSemanticModelDeclarationName(parameter)
+			select case symbGetParamMode(parameter)
+			case FB_PARAMMODE_BYVAL: parameter_mode = "byval"
+			case FB_PARAMMODE_BYREF: parameter_mode = "byref"
+			case FB_PARAMMODE_BYDESC: parameter_mode = "bydesc"
+			case FB_PARAMMODE_VARARG: parameter_mode = "vararg"
+			case else
+				fbSemanticModelFailAt("invalid procedure header parameter mode"): exit sub
+			end select
+			fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+				TABCHAR + "procedure-header-parameter:" + fbSemanticModelNumber(statement) + ":" + fbSemanticModelNumber(ordinal) + _
+				TABCHAR + fbSemanticModelEscape(parameter_mode + TABCHAR + parameter_name))
+			ordinal += 1
+		end if
+		parameter = symbGetParamNext(parameter)
+	wend
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+		TABCHAR + "procedure-header-parameter-count:" + fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(ordinal))
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + _
+		TABCHAR + "procedure-header-instance:" + fbSemanticModelNumber(statement) + TABCHAR + fbSemanticModelNumber(abs(symbIsMethod(proc) <> FALSE)))
+
 end sub
 
 sub fbSemanticModelAggregateBodyBegin(byval parent as FBSYMBOL ptr)
@@ -2107,8 +2215,10 @@ type SEMANTIC_HINT_TOKEN
     next_token as integer
     token_identity as longint
 end type
-const SEMANTIC_HINT_BUCKET_COUNT = 4096
-const SEMANTIC_HINT_LIMIT = 262144
+'' Large translation units can exceed 262144 identifier observations. Keep
+'' the bucket load bounded as the independently checked observation limit grows.
+const SEMANTIC_HINT_BUCKET_COUNT = 16384
+const SEMANTIC_HINT_LIMIT = 1048576
 dim shared as SEMANTIC_HINT_TOKEN semantic_hint_tokens( )
 dim shared as integer semantic_hint_buckets(0 to SEMANTIC_HINT_BUCKET_COUNT - 1)
 dim shared as integer semantic_hint_token_count
@@ -2446,6 +2556,18 @@ function fbSemanticModelExportCallBinding _
 		if( (reference > 0) and (sym->class = FB_SYMBCLASS_PROC) ) then fbSemanticModelCaptureAccess(reference)
 		if( (sym->class = FB_SYMBCLASS_PROC) and symbGetIsRTL(sym) ) then
 			hBuiltinFunctionUse(sym, reference, "runtime")
+		end if
+	end if
+	'' Only zero-argument pointer getters can feed this observation. Avoid
+	'' retaining receiver entries for the much larger ordinary call stream.
+	if( (is_type = FALSE) and (sym <> NULL) and (receiver <> NULL) ) then
+		if( (sym->class = FB_SYMBCLASS_PROC) andalso symbIsMethod(sym) ) then
+			if( typeIsPtr(symbGetFullType(sym)) ) then
+				dim as FBSYMBOL ptr instance = symbGetProcHeadParam(sym)
+				if( instance <> NULL ) then
+					if( symbGetParamNext(instance) = NULL ) then fbSemanticModelRetainCallReceiver(reference, receiver)
+				end if
+			end if
 		end if
 	end if
 	return reference
@@ -4558,12 +4680,13 @@ end sub
 sub fbSemanticModelExportCurrentMemberPrefix _
     (byval expr as ASTNODE ptr, byval fld as FBSYMBOL ptr, _
      byval receiver_dtype as integer, byval receiver_subtype as FBSYMBOL ptr)
+    '' Assignment targets can be parsed without an active cExpression range.
+    '' This optional receiver observation has no expression to annotate then;
+    '' do not mark the enclosing statement incomplete merely for skipping it.
+    if( semantic_model_active_expression_start.start_line < 1 ) then exit sub
     fbSemanticModelExportCurrentExpressionPrefix(expr)
     if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
     if( lex.ctx->semantic_probe ) then exit sub
-    '' The ordinary prefix exporter deliberately omits parser work without
-    '' an active source expression. Do not add receiver facts for that work.
-    if( semantic_model_active_expression_start.start_line < 1 ) then exit sub
     if( (expr = NULL) or (fld = NULL) or (receiver_subtype = NULL) ) then
         fbSemanticModelFailAt("member receiver lacks accepted storage/type")
         exit sub
@@ -4750,6 +4873,7 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	fbSemanticModelResetMemberNames( )
 	fbSemanticModelResetConstructs( )
 	fbSemanticModelResetExpressions( )
+	fbSemanticModelResetStringSearches()
 	fbSemanticModelResetAccess( )
 
 	semantic_model_pending_scope_exit_valid = FALSE
@@ -4782,6 +4906,8 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	semantic_model_module_binding_count = 0
 	semantic_model_module_implicit_call_count = 0
 	semantic_model_module_node_count = 0
+	semantic_model_argument_input_count = 0
+	semantic_model_call_target_input_count = 0
 	semantic_model_module_construction_count = 0
 	semantic_model_module_temporary_construction_count = 0
 	semantic_model_module_memory_application_count = 0
@@ -4802,6 +4928,38 @@ sub fbSemanticModelBeginModule(byref filename as string)
 	hSemanticModelAppendLine("M" + TABCHAR + hSemanticModelEscape(filename))
 	'' Availability describes this export mode and observed compiler phase.
 	'' END confirms publication; it cannot certify unimplemented analyses.
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+        TABCHAR + "subscript-replacement-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+        TABCHAR + "container-data-pointer-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "numeric-literal-closure" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "literal-token-source-origins" + TABCHAR + iif(fbSemanticModelFullEnabled() and fbSemanticExtraFactsEnabled(FB_SEMEXTRA_LITERAL_GROUPS), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "parsed-string-input-closure" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "qb-raw-data-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "parsed-constant-atom-closure" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "parsed-group-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "pointer-address-input-closure" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "accepted-block-comment-spans" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "procedure-header-parameter-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "original-iif-arm-structures" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "original-string-search-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+        TABCHAR + "written-procedure-overload-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+        TABCHAR + "applied-namespace-lookup-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "pre-backend-procedure-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
 	for capability as integer = 0 to 187
 		dim as string feature, coverage
 		select case capability
@@ -5007,12 +5165,36 @@ sub fbSemanticModelBeginModule(byref filename as string)
 			TABCHAR + feature + TABCHAR + coverage)
 	next
 	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "original-float-width-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "visible-math-catalog-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "visible-math-constant-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "string-compare-contract-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "collection-empty-method-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "collection-empty-comparison-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "constructor-string-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
+		TABCHAR + "native-index-conversion-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "macro-replacement-tokens" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "inferred-initializer-targets" + TABCHAR + iif(fbSemanticModelFullEnabled() and fbSemanticModelMacroProvenanceEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "declaration-initializer-ranges" + TABCHAR + iif(fbSemanticModelFullEnabled() and fbSemanticModelMacroProvenanceEnabled(), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
 		TABCHAR + "constant-initializer-targets" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
 	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
 		TABCHAR + "enum-selected-numeric-operands" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
 	'' Exact automatic-variable cleanup is independent of partial lifetime graphs.
 	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
 		TABCHAR + "variable-cleanup-inputs" + TABCHAR + iif(fbSemanticModelFullEnabled( ), "available", "unavailable"))
+	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + _
+		TABCHAR + "value-initializer-copies" + TABCHAR + iif(fbSemanticModelFullEnabled(), "available", "unavailable"))
 	'' Extra source observations are available only when requested by the client.
 	fbSemanticModelAppendProvenance("CAP" + TABCHAR + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + _
 		TABCHAR + "extended-integer-type-abi" + TABCHAR + "available")
@@ -5087,7 +5269,32 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	end if
 	semantic_model_pending_expression_type = ""
 	if( commit ) then fbSemanticModelExportAccess( )
+	if( commit ) then fbSemanticModelMacroReplacementCounts()
+	if( commit ) then fbSemanticModelMathConstantCounts()
 	if( commit ) then fbSemanticModelExportArrayInitializerInputCount( )
+	if( commit ) then fbSemanticModelExportSubscriptReplacementCount( )
+	if( commit ) then fbSemanticModelExportContainerDataPointerCount( )
+	if( commit ) then fbSemanticModelExportCompareContractCount( )
+	if( commit ) then fbSemanticModelExportCollectionEmptyCount( )
+	if( commit ) then fbSemanticModelConstructorStringCount( )
+	if( commit ) then fbSemanticModelIndexConversionCounts( )
+	if( commit ) then fbSemanticModelNumberLiteralCounts()
+	if( commit ) then fbSemanticModelConstantAtomCounts()
+	if( commit ) then fbSemanticModelGroupInputCounts()
+	if( commit ) then fbSemanticModelPointerAddressCounts()
+	if( commit and fbSemanticModelFullEnabled() ) then
+		'' Count actual source-argument emissions, independently of consumers.
+		'' Optional/default and compiler-created arguments are not source inputs.
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc())) + TABCHAR + _
+			"parsed-call-argument-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + TABCHAR + _
+			fbSemanticModelNumber(semantic_model_argument_input_count))
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc())) + TABCHAR + _
+			"parsed-call-target-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + TABCHAR + _
+			fbSemanticModelNumber(semantic_model_call_target_input_count))
+	end if
+	if( commit ) then fbSemanticModelStringInputCounts()
 	if( commit and fbSemanticExtraFactsEnabled(FB_SEMEXTRA_PREPROCESSOR) and fbSemanticModelFullEnabled( ) and _
 		fbSemanticModelMacroProvenanceEnabled( ) ) then
 		dim as string event_counts = ""
@@ -5123,6 +5330,7 @@ sub fbSemanticModelFinishModule(byval commit as integer)
 	end if
 	if( commit ) then fbSemanticModelFinishVariableNames( )
 	if( commit ) then fbSemanticModelFinishPrimitiveTypes( )
+	if( commit ) then fbSemanticModelFinishStringSearches()
 	if( commit ) then fbSemanticModelFinishTypeShapes( )
 	if( commit ) then fbSemanticModelFinishArrayMutations( )
 	if( commit ) then fbSemanticModelFinishData( )
@@ -5298,6 +5506,17 @@ sub fbSemanticModelExportProc(byval proc as FBSYMBOL ptr, byval astproc as ASTNO
 	if( (hSemanticModelHasSymbol(proc) = FALSE) or (astproc = NULL) ) then exit sub
 
 	procid = hSemanticModelSymbolId(proc)
+	'' A backend may request the same body while lowering an error owner.
+	'' Keep the first, pre-rewrite tree. Store the flag in the module-owned
+	'' symbol table, which already resets identities between translation units.
+	'' Do not keep a pointer into this table while exporting symbols: it grows.
+	dim as integer procedure_index = hSemanticModelFindSymbol(proc)
+	if( (procid = 0) or (procedure_index < 0) ) then
+		fbSemanticModelFailAt("unavailable procedure snapshot identity")
+		exit sub
+	end if
+	if( semantic_model_symbols[procedure_index].procedure_exported ) then exit sub
+	semantic_model_symbols[procedure_index].procedure_exported = TRUE
 	if( proc->id.name <> NULL ) then procname = *proc->id.name
 	if( proc->proc.ext <> NULL ) then
 		proc_start_line = proc->proc.ext->dbg.iniline
@@ -5451,5 +5670,13 @@ function fbSemanticModelEnd(byval succeeded as integer) as integer
 	fbSemanticModelResetMacros( )
 	fbSemanticModelDriverReset( )
 end function
+
+sub fbSemanticModelObserveArgumentInput()
+	if( fbSemanticModelFullEnabled() ) then semantic_model_argument_input_count += 1
+end sub
+
+sub fbSemanticModelObserveCallTargetInput()
+	if( fbSemanticModelFullEnabled() ) then semantic_model_call_target_input_count += 1
+end sub
 
 '' end of tooling/semantic-model.bas

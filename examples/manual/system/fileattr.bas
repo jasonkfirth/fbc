@@ -2,6 +2,9 @@
 ''
 '' Example extracted from the FreeBASIC Manual
 '' from topic 'FILEATTR'
+'' Purpose: Use a BASIC file's native CRT stream for a text round trip.
+'' Responsibilities: Own each handle and pass 32-bit values to fprintf's %i.
+'' This file intentionally does NOT inspect private CRT stream fields.
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgFileattr
 '' --------
@@ -12,7 +15,7 @@
 '' Resource ownership:
 '' Each pass owns one checked handle. The input pass begins only after the
 '' output fixture was written and closed.
-Dim f As FILE Ptr, i As Integer, file_number As Integer
+Dim f As FILE Ptr, i As Long, file_number As Integer
 
 '' Open a file and write some text to it
 
@@ -42,11 +45,14 @@ Else
     If f = 0 Then
       Print "Could not obtain the input file handle"
     Else
-      While feof(f) = 0
+      Do
         i = fgetc(f)
+        If i = EOF_ Then Exit Do
         Print Chr(i);
-      Wend
+      Loop
     End If
     Close #file_number
   End If
 End If
+
+'' end of fileattr.bas

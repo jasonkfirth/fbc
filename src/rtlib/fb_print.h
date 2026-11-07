@@ -130,8 +130,8 @@ FBCALL void         fb_PrintLongint     ( int fnum, long long val, int mask );
 FBCALL void         fb_PrintULongint    ( int fnum, unsigned long long val, int mask );
 FBCALL void         fb_PrintSingle      ( int fnum, float val, int mask );
 FBCALL void         fb_PrintDouble      ( int fnum, double val, int mask );
-FBCALL void         fb_PrintString      ( int fnum, FBSTRING *s, int mask );
-       void         fb_PrintStringEx    ( FB_FILE *handle, FBSTRING *s, int mask );
+FBCALL void         fb_PrintString      ( int fnum, FBSTRING_ACCESS *s, int mask );
+       void         fb_PrintStringEx    ( FB_FILE *handle, FBSTRING_ACCESS *s, int mask );
 FBCALL void         fb_PrintWstr        ( int fnum, const FB_WCHAR *s, int mask );
        void         fb_PrintWstrEx      ( FB_FILE *handle, const FB_WCHAR *s, int mask );
 FBCALL void         fb_PrintFixString   ( int fnum, const char *s, int mask );
@@ -151,7 +151,7 @@ FBCALL void         fb_LPrintLongint    ( int fnum, long long val, int mask );
 FBCALL void         fb_LPrintULongint   ( int fnum, unsigned long long val, int mask );
 FBCALL void         fb_LPrintSingle     ( int fnum, float val, int mask );
 FBCALL void         fb_LPrintDouble     ( int fnum, double val, int mask );
-FBCALL void         fb_LPrintString     ( int fnum, FBSTRING *s, int mask );
+FBCALL void         fb_LPrintString     ( int fnum, FBSTRING_ACCESS *s, int mask );
 FBCALL void         fb_LPrintWstr       ( int fnum, const FB_WCHAR *s, int mask );
 
 FBCALL void         fb_PrintTab         ( int fnum, int newcol );
@@ -169,12 +169,12 @@ FBCALL void         fb_WriteLongint     ( int fnum, long long val, int mask );
 FBCALL void         fb_WriteULongint    ( int fnum, unsigned long long val, int mask );
 FBCALL void         fb_WriteSingle      ( int fnum, float val, int mask );
 FBCALL void         fb_WriteDouble      ( int fnum, double val, int mask );
-FBCALL void         fb_WriteString      ( int fnum, FBSTRING *s, int mask );
+FBCALL void         fb_WriteString      ( int fnum, FBSTRING_ACCESS *s, int mask );
 FBCALL void         fb_WriteWstr        ( int fnum, FB_WCHAR *s, int mask );
 FBCALL void         fb_WriteFixString   ( int fnum, char *s, int mask );
 
-FBCALL int          fb_PrintUsingInit   ( FBSTRING *fmtstr );
-FBCALL int          fb_PrintUsingStr    ( int fnum, FBSTRING *s, int mask );
+FBCALL int          fb_PrintUsingInit   ( FBSTRING_ACCESS *fmtstr );
+FBCALL int          fb_PrintUsingStr    ( int fnum, FBSTRING_ACCESS *s, int mask );
 FBCALL int          fb_PrintUsingWstr   ( int fnum, FB_WCHAR *s, int mask );
 FBCALL int          fb_PrintUsingSingle ( int fnum, float value_f, int mask );
 FBCALL int          fb_PrintUsingDouble ( int fnum, double value, int mask );
@@ -182,6 +182,12 @@ FBCALL int          fb_PrintUsingLongint( int fnum, long long val_ll, int mask )
 FBCALL int          fb_PrintUsingULongint( int fnum, unsigned long long value_ull, int mask );
 FBCALL int          fb_PrintUsingEnd    ( int fnum );
 
-FBCALL int          fb_LPrintUsingInit  ( FBSTRING *fmtstr );
+FBCALL int          fb_LPrintUsingInit  ( FBSTRING_ACCESS *fmtstr );
+
+/* These writer entry points share the existing print-mask and buffer
+   contracts; declaring them also checks their platform calling convention. */
+FBCALL void fb_PrintBufferWstr( const FB_WCHAR *buffer, int mask );
+FBCALL void fb_LPrintFixString ( int fnum, const char *s, int mask );
+FBCALL int fb_PrintUsingBoolean( int fnum, char val, int mask );
 
 /* end of fb_print.h */

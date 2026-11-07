@@ -1,3 +1,9 @@
+'' Project: FreeBASIC compiler unit testing component
+'' File: fbcunit_report.bas
+'' Purpose: Write the unit test XML report and manage its output stream.
+'' Responsibilities: Serialized report callbacks, indentation and text output.
+'' This file intentionally does NOT contain: test execution or result collection.
+
 ''  fbcunit - FreeBASIC Compiler Unit Testing Component
 ''	Copyright (C) 2017-2020 Jeffery R. Marshall (coder[at]execulink[dot]com)
 ''
@@ -28,6 +34,7 @@ private function report_open _
 	) as boolean
 
 	report_close()
+	indent = 0
 
 	f = fopen( filename, "w" )
 
@@ -41,7 +48,9 @@ private function report_close _
 	) as boolean
 
 	if( f ) then
-		function = (0 = fclose( f ))
+		var result = fclose( f )
+		f = NULL
+		function = (result = 0)
 	else
 		function = true
 	end if
@@ -55,7 +64,14 @@ private function report_write _
 	) as boolean
 
 	if( f ) then
-		fprintf( f, space(indent) & "%s", strptr(s) )
+		'' Keep the format fixed and both string pointers valid for empty text.
+		'' One call preserves the spacing/text boundary of each report write.
+		dim padding as string = space(indent)
+		dim padding_text as const zstring ptr = @""
+		dim report_text as const zstring ptr = @""
+		if( len(padding) > 0 ) then padding_text = strptr(padding)
+		if( len(s) > 0 ) then report_text = strptr(s)
+		function = (fprintf( f, "%s%s", padding_text, report_text ) >= 0)
 	else
 		function = false
 	end if
@@ -275,7 +291,10 @@ namespace fbcu
 
 		report_outdent()
 		report_write( !"</testsuites>\n" )
+		report_close()
 
 	end sub
 
 end namespace
+
+'' end of fbcunit_report.bas

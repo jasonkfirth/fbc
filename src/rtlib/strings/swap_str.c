@@ -22,17 +22,17 @@ FBCALL void fb_StrSwap( void *str1, ssize_t size1, int fillrem1,
 		FBSTRING td;
 
 		/* just swap the descriptors */
-		td.data = ((FBSTRING *)str1)->data;
-		td.len  = ((FBSTRING *)str1)->len;
-		td.size  = ((FBSTRING *)str1)->size;
+		td.data = ((FBSTRING_ACCESS *)str1)->data;
+		td.len  = ((FBSTRING_ACCESS *)str1)->len;
+		td.size  = ((FBSTRING_ACCESS *)str1)->size;
 
-		((FBSTRING *)str1)->data = ((FBSTRING *)str2)->data;
-		((FBSTRING *)str1)->len = ((FBSTRING *)str2)->len;
-		((FBSTRING *)str1)->size = ((FBSTRING *)str2)->size;
+		((FBSTRING_ACCESS *)str1)->data = ((FBSTRING_ACCESS *)str2)->data;
+		((FBSTRING_ACCESS *)str1)->len = ((FBSTRING_ACCESS *)str2)->len;
+		((FBSTRING_ACCESS *)str1)->size = ((FBSTRING_ACCESS *)str2)->size;
 
-		((FBSTRING *)str2)->data = td.data;
-		((FBSTRING *)str2)->len = td.len;
-		((FBSTRING *)str2)->size = td.size;
+		((FBSTRING_ACCESS *)str2)->data = td.data;
+		((FBSTRING_ACCESS *)str2)->len = td.len;
+		((FBSTRING_ACCESS *)str2)->size = td.size;
 
 		return;
 	}

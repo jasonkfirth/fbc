@@ -3660,15 +3660,14 @@ private sub hDoCall _
 			end if
 		elseif( is_microsoft_aggregate_vararg ) then
 			dim as integer aggregate_size = semantic_input_subtype->lgt
-			if( (aggregate_size = 1) orElse (aggregate_size = 2) orElse _
-			    (aggregate_size = 4) orElse (aggregate_size = 8) ) then
-				dim as integer integer_dtype = any
-				select case aggregate_size
-				case 1: integer_dtype = FB_DATATYPE_UBYTE
-				case 2: integer_dtype = FB_DATATYPE_USHORT
-				case 4: integer_dtype = FB_DATATYPE_ULONG
-				case 8: integer_dtype = FB_DATATYPE_ULONGINT
-				end select
+			dim as integer integer_dtype = FB_DATATYPE_INVALID
+			select case aggregate_size
+			case 1: integer_dtype = FB_DATATYPE_UBYTE
+			case 2: integer_dtype = FB_DATATYPE_USHORT
+			case 4: integer_dtype = FB_DATATYPE_ULONG
+			case 8: integer_dtype = FB_DATATYPE_ULONGINT
+			end select
+			if( integer_dtype <> FB_DATATYPE_INVALID ) then
 				dim as string integer_type = "i" + str( aggregate_size * 8 )
 				dim as IRVREG ptr integer_pointer = irhlAllocVreg( _
 					typeAddrOf( integer_dtype ), NULL )

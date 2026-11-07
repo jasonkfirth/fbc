@@ -13,8 +13,8 @@ FBCALL int fb_IsRedirected ( int is_input )
 
 	FB_LOCK( );
 
-	if( __fb_ctx.hooks.isredirproc != NULL )
-		result = __fb_ctx.hooks.isredirproc( is_input );
+	if( fb_ctx.hooks.isredirproc != NULL )
+		result = fb_ctx.hooks.isredirproc( is_input );
 	else
 		result = fb_ConsoleIsRedirected( is_input );
 

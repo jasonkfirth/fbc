@@ -509,8 +509,8 @@ type FBS_LABEL
 	parent          as FBSYMBOL_ ptr            '' parent block, not always a proc
 	declared        as integer
 	stmtnum         as integer                  '' can't use colnum as it's unreliable
-
-	gosub           as boolean                  '' if label is used for gosub with gas64
+	'' A native flag fills the existing label slot on 32/64-bit hosts.
+	gosub           as integer                  '' if label is used for gosub with gas64
 end type
 
 '' structure
@@ -660,6 +660,7 @@ enum FB_PROCSTATS
 	FB_PROCSTATS_RETURNUSED     = &h0001
 	FB_PROCSTATS_ASSIGNUSED     = &h0002
 	FB_PROCSTATS_GOSUBUSED      = &h0004
+	FB_PROCSTATS_NATIVEERROROWNER = &h0008  '' Win64 GAS handler activation
 end enum
 
 type FB_PROCGSB

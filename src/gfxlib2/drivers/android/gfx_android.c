@@ -1482,15 +1482,35 @@ void fb_hAndroidSetWindow(ANativeWindow *window)
 		fb_hAndroidConsoleRender();
 }
 
+/* The Android mutex keeps driver exit from releasing this mode's event queue.
+ * Posting takes only the event mutex, never the graphics/driver lock. */
+static void android_post_focus_locked(void)
+{
+	EVENT event;
+	memset(&event, 0, sizeof(event));
+	event.type = can_post_input_locked() ? EVENT_WINDOW_GOT_FOCUS : EVENT_WINDOW_LOST_FOCUS;
+	fb_hPostEvent(&event);
+}
+
 void fb_hAndroidGfxSetLifecycle(int started, int resumed, int focused)
 {
 	int redraw_active;
 	int redraw_console;
+	int was_focused;
+	int is_focused;
 
 	pthread_mutex_lock(&fb_android.mutex);
+	was_focused = can_post_input_locked();
 	fb_android.started = started ? 1 : 0;
 	fb_android.resumed = resumed ? 1 : 0;
 	fb_android.focused = focused ? 1 : 0;
+	is_focused = can_post_input_locked();
+	/* NativeActivity can pause before its separate focus callback arrives.
+	 * Publish the effective input lifecycle once per edge so ScreenEvent
+	 * clients stop foreground rendering and read acknowledgement while hidden.
+	 * Driver exit clears active before the core destroys the event queue. */
+	if (fb_android.active && was_focused != is_focused)
+		android_post_focus_locked();
 	update_render_suspended_locked();
 	redraw_active = fb_android.active && can_render_locked();
 	redraw_console = fb_android.console_enabled && !fb_android.active && can_render_locked();
@@ -1553,6 +1573,9 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 	fb_android.active = 1;
 	configure_window_locked();
 	__fb_gfx->refresh_rate = fb_android.refresh_rate;
+	/* ScreenRes replaces the queue during IME/window resizes. The new queue
+	 * needs the current lifecycle even if its last edge reached the old mode. */
+	android_post_focus_locked();
 
 	pthread_mutex_unlock(&fb_android.mutex);
 

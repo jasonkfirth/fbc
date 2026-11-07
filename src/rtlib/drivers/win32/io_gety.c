@@ -18,7 +18,7 @@ int fb_ConsoleGetRawYEx( HANDLE hConsole )
 
 int fb_ConsoleGetRawY( void )
 {
-    return fb_ConsoleGetRawYEx( __fb_out_handle );
+    return fb_ConsoleGetRawYEx( FB_CONSOLE_OUTPUT_HANDLE );
 }
 
 int fb_ConsoleGetY( void )

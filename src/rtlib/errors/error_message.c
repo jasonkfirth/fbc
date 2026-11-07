@@ -7,6 +7,6 @@
  */
 #include "fb.h"
 
-char __fb_errmsg[FB_ERRMSG_SIZE] = "";
+char fb_errmsg[FB_ERRMSG_SIZE] = "";
 
 /* end of errors/error_message.c */

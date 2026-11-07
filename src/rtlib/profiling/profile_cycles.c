@@ -109,7 +109,7 @@ typedef struct _FB_PROFILE_FILE_DATA
 
 /* cycles profiler global context */
 /* use FB_PROFILE_LOCK()/FB_PROFILE_UNLOCK when accessing */
-typedef struct _FB_PROFILER_CYCLES
+typedef struct FB_PROFILER_CYCLES_
 {
 	FB_PROFILER_GLOBAL *global;
 	double start_time;

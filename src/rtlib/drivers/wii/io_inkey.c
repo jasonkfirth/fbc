@@ -20,7 +20,7 @@
 
 #include "../../fb.h"
 
-FBSTRING *fb_ConsoleInkey(void)
+FBSTRING_ACCESS *fb_ConsoleInkey(void)
 {
 	return 0;
 }

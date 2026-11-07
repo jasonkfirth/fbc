@@ -15,7 +15,7 @@
 	does not check for fb_LEFTSELF( "literal", n ) so if src is a temporary,
 	it just gets deleted.
 */
-FBCALL void fb_LEFTSELF( FBSTRING *src, ssize_t chars )
+FBCALL void fb_LEFTSELF( FBSTRING_ACCESS *src, ssize_t chars )
 {
 	ssize_t     src_len;
 

@@ -106,11 +106,11 @@ char *fb_GfxReadStr(char *buffer, ssize_t maximum_length)
 /* LINE INPUT runtime hooks                                                  */
 /* ------------------------------------------------------------------------- */
 
-int fb_GfxLineInput(FBSTRING *text, void *destination,
+int fb_GfxLineInput(FBSTRING_ACCESS *text, void *destination,
 	ssize_t destination_length, int fill_remaining, int add_question,
 	int add_newline)
 {
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 
 	FB_LOCK();
 	fb_PrintBufferEx(NULL, 0, FB_PRINT_FORCE_ADJUST);
@@ -135,7 +135,7 @@ int fb_GfxLineInput(FBSTRING *text, void *destination,
 int fb_GfxLineInputWstr(const FB_WCHAR *text, FB_WCHAR *destination,
 	ssize_t maximum_characters, int add_question, int add_newline)
 {
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 
 	FB_LOCK();
 	fb_PrintBufferEx(NULL, 0, FB_PRINT_FORCE_ADJUST);
@@ -161,9 +161,9 @@ int fb_GfxLineInputWstr(const FB_WCHAR *text, FB_WCHAR *destination,
 
 void fb_gfx3_line_input_install_hooks_locked(void)
 {
-	__fb_ctx.hooks.readstrproc = fb_GfxReadStr;
-	__fb_ctx.hooks.lineinputproc = fb_GfxLineInput;
-	__fb_ctx.hooks.lineinputwproc = fb_GfxLineInputWstr;
+	fb_ctx.hooks.readstrproc = fb_GfxReadStr;
+	fb_ctx.hooks.lineinputproc = fb_GfxLineInput;
+	fb_ctx.hooks.lineinputwproc = fb_GfxLineInputWstr;
 }
 
 /* end of gfx3_line_input.c */

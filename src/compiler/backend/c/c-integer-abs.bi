@@ -41,8 +41,8 @@ private sub hWriteIntegerAbs(byval dtype as integer)
 		'' Keep magnitude arithmetic unsigned, then preserve the resulting bits.
 		'' In particular, ABS of the signed minimum retains that minimum value.
 		hWriteLine(unsignedtype + " bits = (" + unsignedtype + ")value;", TRUE)
-		hWriteLine("if (value < 0) bits = (" + unsignedtype + ")(" + zero + " - bits);", TRUE)
 		hWriteLine(typename + " result;", TRUE)
+		hWriteLine("if (value < 0) bits = (" + unsignedtype + ")(" + zero + " - bits);", TRUE)
 		hWriteLine("__builtin_memcpy(&result, &bits, sizeof(result));", TRUE)
 		hWriteLine("return result;", TRUE)
 	elseif( size >= 4 ) then

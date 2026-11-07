@@ -88,8 +88,8 @@
 
 #if !defined(FB_NUTTX_HAS_FULL_RT_CONTEXT) || \
     (FB_NUTTX_HAS_FULL_RT_CONTEXT == 0)
-FB_RTLIB_CTX __fb_ctx FB_NUTTX_WEAK;
-char __fb_errmsg[FB_ERRMSG_SIZE] FB_NUTTX_WEAK;
+FB_RTLIB_CTX fb_ctx FB_NUTTX_WEAK;
+char fb_errmsg[FB_ERRMSG_SIZE] FB_NUTTX_WEAK;
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -160,15 +160,15 @@ static uint32_t fb_nuttx_random_state = 327680;
 static int32 fb_nuttx_random_is_qb = 1;
 static int32 fb_nuttx_error_num;
 static const FB_NUTTX_DATA_DESC *fb_nuttx_data_cursor;
-static const FBSTRING *fb_nuttx_print_using_format;
+static const FBSTRING_ACCESS *fb_nuttx_print_using_format;
 static int fb_nuttx_argc;
 static char **fb_nuttx_argv;
 static int32 fb_nuttx_cursor_row = 1;
 static int32 fb_nuttx_cursor_column = 1;
 
-FBSTRING *fb_StrAssign(void *dst_void, const int32 dst_len, const void *src,
+FBSTRING_ACCESS *fb_StrAssign(void *dst_void, const int32 dst_len, const void *src,
     const int32 src_len, const int32 fill_rem);
-void fb_StrDelete(const FBSTRING *s);
+void fb_StrDelete(const FBSTRING_ACCESS *s);
 
 static int32 fb_nuttx_source_length(const void *src, const int32 src_len);
 static const char *fb_nuttx_source_data(const void *src, const int32 src_len);
@@ -201,9 +201,9 @@ static int32 fb_nuttx_decode_fixed_length(const int32 len)
     return (int32)((uint32_t)len & FB_NUTTX_FIXEDLEN_MASK);
 }
 
-static FBSTRING *fb_nuttx_temp_string(const char *text, const int32 len)
+static FBSTRING_ACCESS *fb_nuttx_temp_string(const char *text, const int32 len)
 {
-    FBSTRING *desc;
+    FBSTRING_ACCESS *desc;
 
     desc = &fb_nuttx_temp_desc[fb_nuttx_next_temp_desc];
 
@@ -223,12 +223,12 @@ static FBSTRING *fb_nuttx_temp_string(const char *text, const int32 len)
     return desc;
 }
 
-FBSTRING *fb_StrAllocTempDescZEx(const char *text, const int32 len)
+FBSTRING_ACCESS *fb_StrAllocTempDescZEx(const char *text, const int32 len)
 {
     return fb_nuttx_temp_string(text, fb_nuttx_string_length(text, len));
 }
 
-FBSTRING *fb_StrAllocTempDescF(const void *text, const int32 len)
+FBSTRING_ACCESS *fb_StrAllocTempDescF(const void *text, const int32 len)
 {
     if ((text == NULL) || !fb_nuttx_is_fixed_length(len))
         return fb_nuttx_temp_string("", 0);
@@ -277,7 +277,7 @@ static int32 fb_nuttx_file_seek_position(FILE *stream, const int32 file_num,
     return 0;
 }
 
-static char *fb_nuttx_string_to_cstr(const FBSTRING *s)
+static char *fb_nuttx_string_to_cstr(const FBSTRING_ACCESS *s)
 {
     char *text;
 
@@ -326,7 +326,7 @@ void fb_nuttx_report_status(const int32 status)
 #if FB_NUTTX_HAVE_TCP
 #include "fb_nuttx_tcp.c"
 #else
-int32 fb_FileOpenTcpServer(const FBSTRING *text, const uint32 mode,
+int32 fb_FileOpenTcpServer(const FBSTRING_ACCESS *text, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 len, const char *encoding)
 {
@@ -341,7 +341,7 @@ int32 fb_FileOpenTcpServer(const FBSTRING *text, const uint32 mode,
     return -1;
 }
 
-int32 fb_FileOpenTcp(const FBSTRING *text, const uint32 mode,
+int32 fb_FileOpenTcp(const FBSTRING_ACCESS *text, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 len, const char *encoding)
 {

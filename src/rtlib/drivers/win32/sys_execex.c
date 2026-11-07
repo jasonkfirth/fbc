@@ -9,7 +9,7 @@
 #include "fb_private_console.h"
 #include <process.h>
 
-FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
+FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork )
 {
     char buffer[MAX_PATH+1], *arguments;
     int	res = 0, got_program;

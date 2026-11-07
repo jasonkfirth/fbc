@@ -32,6 +32,7 @@
 */
 
 #include "fb.h"
+#include "str_size.h"
 
 FBCALL void *fb_StrConcatByref
 	(
@@ -52,7 +53,7 @@ FBCALL void *fb_StrConcatByref
 	if( dst == NULL )
 	{
 		if( src_size == FB_STRSIZEVARLEN )
-			fb_hStrDelTemp( (FBSTRING *)src );
+			fb_hStrDelTemp( (FBSTRING_ACCESS *)src );
 
 		return dst;
 	}
@@ -66,26 +67,28 @@ FBCALL void *fb_StrConcatByref
 	/* Are dst & src same same data? */
 	if( dst == src || dst_ptr == src_ptr )
 	{
-		FBSTRING *str = dst;
+		FBSTRING_ACCESS *str = dst;
 		ssize_t old_dst_len = dst_len;
 		ssize_t old_src_len = src_len;
+		ssize_t total;
 
 		FB_STRLOCK();
 		
-		if( fb_hStrRealloc( str, old_dst_len + old_src_len, FB_TRUE ) )
+		if( fb_hStrAddSize( old_dst_len, old_src_len, &total ) &&
+		    fb_hStrRealloc( str, total, FB_TRUE ) != NULL )
 		{
 			/* copy start of dst to second half */
 			if( old_src_len > 0 )
-				FB_MEMCPYX( str->data + old_dst_len, str->data, old_src_len );
+				FB_MEMCPYX( str->data + old_dst_len, str->data, (size_t)old_src_len );
 
-			str->data[old_dst_len + old_src_len] = '\0';
+			str->data[total] = '\0';
 		}
 
 		/* delete temps? */
 		if( dst_size == FB_STRSIZEVARLEN )
-			fb_hStrDelTemp_NoLock( (FBSTRING *)dst );
+			fb_hStrDelTemp_NoLock( (FBSTRING_ACCESS *)dst );
 		if( src_size == FB_STRSIZEVARLEN )
-			fb_hStrDelTemp_NoLock( (FBSTRING *)src );
+			fb_hStrDelTemp_NoLock( (FBSTRING_ACCESS *)src );
 
 		FB_STRUNLOCK();
 

@@ -22,18 +22,18 @@
 
 #include "../../fb.h"
 
-static FBSTRING *fb_hWinceLongintResult( void )
+static FBSTRING_ACCESS *fb_hWinceLongintResult( void )
 {
 	return fb_hStrAllocTemp( NULL, sizeof( unsigned long long ) * 3 );
 }
 
-FBCALL FBSTRING *fb_LongintToStr( long long num )
+FBCALL FBSTRING_ACCESS *fb_LongintToStr( long long num )
 {
-	FBSTRING *destination = fb_hWinceLongintResult();
+	FBSTRING_ACCESS *destination = fb_hWinceLongintResult();
 	int written;
 
 	if( destination == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	written = snprintf(
 		destination->data,
@@ -42,20 +42,20 @@ FBCALL FBSTRING *fb_LongintToStr( long long num )
 		num );
 	if( written < 0 || written > destination->size ) {
 		fb_hStrDelTemp( destination );
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
 	fb_hStrSetLength( destination, (size_t)written );
 	return destination;
 }
 
-FBCALL FBSTRING *fb_ULongintToStr( unsigned long long num )
+FBCALL FBSTRING_ACCESS *fb_ULongintToStr( unsigned long long num )
 {
-	FBSTRING *destination = fb_hWinceLongintResult();
+	FBSTRING_ACCESS *destination = fb_hWinceLongintResult();
 	int written;
 
 	if( destination == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	written = snprintf(
 		destination->data,
@@ -64,7 +64,7 @@ FBCALL FBSTRING *fb_ULongintToStr( unsigned long long num )
 		num );
 	if( written < 0 || written > destination->size ) {
 		fb_hStrDelTemp( destination );
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
 	fb_hStrSetLength( destination, (size_t)written );

@@ -12,6 +12,7 @@
 declare sub fbSemanticModelResetMacros( )
 '' Immutable numeric payload chains accompany canonical replacement text.
 '' They are observations only; none of these hooks changes the stored text.
+declare sub fbSemanticModelMacroArgumentCapture(byref head as integer, byval token as FBTOKEN ptr, byval offset as integer)
 declare sub fbSemanticModelMacroNumericCapture _
 	( byref head as integer, byval token as FBTOKEN ptr, byval offset as integer )
 declare sub fbSemanticModelMacroNumericTrim( byval head as integer, byval units as integer )

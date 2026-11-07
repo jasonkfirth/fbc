@@ -22,14 +22,14 @@
 
 #include "../../fb.h"
 
-FBCALL FBSTRING *fb_LongintToStrQB( long long num )
+FBCALL FBSTRING_ACCESS *fb_LongintToStrQB( long long num )
 {
-	FBSTRING *destination;
+	FBSTRING_ACCESS *destination;
 	int written;
 
 	destination = fb_hStrAllocTemp( NULL, sizeof( long long ) * 3 );
 	if( destination == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	written = snprintf(
 		destination->data,
@@ -38,21 +38,21 @@ FBCALL FBSTRING *fb_LongintToStrQB( long long num )
 		num );
 	if( written < 0 || written > destination->size ) {
 		fb_hStrDelTemp( destination );
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
 	fb_hStrSetLength( destination, (size_t)written );
 	return destination;
 }
 
-FBCALL FBSTRING *fb_ULongintToStrQB( unsigned long long num )
+FBCALL FBSTRING_ACCESS *fb_ULongintToStrQB( unsigned long long num )
 {
-	FBSTRING *destination;
+	FBSTRING_ACCESS *destination;
 	int written;
 
 	destination = fb_hStrAllocTemp( NULL, sizeof( unsigned long long ) * 3 );
 	if( destination == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	written = snprintf(
 		destination->data,
@@ -61,7 +61,7 @@ FBCALL FBSTRING *fb_ULongintToStrQB( unsigned long long num )
 		num );
 	if( written < 0 || written > destination->size ) {
 		fb_hStrDelTemp( destination );
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
 	fb_hStrSetLength( destination, (size_t)written );

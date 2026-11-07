@@ -12,8 +12,8 @@ FBCALL void fb_GetSize( int *cols, int *rows )
 {
 	FB_LOCK();
 
-	if( __fb_ctx.hooks.getsizeproc )
-		__fb_ctx.hooks.getsizeproc( cols, rows );
+	if( fb_ctx.hooks.getsizeproc )
+		fb_ctx.hooks.getsizeproc( cols, rows );
 	else
 		fb_ConsoleGetSize( cols, rows );
 

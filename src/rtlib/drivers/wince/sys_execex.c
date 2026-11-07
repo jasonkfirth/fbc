@@ -23,7 +23,7 @@
 
 #include <windows.h>
 
-FBCALL int fb_ExecEx( FBSTRING *program, FBSTRING *args, int do_fork )
+FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork )
 {
 	STARTUPINFOW startup_info;
 	PROCESS_INFORMATION process_info;

@@ -198,7 +198,8 @@ endif
 # runs first; native unwind metadata is still required for the machine jump.
 RTLIB_ERROR_CFLAGS := $(RTLIB_GOSUB_CFLAGS)
 ifneq ($(RTLIB_ERROR_CFLAGS),)
-RTLIB_ERROR_UNWIND_OBJ := $(foreach directory,$(libfbobjdir) $(libfbpicobjdir) $(libfbmtobjdir) $(libfbmtpicobjdir),$(directory)/errors/error.o $(directory)/errors/error_frame.o)
+# Preserve the policy for generic objects and the selected Win64 overrides.
+RTLIB_ERROR_UNWIND_OBJ := $(foreach directory,$(libfbobjdir) $(libfbpicobjdir) $(libfbmtobjdir) $(libfbmtpicobjdir),$(directory)/errors/error.o $(directory)/errors/error_frame.o $(directory)/drivers/win32/x86_64/error.o $(directory)/drivers/win32/x86_64/error_frame.o)
 $(sort $(RTLIB_ERROR_UNWIND_OBJ)): override ALLCFLAGS += $(RTLIB_ERROR_CFLAGS)
 endif
 
@@ -477,6 +478,22 @@ $(libfbgfx3mtobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtob
 $(libfbgfx3mtpicobjdir)/%.o: $(srcdir)/gfxlib3/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtpicobjdir)
 	@mkdir -p "$(dir $@)"
 	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(GFX3_LINUX_DRM_CFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3objdir)/shared/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX3_H) | $(libfbgfx3objdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3picobjdir)/shared/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX3_H) | $(libfbgfx3picobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(PIC_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3mtobjdir)/shared/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MT_CFLAGS) -MMD -MP -c $< -o $@
+
+$(libfbgfx3mtpicobjdir)/shared/%.o: $(srcdir)/gfxlib2/%.c $(LIBFBGFX3_H) | $(libfbgfx3mtpicobjdir)
+	@mkdir -p "$(dir $@)"
+	$(RUN_CC) $(CPPFLAGS) $(ALLCFLAGS) $(MTPIC_CFLAGS) -MMD -MP -c $< -o $@
 
 ##############################################################################
 # sfxlib (C sources)

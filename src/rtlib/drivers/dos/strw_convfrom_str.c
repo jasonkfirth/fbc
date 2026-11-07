@@ -23,7 +23,7 @@
 ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 {
 	if (src == NULL) {
-		*dst = _LC('\0');
+		*dst = FB_WCHAR_LITERAL('\0');
 		return 0;
 	}
 

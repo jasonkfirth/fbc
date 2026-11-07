@@ -20,10 +20,10 @@
         - serial driver implementations
 */
 
-#ifndef __FB_SERIAL_H__
-#define __FB_SERIAL_H__
+#ifndef FB_RTLIB_SERIAL_H
+#define FB_RTLIB_SERIAL_H
 
-typedef enum _FB_SERIAL_PARITY {
+typedef enum FB_SERIAL_PARITY_ {
     FB_SERIAL_PARITY_NONE,
     FB_SERIAL_PARITY_EVEN,
     FB_SERIAL_PARITY_ODD,
@@ -31,13 +31,13 @@ typedef enum _FB_SERIAL_PARITY {
     FB_SERIAL_PARITY_MARK
 } FB_SERIAL_PARITY;
 
-typedef enum _FB_SERIAL_STOP_BITS {
+typedef enum FB_SERIAL_STOP_BITS_ {
     FB_SERIAL_STOP_BITS_1,
     FB_SERIAL_STOP_BITS_1_5,
 	FB_SERIAL_STOP_BITS_2
 } FB_SERIAL_STOP_BITS;
 
-typedef struct _FB_SERIAL_OPTIONS {
+typedef struct FB_SERIAL_OPTIONS_ {
 	unsigned           uiSpeed;
     unsigned           uiDataBits;
     FB_SERIAL_PARITY   Parity;
@@ -86,7 +86,7 @@ typedef struct _FB_SERIAL_OPTIONS {
 #define FB_COM_PURGE_RX 0x00000001u
 #define FB_COM_PURGE_TX 0x00000002u
 
-typedef struct _FB_COM_STATUS {
+typedef struct FB_COM_STATUS_ {
 	unsigned int capabilities;
 	unsigned int lines;
 	unsigned int errors;

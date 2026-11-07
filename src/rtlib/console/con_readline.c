@@ -49,7 +49,7 @@ static void DoMove
     }
 }
 
-FBCALL FBSTRING *fb_ConReadLine( int soft_cursor )
+FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 {
 	FBSTRING result = { 0, 0, 0 };
 
@@ -73,7 +73,7 @@ FBCALL FBSTRING *fb_ConReadLine( int soft_cursor )
 
 	do {
 		size_t delete_char_count = 0, add_char = FALSE;
-		FBSTRING *s;
+		FBSTRING_ACCESS *s;
 
 		fb_GetXY( &current_x, &current_y );
 
@@ -192,9 +192,9 @@ FBCALL FBSTRING *fb_ConReadLine( int soft_cursor )
 		}
 
         if( delete_char_count ) {
-            FBSTRING *str_fill;
-            FBSTRING *str_left = fb_StrMid( &result, 1, pos );
-            FBSTRING *str_right = fb_StrMid( &result,
+            FBSTRING_ACCESS *str_fill;
+            FBSTRING_ACCESS *str_left = fb_StrMid( &result, 1, pos );
+            FBSTRING_ACCESS *str_right = fb_StrMid( &result,
                                              pos + 1 + delete_char_count,
                                              len - pos - delete_char_count);
             fb_StrAssign( &result, -1, str_left, -1, FALSE );
@@ -217,9 +217,9 @@ FBCALL FBSTRING *fb_ConReadLine( int soft_cursor )
 
         if( add_char ) {
             int old_x = current_x, old_y = current_y;
-            FBSTRING *str_add;
-            FBSTRING *str_left = fb_StrMid( &result, 1, pos );
-            FBSTRING *str_right = fb_StrMid( &result, pos + 1, len - pos);
+            FBSTRING_ACCESS *str_add;
+            FBSTRING_ACCESS *str_left = fb_StrMid( &result, 1, pos );
+            FBSTRING_ACCESS *str_right = fb_StrMid( &result, pos + 1, len - pos);
             tmp_buffer[tmp_buffer_len] = 0;
             str_add = fb_StrAllocTempDescF( tmp_buffer, tmp_buffer_len + 1 );
             fb_StrAssign( &result, -1, str_left, -1, FALSE );

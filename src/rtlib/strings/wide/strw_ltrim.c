@@ -17,7 +17,7 @@ FBCALL FB_WCHAR *fb_WstrLTrim ( const FB_WCHAR *src )
 		return NULL;
 
 	len = fb_wstr_Len( src );
-	p = fb_wstr_SkipChar( src, len, _LC(' ') );
+	p = fb_wstr_SkipChar( src, len, FB_WCHAR_LITERAL(' ') );
 
 	len -= fb_wstr_CalcDiff( src, p );
 	if( len <= 0 )

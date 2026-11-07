@@ -9,7 +9,7 @@
 #include "fb_private_console.h"
 #include <dlfcn.h>
 
-FBCALL void *fb_DylibLoad( FBSTRING *library )
+FBCALL void *fb_DylibLoad( FBSTRING_ACCESS *library )
 {
 	typedef struct {
 		const char *prefix;
@@ -71,7 +71,7 @@ FBCALL void *fb_DylibLoad( FBSTRING *library )
 	return res;
 }
 
-FBCALL void *fb_DylibSymbol( void *library, FBSTRING *symbol )
+FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 {
 	void *proc = NULL;
 

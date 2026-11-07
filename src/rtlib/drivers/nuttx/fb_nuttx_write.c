@@ -56,7 +56,7 @@ void fb_WriteVoid(const int32 file_num, const int32 mask)
     fflush(stream);
 }
 
-void fb_WriteString(const int32 file_num, const FBSTRING *s,
+void fb_WriteString(const int32 file_num, const FBSTRING_ACCESS *s,
     const int32 terminator)
 {
     FILE *stream;

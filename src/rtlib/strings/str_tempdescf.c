@@ -7,9 +7,9 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_StrAllocTempDescF( const char *str, ssize_t str_size )
+FBCALL FBSTRING_ACCESS *fb_StrAllocTempDescF( const char *str, ssize_t str_size )
 {
-	FBSTRING *dsc;
+	FBSTRING_ACCESS *dsc;
 
 	FB_STRLOCK();
 
@@ -19,7 +19,7 @@ FBCALL FBSTRING *fb_StrAllocTempDescF( const char *str, ssize_t str_size )
 	FB_STRUNLOCK();
 
     if( dsc == NULL )
-        return &__fb_ctx.null_desc;
+        return &fb_ctx.null_desc;
 
     dsc->data = (char *)str;
 

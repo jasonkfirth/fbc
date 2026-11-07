@@ -7,7 +7,7 @@
  */
 #include "../../fb.h"
 
-FBCALL int fb_MkDir( FBSTRING *path )
+FBCALL int fb_MkDir( FBSTRING_ACCESS *path )
 {
 	int res;
 

@@ -26,10 +26,10 @@
 /* Localized weekday-name retrieval                                           */
 /* ------------------------------------------------------------------------- */
 
-FBSTRING *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
 {
     LCTYPE locale_type;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
     char *name;
     size_t name_length;
 

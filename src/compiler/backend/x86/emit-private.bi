@@ -131,6 +131,20 @@ declare sub hMOV _
 		byval sname as const zstring ptr _
 	)
 
+'' SSE byte conversions use the original x87 handlers. Their identity
+'' does not depend on the currently installed opcode table.
+declare sub emitX86LoadB2F _
+	( _
+		byval dvreg as IRVREG ptr, _
+		byval svreg as IRVREG ptr _
+	)
+
+declare sub emitX86LoadF2B _
+	( _
+		byval dvreg as IRVREG ptr, _
+		byval svreg as IRVREG ptr _
+	)
+
 declare function _init_opFnTB_SSE _
 	( _
 		byval _opFnTB_SSE as EMIT_OPCB ptr _

@@ -44,7 +44,7 @@ FBCALL FB_WCHAR *fb_WstrUcase2( const FB_WCHAR *src, int mode )
 	}
 
 	/* null char */
-	*d = _LC('\0');
+	*d = FB_WCHAR_LITERAL('\0');
 
 	return dst;
 }

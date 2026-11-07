@@ -32,7 +32,7 @@
 #include <dos/dosextens.h>
 #include <proto/exec.h>
 
-FB_RTLIB_CTX __fb_ctx;
+FB_RTLIB_CTX fb_ctx;
 static int __fb_is_inicnt = 0;
 static APTR previous_requester_window;
 void fb_hAmigaInitAllocator(void);
@@ -62,7 +62,7 @@ void fb_hRtInit(void)
     previous_requester_window = process->pr_WindowPtr;
     process->pr_WindowPtr = (APTR)-1;
 
-    memset(&__fb_ctx, 0, sizeof(FB_RTLIB_CTX));
+    memset(&fb_ctx, 0, sizeof(FB_RTLIB_CTX));
     fb_hInit();
     fb_hAmigaDebug("hinit returned");
 
@@ -82,10 +82,10 @@ void fb_hRtExit(void)
     /* A BASIC destructor may use sound or graphics after fb_End() closed
        the original context. Stop any new service tasks before the final
        join, otherwise an idle sound worker can keep the command alive. */
-    if (__fb_ctx.exit_sfxlib != NULL)
-        __fb_ctx.exit_sfxlib();
-    if (__fb_ctx.exit_gfxlib2 != NULL)
-        __fb_ctx.exit_gfxlib2();
+    if (fb_ctx.exit_sfxlib != NULL)
+        fb_ctx.exit_sfxlib();
+    if (fb_ctx.exit_gfxlib2 != NULL)
+        fb_ctx.exit_gfxlib2();
 
     /* BASIC global destructors have now had the opportunity to signal and
        join their workers. Quiesce remaining tasks before releasing files,
@@ -104,8 +104,8 @@ void fb_hRtExit(void)
     fb_TlsExit();
 #endif
 
-    if (__fb_ctx.errmsg != NULL)
-        fputs(__fb_ctx.errmsg, stderr);
+    if (fb_ctx.errmsg != NULL)
+        fputs(fb_ctx.errmsg, stderr);
     ((struct Process *)FindTask(NULL))->pr_WindowPtr = previous_requester_window;
 }
 
@@ -116,18 +116,18 @@ void fb_hRtExit(void)
 FBCALL void fb_Init(int argc, char **argv, int lang)
 {
     fb_hAmigaDebug("fb_Init");
-    __fb_ctx.argc = argc;
-    __fb_ctx.argv = argv;
-    __fb_ctx.lang = lang;
+    fb_ctx.argc = argc;
+    fb_ctx.argv = argv;
+    fb_ctx.lang = lang;
 }
 
 FBCALL void fb_End(int errlevel)
 {
     fb_hAmigaDebug("fb_End");
-    if (__fb_ctx.exit_sfxlib != NULL)
-        __fb_ctx.exit_sfxlib();
-    if (__fb_ctx.exit_gfxlib2 != NULL)
-        __fb_ctx.exit_gfxlib2();
+    if (fb_ctx.exit_sfxlib != NULL)
+        fb_ctx.exit_sfxlib();
+    if (fb_ctx.exit_gfxlib2 != NULL)
+        fb_ctx.exit_gfxlib2();
 
     exit(errlevel);
 }

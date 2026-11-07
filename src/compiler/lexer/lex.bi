@@ -403,7 +403,12 @@ declare function hMatch _
 
 #define lexGetType( ) (lex.ctx->head->dtype)
 
-#define lexGetSymChain( ) (lex.ctx->head->sym_chain)
+declare function fbSemanticModelNamespaceLookupApplied _
+	( byval chain_ as FBSYMCHAIN ptr, byref kind as const string ) as FBSYMCHAIN ptr
+
+'' Observe parser requests, not the lexer lookahead that populated this cache.
+'' The observer returns this exact chain without allocating native chain slots.
+#define lexGetSymChain( ) (fbSemanticModelNamespaceLookupApplied(lex.ctx->head->sym_chain, "parser-token"))
 
 #define lexGetPeriodPos( ) (lex.ctx->head->prdpos)
 

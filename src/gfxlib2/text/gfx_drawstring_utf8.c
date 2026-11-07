@@ -12,9 +12,9 @@
 
 #include "../fb_gfx.h"
 
-static FBSTRING *hGlyphs( FBSTRING *text )
+static FBSTRING_ACCESS *hGlyphs( FBSTRING_ACCESS *text )
 {
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	ssize_t offset = 0, written = 0, length = text && text->data ? FB_STRSIZE(text) : 0;
 	ssize_t count = fb_hUtf8Count(text ? text->data : NULL, length);
 	unsigned int scalar;
@@ -28,18 +28,18 @@ static FBSTRING *hGlyphs( FBSTRING *text )
 	}
 	fb_hStrDelTemp_NoLock(text);
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
 FBCALL int fb_GfxDrawStringUstr( void *target, float x, float y, int flags,
-	FBSTRING *text, unsigned int color, void *font, int mode,
+	FBSTRING_ACCESS *text, unsigned int color, void *font, int mode,
 	PUTTER *putter, BLENDER *blender, void *parameter )
 {
 	return fb_GfxDrawString(target, x, y, flags, hGlyphs(text), color,
 		font, mode, putter, blender, parameter);
 }
 
-FBCALL int fb_GfxDrawStringSizeUstr( FBSTRING *text, int *width, int *height, void *font )
+FBCALL int fb_GfxDrawStringSizeUstr( FBSTRING_ACCESS *text, int *width, int *height, void *font )
 {
 	return fb_GfxDrawStringSize(hGlyphs(text), width, height, font);
 }

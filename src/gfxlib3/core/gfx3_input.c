@@ -75,6 +75,7 @@ int fb_gfx3_input_init(FB_GFX3_INPUT_STATE *input, uint32_t width,
 	input->mouse_x = -1;
 	input->mouse_y = -1;
 	input->cursor_visible = TRUE;
+	input->keyboard_visible = -2;
 	input->initialized = TRUE;
 	return FB_GFX3_OK;
 }
@@ -475,6 +476,150 @@ void fb_gfx3_input_platform_character(FB_GFX3_INPUT_STATE *input, int key,
 		}
 	}
 	fb_MutexUnlock(input->mutex);
+}
+
+/*
+	A committed IME character is not a physical key transition. Publish
+	paired events for applications using SCREENEVENT and, where representable,
+	a byte for legacy INKEY. Larger Unicode values must not enter the key ring:
+	that API interprets values above 255 as extended keyboard codes.
+*/
+void fb_gfx3_input_platform_text(FB_GFX3_INPUT_STATE *input, uint32_t codepoint)
+{
+	EVENT event;
+	int key;
+
+	if ((input == NULL) || (input->mutex == NULL) || (codepoint == 0u) ||
+	    (codepoint > 0x10FFFFu) ||
+	    ((codepoint >= 0xD800u) && (codepoint <= 0xDFFFu)))
+		return;
+	key = (codepoint == '\n') ? '\r' : (int)codepoint;
+	fb_MutexLock(input->mutex);
+	if (input->initialized) {
+		if (key <= 0xFF)
+			input_post_key_locked(input, key);
+		memset(&event, 0, sizeof(event));
+		event.type = EVENT_KEY_PRESS;
+		event.ascii = key;
+		if (key == '\r')
+			event.scancode = SC_ENTER;
+		else if (key == '\b')
+			event.scancode = SC_BACKSPACE;
+		else if (key == '\t')
+			event.scancode = SC_TAB;
+		else if (key == 27)
+			event.scancode = SC_ESCAPE;
+		input_post_event_locked(input, &event);
+		event.type = EVENT_KEY_RELEASE;
+		input_post_event_locked(input, &event);
+	}
+	fb_MutexUnlock(input->mutex);
+}
+
+int fb_gfx3_input_request_soft_keyboard(FB_GFX3_INPUT_STATE *input,
+	int visible)
+{
+	if ((input == NULL) || (input->mutex == NULL))
+		return -1;
+	fb_MutexLock(input->mutex);
+	if (!input->initialized) {
+		fb_MutexUnlock(input->mutex);
+		return -1;
+	}
+	input->keyboard_requested = (visible != 0);
+	input->keyboard_request_pending = TRUE;
+	fb_MutexUnlock(input->mutex);
+	return 0;
+}
+
+int fb_gfx3_input_take_soft_keyboard_request(FB_GFX3_INPUT_STATE *input,
+	int *visible)
+{
+	if ((input == NULL) || (input->mutex == NULL) || (visible == NULL))
+		return -1;
+	fb_MutexLock(input->mutex);
+	if (!input->initialized || !input->keyboard_request_pending) {
+		fb_MutexUnlock(input->mutex);
+		return 0;
+	}
+	*visible = input->keyboard_requested;
+	input->keyboard_request_pending = FALSE;
+	fb_MutexUnlock(input->mutex);
+	return 1;
+}
+
+int fb_gfx3_input_request_text_region(FB_GFX3_INPUT_STATE *input,
+	int x, int y, int width, int height)
+{
+	if ((input == NULL) || (input->mutex == NULL) || (x < 0) || (y < 0) ||
+	    (width < 1) || (height < 1))
+		return -1;
+	fb_MutexLock(input->mutex);
+	if (!input->initialized || (x > (int)input->width) ||
+	    (y > (int)input->height) ||
+	    (width > (int)input->width - x) ||
+	    (height > (int)input->height - y)) {
+		fb_MutexUnlock(input->mutex);
+		return -1;
+	}
+	input->text_region_x = x;
+	input->text_region_y = y;
+	input->text_region_width = width;
+	input->text_region_height = height;
+	input->text_region_pending = TRUE;
+	fb_MutexUnlock(input->mutex);
+	return 0;
+}
+
+int fb_gfx3_input_take_text_region(FB_GFX3_INPUT_STATE *input,
+	int *x, int *y, int *width, int *height)
+{
+	if ((input == NULL) || (input->mutex == NULL) || (x == NULL) ||
+	    (y == NULL) || (width == NULL) || (height == NULL))
+		return -1;
+	fb_MutexLock(input->mutex);
+	if (!input->initialized || !input->text_region_pending) {
+		fb_MutexUnlock(input->mutex);
+		return 0;
+	}
+	*x = input->text_region_x;
+	*y = input->text_region_y;
+	*width = input->text_region_width;
+	*height = input->text_region_height;
+	input->text_region_pending = FALSE;
+	fb_MutexUnlock(input->mutex);
+	return 1;
+}
+
+void fb_gfx3_input_platform_keyboard_state(FB_GFX3_INPUT_STATE *input,
+	int available, int visible)
+{
+	if ((input == NULL) || (input->mutex == NULL))
+		return;
+	fb_MutexLock(input->mutex);
+	if (input->initialized) {
+		input->keyboard_available = (available != 0);
+		input->keyboard_visible = available ? visible : -2;
+	}
+	fb_MutexUnlock(input->mutex);
+}
+
+int fb_gfx3_input_keyboard_state(FB_GFX3_INPUT_STATE *input,
+	int *available, int *visible)
+{
+	if ((input == NULL) || (input->mutex == NULL))
+		return -1;
+	fb_MutexLock(input->mutex);
+	if (!input->initialized) {
+		fb_MutexUnlock(input->mutex);
+		return -1;
+	}
+	if (available != NULL)
+		*available = input->keyboard_available;
+	if (visible != NULL)
+		*visible = input->keyboard_visible;
+	fb_MutexUnlock(input->mutex);
+	return 0;
 }
 
 void fb_gfx3_input_platform_close(FB_GFX3_INPUT_STATE *input)

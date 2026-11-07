@@ -41,7 +41,7 @@ static char *quote_argument(char *destination, const char *text)
     return destination;
 }
 
-FBCALL int fb_ExecEx(FBSTRING *program, FBSTRING *arguments, int do_fork)
+FBCALL int fb_ExecEx(FBSTRING_ACCESS *program, FBSTRING_ACCESS *arguments, int do_fork)
 {
     char *parsed = NULL, *command = NULL, *cursor, *destination;
     ssize_t program_length = program != NULL ? FB_STRSIZE(program) : 0;

@@ -7,14 +7,14 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_LTRIM( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_LTRIM( FBSTRING_ACCESS *src )
 {
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 	ssize_t len;
 	char *src_ptr = NULL;
 
 	if( src == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	FB_STRLOCK();
 
@@ -36,10 +36,10 @@ FBCALL FBSTRING *fb_LTRIM( FBSTRING *src )
 			fb_hStrCopy( dst->data, src_ptr, len );
 		}
 		else
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
     }
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	/* del if temp */
 	fb_hStrDelTemp_NoLock( src );

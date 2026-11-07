@@ -136,7 +136,13 @@ function cParentExpression _
 
 	'' ')'
 	if( lexGetToken( ) = CHAR_RPRNT ) then
-		dim as longint operands = fbSemanticModelCaptureOperands(parexpr, NULL, "group", -1, semantic_site)
+		'' These saved outer-parser constraints explain why some otherwise
+		'' value-neutral parentheses are required by this grammar context.
+		'' Bits: equality-only-in-parens 1, greater-than 2, indexing 4,
+		'' optional call parentheses 8. The restored options stay unchanged.
+		dim as integer group_context = iif(eqinparensonly, 1, 0) or _
+			iif(gtinparensonly, 2, 0) or iif(idxinparensonly, 4, 0) or iif(is_opt, 8, 0)
+		dim as longint operands = fbSemanticModelCaptureOperands(parexpr, NULL, "group", group_context, semantic_site)
 		lexSkipToken( )
 		fbSemanticModelAttachOperands(parexpr, operands)
 		'' --parent cnt

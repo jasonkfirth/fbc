@@ -12,7 +12,7 @@
 
 #include "fb.h"
 
-FBCALL int fb_ArrayEraseObj( FBARRAY *array, FB_DEFCTOR ctor, FB_DEFCTOR dtor )
+FBCALL int fb_ArrayEraseObj( FBARRAY_ACCESS *array, FB_DEFCTOR ctor, FB_DEFCTOR dtor )
 {
 	if( array->flags & FBARRAY_FLAGS_FIXED_LEN ) {
 		fb_ArrayClearObj( array, ctor, dtor );

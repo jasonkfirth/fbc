@@ -95,7 +95,7 @@ def check_gosub(test):
         events = [row for row in state["events"] if row[1].startswith("gosub-")]
         test.assertTrue({"gosub-allocated", "gosub-direct", "gosub-computed", "gosub-return", "gosub-exit"} <= {row[1] for row in events})
         test.assertEqual({row[9] for row in events}, {events[0][9]})
-        test.assertEqual({row[10] for row in events}, {"setjmp"})
+        test.assertEqual({row[10] for row in events}, {"call-ret" if backend in ("gcc", "clang") else "setjmp"})
 
 
 def check_exclusions(test):

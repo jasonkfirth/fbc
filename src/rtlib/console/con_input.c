@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL int fb_ConsoleInput( FBSTRING *text, int addquestion, int addnewline )
+FBCALL int fb_ConsoleInput( FBSTRING_ACCESS *text, int addquestion, int addnewline )
 {
 	FB_INPUTCTX *ctx;
 	int res;

@@ -20,8 +20,8 @@
         - path conversion policy
 */
 
-#ifndef __FB_WINCE_UNICODE_H__
-#define __FB_WINCE_UNICODE_H__
+#ifndef FB_RTLIB_WINCE_UNICODE_H
+#define FB_RTLIB_WINCE_UNICODE_H
 
 #include "../../fb_unicode.h"
 
@@ -46,14 +46,14 @@ static __inline__ int fb_wince_WstrFromUInt64( FB_WCHAR *buffer,
 	}
 
 	do {
-		reversed[digits++] = (FB_WCHAR)(_LC('0') + (value % radix));
+		reversed[digits++] = (FB_WCHAR)(FB_WCHAR_LITERAL('0') + (value % radix));
 		value /= radix;
 	} while( (value != 0) && (digits < sizeof( reversed ) / sizeof( reversed[0] )) );
 
 	while( (digits > 0) && (output + 1 < buffer_chars) ) {
 		buffer[output++] = reversed[--digits];
 	}
-	buffer[output] = _LC('\0');
+	buffer[output] = FB_WCHAR_LITERAL('\0');
 
 	return (digits == 0) ? (int)output : -1;
 }
@@ -73,7 +73,7 @@ static __inline__ int fb_wince_WstrFromInt64( FB_WCHAR *buffer,
 		return -1;
 	}
 
-	buffer[0] = _LC('-');
+	buffer[0] = FB_WCHAR_LITERAL('-');
 	magnitude = (unsigned long long)(-(value + 1));
 	magnitude += 1;
 	result = fb_wince_WstrFromUInt64( buffer + 1, buffer_chars - 1,

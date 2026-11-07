@@ -37,11 +37,11 @@ char *fb_hGetExeName( char *dst, ssize_t maxlen )
 
 	dst[0] = '\0';
 
-	if( (__fb_ctx.argc <= 0) || (__fb_ctx.argv == NULL) ||
-	    (__fb_ctx.argv[0] == NULL) )
+	if( (fb_ctx.argc <= 0) || (fb_ctx.argv == NULL) ||
+	    (fb_ctx.argv[0] == NULL) )
 		return NULL;
 
-	name = __fb_ctx.argv[0];
+	name = fb_ctx.argv[0];
 	slash = strrchr( name, '/' );
 	if( slash != NULL )
 		name = slash + 1;

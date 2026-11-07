@@ -12,8 +12,8 @@ FBCALL void fb_GetXY( int *col, int *row )
 {
 	FB_LOCK();
 
-	if( __fb_ctx.hooks.getxyproc )
-		__fb_ctx.hooks.getxyproc( col, row );
+	if( fb_ctx.hooks.getxyproc )
+		fb_ctx.hooks.getxyproc( col, row );
 	else
 		fb_ConsoleGetXY( col, row );
 

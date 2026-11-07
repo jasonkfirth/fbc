@@ -32,6 +32,19 @@
 #include once "tooling/semantic-object-operations.bi"
 #include once "tooling/semantic-recovery.bi"
 
+declare sub fbSemanticModelPushExpressionRange _
+	( _
+		byref source_start as LEX_LOCATION, _
+		byval nonphysical_tokens_at_start as longint, _
+		byref previous_start as LEX_LOCATION, _
+		byref previous_nonphysical_tokens as longint _
+	)
+declare sub fbSemanticModelPopExpressionRange _
+	( _
+		byref previous_start as LEX_LOCATION, _
+		byval previous_nonphysical_tokens as longint _
+	)
+
 declare sub fbSemanticModelExportImplicitCall _
 	( _
 		byval owner as FBSYMBOL ptr, _
@@ -495,6 +508,7 @@ private function hProcSymbol _
 
 	function = FALSE
 	dim as LEX_LOCATION semantic_site = lexGetCurrentLocation( )
+	dim as longint semantic_nonphysical = lexGetNonphysicalTokenCount( )
 
 	if( cCompStmtIsAllowed( FB_CMPSTMT_MASK_CODE ) = FALSE ) then
 		hSkipStmt( )
@@ -525,7 +539,15 @@ private function hProcSymbol _
 	'' ID ProcParamList?
 	if( do_call ) then
 		dim as ASTNODE ptr expr = any
+		dim as LEX_LOCATION previous_source_start
+		dim as longint previous_nonphysical_tokens
+		'' A statement call has no enclosing expression parser. Keep its
+		'' source start while parsing the call so its prefix and arguments
+		'' can be recorded without claiming that inputs are missing.
+		fbSemanticModelPushExpressionRange(semantic_site, semantic_nonphysical, _
+			previous_source_start, previous_nonphysical_tokens)
 		expr = cProcCall( base_parent, sym, NULL, NULL, FALSE, options, @semantic_site )
+		fbSemanticModelPopExpressionRange(previous_source_start, previous_nonphysical_tokens)
 
 		'' assignment of a function deref?
 		if( expr <> NULL ) then

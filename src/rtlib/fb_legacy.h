@@ -5,8 +5,8 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
-FBCALL FBSTRING    *fb_LCASE            ( FBSTRING *src );
-FBCALL FBSTRING    *fb_UCASE            ( FBSTRING *src );
+FBCALL FBSTRING_ACCESS    *fb_LCASE            ( FBSTRING_ACCESS *src );
+FBCALL FBSTRING_ACCESS    *fb_UCASE            ( FBSTRING_ACCESS *src );
 
 FBCALL FB_WCHAR    *fb_WstrLcase        ( const FB_WCHAR *src );
 FBCALL FB_WCHAR    *fb_WstrUcase        ( const FB_WCHAR *src );

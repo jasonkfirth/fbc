@@ -21,7 +21,7 @@
 
 #include "../../fb.h"
 
-FBCALL int fb_ExecEx(FBSTRING *program, FBSTRING *args, int do_fork)
+FBCALL int fb_ExecEx(FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork)
 {
 	(void)do_fork;
 

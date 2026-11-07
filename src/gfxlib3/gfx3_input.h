@@ -31,7 +31,7 @@
 
 #define FB_GFX3_INPUT_KEY_COUNT 128u
 /* Mobile IMEs can commit a complete word between two BASIC input polls. */
-#if defined(HOST_ANDROID) || defined(HOST_JS)
+#if defined(HOST_ANDROID) || defined(HOST_JS) || defined(HOST_LINUX)
 #define FB_GFX3_INPUT_KEY_BUFFER_LENGTH 256u
 #else
 #define FB_GFX3_INPUT_KEY_BUFFER_LENGTH 16u
@@ -133,6 +133,15 @@ typedef struct FB_GFX3_INPUT_STATE {
 	int focused;
 	int native_touch;
 	int resizable;
+	int keyboard_request_pending;
+	int keyboard_requested;
+	int keyboard_available;
+	int keyboard_visible;
+	int text_region_pending;
+	int text_region_x;
+	int text_region_y;
+	int text_region_width;
+	int text_region_height;
 	int initialized;
 } FB_GFX3_INPUT_STATE;
 
@@ -169,10 +178,28 @@ void fb_gfx3_input_platform_key(FB_GFX3_INPUT_STATE *input, int type,
 	int scancode, int ascii);
 void fb_gfx3_input_platform_character(FB_GFX3_INPUT_STATE *input, int key,
 	uint32_t repeat_count);
+void fb_gfx3_input_platform_text(FB_GFX3_INPUT_STATE *input, uint32_t codepoint);
+int fb_gfx3_input_request_soft_keyboard(FB_GFX3_INPUT_STATE *input,
+	int visible);
+int fb_gfx3_input_take_soft_keyboard_request(FB_GFX3_INPUT_STATE *input,
+	int *visible);
+int fb_gfx3_input_request_text_region(FB_GFX3_INPUT_STATE *input,
+	int x, int y, int width, int height);
+int fb_gfx3_input_take_text_region(FB_GFX3_INPUT_STATE *input,
+	int *x, int *y, int *width, int *height);
+void fb_gfx3_input_platform_keyboard_state(FB_GFX3_INPUT_STATE *input,
+	int available, int visible);
+int fb_gfx3_input_keyboard_state(FB_GFX3_INPUT_STATE *input,
+	int *available, int *visible);
 void fb_gfx3_input_platform_close(FB_GFX3_INPUT_STATE *input);
 void fb_gfx3_input_set_resizable(FB_GFX3_INPUT_STATE *input, int enabled);
 void fb_gfx3_input_platform_resize(FB_GFX3_INPUT_STATE *input,
 	uint32_t width, uint32_t height);
+/*
+	Taking a resize snapshots the request without removing it. Completion
+	clears only the matching size, so a newer compositor configure survives
+	when it arrives while the framebuffer is being resized.
+*/
 int fb_gfx3_input_take_resize(FB_GFX3_INPUT_STATE *input,
 	uint32_t *width, uint32_t *height);
 void fb_gfx3_input_complete_resize(FB_GFX3_INPUT_STATE *input,

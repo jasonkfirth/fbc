@@ -32,7 +32,7 @@ FBCALL int fb_GfxDropEnable(int enabled)
 	return result;
 }
 
-FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING *output)
+FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING_ACCESS *output)
 {
 	char *text = NULL;
 	int result = FB_DROP_UNAVAILABLE;

@@ -11,9 +11,9 @@
 
 /* Conversion owns a temporary descriptor. Release the string lock before
    entering the profiler, whose state has a separate lock. */
-static FBSTRING *hWideName( const FB_WCHAR *name )
+static FBSTRING_ACCESS *hWideName( const FB_WCHAR *name )
 {
-	FBSTRING *text;
+	FBSTRING_ACCESS *text;
 	FB_STRLOCK();
 	text = fb_hUStrFromWstr_NoLock(name);
 	FB_STRUNLOCK();
@@ -23,7 +23,7 @@ static FBSTRING *hWideName( const FB_WCHAR *name )
 #define WIDE_PROFILE(name, result_type, operation, failure) \
 FBCALL result_type name( const FB_WCHAR *value ) \
 { \
-	FBSTRING *text = hWideName(value); \
+	FBSTRING_ACCESS *text = hWideName(value); \
 	result_type result; \
 	if( text == NULL ) return failure; \
 	result = operation(text->data ? text->data : ""); \
@@ -37,7 +37,7 @@ WIDE_PROFILE(fb_WstrProfileSetFileName, int, fb_ProfileSetFileName, FB_RTERROR_O
 
 FBCALL void fb_WstrProfileIgnore( const FB_WCHAR *value )
 {
-	FBSTRING *text = hWideName(value);
+	FBSTRING_ACCESS *text = hWideName(value);
 	if( text == NULL ) return;
 	fb_ProfileIgnore(text->data ? text->data : "");
 	fb_hStrDelTemp(text);
@@ -55,7 +55,8 @@ FBCALL int fb_WstrProfileGetFileName( FB_WCHAR *dst, int capacity )
 	result = fb_ProfileGetFileName(buffer, sizeof(buffer));
 	if( result != FB_RTERROR_OK ) return result;
 	borrowed.data = buffer;
-	borrowed.len = borrowed.size = strlen(buffer);
+	/* The profiler supplies a terminated name within this fixed-size buffer. */
+	borrowed.len = borrowed.size = (ssize_t)strlen(buffer);
 	wide = fb_UStrToWstr(&borrowed);
 	if( wide == NULL ) return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
 	units = 0;
@@ -66,24 +67,24 @@ FBCALL int fb_WstrProfileGetFileName( FB_WCHAR *dst, int capacity )
 		if( sizeof(FB_WCHAR) == 2 && units > 0 &&
 		    wide[units - 1] >= 0xD800 && wide[units - 1] <= 0xDBFF ) --units;
 	}
-	memcpy(dst, wide, units * sizeof(FB_WCHAR));
+	memcpy(dst, wide, (size_t)units * sizeof(FB_WCHAR));
 	dst[units] = 0;
 	free(wide);
 	return fb_ErrorSetNum(FB_RTERROR_OK);
 }
 
-FBCALL int fb_UStrProfileGetFileName( FBSTRING *dst, int capacity )
+FBCALL int fb_UStrProfileGetFileName( FBSTRING_ACCESS *dst, int capacity )
 {
 	char buffer[PROFILER_MAX_PATH];
 	ssize_t bytes, boundary = 0, next;
-	FBSTRING *text;
+	FBSTRING_ACCESS *text;
 	int result;
 	if( dst == NULL || capacity <= 0 )
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	result = fb_ProfileGetFileName(buffer, sizeof(buffer));
 	if( result != FB_RTERROR_OK ) return result;
 	FB_STRLOCK();
-	text = fb_hUStrNormalize_NoLock(buffer, strlen(buffer));
+	text = fb_hUStrNormalize_NoLock(buffer, (ssize_t)strlen(buffer));
 	result = text ? FB_RTERROR_OK : FB_RTERROR_OUTOFMEM;
 	if( text != NULL ) {
 		/* Apply the byte limit after normalization, which can expand malformed
@@ -95,7 +96,7 @@ FBCALL int fb_UStrProfileGetFileName( FBSTRING *dst, int capacity )
 			if( next >= capacity ) break;
 			boundary = next;
 		}
-		fb_hStrSetLength(text, boundary);
+		fb_hStrSetLength(text, (size_t)boundary);
 		if( text->data ) text->data[boundary] = 0;
 		fb_hUStrMove_NoLock(dst, text, FB_FALSE);
 	}

@@ -10,7 +10,7 @@
 
 FBCALL int fb_FileOpenQB
 	(
-		FBSTRING *str,
+		FBSTRING_ACCESS *str,
 		unsigned int mode,
 		unsigned int access,
 		unsigned int lock,

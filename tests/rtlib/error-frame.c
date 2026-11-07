@@ -91,6 +91,13 @@ static void cleanup_worker( void *opaque )
 	free( worker->resource );
 	worker->resource = NULL;
 	worker->owner->cleaned++;
+	if( worker->owner->mode == MODE_TRANSFER || worker->owner->mode == MODE_TRANSFER_HEAP ) {
+		/* Model successful array erasure and a destructor's temporary source
+		   context. A one-way transfer must retain the handled error instead. */
+		fb_ErrorSetNum( FB_RTERROR_OK );
+		FB_TLSGETCTX( ERROR )->line_num = 3;
+		fb_ErrorSetModName( "cleanup" );
+	}
 }
 
 static void cleanup_heap_worker( void *opaque )
@@ -235,7 +242,8 @@ static int run_case( int mode )
 			owner->failed = 17;
 	} else {
 		if( (mode != MODE_TRANSFER && mode != MODE_TRANSFER_HEAP) || fb_ErrorFrameGetTarget( &owner->frame ) != 1 ||
-		    fb_ErrorGetNum() != FB_RTERROR_FILEIO )
+		    fb_ErrorGetNum() != FB_RTERROR_FILEIO || fb_ErrorGetLineNum() != 100 ||
+		    strcmp( fb_ErrorGetModName(), "worker" ) != 0 )
 			owner->failed = 18;
 		owner->current = NULL;
 	}

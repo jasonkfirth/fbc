@@ -16,7 +16,7 @@
 
 private sub hCComparisonRememberLabel(byval labels as THASH ptr, byval sym as FBSYMBOL ptr)
 	if( sym = NULL orelse symbIsLabel(sym) = FALSE ) then exit sub
-	var key = str(culngint(sym))
+	var key = str(culngint(cuint(sym)))
 	if( hashLookup(labels, strptr(key)) = NULL ) then
 		hashAdd(labels, ZstrDup(strptr(key)), sym, hashHash(strptr(key)))
 	end if
@@ -51,7 +51,7 @@ end sub
 private sub hCComparisonPruneLabel(byval n as ASTNODE ptr, byval removed as THASH ptr, byval live as THASH ptr)
 	if( n = NULL ) then exit sub
 	if( n->class = AST_NODECLASS_LABEL andalso n->l = NULL andalso n->r = NULL ) then
-		var key = str(culngint(n->sym))
+		var key = str(culngint(cuint(n->sym)))
 		if( hashLookup(removed, strptr(key)) <> NULL andalso hashLookup(live, strptr(key)) = NULL ) then
 			'' Only retire labels whose branch this pass removed. Keep the
 			'' symbol's source-access facts intact for semantic observations.

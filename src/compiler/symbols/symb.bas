@@ -351,6 +351,15 @@ function symbGetIllegalRedefErr _
 end function
 
 '':::::
+private function hSkipThreadKeyword( byval sym as FBSYMBOL ptr ) as FBSYMBOL ptr
+	'' Keyword recognition has its own pass. Ordinary symbol searches must
+	'' not let the contextual prefix hide a declaration or imported name.
+	while( sym <> NULL andalso symbIsKeyword( sym ) andalso sym->key.id = FB_TK_THREAD )
+		sym = sym->hash.next
+	wend
+	return sym
+end function
+
 private function hCanDuplicateConstOrProc _
 	( _
 		byval head_sym as FBSYMBOL ptr, _
@@ -373,6 +382,12 @@ private function hCanDuplicateConstOrProc _
 
 		'' only if the keyword or the rtl-proc has a string suffix
 		case FB_SYMBCLASS_KEYWORD, FB_SYMBCLASS_PROC
+			'' THREAD is contextual; retain its keyword entry beside user names.
+			if( symbIsKeyword( head_sym ) andalso head_sym->key.id = FB_TK_THREAD ) then
+				head_sym = head_sym->hash.next
+				continue do
+			end if
+
 			if( symbIsDisabledCommand( head_sym ) ) then
 				head_sym = head_sym->hash.next
 				continue do
@@ -426,6 +441,15 @@ private function hCanDuplicate _
 
 	function = FALSE
 	rejected_variable = NULL
+
+	'' A contextual keyword must not reserve an otherwise unused name.
+	'' Keep duplicate keyword registration and all actual user duplicates checked.
+	if( s->class <> FB_SYMBCLASS_KEYWORD ) then
+		while( symbIsKeyword( head_sym ) andalso head_sym->key.id = FB_TK_THREAD )
+			head_sym = head_sym->hash.next
+			if( head_sym = NULL ) then return TRUE
+		wend
+	end if
 
 	select case as const s->class
 	'' adding a define?
@@ -1230,6 +1254,7 @@ private function hsymbLookupNS _
 	do
 		sym = hashLookupEx( @hashtb->tb, id, index )
 		fbSemanticModelLookupProbe("lexical", hashtb->owner, sym)
+		sym = hSkipThreadKeyword( sym )
 		while( sym )
 			'' return if it's not the global ns (as in C++, any nested
 			'' symbol has precedence over any imported one, even if the
@@ -1315,6 +1340,7 @@ private function hsymbLookupTypeNS _
 	do
 		sym = hashLookupEx( @hashtb->tb, id, index )
 		fbSemanticModelLookupProbe("type-locals", hashtb->owner, sym)
+		sym = hSkipThreadKeyword( sym )
 		while( sym )
 			if( symbIsLocal( sym ) ) then
 				'' but only if it's not main scoped local
@@ -1335,6 +1361,7 @@ private function hsymbLookupTypeNS _
 	'' search in UDT's (TYPE or CLASS) hash tb first
 	sym = hashLookupEx( @symbGetCompHashTb( ns ).tb, id, index )
 	fbSemanticModelLookupProbe("type-own", ns, sym)
+	sym = hSkipThreadKeyword( sym )
 
 	'' don't access locals in a TYPE's namespace
 	while( sym )
@@ -1397,6 +1424,7 @@ private function hsymbLookupTypeNS _
 	do
 		sym = hashLookupEx( @hashtb->tb, id, index )
 		fbSemanticModelLookupProbe("type-fallback", hashtb->owner, sym)
+		sym = hSkipThreadKeyword( sym )
 		if( sym ) then
 			fbSemanticModelLookupDecision("type-fallback-selected", hashtb->owner, sym)
 			return symbNewChainpool( sym )
@@ -1481,6 +1509,10 @@ function symbLookup _
 		hashtb = hashtb->prev
 	loop while( hashtb <> NULL )
 
+	'' Keep the token ID for THREAD LOCAL lookahead, but permit THREAD in
+	'' every ordinary identifier position, including procedure/type names.
+	if( tk = FB_TK_THREAD ) then tk_class = FB_TKCLASS_IDENTIFIER
+
 	'' In a TYPE's namespace?
 	if( symbGetCurrentNamespc( ) <> NULL ) then
 		select case symbGetClass( symbGetCurrentNamespc( ) )
@@ -1564,7 +1596,7 @@ function symbLookupAt _
 	dim as longint semantic_lookup = fbSemanticModelLookupBegin("qualified", id, ns, preserve_case, search_imports)
 
 	if( symbIsEnum( ns ) and (not symbEnumHasHashTb( ns )) ) then
-		return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "enum-without-table")
+		return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "enum-without-table"), "qualified")
 	end if
 
 	if( preserve_case = FALSE ) then
@@ -1577,6 +1609,7 @@ function symbLookupAt _
 	'' search in UDT's (NAMESPACE, TYPE, CLASS or ENUM) hash tb first
 	dim as FBSYMBOL ptr sym = hashLookupEx( @symbGetCompHashTb( ns ).tb, id, index )
 	fbSemanticModelLookupProbe("qualified-own", ns, sym)
+	sym = hSkipThreadKeyword( sym )
 
 	''
 	'' Imported names are considered only after the namespace's own symbols.
@@ -1597,35 +1630,35 @@ function symbLookupAt _
 
 	if( sym = NULL ) then
 		if( search_imports = FALSE ) then
-			return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "imports-disabled")
+			return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "imports-disabled"), "qualified")
 		end if
 
 	else
 		dim as FBSYMCHAIN ptr chain_ = symbNewChainpool( sym )
-		return fbSemanticModelLookupEnd(semantic_lookup, chain_, INVALID, INVALID, "own-symbol")
+		return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, chain_, INVALID, INVALID, "own-symbol"), "qualified")
 	end if
 
 	'' nothing found, now search the imports (if any)..
 	if( symbGetCompExt( ns ) = NULL ) then
-		return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "no-namespace-extension")
+		return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "no-namespace-extension"), "qualified")
 	end if
 
 	if( symbGetCompImportHead( ns ) = NULL ) then
-		return fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "no-imports")
+		return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, NULL, INVALID, INVALID, "no-imports"), "qualified")
 	end if
 
 	'' special cases: the global ns
 	if( ns = @symbGetGlobalNamespc( ) ) then
-		return fbSemanticModelLookupEnd(semantic_lookup, hLookupImportHash( ns, id, index ), INVALID, INVALID, "global-imports")
+		return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, hLookupImportHash( ns, id, index ), INVALID, INVALID, "global-imports"), "qualified")
 	end if
 
 	'' Are we in a type's namespace?  Only search for inherited members
 	select case symbGetClass( ns )
 	case FB_SYMBCLASS_STRUCT, FB_SYMBCLASS_CLASS
-		return fbSemanticModelLookupEnd(semantic_lookup, hLookupImportList( ns, id, index, FB_SYMBLOOKUPOPT_PARENTS ), INVALID, INVALID, "parent-imports")
+		return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, hLookupImportList( ns, id, index, FB_SYMBLOOKUPOPT_PARENTS ), INVALID, INVALID, "parent-imports"), "qualified")
 	end select
 
-	return fbSemanticModelLookupEnd(semantic_lookup, hLookupImportList( ns, id, index ), INVALID, INVALID, "namespace-imports")
+	return fbSemanticModelNamespaceLookupApplied(fbSemanticModelLookupEnd(semantic_lookup, hLookupImportList( ns, id, index ), INVALID, INVALID, "namespace-imports"), "qualified")
 
 end function
 

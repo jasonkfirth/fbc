@@ -7,24 +7,24 @@
  */
 #include "fb.h"
 
-FB_DATADESC *__fb_data_ptr = NULL;
+FB_DATADESC *fb_data_ptr = NULL;
 
 static void hSkipLink( void )
 {
 	/* If a link was reached, move to the next non-link, or NULL ("EOF") */
-	while( __fb_data_ptr && (__fb_data_ptr->len == FB_DATATYPE_LINK) ) {
-		__fb_data_ptr = __fb_data_ptr->next;
+	while( fb_data_ptr && (fb_data_ptr->len == FB_DATATYPE_LINK) ) {
+		fb_data_ptr = fb_data_ptr->next;
 	}
 
-	DBG_ASSERT( (__fb_data_ptr == NULL) ||
-	            (__fb_data_ptr->len != FB_DATATYPE_LINK) );
+	DBG_ASSERT( (fb_data_ptr == NULL) ||
+	            (fb_data_ptr->len != FB_DATATYPE_LINK) );
 }
 
 FBCALL void fb_DataRestore( FB_DATADESC *labeladdr )
 {
 	FB_LOCK();
 
-	__fb_data_ptr = labeladdr;
+	fb_data_ptr = labeladdr;
 	hSkipLink( );
 
 	FB_UNLOCK();
@@ -34,9 +34,9 @@ FBCALL void fb_DataRestore( FB_DATADESC *labeladdr )
 void fb_DataNext( void )
 {
 	/* Move forward in current DATA table, if any */
-	if( __fb_data_ptr ) {
-		DBG_ASSERT( __fb_data_ptr->len != FB_DATATYPE_LINK );
-		__fb_data_ptr += 1;
+	if( fb_data_ptr ) {
+		DBG_ASSERT( fb_data_ptr->len != FB_DATATYPE_LINK );
+		fb_data_ptr += 1;
 		hSkipLink( );
 	}
 }

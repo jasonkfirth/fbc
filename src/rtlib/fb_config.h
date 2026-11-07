@@ -5,8 +5,8 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
-#ifndef __FB_CONFIG_H__
-#define __FB_CONFIG_H__
+#ifndef FB_RTLIB_CONFIG_H
+#define FB_RTLIB_CONFIG_H
 
 #if defined HOST_XBOX
 #elif defined HOST_NUTTX || defined __NuttX__

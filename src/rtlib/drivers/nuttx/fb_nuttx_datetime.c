@@ -174,7 +174,7 @@ static void fb_nuttx_normalize_date(int *day_ptr, int *month_ptr,
     *year_ptr = year;
 }
 
-static int fb_nuttx_interval_type(FBSTRING *interval)
+static int fb_nuttx_interval_type(FBSTRING_ACCESS *interval)
 {
     const char *text;
 
@@ -237,7 +237,7 @@ static int fb_nuttx_month_number(const char *name)
     return 0;
 }
 
-static int fb_nuttx_parse_datetime(FBSTRING *s, int *year, int *month,
+static int fb_nuttx_parse_datetime(FBSTRING_ACCESS *s, int *year, int *month,
     int *day, int *hour, int *minute, int *second)
 {
     char month_name[16];
@@ -455,7 +455,7 @@ static void fb_nuttx_format_append_int(char *buffer, size_t buffer_size,
     fb_nuttx_format_append(buffer, buffer_size, pos, text);
 }
 
-FBSTRING *fb_StrFormat(double value, const FBSTRING *mask)
+FBSTRING_ACCESS *fb_StrFormat(double value, const FBSTRING_ACCESS *mask)
 {
     char buffer[128];
     const char *format;
@@ -609,7 +609,7 @@ int fb_Second(double serial)
 }
 #endif
 
-FBSTRING *fb_MonthName(int month, int abbreviation)
+FBSTRING_ACCESS *fb_MonthName(int month, int abbreviation)
 {
     static const char *long_names[] = {
         "January", "February", "March", "April", "May", "June",
@@ -630,7 +630,7 @@ FBSTRING *fb_MonthName(int month, int abbreviation)
     return fb_StrAllocTempDescZEx(name, (int32)strlen(name));
 }
 
-FBSTRING *fb_WeekdayName(int weekday, int abbreviation,
+FBSTRING_ACCESS *fb_WeekdayName(int weekday, int abbreviation,
     int first_day_of_week)
 {
     static const char *long_names[] = {
@@ -774,7 +774,7 @@ int fb_I18nGet(void)
     return fb_nuttx_i18n_on;
 }
 
-int fb_DateValue(FBSTRING *s)
+int fb_DateValue(FBSTRING_ACCESS *s)
 {
     int year;
     int month;
@@ -790,7 +790,7 @@ int fb_DateValue(FBSTRING *s)
     return fb_DateSerial(year, month, day);
 }
 
-double fb_TimeValue(FBSTRING *s)
+double fb_TimeValue(FBSTRING_ACCESS *s)
 {
     int hour;
     int minute;
@@ -809,7 +809,7 @@ double fb_TimeValue(FBSTRING *s)
 
 #if !defined(FB_NUTTX_USE_GENERIC_DATETIME_MATH) || \
     (FB_NUTTX_USE_GENERIC_DATETIME_MATH == 0)
-int fb_DatePart(FBSTRING *interval, double serial, int first_day_of_week,
+int fb_DatePart(FBSTRING_ACCESS *interval, double serial, int first_day_of_week,
     int first_day_of_year)
 {
     int result;
@@ -876,7 +876,7 @@ int fb_DatePart(FBSTRING *interval, double serial, int first_day_of_week,
     return result;
 }
 
-double fb_DateAdd(FBSTRING *interval, double interval_value_arg, double serial)
+double fb_DateAdd(FBSTRING_ACCESS *interval, double interval_value_arg, double serial)
 {
     int interval_value;
     int interval_type;
@@ -949,7 +949,7 @@ double fb_DateAdd(FBSTRING *interval, double interval_value_arg, double serial)
         fb_TimeSerial(hour, minute, second);
 }
 
-int64_t fb_DateDiff(FBSTRING *interval, double serial1, double serial2,
+int64_t fb_DateDiff(FBSTRING_ACCESS *interval, double serial1, double serial2,
     int first_day_of_week, int first_day_of_year)
 {
     int interval_type;
@@ -1049,7 +1049,7 @@ int64_t fb_DateDiff(FBSTRING *interval, double serial1, double serial2,
 }
 #endif
 
-int32 fb_SetDate(const FBSTRING *date_text)
+int32 fb_SetDate(const FBSTRING_ACCESS *date_text)
 {
     /*
         Setting the board clock is configuration and privilege dependent on
@@ -1063,7 +1063,7 @@ int32 fb_SetDate(const FBSTRING *date_text)
     return -1;
 }
 
-int32 fb_SetTime(const FBSTRING *time_text)
+int32 fb_SetTime(const FBSTRING_ACCESS *time_text)
 {
     (void)time_text;
 

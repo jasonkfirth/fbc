@@ -10,8 +10,8 @@
  * Platform socket implementation and public BASIC declarations live elsewhere.
  */
 
-#ifndef __FB_DEV_TCP_PRIVATE_H__
-#define __FB_DEV_TCP_PRIVATE_H__
+#ifndef FB_RTLIB_DEV_TCP_PRIVATE_H
+#define FB_RTLIB_DEV_TCP_PRIVATE_H
 
 #if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 	#include <winsock2.h>

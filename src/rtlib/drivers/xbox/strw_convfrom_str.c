@@ -23,7 +23,7 @@ static ssize_t fb_wstr_ConvFromA_nomultibyte(FB_WCHAR *dst, ssize_t dst_chars, c
 			c = '?';
 		*dst++ = c;
 	}
-	*dst = _LC('\0');
+	*dst = FB_WCHAR_LITERAL('\0');
 	return dst - origdst;
 }
 
@@ -36,7 +36,7 @@ static ssize_t fb_wstr_ConvFromA_nomultibyte(FB_WCHAR *dst, ssize_t dst_chars, c
 ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 {
 	if (src == NULL) {
-		*dst = _LC('\0');
+		*dst = FB_WCHAR_LITERAL('\0');
 		return 0;
 	}
 
@@ -61,7 +61,7 @@ ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 	ssize_t chars = dst_chars + 1;
 	fb_UTFToWChar( FB_FILE_ENCOD_UTF8, src, dst, &chars );
 	if (chars > dst_chars) {
-		dst[dst_chars] = _LC('\0');
+		dst[dst_chars] = FB_WCHAR_LITERAL('\0');
 		return dst_chars;
 	}
 	return chars;
@@ -75,7 +75,7 @@ ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 		   enough space, so do it manually (this will cut off the last
 		   char, but what can you do) */
 		if (chars == (dst_chars + 1)) {
-			dst[dst_chars] = _LC('\0');
+			dst[dst_chars] = FB_WCHAR_LITERAL('\0');
 			return dst_chars - 1;
 		}
 		return chars;

@@ -18,10 +18,10 @@ const char *short_weekday_names[] = {
 };
 #endif
 
-FBSTRING *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
 {
     const char *pszName;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
     size_t name_len;
 
     if( weekday < 1 || weekday > 7 )

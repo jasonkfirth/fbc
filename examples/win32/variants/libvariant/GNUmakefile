@@ -16,6 +16,7 @@ SRCS += variant-eqv.bas variant-eqv-inv.bas variant-eqv-self.bas variant-pow.bas
 SRCS += variant-eq.bas variant-eq-inv.bas variant-ne.bas variant-ne-inv.bas variant-lt.bas variant-lt-inv.bas 
 SRCS += variant-gt.bas variant-gt-inv.bas variant-le.bas variant-le-inv.bas variant-ge.bas variant-ge-inv.bas
 SRCS += variant-neg.bas variant-not.bas 
+SRCS += variant-string.bas
 OBJS := $(patsubst %.bas,obj/%.o,$(SRCS))
 HEADERS := $(wildcard *.bi ../*.bi)
 

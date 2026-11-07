@@ -21,7 +21,7 @@ int fb_ConsoleWidth( int cols, int rows )
     if( FB_CONSOLE_WINDOW_EMPTY() )
         return 0;
 
-    max = GetLargestConsoleWindowSize( __fb_out_handle );
+    max = GetLargestConsoleWindowSize( FB_CONSOLE_OUTPUT_HANDLE );
     fb_hConsoleGetWindow( NULL, NULL, &ncols, &nrows );
 
     if( cols > 0 )

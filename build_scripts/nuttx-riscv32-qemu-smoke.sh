@@ -2441,7 +2441,7 @@ typedef int32_t int32;
 typedef uint32_t uint32;
 typedef uint32_t FB_WCHAR;
 
-#define _LC(ch) ((FB_WCHAR)(ch))
+#define FB_WCHAR_LITERAL(ch) ((FB_WCHAR)(ch))
 
 #ifndef FB_FALSE
 #  define FB_FALSE 0

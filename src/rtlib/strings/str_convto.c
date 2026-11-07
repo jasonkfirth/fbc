@@ -15,9 +15,9 @@
 
 
 /*:::::*/
-FBCALL FBSTRING *fb_IntToStr ( int num )
+FBCALL FBSTRING_ACCESS *fb_IntToStr ( int num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 
 	/* alloc temp string */
 	dst = fb_hStrAllocTemp( NULL, sizeof( int ) * 3 );
@@ -33,15 +33,15 @@ FBCALL FBSTRING *fb_IntToStr ( int num )
 		fb_hStrSetLength( dst, strlen( dst->data ) );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }
 
 /*:::::*/
-FBCALL FBSTRING *fb_UIntToStr ( unsigned int num )
+FBCALL FBSTRING_ACCESS *fb_UIntToStr ( unsigned int num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 
 	/* alloc temp string */
 	dst = fb_hStrAllocTemp( NULL, sizeof( int ) * 3 );
@@ -57,7 +57,7 @@ FBCALL FBSTRING *fb_UIntToStr ( unsigned int num )
 		fb_hStrSetLength( dst, strlen( dst->data ) );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }

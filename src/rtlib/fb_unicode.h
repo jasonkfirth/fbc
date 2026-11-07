@@ -21,37 +21,53 @@ typedef uint8_t  UTF_8;
 #define UTF16_HALFBASE           ((UTF_32)0x0010000UL)
 #define UTF16_HALFMASK           ((UTF_32)0x3FFUL)
 
+/* Callers provide two or four accessible bytes. Fixed byte copies keep
+   unaligned access and little-endian layout independent of the host scalar ABI. */
 static __inline__ UTF_16 fb_UTF16FromLE( const unsigned char *src )
 {
-	return (UTF_16)((UTF_16)src[0] | ((UTF_16)src[1] << 8));
+	unsigned char bytes[2];
+
+	memcpy( bytes, src, sizeof( bytes ) );
+	return (UTF_16)((UTF_16)bytes[0] | ((UTF_16)bytes[1] << 8));
 }
 
 static __inline__ UTF_32 fb_UTF32FromLE( const unsigned char *src )
 {
-	return ((UTF_32)src[0]) |
-	       ((UTF_32)src[1] << 8) |
-	       ((UTF_32)src[2] << 16) |
-	       ((UTF_32)src[3] << 24);
+	unsigned char bytes[4];
+
+	memcpy( bytes, src, sizeof( bytes ) );
+	return ((UTF_32)bytes[0]) |
+	       ((UTF_32)bytes[1] << 8) |
+	       ((UTF_32)bytes[2] << 16) |
+	       ((UTF_32)bytes[3] << 24);
 }
 
 static __inline__ void fb_UTF16ToLE( unsigned char *dst, UTF_16 c )
 {
-	dst[0] = (unsigned char)(c & 0x00FF);
-	dst[1] = (unsigned char)((c >> 8) & 0x00FF);
+	const unsigned char bytes[2] = {
+	    (unsigned char)(c & 0x00FF),
+	    (unsigned char)((c >> 8) & 0x00FF)
+	};
+
+	memcpy( dst, bytes, sizeof( bytes ) );
 }
 
 static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 {
-	dst[0] = (unsigned char)(c & 0x000000FF);
-	dst[1] = (unsigned char)((c >> 8) & 0x000000FF);
-	dst[2] = (unsigned char)((c >> 16) & 0x000000FF);
-	dst[3] = (unsigned char)((c >> 24) & 0x000000FF);
+	const unsigned char bytes[4] = {
+	    (unsigned char)(c & 0x000000FF),
+	    (unsigned char)((c >> 8) & 0x000000FF),
+	    (unsigned char)((c >> 16) & 0x000000FF),
+	    (unsigned char)((c >> 24) & 0x000000FF)
+	};
+
+	memcpy( dst, bytes, sizeof( bytes ) );
 }
 
 #ifdef DISABLE_WCHAR
 #	include <ctype.h>
 #	define FB_WCHAR char
-#	define _LC(c) c
+#	define FB_WCHAR_LITERAL(c) c
 #	define FB_WEOF ((FB_WCHAR)EOF)
 #	define wcslen(s) strlen(s)
 #	define iswlower(c) islower(c)
@@ -92,7 +108,7 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #	include <wchar.h>
 #	include <wctype.h>
 #	define FB_WCHAR wchar_t
-#	define _LC(c) L ## c
+#	define FB_WCHAR_LITERAL(c) L ## c
 #	if defined HOST_MINGW
 #		define FB_WEOF ((FB_WCHAR)WEOF)
 #		define swprintf _snwprintf
@@ -111,7 +127,7 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #	include <wchar.h>
 #	include <wctype.h>
 #	define FB_WCHAR wchar_t
-#	define _LC(c) L ## c
+#	define FB_WCHAR_LITERAL(c) L ## c
 #	define FB_WEOF ((FB_WCHAR)WEOF)
 #	if defined HOST_SOLARIS
 	static __inline__ int fb_solaris_swprintf( FB_WCHAR *buffer, size_t chars, const FB_WCHAR *format, ... )
@@ -125,7 +141,7 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 		if( (buffer == NULL) || (chars == 0) )
 			return -1;
 
-		buffer[0] = _LC('\0');
+		buffer[0] = FB_WCHAR_LITERAL('\0');
 
 		/*
 		   Solaris keeps the old two-argument swprintf() ABI. These runtime
@@ -136,14 +152,14 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 		for( i = 0; i < sizeof( fmt ) - 1; i++ )
 		{
 			FB_WCHAR c = format[i];
-			if( c == _LC('\0') )
+			if( c == FB_WCHAR_LITERAL('\0') )
 				break;
 			if( c > 127 )
 				return -1;
 			fmt[i] = (char)c;
 		}
 
-		if( format[i] != _LC('\0') )
+		if( format[i] != FB_WCHAR_LITERAL('\0') )
 			return -1;
 
 		fmt[i] = '\0';
@@ -160,7 +176,7 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 		{
 			for( i = 0; (i < chars - 1) && (tmp[i] != '\0'); i++ )
 				buffer[i] = (FB_WCHAR)(unsigned char)tmp[i];
-			buffer[i] = _LC('\0');
+			buffer[i] = FB_WCHAR_LITERAL('\0');
 		}
 
 		free( tmp );
@@ -206,42 +222,42 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 
 #ifndef FB_WSTR_FROM_INT
 #define FB_WSTR_FROM_INT( buffer, num ) \
-    swprintf( buffer, sizeof( int ) * 3 + 1, _LC("%d"), (int) (num) )
+    swprintf( buffer, sizeof( int ) * 3 + 1, FB_WCHAR_LITERAL("%d"), (int) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT
 #define FB_WSTR_FROM_UINT( buffer, num ) \
-    swprintf( buffer, sizeof( unsigned int ) * 3 + 1, _LC("%u"), (unsigned) (num) )
+    swprintf( buffer, sizeof( unsigned int ) * 3 + 1, FB_WCHAR_LITERAL("%u"), (unsigned) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT_OCT
 #define FB_WSTR_FROM_UINT_OCT( buffer, num ) \
-    swprintf( buffer, sizeof( int ) * 4 + 1, _LC("%o"), (unsigned) (num) )
+    swprintf( buffer, sizeof( int ) * 4 + 1, FB_WCHAR_LITERAL("%o"), (unsigned) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_INT64
 #define FB_WSTR_FROM_INT64( buffer, num ) \
-    swprintf( buffer, sizeof( long long ) * 3 + 1, _LC("%lld"), (long long) (num) )
+    swprintf( buffer, sizeof( long long ) * 3 + 1, FB_WCHAR_LITERAL("%lld"), (long long) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT64
 #define FB_WSTR_FROM_UINT64( buffer, num ) \
-    swprintf( buffer, sizeof( unsigned long long ) * 3 + 1, _LC("%llu"), (unsigned long long) (num) )
+    swprintf( buffer, sizeof( unsigned long long ) * 3 + 1, FB_WCHAR_LITERAL("%llu"), (unsigned long long) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT64_OCT
 #define FB_WSTR_FROM_UINT64_OCT( buffer, num ) \
-    swprintf( buffer, sizeof( long long ) * 4 + 1, _LC("%llo"), (unsigned long long) (num) )
+    swprintf( buffer, sizeof( long long ) * 4 + 1, FB_WCHAR_LITERAL("%llo"), (unsigned long long) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_FLOAT
 #define FB_WSTR_FROM_FLOAT( buffer, num ) \
-    swprintf( buffer, 7+8 + 1, _LC("%.7g"), (double) (num) )
+    swprintf( buffer, 7+8 + 1, FB_WCHAR_LITERAL("%.7g"), (double) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_DOUBLE
 #define FB_WSTR_FROM_DOUBLE( buffer, num ) \
-    swprintf( buffer, 16+8 + 1, _LC("%.16g"), (double) (num) )
+    swprintf( buffer, 16+8 + 1, FB_WCHAR_LITERAL("%.16g"), (double) (num) )
 #endif
 
 /* Calculate the number of characters between two pointers. */
@@ -252,8 +268,13 @@ static __inline__ ssize_t fb_wstr_CalcDiff( const FB_WCHAR *ini, const FB_WCHAR 
 
 static __inline__ FB_WCHAR *fb_wstr_AllocTemp( ssize_t chars )
 {
-	/* plus the null-term */
-	return (FB_WCHAR *)malloc( (chars + 1) * sizeof( FB_WCHAR ) );
+	/* Include the terminator without overflowing signed lengths or the
+	   allocation size. Runtime buffers must support pointer differences. */
+	if( (chars < 0) ||
+	    ((size_t)chars > (size_t)PTRDIFF_MAX / sizeof( FB_WCHAR ) - 1) )
+		return NULL;
+
+	return (FB_WCHAR *)malloc( ((size_t)chars + 1) * sizeof( FB_WCHAR ) );
 }
 
 static __inline__ void fb_wstr_Del( FB_WCHAR *s )
@@ -277,8 +298,9 @@ static __inline__ ssize_t fb_wstr_Len( const FB_WCHAR *s )
 			++chars;
 		} while( TRUE );
 	}
-	/* without the null-term */
-	return wcslen( s );
+	/* The runtime represents character counts with ssize_t. Its buffers
+	   and caller-supplied string lengths must fit that signed range. */
+	return (ssize_t)wcslen( s );
 }
 
 ssize_t fb_wstr_ConvFromA( FB_WCHAR *dst, ssize_t dst_chars, const char *src );
@@ -308,10 +330,10 @@ static __inline__ FB_WCHAR fb_wstr_ToUpper( FB_WCHAR c )
 static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t chars )
 {
 	if( (src != NULL) && (chars > 0) )
-		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
+		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, (size_t)chars * sizeof( FB_WCHAR ) );
 
 	/* The destination may be a packed field, so do not dereference it. */
-	const FB_WCHAR terminator = _LC('\0');
+	const FB_WCHAR terminator = FB_WCHAR_LITERAL('\0');
 	memcpy( dst, &terminator, sizeof( terminator ) );
 }
 
@@ -319,7 +341,7 @@ static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t
 static __inline__ FB_WCHAR *fb_wstr_Move( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t chars )
 {
 	if( chars > 0 )
-		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
+		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, (size_t)chars * sizeof( FB_WCHAR ) );
 
 	return dst;
 }
@@ -330,7 +352,7 @@ static __inline__ void fb_wstr_Fill( FB_WCHAR *dst, FB_WCHAR c, ssize_t chars )
 	for( i = 0; i < chars; i++ )
 		*dst++ = c;
 	/* add null-term */
-	*dst = _LC('\0');
+	*dst = FB_WCHAR_LITERAL('\0');
 }
 
 /* Skip all characters (c) from the beginning of the string, max 'n' chars. */
@@ -389,6 +411,10 @@ static __inline__ size_t fb_wstr_InstrAny( const FB_WCHAR *s, const FB_WCHAR *ss
 
 static __inline__ int fb_wstr_Compare( const FB_WCHAR *str1, const FB_WCHAR *str2, ssize_t chars )
 {
+	/* Match the packed path and avoid a library call for an empty range. */
+	if( chars <= 0 )
+		return 0;
+
 	if( ((uintptr_t)(const void *)str1 % sizeof( FB_WCHAR ) != 0) ||
 	    ((uintptr_t)(const void *)str2 % sizeof( FB_WCHAR ) != 0) ) {
 		const unsigned char *left = (const unsigned char *)str1;
@@ -405,7 +431,7 @@ static __inline__ int fb_wstr_Compare( const FB_WCHAR *str1, const FB_WCHAR *str
 		}
 		return 0;
 	}
-	return wcsncmp( str1, str2, chars );
+	return wcsncmp( str1, str2, (size_t)chars );
 }
 
 /* end of fb_unicode.h */

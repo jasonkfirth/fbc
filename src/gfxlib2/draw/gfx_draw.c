@@ -85,7 +85,7 @@ static intptr_t parse_number(char **str)
 	return n;
 }
 
-FBCALL void fb_GfxDraw(void *target, FBSTRING *command)
+FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 {
 	FB_GFXCTX *context;
 	float x, y, dx, dy, ax, ay, x2, y2;
@@ -170,7 +170,7 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING *command)
 				context->last_y = y;
 
 				DRIVER_UNLOCK();
-				fb_GfxDraw(target, (FBSTRING *)value1);
+				fb_GfxDraw(target, (FBSTRING_ACCESS *)value1);
 				DRIVER_LOCK();
 
 				/* And update to x/y produced by the recursive fb_GfxDraw() call */

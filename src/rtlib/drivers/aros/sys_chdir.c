@@ -46,7 +46,7 @@
 /* Current-directory replacement                                             */
 /* ------------------------------------------------------------------------- */
 
-FBCALL int fb_ChDir( FBSTRING *path )
+FBCALL int fb_ChDir( FBSTRING_ACCESS *path )
 {
 	BPTR new_lock;
 	BPTR old_lock;

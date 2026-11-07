@@ -62,7 +62,7 @@ int fb_FileOpenVfsRawEx
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     }
 
-	__fb_ctx.do_file_reset = TRUE;
+	fb_ctx.do_file_reset = TRUE;
 
     /* clear handle */
     memset(handle, 0, sizeof(FB_FILE));
@@ -126,7 +126,7 @@ int fb_FileOpenVfsRawEx
 int fb_FileOpenVfsEx
 	(
 		FB_FILE *handle,
-        FBSTRING *str_filename,
+        FBSTRING_ACCESS *str_filename,
         unsigned int mode,
         unsigned int access,
         unsigned int lock,

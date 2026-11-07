@@ -110,8 +110,6 @@ source_uses_landscape_screen() {
 }
 
 source_uses_threading() {
-	local source_file="$1"
-
 	awk '
 	{
 		line = tolower($0)
@@ -130,7 +128,7 @@ source_uses_threading() {
 
 		exit 1
 	}
-	' "$source_file"
+	' "$@"
 }
 
 source_uses_gfxlib3() {
@@ -330,6 +328,20 @@ sanitize_package() {
 	value="${value%.}"
 	[ -n "$value" ] || value="app"
 	echo "org.freebasic.$value"
+}
+
+write_link_response_argument() {
+	local response_file="$1"
+	local argument="$2"
+
+	# Paths inside a response file bypass MSYS argument conversion.
+	if [[ "$argument" == /* ]] && command -v cygpath >/dev/null 2>&1; then
+		argument="$(cygpath -m "$argument")"
+	fi
+
+	argument="${argument//\\/\\\\}"
+	argument="${argument//\"/\\\"}"
+	printf '"%s"\n' "$argument" >> "$response_file"
 }
 
 android_target_info() {
@@ -615,7 +627,8 @@ if [ "$screen_orientation" = "unspecified" ] && source_uses_landscape_screen "$s
 	screen_orientation="landscape"
 fi
 
-if [ "$use_mt" -eq 0 ] && source_uses_threading "$src"; then
+# Multi-module clients can use thread primitives outside the entry point.
+if [ "$use_mt" -eq 0 ] && source_uses_threading "$src" "${project_sources[@]}"; then
 	use_mt=1
 fi
 
@@ -924,15 +937,32 @@ for ((target_index = 0; target_index < ${#target_keys[@]}; ++target_index)); do
 		android_graphics_libraries=(-lEGL -lGLESv3)
 	fi
 
-	# Refuse unresolved program symbols here, rather than shipping an APK which
-	# fails during System.loadLibrary before the application can report an error.
-	"$cc" -shared -Wl,-z,defs -Wl,-soname,libfreebasicapp.so -o "$sofile" \
-		"${link_objects[@]}" \
-		-Wl,--start-group "${runtime_group[@]}" -Wl,--end-group \
-		-Wl,--wrap=exit \
-		-llog -landroid -lEGL -lGLESv2 -lOpenSLES "${android_graphics_libraries[@]}" \
+	# A complete application may contain hundreds of objects. Keep native
+	# link arguments in a response file to stay within Windows command limits.
+	link_args=(
+		-shared
+		-Wl,-z,defs
+		-Wl,-soname,libfreebasicapp.so
+		-o "$sofile"
+		"${link_objects[@]}"
+		-Wl,--start-group
+		"${runtime_group[@]}"
+		-Wl,--end-group
+		-Wl,--wrap=exit
+		-llog -landroid -lEGL -lGLESv2 -lOpenSLES
+		"${android_graphics_libraries[@]}"
 		-ldl -lm
-
+	)
+	link_response="$target_tmp/link.rsp"
+	: > "$link_response"
+	for link_arg in "${link_args[@]}"; do
+		write_link_response_argument "$link_response" "$link_arg"
+	done
+	link_response_arg="$link_response"
+	if command -v cygpath >/dev/null 2>&1; then
+		link_response_arg="$(cygpath -m "$link_response")"
+	fi
+	"$cc" "@$link_response_arg"
 	if [ "$mode" = "so" ]; then
 		cp "$sofile" "$output"
 		echo "$output"

@@ -51,7 +51,7 @@ int fb_FileGetWstrEx
 		rawbytesread += sizeof(FB_WCHAR) - extra; /* round up */
 	}
 	DBG_ASSERT( (rawbytesread % sizeof(FB_WCHAR)) == 0 );
-	dst[rawbytesread / sizeof(FB_WCHAR)] = _LC('\0');
+	dst[rawbytesread / sizeof(FB_WCHAR)] = FB_WCHAR_LITERAL('\0');
 
 	return FB_RTERROR_OK;
 }

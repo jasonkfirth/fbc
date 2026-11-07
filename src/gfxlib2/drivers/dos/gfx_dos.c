@@ -191,11 +191,11 @@ static void fb_dos_multikey_hook(int scancode, int flags);
 
 static void fb_dos_kb_init(void)
 {
-	__fb_ctx.hooks.inkeyproc  = NULL;
-	__fb_ctx.hooks.getkeyproc = NULL;
-	__fb_ctx.hooks.keyhitproc = NULL;
-	__fb_ctx.hooks.multikeyproc = NULL;
-	__fb_ctx.hooks.sleepproc = NULL;
+	fb_ctx.hooks.inkeyproc  = NULL;
+	fb_ctx.hooks.getkeyproc = NULL;
+	fb_ctx.hooks.keyhitproc = NULL;
+	fb_ctx.hooks.multikeyproc = NULL;
+	fb_ctx.hooks.sleepproc = NULL;
 	
 	__fb_dos_multikey_hook = fb_dos_multikey_hook;
 	(void)fb_ConsoleMultikey(0); /* ensure the ISR is installed */

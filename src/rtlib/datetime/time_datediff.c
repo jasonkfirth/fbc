@@ -15,7 +15,7 @@
 #include <math.h>
 
 /*:::::*/
-FBCALL long long fb_DateDiff( FBSTRING *interval, double serial1, double serial2,
+FBCALL long long fb_DateDiff( FBSTRING_ACCESS *interval, double serial1, double serial2,
                               int first_day_of_week, int first_day_of_year )
 {
     int year1, month1, hour, minute, second, week, end_week;

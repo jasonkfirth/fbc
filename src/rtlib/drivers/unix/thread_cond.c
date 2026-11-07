@@ -8,7 +8,7 @@
 #include "../../fb.h"
 #include "../../fb_private_thread.h"
 
-struct _FBCOND {
+struct FBCOND_ {
 	pthread_cond_t id;
 };
 

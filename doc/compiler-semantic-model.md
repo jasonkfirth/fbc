@@ -1657,6 +1657,14 @@ All properties belong to the module's global namespace:
 | `startup-emission:<ordinal>` | procedure, kind, backend stage, role, requested native priority, selected/encoded priority or empty, placement, exact selected fragment/name |
 | `startup-lifecycle-counts:<module>` | nine counts in the table's family order, excluding this closure |
 
+MinGW C startup groups use the `wrapper-call` role. The procedure still names
+the original BASIC callback; placement names `fb_c_startup_c_<priority>` or
+`fb_c_startup_d_<priority>`, and the selected fragment is its emitted C callee
+followed by `()`. Default priority is 65535 for grouping, while requested and
+selected priority fields retain the native default/explicit distinction. The
+reader requires the selected callback name, kind and priority to agree. These
+C wrappers do not create BASIC procedure identities or reorder source lists.
+
 The source parser assigns priority after appending a constructor/destructor
 to its native list. Separate receipts preserve that sequence instead of
 publishing an earlier zero as the final priority. Generated wrappers can have

@@ -1,10 +1,11 @@
 '' Project: FreeBASIC compiler - semantic namespace visibility
 '' File: tooling/semantic-namespace-visibility.bas
 '' Purpose: Retain source import order and native relationship lifetime.
-'' Responsibilities: Copy live identities, distinguish lookup and lexical owners, close observations.
+'' Responsibilities: Copy live identities, observe applied chains and order import lifetimes.
 '' This file intentionally does NOT contain: independent resolution or inferred global visibility.
 
 #include once "tooling/semantic-private.bi"
+#include once "tooling/semantic-lookup.bi"
 #include once "tooling/semantic-namespace-visibility.bi"
 #include once "tooling/semantic-constructs.bi"
 #include once "tooling/semantic-source.bi"
@@ -33,6 +34,7 @@ private dim shared as longint namespace_using_count, namespace_import_count, nam
 private dim shared as longint namespace_active_using, namespace_using_import_start, namespace_active_refresh
 private dim shared as longint namespace_refresh_import_start
 private dim shared as longint namespace_binding_count
+private dim shared as longint namespace_applied_count, namespace_candidate_count, namespace_event_count
 
 sub fbSemanticModelResetNamespaceVisibility( )
 	if( namespace_imports_ready ) then hashEnd(@namespace_imports)
@@ -54,6 +56,9 @@ sub fbSemanticModelResetNamespaceVisibility( )
 	namespace_active_refresh = 0
 	namespace_refresh_import_start = 0
 	namespace_binding_count = 0
+	namespace_applied_count = 0
+	namespace_candidate_count = 0
+	namespace_event_count = 0
 end sub
 
 private function hNext( byref count as longint ) as longint
@@ -66,6 +71,11 @@ private function hNext( byref count as longint ) as longint
 end function
 
 private sub hProperty( byref key as const string, byref value as const string )
+	dim as longint event_id = hNext(namespace_event_count)
+	if( event_id = 0 ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+		"namespace-event:" + fbSemanticModelNumber(event_id) + TABCHAR + fbSemanticModelEscape(key))
 	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
 		key + TABCHAR + fbSemanticModelEscape(value))
@@ -75,6 +85,47 @@ private function hObservationContext( ) as string
 	return fbSemanticModelNumber(fbSemanticModelCurrentStatement( )) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentSource( )) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentCompound( ))
+end function
+
+/'
+	A cached identifier chain can be populated speculatively while reading
+	A.Member. Only its parser request, or an explicit qualified lookup, is
+	evidence that a native name search was applied. Record every request,
+	including an empty chain, and preserve every import candidate. Candidate
+	presence is conservative: later overload filtering may choose another one.
+
+	The model owns copied IDs only. Iterating the live chain here consumes no
+	chain-pool entries and returns the same pointer used by the parser.
+'/
+function fbSemanticModelNamespaceLookupApplied _
+	( byval chain_ as FBSYMCHAIN ptr, byref kind as const string ) as FBSYMCHAIN ptr
+	function = chain_
+	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit function
+	if( (lex.ctx = NULL) orElse lex.ctx->semantic_probe ) then exit function
+	if( fbSemanticModelModuleIdentity( ) = 0 ) then exit function
+	dim as longint native_lookup
+	if( kind = "parser-token" ) then
+		native_lookup = lex.ctx->head->semantic_lookup
+	else
+		native_lookup = fbSemanticModelLastLookup( )
+	end if
+	dim as longint identity = hNext(namespace_applied_count), count = 0
+	if( identity = 0 ) then exit function
+	dim as FBSYMCHAIN ptr item = chain_
+	while( item <> NULL )
+		if( (item->sym = NULL) or (count >= CHAINPOOL_SIZE) ) then
+			fbSemanticModelFailAt("applied namespace chain exceeds its native bounds")
+			exit function
+		end if
+		count += 1
+		if( hNext(namespace_candidate_count) = 0 ) then exit function
+		hProperty("namespace-applied-candidate:" + fbSemanticModelNumber(identity) + ":" + _
+			fbSemanticModelNumber(count), fbSemanticModelNumber(fbSemanticModelSymbolId(item->sym)) + _
+			TABCHAR + fbSemanticModelNumber(abs(item->isimport <> FALSE)))
+		item = item->next
+	wend
+	hProperty("namespace-applied-chain:" + fbSemanticModelNumber(identity), kind + TABCHAR + _
+		fbSemanticModelNumber(native_lookup) + TABCHAR + hObservationContext( ) + TABCHAR + fbSemanticModelNumber(count))
 end function
 
 function fbSemanticModelUsingBegin _
@@ -251,8 +302,16 @@ sub fbSemanticModelFinishNamespaceVisibility( byval commit as integer )
 		hProperty("namespace-visibility-counts:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )), _
 			fbSemanticModelNumber(namespace_using_count) + TABCHAR + fbSemanticModelNumber(namespace_import_count) + _
 			TABCHAR + fbSemanticModelNumber(namespace_remove_count) + TABCHAR + fbSemanticModelNumber(namespace_refresh_count))
+		hProperty("namespace-applied-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )), _
+            fbSemanticModelNumber(namespace_applied_count) + TABCHAR + fbSemanticModelNumber(namespace_candidate_count))
 		hProperty("namespace-binding-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )), _
 			fbSemanticModelNumber(namespace_binding_count))
+	end if
+	if( commit and fbSemanticModelFullEnabled( ) ) then
+		fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+			fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc( ))) + TABCHAR + _
+			"namespace-event-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + _
+			fbSemanticModelNumber(namespace_event_count))
 	end if
 	fbSemanticModelResetNamespaceVisibility( )
 end sub

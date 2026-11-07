@@ -120,6 +120,8 @@ def main() -> int:
     parser.add_argument('--allow-external-output', action='store_true',
                         help='Explicitly permit a dedicated result/scratch directory on another volume')
     parser.add_argument('--unit', action='append', help='Compiler-relative module; repeatable')
+    parser.add_argument('--semantic-extra-facts', choices=('all',),
+                        help='Request optional semantic facts from each compiler export')
     parser.add_argument('--timeout', type=int, default=600)
     parser.add_argument('--retry-failed', action='store_true')
     parser.add_argument('--stop-on-failure', action='store_true',
@@ -150,7 +152,9 @@ def main() -> int:
         raise ValueError('Requested modules are outside the Make-selected graph')
     frontend = arguments(settings['FLAGS'], settings['INCLUDES'])
     pins = {'compiler': digest(compiler), 'linter': digest(linter),
-            'configuration': digest(configuration), 'controller': digest(Path(__file__))}
+            'configuration': digest(configuration), 'controller': digest(Path(__file__)),
+            'semantic_extra_facts': options.semantic_extra_facts or ''}
+    settings['SEMANTIC_EXTRA_FACTS'] = options.semantic_extra_facts or ''
     receipt_path = output / 'results.json'
     receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
     if receipt and receipt['pins'] != pins:
@@ -189,6 +193,8 @@ def main() -> int:
             flags = shlex.split(settings['FLAGS']) + shlex.split(settings['INCLUDES'])
             command = [str(compiler), '-prefix', str(root), '-target', 'win64', '-gen', 'gcc',
                        *flags, '-i', str(root / 'src/compiler'), '-i', str(root / 'inc'),
+                       *(('-semantic-extra-facts', options.semantic_extra_facts)
+                         if options.semantic_extra_facts else ()),
                        '-r', '-semantic-bundle',
                        str(prefix), '-o', str(prefix.with_suffix('.c')), str(source)]
             result = run(command, root=root, timeout=options.timeout)

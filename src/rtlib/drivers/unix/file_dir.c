@@ -141,10 +141,10 @@ static char *find_next ( int *attrib )
 	}
 }
 
-FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
+FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_attrib )
 {
 	FB_DIRCTX *ctx;
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 	ssize_t len;
 	int tmp_attrib;
 	char *name, *p;
@@ -239,9 +239,9 @@ FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
 		if( res )
 			fb_hStrCopy( res->data, name, len );
 		else
-			res = &__fb_ctx.null_desc;
+			res = &fb_ctx.null_desc;
 	} else {
-		res = &__fb_ctx.null_desc;
+		res = &fb_ctx.null_desc;
 		*out_attrib = 0;
 	}
 

@@ -22,6 +22,7 @@ extern "rtlib"
 '' Wide string declarations
 '' -------------------------------------------------------------------------
 
+#ifndef FB_NO_STRING_REPLACE
 declare function Replace overload alias "fb_TextReplace_ssw" _
     ( byref expression as const string, byref find_text as const string, _
       byref replacement as const wstring, byval start as integer = 1, _
@@ -57,6 +58,8 @@ declare function Replace overload alias "fb_TextReplace_www" _
       byref replacement as const wstring, byval start as integer = 1, _
       byval count as integer = -1, byval compare as long = fbBinaryCompare ) as wstring
 
+#endif
+
 declare function StrComp overload alias "fb_TextComp_sw" _
     ( byref string1 as const string, byref string2 as const wstring, _
       byval compare as long = fbBinaryCompare ) as long
@@ -79,6 +82,7 @@ declare function Format overload alias "fb_TextFormat_w" _
 '' -------------------------------------------------------------------------
 '' UTF-8 and mixed string declarations
 '' -------------------------------------------------------------------------
+#ifndef FB_NO_STRING_REPLACE
 declare function Replace overload alias "fb_TextReplace_ssu" _
     ( byref expression as const string, byref find_text as const string, _
       byref replacement as const ustring, byval start as integer = 1, _
@@ -173,6 +177,8 @@ declare function Replace overload alias "fb_TextReplace_uuu" _
     ( byref expression as const ustring, byref find_text as const ustring, _
       byref replacement as const ustring, byval start as integer = 1, _
       byval count as integer = -1, byval compare as long = fbBinaryCompare ) as ustring
+
+#endif
 
 declare function StrComp overload alias "fb_TextComp_su" _
     ( byref string1 as const string, byref string2 as const ustring, _

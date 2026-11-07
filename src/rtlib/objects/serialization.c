@@ -174,7 +174,7 @@ invalid:
 	return 0;
 }
 
-static int ser_prepare( SER_CONTEXT *ctx, FBSTRING *schema, FBSTRING *program )
+static int ser_prepare( SER_CONTEXT *ctx, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program )
 {
 	const char *cursor, *end, *p;
 	if( !schema || !program || !schema->data || !program->data || FB_STRSIZE(schema) <= 0 ||
@@ -477,10 +477,10 @@ static int ser_read( SER_CONTEXT *ctx, size_t index, unsigned char *base )
 /* Entry points and transactional commit                                      */
 /* ------------------------------------------------------------------------- */
 
-FBCALL FBSTRING *fb_Serialize( void *value, FBSTRING *schema, FBSTRING *program )
+FBCALL FBSTRING_ACCESS *fb_Serialize( void *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program )
 {
 	SER_CONTEXT ctx = {0};
-	FBSTRING result = {0}, *temporary = &__fb_ctx.null_desc;
+	FBSTRING result = {0}, *temporary = &fb_ctx.null_desc;
 	if( value && ser_prepare(&ctx, schema, program) && ser_put(&ctx, "FBS1", 4) &&
 	    ser_put_uint(&ctx, (uint64_t)FB_STRSIZE(schema), 4) &&
 	    ser_put(&ctx, schema->data, (size_t)FB_STRSIZE(schema)) && ser_write(&ctx, 0, value) ) {
@@ -512,7 +512,7 @@ FBCALL FBSTRING *fb_Serialize( void *value, FBSTRING *schema, FBSTRING *program 
 	return temporary;
 }
 
-FBCALL ssize_t fb_Deserialize( void *value, FBSTRING *schema, FBSTRING *program, FBSTRING *payload )
+FBCALL ssize_t fb_Deserialize( void *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program, FBSTRING_ACCESS *payload )
 {
 	SER_CONTEXT ctx = {0};
 	unsigned char *scratch = NULL;
@@ -572,12 +572,12 @@ done:
 	return success ? FB_TRUE : FB_FALSE;
 }
 
-FBCALL FBSTRING *fb_SerializeArray( FBARRAY *value, FBSTRING *schema, FBSTRING *program )
+FBCALL FBSTRING_ACCESS *fb_SerializeArray( FBARRAY_ACCESS *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program )
 {
 	return fb_Serialize(value, schema, program);
 }
 
-FBCALL ssize_t fb_DeserializeArray( FBARRAY *value, FBSTRING *schema, FBSTRING *program, FBSTRING *payload )
+FBCALL ssize_t fb_DeserializeArray( FBARRAY_ACCESS *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program, FBSTRING_ACCESS *payload )
 {
 	return fb_Deserialize(value, schema, program, payload);
 }

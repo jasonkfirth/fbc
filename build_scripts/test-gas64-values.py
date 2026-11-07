@@ -17,8 +17,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("fbc", "cc", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--toolchain-prefix", type=Path, help="Runtime prefix; defaults to this source tree")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
+    prefix = args.toolchain_prefix.resolve() if args.toolchain_prefix else root
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     paths = [Path(__file__).resolve(), root / "tests/compiler-support/gas64-frac-integer.bas",
@@ -28,6 +30,11 @@ def main():
     receipt = {"status": "pending", "records": records,
                "compiler_sha256": hashlib.sha256(args.fbc.resolve().read_bytes()).hexdigest(),
                "source_sha256": {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}}
+    receipt["runtime_prefix"] = str(prefix)
+    receipt["runtime_sha256"] = {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted((prefix / "lib/freebasic").glob("*/fbrt0.o"))}
+    receipt["runtime_sha256"].update({str(p): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted((prefix / "lib/freebasic").glob("*/libfb.a"))})
     def save():
         (output / "results.json").write_text(json.dumps(receipt, indent=2) + "\n")
     save()
@@ -53,7 +60,7 @@ def main():
                                (paths[4], "PACKED_RETURN=PASS")):
             binary = output / (source.stem + "-" + backend + suffix)
             objects = [obj] if source == paths[2] else ([packed_obj] if source == paths[4] else [])
-            compile_command([args.fbc.resolve(), "-prefix", root, "-i", root / "inc", "-gen", backend,
+            compile_command([args.fbc.resolve(), "-prefix", prefix, "-i", root / "inc", "-gen", backend,
                              source, *objects, "-x", binary], binary.stem + "-compile")
             result = subprocess.run([str(binary)], env=environment, capture_output=True, text=True, timeout=5)
             if result.returncode or marker not in result.stdout:

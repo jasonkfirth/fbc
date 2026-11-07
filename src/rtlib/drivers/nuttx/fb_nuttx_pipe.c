@@ -139,7 +139,7 @@ static int fb_nuttx_pipe_write_listing( const char *path, int fnum,
 /* OPEN PIPE entry point                                                     */
 /* ------------------------------------------------------------------------- */
 
-int32 fb_FileOpenPipe( const FBSTRING *str_filename, const uint32 mode,
+int32 fb_FileOpenPipe( const FBSTRING_ACCESS *str_filename, const uint32 mode,
                        const uint32 access, const uint32 lock,
                        const int32 fnum, const int32 len,
                        const char *encoding )

@@ -11,9 +11,9 @@
 
 /* The caller owns the returned temporary descriptor. Only its allocation
    uses the string lock; drawing takes the graphics lock after conversion. */
-static FBSTRING *fb_hGfxWideGlyphs( const FB_WCHAR *buffer, size_t length )
+static FBSTRING_ACCESS *fb_hGfxWideGlyphs( const FB_WCHAR *buffer, size_t length )
 {
-	FBSTRING *glyphs;
+	FBSTRING_ACCESS *glyphs;
 	size_t i, written = 0;
 	unsigned int scalar;
 	if( buffer == NULL && length != 0 ) return NULL;

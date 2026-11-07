@@ -2,7 +2,7 @@
  * Project: FreeBASIC runtime library
  * File: strings/str_format.c
  * Purpose: format function.
- * Responsibilities: Byte string descriptors, temporaries and string operations.
+ * Responsibilities: Numeric/calendar mask passes, locale tokens and temporary output.
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
@@ -247,7 +247,8 @@ void fb_hGetNumberParts
 
 		/* Move usable fractional part of number to begin of buffer */
 		len_frac = pszFracEnd - pszFracStart;
-		memmove( pachFracPart, pszFracStart, len_frac );
+		/* The slice stays inside the bounded fractional buffer. */
+		memmove( pachFracPart, pszFracStart, (size_t)len_frac );
 		pachFracPart[len_frac] = 0;
 	}
 
@@ -284,16 +285,15 @@ void fb_hGetNumberParts
 }
 
 static
-FBSTRING *fb_hBuildDouble
+FBSTRING_ACCESS *fb_hBuildDouble
 	(
 		double num,
-		char decimal_point,
-		char thousands_separator
+		char decimal_point
 	)
 {
 	char FixPart[128], FracPart[128], chSign;
 	ssize_t LenFix, LenFrac, LenSign, LenDecPoint, LenTotal;
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 
 	fb_hGetNumberParts( num,
 	                    FixPart, sizeof( FixPart ), &LenFix,
@@ -313,17 +313,17 @@ FBSTRING *fb_hBuildDouble
 		if( LenSign!=0 ) {
 			dst->data[0] = chSign;
 		}
-		FB_MEMCPY( dst->data + LenSign, FixPart, LenFix );
+		FB_MEMCPY( dst->data + LenSign, FixPart, (size_t)LenFix );
 		if( LenDecPoint!=0 ) {
 			dst->data[LenSign + LenFix] = decimal_point;
 		}
 		FB_MEMCPY( dst->data + LenSign + LenFix + LenDecPoint,
 		           FracPart,
-		           LenFrac );
+		           (size_t)LenFrac );
 		dst->data[LenTotal] = 0;
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }
@@ -390,7 +390,7 @@ static double hRound
 static
 int fb_hProcessMask
 	(
-		FBSTRING *dst,
+		FBSTRING_ACCESS *dst,
 		const char *mask,
 		ssize_t mask_length,
 		double value,
@@ -566,9 +566,9 @@ int fb_hProcessMask
 			/* handle too big numbers */
 			if( (ExpValue > 0) && !pInfo->has_exponent )
 			{
-				int i;
-				for( i = 0; i < ExpValue; i++ )
-					FixPart[LenFix+i] = '0';
+				ssize_t padding;
+				for( padding = 0; padding < ExpValue; padding++ )
+					FixPart[LenFix+padding] = '0';
 
 				LenFix += ExpValue;
 
@@ -591,7 +591,8 @@ int fb_hProcessMask
 	for( i=0; i!=mask_length; ++i ) {
 		const char *pszAdd = mask + i;
 		char *pszAddFree = NULL;
-		int LenAdd = 1;
+		/* Output slices share the signed descriptor length used by hSnprintf. */
+		ssize_t LenAdd = 1;
 		char chCurrent = *pszAdd;
 		if( do_skip ) {
 			do_skip = FALSE;
@@ -656,7 +657,7 @@ int fb_hProcessMask
 						DBG_ASSERT( IndexFix!=LenFix );
 						pszAdd = FixPart + IndexFix;
 						if( pInfo->has_thousand_sep ) {
-							int remaining = LenFix - IndexFix;
+							ssize_t remaining = LenFix - IndexFix;
 							if( IndexFix != LenFix && (remaining % 3)==0 ) {
 								if( did_thousandsep ) {
 									did_thousandsep = FALSE;
@@ -680,6 +681,8 @@ int fb_hProcessMask
 							NumSkipFix += LenAdd;
 						}
 					}
+					break;
+				default:
 					break;
 				}
 				if( do_add )
@@ -730,6 +733,8 @@ int fb_hProcessMask
 							return FALSE;
 #endif
 						}
+						break;
+					default:
 						break;
 					}
 				}
@@ -846,7 +851,7 @@ int fb_hProcessMask
 
 							} else {
 								if( pInfo->has_thousand_sep ) {
-									int remaining = LenFix - IndexFix + NumSkipFix;
+									ssize_t remaining = LenFix - IndexFix + NumSkipFix;
 									if( (remaining % 3)==0 ) {
 										if( did_thousandsep ) {
 											did_thousandsep = FALSE;
@@ -971,7 +976,7 @@ int fb_hProcessMask
 							}
 						}
 						if( chCurrent=='t' && count==5 ) {
-							FBSTRING *tmp;
+							FBSTRING_ACCESS *tmp;
 							i += count-1;
 							fb_IntlGetTimeFormat( FixPart, sizeof(FixPart), FALSE );
 							tmp = fb_hStrFormat ( value,
@@ -1001,7 +1006,7 @@ int fb_hProcessMask
 								do_add = TRUE;
 							}
 						} else if( chCurrent=='d' && count==5 ) {
-							FBSTRING *tmp;
+							FBSTRING_ACCESS *tmp;
 							i += count-1;
 							fb_IntlGetDateFormat( FixPart, sizeof(FixPart), FALSE );
 							tmp = fb_hStrFormat ( value,
@@ -1038,7 +1043,7 @@ int fb_hProcessMask
 							}
 						} else if( chCurrent=='d' && (count==3 || count==4) ) {
 							int weekday = fb_Weekday( value, FB_WEEK_DAY_SUNDAY );
-							FBSTRING *tmp = fb_WeekdayName( weekday, (count==3), FB_WEEK_DAY_SUNDAY );
+							FBSTRING_ACCESS *tmp = fb_WeekdayName( weekday, (count==3), FB_WEEK_DAY_SUNDAY );
 							i += count-1;
 							if( !do_output ) {
 								pInfo->length_min += FB_STRSIZE( tmp );
@@ -1152,7 +1157,7 @@ int fb_hProcessMask
 							}
 						} else if( chCurrent=='M' && (count==3 || count==4) ) {
 							int month = fb_Month( value );
-							FBSTRING *tmp = fb_MonthName( month, (count==3) );
+							FBSTRING_ACCESS *tmp = fb_MonthName( month, (count==3) );
 							i += count-1;
 							if( !do_output ) {
 								pInfo->length_min += FB_STRSIZE( tmp );
@@ -1286,10 +1291,22 @@ int fb_hProcessMask
 			DBG_ASSERT(pszOut!=NULL);
 			if( pszAddFree!=NULL )
 				pszAdd = pszAddFree;
-			if( LenAdd==0 )
-				LenAdd = strlen( pszAdd );
+			if( LenAdd==0 ) {
+				size_t length = strlen( pszAdd );
+				if( length > (size_t)FB_STRSIZEMSK ) {
+					free( pszAddFree );
+					fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+					return FALSE;
+				}
+				LenAdd = (ssize_t)length;
+			}
+			if( LenAdd < 0 ) {
+				free( pszAddFree );
+				fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+				return FALSE;
+			}
 			DBG_ASSERT(LenOut>=LenAdd);
-			FB_MEMCPY( pszOut, pszAdd, LenAdd );
+			FB_MEMCPY( pszOut, pszAdd, (size_t)LenAdd );
 			pszOut += LenAdd;
 #ifdef DEBUG
 			LenOut -= LenAdd;
@@ -1318,24 +1335,30 @@ int fb_hProcessMask
 	} else {
 		DBG_ASSERT( LenOut>=0 );
 		*pszOut = 0;
-		fb_hStrSetLength( dst, pszOut - dst->data );
+		fb_hStrSetLength( dst, (size_t)(pszOut - dst->data) );
 	}
 
 	return TRUE;
 }
 
-FBCALL FBSTRING *fb_hStrFormat
+FBCALL FBSTRING_ACCESS *fb_hStrFormat
 	(
 		double value,
 		const char *mask,
 		size_t mask_length
 	)
 {
-	FBSTRING *dst = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *dst = &fb_ctx.null_desc;
 	const char *pszIntlResult;
 	char chDecimalPoint, chThousandsSep, chDateSep, chTimeSep;
 
 	fb_ErrorSetNum( FB_RTERROR_OK );
+
+	/* Mask offsets must fit the signed runtime string length domain. */
+	if( mask != NULL && mask_length > (size_t)FB_STRSIZEMSK ) {
+		fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		return dst;
+	}
 
 	/* Lock to prevent inconsistent results if fb_I18nSet() called? */
 	FB_LOCK();
@@ -1356,7 +1379,7 @@ FBCALL FBSTRING *fb_hStrFormat
 
 	if( mask == NULL || mask_length==0 )
 	{
-		dst = fb_hBuildDouble( value, chDecimalPoint, 0 );
+		dst = fb_hBuildDouble( value, chDecimalPoint );
 	}
 	else
 	{
@@ -1364,7 +1387,7 @@ FBCALL FBSTRING *fb_hStrFormat
 
 		/* Extract all information from the mask string */
 		if( fb_hProcessMask( NULL,
-		                     mask, mask_length,
+		                     mask, (ssize_t)mask_length,
 		                     value, &info,
 		                     chThousandsSep, chDecimalPoint,
 		                     chDateSep, chTimeSep ) )
@@ -1373,16 +1396,19 @@ FBCALL FBSTRING *fb_hStrFormat
 			if( dst == NULL )
 			{
 				fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
-				dst = &__fb_ctx.null_desc;
+				dst = &fb_ctx.null_desc;
 			}
 			else
 			{
 				/* Build the new string according to the mask */
-				fb_hProcessMask( dst,
-				                 mask, mask_length,
-				                 value, &info,
-				                 chThousandsSep, chDecimalPoint,
-				                 chDateSep, chTimeSep );
+				if( !fb_hProcessMask( dst,
+				                     mask, (ssize_t)mask_length,
+				                     value, &info,
+				                     chThousandsSep, chDecimalPoint,
+				                     chDateSep, chTimeSep ) ) {
+					fb_hStrDelTemp( dst );
+					dst = &fb_ctx.null_desc;
+				}
 			}
 		}
 	}
@@ -1390,13 +1416,13 @@ FBCALL FBSTRING *fb_hStrFormat
 	return dst;
 }
 
-FBCALL FBSTRING *fb_StrFormat
+FBCALL FBSTRING_ACCESS *fb_StrFormat
 	(
 		double value,
-		FBSTRING *mask
+		FBSTRING_ACCESS *mask
 	)
 {
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 
 	dst = fb_hStrFormat( value, mask->data, FB_STRSIZE(mask) );
 

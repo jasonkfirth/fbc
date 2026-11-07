@@ -2,8 +2,8 @@
 	Project: FreeBASIC C backend
 	File: backend/c/c-abi-parameters.bi
 	Purpose: Express ignored formal parameters required by a calling contract.
-	Responsibilities: Own per-output names, observe procedure addresses, and
-	check unused parameters against the complete emitted procedure body.
+	Responsibilities: Own per-output names and check unused parameters against
+	the complete emitted procedure body.
 	This file intentionally does NOT contain: procedure type, call operand or BASIC diagnostic changes.
 '/
 
@@ -20,16 +20,13 @@ type CABIPROC
 	parameters as CABIPARAM ptr
 	next_definition as CABIPROC ptr
 	header_at as uinteger
-	fixed_contract as integer
-	address_seen as integer
 	emit_header as integer
 	semantic_signature as longint
 end type
 
-private const C_ABI_UNUSED_TEXT = " __attribute__((unused))"
-'' The selected-backend ABI observer bounds its complete header at 64 KiB.
-'' Optional intent spelling must not push an otherwise valid observation over it.
-private const C_ABI_OBSERVED_HEADER_LIMIT = 65536
+private const C_ABI_C23_BEGIN = !"#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L\n"
+private const C_ABI_C23_ELSE = !"\n#else\n"
+private const C_ABI_C23_END = !"\n#endif\n"
 
 '' These pools own C spellings, not symbols. Local symbols may already have
 '' expired when the final output observes global callback initializers.
@@ -81,11 +78,6 @@ private function hCAbiGet( byval sym as FBSYMBOL ptr ) as CABIPROC ptr
 	return entry
 end function
 
-private sub hCAbiAddress( byval sym as FBSYMBOL ptr )
-	var entry = hCAbiGet(sym)
-	if( entry <> NULL ) then entry->address_seen = TRUE
-end sub
-
 private sub hCAbiParameter _
 	( byref first as CABIPARAM ptr, byref last as CABIPARAM ptr, _
 	  byval param as FBSYMBOL ptr, byval insert_at as uinteger )
@@ -93,7 +85,9 @@ private sub hCAbiParameter _
 	if( c_abi_ready = FALSE orelse c_local_refs_complete = FALSE ) then exit sub
 	var storage = symbGetParamVar(param)
 	if( storage = NULL ) then exit sub
-	if( symbIsParamVar(storage) = FALSE orelse symbGetIsAccessed(storage) ) then exit sub
+	if( symbIsParamVar(storage) = FALSE ) then exit sub
+	'' Access flags can describe reads removed with private dead stores.
+	'' The late body check keeps every name still needed by emitted C.
 	var identifier = hGetCId(storage)
 	if( len(identifier) = 0 ) then exit sub
 	var entry = cptr(CABIPARAM ptr, listNewNode(@c_abi_params))
@@ -126,7 +120,6 @@ private sub hCAbiDefinition _
 	DZstrAssign(entry->header, strptr(header))
 	entry->parameters = first
 	entry->semantic_signature = semantic_signature
-	entry->fixed_contract = (symbIsPrivate(sym) = FALSE) or symbIsExport(sym) or symbIsVirtual(sym)
 	var param = first
 	while( param <> NULL )
 		param->insert_at += prefix_length
@@ -167,62 +160,89 @@ private function hCAbiFind _
 	return FALSE
 end function
 
+private function hCAbiIdentifierByte( byval value as ubyte ) as integer
+	select case value
+	case asc("a") to asc("z"), asc("A") to asc("Z"), asc("0") to asc("9"), asc("_"), asc("$"), 128 to 255
+		return TRUE
+	end select
+	return FALSE
+end function
+
+private function hCAbiHasReference _
+	( byval buffer as const ubyte ptr, byval body_last as uinteger, _
+	  byval body_first as uinteger, byval identifier as const ubyte ptr, _
+	  byval name_length as uinteger ) as integer
+
+	'' Short C ABI names must not match parts of unrelated identifiers.
+	'' Strings and comments may conservatively retain a name; they cannot
+	'' cause a required parameter name to be removed.
+	var search_at = body_first
+	dim as uinteger position
+	while( hCAbiFind(buffer, body_last, search_at, identifier, name_length, position) )
+		var after_name = position + name_length
+		if( ((position = body_first) orelse hCAbiIdentifierByte(buffer[position - 1]) = FALSE) andalso _
+		    ((after_name = body_last) orelse hCAbiIdentifierByte(buffer[after_name]) = FALSE) ) then return TRUE
+		search_at = after_name
+	wend
+	return FALSE
+end function
+
 private sub hCAbiPrepare( byval buffer as const ubyte ptr, byval size as uinteger )
 	dim as uinteger search_at = 0
 	var entry = c_abi_definitions
 	while( entry <> NULL )
-		if( entry->fixed_contract or entry->address_seen ) then
-			var header_length = cuint(len(*entry->header.data))
-			dim as uinteger position
-			if( hCAbiFind(buffer, size, search_at, cptr(const ubyte ptr, entry->header.data), _
-			              header_length, position) ) then
-				'' Definitions are emitted in source order at column zero. A
-				'' prototype has no formal names, and cannot match this header.
-				var body_first = position + header_length
-				while( body_first < size )
-					select case buffer[body_first]
-					case asc(!"\t"), asc(!"\n"), asc(!"\r"), asc(" ")
-						body_first += 1
-					case else
-						exit while
-					end select
-				wend
-				if( ((position = 0) orelse (buffer[position - 1] = asc(!"\n"))) andalso _
-				    (body_first < size) andalso (buffer[body_first] = asc("{")) ) then
-					dim as uinteger body_last
-					'' Nested scopes retain indentation. The outer procedure
-					'' brace is the first closing brace at column zero. Opaque
-					'' assembly is excluded before inspecting this buffer.
-					if( hCAbiFind(buffer, size, body_first + 1, cptr(const ubyte ptr, strptr(!"\n}")), _
-					              2, body_last) andalso (body_last + 2 < size) ) then
-						if( buffer[body_last + 2] = asc(!"\n") orelse buffer[body_last + 2] = asc(!"\r") ) then
-							entry->header_at = position
-							dim as uinteger extra_bytes = 0
-							var param = entry->parameters
-							while( param <> NULL )
-								var name_length = cuint(len(*param->name))
-								if( (param->insert_at >= name_length) andalso _
-								    (param->insert_at <= header_length) ) then
-									var name_at = param->insert_at - name_length
-									if( memcmp(cptr(const ubyte ptr, entry->header.data) + name_at, _
-									           param->name, name_length) = 0 ) then
-										dim as uinteger reference_at
-										if( hCAbiFind(buffer, body_last, body_first + 1, _
-										              cptr(const ubyte ptr, param->name), name_length, reference_at) = FALSE ) then
-											param->emit_unused = TRUE
-											entry->emit_header = TRUE
-											extra_bytes += len(C_ABI_UNUSED_TEXT)
-										end if
+		'' Removing a name leaves the complete calling signature intact for
+		'' both private direct calls and externally visible procedures.
+		var header_length = cuint(len(*entry->header.data))
+		dim as uinteger position
+		var found = hCAbiFind(buffer, size, search_at, cptr(const ubyte ptr, entry->header.data), _
+		                     header_length, position)
+		'' Read-only ABI wrappers can be written after later procedure bodies.
+		'' Retain the forward scan, then check earlier bodies if it misses.
+		if( found = FALSE andalso search_at > 0 ) then
+			found = hCAbiFind(buffer, size, 0, cptr(const ubyte ptr, entry->header.data), _
+			                  header_length, position)
+		end if
+		if( found ) then
+			'' Definitions are emitted in source order at column zero. A
+			'' prototype has no formal names, and cannot match this header.
+			var body_first = position + header_length
+			while( body_first < size )
+				select case buffer[body_first]
+				case asc(!"\t"), asc(!"\n"), asc(!"\r"), asc(" ")
+					body_first += 1
+				case else
+					exit while
+				end select
+			wend
+			if( ((position = 0) orelse (buffer[position - 1] = asc(!"\n"))) andalso _
+			    (body_first < size) andalso (buffer[body_first] = asc("{")) ) then
+				dim as uinteger body_last
+				'' Nested scopes retain indentation. The outer procedure
+				'' brace is the first closing brace at column zero. Opaque
+				'' assembly is excluded before inspecting this buffer.
+				if( hCAbiFind(buffer, size, body_first + 1, cptr(const ubyte ptr, strptr(!"\n}")), _
+				              2, body_last) andalso (body_last + 2 < size) ) then
+					if( buffer[body_last + 2] = asc(!"\n") orelse buffer[body_last + 2] = asc(!"\r") ) then
+						entry->header_at = position
+						var param = entry->parameters
+						while( param <> NULL )
+							var name_length = cuint(len(*param->name))
+							if( (param->insert_at >= name_length) andalso _
+							    (param->insert_at <= header_length) ) then
+								var name_at = param->insert_at - name_length
+								if( memcmp(cptr(const ubyte ptr, entry->header.data) + name_at, _
+								           param->name, name_length) = 0 ) then
+									if( hCAbiHasReference(buffer, body_last, body_first + 1, _
+									                      cptr(const ubyte ptr, param->name), name_length) = FALSE ) then
+										param->emit_unused = TRUE
+										entry->emit_header = TRUE
 									end if
 								end if
-								param = param->next_param
-							wend
-							if( (entry->semantic_signature <> 0) andalso _
-							    (header_length + extra_bytes > C_ABI_OBSERVED_HEADER_LIMIT) ) then
-								entry->emit_header = FALSE
 							end if
-							search_at = body_last + 2
-						end if
+							param = param->next_param
+						wend
+						search_at = body_last + 2
 					end if
 				end if
 			end if
@@ -231,23 +251,32 @@ private sub hCAbiPrepare( byval buffer as const ubyte ptr, byval size as uintege
 	wend
 end sub
 
+private function hCAbiUnnamedHeader( byval entry as CABIPROC ptr ) as string
+	'' The C23 definition keeps every argument type and removes only names
+	'' absent from the complete emitted body after private-store removal.
+	dim as string header
+	dim as uinteger cursor = 0
+	var param = entry->parameters
+	while( param <> NULL )
+		if( param->emit_unused ) then
+			var name_at = param->insert_at - cuint(len(*param->name))
+			assert(name_at >= cursor)
+			header += mid(*entry->header.data, cursor + 1, name_at - cursor)
+			cursor = param->insert_at
+		end if
+		param = param->next_param
+	wend
+	header += mid(*entry->header.data, cursor + 1)
+	return header
+end function
+
 private sub hCAbiSemanticHeaders( )
 	var entry = c_abi_definitions
 	while( entry <> NULL )
 		if( entry->semantic_signature <> 0 ) then
 			dim as string header
 			if( entry->emit_header ) then
-				dim as uinteger cursor = 0
-				var param = entry->parameters
-				while( param <> NULL )
-					if( param->emit_unused ) then
-						header += mid(*entry->header.data, cursor + 1, param->insert_at - cursor)
-						header += C_ABI_UNUSED_TEXT
-						cursor = param->insert_at
-					end if
-					param = param->next_param
-				wend
-				header += mid(*entry->header.data, cursor + 1)
+				header = hCAbiUnnamedHeader(entry)
 			else
 				header = *entry->header.data
 			end if
@@ -267,32 +296,35 @@ private function hCAbiWriteChunk( byval buffer as const ubyte ptr, byval size as
 end function
 
 private function hCAbiWriteOutput _
-	( byval buffer as const ubyte ptr, byval size as uinteger, _
-	  byval opaque as integer ) as integer
+	( byval buffer as const ubyte ptr, byval size as uinteger ) as integer
 
 	if( c_abi_ready = FALSE ) then
 		return hCAbiWriteChunk(buffer, size)
 	end if
-	if( (opaque = FALSE) andalso (env.clopt.debuginfo = FALSE) ) then hCAbiPrepare(buffer, size)
+	'' Candidate parameters already passed the procedure-local assembly
+	'' check. An opaque body elsewhere cannot refer to their local names.
+	if( env.clopt.debuginfo = FALSE ) then hCAbiPrepare(buffer, size)
 	hCAbiSemanticHeaders( )
-	'' The GNU11 warning profile requires formal names in definitions. This records an
-	'' ignored slot in an unchanged public/callback signature. It is added
-	'' only after the optimized AST and the actual C body have no use for it.
+	'' GNU11 requires parameter names in definitions. C23 permits an unnamed
+	'' parameter, so emit both headers and let the C compiler select its path.
+	'' The body and the ABI are identical in both paths. No warning attribute is
+	'' needed, and the legacy path still exposes its unused-parameter warnings.
 	dim as uinteger cursor = 0
 	var entry = c_abi_definitions
 	while( entry <> NULL )
 		if( entry->emit_header ) then
-			var param = entry->parameters
-			while( param <> NULL )
-				if( param->emit_unused ) then
-					var position = entry->header_at + param->insert_at
-					assert(position >= cursor andalso position <= size)
-					if( hCAbiWriteChunk(buffer + cursor, position - cursor) = FALSE ) then return FALSE
-					if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_UNUSED_TEXT)), len(C_ABI_UNUSED_TEXT)) = FALSE ) then return FALSE
-					cursor = position
-				end if
-				param = param->next_param
-			wend
+			var position = entry->header_at
+			var header_length = cuint(len(*entry->header.data))
+			assert(position >= cursor andalso position <= size)
+			assert(header_length <= size - position)
+			if( hCAbiWriteChunk(buffer + cursor, position - cursor) = FALSE ) then return FALSE
+			if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_C23_BEGIN)), len(C_ABI_C23_BEGIN)) = FALSE ) then return FALSE
+			var unnamed_header = hCAbiUnnamedHeader(entry)
+			if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(unnamed_header)), len(unnamed_header)) = FALSE ) then return FALSE
+			if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_C23_ELSE)), len(C_ABI_C23_ELSE)) = FALSE ) then return FALSE
+			if( hCAbiWriteChunk(buffer + position, header_length) = FALSE ) then return FALSE
+			if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_C23_END)), len(C_ABI_C23_END)) = FALSE ) then return FALSE
+			cursor = position + header_length
 		end if
 		entry = entry->next_definition
 	wend

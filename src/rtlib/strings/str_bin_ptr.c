@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_BIN_p( const void *p )
+FBCALL FBSTRING_ACCESS *fb_BIN_p( const void *p )
 {
 #ifdef HOST_64BIT
 	return fb_BIN_l( (unsigned long long int)p );
@@ -16,7 +16,7 @@ FBCALL FBSTRING *fb_BIN_p( const void *p )
 #endif
 }
 
-FBCALL FBSTRING *fb_BINEx_p( const void *p, int digits )
+FBCALL FBSTRING_ACCESS *fb_BINEx_p( const void *p, int digits )
 {
 #ifdef HOST_64BIT
 	return fb_BINEx_l( (unsigned long long int)p, digits );

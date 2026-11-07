@@ -63,11 +63,11 @@ static int input_pop_key(FB_GFX3_INPUT_STATE *input)
 /* Keyboard hooks                                                            */
 /* ------------------------------------------------------------------------- */
 
-FBSTRING *fb_GfxInkey(void)
+FBSTRING_ACCESS *fb_GfxInkey(void)
 {
 	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_INPUT_STATE *input;
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	int key;
 
 	FB_GRAPHICS_LOCK();
@@ -273,7 +273,7 @@ FBCALL int fb_GfxDropEnable(int enabled)
 	return result;
 }
 
-FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING *output)
+FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING_ACCESS *output)
 {
 	FB_GFX3_INPUT_STATE *input;
 	char *text = NULL;
@@ -363,14 +363,14 @@ void fb_GfxSleep(int milliseconds)
 
 void fb_gfx3_input_install_hooks_locked(void)
 {
-	__fb_ctx.hooks.inkeyproc = fb_GfxInkey;
-	__fb_ctx.hooks.getkeyproc = fb_GfxGetkey;
-	__fb_ctx.hooks.keyhitproc = fb_GfxKeyHit;
-	__fb_ctx.hooks.multikeyproc = fb_GfxMultikey;
-	__fb_ctx.hooks.getmouseproc = fb_GfxGetMouse;
-	__fb_ctx.hooks.setmouseproc = fb_GfxSetMouse;
-	__fb_ctx.hooks.sleepproc = fb_GfxSleep;
-	__fb_ctx.hooks.isredirproc = fb_GfxIsRedir;
+	fb_ctx.hooks.inkeyproc = fb_GfxInkey;
+	fb_ctx.hooks.getkeyproc = fb_GfxGetkey;
+	fb_ctx.hooks.keyhitproc = fb_GfxKeyHit;
+	fb_ctx.hooks.multikeyproc = fb_GfxMultikey;
+	fb_ctx.hooks.getmouseproc = fb_GfxGetMouse;
+	fb_ctx.hooks.setmouseproc = fb_GfxSetMouse;
+	fb_ctx.hooks.sleepproc = fb_GfxSleep;
+	fb_ctx.hooks.isredirproc = fb_GfxIsRedir;
 }
 
 /* end of gfx3_input_api.c */

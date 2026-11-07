@@ -15,8 +15,8 @@ FBCALL int fb_PageCopy( int src, int dst )
 
 	int res;
 
-	if( __fb_ctx.hooks.pagecopyproc )
-		res = __fb_ctx.hooks.pagecopyproc( src, dst );
+	if( fb_ctx.hooks.pagecopyproc )
+		res = fb_ctx.hooks.pagecopyproc( src, dst );
 	else
 	{
 		if( (src >= FB_CONSOLE_MAXPAGES) || (dst >= FB_CONSOLE_MAXPAGES) )

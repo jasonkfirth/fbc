@@ -1504,6 +1504,8 @@ private sub _emitSTORECLONGDOUBLEST0 _
 		byval resultptr as IRVREG ptr, _
 		byval unused as integer _
 	)
+
+	ASSERT_PROC_DECL( EMIT_STKCB )
 	dim as string pointer_value
 	dim as integer storage_size = 12
 
@@ -1551,6 +1553,8 @@ private sub _emitLOADCLONGDOUBLEST0 _
 		byval source as IRVREG ptr, _
 		byval unused as integer _
 	)
+
+	ASSERT_PROC_DECL( EMIT_STKCB )
 	dim as string source_operand
 	dim as integer storage_size = 12
 
@@ -1578,6 +1582,8 @@ private sub _emitBRANCH _
 		byval label as FBSYMBOL ptr, _
 		byval op as integer _
 	) static
+
+	ASSERT_PROC_DECL( EMIT_BRCCB )
 
 	dim ostr as string
 
@@ -7744,105 +7750,178 @@ end sub
 '' functions table
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-#define EMIT_CBENTRY(op) cast( EMIT_OPCB, @_emit##op## )
 
-	'' same order as EMIT_NODEOP
-	dim shared _opFnTB(0 to EMIT_MAXOPS-1) as EMIT_OPCB => _
-	{ _
-		EMIT_CBENTRY(NOP), _
-		_
-		EMIT_CBENTRY(LOADI2I), EMIT_CBENTRY(LOADF2I), EMIT_CBENTRY(LOADL2I), EMIT_CBENTRY(LOADB2I), _
-		EMIT_CBENTRY(LOADI2F), EMIT_CBENTRY(LOADF2F), EMIT_CBENTRY(LOADL2F), EMIT_CBENTRY(LOADB2F), _
-		EMIT_CBENTRY(LOADI2L), EMIT_CBENTRY(LOADF2L), EMIT_CBENTRY(LOADL2L), EMIT_CBENTRY(LOADB2L), _
-		EMIT_CBENTRY(LOADI2B), EMIT_CBENTRY(LOADF2B), EMIT_CBENTRY(LOADL2B), EMIT_CBENTRY(LOADB2B), _
-		_
-		EMIT_CBENTRY(STORI2I), EMIT_CBENTRY(STORF2I), EMIT_CBENTRY(STORL2I), EMIT_CBENTRY(STORB2I), _
-		EMIT_CBENTRY(STORI2F), EMIT_CBENTRY(STORF2F), EMIT_CBENTRY(STORL2F), EMIT_CBENTRY(STORB2F), _
-		EMIT_CBENTRY(STORI2L), EMIT_CBENTRY(STORF2L), EMIT_CBENTRY(STORL2L), EMIT_CBENTRY(STORB2L), _
-		EMIT_CBENTRY(STORI2B), EMIT_CBENTRY(STORF2B), EMIT_CBENTRY(STORL2B), EMIT_CBENTRY(STORB2B), _
-		_
-		EMIT_CBENTRY(MOVI), EMIT_CBENTRY(MOVF), EMIT_CBENTRY(MOVL), _
-		EMIT_CBENTRY(ADDI), EMIT_CBENTRY(ADDF), EMIT_CBENTRY(ADDL), _
-		EMIT_CBENTRY(SUBI), EMIT_CBENTRY(SUBF), EMIT_CBENTRY(SUBL), _
-		EMIT_CBENTRY(MULI), EMIT_CBENTRY(MULF), EMIT_CBENTRY(MULL), _
-		EMIT_CBENTRY(DIVI), EMIT_CBENTRY(DIVF), NULL              , _
-		EMIT_CBENTRY(MODI), NULL              , NULL              , _
-		EMIT_CBENTRY(SHLI), EMIT_CBENTRY(SHLL), _
-		EMIT_CBENTRY(SHRI), EMIT_CBENTRY(SHRL), _
-		EMIT_CBENTRY(ANDI), EMIT_CBENTRY(ANDL), _
-		EMIT_CBENTRY(ORI) , EMIT_CBENTRY(ORL) , _
-		EMIT_CBENTRY(XORI), EMIT_CBENTRY(XORL), _
-		EMIT_CBENTRY(EQVI), EMIT_CBENTRY(EQVL), _
-		EMIT_CBENTRY(IMPI), EMIT_CBENTRY(IMPL), _
-		EMIT_CBENTRY(ATN2), _
-		EMIT_CBENTRY(POW), _
-		EMIT_CBENTRY(ADDROF), _
-		EMIT_CBENTRY(DEREF), _
-		_
-		EMIT_CBENTRY(CGTI), EMIT_CBENTRY(CGTF), EMIT_CBENTRY(CGTL), _
-		EMIT_CBENTRY(CLTI), EMIT_CBENTRY(CLTF), EMIT_CBENTRY(CLTL), _
-		EMIT_CBENTRY(CEQI), EMIT_CBENTRY(CEQF), EMIT_CBENTRY(CEQL), _
-		EMIT_CBENTRY(CNEI), EMIT_CBENTRY(CNEF), EMIT_CBENTRY(CNEL), _
-		EMIT_CBENTRY(CGEI), EMIT_CBENTRY(CGEF), EMIT_CBENTRY(CGEL), _
-		EMIT_CBENTRY(CLEI), EMIT_CBENTRY(CLEF), EMIT_CBENTRY(CLEL), _
-		_
-		EMIT_CBENTRY(NEGI), EMIT_CBENTRY(NEGF), EMIT_CBENTRY(NEGL), _
-		EMIT_CBENTRY(NOTI), EMIT_CBENTRY(NOTL), _
-		_
-		NULL, _
-		_
-		EMIT_CBENTRY(ABSI), EMIT_CBENTRY(ABSF), EMIT_CBENTRY(ABSL), _
-		EMIT_CBENTRY(SGNI), EMIT_CBENTRY(SGNF), EMIT_CBENTRY(SGNL), _
-		_
-		EMIT_CBENTRY(FIX), _
-		EMIT_CBENTRY(FRAC), _
-		EMIT_CBENTRY(CONVFD2FS), _
-		_
-		NULL, _
-		_
-		EMIT_CBENTRY(SIN), EMIT_CBENTRY(ASIN), _
-		EMIT_CBENTRY(COS), EMIT_CBENTRY(ACOS), _
-		EMIT_CBENTRY(TAN), EMIT_CBENTRY(ATAN), _
-		EMIT_CBENTRY(SQRT), _
-		_
-		NULL, _
-		NULL, _
-		_
-		EMIT_CBENTRY(LOG), _
-		EMIT_CBENTRY(EXP), _
-		EMIT_CBENTRY(FLOOR), _
-		EMIT_CBENTRY(XCHGTOS), _
-		_
-		EMIT_CBENTRY(STACKALIGN), _
-		EMIT_CBENTRY(PUSHI), EMIT_CBENTRY(PUSHF), EMIT_CBENTRY(PUSHL), _
-		EMIT_CBENTRY(POPI), EMIT_CBENTRY(POPF), EMIT_CBENTRY(POPL), _
-		EMIT_CBENTRY(PUSHUDT), _
-		EMIT_CBENTRY(POPST0), _
-		EMIT_CBENTRY(LOADCLONGDOUBLEST0), _
-		EMIT_CBENTRY(STORECLONGDOUBLEST0), _
-		_
-		EMIT_CBENTRY(CALL), _
-		EMIT_CBENTRY(CALLPTR), _
-		EMIT_CBENTRY(BRANCH), _
-		EMIT_CBENTRY(JUMP), _
-		EMIT_CBENTRY(JUMPPTR), _
-		EMIT_CBENTRY(RET), _
-		_
-		EMIT_CBENTRY(LABEL), _
-		EMIT_CBENTRY(PUBLIC), _
-		EMIT_CBENTRY(LIT), _
-		EMIT_CBENTRY(JMPTB), _
-		_
-		EMIT_CBENTRY(MEMMOVE), _
-		EMIT_CBENTRY(MEMSWAP), _
-		EMIT_CBENTRY(MEMFILL), _
-		EMIT_CBENTRY(STKCLEAR), _
-		_
-		EMIT_CBENTRY(LINEINI), _
-		EMIT_CBENTRY(LINEEND), _
-		EMIT_CBENTRY(SCOPEINI), _
-		EMIT_CBENTRY(SCOPEEND) _
-	}
+sub emitX86LoadB2F _
+	( _
+		byval dvreg as IRVREG ptr, _
+		byval svreg as IRVREG ptr _
+	)
+
+	ASSERT_PROC_DECL( EMIT_BOPCB )
+	_emitLOADB2F( dvreg, svreg )
+end sub
+
+sub emitX86LoadF2B _
+	( _
+		byval dvreg as IRVREG ptr, _
+		byval svreg as IRVREG ptr _
+	)
+
+	ASSERT_PROC_DECL( EMIT_BOPCB )
+	_emitLOADF2B( dvreg, svreg )
+end sub
+
+dim shared _opFnTB(0 to EMIT_MAXOPS-1) as EMIT_OPCB
+
+'' Reset every slot before installing optional SSE replacements. Each
+'' slot uses the same callback kind selected by its EMIT_NODECLASS.
+private sub hInitOpFnTB( )
+	_opFnTB(EMIT_OP_NOP).nop = @_emitNOP
+	_opFnTB(EMIT_OP_LOADI2I).bop = @_emitLOADI2I
+	_opFnTB(EMIT_OP_LOADF2I).bop = @_emitLOADF2I
+	_opFnTB(EMIT_OP_LOADL2I).bop = @_emitLOADL2I
+	_opFnTB(EMIT_OP_LOADB2I).bop = @_emitLOADB2I
+	_opFnTB(EMIT_OP_LOADI2F).bop = @_emitLOADI2F
+	_opFnTB(EMIT_OP_LOADF2F).bop = @_emitLOADF2F
+	_opFnTB(EMIT_OP_LOADL2F).bop = @_emitLOADL2F
+	_opFnTB(EMIT_OP_LOADB2F).bop = @_emitLOADB2F
+	_opFnTB(EMIT_OP_LOADI2L).bop = @_emitLOADI2L
+	_opFnTB(EMIT_OP_LOADF2L).bop = @_emitLOADF2L
+	_opFnTB(EMIT_OP_LOADL2L).bop = @_emitLOADL2L
+	_opFnTB(EMIT_OP_LOADB2L).bop = @_emitLOADB2L
+	_opFnTB(EMIT_OP_LOADI2B).bop = @_emitLOADI2B
+	_opFnTB(EMIT_OP_LOADF2B).bop = @_emitLOADF2B
+	_opFnTB(EMIT_OP_LOADL2B).bop = @_emitLOADL2B
+	_opFnTB(EMIT_OP_LOADB2B).bop = @_emitLOADB2B
+	_opFnTB(EMIT_OP_STORI2I).bop = @_emitSTORI2I
+	_opFnTB(EMIT_OP_STORF2I).bop = @_emitSTORF2I
+	_opFnTB(EMIT_OP_STORL2I).bop = @_emitSTORL2I
+	_opFnTB(EMIT_OP_STORB2I).bop = @_emitSTORB2I
+	_opFnTB(EMIT_OP_STORI2F).bop = @_emitSTORI2F
+	_opFnTB(EMIT_OP_STORF2F).bop = @_emitSTORF2F
+	_opFnTB(EMIT_OP_STORL2F).bop = @_emitSTORL2F
+	_opFnTB(EMIT_OP_STORB2F).bop = @_emitSTORB2F
+	_opFnTB(EMIT_OP_STORI2L).bop = @_emitSTORI2L
+	_opFnTB(EMIT_OP_STORF2L).bop = @_emitSTORF2L
+	_opFnTB(EMIT_OP_STORL2L).bop = @_emitSTORL2L
+	_opFnTB(EMIT_OP_STORB2L).bop = @_emitSTORB2L
+	_opFnTB(EMIT_OP_STORI2B).bop = @_emitSTORI2B
+	_opFnTB(EMIT_OP_STORF2B).bop = @_emitSTORF2B
+	_opFnTB(EMIT_OP_STORL2B).bop = @_emitSTORL2B
+	_opFnTB(EMIT_OP_STORB2B).bop = @_emitSTORB2B
+	_opFnTB(EMIT_OP_MOVI).bop = @_emitMOVI
+	_opFnTB(EMIT_OP_MOVF).bop = @_emitMOVF
+	_opFnTB(EMIT_OP_MOVL).bop = @_emitMOVL
+	_opFnTB(EMIT_OP_ADDI).bop = @_emitADDI
+	_opFnTB(EMIT_OP_ADDF).bop = @_emitADDF
+	_opFnTB(EMIT_OP_ADDL).bop = @_emitADDL
+	_opFnTB(EMIT_OP_SUBI).bop = @_emitSUBI
+	_opFnTB(EMIT_OP_SUBF).bop = @_emitSUBF
+	_opFnTB(EMIT_OP_SUBL).bop = @_emitSUBL
+	_opFnTB(EMIT_OP_MULI).bop = @_emitMULI
+	_opFnTB(EMIT_OP_MULF).bop = @_emitMULF
+	_opFnTB(EMIT_OP_MULL).bop = @_emitMULL
+	_opFnTB(EMIT_OP_DIVI).bop = @_emitDIVI
+	_opFnTB(EMIT_OP_DIVF).bop = @_emitDIVF
+	_opFnTB(EMIT_OP_DIVL).bop = NULL
+	_opFnTB(EMIT_OP_MODI).bop = @_emitMODI
+	_opFnTB(EMIT_OP_MODF).bop = NULL
+	_opFnTB(EMIT_OP_MODL).bop = NULL
+	_opFnTB(EMIT_OP_SHLI).bop = @_emitSHLI
+	_opFnTB(EMIT_OP_SHLL).bop = @_emitSHLL
+	_opFnTB(EMIT_OP_SHRI).bop = @_emitSHRI
+	_opFnTB(EMIT_OP_SHRL).bop = @_emitSHRL
+	_opFnTB(EMIT_OP_ANDI).bop = @_emitANDI
+	_opFnTB(EMIT_OP_ANDL).bop = @_emitANDL
+	_opFnTB(EMIT_OP_ORI).bop = @_emitORI
+	_opFnTB(EMIT_OP_ORL).bop = @_emitORL
+	_opFnTB(EMIT_OP_XORI).bop = @_emitXORI
+	_opFnTB(EMIT_OP_XORL).bop = @_emitXORL
+	_opFnTB(EMIT_OP_EQVI).bop = @_emitEQVI
+	_opFnTB(EMIT_OP_EQVL).bop = @_emitEQVL
+	_opFnTB(EMIT_OP_IMPI).bop = @_emitIMPI
+	_opFnTB(EMIT_OP_IMPL).bop = @_emitIMPL
+	_opFnTB(EMIT_OP_ATN2).bop = @_emitATN2
+	_opFnTB(EMIT_OP_POW).bop = @_emitPOW
+	_opFnTB(EMIT_OP_ADDROF).bop = @_emitADDROF
+	_opFnTB(EMIT_OP_DEREF).bop = @_emitDEREF
+	_opFnTB(EMIT_OP_CGTI).rel = @_emitCGTI
+	_opFnTB(EMIT_OP_CGTF).rel = @_emitCGTF
+	_opFnTB(EMIT_OP_CGTL).rel = @_emitCGTL
+	_opFnTB(EMIT_OP_CLTI).rel = @_emitCLTI
+	_opFnTB(EMIT_OP_CLTF).rel = @_emitCLTF
+	_opFnTB(EMIT_OP_CLTL).rel = @_emitCLTL
+	_opFnTB(EMIT_OP_CEQI).rel = @_emitCEQI
+	_opFnTB(EMIT_OP_CEQF).rel = @_emitCEQF
+	_opFnTB(EMIT_OP_CEQL).rel = @_emitCEQL
+	_opFnTB(EMIT_OP_CNEI).rel = @_emitCNEI
+	_opFnTB(EMIT_OP_CNEF).rel = @_emitCNEF
+	_opFnTB(EMIT_OP_CNEL).rel = @_emitCNEL
+	_opFnTB(EMIT_OP_CGEI).rel = @_emitCGEI
+	_opFnTB(EMIT_OP_CGEF).rel = @_emitCGEF
+	_opFnTB(EMIT_OP_CGEL).rel = @_emitCGEL
+	_opFnTB(EMIT_OP_CLEI).rel = @_emitCLEI
+	_opFnTB(EMIT_OP_CLEF).rel = @_emitCLEF
+	_opFnTB(EMIT_OP_CLEL).rel = @_emitCLEL
+	_opFnTB(EMIT_OP_NEGI).uop = @_emitNEGI
+	_opFnTB(EMIT_OP_NEGF).uop = @_emitNEGF
+	_opFnTB(EMIT_OP_NEGL).uop = @_emitNEGL
+	_opFnTB(EMIT_OP_NOTI).uop = @_emitNOTI
+	_opFnTB(EMIT_OP_NOTL).uop = @_emitNOTL
+	_opFnTB(EMIT_OP_HADDF).uop = NULL
+	_opFnTB(EMIT_OP_ABSI).uop = @_emitABSI
+	_opFnTB(EMIT_OP_ABSF).uop = @_emitABSF
+	_opFnTB(EMIT_OP_ABSL).uop = @_emitABSL
+	_opFnTB(EMIT_OP_SGNI).uop = @_emitSGNI
+	_opFnTB(EMIT_OP_SGNF).uop = @_emitSGNF
+	_opFnTB(EMIT_OP_SGNL).uop = @_emitSGNL
+	_opFnTB(EMIT_OP_FIX).uop = @_emitFIX
+	_opFnTB(EMIT_OP_FRAC).uop = @_emitFRAC
+	_opFnTB(EMIT_OP_CONVFD2FS).uop = @_emitCONVFD2FS
+	_opFnTB(EMIT_OP_SWZREP).uop = NULL
+	_opFnTB(EMIT_OP_SIN).uop = @_emitSIN
+	_opFnTB(EMIT_OP_ASIN).uop = @_emitASIN
+	_opFnTB(EMIT_OP_COS).uop = @_emitCOS
+	_opFnTB(EMIT_OP_ACOS).uop = @_emitACOS
+	_opFnTB(EMIT_OP_TAN).uop = @_emitTAN
+	_opFnTB(EMIT_OP_ATAN).uop = @_emitATAN
+	_opFnTB(EMIT_OP_SQRT).uop = @_emitSQRT
+	_opFnTB(EMIT_OP_RSQRT).uop = NULL
+	_opFnTB(EMIT_OP_RCP).uop = NULL
+	_opFnTB(EMIT_OP_LOG).uop = @_emitLOG
+	_opFnTB(EMIT_OP_EXP).uop = @_emitEXP
+	_opFnTB(EMIT_OP_FLOOR).uop = @_emitFLOOR
+	_opFnTB(EMIT_OP_XCHGTOS).uop = @_emitXCHGTOS
+	_opFnTB(EMIT_OP_STACKALIGN).stk = @_emitSTACKALIGN
+	_opFnTB(EMIT_OP_PUSHI).stk = @_emitPUSHI
+	_opFnTB(EMIT_OP_PUSHF).stk = @_emitPUSHF
+	_opFnTB(EMIT_OP_PUSHL).stk = @_emitPUSHL
+	_opFnTB(EMIT_OP_POPI).stk = @_emitPOPI
+	_opFnTB(EMIT_OP_POPF).stk = @_emitPOPF
+	_opFnTB(EMIT_OP_POPL).stk = @_emitPOPL
+	_opFnTB(EMIT_OP_PUSHUDT).stk = @_emitPUSHUDT
+	_opFnTB(EMIT_OP_POPST0).stk = @_emitPOPST0
+	_opFnTB(EMIT_OP_LOADCLONGDOUBLEST0).stk = @_emitLOADCLONGDOUBLEST0
+	_opFnTB(EMIT_OP_STORECLONGDOUBLEST0).stk = @_emitSTORECLONGDOUBLEST0
+	_opFnTB(EMIT_OP_CALL).brc = @_emitCALL
+	_opFnTB(EMIT_OP_CALLPTR).brc = @_emitCALLPTR
+	_opFnTB(EMIT_OP_BRANCH).brc = @_emitBRANCH
+	_opFnTB(EMIT_OP_JUMP).brc = @_emitJUMP
+	_opFnTB(EMIT_OP_JUMPPTR).brc = @_emitJUMPPTR
+	_opFnTB(EMIT_OP_RET).uop = @_emitRET
+	_opFnTB(EMIT_OP_LABEL).sop = @_emitLABEL
+	_opFnTB(EMIT_OP_PUBLIC).sop = @_emitPUBLIC
+	_opFnTB(EMIT_OP_LIT).lit = @_emitLIT
+	_opFnTB(EMIT_OP_JMPTB).jtb = @_emitJMPTB
+	_opFnTB(EMIT_OP_MEMMOVE).mem = @_emitMEMMOVE
+	_opFnTB(EMIT_OP_MEMSWAP).mem = @_emitMEMSWAP
+	_opFnTB(EMIT_OP_MEMFILL).mem = @_emitMEMFILL
+	_opFnTB(EMIT_OP_STKCLEAR).mem = @_emitSTKCLEAR
+	_opFnTB(EMIT_OP_LINEINI).dbg = @_emitLINEINI
+	_opFnTB(EMIT_OP_LINEEND).dbg = @_emitLINEEND
+	_opFnTB(EMIT_OP_SCOPEINI).dbg = @_emitSCOPEINI
+	_opFnTB(EMIT_OP_SCOPEEND).dbg = @_emitSCOPEEND
+end sub
 
 
 
@@ -8589,6 +8668,7 @@ function emitGasX86_ctor _
 		@_getSectionString _     '' only called privately
 	)
 
+	hInitOpFnTB( )
 	emit.vtbl = _vtbl
 	emit.opFnTb = @_opFnTB(0)
 

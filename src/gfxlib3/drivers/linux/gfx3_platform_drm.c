@@ -57,6 +57,7 @@ int fb_gfx3_platform_drm_should_default(void)
 
 #if defined(FB_GFX3_HAVE_DRM_EGL_GBM)
 
+#include "../../../gfxlib2/drivers/linux/fb_linux_maliit.h"
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -810,6 +811,8 @@ static void drm_destroy(void *opaque)
 
 	if (platform == NULL)
 		return;
+	/* Stop Maliit callbacks before the mode's input state can be released. */
+	fb_hLinuxMaliitCancelPending();
 	(void)drm_wait_page_flip(platform);
 	fb_gfx3_platform_drm_input_destroy(platform->input_adapter);
 	platform->input_adapter = NULL;

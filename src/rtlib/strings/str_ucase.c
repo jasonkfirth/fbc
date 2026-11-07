@@ -8,15 +8,15 @@
 #include "fb.h"
 #include <ctype.h>
 
-FBCALL FBSTRING *fb_StrUcase2( FBSTRING *src, int mode )
+FBCALL FBSTRING_ACCESS *fb_StrUcase2( FBSTRING_ACCESS *src, int mode )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	ssize_t i, len = 0;
 	int c;
 	char		*s, *d;
 
 	if( src == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	FB_STRLOCK();
 
@@ -52,7 +52,7 @@ FBCALL FBSTRING *fb_StrUcase2( FBSTRING *src, int mode )
 		/* null char */
 		*d = '\0';
 	} else {
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 	}
 
 	/* del if temp */

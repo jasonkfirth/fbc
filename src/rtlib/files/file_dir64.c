@@ -7,10 +7,10 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_Dir64( FBSTRING *filespec, int attrib, long long *outattrib )
+FBCALL FBSTRING_ACCESS *fb_Dir64( FBSTRING_ACCESS *filespec, int attrib, long long *outattrib )
 {
 	int ioutattrib;
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 
 	res = fb_Dir( filespec, attrib, &ioutattrib );
 

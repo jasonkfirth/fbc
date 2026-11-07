@@ -150,14 +150,14 @@ int main(void)
 	atomic_store(&fail_allocation, 1);
 	check(fb_GfxScreenRes(64, 64, 32, 1, DRIVER_NULL, 0) == FB_RTERROR_OUTOFMEM,
 	      "allocation failure was not exercised");
-	check(!__fb_gfx && !__fb_ctx.hooks.inkeyproc, "failed allocation left mode/hooks installed");
+	check(!__fb_gfx && !fb_ctx.hooks.inkeyproc, "failed allocation left mode/hooks installed");
 	check(fb_GfxScreenQB(-1, -1, -1) == FB_RTERROR_ILLEGALFUNCTIONCALL, "invalid QB mode accepted");
 	check(!runtime_depth && !graphics_depth, "failure path leaked a lock");
 	check(fb_GfxScreenRes(64, 64, 32, 1, DRIVER_NULL, 0) == FB_RTERROR_OK, "mode recovery failed");
 	__fb_gfx->driver = &driver;
-	__fb_ctx.exit_gfxlib2();
-	__fb_ctx.exit_gfxlib2();
-	check(!__fb_gfx && !__fb_ctx.hooks.inkeyproc && atomic_load(&exits) == 2,
+	fb_ctx.exit_gfxlib2();
+	fb_ctx.exit_gfxlib2();
+	check(!__fb_gfx && !fb_ctx.hooks.inkeyproc && atomic_load(&exits) == 2,
 	      "shutdown was incomplete or not idempotent");
 	check(!runtime_depth && !graphics_depth, "shutdown leaked a lock");
 	fb_hRtExit();

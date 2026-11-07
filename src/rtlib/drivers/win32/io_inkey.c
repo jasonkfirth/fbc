@@ -9,15 +9,15 @@
 #include "fb_private_console.h"
 
 /* Caller is expected to hold FB_LOCK() */
-FBSTRING *fb_ConsoleInkey( void )
+FBSTRING_ACCESS *fb_ConsoleInkey( void )
 {
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 	int key;
 
 	key = fb_hConsoleGetKey( TRUE );
 
 	if( key == -1 ) {
-		res = &__fb_ctx.null_desc;
+		res = &fb_ctx.null_desc;
 	} else {
 		res = fb_hMakeInkeyStr( key );
 	}

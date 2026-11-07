@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 
@@ -155,9 +156,67 @@ def main() -> int:
         ("builtins", "tests/crt/builtin-backends.bas", ""),
         ("asm-registers", "tests/quirk/inline-asm-registers.bas", ""),
         ("qb-headers", "tests/qb/vb-string-helpers.bas", ""),
+        ("fbcunit-report", "tests/compiler-support/fbcunit-report-contract.bas", ""),
+        ("runtime-aliases", "tests/compiler-support/c-runtime-aliases.bas", ""),
+        ("readonly-entries", "tests/compiler-support/c-readonly-entry-reachability.bas", ""),
+        ("unused-parameters", "tests/compiler-support/c-unused-parameters-after-stores.bas",
+         "C_UNUSED_PARAMETERS_AFTER_STORES_PASS"),
+        ("opaque-local-metadata", "tests/compiler-support/c-opaque-local-metadata.bas",
+         "C_OPAQUE_LOCAL_METADATA_PASS"),
+        ("error-capture-layout", "tests/compiler-support/c-error-capture-layout.bas",
+         "C_ERROR_CAPTURE_LAYOUT_PASS"),
+        ("startup-declarations", "tests/compiler-support/c-startup-declarations.bas",
+         "C_STARTUP_DECLARATIONS_PASS\nC_STARTUP_DECLARATIONS_CLEANUP_PASS"),
+        ("reserved-names", "tests/compiler-support/c-reserved-names.bas",
+         "C_RESERVED_NAMES_PASS\nC_RESERVED_DESTRUCTOR_PASS"),
+        ("terminating-context", "tests/compiler-support/c-terminating-context.bas",
+         "C_TERMINATING_CONTEXT_PASS"),
+        ("unused-pointer-stores", "tests/compiler-support/c-unused-pointer-stores.bas",
+         "POINTER_STORE_VALUES_PASS"),
+        ("array-descriptor-end", "tests/compiler-support/c-array-descriptor-end.bas",
+         "ARRAY_DESCRIPTOR_END_PASS"),
+        ("custom-entry", "tests/compiler-support/c-custom-entry.bas",
+         "CUSTOM_ENTRY_VALUES_PASS"),
+        ("named-memory-asm", "tests/compiler-support/c-named-memory-asm.bas",
+         "C_NAMED_MEMORY_ASM_PASS"),
+        ("static-erased-callbacks", "tests/compiler-support/c-static-erased-callbacks.bas",
+         "C_STATIC_ERASED_CALLBACKS_PASS"),
+        ("predefined-timestamps", "tests/compiler-support/c-predefined-timestamps.bas",
+         "PREDEFINED_TIMESTAMPS_PASS"),
+        ("virtual-receiver", "tests/compiler-support/c-virtual-receiver-check.bas",
+         "VIRTUAL_RECEIVER_CHECK_PASS"),
+        ("virtual-receiver-checked", "tests/compiler-support/c-virtual-receiver-check.bas",
+         "VIRTUAL_RECEIVER_CHECK_PASS"),
+        ("pointer-values", "tests/compiler-support/c-pointer-values.bas", "POINTER_VALUES_PASS 330"),
+        ("pointer-order", "tests/compiler-support/c-pointer-order.bas", "POINTER_ORDER_VALUES_PASS"),
+        ("pointer-null-order", "tests/compiler-support/c-pointer-null-order.bas", "POINTER_NULL_ORDER_PASS"),
+        ("array-values", "tests/compiler-support/c-array-values.bas", "ARRAY_VALUE_MATRIX_PASS"),
+        ("dispatch-values", "tests/compiler-support/c-dispatch-values.bas", "DISPATCH_VALUES_PASS"),
+        ("gosub-values", "tests/compiler-support/c-gosub-values.bas", "GOSUB_VALUES_PASS"),
+        ("label-flag-layout", "tests/compiler-support/c-label-flag-layout.bas", "C_LABEL_FLAG_LAYOUT_PASS"),
+        ("label-flag-gosub", "tests/compiler-support/label-flag-gosub.bas", "LABEL_FLAG_GOSUB_PASS"),
+        ("member-pointer-slots", "tests/compiler-support/c-member-pointer-slots.bas", "MEMBER_POINTER_SLOTS_PASS"),
+        ("record-layout", "tests/compiler-support/c-record-layout.bas", "RECORD_LAYOUT_PASS 6"),
+        ("packed-descriptors", "tests/compiler-support/c-packed-descriptors.bas", "PACKED_DESCRIPTORS_PASS"),
+        ("packed-descriptor-tail", "tests/compiler-support/c-packed-descriptor-tail.bas", "PACKED_DESCRIPTOR_TAIL_PASS"),
+        ("packed-descriptor-init", "tests/compiler-support/c-packed-descriptor-init.bas", "PACKED_DESCRIPTOR_INIT_PASS"),
+        ("packed-anonymous-descriptors", "tests/compiler-support/c-packed-anonymous-descriptors.bas", "PACKED_ANONYMOUS_DESCRIPTORS_PASS"),
+        ("external-prototypes", "tests/compiler-support/c-external-prototypes.bas", "EXTERNAL_PROTOTYPES_PASS"),
     ]
     with tempfile.TemporaryDirectory(prefix="fbc-backends-") as temporary:
         working = Path(temporary)
+        # Source diagnostics must survive changes in C warning cleanup and
+        # remain consistent for the native assembly producers as well.
+        source_warnings = subprocess.run(
+            [sys.executable, "-B", str(root / "build_scripts/test-source-warnings.py"),
+             "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+             "--work-dir", str(working)],
+            cwd=root, text=True, capture_output=True, check=False)
+        if source_warnings.returncode:
+            print("source warning regression failed\n"
+                  f"{source_warnings.stdout}{source_warnings.stderr}")
+            return 1
+        print(source_warnings.stdout.strip())
         # Test the C parser directly so stale installed runtime archives cannot
         # conceal a missing CRT API or a loss of native long-double precision.
         locale_test = working / ("longdouble-locale.exe" if os.name == "nt"
@@ -180,6 +239,83 @@ def main() -> int:
                   f"{locale_run.stdout}{locale_run.stderr}")
             return 1
         print(locale_run.stdout.strip())
+        # The dispatcher restores the exact signature before invoking an erased
+        # callback. Check both C producers and dialects independently of GAS64.
+        callback_command = [sys.executable,
+                            str(root / "tests/compiler-support/c-generic-callback-values.py"),
+                            "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+                            "--gcc", os.environ.get("GCC") or "gcc", "--work-dir", str(working),
+                            "--standard", "gnu23", "--optimization", "2", "--mode", "e"]
+        if clang:
+            callback_command += ["--clang", clang]
+        callback_check = subprocess.run(callback_command, cwd=working, text=True,
+                                        capture_output=True, timeout=180, check=False)
+        if callback_check.returncode:
+            print(callback_check.stdout + callback_check.stderr)
+            return 1
+        print(callback_check.stdout.strip())
+
+        names_check = subprocess.run(
+            [sys.executable, str(root / "tests/compiler-support/c-longdouble-temporary-names.py"),
+             "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+             "--root", str(root), "--work-dir", str(working)],
+            cwd=working, text=True, capture_output=True, timeout=600, check=False)
+        if names_check.returncode:
+            print(names_check.stdout + names_check.stderr)
+            return 1
+        print(names_check.stdout.strip())
+        # Native C declarations can be incompatible under LTO even when their
+        # byte layouts agree. Keep this check alongside the value fixtures.
+        header_command = [sys.executable,
+                          str(root / "tests/compiler-support/c-anonymous-header.py"),
+                          "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+                          "--gcc", os.environ.get("GCC") or "gcc", "--work-dir", str(working)]
+        header_check = subprocess.run(header_command, cwd=working, text=True,
+                                      capture_output=True, timeout=180, check=False)
+        if header_check.returncode:
+            print(header_check.stdout + header_check.stderr)
+            return 1
+        print(header_check.stdout.strip())
+        pointer_command = [sys.executable,
+                           str(root / "tests/compiler-support/c-record-pointer-dependencies.py"),
+                           "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+                           "--gcc", os.environ.get("GCC") or "gcc", "--work-dir", str(working)]
+        if clang:
+            pointer_command += ["--clang", clang]
+        pointer_check = subprocess.run(pointer_command, cwd=working, text=True,
+                                       capture_output=True, timeout=180, check=False)
+        if pointer_check.returncode:
+            print(pointer_check.stdout + pointer_check.stderr)
+            return 1
+        print(pointer_check.stdout.strip())
+        # A local record completed inside a function must use the same tag as
+        # an earlier declaration required by static storage or generated helpers.
+        scope_command = [sys.executable,
+                         str(root / "tests/compiler-support/c-record-declaration-scope.py"),
+                         "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+                         "--gcc", shutil.which(os.environ.get("GCC") or "gcc"),
+                         "--work-dir", str(working)]
+        if clang:
+            scope_command += ["--clang", clang]
+        scope_check = subprocess.run(scope_command, cwd=working, text=True,
+                                     capture_output=True, timeout=180, check=False)
+        if scope_check.returncode:
+            print(scope_check.stdout + scope_check.stderr)
+            return 1
+        print(scope_check.stdout.strip())
+        prototype_command = [sys.executable,
+                             str(root / "tests/compiler-support/c-record-prototype-views.py"),
+                             "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+                             "--gcc", shutil.which(os.environ.get("GCC") or "gcc"),
+                             "--work-dir", str(working)]
+        if clang:
+            prototype_command += ["--clang", clang]
+        prototype_check = subprocess.run(prototype_command, cwd=working, text=True,
+                                         capture_output=True, timeout=180, check=False)
+        if prototype_check.returncode:
+            print(prototype_check.stdout + prototype_check.stderr)
+            return 1
+        print(prototype_check.stdout.strip())
         # Every compiler contains GAS64, even when its host has 32-bit INTEGER.
         # Emission checks that host-width references match the fixed-width state
         # without requiring the target's assembler, linker, or runtime libraries.
@@ -339,6 +475,64 @@ def main() -> int:
                 print(f"compiler target query failed\n{target.stdout}{target.stderr}")
                 return 1
             system, _, architecture = target.stdout.strip().partition("-")
+            # The driver's legacy Win64 target spelling omits the CPU suffix.
+            # It still needs the x86-64 layout, arithmetic and TLS fixtures.
+            if system == "win64" and not architecture:
+                architecture = "x86_64"
+            if system in ("win32", "win64"):
+                printer_exe = working / "win32-printer-geometry.exe"
+                printer_arch = "-m64" if system == "win64" or architecture == "x86_64" else "-m32"
+                printer_lib = "win64" if printer_arch == "-m64" else "win32"
+                printer_build = subprocess.run(
+                    [os.environ.get("GCC") or "gcc", printer_arch, "-std=gnu23", "-O2",
+                     "-Wall", "-Wextra", "-fno-strict-aliasing", "-ffunction-sections",
+                     "-fdata-sections", str(root / "tests/compiler-support/win32-printer-geometry.c"),
+                     "-Wl,--gc-sections", str(toolchain_prefix / "lib/freebasic" / printer_lib / "libfb.a"),
+                     "-lwinspool", "-lgdi32", "-lm", "-mthreads", "-o", str(printer_exe)],
+                    cwd=working, text=True, capture_output=True, timeout=120, check=False)
+                if printer_build.returncode:
+                    print(f"Win32 printer geometry build failed\n{printer_build.stdout}{printer_build.stderr}")
+                    return 1
+                printer_run = subprocess.run([str(printer_exe)], cwd=working, text=True,
+                                             capture_output=True, timeout=30, check=False)
+                if printer_run.returncode or "PRINTER_GEOMETRY_PASS" not in printer_run.stdout:
+                    print(f"Win32 printer geometry failed\n{printer_run.stdout}{printer_run.stderr}")
+                    return 1
+                print("win32/printer-geometry: passed")
+                for console_wide in (False, True):
+                    console_kind = "wide" if console_wide else "narrow"
+                    console_exe = working / f"win32-console-buffer-{console_kind}.exe"
+                    console_build = subprocess.run(
+                        [os.environ.get("GCC") or "gcc", printer_arch, "-std=gnu23", "-O2",
+                         "-Wall", "-Wextra", "-fno-strict-aliasing", "-ffunction-sections",
+                         "-fdata-sections", *(["-DCONSOLE_BUFFER_WIDE"] if console_wide else []),
+                         str(root / "tests/compiler-support/win32-console-buffer.c"),
+                         "-Wl,--gc-sections", str(toolchain_prefix / "lib/freebasic" / printer_lib / "libfb.a"),
+                         "-lm", "-mthreads", "-o", str(console_exe)],
+                        cwd=working, text=True, capture_output=True, timeout=120, check=False)
+                    if console_build.returncode:
+                        print(f"Win32 console {console_kind} build failed\n{console_build.stdout}{console_build.stderr}")
+                        return 1
+                    console_run = subprocess.run([str(console_exe)], cwd=working, text=True,
+                                                 capture_output=True, timeout=30, check=False)
+                    if console_run.returncode or "CONSOLE_BUFFER_PASS" not in console_run.stdout:
+                        print(f"Win32 console {console_kind} failed\n{console_run.stdout}{console_run.stderr}")
+                        return 1
+                    print(f"win32/console-buffer-{console_kind}: passed")
+                variant_command = [sys.executable,
+                                   str(root / "tests/compiler-support/variant-native-abi.py"),
+                                   "--fbc", str(options.fbc.resolve()),
+                                   "--prefix", str(toolchain_prefix),
+                                   "--gcc", os.environ.get("GCC") or "gcc",
+                                   "--work-dir", str(working)]
+                if clang:
+                    variant_command += ["--clang", clang]
+                variant_check = subprocess.run(variant_command, cwd=working, text=True,
+                                               capture_output=True, timeout=180, check=False)
+                if variant_check.returncode:
+                    print(variant_check.stdout + variant_check.stderr)
+                    return 1
+                print(variant_check.stdout.strip())
             int128_object = None
             int128_input_object = None
             thread_local_extern_object = None
@@ -407,6 +601,64 @@ def main() -> int:
                     return 1
                 fixtures.append(("incomplete-extern",
                                  "tests/compiler-support/incomplete-extern.bas", ""))
+            if system == "win64" or (architecture == "x86_64" and system in (
+                    "linux", "android", "darwin", "freebsd", "openbsd", "netbsd",
+                    "dragonfly", "solaris", "illumos", "haiku")):
+                stdio_object = working / "stdio-contract.o"
+                c_build = subprocess.run(
+                    [os.environ.get("GCC") or "gcc", "-m64", "-c",
+                     str(root / "tests/compiler-support/stdio-contract.c"),
+                     "-o", str(stdio_object)], cwd=working, text=True,
+                    capture_output=True, timeout=60, check=False)
+                if c_build.returncode:
+                    print("stdio contract fixture compilation failed\n"
+                          f"{c_build.stdout}{c_build.stderr}")
+                    return 1
+                fixtures.append(("stdio-contract", "tests/compiler-support/stdio-contract.bas", ""))
+                if system == "win64":
+                    # Compare the public UCRT record and accessors with the
+                    # actual SDK, then exchange bytes through the same stream.
+                    crt_object = working / "crt-native-values.o"
+                    c_build = subprocess.run(
+                        [os.environ.get("GCC") or "gcc", "-m64", "-std=c99",
+                         "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-c",
+                         str(root / "tests/compiler-support/crt-native-values.c"),
+                         "-o", str(crt_object)], cwd=working, text=True,
+                        capture_output=True, timeout=60, check=False)
+                    if c_build.returncode:
+                        print("CRT native observer compilation failed\n"
+                              f"{c_build.stdout}{c_build.stderr}")
+                        return 1
+                    fixtures.append(("crt-native-values",
+                                     "tests/compiler-support/crt-native-values.bas",
+                                     "CRT_NATIVE_VALUES_PASS"))
+                if system != "android":
+                    wide_object = working / "wide-libc-native.o"
+                    c_build = subprocess.run(
+                        [os.environ.get("GCC") or "gcc", "-m64", "-c",
+                         str(root / "tests/compiler-support/c-wide-libc-native.c"),
+                         "-o", str(wide_object)], cwd=working, text=True,
+                        capture_output=True, timeout=60, check=False)
+                    if c_build.returncode:
+                        print("wide libc fixture compilation failed\n"
+                              f"{c_build.stdout}{c_build.stderr}")
+                        return 1
+                    fixtures.append(("wide-libc", "tests/compiler-support/c-wide-libc.bas", ""))
+                    fixtures.append(("long-literals", "tests/compiler-support/c-long-literals.bas", ""))
+                    address_object = working / "procedure-address-native.o"
+                    c_build = subprocess.run(
+                        [os.environ.get("GCC") or "gcc", "-m64", "-c",
+                         str(root / "tests/compiler-support/procedure-address-identity.c"),
+                         "-o", str(address_object)], cwd=working, text=True,
+                        capture_output=True, timeout=60, check=False)
+                    if c_build.returncode:
+                        print("procedure address fixture compilation failed\n"
+                              f"{c_build.stdout}{c_build.stderr}")
+                        return 1
+                    fixtures.append(("procedure-address-identity", "tests/compiler-support/procedure-address-identity.bas", ""))
+                    fixtures.append(("deep-reachability", "tests/compiler-support/c-procedure-deep-reachability.bas", "DEEP_REACHABILITY=PASS"))
+                    fixtures.append(("array-virtual-origins", "tests/compiler-support/c-array-virtual-origins.bas", "ARRAY_ORIGIN=PASS"))
+                    fixtures.append(("destructor-reachability", "tests/compiler-support/c-destructor-reachability.bas", "LEAF= 0\nLEAF= 0\nLEAF= 0\nLEAF= 0\nLEAF= 0\nLEAF= 0\nVIRTUAL_ITEM\nVIRTUAL_BASE\nDESTRUCTOR_ROOTS_MAIN=PASS\nSTATIC_ROOT= 17\nLEAF= 0\nLEAF= 0"))
             if architecture in ("x86_64", "aarch64"):
                 fixtures.extend((
                     ("int128-layout", "tests/compiler-support/integer128-layout.bas",
@@ -415,12 +667,22 @@ def main() -> int:
                      "128-bit integer arithmetic passed"),
                     ("thread-local", "tests/compiler-support/thread-local.bas",
                      "thread-local storage passed"),
+                    ("thread-local-contextual-procedure", "tests/compiler-support/thread-contextual-procedure.bas",
+                     "CONTEXTUAL_THREAD_PROCEDURE_PASS"),
+                    ("thread-local-contextual-namespace", "tests/compiler-support/thread-contextual-namespace.bas",
+                     "CONTEXTUAL_THREAD_NAMESPACE_PASS"),
+                    ("thread-local-contextual-import", "tests/compiler-support/thread-contextual-import.bas",
+                     "CONTEXTUAL_THREAD_IMPORT_PASS"),
                 ))
         except (OSError, subprocess.TimeoutExpired) as error:
             print(f"C ABI fixture: {error}")
             return 1
         for backend in backends:
             for name, source, expected in fixtures:
+                if name in ("wide-libc", "long-literals", "procedure-address-identity", "deep-reachability", "destructor-reachability", "array-virtual-origins") and backend not in ("gcc", "clang"):
+                    continue
+                if name in ("gosub-values", "label-flag-layout") and backend not in ("gcc", "clang"):
+                    continue
                 if name == "asm-att-llvm" and backend != "llvm":
                     continue
                 executable = working / (backend + "-" + name)
@@ -439,16 +701,148 @@ def main() -> int:
                     # These fixtures contain Intel tokens. Darwin defaults to
                     # AT&T string expressions, so select their actual syntax.
                     command += ["-asm", "intel"]
+                if name == "custom-entry":
+                    command += ["-entry", "custom_entry"]
+                if name == "label-flag-layout":
+                    command += ["-i", str(root / "src/compiler")]
                 if name == "asm-att-llvm":
                     command += ["-asm", "att"]
                 if name == "qb-headers":
                     command += ["-lang", "qb"]
+                if name in ("dispatch-values", "gosub-values", "error-capture-layout"):
+                    # RESUME needs the failing statement's continuation labels.
+                    command += ["-ex"]
+                if name == "terminating-context":
+                    command += ["-exx"]
+                if name == "virtual-receiver-checked":
+                    command += ["-exx"]
                 if name.startswith("thread-local"):
                     command += ["-mt"]
+                if name == "startup-declarations":
+                    module_object = working / (backend + "-startup-module.o")
+                    module_build = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         "-d", "STARTUP_MODULE_PROBE", "-m", "startup_module_driver",
+                         "-c", str(input_source), "-o", str(module_object)],
+                        cwd=working, text=True, capture_output=True, timeout=600, check=False)
+                    if module_build.returncode:
+                        print(f"{backend}/{name}: module failed\n"
+                              f"{module_build.stdout}{module_build.stderr}")
+                        return 1
+                    command += [str(module_object)]
+                if name == "external-prototypes":
+                    observer = working / (backend + "-external-prototypes.o")
+                    built = subprocess.run(
+                        [os.environ.get("GCC") or "gcc", "-std=c99", "-Wall", "-Wextra",
+                         "-Werror", "-c", str(root / "tests/compiler-support/c-external-prototypes.c"),
+                         "-o", str(observer)], cwd=working, text=True, capture_output=True,
+                        timeout=60, check=False)
+                    if built.returncode:
+                        print(f"{backend}/{name}: C observer failed\n{built.stdout}{built.stderr}")
+                        return 1
+                    command += [str(observer)]
                 if name == "thread-local-extern":
                     command += [str(thread_local_extern_object)]
                 if name == "incomplete-extern":
                     command += [str(incomplete_extern_object)]
+                    if backend in ("gcc", "clang"):
+                        # An address-only object must retain its unknown extent.
+                        # A char surrogate happens to link, but gives C the wrong
+                        # bounds when the address identifies a larger region.
+                        generated = working / (backend + "-incomplete-extern.c")
+                        emitted = subprocess.run(
+                            [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                             "-r", str(input_source), "-o", str(generated)],
+                            cwd=working, text=True, capture_output=True, timeout=120,
+                            check=False)
+                        if emitted.returncode or not re.search(
+                                r"\bextern\s+struct\s+\w+\s+c2fb_incomplete_object\s*;",
+                                generated.read_text() if generated.is_file() else ""):
+                            print(f"{backend}/{name}: incomplete object extent lost\n"
+                                  f"{emitted.stdout}{emitted.stderr}")
+                            return 1
+                if name == "long-literals":
+                    generated = working / (backend + "-long-literals.c")
+                    emitted = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         "-m", input_source.stem, "-r", str(input_source), "-o", str(generated)],
+                        cwd=working, text=True, capture_output=True, timeout=120,
+                        check=False)
+                    if emitted.returncode:
+                        print(f"{backend}/{name}: literal emission failed\n"
+                              f"{emitted.stdout}{emitted.stderr}")
+                        return 1
+                    checked = subprocess.run(
+                        [os.environ.get("GCC") or "gcc", "-std=gnu11", "-nostdinc",
+                         "-Wpedantic", "-Werror=overlength-strings", "-fsyntax-only", str(generated)],
+                        cwd=working, text=True, capture_output=True, timeout=120,
+                        check=False)
+                    if checked.returncode:
+                        print(f"{backend}/{name}: long quoted literal remains\n"
+                              f"{checked.stdout}{checked.stderr}")
+                        return 1
+                if name == "deep-reachability":
+                    generated = working / (backend + "-deep-reachability.c")
+                    emitted = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         "-m", input_source.stem, "-r", str(input_source), "-o", str(generated)],
+                        cwd=working, text=True, capture_output=True, timeout=120,
+                        check=False)
+                    if emitted.returncode or "UNUSED_DEEP_LEAF" in generated.read_text().upper():
+                        print(f"{backend}/{name}: unreachable private body remains\n"
+                              f"{emitted.stdout}{emitted.stderr}")
+                        return 1
+                if name == "destructor-reachability":
+                    generated = working / (backend + "-destructor-reachability.c")
+                    emitted = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         "-g", "-m", input_source.stem, "-r", str(input_source), "-o", str(generated)],
+                        cwd=working, text=True, capture_output=True, timeout=120,
+                        check=False)
+                    if emitted.returncode or "UNOBSERVED_DTOR" in generated.read_text().upper():
+                        print(f"{backend}/{name}: unreachable destructor remains\n"
+                              f"{emitted.stdout}{emitted.stderr}")
+                        return 1
+                if name in ("array-virtual-origins", "pointer-values") and backend == "clang":
+                    command += ["-Wc", "-fsanitize=pointer-overflow",
+                                "-Wc", "-fsanitize-trap=pointer-overflow"]
+                if name == "procedure-address-identity":
+                    command += [str(address_object)]
+                if name == "stdio-contract":
+                    command += [str(stdio_object)]
+                if name == "crt-native-values":
+                    command += [str(crt_object)]
+                if name == "wide-libc":
+                    command += [str(wide_object)]
+                    generated = working / (backend + "-wide-libc.c")
+                    emitted = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         "-m", input_source.stem, "-r", str(input_source), "-o", str(generated)],
+                        cwd=working, text=True, capture_output=True, timeout=120,
+                        check=False)
+                    code = generated.read_text() if generated.is_file() else ""
+                    if (emitted.returncode or "fb_c_wcslen(" not in code or "fb_c_wcsncmp(" not in code or
+                            "fb_c_wcschr(" not in code or "&wcschr" not in code or "&fb_c_wcschr" in code or
+                            "&wcslen" not in code or "&fb_c_wcslen" in code):
+                        print(f"{backend}/{name}: wide alignment/address contract changed\n"
+                              f"{emitted.stdout}{emitted.stderr}")
+                        return 1
+                if name == "readonly-entries" and system == "win64" and backend in ("gcc", "clang"):
+                    # Private CDECL bodies bypass const inference. This host's
+                    # BASIC convention exercises the separate implementation.
+                    generated = working / (backend + "-readonly-entries.c")
+                    emitted = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         "-m", input_source.stem, "-r", str(input_source), "-o", str(generated)],
+                        cwd=working, text=True, capture_output=True, timeout=120,
+                        check=False)
+                    code = generated.read_text() if generated.is_file() else ""
+                    if (emitted.returncode or "DIRECTREAD" in code or "DEADADDRESS" in code or
+                            any(token not in code for token in
+                                ("ADDRESSREAD", "SELFADDRESSREAD", "readonly_shared_entry"))):
+                        print(f"{backend}/{name}: private entry reachability changed\n"
+                              f"{emitted.stdout}{emitted.stderr}")
+                        return 1
                 if name.startswith("c-abi"):
                     command += [str(c_object)]
                     if backend == "llvm":
@@ -486,24 +880,50 @@ def main() -> int:
                         if not arguments or any(arg not in slots for arg in arguments):
                             print(f"{backend}/{name}: byval argument lacks aligned local storage")
                             return 1
-                    if backend == "clang":
-                        # This must follow -Wall so Clang's expensive C-only
-                        # warning analysis stays disabled for generated code.
+                    if backend in ("gcc", "clang"):
                         diagnostic = built.stdout + built.stderr
-                        enabled = diagnostic.find("-Wall")
-                        disabled = diagnostic.find("-Wno-uninitialized")
-                        if enabled < 0 or disabled < enabled:
-                            print(f"{backend}/{name}: uninitialized-warning policy missing\n{diagnostic}")
+                        disabled = ("-Wno-main", "-Wno-misleading-indentation",
+                                    "-Wno-builtin-requires-header", "-Wno-uninitialized",
+                                    "-Wno-warn-absolute-paths")
+                        if "-Wall" not in diagnostic or any(flag in diagnostic for flag in disabled):
+                            print(f"{backend}/{name}: C warnings were disabled\n{diagnostic}")
                             return 1
-                    executed = subprocess.run([str(executable)], cwd=working, text=True,
+                    arguments = [str(executable)]
+                    if name == "stdio-contract":
+                        arguments.append(str(working / "stdio-roundtrip.txt"))
+                    if name == "crt-native-values":
+                        arguments.append(str(working / "crt-values.bin"))
+                    if name == "fbcunit-report":
+                        arguments += [str(working / filename) for filename in
+                                      ("report-first.txt", "report-next.txt", "report.xml")]
+                    executed = subprocess.run(arguments, cwd=working, text=True,
                                               capture_output=True, timeout=30, check=False)
                 except (OSError, subprocess.TimeoutExpired) as error:
                     print(f"{backend}/{name}: {error}")
                     return 1
-                if executed.returncode or executed.stdout.strip() != expected:
+                matches_expected = executed.stdout.strip() == expected
+                if name == "label-flag-layout":
+                    fields = executed.stdout.split()
+                    matches_expected = (len(fields) == 5 and fields[0] == expected
+                                        and all(field.isdecimal() for field in fields[1:]))
+                if executed.returncode or not matches_expected:
                     print(f"{backend}/{name}: execution failed\n{executed.stdout}{executed.stderr}")
                     return 1
                 print(f"{backend}/{name}: passed")
+                if name == "virtual-receiver-checked":
+                    for mode in ("null-virtual", "null-abstract"):
+                        try:
+                            rejected = subprocess.run(
+                                [str(executable), mode], cwd=working, text=True,
+                                capture_output=True, timeout=30, check=False)
+                        except (OSError, subprocess.TimeoutExpired) as error:
+                            print(f"{backend}/{name}/{mode}: {error}")
+                            return 1
+                        diagnostic = rejected.stdout + rejected.stderr
+                        if rejected.returncode != 7 or "null pointer access" not in diagnostic.lower():
+                            print(f"{backend}/{name}/{mode}: receiver check failed\n{diagnostic}")
+                            return 1
+                        print(f"{backend}/{name}/{mode}: passed")
 
         invalid_source = root / "tests/compiler-support/incomplete-extern-invalid-value.bas"
         invalid_output = working / "incomplete-extern-invalid-value.o"
@@ -1150,14 +1570,30 @@ def main() -> int:
             if built.returncode:
                 print(f"gas/int128-arithmetic: compilation failed\n{built.stdout}{built.stderr}")
                 return 1
-            assembled = subprocess.run(
-                [os.environ.get("AS") or "as", "--32", "-o",
-                 str(working / "gas-int128-arithmetic.o"), str(assembly)],
-                cwd=working, text=True, capture_output=True, timeout=60, check=False)
-            if assembled.returncode:
-                print(f"gas/int128-arithmetic: assembly failed\n{assembled.stdout}{assembled.stderr}")
-                return 1
-            print("gas/int128-arithmetic: emitted")
+            arithmetic_object = working / "gas-int128-arithmetic.o"
+            # MinGW's native assembler produces COFF and cannot consume the
+            # ELF directives selected by linux-x86. Use an explicit ELF target.
+            if os.name == "nt" and clang is not None:
+                assemble_command = [clang, "-target", "i386-linux-gnu", "-c", "-x", "assembler",
+                                    str(assembly), "-o", str(arithmetic_object)]
+            elif os.name != "nt" or os.environ.get("AS"):
+                assemble_command = [os.environ.get("AS") or "as", "--32", "-o",
+                                    str(arithmetic_object), str(assembly)]
+            else:
+                assemble_command = None
+            if assemble_command is not None:
+                assembled = subprocess.run(assemble_command, cwd=working, text=True,
+                                           capture_output=True, timeout=60, check=False)
+                if assembled.returncode:
+                    print(f"gas/int128-arithmetic: assembly failed\n{assembled.stdout}{assembled.stderr}")
+                    return 1
+                header = arithmetic_object.read_bytes()[:20]
+                if header[:5] != b"\x7fELF\x01" or header[18:20] != b"\x03\x00":
+                    print("gas/int128-arithmetic: expected an i386 ELF32 object")
+                    return 1
+                print("gas/int128-arithmetic: ELF32 object passed")
+            else:
+                print("gas/int128-arithmetic: emitted; ELF32 assembly requires Clang or AS on Windows")
 
             thread_local_source = root / "tests/compiler-support/thread-local.bas"
             executable = working / "gas64-thread-local"
@@ -1179,6 +1615,32 @@ def main() -> int:
                 print(f"gas64/thread-local: execution failed\n{executed.stdout}{executed.stderr}")
                 return 1
             print("gas64/thread-local: passed")
+
+            # Keyword lookup is shared by the C and native backends. Keep the
+            # ordinary name and storage-prefix contracts covered on both paths.
+            for role in ("procedure", "namespace", "import"):
+                source = root / ("tests/compiler-support/thread-contextual-" + role + ".bas")
+                executable = working / ("gas64-thread-contextual-" + role)
+                command = [*compiler_args, "-i", str(root / "inc"),
+                           "-gen", "gas64", "-mt", str(source), "-x", str(executable)]
+                try:
+                    built = subprocess.run(command, cwd=working, text=True,
+                                           capture_output=True, timeout=120, check=False)
+                    if built.returncode:
+                        print(f"gas64/thread-contextual-{role}: compilation failed\n"
+                              f"{built.stdout}{built.stderr}")
+                        return 1
+                    executed = subprocess.run([str(executable)], cwd=working, text=True,
+                                              capture_output=True, timeout=30, check=False)
+                except (OSError, subprocess.TimeoutExpired) as error:
+                    print(f"gas64/thread-contextual-{role}: {error}")
+                    return 1
+                if (executed.returncode or executed.stdout.strip() !=
+                        "CONTEXTUAL_THREAD_" + role.upper() + "_PASS"):
+                    print(f"gas64/thread-contextual-{role}: execution failed\n"
+                          f"{executed.stdout}{executed.stderr}")
+                    return 1
+                print(f"gas64/thread-contextual-{role}: passed")
 
             if thread_local_extern_object is not None:
                 source = root / "tests/compiler-support/thread-local-extern.bas"

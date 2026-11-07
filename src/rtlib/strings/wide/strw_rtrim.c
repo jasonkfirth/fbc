@@ -20,7 +20,7 @@ FBCALL FB_WCHAR *fb_WstrRTrim ( const FB_WCHAR *src )
 	if( chars <= 0 )
 		return NULL;
 
-	p = fb_wstr_SkipCharRev( src, chars, _LC(' ') );
+	p = fb_wstr_SkipCharRev( src, chars, FB_WCHAR_LITERAL(' ') );
 	chars = fb_wstr_CalcDiff( src, p );
 	if( chars <= 0 )
 		return NULL;

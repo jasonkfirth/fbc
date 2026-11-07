@@ -62,11 +62,11 @@ FBCALL FB_WCHAR *fb_WstrOctEx_l( unsigned long long num, int digits )
 
 	remaining.number = num;
 	for( index = digits - 1; index >= 0; --index ) {
-		result[index] = _LC( '0' ) + (remaining.word.low & 7);
+		result[index] = FB_WCHAR_LITERAL( '0' ) + (remaining.word.low & 7);
 		fb_hArosWoctShiftRightThree( &remaining );
 	}
 
-	result[digits] = _LC( '\0' );
+	result[digits] = FB_WCHAR_LITERAL( '\0' );
 	return result;
 }
 

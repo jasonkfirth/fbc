@@ -94,11 +94,11 @@ const FB_GFX3_PLATFORM_VTABLE *fb_gfx3_platform_default(void)
 
 #ifdef HOST_WIN32
 
-struct _FBMUTEX {
+struct FBMUTEX_ {
 	CRITICAL_SECTION value;
 };
 
-struct _FBCOND {
+struct FBCOND_ {
 	CONDITION_VARIABLE value;
 };
 
@@ -189,11 +189,11 @@ static void test_delay(void)
 
 #else
 
-struct _FBMUTEX {
+struct FBMUTEX_ {
 	pthread_mutex_t value;
 };
 
-struct _FBCOND {
+struct FBCOND_ {
 	pthread_cond_t value;
 };
 
@@ -290,7 +290,7 @@ static void test_delay(void)
 
 #endif
 
-struct _FBTHREAD {
+struct FBTHREAD_ {
 	TEST_THREAD thread;
 	FB_THREADPROC proc;
 	void *parameter;

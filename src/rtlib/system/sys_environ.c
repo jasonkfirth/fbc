@@ -61,9 +61,9 @@ static int hSetEnviron( const char *text )
 }
 #endif
 
-FBCALL FBSTRING *fb_GetEnviron ( FBSTRING *varname )
+FBCALL FBSTRING_ACCESS *fb_GetEnviron ( FBSTRING_ACCESS *varname )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	char 		*tmp;
 	ssize_t len;
 
@@ -83,10 +83,10 @@ FBCALL FBSTRING *fb_GetEnviron ( FBSTRING *varname )
 			fb_hStrCopy( dst->data, tmp, len );
 		}
 		else
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	/* del if temp */
 	fb_hStrDelTemp_NoLock( varname );
@@ -96,7 +96,7 @@ FBCALL FBSTRING *fb_GetEnviron ( FBSTRING *varname )
 	return dst;
 }
 
-FBCALL int fb_SetEnviron ( FBSTRING *str )
+FBCALL int fb_SetEnviron ( FBSTRING_ACCESS *str )
 {
 	int res = 0;
 

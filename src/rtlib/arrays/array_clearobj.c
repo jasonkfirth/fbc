@@ -16,7 +16,7 @@
 
 #include "fb.h"
 
-void fb_hArrayCtorObj( FBARRAY *array, FB_DEFCTOR ctor )
+void fb_hArrayCtorObj( FBARRAY_ACCESS *array, FB_DEFCTOR ctor )
 {
 	size_t elements, element_len;
 	unsigned char *this_;
@@ -40,7 +40,7 @@ void fb_hArrayCtorObj( FBARRAY *array, FB_DEFCTOR ctor )
 
 FBCALL int fb_ArrayClearObj
 	(
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		FB_DEFCTOR ctor,
 		FB_DEFCTOR dtor
 	)

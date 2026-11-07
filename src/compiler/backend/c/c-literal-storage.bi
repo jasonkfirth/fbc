@@ -52,7 +52,7 @@ end sub
 
 private function hCLiteralStorageGet(byval sym as FBSYMBOL ptr) as CLITERALSTORAGE ptr
 	assert(c_literal_storage_ready)
-	var key = str(culngint(sym))
+	var key = str(culngint(cuint(sym)))
 	var entry = cptr(CLITERALSTORAGE ptr, hashLookup(@c_literal_symbols, strptr(key)))
 	if( entry <> NULL ) then return entry
 	entry = listNewNode(@c_literal_storage)
@@ -96,7 +96,7 @@ private function hCLiteralStorageName(byval sym as FBSYMBOL ptr) as string
 		if( symbGetType(sym) = FB_DATATYPE_WCHAR ) then
 			'' The builder consumes the internal wide encoding exactly once.
 			hBuildWstrLit(initializer, symbGetVarLitTextW(sym), symbGetWstrLength(sym) + 1)
-			if( hUseNumericWstrLit() ) then
+			if( hUseNumericWstrLit() or symbGetWstrLength(sym) > C_STRING_LITERAL_LIMIT ) then
 				'' A compound literal is an expression with block lifetime. Its
 				'' element list also initializes our module-owned array directly.
 				var brace = instr(initializer, "{")
@@ -104,7 +104,13 @@ private function hCLiteralStorageName(byval sym as FBSYMBOL ptr) as string
 				initializer = mid(initializer, brace)
 			end if
 		else
-			hBuildStrLit(initializer, hUnescape(symbGetVarLitText(sym)), symbGetStrLength(sym) + 1, 0)
+			var decoded = hUnescape(symbGetVarLitText(sym))
+			var length = symbGetStrLength(sym) + 1
+			if( length - 1 > C_STRING_LITERAL_LIMIT ) then
+				hBuildNumericStrLit(initializer, decoded, length)
+			else
+				hBuildStrLit(initializer, decoded, length, 0)
+			end if
 		end if
 		var prefix = "static const " + hEmitType(typeUnsetIsConst(symbGetFullType(sym)), NULL) + " "
 		var declaration = prefix + *entry->identifier + "[]"

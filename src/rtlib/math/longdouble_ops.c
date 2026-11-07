@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "extended_math.h"
 
 enum {
 	FB_LONGDOUBLE_BOP_ADD = 1,

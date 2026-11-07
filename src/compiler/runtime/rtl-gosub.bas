@@ -190,14 +190,38 @@
 		) _
 	}
 
+'' Target identifiers are private to one C activation. Their public runtime
+'' declarations preserve the existing opaque, one-pointer GOSUB context.
+dim shared as FB_RTL_PROCDEF targetdata(0 to ...) = _
+{ _
+	(@FB_RTL_GOSUBPUSHTARGET, NULL, FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+	 NULL, FB_RTL_OPT_NONE, 2, _
+	 { (typeMultAddrOf(FB_DATATYPE_VOID, 2), FB_PARAMMODE_BYVAL, FALSE), _
+	   (FB_DATATYPE_ULONG, FB_PARAMMODE_BYVAL, FALSE) }), _
+	(@FB_RTL_GOSUBRETURNTARGET, NULL, FB_DATATYPE_ULONG, FB_FUNCMODE_FBCALL, _
+	 NULL, FB_RTL_OPT_NONE, 1, _
+	 { (typeMultAddrOf(FB_DATATYPE_VOID, 2), FB_PARAMMODE_BYVAL, FALSE) }), _
+	(NULL) _
+}
+
 '':::::
 	sub rtlGosubModInit( )
 
-	'' No need to add these procs if GOSUB isn't allowed in the dialect...
+	'' Language GOSUB services follow the selected dialect.
 	if( fbLangOptIsSet( FB_LANG_OPT_GOSUB ) ) then
 
 		rtlAddIntrinsicProcs( @funcdata(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB )
+		if( env.clopt.backend = FB_BACKEND_GCC or env.clopt.backend = FB_BACKEND_CLANG ) then
+			rtlAddIntrinsicProcs(@targetdata(0), FALSE, FALSE, FB_RTL_DOMAIN_GOSUB)
+		end if
 
+	end if
+
+	'' C ERROR owners also need a native checkpoint when the source dialect
+	'' has no GOSUB. Register the internal setjmp family without enabling the
+	'' language's GOSUB services or syntax.
+	if( fbLangOptIsSet(FB_LANG_OPT_GOSUB) or _
+	    env.clopt.backend = FB_BACKEND_GCC or env.clopt.backend = FB_BACKEND_CLANG ) then
 		if( env.clopt.target = FB_COMPTARGET_WIN32 ) then
 			if( fbIs64bit() ) then
 				if( fbGetCpuFamily( ) = FB_CPUFAMILY_AARCH64 ) then

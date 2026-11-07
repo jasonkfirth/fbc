@@ -249,18 +249,18 @@ int fb_hGetCh(int remove)
 }
 
 /* Caller is expected to hold FB_LOCK() */
-FBSTRING *fb_ConsoleInkey( void )
+FBSTRING_ACCESS *fb_ConsoleInkey( void )
 {
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 	int ch;
 
 	if (!__fb_con.inited)
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	if ((ch = fb_hGetCh(TRUE)) >= 0) {
 		res = fb_hMakeInkeyStr( ch );
 	} else {
-		res = &__fb_ctx.null_desc;
+		res = &fb_ctx.null_desc;
 	}
 
 	return res;

@@ -42,6 +42,9 @@ declare function StrComp __FB_STRING_OVERLOAD__ alias "fb_StrComp" _
   #define __FB_STRING_INDEX__ integer
 #endif
 
+/'' A project with its own Replace implementation can keep that API while
+   still using the other string and VB compatibility declarations. '/
+#ifndef FB_NO_STRING_REPLACE
 declare function Replace __FB_STRING_OVERLOAD__ alias "fb_StrReplace" _
           ( byref expression as const string, _
             byref find_text as const string, _
@@ -49,6 +52,7 @@ declare function Replace __FB_STRING_OVERLOAD__ alias "fb_StrReplace" _
             byval start as __FB_STRING_INDEX__ = 1, _
             byval count as __FB_STRING_INDEX__ = -1, _
             byval compare as long = fbBinaryCompare ) as string
+#endif
 
 declare function StrReverse __FB_STRING_OVERLOAD__ alias "fb_StrReverse" _
           ( byref expression as const string ) as string

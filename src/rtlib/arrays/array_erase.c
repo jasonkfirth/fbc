@@ -27,7 +27,7 @@
 
 #include "fb.h"
 
-FBCALL int fb_ArrayErase( FBARRAY *array )
+FBCALL int fb_ArrayErase( FBARRAY_ACCESS *array )
 {
 	/* ptr can be NULL, for global dynamic arrays that were never allocated,
 	   but will still be destroyed on program exit */

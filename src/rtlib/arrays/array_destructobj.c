@@ -1,13 +1,13 @@
 /*
  * Project: FreeBASIC runtime library
  * File: arrays/array_destructobj.c
- * Purpose: ERASE for dynamic arrays of objects: destruct elements and free the array.
- * Responsibilities: Array descriptors, bounds, allocation and element lifetimes.
- * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
+ * Purpose: Retire object-array elements in reverse order.
+ * Responsibilities: Preserve retained elements and valid physical element addresses.
+ * This file intentionally does NOT contain: Array allocation or constructor-completion tracking.
  */
 #include "fb.h"
 
-void fb_hArrayDtorObj( FBARRAY *array, FB_DEFCTOR dtor, size_t keep_idx )
+void fb_hArrayDtorObj( FBARRAY_ACCESS *array, FB_DEFCTOR dtor, size_t keep_idx )
 {
 	size_t elements, element_len;
 	unsigned char *this_;
@@ -19,17 +19,18 @@ void fb_hArrayDtorObj( FBARRAY *array, FB_DEFCTOR dtor, size_t keep_idx )
 
 	/* call dtors in the inverse order */
 	element_len = array->element_len;
-	this_ = ((unsigned char *)array->ptr) + ((elements-1) * element_len);
+	this_ = (unsigned char *)array->ptr;
 
+	/* Count down before forming an element address. Keep the physical
+	   origin fixed across callbacks, and never step before element zero. */
 	while( elements > keep_idx ) {
-		/* !!!FIXME!!! check exceptions (only if rewritten in C++) */
-		dtor( this_ );
-		this_ -= element_len;
 		--elements;
+		/* !!!FIXME!!! check exceptions (only if rewritten in C++) */
+		dtor( this_ + (elements * element_len) );
 	}
 }
 
-FBCALL void fb_ArrayDestructObj( FBARRAY *array, FB_DEFCTOR dtor )
+FBCALL void fb_ArrayDestructObj( FBARRAY_ACCESS *array, FB_DEFCTOR dtor )
 {
 	fb_hArrayDtorObj( array, dtor, 0 );
 }

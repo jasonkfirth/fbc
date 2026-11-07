@@ -569,6 +569,8 @@ guarded path. Target/backend cases retain actual encoded priorities and NetBSD
 or shared-library placement. Runtime controls compare all export modes; legacy
 controls check native declaration counters and GOSUB status. Transport/reset,
 unavailable modes, damaged ownership/order and production guards are covered.
+Grouped MinGW C callback facts are checked against selected C names, kinds
+and priorities; corrupted wrapper placements and callee spellings are rejected.
 
 `native_blocks.py` exercises native procedure/scope wrappers, original scope
 exits, surviving branch links and selected cleanup order. Nested returns and

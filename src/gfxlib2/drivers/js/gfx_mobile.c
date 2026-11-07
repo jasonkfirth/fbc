@@ -16,8 +16,21 @@ EM_JS(void, js_mobile_control, (int what, int a, int b, int c, int d), {
 	}
 	var state = Module['fbSoftKeyboard'];
 	if (!state) {
+		var available = -2;
+		if (typeof navigator.maxTouchPoints === 'number')
+			available = navigator.maxTouchPoints > 0 ? -1 : 0;
+		if (window.matchMedia) {
+			try {
+				if (window.matchMedia('(any-pointer: coarse)').matches)
+					available = -1;
+				else if (available === -2)
+					available = 0;
+			} catch (error) {
+				/* A missing media-query implementation leaves capability unknown. */
+			}
+		}
 		state = { requested: false, regions: [], input: null,
-			available: navigator.maxTouchPoints > 0 || (window.matchMedia && window.matchMedia('(any-pointer: coarse)').matches) };
+			available: available };
 		Module['fbSoftKeyboard'] = state;
 		state.occluded = function() {
 			var visible = window.visualViewport && window.innerHeight - window.visualViewport.height > 100;
@@ -27,7 +40,7 @@ EM_JS(void, js_mobile_control, (int what, int a, int b, int c, int d), {
 		};
 		state.focus = function(visible, refocus) {
 			state.requested = visible;
-			if (!state.available) return;
+			if (state.available === 0) return;
 			if (!visible) {
 				if (state.input && document.activeElement === state.input) {
 					state.input.blur();
@@ -60,7 +73,7 @@ EM_JS(void, js_mobile_control, (int what, int a, int b, int c, int d), {
 				 * Android's ordinary text keyboard retains English words until
 				 * Space even with autocorrection disabled. Its URI layout sends
 				 * raw text and retains a space bar. Other mobile layouts stay text. */
-				input.inputMode = /Android/i.test(navigator.userAgent || '') ? 'url' : 'text';
+			input.inputMode = /Android/i.test(navigator.userAgent || "") ? 'url' : 'text';
 				input.spellcheck = false;
 				/* Keep a real editable target in the viewport. display:none and
 				 * off-screen targets cannot summon the IME on mobile Safari. */
@@ -244,6 +257,8 @@ EM_JS(void, js_mobile_control, (int what, int a, int b, int c, int d), {
 		var bounded = function(value) { return Number.isFinite(value) ? Math.max(0, Math.min(32767, Math.floor(value))) : 0; };
 		var angle = window.screen && window.screen.orientation ? window.screen.orientation.angle : window.orientation || 0;
 		HEAP32.set([bounded(width), bounded(height), bounded(96 * (window.devicePixelRatio || 1)), ((angle % 360) + 360) % 360], a >> 2);
+	} else if (what === 21) {
+		HEAP32.set([state.available, 0, 0, 0], a >> 2);
 	} else if (what === 20) {
 		var visible = 0;
 		if (state.occluded()) {
@@ -253,7 +268,7 @@ EM_JS(void, js_mobile_control, (int what, int a, int b, int c, int d), {
 			 * Older browsers expose only a viewport-occlusion heuristic. */
 			visible = -2;
 		}
-		HEAP32.set([visible, state.available ? -1 : 0, 0, 0], a >> 2);
+		HEAP32.set([visible, state.available, 0, 0], a >> 2);
 	} else if (what === 119) {
 		state.focus(a !== 0);
 	} else if (what === 120) {

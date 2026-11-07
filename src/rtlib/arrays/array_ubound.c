@@ -15,14 +15,13 @@
    Note: The dimension count can be set (in the descriptor) even for unallocated
    arrays, as it's fixed and determines the descriptor size. However, currently
    ubound( a, 0 ) will always return 0 for unallocated arrays. */
-FBCALL ssize_t fb_ArrayUBound( FBARRAY *array, ssize_t dimension )
+FBCALL ssize_t fb_ArrayUBound( FBARRAY_ACCESS *array, ssize_t dimension )
 {
-	/* given dimension is 1-based */
-	dimension -= 1;
+	/* Keep the dimension 1-based until it has been validated below. */
 
 	/* Querying dimension count? */
-	if( dimension == -1 ) {
-		if( array->data ) {
+	if( dimension == 0 ) {
+		if( array->ptr ) {
 			return (ssize_t)array->dimensions;
 		}
 		return 0;
@@ -30,12 +29,14 @@ FBCALL ssize_t fb_ArrayUBound( FBARRAY *array, ssize_t dimension )
 
 	/* Querying dimension's ubound. */
 
+	/* PTR identifies storage; virtual DATA can have zero address bits.
+	   Validate the 1-based dimension before subtracting, even at SSIZE_MIN. */
 	/* unallocated array or out-of-bound dimension? */
-	if( (array->data == NULL) ||
-	    (dimension < 0) || ((size_t)dimension >= array->dimensions) ) {
+	if( (array->ptr == NULL) ||
+	    (dimension < 1) || ((size_t)dimension > array->dimensions) ) {
 		return -1;
 	}
-	return array->dimTB[dimension].ubound;
+	return array->dimTB[dimension - 1].ubound;
 }
 
 /* end of arrays/array_ubound.c */

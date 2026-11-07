@@ -256,7 +256,7 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *src, unsigned int size, void *pal, int bitsperpixel)
+FBCALL int fb_GfxBsaveEx(FBSTRING_ACCESS *filename, void *src, unsigned int size, void *pal, int bitsperpixel)
 {
 	FILE *f;
 	FB_GFXCTX *context;
@@ -334,7 +334,7 @@ FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *src, unsigned int size, void 
 	return fb_ErrorSetNum( result );
 }
 
-FBCALL int fb_GfxBsave(FBSTRING *filename, void *src, unsigned int size, void *pal)
+FBCALL int fb_GfxBsave(FBSTRING_ACCESS *filename, void *src, unsigned int size, void *pal)
 {
 	return fb_GfxBsaveEx(filename, src, size, pal, 0);
 }

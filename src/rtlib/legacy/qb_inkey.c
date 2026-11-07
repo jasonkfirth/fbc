@@ -8,9 +8,9 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL FBSTRING *fb_InkeyQB( void )
+FBCALL FBSTRING_ACCESS *fb_InkeyQB( void )
 {
-	FBSTRING *res = fb_Inkey();
+	FBSTRING_ACCESS *res = fb_Inkey();
 	
 	FB_LOCK();
 	

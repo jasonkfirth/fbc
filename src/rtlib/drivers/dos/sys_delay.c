@@ -76,7 +76,7 @@ static unsigned int usleep_private(unsigned int _useconds)
 
 FBCALL void fb_Delay( int msecs )
 {
-	if( msecs > 0 && __fb_ctx.idle_sfxlib && __fb_ctx.idle_sfxlib( msecs ) )
+	if( msecs > 0 && fb_ctx.idle_sfxlib && fb_ctx.idle_sfxlib( msecs ) )
 		return;
 
 #if defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)

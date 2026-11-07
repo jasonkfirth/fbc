@@ -42,7 +42,7 @@ static void hWriteStrEx( FB_FILE *handle, const char *s, size_t len, int mask )
     FB_UNLOCK( );
 }
 
-FBCALL void fb_WriteString ( int fnum, FBSTRING *s, int mask )
+FBCALL void fb_WriteString ( int fnum, FBSTRING_ACCESS *s, int mask )
 {
 	FB_FILE *handle = FB_FILE_TO_HANDLE( fnum );
 

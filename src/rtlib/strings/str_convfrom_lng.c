@@ -58,7 +58,7 @@ FBCALL long long fb_hStr2Longint( char *src, ssize_t len )
 	return (long long)strtoull( p, NULL, radix );
 }
 
-FBCALL long long fb_VALLNG ( FBSTRING *str )
+FBCALL long long fb_VALLNG ( FBSTRING_ACCESS *str )
 {
     long long val;
 

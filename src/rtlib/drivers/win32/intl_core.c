@@ -9,9 +9,9 @@
 #include "fb_private_intl.h"
 
 /* Convert a strings character set to another character set. */
-static FBSTRING *fb_hIntlConvertToWC( FBSTRING *source, UINT source_cp )
+static FBSTRING_ACCESS *fb_hIntlConvertToWC( FBSTRING_ACCESS *source, UINT source_cp )
 {
-    FBSTRING *res;
+    FBSTRING_ACCESS *res;
     int CharsRequired;
 
     FB_STRLOCK();
@@ -35,7 +35,7 @@ static FBSTRING *fb_hIntlConvertToWC( FBSTRING *source, UINT source_cp )
                              CharsRequired );
         *((WCHAR*) (res->data + idx)) = 0;
     } else {
-        res = &__fb_ctx.null_desc;
+        res = &fb_ctx.null_desc;
     }
 
     fb_hStrDelTemp_NoLock( source );
@@ -45,9 +45,9 @@ static FBSTRING *fb_hIntlConvertToWC( FBSTRING *source, UINT source_cp )
     return res;
 }
 
-static FBSTRING *fb_hIntlConvertFromWC( FBSTRING *source, UINT dest_cp )
+static FBSTRING_ACCESS *fb_hIntlConvertFromWC( FBSTRING_ACCESS *source, UINT dest_cp )
 {
-    FBSTRING *res;
+    FBSTRING_ACCESS *res;
     int CharsRequired;
 
     FB_STRLOCK();
@@ -74,7 +74,7 @@ static FBSTRING *fb_hIntlConvertFromWC( FBSTRING *source, UINT dest_cp )
                              NULL );
         res->data[CharsRequired] = 0;
     } else {
-        res = &__fb_ctx.null_desc;
+        res = &fb_ctx.null_desc;
     }
 
     fb_hStrDelTemp_NoLock( source );
@@ -84,7 +84,7 @@ static FBSTRING *fb_hIntlConvertFromWC( FBSTRING *source, UINT dest_cp )
     return res;
 }
 
-FBSTRING *fb_hIntlConvertString( FBSTRING *source, int source_cp, int dest_cp )
+FBSTRING_ACCESS *fb_hIntlConvertString( FBSTRING_ACCESS *source, int source_cp, int dest_cp )
 {
 	return fb_hIntlConvertFromWC( fb_hIntlConvertToWC( source, source_cp ), dest_cp );
 }

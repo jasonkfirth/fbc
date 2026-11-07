@@ -62,10 +62,10 @@ static void hStrSetEx
 	}
 
 	if( src_size == FB_STRSIZEVARLEN )
-		fb_hStrDelTemp( (FBSTRING *)src );
+		fb_hStrDelTemp( (FBSTRING_ACCESS *)src );
 
 	if( dst_size == FB_STRSIZEVARLEN )
-		fb_hStrDelTemp( (FBSTRING *)dst );
+		fb_hStrDelTemp( (FBSTRING_ACCESS *)dst );
 }
 
 FBCALL void fb_StrLsetEx
@@ -90,7 +90,7 @@ FBCALL void fb_StrRsetEx
 	hStrSetEx( dst, dst_size, src, src_size, FB_TRUE );
 }
 
-FBCALL void fb_StrLset ( FBSTRING *dst, FBSTRING *src )
+FBCALL void fb_StrLset ( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src )
 {
 	ssize_t slen, dlen, len;
 
@@ -124,7 +124,7 @@ FBCALL void fb_StrLset ( FBSTRING *dst, FBSTRING *src )
 }
 
 /* LSET fixed length string from var-len string */
-FBCALL void fb_StrLsetANA ( void *dst, ssize_t dst_size, FBSTRING *src )
+FBCALL void fb_StrLsetANA ( void *dst, ssize_t dst_size, FBSTRING_ACCESS *src )
 {
 	ssize_t slen, dlen, len;
 	char *dst_bytes = (char *)dst;
@@ -152,7 +152,7 @@ FBCALL void fb_StrLsetANA ( void *dst, ssize_t dst_size, FBSTRING *src )
 	fb_hStrDelTemp( src );
 }
 
-FBCALL void fb_StrRset ( FBSTRING *dst, FBSTRING *src )
+FBCALL void fb_StrRset ( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src )
 {
 	ssize_t slen, dlen, len, padlen;
 
@@ -183,7 +183,7 @@ FBCALL void fb_StrRset ( FBSTRING *dst, FBSTRING *src )
 }
 
 /* RSET fixed length string from var-len string */
-FBCALL void fb_StrRsetANA ( void *dst, ssize_t dst_size, FBSTRING *src )
+FBCALL void fb_StrRsetANA ( void *dst, ssize_t dst_size, FBSTRING_ACCESS *src )
 {
 	ssize_t slen, dlen, len, padlen;
 	char *dst_bytes = (char *)dst;

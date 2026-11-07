@@ -25,9 +25,11 @@
 ''       nov/2005 unicode support added [v1ctor]
 
 
+#include once "tooling/semantic-extra-facts.bi"
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "lexer/lex.bi"
+#include once "tooling/semantic-comments.bi"
 #include once "preprocessor/pp.bi"
 #include once "parser/parser.bi"
 #include once "tooling/semantic-macros.bi"
@@ -2320,7 +2322,8 @@ sub lexNextToken _
 	)
 
 	dim as uinteger char = any
-	dim as integer reread = any, readchar = any, preserve_ending = any
+	dim as integer reread = any, readchar = any
+	dim as longint semantic_literal_start_units, preserve_ending = any
 
 	t->after_space = lex.ctx->after_space
 	lex.ctx->after_space = FALSE
@@ -2372,6 +2375,10 @@ sub lexNextToken _
 
 	lex.ctx->lastfilepos = lex.ctx->filepos + (lex.ctx->buffptr - @lex.ctx->buff) - 1
 
+	semantic_literal_start_units = 0
+	if( (t->source.macro_identity <> 0) and fbSemanticExtraFactsEnabled(FB_SEMEXTRA_LITERAL_GROUPS) ) then
+		semantic_literal_start_units = lexGetMacroRemainingUnits()
+	end if
 	select case as const char
 	'' '.'?
 	case CHAR_DOT
@@ -2606,6 +2613,13 @@ sub lexNextToken _
 
 	loop while( reread )
 
+	if( t->class = FB_TKCLASS_STRLITERAL ) then
+		t->numeric_payload = 0
+		t->numeric_macro_units = 0
+		if( semantic_literal_start_units > 0 ) then t->numeric_macro_units = semantic_literal_start_units - lexGetMacroRemainingUnits()
+		if( t->numeric_macro_units > 0 ) then fbSemanticModelMacroNumericRestore(*t)
+	end if
+
 	if( preserve_ending = FALSE ) then
 		t->source.end_line = lex.ctx->linenum
 		t->source.end_column = lex.ctx->column
@@ -2619,6 +2633,21 @@ end sub
 '' MultiLineComment  = '/' ''' . '/' '''
 ''
 private sub hMultiLineComment( ) static
+	dim as LEX_LOCATION comment_first, comment_last
+	comment_first.source_file = env.inf.name
+	comment_first.start_line = lex.ctx->linenum
+	comment_first.start_column = lex.ctx->column - 1
+	comment_first.end_line = lex.ctx->linenum
+	comment_first.end_column = lex.ctx->column - 1
+	comment_first.source_context = fbSemanticModelCurrentSource()
+	comment_first.raw_start_line = lex.ctx->raw_linenum
+	comment_first.raw_end_line = lex.ctx->raw_linenum
+	comment_first.raw_start_column = lex.ctx->column - 1
+	comment_first.raw_end_column = lex.ctx->column - 1
+	comment_first.macro_identity = fbSemanticModelMacroTokenOrigin()
+	comment_first.raw_valid = (lex.ctx->kind <> LEX_TKCTX_CONTEXT_EVAL) and _
+		(lex.ctx->deflen = 0) and (comment_first.macro_identity = 0)
+	comment_first.is_physical = comment_first.raw_valid
 	dim as integer cnt
 
 	'' skip the last '''
@@ -2680,6 +2709,14 @@ private sub hMultiLineComment( ) static
 			lexEatChar( )
 		end select
 	loop
+
+	comment_last = comment_first
+	comment_last.raw_end_line = lex.ctx->raw_linenum
+	comment_last.raw_end_column = lex.ctx->column
+	comment_last.end_line = lex.ctx->linenum
+	comment_last.end_column = lex.ctx->column
+	fbSemanticModelAcceptBlockComment(comment_first, comment_last)
+
 
 end sub
 

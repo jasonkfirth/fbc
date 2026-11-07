@@ -631,7 +631,7 @@ exit_error:
 	return result;
 }
 
-static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader)
+static int gfx_bload(FBSTRING_ACCESS *filename, void *dest, void *pal, int usenewheader)
 {
 	FILE *f;
 	FB_GFXCTX *context;
@@ -757,12 +757,12 @@ static int gfx_bload(FBSTRING *filename, void *dest, void *pal, int usenewheader
 	return fb_ErrorSetNum( result );
 }
 
-FBCALL int fb_GfxBload(FBSTRING *filename, void *dest, void *pal)
+FBCALL int fb_GfxBload(FBSTRING_ACCESS *filename, void *dest, void *pal)
 {
 	return gfx_bload( filename, dest, pal, TRUE );
 }
 
-FBCALL int fb_GfxBloadQB(FBSTRING *filename, void *dest, void *pal)
+FBCALL int fb_GfxBloadQB(FBSTRING_ACCESS *filename, void *dest, void *pal)
 {
 	return gfx_bload( filename, dest, pal, FALSE );
 }

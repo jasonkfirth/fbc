@@ -9,17 +9,17 @@
 
 FBCALL void fb_DataReadWstr( FB_WCHAR *dst, ssize_t dst_size )
 {
-	FB_WCHAR empty_string[] = _LC("");
+	FB_WCHAR empty_string[] = FB_WCHAR_LITERAL("");
 
 	FB_LOCK();
 
-	if( __fb_data_ptr ) {
-		if( __fb_data_ptr->len == FB_DATATYPE_OFS ) {
+	if( fb_data_ptr ) {
+		if( fb_data_ptr->len == FB_DATATYPE_OFS ) {
 			/* !!!WRITEME!!! */
-		} else if( __fb_data_ptr->len & FB_DATATYPE_WSTR ) {
-			fb_WstrAssign( dst, dst_size, __fb_data_ptr->wstr );
+		} else if( fb_data_ptr->len & FB_DATATYPE_WSTR ) {
+			fb_WstrAssign( dst, dst_size, fb_data_ptr->wstr );
 		} else {
-			fb_WstrAssignFromA( dst, dst_size, __fb_data_ptr->zstr, __fb_data_ptr->len );
+			fb_WstrAssignFromA( dst, dst_size, fb_data_ptr->zstr, fb_data_ptr->len );
 		}
 	} else {
 		/* no more DATA, return empty string */

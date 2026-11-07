@@ -8,12 +8,12 @@
 #include "../../fb.h"
 #include "fb_private_intl.h"
 
-FBSTRING *fb_DrvIntlGetMonthName( int month, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetMonthName( int month, int short_names )
 {
     char *pszName = NULL;
     size_t name_len;
     LCTYPE lctype;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
 
     if( month < 1 || month > 12 )
         return NULL;

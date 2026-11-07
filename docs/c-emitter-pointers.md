@@ -626,4 +626,13 @@ to the two backend HLC objects; coherent-producer and full-model acceptance
 of this extension remains pending. The original corpus/platform gates remain
 open.
 
+## Ordered native addresses
+
+The [ordered-pointer repair](c-emitter-pointer-order.md) replaces C object-relative
+ordering with unsigned native-address comparisons. Null constant results retain
+operand evaluation. Six unchanged Exampleageddon profiles lose 30 GCC warnings,
+with unchanged Clang counts. Canonical compiler source and permanent value tests
+are updated; full compiler/corpus refresh and private ERROR integration remain
+separate pending work.
+
 <!-- end of c-emitter-pointers.md -->

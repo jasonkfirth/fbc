@@ -8,6 +8,8 @@
 #include "../../fb.h"
 #include "fb_private_console.h"
 
+#include <limits.h>
+
 typedef struct _fb_PrintInfo {
     fb_Rect         rWindow;
     fb_Coord        BufferSize;
@@ -31,14 +33,24 @@ static void fb_hHookConScroll
     SMALL_RECT srScroll;
     COORD dwDest;
 
+    /* Console screen-buffer coordinates are signed 16-bit values. Validate
+       the callback rectangle before forming widths or narrowing positions. */
+    if( rows <= 0 || x1 < 0 || y1 < 0 || x2 < x1 || y2 < y1 ||
+        pInfo->BufferSize.X <= 0 || pInfo->BufferSize.X > SHRT_MAX ||
+        pInfo->BufferSize.Y <= 0 || pInfo->BufferSize.Y > SHRT_MAX ||
+        x2 >= pInfo->BufferSize.X || y2 >= pInfo->BufferSize.Y )
+        return;
+
     if( !pInfo->fViewSet ) {
         /* Try to move the window first ... */
-        if( (handle->Border.Bottom+1) < pInfo->BufferSize.Y ) {
-            int remaining = pInfo->BufferSize.Y - handle->Border.Bottom - 1;
+        if( (y2+1) < pInfo->BufferSize.Y ) {
+            int remaining = pInfo->BufferSize.Y - y2 - 1;
             int move_size = ((remaining < rows) ? remaining : rows);
 
             handle->Border.Top += move_size;
             handle->Border.Bottom += move_size;
+            y1 += move_size;
+            y2 += move_size;
 
             rows -= move_size;
             if( rows==0 )
@@ -54,17 +66,17 @@ static void fb_hHookConScroll
 
     } else {
         /* Scroll only the area defined by a previous VIEW PRINT */
-        dwDest.X = (SHORT) handle->Border.Left;
-        dwDest.Y = (SHORT) handle->Border.Top;
-        srScroll.Right = (SHORT) handle->Border.Right;
-        srScroll.Bottom = (SHORT) handle->Border.Bottom;
-        iBufferHeight = handle->Border.Bottom - handle->Border.Top + 1;
+        dwDest.X = (SHORT) x1;
+        dwDest.Y = (SHORT) y1;
+        srScroll.Right = (SHORT) x2;
+        srScroll.Bottom = (SHORT) y2;
+        iBufferHeight = y2 - y1 + 1;
     }
 
     if( iBufferHeight <= rows ) {
         /* simply clear the buffer */
-        iClearFrom = handle->Border.Top;
-        iClearTo = handle->Border.Bottom + 1;
+        iClearFrom = y1;
+        iClearTo = y2 + 1;
     } else {
         /* Move some part of the console screen buffer to another
          * position. */
@@ -92,18 +104,18 @@ static void fb_hHookConScroll
     /* Clear all parts of the screen buffer not covered by the scrolling
      * region */
     if( iClearFrom!=iClearTo ) {
-        SHORT x1 = handle->Border.Left;
+        SHORT left = (SHORT) x1;
         WORD attr = pInfo->wAttributes;
-        DWORD width = handle->Border.Right - x1 + 1;
+        DWORD width = (DWORD) (x2 - x1 + 1);
         for( iClearPos=iClearFrom; iClearPos!=iClearTo; ++iClearPos ) {
             DWORD written;
-            COORD coord = { x1, (SHORT) iClearPos };
+            COORD coord = { left, (SHORT) iClearPos };
             FillConsoleOutputAttribute( hnd, attr, width, coord, &written);
             FillConsoleOutputCharacter( hnd, ' ', width, coord, &written );
         }
     }
 
-    handle->Coord.Y = handle->Border.Bottom;
+    handle->Coord.Y = y2;
 }
 
 static int fb_hHookConWrite
@@ -116,29 +128,49 @@ static int fb_hHookConWrite
     fb_PrintInfo *pInfo = (fb_PrintInfo*) handle->Opaque;
     HANDLE hnd = pInfo->hOutput;
     const char *pachText = (const char *) buffer;
-    CHAR_INFO *lpBuffer = alloca( sizeof(CHAR_INFO) * length );
+    /* Most console rows fit in one KiB of local storage. Longer rows use
+       the heap, bounded by the screen buffer's signed 16-bit width. */
+    CHAR_INFO localBuffer[256];
+    CHAR_INFO *lpBuffer = localBuffer;
     WORD wAttributes = pInfo->wAttributes;
-    COORD dwBufferSize = { (SHORT) length, 1 };
+    COORD dwBufferSize;
     COORD dwBufferCoord = { 0, 0 };
-    SMALL_RECT srWriteRegion = {
-        (SHORT) handle->Coord.X,
-        (SHORT) handle->Coord.Y,
-        (SHORT) (handle->Coord.X + length - 1),
-        (SHORT) handle->Coord.Y
-    };
+    SMALL_RECT srWriteRegion;
     size_t i;
     int result;
+
+    if( length == 0 )
+        return TRUE;
+    if( buffer == NULL || pInfo->BufferSize.X <= 0 ||
+        pInfo->BufferSize.X > SHRT_MAX || pInfo->BufferSize.Y <= 0 ||
+        pInfo->BufferSize.Y > SHRT_MAX || handle->Coord.X < 0 ||
+        handle->Coord.X >= pInfo->BufferSize.X || handle->Coord.Y < 0 ||
+        handle->Coord.Y >= pInfo->BufferSize.Y ||
+        length > (size_t) (pInfo->BufferSize.X - handle->Coord.X) )
+        return FALSE;
+
+    if( length > sizeof(localBuffer) / sizeof(localBuffer[0]) ) {
+        lpBuffer = malloc( sizeof(CHAR_INFO) * length );
+        if( lpBuffer == NULL )
+            return FALSE;
+    }
+
+    dwBufferSize.X = (SHORT) length;
+    dwBufferSize.Y = 1;
+    srWriteRegion.Left = (SHORT) handle->Coord.X;
+    srWriteRegion.Top = (SHORT) handle->Coord.Y;
+    srWriteRegion.Right = (SHORT) (handle->Coord.X + (int) length - 1);
+    srWriteRegion.Bottom = (SHORT) handle->Coord.Y;
 
     for( i=0; i!=length; ++i ) {
         CHAR_INFO *pCharInfo = lpBuffer + i;
         pCharInfo->Attributes = wAttributes;
         pCharInfo->Char.AsciiChar = pachText[i];
     }
-    result = WriteConsoleOutput( hnd,
-                                 lpBuffer,
-                                 dwBufferSize,
-                                 dwBufferCoord,
-                                 &srWriteRegion );
+    result = WriteConsoleOutput( hnd, lpBuffer, dwBufferSize,
+                                   dwBufferCoord, &srWriteRegion );
+    if( lpBuffer != localBuffer )
+        free( lpBuffer );
     return result;
 }
 
@@ -161,14 +193,19 @@ void fb_ConsolePrintBufferEx( const void *buffer, size_t len, int mask )
 
     if( FB_CONSOLE_WINDOW_EMPTY() ) {
         /* output was redirected! */
-        DWORD dwBytesWritten;
-        while( len!=0 &&
-               WriteFile( __fb_out_handle,
-                          pachText,
-                          len,
-                          &dwBytesWritten,
-                          NULL ) == TRUE )
-        {
+        while( len!=0 ) {
+            DWORD dwBytesWritten = 0;
+            DWORD bytesToWrite = MAXDWORD;
+
+            /* WriteFile accepts a DWORD count even when size_t is wider.
+               Stop after failure or zero progress instead of repeating the
+               same request indefinitely. */
+            if( len < (size_t) MAXDWORD )
+                bytesToWrite = (DWORD) len;
+            if( WriteFile( FB_CONSOLE_OUTPUT_HANDLE, pachText, bytesToWrite,
+                           &dwBytesWritten, NULL ) != TRUE ||
+                dwBytesWritten == 0 || dwBytesWritten > bytesToWrite )
+                break;
             pachText += dwBytesWritten;
             len -= dwBytesWritten;
         }
@@ -187,7 +224,7 @@ void fb_ConsolePrintBufferEx( const void *buffer, size_t len, int mask )
     hooks.Border.Right  = win_left + win_cols - 1;
     hooks.Border.Bottom = win_top + view_bottom - 1;
 
-    info.hOutput        = __fb_out_handle;
+    info.hOutput        = FB_CONSOLE_OUTPUT_HANDLE;
     info.rWindow.Left   = win_left;
     info.rWindow.Top    = win_top;
     info.rWindow.Right  = win_left + win_cols - 1;
@@ -198,7 +235,7 @@ void fb_ConsolePrintBufferEx( const void *buffer, size_t len, int mask )
     {
         CONSOLE_SCREEN_BUFFER_INFO screen_info;
 
-        if( !GetConsoleScreenBufferInfo( __fb_out_handle, &screen_info ) ) {
+        if( !GetConsoleScreenBufferInfo( FB_CONSOLE_OUTPUT_HANDLE, &screen_info ) ) {
             hooks.Coord.X = hooks.Border.Left;
             hooks.Coord.Y = hooks.Border.Top;
             info.BufferSize.X = FB_SCRN_DEFAULT_WIDTH;
@@ -263,7 +300,7 @@ void fb_ConsolePrintBufferEx( const void *buffer, size_t len, int mask )
 
 void fb_ConsolePrintBuffer( const char *buffer, int mask )
 {
-    return fb_ConsolePrintBufferEx( buffer, strlen(buffer), mask );
+    fb_ConsolePrintBufferEx( buffer, strlen(buffer), mask );
 }
 
 /* end of drivers/win32/io_printbuff.c */

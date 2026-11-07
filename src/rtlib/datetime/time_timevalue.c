@@ -8,7 +8,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL double fb_TimeValue ( FBSTRING *s )
+FBCALL double fb_TimeValue ( FBSTRING_ACCESS *s )
 {
     int hour;
     int minute;

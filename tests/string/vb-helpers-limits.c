@@ -11,7 +11,7 @@
 
 /* Only the services used by these entry points are supplied. The allocator
    always fails, so even a one-byte request must take the real error path. */
-FB_RTLIB_CTX __fb_ctx;
+FB_RTLIB_CTX fb_ctx;
 static int last_error;
 static int allocations;
 static int releases;
@@ -45,25 +45,25 @@ int main( void )
 	FBSTRING *result;
 
 	result = fb_StrReplace( &src, &find, &huge, 1, -1, 0 );
-	assert( result == &__fb_ctx.null_desc );
+	assert( result == &fb_ctx.null_desc );
 	assert( last_error == FB_RTERROR_OUTOFMEM );
 	assert( allocations == 0 && releases == 3 );
 	result = fb_StrReverse( &huge );
-	assert( result == &__fb_ctx.null_desc );
+	assert( result == &fb_ctx.null_desc );
 	assert( last_error == FB_RTERROR_OUTOFMEM && allocations == 0 );
 
 	result = fb_StrReplace( &src, &find, &src, 1, -1, 0 );
-	assert( result == &__fb_ctx.null_desc );
+	assert( result == &fb_ctx.null_desc );
 	assert( last_error == FB_RTERROR_OUTOFMEM && allocations == 1 );
 	result = fb_StrReverse( &src );
-	assert( result == &__fb_ctx.null_desc );
+	assert( result == &fb_ctx.null_desc );
 	assert( last_error == FB_RTERROR_OUTOFMEM && allocations == 2 );
 
 	result = fb_StrReplace( &src, &find, &huge, FB_STRSIZEMSK, -1, 0 );
-	assert( result == &__fb_ctx.null_desc );
+	assert( result == &fb_ctx.null_desc );
 	assert( last_error == FB_RTERROR_OK && allocations == 2 );
 	result = fb_StrReplace( &src, &find, &src, -FB_STRSIZEMSK - 1, -1, 0 );
-	assert( result == &__fb_ctx.null_desc );
+	assert( result == &fb_ctx.null_desc );
 	assert( last_error == FB_RTERROR_ILLEGALFUNCTIONCALL );
 
 	releases = 0;
@@ -73,8 +73,8 @@ int main( void )
 	assert( releases == 2 );
 	assert( fb_StrComp( NULL, &src, 0 ) == -1 );
 	assert( fb_StrComp( NULL, NULL, 0 ) == 0 );
-	assert( fb_StrReverse( NULL ) == &__fb_ctx.null_desc );
-	assert( fb_StrReplace( NULL, NULL, NULL, 1, -1, 0 ) == &__fb_ctx.null_desc );
+	assert( fb_StrReverse( NULL ) == &fb_ctx.null_desc );
+	assert( fb_StrReplace( NULL, NULL, NULL, 1, -1, 0 ) == &fb_ctx.null_desc );
 	assert( last_error == FB_RTERROR_OK );
 	puts( "VB string allocation/overflow checks passed" );
 	return 0;

@@ -1,4 +1,10 @@
-/* common x11 internal definitions */
+/*
+	Project: FreeBASIC gfxlib2
+	File: fb_gfx_x11.h
+	Purpose: Share X11 window and input contracts between the X11 drivers.
+	Responsibilities: Declare common driver state and X11 helper functions.
+	This file does not own event-loop state or graphics primitives.
+*/
 
 #ifndef DISABLE_X11
 
@@ -53,9 +59,13 @@ extern int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, i
 extern void fb_hX11Exit(void);
 extern void fb_hX11Lock(void);
 extern void fb_hX11Unlock(void);
+/* The caller keeps the graphics mode alive while this snapshots driver state. */
+extern int fb_hX11WindowHasFocus(void);
 extern void fb_hX11SetPalette(int index, int r, int g, int b);
 extern void fb_hX11WaitVSync(void);
 extern int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip);
+extern int fb_hX11GetTouchCount(void);
+extern int fb_hX11GetTouch(int index, int *x, int *y, int *id);
 extern void fb_hX11SetMouse(int x, int y, int cursor, int clip);
 extern void fb_hX11SetWindowTitle(char *title);
 extern int fb_hX11SetWindowPos(int x, int y);
@@ -70,3 +80,5 @@ extern int fb_hX11ScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ss
 #endif
 
 #endif
+
+/* end of fb_gfx_x11.h */

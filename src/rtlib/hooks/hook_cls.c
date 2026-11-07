@@ -15,8 +15,8 @@ FBCALL void fb_Cls( int mode )
 
 	FB_LOCK();
 
-	if( __fb_ctx.hooks.clsproc )
-		__fb_ctx.hooks.clsproc( mode );
+	if( fb_ctx.hooks.clsproc )
+		fb_ctx.hooks.clsproc( mode );
 	else
         fb_ConsoleClear( mode );
 

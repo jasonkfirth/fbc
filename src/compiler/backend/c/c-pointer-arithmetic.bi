@@ -31,16 +31,31 @@ end function
 private sub hCReadAddress( byval address as EXPRNODE ptr, byval remaining as integer = 64 )
 	'' This tree is owned by a scalar read. Qualify its storage addresses,
 	'' including intermediate casts, without changing the loaded value type.
-	'' Stop at integer conversions and opaque text; neither proves a pointer
-	'' path. The budget bounds traversal of source-generated cast chains.
+	'' Native address carriers retain the pointer's read-only byte view.
+	'' Follow only native-width casts and ADD/SUB nodes; opaque values
+	'' and scalar calculations do not establish another address path.
+	'' The budget bounds traversal of source-generated expression trees.
 	if( remaining <= 0 ) then exit sub
-	if( typeIsPtr(address->dtype) = FALSE ) then exit sub
+	if( typeIsPtr(address->dtype) = FALSE ) then
+		if( typeGetClass(address->dtype) <> FB_DATACLASS_INTEGER ) then exit sub
+		if( typeGetSize(address->dtype) <> env.pointersize ) then exit sub
+		select case address->class
+		case EXPRCLASS_CAST
+			hCReadAddress(address->l, remaining - 1)
+		case EXPRCLASS_BOP
+			if( address->op = AST_OP_ADD or address->op = AST_OP_SUB ) then
+				hCReadAddress(address->l, remaining - 1)
+				hCReadAddress(address->r, remaining - 1)
+			end if
+		end select
+		exit sub
+	end if
 	if( typeGetPtrCnt(address->dtype) = 1 andalso _
 	    typeGetDtOnly(address->dtype) = FB_DATATYPE_FUNCTION ) then exit sub
 	address->dtype = typeAddrOf(typeSetIsConst(typeDeref(address->dtype)))
 	select case address->class
 	case EXPRCLASS_CAST
-		if( typeIsPtr(address->l->dtype) ) then hCReadAddress(address->l, remaining - 1)
+		hCReadAddress(address->l, remaining - 1)
 	case EXPRCLASS_BOP
 		select case address->op
 		case AST_OP_ADD, AST_OP_SUB

@@ -1,5 +1,14 @@
+'' Project: FreeBASIC variant helper library
+'' File: intern.bi
+'' Purpose: Share internal operator macros and text conversion declarations.
+'' Responsibilities: Keep primitive operations and ownership contracts consistent.
+'' This file intentionally does NOT expose the public wrapper interface.
+
 #ifndef FB_EXAMPLES_WIN32_VARIANTS_LIBVARIANT_INTERN_BI
 #define FB_EXAMPLES_WIN32_VARIANTS_LIBVARIANT_INTERN_BI
+
+'' Returns an owned BSTR; its containing VARIANT releases it with VariantClear.
+declare function hVarAllocBstrFromZstring( byval rhs as zstring ptr ) as BSTR
 
 '':::::
 #macro VAR_GEN_CTOR( r_type, vt_type )
@@ -31,7 +40,6 @@
 	end operator
 #endmacro
 
-#endif
 
 '':::::
 #macro VAR_GEN_CAST( ret_type, vt_type )
@@ -155,3 +163,7 @@
 
 	end operator
 #endmacro
+
+#endif
+
+'' end of intern.bi

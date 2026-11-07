@@ -65,7 +65,7 @@ static void hWstrSetEx
 			fb_wstr_Fill( &dst[slen], 32, padlen );
 	}
 
-	dst[dlen] = _LC('\0');
+	dst[dlen] = FB_WCHAR_LITERAL('\0');
 }
 
 FBCALL void fb_WstrLsetEx

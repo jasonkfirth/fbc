@@ -182,11 +182,13 @@ enum
 	EXPRCLASS_ARRAYADDR
 	EXPRCLASS_VTABLE
 	EXPRCLASS_CALL
+	EXPRCLASS_DISCARD
 end enum
 
 const C_MEMBER_VIEW_VALUE = 1
 const C_MEMBER_VIEW_STORAGE = 2
 const C_MEMBER_VIEW_WRITE = 3
+const C_MEMBER_VIEW_DESCRIPTOR_READ = 4
 
 type EXPRNODE
 	class       as integer  '' EXPRCLASS_*
@@ -198,6 +200,7 @@ type EXPRNODE
 	l           as EXPRNODE ptr  '' CAST/UOP/BOP
 	r           as EXPRNODE ptr  '' BOP
 	member_view as integer      '' MEMBER uses an alignment-one record view; an empty path dereferences it.
+	virtual_origin as integer   '' Native address bits loaded from an array descriptor's DATA field.
 
 	union
 		text    as zstring ptr  '' TEXT/MEMBER/CALL
@@ -225,6 +228,7 @@ type CALIGNVIEW
 	subtype    as FBSYMBOL ptr
 	section    as integer
 	emitted    as integer
+	rawproc    as integer
 end type
 
 '' Owned C spellings outlive the local symbols from which they were emitted.
@@ -232,6 +236,7 @@ type CPOINTERVIEW
 	original   as DZSTRING
 	aliasname  as DZSTRING
 	section    as integer
+	incomplete as integer
 end type
 
 type CGFXBLENDER
@@ -263,7 +268,6 @@ enum
 	BUILTIN_D2I           = (1 shl 3)
 	BUILTIN_D2L           = (1 shl 4)
 	BUILTIN_D2UL          = (1 shl 5)
-	BUILTIN_STATICASSERT  = (1 shl 6)
 	BUILTIN_F2I128        = (1 shl 7)
 	BUILTIN_F2U128        = (1 shl 8)
 	BUILTIN_D2I128        = (1 shl 9)
@@ -312,7 +316,7 @@ type IRHLCCTX
 	gfxblenderid            as uinteger
 	gfxcontextid            as uinteger
 	unalignedid             as uinteger '' Per-emission byte-copy temporary names, reset by _emitBegin().
-	localassertid           as uinteger '' Unique local enum names for pre-C11 layout checks.
+	assertid                as uinteger '' Unique enum names for pre-C11 layout checks.
 	codeptrid               as uinteger '' Typed representation-transfer temporaries.
 
 	globalvarpass           as integer  '' Global var emitting is done in 2 passes; this allows the callbacks to identify the current pass.
@@ -350,9 +354,10 @@ declare function exprTryCRecordArrayAddress(byval dtype as integer, byval subtyp
 declare function hIsScalarLoadType(byval dtype as integer) as integer
 
 declare sub hCRememberViewType( byval dtype as integer, byval subtype as FBSYMBOL ptr )
+declare function hCLatestViewType( byval dtype as integer, byval subtype as FBSYMBOL ptr ) as CALIGNVIEW ptr
 declare sub hCClearPointerViews( byval firstsection as integer )
 declare function hCPointerViewSection( byval dtype as integer, byval subtype as FBSYMBOL ptr ) as integer
-declare function hCPointerViewName( byref original as string, byval declsection as integer ) as string
+declare function hCPointerViewName( byref original as string, byval declsection as integer, byval incomplete as integer ) as string
 
 declare sub exprFreeNode( byval n as EXPRNODE ptr )
 declare function hIsArrayCallbackParam( byval proc as FBSYMBOL ptr, byval param_index as integer ) as integer
@@ -367,6 +372,14 @@ declare sub hCStaticCodeFinish()
 declare sub hCUnobservedFinish()
 declare sub hCLiteralStorageInit()
 declare sub hCLiteralStorageFinish()
+
+declare sub hCStartupInit()
+declare sub hCStartupFinish()
+declare function hCStartupGrouped(byval proc as FBSYMBOL ptr) as integer
+declare function hCStartupAttributeToken(byval proc as FBSYMBOL ptr) as string
+declare sub hCStartupAdd(byval proc as FBSYMBOL ptr)
+declare sub hCStartupEmit()
+declare function hCStartupWritePrelude() as integer
 declare sub hCLiteralStoragePrepare(byval buffer as ubyte ptr, byval bytes as uinteger)
 #if __FB_DEBUG__
 declare sub exprDump( byval n as EXPRNODE ptr )
@@ -374,25 +387,31 @@ declare sub exprDump( byval n as EXPRNODE ptr )
 
 '' globals
 dim shared as IRHLCCTX ctx
+#include once "backend/c/error-owner-types.bi"
 
 
 '' Coverage of the current procedure AST for local storage declarations.
-'' Reset at procedure entry; debug, opaque assembly and naked procedures keep locals.
+'' Reset at procedure entry; opaque assembly and naked procedures keep locals.
+'' Debug builds keep reachable source locals while dropping unreachable storage.
 dim shared as integer c_local_refs_complete
 '' Each procedure owns a pointer-keyed reference index, separate from the parser's
 '' historical ACCESSED flags. Keys are owned; local symbols are only borrowed.
 dim shared as THASH c_local_refs
+'' Reachable source declarations remain available to the debugger.
+dim shared as THASH c_debug_decls
 '' Minimum-alignment pointee typedefs own their spellings for one C output.
 '' Record definitions keep their natural fields, including recursive pointers.
 dim shared as TLIST c_pointer_views
-dim shared as integer c_pointer_view_id, c_pointer_raw_types
+dim shared as integer c_pointer_view_id, c_pointer_raw_types, c_pointer_prototypes
 #include once "backend/c/asm-names.bi"
 #include once "backend/c/c-identifiers.bi"
 #include once "backend/c/c-generated-leaves.bi"
+#include once "backend/c/c-procedure-prototypes.bi"
 #include once "backend/c/c-abi-parameters.bi"
 #include once "backend/c/c-auto-descriptors.bi"
 declare function hCStaticArrayBacking(byval sym as FBSYMBOL ptr) as FBSYMBOL ptr
 declare function hCStaticScalarCandidate(byval sym as FBSYMBOL ptr) as integer
+declare sub hCGosubInit( )
 declare sub hCStaticArrayInitializers(byval proc as FBSYMBOL ptr)
 #include once "backend/c/c-unused-scalar-stores.bi"
 #include once "backend/c/c-integer-ranges.bi"
@@ -472,6 +491,7 @@ private sub _end( )
 	hCReadOnlyLocalsFinish()
 	hCStaticCodeFinish()
 	hCLeafFinish( )
+	hCPrototypeFinish( )
 	hCAbiFinish( )
 	hCReadOnlyFinish()
 	hCUnobservedFinish()
@@ -483,6 +503,7 @@ private sub _end( )
 	listEnd(@c_scalar_dependencies)
 	listEnd(@c_scalar_stores)
 	if( c_local_refs.list <> NULL ) then hashEnd(@c_local_refs)
+	if( c_debug_decls.list <> NULL ) then hashEnd(@c_debug_decls)
 	''
 	'' Section buffers are retained while the compiler processes input modules so
 	'' later modules can reuse their capacity.  The backend owns these allocations
@@ -708,39 +729,23 @@ private sub hUpdateCurrentFileName( byval filename as zstring ptr )
 	ctx.escapedinputfilename = hReplace( filename, "\", $"\\" )
 end sub
 
-private sub hWriteStaticAssert( byref expr as string )
-	dim as integer section = any
-
-	if( sectionInsideProc( ) ) then
-		'' A block-scope extern object is diagnosed as an unused variable.
-		'' Keep the ABI check as a real C11 assertion. Older C dialects use
-		'' an enum constraint, which reserves no storage or external symbol.
-		ctx.localassertid += 1
-		if( ctx.localassertid = 0 ) then
-			errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
-			exit sub
-		end if
-		hWriteLine( "#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)", TRUE )
-		hWriteLine( "_Static_assert( (" + expr + "), ""FreeBASIC ABI mismatch"" );" )
-		hWriteLine( "#else", TRUE )
-		hWriteLine( "enum { fb_c_local_assert_" + str(ctx.localassertid) + _
-		            " = 1 / ((" + expr + ") ? 1 : 0) };" )
-		hWriteLine( "#endif", TRUE )
+private sub hWriteStaticAssert( byref expr as string, byval hoist as integer = FALSE )
+	'' An enum works at file and block scope, including older C dialects.
+	'' Division by zero makes a failed ABI check a compile-time error.
+	ctx.assertid += 1
+	if( ctx.assertid = 0 ) then
+		errReportEx( FB_ERRMSG_INTERNAL, __FUNCTION__ )
 		exit sub
 	end if
-
-	if( (ctx.usedbuiltins and BUILTIN_STATICASSERT) = 0 ) then
-		ctx.usedbuiltins or= BUILTIN_STATICASSERT
-
-		'' Emit the #define into the header section, not inside procedures,
-		'' and above the 1st use (can't be emitted from _emitEnd() because
-		'' then it could appear behind struct declarations...)
-		section = sectionGosub( 0 )
-		hWriteLine( "#define fb_c_static_assert_check( expr ) extern int fb_c_static_assert[(expr) ? 1 : -1]", TRUE )
-		sectionReturn( section )
+	var assertion = "enum { fb_c_assert_" + str(ctx.assertid) + _
+	                " = 1 / ((" + expr + ") ? 1 : 0) };"
+	'' Pointer carriers already belong to this block's declaration header.
+	'' Layout checks stay beside their completed, possibly local types.
+	if( hoist ) then
+		hWriteDeclaration( assertion )
+	else
+		hWriteLine( assertion )
 	end if
-
-	hWriteLine( "fb_c_static_assert_check( " + expr + " );" )
 end sub
 
 private sub hAppendClobber _
@@ -975,14 +980,23 @@ end sub
 enum EMITPROC_OPTIONS
 	EMITPROC_ISPROTO   = &h1
 	EMITPROC_ISPROCPTR = &h2
+	EMITPROC_ISCALLVIEW = &h4
 end enum
 
 private sub hAppendCtorAttrib _
 	( _
 		byref ln as string, _
 		byval proc as FBSYMBOL ptr, _
-		byval in_front as integer _
+		byval in_front as integer, _
+		byval observe as integer = TRUE _
 	)
+
+	if( hCStartupGrouped(proc) ) then
+		if( in_front = FALSE ) then ln += " "
+		ln += hCStartupAttributeToken(proc)
+		if( in_front ) then ln += " "
+		exit sub
+	end if
 
 	dim as integer priority = any
 
@@ -1011,9 +1025,11 @@ private sub hAppendCtorAttrib _
 		if( in_front ) then
 			ln += " "
 		end if
-		fbSemanticModelStartupEmission(proc, iif(symbGetIsGlobalCtor(proc), "constructor", "destructor"), _
-			"c", iif(in_front, "definition-attribute", "declaration-attribute"), _
-			iif(priority = 0, "", str(priority)), "function-attribute", mid(ln, semantic_start + 1))
+		if( observe ) then
+			fbSemanticModelStartupEmission(proc, iif(symbGetIsGlobalCtor(proc), "constructor", "destructor"), _
+				"c", iif(in_front, "definition-attribute", "declaration-attribute"), _
+				iif(priority = 0, "", str(priority)), "function-attribute", mid(ln, semantic_start + 1))
+		end if
 	end if
 end sub
 
@@ -1115,7 +1131,30 @@ private function hNeedAbiAlias( byval proc as FBSYMBOL ptr ) as integer
 end function
 
 private function hNeedAlias( byval proc as FBSYMBOL ptr ) as integer
-	return hNeedAbiAlias(proc) orelse hCNameNeedsEncoding(symbGetMangledName(proc))
+	if( hCSymbolNeedsEncoding(proc) ) then return TRUE
+	if( hNeedAbiAlias(proc) = FALSE ) then return FALSE
+
+	'' On x86, non-C conventions can decorate the C compiler's object name.
+	'' Keep their explicit aliases, including stdcall's hidden-result rules.
+	if( (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) andalso _
+	    (symbGetProcMode(proc) <> FB_FUNCMODE_CDECL) ) then return TRUE
+
+	'' An alias back to the C identifier's default object name adds no ABI
+	'' information. Omitting it also lets an explicit rtlib declaration share
+	'' the exact prototype already emitted for the compiler's intrinsic.
+	var object_name = hGetCId(proc)
+	if( env.underscoreprefix ) then object_name = "_" + object_name
+	return (hGetMangledNameForASM(proc, TRUE) <> object_name)
+end function
+
+'' GCC can call a libc builtin directly, but Clang cannot take its address.
+'' Keep direct calls unchanged and use a separate libc declaration for addresses.
+private function hCBuiltinAddressId( byval proc as FBSYMBOL ptr ) as string
+	if( irUsesClangCCompiler() ) then return ""
+	if( len(irGetBuiltinLibcName(proc)) = 0 ) then return ""
+
+	var identifier = hGetCId(proc)
+	return hEncodeCName(strptr(identifier), "fb_c_builtin_address_")
 end function
 
 private function hEmitMutableLibcPtrParam _
@@ -1350,7 +1389,9 @@ end function
 private function hCLongDoubleFromNativeExpression _
 	( byref native_expression as string, byval subtype as FBSYMBOL ptr ) as string
 
-	var identifier = "fb_c_clongdouble_native_result_" + str( symbUniqueId( ) )
+	'' Copy the identifier text, not the address of its shared string buffer.
+	'' A valid BASIC name also avoids the default generator's C dollar extension.
+	var identifier = "fb_c_clongdouble_native_result_" + *symbUniqueId( TRUE )
 	var native_identifier = identifier + "_native"
 	var type_name = hEmitType( FB_DATATYPE_STRUCT, subtype )
 	function = "__extension__ ({ " + type_name + " " + identifier + "; " + _
@@ -1365,7 +1406,7 @@ end function
 private function hCLongDoubleToNativeExpression _
 	( byref value_expression as string, byval subtype as FBSYMBOL ptr ) as string
 
-	var identifier = "fb_c_clongdouble_native_argument_" + str( symbUniqueId( ) )
+	var identifier = "fb_c_clongdouble_native_argument_" + *symbUniqueId( TRUE )
 	var type_name = hEmitType( FB_DATATYPE_STRUCT, subtype )
 	function = "__extension__ ({ " + type_name + " " + identifier + " = " + _
 		value_expression + "; fb_LongDoubleToNative( (const void*)&" + identifier + ", " + _
@@ -1381,7 +1422,8 @@ private function hEmitProcHeader _
 	( _
 		byval proc as FBSYMBOL ptr, _
 		byval options as EMITPROC_OPTIONS, _
-		byval readonly_variant as CREADONLYPROC ptr = NULL _
+		byval readonly_variant as CREADONLYPROC ptr = NULL, _
+		byval builtin_address_id as const zstring ptr = NULL _
 	) as string
 
 	dim as string ln, mangled
@@ -1390,9 +1432,15 @@ private function hEmitProcHeader _
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as string semantic_result, semantic_convention, semantic_role
+	dim as integer deferred_prototype = ((options and EMITPROC_ISPROTO) <> 0)
 
-	if( options = 0 ) then
-		'' ctor/dtor flags on bodies
+	'' A prototype needs record identity and pointer alignment, not its fields.
+	'' Keep its aliases separate from later completed-record access aliases.
+	if( deferred_prototype ) then c_pointer_prototypes += 1
+
+	if( options = 0 andalso c_prototype_startup_on_header = FALSE ) then
+		'' A declaration carrying the startup attribute already registers the
+		'' same definition. Otherwise the body must carry that attribute.
 		hAppendCtorAttrib( ln, proc, TRUE )
 	end if
 
@@ -1448,10 +1496,12 @@ private function hEmitProcHeader _
 	semantic_role = iif((options and EMITPROC_ISPROCPTR) <> 0, "pointer-type", _
 		iif((options and EMITPROC_ISPROTO) <> 0, "declaration", "definition"))
 	dim as longint semantic_signature = 0
-	if( readonly_variant = NULL ) then semantic_signature = fbSemanticModelBackendAbiBegin(proc, "c", semantic_role, semantic_result, semantic_convention)
+	if( readonly_variant = NULL andalso (options and EMITPROC_ISCALLVIEW) = 0 ) then _
+		semantic_signature = fbSemanticModelBackendAbiBegin(proc, "c", semantic_role, semantic_result, semantic_convention)
 
 	if( (options and EMITPROC_ISPROCPTR) = 0 ) then
 		if( hProcDoesNotReturn( proc ) ) then ln += " __attribute__((noreturn))"
+		if( symbGetIsRTL(proc) andalso *symbGetMangledName(proc) = "_setjmp" ) then ln += " __attribute__((returns_twice))"
 	end if
 	ln += " "
 
@@ -1465,8 +1515,10 @@ private function hEmitProcHeader _
 	else
 		var identifier = hGetCId(proc)
 		if( readonly_variant <> NULL ) then identifier = *readonly_variant->identifier
+		if( builtin_address_id <> NULL ) then identifier = *builtin_address_id
 		ln += identifier
-		if( readonly_variant = NULL ) then fbSemanticModelEmissionName(proc, "c", identifier)
+		if( readonly_variant = NULL andalso builtin_address_id = NULL ) then _
+			fbSemanticModelEmissionName(proc, "c", identifier)
 	end if
 
 	'' Parameter list
@@ -1514,6 +1566,9 @@ private function hEmitProcHeader _
 			'' Emit clang-compatible datatype for main()'s argv,
 			'' clang is very strict about this...
 			if( param->stats and FB_SYMBSTATS_ARGV ) then
+				'' The C spelling is special, but the parameter name below still
+				'' needs the type of this parameter, not the preceding one.
+				symbGetRealParamDtype( param, dtype, subtype )
 				DZstrConcatAssign( params, "char**" )
 				fbSemanticModelBackendAbiParameter(semantic_signature, param, 0, 1, "argv", "char**")
 			else
@@ -1576,20 +1631,25 @@ private function hEmitProcHeader _
 	DZstrAllocate( params, 0 )
 
 	ln += " )"
-	if( (options and EMITPROC_ISPROCPTR) = 0 andalso readonly_variant = NULL ) then hObserveProcObjectName(proc, mangled)
+	if( (options and EMITPROC_ISPROCPTR) = 0 andalso readonly_variant = NULL andalso _
+	    builtin_address_id = NULL ) then hObserveProcObjectName(proc, mangled)
 
 	if( ((options and EMITPROC_ISPROCPTR) = 0) and _
 	    ((options and EMITPROC_ISPROTO) <> 0)        ) then
 		'' Add asm("mangledname") alias if needed.
 		'' asm() can only be be used on prototypes.
-		if( hNeedAlias(proc) andalso readonly_variant = NULL ) then
+		if( builtin_address_id <> NULL ) then
+			var object_name = irGetBuiltinLibcName(proc)
+			if( env.underscoreprefix ) then object_name = "_" + object_name
+			hAppendCObjectAlias( ln, object_name )
+		elseif( hNeedAlias(proc) andalso readonly_variant = NULL ) then
 			var object_name = hGetProcObjectName( proc, mangled )
 			hAppendCObjectAlias( ln, object_name )
 		end if
 
 		'' MinGW GCC takes constructor priorities from the first declaration.
-		'' Alias prototypes must retain them before the attributed definition.
-		hAppendCtorAttrib( ln, proc, FALSE )
+		'' Keep them on the shared alias prototype before the definition.
+		hAppendCtorAttrib( ln, proc, FALSE, ((options and EMITPROC_ISCALLVIEW) = 0) )
 	end if
 
 	if( abi_first <> NULL ) then
@@ -1597,6 +1657,7 @@ private function hEmitProcHeader _
 	else
 		fbSemanticModelBackendAbiEnd(semantic_signature, ln)
 	end if
+	if( deferred_prototype ) then c_pointer_prototypes -= 1
 	function = ln
 end function
 
@@ -1714,6 +1775,14 @@ private sub hEmitUDT( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 	else
 		'' Write to toplevel
 		section = 0
+	end if
+
+	'' An outward declaration can be required by static storage or a generated
+	'' helper. Completing that tag in a local block would create a different C
+	'' type with the same spelling. Keep completion in the existing outer scope.
+	if( symbIsStruct(s) andalso symbGetIsAccessed(s) ) then
+		var declared = hCLatestViewType(FB_DATATYPE_STRUCT, s)
+		if( declared <> NULL andalso declared->section < section ) then section = declared->section
 	end if
 
 	section = sectionGosub( section )
@@ -1861,27 +1930,30 @@ private sub hEmitVarDecl _
 		ln += "struct " + vtabletag
 	elseif( use_extern and (typeGetPtrCnt(dtype) = 0) and _
 	    (typeGet(dtype) = FB_DATATYPE_FWDREF) ) then
-		'' C allows an extern object declaration with an incomplete type.
-		'' The C backend only needs a concrete spelling to form its address;
-		'' accesses that require the missing layout are rejected by the parser.
-		ln += "char"
+		'' Keep the object's layout unknown to C too. A char declaration
+		'' invents a one-byte extent for storage owned by another translation
+		'' unit or by the linker. The parser permits only address operations.
+		ln += "struct fb_c_incomplete_object_" + hGetCId( sym )
 	else
 		'' C permits the pointee of a local pointer to remain const even though
 		'' top-level const on the BASIC variable itself is not emitted here.
 		dtype = hCReadOnlyLocalType(sym, dtype)
 		ln += hEmitType( typeUnsetIsConst( dtype ), sym->subtype, TRUE )
 	end if
-	var identifier = hGetCId( sym )
+	var identifier = hCErrSymbolText( sym )
+	if( len(identifier) = 0 ) then identifier = hGetCId( sym )
 	ln += " " + identifier
 	fbSemanticModelEmissionName(sym, "c", identifier)
 	if( is_vtable = FALSE ) then ln += hEmitArrayDecl( sym )
 	dim as string selected_object_name
+	dim as integer windows_tls_alias = FALSE
 	if( sym->class = FB_SYMBCLASS_VAR andalso symbIsLocal(sym) = FALSE ) then
-		if( hCNameNeedsEncoding(symbGetMangledName(sym)) andalso _
+		if( hCSymbolNeedsEncoding(sym) andalso _
 		    (hCUseEmulatedTlsName(sym, symbGetMangledName(sym)) = FALSE) ) then
 			'' Global C tokens may differ; retain the original object identity.
 			var object_name = hGetMangledNameForASM( sym, TRUE )
-			hAppendCObjectAlias( ln, object_name )
+			windows_tls_alias = hCUsesWindowsTlsAlias(sym)
+			if( windows_tls_alias = FALSE ) then hAppendCObjectAlias( ln, object_name )
 			selected_object_name = object_name
 		end if
 	end if
@@ -1919,11 +1991,37 @@ private sub hEmitVarDecl _
 		end if
 	end if
 
+	if( static_storage andalso hCGlobalStorageDebugRetained(sym) ) then
+		'' A debugger can inspect this source global after its private users
+		'' were discarded. Keep real storage in optimized objects, rather
+		'' than leaving a declaration that the C compiler can eliminate.
+		ln += " __attribute__((used))"
+	end if
+
 	if( varini ) then
 		ln += " = " + *varini
 	end if
 
 	ln += ";"
+	if( windows_tls_alias ) then
+		'' GCC's Windows TLS relocations cannot use an asm-labelled C token.
+		'' For an extern, redirect the generated name to the ABI name. For a
+		'' definition, export the ABI name at the generated object's address.
+		var asm_identifier = identifier
+		if( env.underscoreprefix ) then asm_identifier = "_" + asm_identifier
+		dim as string directive
+		if( use_extern ) then
+			if( symbIsExtern(sym) ) then directive = ".set " + asm_identifier + ", " + selected_object_name
+		else
+			if( static_storage = FALSE ) then directive = ".globl " + selected_object_name + chr(10)
+			directive += ".set " + selected_object_name + ", " + asm_identifier
+		end if
+		if( len(directive) > 0 ) then
+			ln += " __asm__("
+			hBuildStrLit( ln, strptr(directive), len(directive) + 1, 0 )
+			ln += ");"
+		end if
+	end if
 	'' C static initializers are constant data. Their declaration can precede
 	'' statements; BASIC runtime initialization remains in the emitted body.
 	if( (varini = NULL) orelse static_storage ) then
@@ -1935,15 +2033,30 @@ end sub
 
 private function hHasCLocalReference( byval sym as FBSYMBOL ptr ) as integer
 	if( c_local_refs.list = NULL ) then return FALSE
-	var key = str(culngint(sym))
+	var key = str(culngint(cuint(sym)))
 	return (hashLookup(@c_local_refs, strptr(key)) <> NULL)
 end function
+
+private function hHasCReachableDeclaration( byval sym as FBSYMBOL ptr ) as integer
+	if( c_debug_decls.list = NULL ) then return FALSE
+	var key = str(culngint(cuint(sym)))
+	return (hashLookup(@c_debug_decls, strptr(key)) <> NULL)
+end function
+
+private sub hRememberCReachableDeclaration( byval sym as FBSYMBOL ptr )
+	if( c_debug_decls.list = NULL orelse sym = NULL ) then exit sub
+	if( symbIsVar(sym) = FALSE orelse symbIsLocal(sym) = FALSE ) then exit sub
+	var key = str(culngint(cuint(sym)))
+	if( hashLookup(@c_debug_decls, strptr(key)) = NULL ) then
+		hashAdd(@c_debug_decls, ZstrDup(strptr(key)), sym, hashHash(strptr(key)))
+	end if
+end sub
 
 private sub hRememberCLocalReference( byval sym as FBSYMBOL ptr )
 	if( sym = NULL ) then exit sub
 	if( symbIsVar(sym) = FALSE orelse symbIsLocal(sym) = FALSE ) then exit sub
 	symbSetIsAccessed(sym)
-	var key = str(culngint(sym))
+	var key = str(culngint(cuint(sym)))
 	if( hashLookup(@c_local_refs, strptr(key)) = NULL ) then
 		hashAdd(@c_local_refs, ZstrDup(strptr(key)), sym, hashHash(strptr(key)))
 	end if
@@ -1951,15 +2064,26 @@ end sub
 
 private sub hClearCLocalReferences( )
 	if( c_local_refs.list <> NULL ) then hashEnd(@c_local_refs)
+	if( c_debug_decls.list <> NULL ) then hashEnd(@c_debug_decls)
 end sub
 
 private sub hMarkReferencedLocalInTree( byval n as ASTNODE ptr )
 	if( n = NULL ) then exit sub
 
 	'' LIT nodes load as comments; only assembler text can hide storage uses.
-	if( n->class = AST_NODECLASS_ASM ) then
-		'' Assembly can name storage without an ordinary variable node.
-		c_local_refs_complete = FALSE
+	if( n->class = AST_NODECLASS_DECL ) then
+		hRememberCReachableDeclaration(n->sym)
+	elseif( n->class = AST_NODECLASS_ASM ) then
+		'' Unary named-memory operands expose all storage uses. Keep general
+		'' assembly opaque, including hidden stack and quoted C operands.
+		var token = n->asm.tokhead
+		while( token <> NULL )
+			if( token->type = AST_ASMTOK_SYMB ) then hRememberCLocalReference(token->sym)
+			token = token->next
+		wend
+		if( hCScalarAsmReferencesComplete(n->asm.tokhead) = FALSE ) then
+			c_local_refs_complete = FALSE
+		end if
 		ctx.computedgotoopaque = TRUE
 	elseif( n->class <> AST_NODECLASS_DECL ) then
 		'' A declaration alone does not use storage. Its initialization children
@@ -2015,9 +2139,47 @@ end sub
 
 private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	assert( symbIsLocal( sym ) )
+	if( errorhelper or hCErrCapture( sym ) >= 0 ) then exit sub
 
 	'' Fake dynamic array symbol? Descriptor will be emitted instead
 	if( symbGetIsDynamic( sym ) ) then
+		exit sub
+	end if
+
+	'' An unreachable declaration has no executable debug scope. Preserve
+	'' reachable declarations, opaque assembly and all object lifetimes.
+	if( env.clopt.debuginfo andalso (ctx.computedgotoopaque = FALSE) andalso _
+	    (symbIsTemp(sym) = FALSE) andalso (symbGetIsImplicit(sym) = FALSE) andalso _
+	    (symbIsParamVar(sym) = FALSE) andalso (symbIsStatic(sym) = FALSE) andalso _
+	    (symbIsRef(sym) = FALSE) andalso (symbIsThreadLocal(sym) = FALSE) andalso _
+	    (symbIsThreadLocalC(sym) = FALSE) andalso _
+	    ((symbGetAttrib(sym) and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN or _
+	      FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_COMMON)) = 0) andalso _
+	    (hHasCReachableDeclaration(sym) = FALSE) andalso (hHasCLocalReference(sym) = FALSE) andalso _
+	    (symbGetTypeIniTree(sym) = NULL) andalso _
+	    ((symbGetAttrib(sym) and FB_SYMBATTRIB_FUNCRESULT) = 0) andalso _
+	    (symbGetArrayDimensions(sym) = 0) andalso _
+	    (symbHasCtor(sym) = FALSE) andalso (symbHasDtor(sym) = FALSE) ) then
+		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
+		exit sub
+	end if
+
+	'' Statement temporaries and compiler-generated scope variables have no
+	'' source name for the debugger. User implicit declarations do not carry
+	'' FB_SYMBSTATS_IMPLICIT; that flag identifies compiler-owned storage.
+	'' Omit its storage only when the complete statement scan found no use
+	'' and neither inline assembly nor object lifetime can require it.
+	'' Reachable string initialization, copyback and cleanup are indexed
+	'' as uses above. An unreachable string temporary has no lifetime to run.
+	if( env.clopt.debuginfo andalso (ctx.computedgotoopaque = FALSE) andalso _
+	    (symbIsTemp(sym) or symbGetIsImplicit(sym)) andalso _
+	    (symbIsStatic(sym) = FALSE) andalso (symbIsParamVar(sym) = FALSE) andalso _
+	    (symbIsRef(sym) = FALSE) andalso _
+	    (hHasCLocalReference(sym) = FALSE) andalso (symbGetTypeIniTree(sym) = NULL) andalso _
+	    ((symbGetAttrib(sym) and FB_SYMBATTRIB_FUNCRESULT) = 0) andalso _
+	    (symbGetArrayDimensions(sym) = 0) andalso _
+	    (symbHasCtor(sym) = FALSE) andalso (symbHasDtor(sym) = FALSE) ) then
+		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
 		exit sub
 	end if
 
@@ -2036,7 +2198,14 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	'' created. Direct indexing uses that data without using the descriptor.
 	'' Only an actual optimized-AST descriptor reference requires this private
 	'' constant metadata. Keep dynamic arrays and lifetime wrappers intact.
-	if( c_local_refs_complete andalso symbIsStatic(sym) andalso symbIsDescriptor(sym) ) then
+	'' Implicit static descriptors have no source name or stack slot that
+	'' opaque assembly can access indirectly. Typed assembler symbols are
+	'' indexed above, as are hidden calls and ordinary descriptor references.
+	'' Preserve named array data for the debugger, including its element
+	'' type and bounds. The unreferenced private descriptor has no source
+	'' binding of its own. Naked bodies retain their storage contract.
+	if( (symbIsNaked(ctx.currproc) = FALSE) andalso _
+	    symbIsStatic(sym) andalso symbIsDescriptor(sym) ) then
 		var backing = sym->var_.desc.array
 		if( (backing <> NULL) andalso symbIsVar(backing) andalso symbIsLocal(backing) andalso _
 		    symbIsStatic(backing) andalso (symbIsDynamic(backing) = FALSE) andalso _
@@ -2151,10 +2320,10 @@ end sub
 private sub hMaybeEmitProcProto( byval s as FBSYMBOL ptr )
 	dim as integer section = any
 
-	'' Empty module bodies are discarded before the final prototype pass.
-	'' Their constructor status records startup intent, not an emitted body.
+	'' A private parsed body can be discarded during AST flushing. Its
+	'' original access flag may still reflect calls from another dead body,
+	'' but a static prototype without a definition is not useful C.
 	if( symbIsPrivate( s ) andalso symbGetIsParsed( s ) andalso _
-	    symbGetIsModLevelProc( s ) andalso _
 	    (symbGetProcIsEmitted( s ) = FALSE) ) then
 		exit sub
 	end if
@@ -2186,13 +2355,29 @@ private sub hMaybeEmitProcProto( byval s as FBSYMBOL ptr )
 	'' All procedure declarations go into the toplevel header
 	section = sectionGosub( 0 )
 
-	var prototype = hEmitProcHeader( s, EMITPROC_ISPROTO ) + ";"
+	var identifier = hGetCId( s )
+	var signature = hCPrototypeCanonicalEntry(s)
+	if( hCPrototypeHasName(identifier) ) then
+		'' Compare without recording an ABI or startup observation for a
+		'' declaration that may already be present in this C translation unit.
+		var probe = hEmitProcHeader( signature, EMITPROC_ISPROTO or EMITPROC_ISCALLVIEW ) + ";"
+		if( hCPrototypeMatches(identifier, probe) ) then
+			sectionReturn( section )
+			exit sub
+		end if
+	end if
+	var prototype = hEmitProcHeader( signature, EMITPROC_ISPROTO ) + ";"
 	var first = ctx.sections(0).bufferlen
 	hWriteLine( prototype )
 	hCLeafPrototype( s, first )
+	hCPrototypeRemember( identifier, prototype )
 
 	sectionReturn( section )
 end sub
+
+#include once "backend/c/c-wide-libc.bi"
+
+#include once "backend/c/c-record-layout.bi"
 
 private sub hEmitFieldTypes( byval udt as FBSYMBOL ptr )
 	dim as FBSYMBOL ptr fld = any
@@ -2278,12 +2463,111 @@ private function hFieldNeedsRuntimeAlignment _
 	function = FALSE
 end function
 
-private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
-	dim as integer skip = any, dtype = any, align = any
-	dim as FBSYMBOL ptr subtype = any, fld = any
-	dim as FBSYMBOL ptr ptr anonnode = any
+declare function hCExplicitRecordLayout( byval udt as FBSYMBOL ptr ) as integer
+
+private function hCRecordAlignment( byval udt as FBSYMBOL ptr ) as integer
+	var alignment = typeCalcNaturalAlign( FB_DATATYPE_STRUCT, udt )
+	var packing = symbGetUDTAlign( udt )
+	if( packing > 0 andalso packing < alignment ) then alignment = packing
+	if( hCExplicitRecordLayout( udt ) ) then return alignment
+
+	'' Descriptor fields retain their runtime alignment even in a packed
+	'' record. The C type can therefore be more aligned than FIELD=N says.
+	'' Compare this effective alignment before omitting a parent's packing.
+	var fld = symbUdtGetFirstField( udt )
+	while( fld <> NULL )
+		if( hFieldNeedsRuntimeAlignment( fld ) ) then
+			var fieldalign = typeCalcNaturalAlign( symbGetType( fld ), symbGetSubtype( fld ) )
+			if( fieldalign > alignment ) then alignment = fieldalign
+		end if
+		fld = symbUdtGetNextField( fld )
+	wend
+	return alignment
+end function
+
+private sub hEmitCRecordField _
+	( byval fld as FBSYMBOL ptr, byval align as integer, byval explicitlayout as integer )
+	dim as integer skip = FALSE, dtype = any
+	dim as FBSYMBOL ptr subtype = any
 	dim as DZSTRING ln
 	DZstrZero( ln )
+
+	'' Preserve pointee qualifiers while leaving the field itself writable
+	'' for BASIC initialization and constructor assignments.
+	dtype = symbGetType( fld ) or typeGetConstMask( symbGetFullType( fld ) )
+	dtype = typeUnsetIsConst( dtype )
+	subtype = symbGetSubtype( fld )
+	DZstrAssign( ln, hEmitType( dtype, subtype, TRUE ) )
+	DZstrConcatAssign( ln, " " + hGetCFieldId( fld ) )
+	DZstrConcatAssign( ln, hEmitArrayDecl( fld ) )
+
+	'' Field alignment (FIELD = N)?
+	if( explicitlayout ) then
+		'' The explicit body owns alignment; gaps above own offsets.
+	elseif( env.clopt.target = FB_COMPTARGET_RISCOS ) then
+		'' The enclosing RISC OS structure is packed to remove GCC's
+		'' four-byte aggregate minimum. Restore each field's effective
+		'' FreeBASIC alignment explicitly inside that packed body.
+		var effectivealign = typeCalcNaturalAlign( dtype, subtype )
+		if( (hFieldNeedsRuntimeAlignment( fld ) = FALSE) andalso _
+		    (align > 0) andalso (align < effectivealign) ) then
+			effectivealign = align
+		end if
+		DZstrConcatAssign( ln, _
+			" __attribute__((aligned(" + str( effectivealign ) + ")))" )
+	elseif( align > 0 ) then
+		'' The aligned(N) attribute alone increases the alignment,
+		'' together with packed it decreases it.
+		'' FIELD = N in FB only decreases alignment, but never increases it.
+		skip = (align >= typeCalcNaturalAlign( dtype, subtype ))
+		skip or= hFieldNeedsRuntimeAlignment( fld )
+
+		'' Don't add unnecessary attributes on nested structures
+		'' that are already packed to the same alignment,
+		'' gcc would show a warning in that case.
+		if( typeGet( dtype ) = FB_DATATYPE_STRUCT ) then
+			var fieldudtalign = symbGetUDTAlign( subtype )
+			if( fieldudtalign > 0 ) then
+				fieldudtalign = hCRecordAlignment( subtype )
+				skip or= (align >= fieldudtalign)
+			end if
+		end if
+
+		if( skip = FALSE ) then
+			DZstrConcatAssign( ln, _
+				" __attribute__((packed, aligned(" + str( align ) + ")))" )
+		end if
+	end if
+
+	'' The alignment of nested structures which are packed with a
+	'' smaller alignment than the natural or specified alignment of the
+	'' parent structure has to be specified explicitly,
+	'' otherwise the field will be packed too.
+	if( explicitlayout = FALSE andalso (align <= 0 orelse skip) ) then
+		if( typeGet( dtype ) = FB_DATATYPE_STRUCT ) then
+			var effectivealign = typeCalcNaturalAlign( dtype, subtype )
+			if ( align > 0 andalso align < effectivealign ) then
+				effectivealign = align
+			end if
+			var fieldudtalign = symbGetUDTAlign( subtype )
+			if( fieldudtalign > 0 andalso effectivealign > fieldudtalign ) then
+				DZstrConcatAssign( ln, _
+					" __attribute__((aligned(" + str( effectivealign ) + ")))" )
+			end if
+		end if
+	end if
+
+	DZstrConcatAssign( ln, ";" )
+	hWriteLine( *ln.data, TRUE )
+	DZstrAllocate( ln, 0 )
+end sub
+
+#include once "backend/c/c-explicit-record-layout.bi"
+
+private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
+	dim as integer skip = any
+	dim as FBSYMBOL ptr fld = any
+	dim as FBSYMBOL ptr ptr anonnode = any
 
 	'' Write out the fields
 	fld = symbUdtGetFirstField( s )
@@ -2316,71 +2600,7 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 		skip = symbIsDynamic( fld )
 
 		if( skip = FALSE ) then
-			'' Preserve pointee qualifiers while leaving the field itself writable
-			'' for BASIC initialization and constructor assignments.
-			dtype = symbGetType( fld ) or typeGetConstMask( symbGetFullType( fld ) )
-			dtype = typeUnsetIsConst( dtype )
-			subtype = symbGetSubtype( fld )
-			DZstrAssign( ln, hEmitType( dtype, subtype, TRUE ) )
-			DZstrConcatAssign( ln, " " + hGetCFieldId( fld ) )
-			DZstrConcatAssign( ln, hEmitArrayDecl( fld ) )
-
-			'' Field alignment (FIELD = N)?
-			align = symbGetUDTAlign( s )
-			if( env.clopt.target = FB_COMPTARGET_RISCOS ) then
-				'' The enclosing RISC OS structure is packed to remove GCC's
-				'' four-byte aggregate minimum. Restore each field's effective
-				'' FreeBASIC alignment explicitly inside that packed body.
-				var effectivealign = typeCalcNaturalAlign( dtype, subtype )
-				if( (hFieldNeedsRuntimeAlignment( fld ) = FALSE) andalso _
-				    (align > 0) andalso (align < effectivealign) ) then
-					effectivealign = align
-				end if
-				DZstrConcatAssign( ln, _
-					" __attribute__((aligned(" + str( effectivealign ) + ")))" )
-			elseif( align > 0 ) then
-				'' The aligned(N) attribute alone increases the alignment,
-				'' together with packed it decreases it.
-				'' FIELD = N in FB only decreases alignment, but never increases it.
-				skip = (align >= typeCalcNaturalAlign( dtype, subtype ))
-				skip or= hFieldNeedsRuntimeAlignment( fld )
-
-				'' Don't add unnecessary attributes on nested structures
-				'' that are already packed to the same alignment,
-				'' gcc would show a warning in that case.
-				if( typeGet( dtype ) = FB_DATATYPE_STRUCT ) then
-					var fieldudtalign = symbGetUDTAlign( subtype )
-					if( fieldudtalign > 0 ) then
-						skip or= (align >= fieldudtalign)
-					end if
-				end if
-
-				if( skip = FALSE ) then
-					DZstrConcatAssign( ln, _
-						" __attribute__((packed, aligned(" + str( align ) + ")))" )
-				end if
-			end if
-
-			'' The alignment of nested structures which are packed with a
-			'' smaller alignment than the natural or specified alignment of the
-			'' parent structure has to be specified explicitly,
-			'' otherwise the field will be packed too.
-			if ( align <= 0 orelse skip ) then
-				if( typeGet( dtype ) = FB_DATATYPE_STRUCT ) then
-					var effectivealign = typeCalcNaturalAlign( dtype, subtype )
-					if ( align > 0 andalso align < effectivealign ) then
-						effectivealign = align
-					end if
-					var fieldudtalign = symbGetUDTAlign( subtype )
-					if( fieldudtalign > 0 andalso effectivealign > fieldudtalign ) then
-						DZstrConcatAssign( ln, _
-							" __attribute__((aligned(" + str( effectivealign ) + ")))" )
-					end if
-				end if
-			end if
-
-			DZstrConcatAssign( ln, ";" )
-			hWriteLine( *ln.data, TRUE )
+			hEmitCRecordField( fld, symbGetUDTAlign( s ), FALSE )
 		end if
 
 		fld = symbUdtGetNextField( fld )
@@ -2390,28 +2610,24 @@ private sub hEmitStructWithFields( byval s as FBSYMBOL ptr )
 	hPopAnonParents( NULL )
 
 	assert( listGetHead( @ctx.anonstack ) = NULL )
-	DZstrAllocate( ln, 0 )
 end sub
 
 private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
-	dim as integer emit_fields = any
+	dim as integer emit_fields = any, naturalcalignment = 1
 	dim as string ln
 
-	'' Already in the process of emitting this UDT?
-	if( symbGetIsBeingEmitted( s ) ) then
-		'' This means there is a circular dependency with another UDT.
-		'' One of the references can be a pointer only though,
-		'' because UDTs cannot contain each-other, so this can always
-		'' be solved by using a forward reference.
-		if( is_ptr ) then
-			'' Emit a forward reference for this struct (if not yet done).
-			'' The symbol's accessed bit prevents emitting this struct reference twice.
-			if( symbGetIsAccessed( s ) = FALSE ) then
-				symbSetIsAccessed( s )
-				hWriteLine( hGetUdtName( s ) + ";" )
-			end if
-			exit sub
+	'' Pointer fields and callback parameters need only a tag while another
+	'' record is being declared. Expanding their bodies would pull unrelated
+	'' layouts into C. By-value fields and later alignment views still request
+	'' complete records through the ordinary path below.
+	if( is_ptr andalso (symbGetIsBeingEmitted( s ) orelse (c_pointer_raw_types <> 0) orelse (c_pointer_prototypes <> 0)) ) then
+		'' Reuse the forward-declaration state used for recursive records.
+		if( symbGetIsAccessed( s ) = FALSE ) then
+			symbSetIsAccessed( s )
+			hWriteLine( hGetUdtName( s ) + ";" )
+			hCRememberViewType(FB_DATATYPE_STRUCT, s)
 		end if
+		exit sub
 	end if
 
 	symbSetIsBeingEmitted( s )
@@ -2466,23 +2682,29 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 	sectionIndent( )
 
 	if( emit_fields ) then
-		hEmitStructWithFields( s )
+		if( hCExplicitRecordLayout( s ) ) then
+			var fld = symbUdtGetFirstField( s )
+			var paddingid = 0
+			naturalcalignment = hEmitExplicitRecordBody( s, s, fld, 0, paddingid )
+			assert( fld = NULL )
+		else
+			hEmitStructWithFields( s )
+		end if
 	else
-		hWriteLine( "uint8 __fb_struct_body[" & symbGetSizeOf( s ) & "];", TRUE )
+		hWriteLine( "uint8 fb_c_struct_body[" & symbGetSizeOf( s ) & "];", TRUE )
 	end if
 
 	'' Close the UDT body. Give RISC OS aggregates the effective alignment
 	'' already used for FreeBASIC's size calculation. The packed attribute
 	'' removes GCC's otherwise unavoidable four-byte aggregate minimum.
 	sectionUnindent( )
-	if( env.clopt.target = FB_COMPTARGET_RISCOS ) then
+	if( env.clopt.target = FB_COMPTARGET_RISCOS orelse hCExplicitRecordLayout( s ) ) then
 		var effectivealign = s->udt.natalign
 		if( (symbGetUDTAlign( s ) > 0) andalso _
 		    (symbGetUDTAlign( s ) < effectivealign) ) then
 			effectivealign = symbGetUDTAlign( s )
 		end if
-		hWriteLine( "} __attribute__((packed, aligned(" + _
-		            str( effectivealign ) + ")));", TRUE )
+		hEmitExplicitRecordEnd( effectivealign, naturalcalignment )
 	else
 		hWriteLine( "};", TRUE )
 	end if
@@ -2496,6 +2718,7 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 	'' that could easily cause stack trashing etc., because local vars
 	'' allocated by gcc would be smaller than expected, etc.
 	hWriteStaticAssert( "sizeof( " + hGetUdtTag( s ) + hGetUdtId( s ) + " ) == " + str( culngint( symbGetSizeOf( s ) ) ) )
+	if( emit_fields ) then hCVerifyRecordFields(s)
 end sub
 
 private sub hWriteX86F2I _
@@ -2675,6 +2898,11 @@ private sub hMaybeEmitProcExport( byval proc as FBSYMBOL ptr )
 end sub
 
 private function _emitBegin( ) as integer
+	hCGosubInit()
+	errorabiwritten = FALSE
+	errorserial = 0
+	errorhelper = FALSE
+	hCStartupInit()
 	hCReadOnlyLocalsInit()
 	hCStaticCodeInit()
 	hCEvaluatedValuesInit()
@@ -2691,12 +2919,14 @@ private function _emitBegin( ) as integer
 	end if
 
 	hCLeafInit( )
+	hCPrototypeInit( )
 	hCAbiInit( )
 	hCReadOnlyInit()
 	hCUnobservedInit()
 	hCClearPointerViews(0)
 	c_pointer_view_id = 0
 	c_pointer_raw_types = 0
+	c_pointer_prototypes = 0
 	'' Declaration metadata belongs to one C output; retain only list capacity.
 	do while( listGetHead(@ctx.alignmentviews) <> NULL )
 		listDelNode(@ctx.alignmentviews, listGetHead(@ctx.alignmentviews))
@@ -2711,7 +2941,7 @@ private function _emitBegin( ) as integer
 	ctx.linenum = 0
 	ctx.usedbuiltins = 0
 	ctx.unalignedid = 0
-	ctx.localassertid = 0
+	ctx.assertid = 0
 	ctx.codeptrid = 0
 	ctx.varinisym = NULL
 	ctx.globalvarpass = 0
@@ -2768,8 +2998,10 @@ private sub hWriteFloatEqual( byref suffix as string, byval dtype as integer )
 end sub
 
 #include once "backend/c/c-integer-abs.bi"
+#include once "backend/c/c-stdio-contract.bi"
 
 private sub _emitEnd( )
+	hCErrDestroyBoundaries( )
 	hAsmEndNames( )
 	dim as integer section = any
 	dim as integer output_error = FALSE
@@ -2780,9 +3012,17 @@ private sub _emitEnd( )
 	section = sectionGosub( 0 )
 
 	if( fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_GUI ) then
+		'' The platform launcher finds this weak object by its native ABI name.
+		'' Give its C token our own namespace and declare the binding first.
 		hWriteLine( "#if defined(__GNUC__)", TRUE )
-		hWriteLine( "__attribute__((weak)) const int __fb_app_mode_gui_enabled = 1;", TRUE )
+		var object_name = "__fb_app_mode_gui_enabled"
+		if( env.underscoreprefix ) then object_name = "_" + object_name
+		var declaration = "extern const int fb_c_gui_mode_enabled"
+		hAppendCObjectAlias(declaration, object_name)
+		hWriteLine(declaration + ";", TRUE)
+		hWriteLine( "__attribute__((weak)) const int fb_c_gui_mode_enabled = 1;", TRUE )
 		hWriteLine( "#else", TRUE )
+		hWriteLine( "extern const int __fb_app_mode_gui_enabled;", TRUE )
 		hWriteLine( "const int __fb_app_mode_gui_enabled = 1;", TRUE )
 		hWriteLine( "#endif", TRUE )
 	end if
@@ -2872,12 +3112,15 @@ private sub _emitEnd( )
 		ctx.exports = ""
 	end if
 
+	hCStartupEmit()
+
 	'' Global initializer addresses are roots too. Close the private graph
 	'' before deciding which deferred ABI entry points need definitions.
 	hCLeafReachable()
 	hCReadOnlyWritePrivateWrappers()
 	hCLeafPrune( )
 	hCLeafFinish( )
+	hCPrototypeFinish( )
 
 	'' body (is appended to header section)
 	sectionEnd( )
@@ -2886,7 +3129,14 @@ private sub _emitEnd( )
 	if( (ctx.sections(0).old = FALSE) andalso _
 	    (ctx.sections(0).bufferlen > 0) ) then
 		hCLiteralStoragePrepare(ctx.sections(0).buffer, ctx.sections(0).bufferlen)
-		if( hCAbiWriteOutput(ctx.sections(0).buffer, ctx.sections(0).bufferlen, c_leaf_opaque) = FALSE ) then
+		'' A tag/void typedef has no dependency on the generated scalar types.
+		'' Write it before all declarations, including earlier procedure bodies.
+		if( hCStartupWritePrelude() = FALSE ) then output_error = TRUE
+		var stdio_declaration = hCStdioDeclaration()
+		if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(stdio_declaration)), len(stdio_declaration)) = FALSE ) then
+			output_error = TRUE
+		end if
+		if( hCAbiWriteOutput(ctx.sections(0).buffer, ctx.sections(0).bufferlen) = FALSE ) then
 			output_error = TRUE
 		end if
 	end if
@@ -2896,6 +3146,7 @@ private sub _emitEnd( )
 	hCReadOnlyLocalsFinish()
 	hCStaticCodeFinish()
 	hCLiteralStorageFinish()
+	hCStartupFinish()
 	sectionEnd( )
 
 	if( close( #env.outf.num ) <> 0 ) then
@@ -3122,7 +3373,13 @@ private function hEmitType _
 					needsview = (typeGetDtOnly(dtype) <> FB_DATATYPE_VOID) and (s <> "void") and (s <> "const void")
 					if( typeGetSize(typeGetDtOnly(dtype)) = 1 ) then needsview = FALSE
 				end if
-				if( needsview ) then s = hCPointerViewName(s, declsection)
+				if( needsview ) then
+					var incomplete = FALSE
+					if( i = ptrcount - 1 andalso typeGetDtOnly(dtype) = FB_DATATYPE_STRUCT andalso subtype <> NULL ) then
+						incomplete = (symbGetIsEmitted(subtype) = FALSE)
+					end if
+					s = hCPointerViewName(s, declsection, incomplete)
+				end if
 			end if
 			s += "*"
 			if( emit_const andalso typeIsConstAt( dtype, i ) ) then
@@ -3150,6 +3407,7 @@ private function exprNew _
 	n->class = class_
 	n->dtype = dtype
 	n->subtype = subtype
+	n->virtual_origin = FALSE
 
 	function = n
 end function
@@ -3251,6 +3509,8 @@ private function symbIsCArray( byval sym as FBSYMBOL ptr ) as integer
 	return FALSE
 end function
 
+#include once "backend/c/c-callback-representation.bi"
+
 private function exprNewCAST _
 	( _
 		byval dtype as integer, _
@@ -3303,6 +3563,12 @@ private function exprNewCAST _
 
 	var n = exprNew( EXPRCLASS_CAST, dtype, subtype )
 	n->l = l
+	'' Native-width casts preserve a descriptor address's representation.
+	if( typeGetClass(dtype) = FB_DATACLASS_INTEGER andalso _
+	    typeGetClass(l->dtype) = FB_DATACLASS_INTEGER andalso _
+	    typeGetSize(dtype) = env.pointersize andalso typeGetSize(l->dtype) = env.pointersize ) then
+		n->virtual_origin = l->virtual_origin
+	end if
 	function = n
 end function
 
@@ -3564,6 +3830,16 @@ private function exprIsNullPointerConstant( byval n as EXPRNODE ptr ) as integer
 	       (literal->val.i = 0)
 end function
 
+'' Recognize only constant zero addresses. Dynamic operands remain in the tree.
+private function exprIsZeroAddress( byval n as EXPRNODE ptr ) as integer
+	while( n->class = EXPRCLASS_CAST )
+		if( typeGetClass(n->dtype) <> FB_DATACLASS_INTEGER ) then return FALSE
+		n = n->l
+	wend
+	return n->class = EXPRCLASS_IMM andalso _
+	       typeGetClass(n->dtype) = FB_DATACLASS_INTEGER andalso n->val.i = 0
+end function
+
 private function exprNewBOP _
 	( _
 		byval op as integer, _
@@ -3597,6 +3873,40 @@ private function exprNewBOP _
 		end if
 	end select
 
+	'' Null is the lowest unsigned address. Reduce its ordered comparisons
+	'' before numeric lowering, keeping evaluation even for constant results.
+	select case as const( op )
+	case AST_OP_GT, AST_OP_LT, AST_OP_GE, AST_OP_LE
+		if( typeIsPtr(l->dtype) or typeIsPtr(r->dtype) ) then
+			dim as EXPRNODE ptr value = NULL, zero = NULL
+			dim as integer constant_result = -1
+			if( exprIsZeroAddress(r) ) then
+				select case op
+				case AST_OP_GT: op = AST_OP_NE
+				case AST_OP_LE: op = AST_OP_EQ
+				case AST_OP_LT: constant_result = 0
+				case AST_OP_GE: constant_result = 1
+				end select
+				value = l: zero = r
+			elseif( exprIsZeroAddress(l) ) then
+				select case op
+				case AST_OP_LT: op = AST_OP_NE
+				case AST_OP_GE: op = AST_OP_EQ
+				case AST_OP_GT: constant_result = 0
+				case AST_OP_LE: constant_result = 1
+				end select
+				value = r: zero = l
+			end if
+			if( constant_result >= 0 ) then
+				exprFreeTree(zero)
+				n = exprNew(EXPRCLASS_DISCARD, FB_DATATYPE_LONG, NULL)
+				n->l = value
+				n->val.i = constant_result
+				return n
+			end if
+		end if
+	end select
+
 	'' Integer zero is a C null pointer constant in equality comparisons. The
 	'' IR can erase pointer qualifiers here, so retaining its typed zero cast
 	'' can make nested const pointers appear incompatible. Argument casts keep
@@ -3615,6 +3925,18 @@ private function exprNewBOP _
 		end if
 	end if
 
+	'' BASIC compares native addresses, including null, unrelated objects
+	'' and procedure pointers. C ordering only covers positions within one
+	'' object, so convert before the comparison. Both operands stay single
+	'' expressions and retain the target's full unsigned pointer width.
+	select case as const( op )
+	case AST_OP_GT, AST_OP_LT, AST_OP_GE, AST_OP_LE
+		if( typeIsPtr(l->dtype) or typeIsPtr(r->dtype) ) then
+			l = exprNewCAST(FB_DATATYPE_UINT, NULL, l)
+			r = exprNewCAST(FB_DATATYPE_UINT, NULL, r)
+		end if
+	end select
+
 	'' if both are pointers, and either has a mangle modifier, then
 	'' cast both sides to ubyte*, otherwise, gcc may warn about comparing
 	'' distinct pointer types without a cast.  For example with pointers
@@ -3630,6 +3952,38 @@ private function exprNewBOP _
 			end if
 		end if
 	end select
+
+	'' BASIC pointer values use native addresses, including null and
+	'' virtual origins. Form offsets with unsigned native arithmetic;
+	'' converting after a C pointer step would already have evaluated
+	'' invalid address formation. Actual loads/stores keep their own
+	'' access paths, and each operand remains in this expression once.
+	if( (op = AST_OP_ADD or op = AST_OP_SUB) andalso typeIsPtr(dtype) ) then
+		dim as EXPRNODE ptr pointer_value = NULL, offset_value = NULL
+		dim as integer pointer_on_left = FALSE
+		if( typeIsPtr(l->dtype) andalso typeIsPtr(r->dtype) = FALSE ) then
+			pointer_value = l
+			offset_value = r
+			pointer_on_left = TRUE
+		elseif( op = AST_OP_ADD andalso typeIsPtr(r->dtype) andalso typeIsPtr(l->dtype) = FALSE ) then
+			pointer_value = r
+			offset_value = l
+		end if
+		if( pointer_value <> NULL andalso typeGetClass(offset_value->dtype) = FB_DATACLASS_INTEGER ) then
+			var element_size = symbCalcLen(typeDeref(pointer_value->dtype), pointer_value->subtype)
+			if( element_size > 0 ) then
+				pointer_value = exprNewCAST(FB_DATATYPE_UINT, NULL, pointer_value)
+				offset_value = exprNewCAST(FB_DATATYPE_UINT, NULL, offset_value)
+				if( element_size <> 1 ) then offset_value = exprNewBOP(AST_OP_MUL, offset_value, exprNewIMMi(element_size, FB_DATATYPE_UINT))
+				if( pointer_on_left ) then
+					n = exprNewBOP(op, pointer_value, offset_value)
+				else
+					n = exprNewBOP(AST_OP_ADD, offset_value, pointer_value)
+				end if
+				return exprNewCAST(dtype, subtype, n)
+			end if
+		end if
+	end if
 
 	if( op = AST_OP_ADD ) then
 		var address = hCByteOffsetChain( l, r )
@@ -3648,10 +4002,15 @@ private function exprNewBOP _
 	n->l = l
 	n->r = r
 	n->op = op
+	if( (op = AST_OP_ADD or op = AST_OP_SUB) andalso _
+	    typeGetClass(dtype) = FB_DATACLASS_INTEGER andalso typeGetSize(dtype) = env.pointersize ) then
+		n->virtual_origin = l->virtual_origin or r->virtual_origin
+	end if
 
 	function = n
 end function
 
+#include once "backend/c/c-address-arithmetic.bi"
 #include once "backend/c/c-array-index.bi"
 #include once "backend/c/c-bulk-memory.bi"
 
@@ -3783,6 +4142,10 @@ private function hEmitFloat _
 	function = s
 end function
 
+'' ISO C requires support for 4095 characters in one concatenated string
+'' literal, excluding its terminator. Longer data uses an array initializer.
+const C_STRING_LITERAL_LIMIT = 4095
+
 private sub hBuildStrLit _
 	( _
 		byref ln as string, _
@@ -3857,12 +4220,38 @@ private sub hBuildStrLit _
 	DZstrAllocate( buffer, 0 )
 end sub
 
+private sub hBuildNumericStrLit _
+	( _
+		byref ln as string, _
+		byval z as zstring ptr, _
+		byval length as longint _  '' including null terminator
+	)
+
+	assert(z <> NULL and length > 0)
+	dim as DZSTRING buffer
+	DZstrZero(buffer)
+	DZstrAssign(buffer, strptr(ln))
+	DZstrConcatAssign(buffer, "{ ")
+	for i as longint = 0 to length - 1
+		if( i > 0 ) then DZstrConcatAssign(buffer, ", ")
+		if( i mod 32 = 0 ) then DZstrConcatAssign(buffer, !"\n")
+		dim as uinteger ch = 0
+		if( i < length - 1 ) then ch = cptr(ubyte ptr, z)[i]
+		'' The backing array has C char elements. Explicit conversion retains
+		'' high byte values with either signed or unsigned plain char.
+		if( ch > 127 ) then DZstrConcatAssign(buffer, "(char)")
+		DZstrConcatAssign(buffer, str(ch))
+	next
+	DZstrConcatAssign(buffer, " }")
+	ln = *buffer.data
+	DZstrAllocate(buffer, 0)
+end sub
+
 private function hUseNumericWstrLit( ) as integer
-	'' Some COFF targets may use a 32-bit FreeBASIC WCHAR while the C
-	'' compiler's L"..." literals are not 32-bit wchar_t strings.  Emit
-	'' numeric target-WCHAR arrays there so WSTRING literals are described
-	'' by FreeBASIC's target table instead of the host C wide-character ABI.
-	function = fbTargetWcharIsUtf32( ) and fbTargetSupportsCOFF( )
+	'' A C compiler may use a signed 32-bit wchar_t while FreeBASIC uses
+	'' unsigned UTF-32 code units. Numeric arrays keep literal storage
+	'' compatible with the target WCHAR type regardless of that ABI choice.
+	function = fbTargetWcharIsUtf32( )
 end function
 
 private sub hBuildNumericWstrLit _
@@ -3894,6 +4283,16 @@ private sub hBuildNumericWstrLit _
 			ch = 0
 		end if
 
+		if( (fbGetTargetWcharSize() = 2) and (ch >= &h10000ul) and (ch <= &h10FFFFul) ) then
+			'' The encoded source holds a code point, while UTF-16 storage
+			'' counts both surrogate code units in length.
+			ch -= &h10000ul
+			DZstrConcatAssign(buffer, hEmitInt(env.target.wchar, (ch shr 10) + &hD800ul))
+			i += 1
+			if( i >= length ) then exit for
+			DZstrConcatAssign(buffer, ", ")
+			ch = (ch and &h3FFul) + &hDC00ul
+		end if
 		DZstrConcatAssign( buffer, hEmitInt( env.target.wchar, ch ) )
 	next
 
@@ -3922,7 +4321,7 @@ private sub hBuildWstrLit _
 
 	'' (ditto)
 
-	if( hUseNumericWstrLit( ) ) then
+	if( hUseNumericWstrLit() or length - 1 > C_STRING_LITERAL_LIMIT ) then
 		hBuildNumericWstrLit( ln, w, length )
 		exit sub
 	end if
@@ -4102,11 +4501,29 @@ end sub
 
 #include once "backend/c/c-literal-storage.bi"
 
+private sub hCEnsureBuiltinAddressPrototype _
+	( byval proc as FBSYMBOL ptr, byref address_id as string )
+
+	if( hCPrototypeHasName(address_id) ) then exit sub
+	var saved_section = sectionGosub(0)
+	var address_prototype = hEmitProcHeader(proc, EMITPROC_ISPROTO or EMITPROC_ISCALLVIEW, _
+		NULL, strptr(address_id)) + ";"
+	hWriteLine(address_prototype)
+	hCPrototypeRemember(address_id, address_prototype)
+	sectionReturn(saved_section)
+end sub
+
+#include once "backend/c/c-error-continuations.bi"
+
 private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr, byval native_storage as integer = FALSE )
+	var capture_name = hCErrSymbolText( sym )
+	if( len(capture_name) ) then s += capture_name: exit sub
 	hCLeafReference( sym )
 	'' String literal?
 	if( symbGetIsLiteral( sym ) ) then
-		if( native_storage ) then
+		var long_literal = iif(symbGetType(sym) = FB_DATATYPE_WCHAR, _
+		                       symbGetWstrLength(sym), symbGetStrLength(sym)) > C_STRING_LITERAL_LIMIT
+		if( native_storage or long_literal ) then
 			s += hCLiteralStorageName(sym)
 		elseif( symbGetType(sym) = FB_DATATYPE_WCHAR ) then
 			hBuildWstrLit(s, symbGetVarLitTextW(sym), symbGetWstrLength(sym) + 1)
@@ -4116,10 +4533,16 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr, byval nativ
 	else
 		if( symbIsLabel( sym ) ) then
 			if( sym = ctx.procentrylabel ) then symbSetIsAccessed( sym )
-			s += "&&"
+			s += hCResumeAddress(sym)
+			exit sub
 		elseif( symbIsProc( sym ) ) then
-			hCAbiAddress(sym)
 			s += "&"
+			var builtin_address = hCBuiltinAddressId(sym)
+			if( len(builtin_address) > 0 ) then
+				hCEnsureBuiltinAddressPrototype(sym, builtin_address)
+				s += builtin_address
+				exit sub
+			end if
 		end if
 		s += hGetCId( sym )
 	end if
@@ -4130,10 +4553,27 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 	dim as integer is_builtin = any
 
 	select case as const( n->class )
+	case EXPRCLASS_DISCARD
+		'' The comma expression evaluates once, then produces the proven C bool.
+		ctx.exprtext += "((void)("
+		hExprFlush(n->l, FALSE)
+		ctx.exprtext += "), " + str(n->val.i) + ")"
+
 	case EXPRCLASS_TEXT, EXPRCLASS_CALL
 		ctx.exprtext += *n->text
 
 	case EXPRCLASS_MEMBER
+		if( n->member_view = C_MEMBER_VIEW_DESCRIPTOR_READ ) then
+			var valuetype = hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE)
+			var offset = str(n->r->val.i) + "ll"
+			'' The view covers only the byte range actually read. A larger
+			'' generic descriptor type need not fit in a fixed-rank object.
+			ctx.exprtext += "*((" + valuetype + "*)__builtin_memcpy( &(" + valuetype + "){0}, " + _
+			                "&((const uint8 (*)[" + offset + " + sizeof(" + valuetype + ")])("
+			hExprFlush(n->l, FALSE)
+			ctx.exprtext += "))[0][" + offset + "], sizeof(" + valuetype + ") ))"
+			exit sub
+		end if
 		if( n->member_view = C_MEMBER_VIEW_VALUE andalso hCMemberViewIsAggregate(n) ) then
 			var tempname = hCUnalignedTempName()
 			ctx.exprtext += "__extension__ ({ " + hEmitType(typeUnsetIsConst(n->dtype), n->subtype) + _
@@ -4168,11 +4608,27 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		ctx.exprtext += ")" + *n->text
 
 	case EXPRCLASS_INDEX
-		ctx.exprtext += "("
-		hExprFlush(n->l, FALSE)
-		ctx.exprtext += ")["
-		hExprFlush(n->r, FALSE)
-		ctx.exprtext += "]"
+		if( n->r->class <> EXPRCLASS_IMM ) then
+			'' Native array scaling wraps before the physical load/store. C
+			'' subscripting instead performs pointer arithmetic, which can
+			'' overflow even when the resulting native address is an owned slot.
+			'' Keep both operands single-evaluated and retain the element type.
+			'' Existing pointer views preserve packed element alignment.
+			var element_type = hCReadOnlyLocalType(n->sym, n->dtype)
+			var native_type = hEmitType(FB_DATATYPE_UINT, NULL)
+			ctx.exprtext += "(*(" + hEmitType(typeAddrOf(element_type), n->subtype, TRUE) + ")((" + native_type + ")"
+			hExprFlush(n->l, TRUE)
+			ctx.exprtext += " + (" + native_type + ")("
+			hExprFlush(n->r, FALSE)
+			ctx.exprtext += ") * " + hEmitInt(FB_DATATYPE_UINT, symbGetSizeOf(n->sym)) + "))"
+		else
+			'' Constant indices have already passed the storage-span proof.
+			ctx.exprtext += "("
+			hExprFlush(n->l, FALSE)
+			ctx.exprtext += ")["
+			hExprFlush(n->r, FALSE)
+			ctx.exprtext += "]"
+		end if
 
 	case EXPRCLASS_ARRAYADDR
 		dim as longint offset
@@ -4225,7 +4681,7 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			var resultname = hCUnalignedTempName()
 			hWriteDeclaration(hEmitType(qualified_dtype, n->subtype, TRUE) + " " + inputname + ";")
 			hWriteDeclaration(hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE) + " " + resultname + ";")
-			hWriteStaticAssert("sizeof(" + inputname + ") == sizeof(" + resultname + ")")
+			hWriteStaticAssert("sizeof(" + inputname + ") == sizeof(" + resultname + ")", TRUE)
 
 			'' Keep the conversion at its expression site. Hoisted bindings must
 			'' not evaluate a skipped branch or duplicate an effectful operand.
@@ -4236,12 +4692,13 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			exit sub
 		end if
 		if( typeIsPtr(n->dtype) andalso typeIsPtr(n->l->dtype) andalso _
-		    ((typeGetDtAndPtrOnly(n->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) xor _
-		     (typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION))) andalso _
+		    (((typeGetDtAndPtrOnly(n->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) xor _
+		      (typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION))) orelse _
+		     hCCallbackRepresentationCast(n->dtype, n->subtype, n->l->dtype, n->l->subtype)) andalso _
 		    sectionInsideProc() andalso (ctx.varinisym = NULL) ) then
 			'' BASIC library lookups and callback APIs carry native code addresses
-			'' in ANY PTR. Copy the representation between the exact declared types
-			'' instead of relying on C's object/function pointer cast extension.
+			'' in ANY PTR or a generic procedure pointer. Transfer their representation
+			'' between the exact declared types; evaluation and typed calls stay intact.
 			'' Different pointer sizes cannot satisfy this native ABI contract.
 			ctx.codeptrid += 1
 			if( ctx.codeptrid = 0 ) then
@@ -4259,7 +4716,7 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			end if
 			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->l->dtype), inputsubtype, TRUE) + " " + inputname + ";" )
 			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->dtype), n->subtype, TRUE) + " " + resultname + ";" )
-			hWriteStaticAssert( "sizeof(" + inputname + ") == sizeof(" + resultname + ")" )
+			hWriteStaticAssert( "sizeof(" + inputname + ") == sizeof(" + resultname + ")", TRUE )
 
 			'' Keep evaluation at the original expression site, including inside
 			'' a lazy enclosing expression. The input is evaluated exactly once.
@@ -4376,6 +4833,12 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			if( need_parens ) then
 				ctx.exprtext += "("
 			end if
+			var procedure_compare = astOpIsRelational(n->op) andalso _
+				(hCProcedureAddressValue(n->l) or hCProcedureAddressValue(n->r))
+			'' BASIC compares machine addresses. Separate C declarations can
+			'' share one linker entry, so C function-identity assumptions do
+			'' not describe this comparison. Preserve both operand evaluations.
+			if( procedure_compare ) then ctx.exprtext += "(" + hEmitType(FB_DATATYPE_UINT, NULL) + ")"
 			hExprFlush( n->l, TRUE )
 			ctx.exprtext += *hBopToStr( n->op )
 			var leftdtype = typeGetDtAndPtrOnly(n->l->dtype)
@@ -4390,7 +4853,10 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 				((rightdtype = FB_DATATYPE_INTEGER) or (rightdtype = FB_DATATYPE_LONG) or _
 				 (rightdtype = FB_DATATYPE_LONGINT)) andalso _
 				(typeGetSize(n->r->dtype) = env.pointersize)
-			if( unsigned_offset ) then
+			if( procedure_compare ) then
+				ctx.exprtext += "(" + hEmitType(FB_DATATYPE_UINT, NULL) + ")"
+				hExprFlush(n->r, TRUE)
+			elseif( unsigned_offset ) then
 				'' This is the conversion C already performs in the native
 				'' unsigned domain. UINT and same-width ULONG/ULONGINT have the
 				'' same C spelling. Keep this in formatting so byte-offset
@@ -4414,6 +4880,7 @@ private function exprFlush _
 		byval need_parens as integer = FALSE _
 	) as string
 
+	n = hCIntegerAddressValues( n )
 	hExprFlush( n, need_parens )
 
 	function = ctx.exprtext
@@ -4444,7 +4911,8 @@ private sub exprDump( byval n as EXPRNODE ptr )
 		@"INDEX", _ '' EXPRCLASS_INDEX
 		@"ARRAYADDR", _ '' EXPRCLASS_ARRAYADDR
 		@"VTABLE", _ '' EXPRCLASS_VTABLE
-		@"CALL" _ '' EXPRCLASS_CALL
+		@"CALL", _ '' EXPRCLASS_CALL
+		@"DISCARD" _ '' EXPRCLASS_DISCARD
 	}
 
 	s += *names(n->class)
@@ -4487,7 +4955,7 @@ private sub exprDump( byval n as EXPRNODE ptr )
 	print s
 
 	select case( n->class )
-	case EXPRCLASS_CAST, EXPRCLASS_UOP, EXPRCLASS_MEMBER, EXPRCLASS_ARRAYADDR
+	case EXPRCLASS_CAST, EXPRCLASS_UOP, EXPRCLASS_MEMBER, EXPRCLASS_ARRAYADDR, EXPRCLASS_DISCARD
 		exprDump( n->l )
 	case EXPRCLASS_BOP, EXPRCLASS_INDEX
 		exprDump( n->l )
@@ -4749,6 +5217,7 @@ private function exprNewVREG _
 	dim as integer dtype = any, have_offset = any
 	dim as EXPRNODE ptr byte_index = NULL
 	dim as integer accessdtype = vreg->dtype
+	dim as integer virtual_origin = FALSE
 	if( is_lvalue and write_value ) then
 		'' The AST has already checked writes, including initialization of
 		'' CONST variables. Their C storage is mutable during initialization;
@@ -4771,6 +5240,9 @@ private function exprNewVREG _
 			if( vreg->vidx ) then
 				'' recursion
 				l = exprNewVREG( vreg->vidx )
+				if( vreg->ofs = symb.fbarray_data andalso typeGetClass(vreg->dtype) = FB_DATACLASS_INTEGER andalso typeGetSize(vreg->dtype) = env.pointersize andalso _
+				    typeGetDtAndPtrOnly(l->dtype) = typeAddrOf(FB_DATATYPE_STRUCT) andalso _
+				    l->subtype <> NULL andalso symbIsDescriptor(l->subtype) ) then virtual_origin = TRUE
 				var member = exprTryCMember(l, vreg->ofs, accessdtype, vreg->subtype, _
 					FALSE, (is_lvalue = FALSE), (is_lvalue and write_value))
 				if( member <> NULL ) then
@@ -5014,7 +5486,15 @@ private function exprNewVREG _
 		'' BASIC pointee contract when loading a pointer value from a field.
 		var value = exprNew(EXPRCLASS_CAST, l->dtype, l->subtype)
 		value->l = l
+		value->virtual_origin = l->virtual_origin
 		l = value
+	end if
+	if( is_lvalue = FALSE ) then
+		if( vreg->typ = IR_VREGTYPE_VAR andalso vreg->sym <> NULL andalso _
+		    symbIsDescriptor(vreg->sym) andalso vreg->ofs = symb.fbarray_data andalso _
+		    vreg->vidx = NULL andalso typeGetClass(vreg->dtype) = FB_DATACLASS_INTEGER andalso _
+		    typeGetSize(vreg->dtype) = env.pointersize ) then virtual_origin = TRUE
+		l->virtual_origin or= virtual_origin
 	end if
 	function = l
 end function
@@ -5192,6 +5672,25 @@ private sub exprSTORE _
 	static as string ln, tempvar
 	dim as EXPRNODE ptr l = NULL
 	dim as EXPRNODE ptr addr = NULL
+	if( typeIsPtr(vr->dtype) ) then
+		'' Loading a cached register may already have wrapped its declared
+		'' integer result in a pointer cast. Preserve those conversions, but
+		'' evaluate the call once in an integer temporary before applying them.
+		dim as EXPRNODE ptr ptr call_result = @r
+		while( (*call_result)->class = EXPRCLASS_CAST )
+			call_result = @((*call_result)->l)
+		wend
+		var value = *call_result
+		if( typeIsPtr(value->dtype) = FALSE andalso _
+		    typeGetClass(value->dtype) = FB_DATACLASS_INTEGER ) then
+			if( value->class = EXPRCLASS_CALL orelse _
+			    (value->class = EXPRCLASS_UOP andalso value->op = AST_OP_ABS) ) then
+				var converted = irhlAllocVreg(value->dtype, value->subtype)
+				exprSTORE(converted, value, TRUE)
+				*call_result = exprNewVREG(converted)
+			end if
+		end if
+	end if
 	dim as integer store_dtype = vr->dtype
 	if( vr->typ = IR_VREGTYPE_VAR andalso vr->ofs = 0 andalso vr->vidx = NULL ) then
 		store_dtype = hCReadOnlyLocalType(vr->sym, store_dtype)
@@ -5205,7 +5704,13 @@ private sub exprSTORE _
 		'' and retain their rounding and floating-environment behaviour.
 		r = exprNewCAST( vr->dtype, vr->subtype, r )
 		var value = exprFlush(r)
-		if( hCScalarStoreValueContext(vr->sym) ) then value = hCEvaluatedScalar(vr->dtype, value)
+		if( hCScalarStoreValueContext(vr->sym) ) then
+			if( typeIsPtr(vr->dtype) ) then
+				value = hCEvaluatedPointer(value)
+			else
+				value = hCEvaluatedScalar(vr->dtype, value)
+			end if
+		end if
 		hWriteLine( "(void)(" + value + ");" )
 		exit sub
 	end if
@@ -5214,6 +5719,14 @@ private sub exprSTORE _
 		'' Only pure, unread descriptor initialization can reach this path.
 		exprFreeTree(r)
 		exit sub
+	end if
+
+	if( vr->typ = IR_VREGTYPE_VAR andalso vr->sym <> NULL andalso _
+	    symbIsDescriptor(vr->sym) andalso vr->ofs = symb.fbarray_data andalso _
+	    typeIsPtr(vr->dtype) ) then
+		'' The descriptor holds a virtual array origin, which may lie before
+		'' or after the allocated object even when every element is valid.
+		r = hCNativePointerOffsets(r)
 	end if
 
 	if( irIsREG( vr ) ) then
@@ -5246,7 +5759,20 @@ private sub exprSTORE _
 				'' valid too, without discarding pointed-to const qualifiers.
 				'' Keep initializers for builtin va_list array types, which C
 				'' does not allow us to assign. Skipped calls invent no value.
-				hWriteDeclaration( ln + ";" )
+				var primitive_temp = (typeIsPtr(vr->dtype) = FALSE) andalso _
+					(typeGetDtOnly(vr->dtype) <> FB_DATATYPE_ENUM) andalso _
+					(typeGetClass(vr->dtype) = FB_DATACLASS_INTEGER or typeGetClass(vr->dtype) = FB_DATACLASS_FPOINT)
+				if( errorhelper and primitive_temp ) then
+					'' A callback can enter a nested source scope at its handler
+					'' label. Primitive temporary storage belongs above that jump;
+					'' its producing call stays here. Pointer views and local enum
+					'' types retain their existing declaration scope.
+					var section = sectionGosub(errordeclsection)
+					hWriteLine(ln + ";")
+					sectionReturn(section)
+				else
+					hWriteDeclaration(ln + ";")
+				end if
 				ln = tempvar
 			end if
 			ln += " = "
@@ -5388,10 +5914,26 @@ private sub _emitBop _
 		l = exprNewBOP( op, l, r )
 
 	case AST_OP_SHL, AST_OP_SHR
-		'' Mask the shift amount to ensure it's valid, avoiding C UB
+		'' BASIC masks the shift count to the operand width.
 		r = exprNewBOP( AST_OP_AND, r, exprNewIMMi( typeGetBits( l->dtype ) - 1 ) )
 
-		l = exprNewBOP( op, l, r )
+		if( op = AST_OP_SHL ) then
+			'' C left-shifting a negative or overflowing signed value is
+			'' undefined. Shift its unsigned representation, then return to
+			'' the original BASIC type. Keep the calculation at least as wide
+			'' as C's unsigned int so small operands are not promoted to int.
+			var dtype = l->dtype
+			var subtype = l->subtype
+			var unsigned_dtype = typeToUnsigned( dtype )
+			if( typeGetBits( unsigned_dtype ) < typeGetBits( FB_DATATYPE_LONG ) ) then
+				unsigned_dtype = FB_DATATYPE_ULONG
+			end if
+			l = exprNewCAST( unsigned_dtype, NULL, l )
+			l = exprNewBOP( op, l, r )
+			l = exprNewCAST( dtype, subtype, l )
+		else
+			l = exprNewBOP( op, l, r )
+		end if
 
 	case AST_OP_EQV
 		l = exprNewBOP( AST_OP_XOR, l, r )
@@ -5562,14 +6104,31 @@ private sub _emitLoadRes( byval v1 as IRVREG ptr, byval vr as IRVREG ptr )
 	_emitStore( vr, v1 )
 	if( hUsesCLongDoubleCABI( ctx.currproc ) andalso _
 	    hIsCLongDoubleType( vr->dtype, vr->subtype ) ) then
-		var identifier = "fb_c_clongdouble_return_" + str( symbUniqueId( ) )
+		var identifier = "fb_c_clongdouble_return_" + *symbUniqueId( TRUE )
 		var type_name = hEmitType( typeUnsetIsConst( vr->dtype ), vr->subtype, TRUE )
 		hWriteLine( type_name + " " + identifier + " = " + _
 		            exprFlush( exprNewVREG( vr ) ) + ";" )
+		hCErrLeave( )
 		hWriteLine( "return fb_LongDoubleToNative( (const void*)&" + _
 		            identifier + ", " + str( vr->subtype->lgt ) + "u );" )
 	else
-		hWriteLine( "return " + exprFlush( exprNewVREG( vr ) ) + ";" )
+		if( errorplan <> NULL andalso errorhelper = FALSE ) then
+			var result = exprNewVREG(vr)
+			'' Match the C header, including pointed-to const that a result vreg can lose.
+			var result_type = hEmitType(typeUnsetIsConst(symbGetProcRealType(ctx.currproc)), _
+			    symbGetProcRealSubtype(ctx.currproc), TRUE)
+			'' The entry body follows its declaration header. Keep storage
+			'' there while evaluating the result at the original return site.
+			assert(ctx.procentrysection >= 3)
+			var saved_section = sectionGosub(ctx.procentrysection - 1)
+			hWriteLine(result_type + " fb_error_result;")
+			sectionReturn(saved_section)
+			hWriteLine("fb_error_result = " + exprFlush(result) + ";")
+			hCErrLeave( )
+			hWriteLine("return fb_error_result;")
+		else
+			hWriteLine( "return " + exprFlush( exprNewVREG( vr ) ) + ";" )
+		end if
 	end if
 end sub
 
@@ -5682,15 +6241,17 @@ private sub hDoCall _
 
 	dim as CREADONLYPROC ptr readonly_variant = NULL
 	if( indirect = FALSE ) then
+		var wide_libc = hCWideLibcName(proc)
+		if( len(wide_libc) > 0 ) then s = wide_libc
 		readonly_variant = hCReadOnlyCallee(proc)
 		if( readonly_variant <> NULL ) then
 			s = *readonly_variant->identifier
-			if( proc <> ctx.currproc ) then readonly_variant->external_call = TRUE
 		end if
+		'' A rewritten direct call retains the implementation, but not an
+		'' otherwise unobserved ABI wrapper. Addresses use hSym2Text instead.
+		hCLeafReference(proc, readonly_variant = NULL)
 	end if
 	dim as IRCALLARG ptr arg = any
-	dim as integer dtype = any
-	dim as FBSYMBOL ptr subtype = any
 	dim as integer param_index = 0
 	dim as DZSTRING args
 	DZstrZero( args )
@@ -5700,8 +6261,9 @@ private sub hDoCall _
 		semantic_result_dtype = vr->dtype
 		semantic_result_subtype = vr->subtype
 	end if
-	dim as longint semantic_call = fbSemanticModelCallAbiBegin(proc, "c", indirect, vr <> NULL, _
-		semantic_result_dtype, semantic_result_subtype, "", "", level, bytestopop)
+	dim as longint semantic_call = 0
+	dim as string resume_retry, resume_next
+	var resume_throw = (indirect = FALSE) andalso hCResumeIsThrow(proc)
 
 	dim as CGFXBLENDER ptr gfx_adapter = NULL
 	dim as string gfx_callback, gfx_context
@@ -5712,6 +6274,8 @@ private sub hDoCall _
 	arg = listGetTail( @irhl.callargs )
 	while( arg andalso (arg->level = level) )
 		dim as IRCALLARG ptr prev = listGetPrev( arg )
+		dim as integer dtype = FB_DATATYPE_INVALID
+		dim as FBSYMBOL ptr subtype = NULL
 		dim as integer semantic_input_dtype = arg->vr->dtype
 		dim as FBSYMBOL ptr semantic_input_subtype = arg->vr->subtype
 		dim as string semantic_kind = "unmapped-value"
@@ -5726,6 +6290,20 @@ private sub hDoCall _
 			hIsCLongDoubleType( semantic_input_dtype, semantic_input_subtype )
 		dim as integer is_longdouble_cabi_argument = FALSE
 		var expr = exprNewVREG( arg->vr, is_longdouble_vararg )
+		if( indirect = FALSE andalso hGetCId(proc) = "fb_ErrorSetHandler" ) then
+			var handler_index = hCErrCallHandler(expr)
+			if( handler_index >= 0 ) then
+				exprFreeTree(expr)
+				listDelNode(@irhl.callargs, arg)
+				hCErrSelect(handler_index, vr, level)
+				exit sub
+			end if
+		end if
+
+		if( semantic_call = 0 ) then
+			semantic_call = fbSemanticModelCallAbiBegin(proc, "c", indirect, vr <> NULL, _
+				semantic_result_dtype, semantic_result_subtype, "", "", level, bytestopop)
+		end if
 
 		'' param will be NULL for hidden struct result arg, since
 		'' no corresponding PARAM exists.
@@ -5810,6 +6388,10 @@ private sub hDoCall _
 				gfx_adapter = NULL
 			end if
 		end if
+		if( resume_throw ) then
+			if( param_index = symbGetProcParams(proc) - 1 ) then resume_retry = semantic_value
+			if( param_index = symbGetProcParams(proc) ) then resume_next = semantic_value
+		end if
 		fbSemanticModelCallAbiArgument(semantic_call, arg->param, 0, 1, semantic_kind, _
 			semantic_input_dtype, semantic_input_subtype, semantic_selected_dtype, semantic_selected_subtype, "", "", semantic_value)
 		DZstrConcatAssign( args, semantic_value )
@@ -5829,7 +6411,18 @@ private sub hDoCall _
 	end if
 	DZstrAllocate( args, 0 )
 	s += " )"
+	if( semantic_call = 0 ) then
+		semantic_call = fbSemanticModelCallAbiBegin(proc, "c", indirect, vr <> NULL, _
+			semantic_result_dtype, semantic_result_subtype, "", "", level, bytestopop)
+	end if
 	fbSemanticModelCallAbiEnd(semantic_call, s)
+	if( resume_throw ) then
+		hCResumeBeforeThrow(resume_retry, resume_next)
+	elseif( (indirect = FALSE) andalso hCResumeIsCheck(proc) ) then
+		hCResumeBeforeThrow("", "")
+	elseif( (indirect = FALSE) andalso hCResumeIsResume(proc) andalso c_resume_enabled ) then
+		c_resume_native_pending = TRUE
+	end if
 	if( (vr <> NULL) andalso hUsesCLongDoubleCABI( proc ) andalso _
 	    hIsCLongDoubleType( vr->dtype, vr->subtype ) ) then
 		s = hCLongDoubleFromNativeExpression( s, vr->subtype )
@@ -5841,8 +6434,13 @@ private sub hDoCall _
 	else
 		exprSTORE( vr, exprNewTEXT( vr->dtype, vr->subtype, s ), TRUE )
 	end if
+	if( indirect = FALSE andalso symbGetIsRTL(proc) andalso *symbGetMangledName(proc) = FB_RTL_INIT ) then
+		if( errorplan <> NULL andalso errorhelper = FALSE andalso astGetProc()->block.proc.ismain ) then hCErrRegisterFrame()
+	end if
 
 end sub
+
+#include once "backend/c/c-gosub.bi"
 
 private sub _emitCall _
 	( _
@@ -5854,7 +6452,6 @@ private sub _emitCall _
 
 	static as string s
 
-	hCLeafReference( proc )
 	s = hGetCId( proc )
 	hDoCall( s, proc, FALSE, bytestopop, vr, level )
 
@@ -5872,6 +6469,27 @@ private sub _emitCallPtr _
 	static as string s
 
 	s = "(" + exprFlush( exprNewVREG( v1 ) ) + ")"
+	'' A callback typedef needed by a record can precede the completed record.
+	'' Its pointer parameters then use natural alignment. Rebuild the same ABI
+	'' signature with completed pointer views before calling through it, so the
+	'' indirect call does not promise alignment absent from the BASIC pointer.
+	'' This is only a C expression; it does not add a semantic ABI declaration.
+	dim as FBSYMBOL ptr calltype = proc
+	if( hCRawProcedureType(calltype) = FALSE ) then
+		calltype = NULL
+		if( v1 <> NULL andalso v1->subtype <> NULL ) then
+			if( hCRawProcedureType(v1->subtype) ) then calltype = v1->subtype
+		end if
+	end if
+	if( calltype <> NULL ) then
+		var signature = hEmitProcHeader(calltype, EMITPROC_ISPROTO or EMITPROC_ISPROCPTR or EMITPROC_ISCALLVIEW)
+		var identifier = "(*" + hGetCId(calltype) + ")"
+		var position = instr(signature, identifier)
+		if( position > 0 ) then
+			signature = left(signature, position - 1) + "(*)" + mid(signature, position + len(identifier))
+			s = "((" + signature + ")" + s + ")"
+		end if
+	end if
 	hDoCall( s, proc, TRUE, bytestopop, vr, level )
 
 end sub
@@ -5906,18 +6524,33 @@ private sub hEmitComputedGotoAddress( )
 end sub
 
 private sub _emitJumpPtr( byval v1 as IRVREG ptr )
-	var jumptarget = exprFlush( exprNewVREG( v1 ), TRUE )
-	ctx.computedgotodispatch = TRUE
-	if( ctx.computedgotoopaque ) then hEmitComputedGotoAddress( )
-	'' The procedure-end pass has seen every real label address. Its local
-	'' macro selects the transfer form without buffering or evaluating this
-	'' expression again, including when the destination appears later.
-	hWriteLine( "fb_c_indirect_jump(" + jumptarget + ");" )
+	var jumptarget = exprFlush(exprNewVREG(v1), TRUE)
+	if( c_resume_pending ) then
+		hCResumeLocalJump(jumptarget)
+		exit sub
+	end if
+	if( c_resume_native_pending ) then
+		'' C tokens resume inside the runtime call. A returned native label
+		'' uses the same typed handoff as a failed checked operation.
+		c_resume_native_pending = FALSE
+		hWriteLine(hCResumeName(CRESUME_NATIVEDISPATCH) + "(" + jumptarget + ");")
+		hWriteLine("__builtin_unreachable();")
+		exit sub
+	end if
+	'' An unclassified indirect transfer keeps GNU label representation for
+	'' the complete procedure. Known ERROR returns never leave their scope.
+	c_resume_enabled = FALSE
+	hEmitComputedGotoAddress()
+	hWriteLine("goto *" + jumptarget + ";")
 end sub
 
 private sub _emitBranch( byval op as integer, byval label as FBSYMBOL ptr )
-	assert( op = AST_OP_JMP )
-	hWriteLine( "goto " + hGetCId( label ) + ";" )
+	if( op = AST_OP_CALL ) then
+		hCGosubCall(label)
+	else
+		assert(op = AST_OP_JMP)
+		hWriteLine( "goto " + hGetCId( label ) + ";" )
+	end if
 end sub
 
 private sub _emitJmpTb _
@@ -6331,6 +6964,12 @@ private function hStripSimpleAsmPlaceholderBrackets( byref asmcode as string ) a
 						j += 1
 					wend
 					if( (j <= length) andalso (asmcode[j - 1] = asc( "]" )) ) then
+						'' A memory placeholder expands to a complete assembler operand.
+						'' Keep PTR separated when the BASIC source used PTR[%N].
+						if( (i >= 4) andalso (lcase(mid(asmcode, i - 3, 3)) = "ptr") andalso _
+						    ((i = 4) orelse (hAsmNameChar(asmcode[i - 5], FALSE) = FALSE)) ) then
+							DZstrConcatAssignC( result, asc( " " ) )
+						end if
 						DZstrConcatAssign( result, mid( asmcode, first, afterdigits - first ) )
 						i = j + 1
 						matched = TRUE
@@ -6421,10 +7060,10 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 				clang_lea = (lcase(asmtext) = "lea")
 				asmlinebegin = FALSE
 			end if
-			if( irUsesClangCCompiler() and _
-			    (env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL) ) then
+			if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
 				'' LLVM accepts lower or upper case operand qualifiers, but not
-				'' mixed forms such as Ptr. Keep literals and symbol text intact.
+				'' mixed forms such as Ptr. GNU as accepts lowercase as well.
+				'' Keep literals and symbol text intact.
 				select case( lcase(asmtext) )
 				case "ptr", "offset", "byte", "word", "dword", "qword", _
 				     "tbyte", "fword", "xmmword", "ymmword", "zmmword"
@@ -6554,12 +7193,11 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 
 	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
 		if( sectionInsideProc( ) ) then asmcode = hAsmLocalizeNames( asmcode )
-		if( irUsesClangCCompiler() ) then
-			'' Normalize the segment first: a C memory operand in gs:[%0]
-			'' already supplies its own brackets and becomes gs:%0 below.
-			asmcode = hMoveAsmSegmentPrefixes( asmcode )
-			asmcode = hStripSimpleAsmPlaceholderBrackets( asmcode )
-		end if
+		'' A C memory operand supplies its own address brackets. Normalize
+		'' segment overrides first so both GCC and Clang can assemble the
+		'' same generated Intel syntax, including gs:[%0] as gs:%0.
+		asmcode = hMoveAsmSegmentPrefixes( asmcode )
+		asmcode = hStripSimpleAsmPlaceholderBrackets( asmcode )
 
 		''
 		'' Escape double quotes, backslashes, etc. in the asm text,
@@ -6800,12 +7438,31 @@ private sub _emitVarIniOfs _
 	end if
 
 	dim as EXPRNODE ptr l = any
-
-	l = exprNewOFFSET( rhs, ofs )
+	var initializer_scope = ctx.variniscopes
+	if( ofs <> 0 andalso initializer_scope <> NULL andalso _
+	    initializer_scope->udt <> NULL andalso symbIsDescriptor(initializer_scope->udt) andalso _
+	    initializer_scope->emitted_elements = 0 andalso rhs <> NULL andalso _
+	    symbIsVar(rhs) andalso symbGetArrayDimensions(rhs) > 0 andalso _
+	    symbIsDynamic(rhs) = FALSE andalso symbGetArrayDiff(rhs) = ofs ) then
+		'' FBARRAY.DATA is a virtual origin for arrays with nonzero lower
+		'' bounds. C pointer arithmetic cannot form an address outside the
+		'' array, so calculate the same native ABI address as an integer.
+		l = exprNewCAST( FB_DATATYPE_UINT, NULL, exprNewOFFSET(rhs, 0) )
+		l = exprNewBOP( AST_OP_ADD, l, exprNewIMMi(ofs, FB_DATATYPE_UINT) )
+	else
+		l = exprNewOFFSET( rhs, ofs )
+	end if
 
 	var dtype = symbGetType( sym ) or typeGetConstMask( symbGetFullType( sym ) )
 	if( symbIsRef( sym ) ) then
 		dtype = typeAddrOf( dtype )
+	end if
+	if( rhs <> NULL andalso symbIsProc(rhs) andalso ofs = 0 andalso _
+	    typeIsPtr(dtype) andalso typeGetDtAndPtrOnly(dtype) <> typeAddrOf(FB_DATATYPE_FUNCTION) ) then
+		'' BASIC stores these code addresses in native ANY PTR slots. Keep
+		'' the static relocation through the target's unsigned address type;
+		'' a direct function-to-object pointer cast is not an ISO C conversion.
+		l = exprNewCAST( FB_DATATYPE_UINT, NULL, l )
 	end if
 	l = exprNewCAST( dtype, sym->subtype, l )
 
@@ -6858,6 +7515,8 @@ private sub _emitVarIniStr _
 		DZstrConcatAssign(initializer, " }")
 		ctx.varini = *initializer.data
 		DZstrAllocate(initializer, 0)
+	elseif( litlength > C_STRING_LITERAL_LIMIT ) then
+		hBuildNumericStrLit(ctx.varini, decoded, litlength + 1)
 	else
 		hBuildStrLit( ctx.varini, decoded, litlength + 1, 0 )
 	end if
@@ -7188,6 +7847,8 @@ private sub _emitFbctinfEnd( )
 	hWriteLine( ctx.fbctinf, TRUE )
 end sub
 
+#include once "backend/c/c-startup-groups.bi"
+
 private sub _emitProcBegin _
 	( _
 		byval proc as FBSYMBOL ptr, _
@@ -7203,12 +7864,14 @@ private sub _emitProcBegin _
 	end if
 	hClearCLocalReferences( )
 	hashInit(@c_local_refs, 256, TRUE) '' Fixed buckets; chains admit larger local sets.
+	if( env.clopt.debuginfo ) then hashInit(@c_debug_decls, 256, TRUE)
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
 	hMarkReferencedLocals( astGetProc()->l )
 	if( hCComparisonsBegin(astGetProc()->l) ) then
 		'' Recompute storage uses after comparisons lose their value operands.
 		hClearCLocalReferences()
 		hashInit(@c_local_refs, 256, TRUE)
+		if( env.clopt.debuginfo ) then hashInit(@c_debug_decls, 256, TRUE)
 		hMarkReferencedLocals(astGetProc()->l)
 	end if
 	dim as integer locals_changed = FALSE
@@ -7224,6 +7887,7 @@ private sub _emitProcBegin _
 		'' Rebuild the storage index after removing unobserved stores.
 		hClearCLocalReferences()
 		hashInit(@c_local_refs, 256, TRUE)
+		if( env.clopt.debuginfo ) then hashInit(@c_debug_decls, 256, TRUE)
 		hMarkReferencedLocals(astGetProc()->l)
 	end if
 	hCStaticArrayInitializers(proc)
@@ -7243,6 +7907,7 @@ private sub _emitProcBegin _
 
 	irhlEmitProcBegin( )
 	hCLeafBegin( proc )
+	hCStartupAdd(proc)
 
 	dim as string mangled
 
@@ -7266,16 +7931,34 @@ private sub _emitProcBegin _
 	end if
 
 	sectionBegin( )
+	'' _emitEnd() declares every emitted global body in the shared header.
+	'' Its startup attribute also registers an ordinary unaliased callback;
+	'' repeating it on the definition duplicates the Clang observation.
+	c_prototype_startup_on_header = _
+		((proc->stats and (FB_SYMBSTATS_GLOBALCTOR or FB_SYMBSTATS_GLOBALDTOR)) <> 0)
 
-	'' If an asm("mangledname") alias is needed, emit an extra prototype
-	'' right above the procedure body, because asm() is only allowed on
-	'' prototypes.
+	'' asm("mangledname") belongs on a prototype. Put it in the shared
+	'' header so calls before this body and the body use one declaration.
 	if( hNeedAlias( proc ) ) then
-		hWriteLine( hEmitProcHeader( proc, EMITPROC_ISPROTO ) + ";" )
+		var saved_section = sectionGosub( 0 )
+		var identifier = hGetCId( proc )
+		var prototype = hEmitProcHeader( proc, EMITPROC_ISPROTO ) + ";"
+		var first = ctx.sections(0).bufferlen
+		hWriteLine( prototype )
+		hCLeafPrototype( proc, first )
+		hCPrototypeRemember( identifier, prototype )
+		sectionReturn( saved_section )
 	end if
 
 	var original_header = hEmitProcHeader(proc, 0)
 	var readonly_variant = hCReadOnlyBegin(proc, original_header)
+	'' Capture references use the selected implementation parameter types.
+	hCResumeBegin(astGetProc()->l)
+	hCErrPrepare(proc)
+	if( errorplan = NULL ) then
+		if( hCResumeNeedsCaptures() or irhlcErrorNeedsCleanupBoundary(astGetProc()->l) ) then c_resume_enabled = FALSE
+	end if
+	hCGosubBegin(proc)
 	if( readonly_variant = NULL ) then
 		hWriteLine(original_header)
 	else
@@ -7283,6 +7966,7 @@ private sub _emitProcBegin _
 	end if
 
 	hWriteLine( "{" )
+	hCResumeDeclarationStart()
 	sectionIndent( )
 	sectionBegin( )
 
@@ -7311,6 +7995,8 @@ private sub _emitProcBegin _
 		end if
 		param = symbGetProcPrevParam( proc, param )
 	loop
+	hCErrOwnerLocals( )
+	hCErrRecordOwnerPrologue()
 
 end sub
 
@@ -7383,36 +8069,14 @@ private sub _emitProcEnd _
 	end if
 
 	hDropUnusedProcEntry( initlabel )
-	if( ctx.computedgotodispatch ) then
-		var section = sectionGosub( 2 )
-		if( ctx.computedgotoaddress or ctx.computedgotoopaque ) then
-			'' The slot belongs to this activation, including recursive calls.
-			'' Its header declaration also covers jumps from nested scopes.
-			hWriteLine( "void* fb_c_jump_target = 0;" )
-			hWriteLine( "#define fb_c_indirect_jump(value) do { fb_c_jump_target = (value); goto fb_c_jump_dispatch; } while(0)", TRUE )
-		else
-			'' A GNU indirect jump can only target a label in this C function.
-			'' With no label addresses or opaque text, error handling must either
-			'' terminate or unwind through an owned runtime frame. A returned
-			'' target cannot name a valid continuation here. Stop instead of
-			'' jumping into another activation with the wrong stack and locals.
-			'' Keep the legacy label ABI whenever real local targets exist.
-			hWriteLine( "#define fb_c_indirect_jump(value) do { (void)(value); __builtin_abort(); } while(0)", TRUE )
-		end if
-		sectionReturn( section )
-		if( ctx.computedgotoaddress or ctx.computedgotoopaque ) then
-			'' Preserve normal fallthrough without executing the dispatch block.
-			hWriteLine( "goto fb_c_jump_dispatch_end;" )
-			hWriteLine( "fb_c_jump_dispatch:;" )
-			hWriteLine( "goto *fb_c_jump_target;" )
-			hWriteLine( "fb_c_jump_dispatch_end:;" )
-		end if
-	end if
+	hCGosubEnd()
+	hCResumeCloseBody()
 	sectionEnd( )
 
+	if( symbGetType(proc) = FB_DATATYPE_VOID andalso hProcDoesNotReturn(proc) = FALSE ) then hCErrLeave( )
 	sectionUnindent( )
 	hWriteLine( "}" )
-	if( ctx.computedgotodispatch ) then hWriteLine( "#undef fb_c_indirect_jump", TRUE )
+	hCResumeEnd()
 
 	sectionEnd( )
 	hCReadOnlyEnd(proc)
@@ -7454,6 +8118,8 @@ private sub _emitProcEnd _
 	'' Static local descriptors are finalized after PROCEND. Keep their
 	'' borrowed reference keys until the next procedure begins.
 	irhlEmitProcEnd( )
+	hCErrEmitHelpers( )
+	hCErrDestroy( )
 
 end sub
 
@@ -7472,6 +8138,8 @@ private sub _emitScopeEnd( byval s as FBSYMBOL ptr )
 end sub
 
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+#include once "backend/c/error-owner-code.bi"
 
 dim shared as IR_VTBL irhlc_vtbl = _
 ( _
@@ -7492,7 +8160,7 @@ dim shared as IR_VTBL irhlc_vtbl = _
 	@_emitConvert, _
 	@_emitLabel, _
 	@_emitLabel, _
-	NULL, _
+	@_emitReturn, _
 	@_emitProcBegin, _
 	@_emitProcEnd, _
 	@irhlEmitPushArg, _

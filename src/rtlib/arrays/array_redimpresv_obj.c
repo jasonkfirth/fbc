@@ -9,7 +9,7 @@
 
 int fb_ArrayRedimPresvObj
 	(
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		size_t element_len,
 		FB_DEFCTOR ctor,
 		FB_DEFCTOR dtor,

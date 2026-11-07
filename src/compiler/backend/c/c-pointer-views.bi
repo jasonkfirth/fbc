@@ -40,25 +40,33 @@ private function hCPointerViewSection _
 end function
 
 private function hCPointerViewName _
-	( byref original as string, byval declsection as integer ) as string
+	( byref original as string, byval declsection as integer, byval incomplete as integer ) as string
 
 	var entry = cptr(CPOINTERVIEW ptr, listGetHead(@c_pointer_views))
 	while( entry <> NULL )
-		if( entry->section = declsection andalso *entry->original.data = original ) then return *entry->aliasname.data
+		'' Prototypes keep their first spelling after record completion, so
+		'' exact declaration matching still removes repeated declarations.
+		'' Actual accesses need a fresh complete view: GCC can forget lowered
+		'' alignment when a typedef precedes the record body.
+		if( entry->section = declsection andalso *entry->original.data = original ) then
+			if( entry->incomplete = incomplete orelse c_pointer_prototypes <> 0 ) then return *entry->aliasname.data
+		end if
 		entry = listGetNext(entry)
 	wend
 	c_pointer_view_id += 1
 	var aliasname = "fb_c_pointer_view_" + str(c_pointer_view_id)
 	var previous = sectionGosub(declsection)
-	'' A typedef can lower alignment without changing the compatible object
-	'' type. Applying this to complete pointees preserves sizeof and field
-	'' offsets; the pointer object itself keeps its ordinary ABI alignment.
+	'' These aliases retain compatible types and the original record layout.
+	'' Clang keeps lowered alignment on a forward declaration. A separate
+	'' completed-record alias also preserves it for actual accesses with GCC.
+	'' The pointer object itself keeps its ordinary ABI alignment.
 	hWriteLine("typedef " + original + " " + aliasname + " __attribute__((aligned(1)));", TRUE)
 	sectionReturn(previous)
 	entry = listNewNode(@c_pointer_views)
 	DZstrAssign(entry->original, strptr(original))
 	DZstrAssign(entry->aliasname, strptr(aliasname))
 	entry->section = declsection
+	entry->incomplete = incomplete
 	return aliasname
 end function
 

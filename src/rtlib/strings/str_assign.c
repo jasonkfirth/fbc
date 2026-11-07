@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include "str_size.h"
 
 FBCALL void *fb_StrAssignEx
 	(
@@ -17,7 +18,7 @@ FBCALL void *fb_StrAssignEx
 		int is_init
 	)
 {
-	FBSTRING *dstr;
+	FBSTRING_ACCESS *dstr;
 	const char *src_ptr;
 	ssize_t src_len;
 
@@ -26,7 +27,7 @@ FBCALL void *fb_StrAssignEx
 	if( dst == NULL )
 	{
 		if( src_size == FB_STRSIZEVARLEN )
-			fb_hStrDelTemp_NoLock( (FBSTRING *)src );
+			fb_hStrDelTemp_NoLock( (FBSTRING_ACCESS *)src );
 
 		FB_STRUNLOCK();
 
@@ -39,7 +40,7 @@ FBCALL void *fb_StrAssignEx
 	/* is dst var-len? */
 	if( dst_size == FB_STRSIZEVARLEN )
 	{
-        dstr = (FBSTRING *)dst;
+        dstr = (FBSTRING_ACCESS *)dst;
 
 		/* src NULL? */
 		if( src_len == 0 )
@@ -63,15 +64,15 @@ FBCALL void *fb_StrAssignEx
 				if( is_init == FB_FALSE )
 					fb_StrDelete( dstr );
 
-				dstr->data = (char *)src_ptr;
+				dstr->data = ((FBSTRING_ACCESS *)src)->data;
 				dstr->len = src_len;
-				dstr->size = ((FBSTRING *)src)->size;
+				dstr->size = ((FBSTRING_ACCESS *)src)->size;
 
-				((FBSTRING *)src)->data = NULL;
-				((FBSTRING *)src)->len = 0;
-				((FBSTRING *)src)->size = 0;
+				((FBSTRING_ACCESS *)src)->data = NULL;
+				((FBSTRING_ACCESS *)src)->len = 0;
+				((FBSTRING_ACCESS *)src)->size = 0;
 
-				fb_hStrDelTempDesc( (FBSTRING *)src );
+				fb_hStrDelTempDesc( (FBSTRING_ACCESS *)src );
 
 				FB_STRUNLOCK();
 
@@ -81,12 +82,14 @@ FBCALL void *fb_StrAssignEx
         	/* else, realloc dst if needed and copy src */
         	if( is_init == FB_FALSE )
         	{
-				if( FB_STRSIZE( dst ) != src_len )
-					fb_hStrRealloc( dstr, src_len, FB_FALSE );
+				if( FB_STRSIZE( dst ) != src_len &&
+				    fb_hStrRealloc( dstr, src_len, FB_FALSE ) == NULL )
+					goto cleanup;
         	}
         	else
         	{
-				fb_hStrAlloc( dstr, src_len );
+				if( fb_hStrAlloc( dstr, src_len ) == NULL )
+					goto cleanup;
         	}
 
 			fb_hStrCopy( dstr->data, src_ptr, src_len );
@@ -108,7 +111,7 @@ FBCALL void *fb_StrAssignEx
 		dst_size -= src_len;
 		if( dst_size > 0 )
 		{
-			memset( &(((char *)dst)[src_len]), 32, dst_size );
+			memset( &(((char *)dst)[src_len]), 32, (size_t)dst_size );
 		}
 	}
 	/* fixed-len zstring or zstring ptr */
@@ -141,14 +144,16 @@ FBCALL void *fb_StrAssignEx
 		{
 			dst_size -= src_len;
 			if( dst_size > 0 )
-				memset( &(((char *)dst)[src_len]), 0, dst_size );
+				memset( &(((char *)dst)[src_len]), 0, (size_t)dst_size );
 		}
 	}
 
 
+cleanup:
+	/* Allocation failure must still retire a source temporary. */
 	/* delete temp? */
 	if( src_size == FB_STRSIZEVARLEN )
-		fb_hStrDelTemp_NoLock( (FBSTRING *)src );
+		fb_hStrDelTemp_NoLock( (FBSTRING_ACCESS *)src );
 
 	FB_STRUNLOCK();
 

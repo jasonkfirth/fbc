@@ -36,10 +36,6 @@ const SSE_VECTOR_WIDTH_2 = 2
 const SSE_VECTOR_WIDTH_3 = 3
 const SSE_VECTOR_WIDTH_4 = 4
 
-'' Module state: backend initialization selects these conversion emitters.
-dim shared _emitLOADB2F_x86 as sub( byval dvreg as IRVREG ptr, byval svreg as IRVREG ptr )
-dim shared _emitLOADF2B_x86 as sub( byval dvreg as IRVREG ptr, byval svreg as IRVREG ptr )
-
 private sub hULONG2DBL _
 	( _
 		byval svreg as IRVREG ptr _
@@ -75,7 +71,7 @@ private sub _emitLOADB2F_SSE( byval dvreg as IRVREG ptr, byval svreg as IRVREG p
 	dim as integer ddsize = any
 
 	'' load source to ST(0)
-	_emitLOADB2F_x86( dvreg, svreg )
+	emitX86LoadB2F( dvreg, svreg )
 
 	hPrepOperand( dvreg, dst )
 	ddsize = typeGetSize( dvreg->dtype )
@@ -135,7 +131,7 @@ private sub _emitLOADF2B_SSE( byval dvreg as IRVREG ptr, byval svreg as IRVREG p
 	end if
 
 	'' let x86 LOADF2B handle it from the FPU STACK to destine
-	_emitLOADF2B_x86( dvreg, svreg )
+	emitX86LoadF2B( dvreg, svreg )
 
 end sub
 
@@ -3015,7 +3011,6 @@ end sub
 '' functions table
 ''::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-#define EMIT_CBENTRY(op) cast( EMIT_OPCB, @_emit##op## )
 
 
 function _init_opFnTB_SSE _
@@ -3024,73 +3019,67 @@ function _init_opFnTB_SSE _
 	) as integer
 
 	'' load
-	if( _emitLOADB2F_x86 = NULL ) then
-		_emitLOADB2F_x86 = cast( EMIT_BOPCB, _opFnTB_SSE[EMIT_OP_LOADB2F] )
-	end if
-	if( _emitLOADF2B_x86 = NULL ) then
-		_emitLOADF2B_x86 = cast( EMIT_BOPCB, _opFnTB_SSE[EMIT_OP_LOADF2B] )
-	end if
-	_opFnTB_SSE[EMIT_OP_LOADF2I] = EMIT_CBENTRY(LOADF2I_SSE)
-	_opFnTB_SSE[EMIT_OP_LOADI2F] = EMIT_CBENTRY(LOADI2F_SSE)
-	_opFnTB_SSE[EMIT_OP_LOADF2L] = EMIT_CBENTRY(LOADF2L_SSE)
-	_opFnTB_SSE[EMIT_OP_LOADL2F] = EMIT_CBENTRY(LOADL2F_SSE)
-	_opFnTB_SSE[EMIT_OP_LOADF2F] = EMIT_CBENTRY(LOADF2F_SSE)
-	_opFnTB_SSE[EMIT_OP_LOADB2F] = EMIT_CBENTRY(LOADB2F_SSE)
-	_opFnTB_SSE[EMIT_OP_LOADF2B] = EMIT_CBENTRY(LOADF2B_SSE)
+	_opFnTB_SSE[EMIT_OP_LOADF2I].bop = @_emitLOADF2I_SSE
+	_opFnTB_SSE[EMIT_OP_LOADI2F].bop = @_emitLOADI2F_SSE
+	_opFnTB_SSE[EMIT_OP_LOADF2L].bop = @_emitLOADF2L_SSE
+	_opFnTB_SSE[EMIT_OP_LOADL2F].bop = @_emitLOADL2F_SSE
+	_opFnTB_SSE[EMIT_OP_LOADF2F].bop = @_emitLOADF2F_SSE
+	_opFnTB_SSE[EMIT_OP_LOADB2F].bop = @_emitLOADB2F_SSE
+	_opFnTB_SSE[EMIT_OP_LOADF2B].bop = @_emitLOADF2B_SSE
 
 	'' store
-	_opFnTB_SSE[EMIT_OP_STORF2I] = EMIT_CBENTRY(STORF2I_SSE)
-	_opFnTB_SSE[EMIT_OP_STORI2F] = EMIT_CBENTRY(STORI2F_SSE)
-	_opFnTB_SSE[EMIT_OP_STORF2L] = EMIT_CBENTRY(STORF2L_SSE)
-	_opFnTB_SSE[EMIT_OP_STORL2F] = EMIT_CBENTRY(STORL2F_SSE)
-	_opFnTB_SSE[EMIT_OP_STORF2F] = EMIT_CBENTRY(STORF2F_SSE)
+	_opFnTB_SSE[EMIT_OP_STORF2I].bop = @_emitSTORF2I_SSE
+	_opFnTB_SSE[EMIT_OP_STORI2F].bop = @_emitSTORI2F_SSE
+	_opFnTB_SSE[EMIT_OP_STORF2L].bop = @_emitSTORF2L_SSE
+	_opFnTB_SSE[EMIT_OP_STORL2F].bop = @_emitSTORL2F_SSE
+	_opFnTB_SSE[EMIT_OP_STORF2F].bop = @_emitSTORF2F_SSE
 
 	'' binary ops
-	_opFnTB_SSE[EMIT_OP_MOVF] = EMIT_CBENTRY(MOVF_SSE)
-	_opFnTB_SSE[EMIT_OP_ADDF] = EMIT_CBENTRY(ADDF_SSE)
-	_opFnTB_SSE[EMIT_OP_SUBF] = EMIT_CBENTRY(SUBF_SSE)
-	_opFnTB_SSE[EMIT_OP_MULF] = EMIT_CBENTRY(MULF_SSE)
-	_opFnTB_SSE[EMIT_OP_DIVF] = EMIT_CBENTRY(DIVF_SSE)
+	_opFnTB_SSE[EMIT_OP_MOVF].bop = @_emitMOVF_SSE
+	_opFnTB_SSE[EMIT_OP_ADDF].bop = @_emitADDF_SSE
+	_opFnTB_SSE[EMIT_OP_SUBF].bop = @_emitSUBF_SSE
+	_opFnTB_SSE[EMIT_OP_MULF].bop = @_emitMULF_SSE
+	_opFnTB_SSE[EMIT_OP_DIVF].bop = @_emitDIVF_SSE
 
-	_opFnTB_SSE[EMIT_OP_ATN2] = EMIT_CBENTRY(ATN2_SSE)
-	_opFnTB_SSE[EMIT_OP_POW] = EMIT_CBENTRY(POW_SSE)
+	_opFnTB_SSE[EMIT_OP_ATN2].bop = @_emitATN2_SSE
+	_opFnTB_SSE[EMIT_OP_POW].bop = @_emitPOW_SSE
 
 	'' relational
-	_opFnTB_SSE[EMIT_OP_CGTF] = EMIT_CBENTRY(CGTF_SSE)
-	_opFnTB_SSE[EMIT_OP_CLTF] = EMIT_CBENTRY(CLTF_SSE)
-	_opFnTB_SSE[EMIT_OP_CEQF] = EMIT_CBENTRY(CEQF_SSE)
-	_opFnTB_SSE[EMIT_OP_CNEF] = EMIT_CBENTRY(CNEF_SSE)
-	_opFnTB_SSE[EMIT_OP_CGEF] = EMIT_CBENTRY(CGEF_SSE)
-	_opFnTB_SSE[EMIT_OP_CLEF] = EMIT_CBENTRY(CLEF_SSE)
+	_opFnTB_SSE[EMIT_OP_CGTF].rel = @_emitCGTF_SSE
+	_opFnTB_SSE[EMIT_OP_CLTF].rel = @_emitCLTF_SSE
+	_opFnTB_SSE[EMIT_OP_CEQF].rel = @_emitCEQF_SSE
+	_opFnTB_SSE[EMIT_OP_CNEF].rel = @_emitCNEF_SSE
+	_opFnTB_SSE[EMIT_OP_CGEF].rel = @_emitCGEF_SSE
+	_opFnTB_SSE[EMIT_OP_CLEF].rel = @_emitCLEF_SSE
 
 	'' unary ops
-	_opFnTB_SSE[EMIT_OP_NEGF] = EMIT_CBENTRY(NEGF_SSE)
-	_opFnTB_SSE[EMIT_OP_HADDF] = EMIT_CBENTRY(HADDF_SSE)
-	_opFnTB_SSE[EMIT_OP_ABSF] = EMIT_CBENTRY(ABSF_SSE)
-	_opFnTB_SSE[EMIT_OP_SGNF] = EMIT_CBENTRY(SGNF_SSE)
+	_opFnTB_SSE[EMIT_OP_NEGF].uop = @_emitNEGF_SSE
+	_opFnTB_SSE[EMIT_OP_HADDF].uop = @_emitHADDF_SSE
+	_opFnTB_SSE[EMIT_OP_ABSF].uop = @_emitABSF_SSE
+	_opFnTB_SSE[EMIT_OP_SGNF].uop = @_emitSGNF_SSE
 
-	_opFnTB_SSE[EMIT_OP_FIX] = EMIT_CBENTRY(FIX_SSE)
-	_opFnTB_SSE[EMIT_OP_FRAC] = EMIT_CBENTRY(FRAC_SSE)
+	_opFnTB_SSE[EMIT_OP_FIX].uop = @_emitFIX_SSE
+	_opFnTB_SSE[EMIT_OP_FRAC].uop = @_emitFRAC_SSE
 
-	_opFnTB_SSE[EMIT_OP_SIN] = EMIT_CBENTRY(SIN_SSE)
-	_opFnTB_SSE[EMIT_OP_ASIN] = EMIT_CBENTRY(ASIN_SSE)
-	_opFnTB_SSE[EMIT_OP_COS] = EMIT_CBENTRY(COS_SSE)
-	_opFnTB_SSE[EMIT_OP_ACOS] = EMIT_CBENTRY(ACOS_SSE)
-	_opFnTB_SSE[EMIT_OP_TAN] = EMIT_CBENTRY(TAN_SSE)
-	_opFnTB_SSE[EMIT_OP_ATAN] = EMIT_CBENTRY(ATAN_SSE)
+	_opFnTB_SSE[EMIT_OP_SIN].uop = @_emitSIN_SSE
+	_opFnTB_SSE[EMIT_OP_ASIN].uop = @_emitASIN_SSE
+	_opFnTB_SSE[EMIT_OP_COS].uop = @_emitCOS_SSE
+	_opFnTB_SSE[EMIT_OP_ACOS].uop = @_emitACOS_SSE
+	_opFnTB_SSE[EMIT_OP_TAN].uop = @_emitTAN_SSE
+	_opFnTB_SSE[EMIT_OP_ATAN].uop = @_emitATAN_SSE
 
-	_opFnTB_SSE[EMIT_OP_SQRT] = EMIT_CBENTRY(SQRT_SSE)
-	_opFnTB_SSE[EMIT_OP_RSQRT] = EMIT_CBENTRY(RSQRT_SSE)
-	_opFnTB_SSE[EMIT_OP_RCP] = EMIT_CBENTRY(RCP_SSE)
+	_opFnTB_SSE[EMIT_OP_SQRT].uop = @_emitSQRT_SSE
+	_opFnTB_SSE[EMIT_OP_RSQRT].uop = @_emitRSQRT_SSE
+	_opFnTB_SSE[EMIT_OP_RCP].uop = @_emitRCP_SSE
 
-	_opFnTB_SSE[EMIT_OP_LOG] = EMIT_CBENTRY(LOG_SSE)
-	_opFnTB_SSE[EMIT_OP_EXP] = EMIT_CBENTRY(EXP_SSE)
+	_opFnTB_SSE[EMIT_OP_LOG].uop = @_emitLOG_SSE
+	_opFnTB_SSE[EMIT_OP_EXP].uop = @_emitEXP_SSE
 
-	_opFnTB_SSE[EMIT_OP_FLOOR] = EMIT_CBENTRY(FLOOR_SSE)
-	_opFnTB_SSE[EMIT_OP_SWZREP] = EMIT_CBENTRY(SWZREPF_SSE)
+	_opFnTB_SSE[EMIT_OP_FLOOR].uop = @_emitFLOOR_SSE
+	_opFnTB_SSE[EMIT_OP_SWZREP].uop = @_emitSWZREPF_SSE
 
-	_opFnTB_SSE[EMIT_OP_PUSHF] = EMIT_CBENTRY(PUSHF_SSE)
-	_opFnTB_SSE[EMIT_OP_POPF] = EMIT_CBENTRY(POPF_SSE)
+	_opFnTB_SSE[EMIT_OP_PUSHF].stk = @_emitPUSHF_SSE
+	_opFnTB_SSE[EMIT_OP_POPF].stk = @_emitPOPF_SSE
 
 	function = TRUE
 end function

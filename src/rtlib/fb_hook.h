@@ -5,12 +5,12 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
-typedef FBSTRING   *(*FB_INKEYPROC)     ( void );
+typedef FBSTRING_ACCESS   *(*FB_INKEYPROC)     ( void );
 typedef int         (*FB_GETKEYPROC)    ( void );
 typedef int         (*FB_KEYHITPROC)    ( void );
 
-FBCALL FBSTRING    *fb_Inkey            ( void );
-FBCALL FBSTRING    *fb_InkeyQB          ( void );
+FBCALL FBSTRING_ACCESS    *fb_Inkey            ( void );
+FBCALL FBSTRING_ACCESS    *fb_InkeyQB          ( void );
 FBCALL int          fb_Getkey           ( void );
 FBCALL int          fb_KeyHit           ( void );
 
@@ -35,7 +35,7 @@ FBCALL void         fb_ViewUpdate       ( void );
 typedef int         (*FB_WIDTHPROC)     ( int cols, int rows );
 
 FBCALL int          fb_Width            ( int cols, int rows );
-FBCALL int          fb_WidthDev         ( FBSTRING *dev, int width );
+FBCALL int          fb_WidthDev         ( FBSTRING_ACCESS *dev, int width );
 FBCALL int          fb_WidthFile        ( int fnum, int width );
 
 typedef int         (*FB_GETXPROC)      ( void );
@@ -58,11 +58,11 @@ typedef void        (*FB_PRINTBUFFWPROC)( const FB_WCHAR *buffer, size_t len, in
 typedef char        *(*FB_READSTRPROC)  ( char *buffer, ssize_t len );
         char        *fb_ReadString      ( char *buffer, ssize_t len, FILE *f );
 
-typedef int         (*FB_LINEINPUTPROC) ( FBSTRING *text, void *dst, ssize_t dst_len,
+typedef int         (*FB_LINEINPUTPROC) ( FBSTRING_ACCESS *text, void *dst, ssize_t dst_len,
 										  int fillrem, int addquestion, int addnewline );
 typedef int         (*FB_LINEINPUTWPROC)( const FB_WCHAR *text, FB_WCHAR *dst,
                                           ssize_t max_chars, int addquestion, int addnewline );
-FBCALL int          fb_LineInput        ( FBSTRING *text, void *dst, ssize_t dst_len,
+FBCALL int          fb_LineInput        ( FBSTRING_ACCESS *text, void *dst, ssize_t dst_len,
 										  int fillrem, int addquestion, int addnewline );
 FBCALL int          fb_LineInputWstr    ( const FB_WCHAR *text, FB_WCHAR *dst,
                                           ssize_t max_chars, int addquestion, int addnewline );

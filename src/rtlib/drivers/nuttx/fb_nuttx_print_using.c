@@ -120,14 +120,14 @@ static void fb_nuttx_using_print_number(FILE *stream, const double value)
     fputs(buffer, stream);
 }
 
-int32 fb_PrintUsingInit(const FBSTRING *format)
+int32 fb_PrintUsingInit(const FBSTRING_ACCESS *format)
 {
     fb_nuttx_print_using_format = format;
 
     return 0;
 }
 
-int32 fb_PrintUsingStr(const int32 file_num, const FBSTRING *s,
+int32 fb_PrintUsingStr(const int32 file_num, const FBSTRING_ACCESS *s,
     const int32 flags)
 {
     FILE *stream;

@@ -50,8 +50,8 @@
 */
 #define FB_NUTTX_WEAK __attribute__((weak))
 
-FB_RTLIB_CTX __fb_ctx FB_NUTTX_WEAK;
-char __fb_errmsg[FB_ERRMSG_SIZE] FB_NUTTX_WEAK;
+FB_RTLIB_CTX fb_ctx FB_NUTTX_WEAK;
+char fb_errmsg[FB_ERRMSG_SIZE] FB_NUTTX_WEAK;
 
 #define FB_NUTTX_HEADLESS_IMAGE_MAGIC 0x4e584749u
 
@@ -166,13 +166,13 @@ static FB_NUTTX_HEADLESS_IMAGE *fb_nuttx_headless_image(void *image)
 
 void fb_nuttx_gfx_compat_init(int argc, char *argv[])
 {
-    memset(&__fb_ctx, 0, sizeof(__fb_ctx));
+    memset(&fb_ctx, 0, sizeof(fb_ctx));
 
-    __fb_ctx.argc = argc;
-    __fb_ctx.argv = argv;
-    __fb_ctx.null_desc.data = NULL;
-    __fb_ctx.null_desc.len = 0;
-    __fb_ctx.null_desc.size = 0;
+    fb_ctx.argc = argc;
+    fb_ctx.argv = argv;
+    fb_ctx.null_desc.data = NULL;
+    fb_ctx.null_desc.len = 0;
+    fb_ctx.null_desc.size = 0;
 
     fb_nuttx_view_toprow = -1;
     fb_nuttx_view_botrow = -1;
@@ -180,82 +180,82 @@ void fb_nuttx_gfx_compat_init(int argc, char *argv[])
 
 void fb_nuttx_gfx_compat_exit(void)
 {
-    if (__fb_ctx.exit_gfxlib2 != NULL) {
+    if (fb_ctx.exit_gfxlib2 != NULL) {
         void (*exit_gfxlib2)(void);
 
-        exit_gfxlib2 = __fb_ctx.exit_gfxlib2;
-        __fb_ctx.exit_gfxlib2 = NULL;
+        exit_gfxlib2 = fb_ctx.exit_gfxlib2;
+        fb_ctx.exit_gfxlib2 = NULL;
         exit_gfxlib2();
     }
 }
 
 int fb_nuttx_gfx_active(void)
 {
-    return __fb_ctx.hooks.printbuffproc != NULL;
+    return fb_ctx.hooks.printbuffproc != NULL;
 }
 
 int fb_nuttx_gfx_print_buffer(const void *buffer, size_t len, int mask)
 {
-    if (__fb_ctx.hooks.printbuffproc == NULL)
+    if (fb_ctx.hooks.printbuffproc == NULL)
         return 0;
 
 #ifdef FB_NUTTX_QEMU_MOCK_DEVICES
     fb_nuttx_qemu_trace_gfx_console(buffer, len, mask);
 #endif
 
-    __fb_ctx.hooks.printbuffproc(buffer, len, mask);
+    fb_ctx.hooks.printbuffproc(buffer, len, mask);
 
     return 1;
 }
 
-FBSTRING *fb_nuttx_gfx_inkey(void)
+FBSTRING_ACCESS *fb_nuttx_gfx_inkey(void)
 {
-    if (__fb_ctx.hooks.inkeyproc == NULL)
-        return &__fb_ctx.null_desc;
+    if (fb_ctx.hooks.inkeyproc == NULL)
+        return &fb_ctx.null_desc;
 
-    return __fb_ctx.hooks.inkeyproc();
+    return fb_ctx.hooks.inkeyproc();
 }
 
 int fb_nuttx_gfx_cls(int mode)
 {
-    if (__fb_ctx.hooks.clsproc == NULL)
+    if (fb_ctx.hooks.clsproc == NULL)
         return 0;
 
-    __fb_ctx.hooks.clsproc(mode);
+    fb_ctx.hooks.clsproc(mode);
 
     return 1;
 }
 
 int fb_nuttx_gfx_locate(int row, int col, int cursor)
 {
-    if (__fb_ctx.hooks.locateproc == NULL)
+    if (fb_ctx.hooks.locateproc == NULL)
         return 0;
 
-    return __fb_ctx.hooks.locateproc(row, col, cursor);
+    return fb_ctx.hooks.locateproc(row, col, cursor);
 }
 
 int fb_nuttx_gfx_get_x(void)
 {
-    if (__fb_ctx.hooks.getxproc == NULL)
+    if (fb_ctx.hooks.getxproc == NULL)
         return 0;
 
-    return __fb_ctx.hooks.getxproc();
+    return fb_ctx.hooks.getxproc();
 }
 
 int fb_nuttx_gfx_get_y(void)
 {
-    if (__fb_ctx.hooks.getyproc == NULL)
+    if (fb_ctx.hooks.getyproc == NULL)
         return 0;
 
-    return __fb_ctx.hooks.getyproc();
+    return fb_ctx.hooks.getyproc();
 }
 
 int fb_nuttx_gfx_get_size(int *cols, int *rows)
 {
-    if (__fb_ctx.hooks.getsizeproc == NULL)
+    if (fb_ctx.hooks.getsizeproc == NULL)
         return 0;
 
-    __fb_ctx.hooks.getsizeproc(cols, rows);
+    fb_ctx.hooks.getsizeproc(cols, rows);
 
     return 1;
 }
@@ -354,7 +354,7 @@ void fb_TlsFreeCtxTb(void)
         fb_TlsDelCtx(i);
 }
 
-int __attribute__((weak)) fb_hStrDelTemp(FBSTRING *str)
+int __attribute__((weak)) fb_hStrDelTemp(FBSTRING_ACCESS *str)
 {
     if (str == NULL)
         return FALSE;
@@ -374,7 +374,7 @@ int __attribute__((weak)) fb_hStrDelTemp(FBSTRING *str)
     return TRUE;
 }
 
-FBSTRING *fb_hStrRealloc(FBSTRING *str, ssize_t size, int preserve)
+FBSTRING_ACCESS *fb_hStrRealloc(FBSTRING_ACCESS *str, ssize_t size, int preserve)
 {
     char *old_data;
     char *new_data;
@@ -423,8 +423,8 @@ int fb_Getkey(void)
     unsigned char ch;
     ssize_t nread;
 
-    if (__fb_ctx.hooks.getkeyproc != NULL)
-        return __fb_ctx.hooks.getkeyproc();
+    if (fb_ctx.hooks.getkeyproc != NULL)
+        return fb_ctx.hooks.getkeyproc();
 
     nread = read(STDIN_FILENO, &ch, 1);
     if (nread == 1)
@@ -435,16 +435,16 @@ int fb_Getkey(void)
 
 int fb_KeyHit(void)
 {
-    if (__fb_ctx.hooks.keyhitproc != NULL)
-        return __fb_ctx.hooks.keyhitproc();
+    if (fb_ctx.hooks.keyhitproc != NULL)
+        return fb_ctx.hooks.keyhitproc();
 
     return 0;
 }
 
 int fb_GetMouse(int *x, int *y, int *z, int *buttons_, int *clip)
 {
-    if (__fb_ctx.hooks.getmouseproc != NULL)
-        return __fb_ctx.hooks.getmouseproc(x, y, z, buttons_, clip);
+    if (fb_ctx.hooks.getmouseproc != NULL)
+        return fb_ctx.hooks.getmouseproc(x, y, z, buttons_, clip);
 
     if (x != NULL)
         *x = -1;
@@ -462,8 +462,8 @@ int fb_GetMouse(int *x, int *y, int *z, int *buttons_, int *clip)
 
 int fb_SetMouse(int x, int y, int cursor, int clip)
 {
-    if (__fb_ctx.hooks.setmouseproc != NULL)
-        return __fb_ctx.hooks.setmouseproc(x, y, cursor, clip);
+    if (fb_ctx.hooks.setmouseproc != NULL)
+        return fb_ctx.hooks.setmouseproc(x, y, cursor, clip);
 
     return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 }
@@ -497,19 +497,19 @@ int fb_GetMouse64(long long *x, long long *y, long long *z,
 
 int fb_Multikey(int scancode)
 {
-    if (__fb_ctx.hooks.multikeyproc != NULL)
-        return __fb_ctx.hooks.multikeyproc(scancode);
+    if (fb_ctx.hooks.multikeyproc != NULL)
+        return fb_ctx.hooks.multikeyproc(scancode);
 
     return FB_FALSE;
 }
 
-FBSTRING *fb_hMakeInkeyStr(int ch)
+FBSTRING_ACCESS *fb_hMakeInkeyStr(int ch)
 {
     static char text[2];
     static FBSTRING result;
 
     if ((ch <= 0) || (ch > 255))
-        return &__fb_ctx.null_desc;
+        return &fb_ctx.null_desc;
 
     text[0] = (char)ch;
     text[1] = '\0';
@@ -586,8 +586,8 @@ int fb_ConsoleGetBotRow(void)
 
         rows = 25;
 
-        if (__fb_ctx.hooks.getsizeproc != NULL)
-            __fb_ctx.hooks.getsizeproc(NULL, &rows);
+        if (fb_ctx.hooks.getsizeproc != NULL)
+            fb_ctx.hooks.getsizeproc(NULL, &rows);
 
         if (rows <= 0)
             rows = 25;
@@ -626,8 +626,8 @@ int fb_ConsoleViewEx(int toprow, int botrow, int set_cursor)
 
     rows = 25;
 
-    if (__fb_ctx.hooks.getsizeproc != NULL)
-        __fb_ctx.hooks.getsizeproc(NULL, &rows);
+    if (fb_ctx.hooks.getsizeproc != NULL)
+        fb_ctx.hooks.getsizeproc(NULL, &rows);
 
     if (toprow <= 0)
         toprow = 1;
@@ -686,7 +686,7 @@ void fb_GfxEllipse(void *target, float x, float y, float radius,
 }
 
 void fb_GfxPaint(void *target, float fx, float fy, unsigned int color,
-    unsigned int border_color, FBSTRING *pattern, int mode, int coord_type)
+    unsigned int border_color, FBSTRING_ACCESS *pattern, int mode, int coord_type)
 {
     (void)target;
     (void)fx;
@@ -698,14 +698,14 @@ void fb_GfxPaint(void *target, float fx, float fy, unsigned int color,
     (void)coord_type;
 }
 
-void fb_GfxDraw(void *target, FBSTRING *command)
+void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 {
     (void)target;
     (void)command;
 }
 
 int fb_GfxDrawString(void *target, float fx, float fy, int coord_type,
-    FBSTRING *string, unsigned int color, void *font, int mode,
+    FBSTRING_ACCESS *string, unsigned int color, void *font, int mode,
     PUTTER *putter, BLENDER *blender, void *param)
 {
     (void)target;
@@ -872,7 +872,7 @@ int fb_GfxImageInfo64(void *img, long long *width, long long *height,
 }
 
 int fb_GfxGet(void *target, float x1, float y1, float x2, float y2,
-    unsigned char *dest, int coord_type, FBARRAY *array)
+    unsigned char *dest, int coord_type, FBARRAY_ACCESS *array)
 {
     (void)target;
     (void)x1;
@@ -887,7 +887,7 @@ int fb_GfxGet(void *target, float x1, float y1, float x2, float y2,
 }
 
 int fb_GfxGetQB(void *target, float x1, float y1, float x2, float y2,
-    unsigned char *dest, int coord_type, FBARRAY *array)
+    unsigned char *dest, int coord_type, FBARRAY_ACCESS *array)
 {
     return fb_GfxGet(target, x1, y1, x2, y2, dest, coord_type, array);
 }
@@ -914,7 +914,7 @@ int fb_GfxPut(void *target, float x, float y, unsigned char *src, int x1,
     return fb_ErrorSetNum(FB_RTERROR_OK);
 }
 
-int fb_GfxBload(FBSTRING *filename, void *dest, void *pal)
+int fb_GfxBload(FBSTRING_ACCESS *filename, void *dest, void *pal)
 {
     (void)filename;
     (void)dest;
@@ -923,12 +923,12 @@ int fb_GfxBload(FBSTRING *filename, void *dest, void *pal)
     return fb_ErrorSetNum(FB_RTERROR_OK);
 }
 
-int fb_GfxBloadQB(FBSTRING *filename, void *dest, void *pal)
+int fb_GfxBloadQB(FBSTRING_ACCESS *filename, void *dest, void *pal)
 {
     return fb_GfxBload(filename, dest, pal);
 }
 
-int fb_GfxBsaveEx(FBSTRING *filename, void *src, unsigned int size, void *pal,
+int fb_GfxBsaveEx(FBSTRING_ACCESS *filename, void *src, unsigned int size, void *pal,
     int bitsperpixel)
 {
     (void)filename;
@@ -940,12 +940,12 @@ int fb_GfxBsaveEx(FBSTRING *filename, void *src, unsigned int size, void *pal,
     return fb_ErrorSetNum(FB_RTERROR_OK);
 }
 
-int fb_GfxBsave(FBSTRING *filename, void *src, unsigned int size, void *pal)
+int fb_GfxBsave(FBSTRING_ACCESS *filename, void *src, unsigned int size, void *pal)
 {
     return fb_GfxBsaveEx(filename, src, size, pal, 0);
 }
 
-void fb_GfxControl_s(int what, FBSTRING *param)
+void fb_GfxControl_s(int what, FBSTRING_ACCESS *param)
 {
     (void)what;
     (void)param;
@@ -1219,7 +1219,7 @@ int fb_PageSet(int active, int visible)
     return fb_GfxPageSet(active, visible);
 }
 
-int fb_GfxLineInput(FBSTRING *text, void *dst, ssize_t dst_len, int fillrem,
+int fb_GfxLineInput(FBSTRING_ACCESS *text, void *dst, ssize_t dst_len, int fillrem,
     int addquestion, int addnewline)
 {
     (void)text;

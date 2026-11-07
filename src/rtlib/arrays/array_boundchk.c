@@ -98,14 +98,14 @@ static void *hThrowError
 FBCALL void *fb_ArrayDimensionChk
 	( 
 		ssize_t dimensions,
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		int linenum,
 		const char *filename,
 		const char *variablename
 	)
 {
-	/* unallocated array */
-	if( (array == NULL) || (array->data == NULL) ) {
+	/* Check physical storage, not the virtual zero-index address. */
+	if( (array == NULL) || (array->ptr == NULL) ) {
 		return hThrowError( FB_RTERROR_NOTDIMENSIONED,
 			0, 0, 0, linenum, filename, variablename );
 	}

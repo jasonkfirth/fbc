@@ -58,6 +58,28 @@ declare sub fbSemanticModelDeclarationRepeat(byval sym as FBSYMBOL ptr, byref ki
 declare sub fbSemanticModelExportProcedureReplacement(byval previous as FBSYMBOL ptr, byval canonical as FBSYMBOL ptr)
 declare sub fbSemanticModelProcedureVisibility(byval proc as FBSYMBOL ptr, byref written as const string)
 
+declare function fbSemanticModelFullEnabled() as integer
+declare function fbSemanticModelNumber(byval value as longint) as string
+declare function fbSemanticModelCurrentStatement() as longint
+declare sub fbSemanticModelAppendDetail(byref value as string)
+
+'' Final method symbols are implicitly overloaded in modern FB. Keep the
+'' parser-accepted header choice independently, including explicit absence.
+'' The statement subject prevents a later definition from replacing the
+'' declaration's policy evidence. Metadata capture never changes attributes.
+private sub hSemanticWrittenOverload(byval proc as FBSYMBOL ptr, byval written_overload as integer)
+    if( fbSemanticModelFullEnabled() = FALSE ) then exit sub
+    dim as longint statement = fbSemanticModelCurrentStatement()
+    if( statement = 0 ) then
+        fbSemanticModelFailAt("written OVERLOAD header has no statement")
+        exit sub
+    end if
+    fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+        fbSemanticModelNumber(fbSemanticModelSymbolId(proc)) + TABCHAR + _
+        "procedure-header-written-overload:" + fbSemanticModelNumber(statement) + _
+        TABCHAR + iif(written_overload, "1", "0"))
+end sub
+
 '' [ALIAS "id"]
 function cAliasAttribute( ) as zstring ptr
 	static as zstring * FB_MAXNAMELEN+1 aliasid
@@ -1526,7 +1548,8 @@ private sub hParseProcHeaderAttributes _
 		byref mode_is_explicit as integer, _
 		byref palias as zstring ptr, _
 		byref semantic_has_library as integer, _
-		byref semantic_written_convention as integer _
+		byref semantic_written_convention as integer, _
+		byref semantic_written_overload as integer _
 	)
 
 	'' [NAKED]
@@ -1571,6 +1594,7 @@ private sub hParseProcHeaderAttributes _
 			errReportNotAllowed( FB_LANG_OPT_FUNCOVL )
 		else
 			pattrib or= FB_PROCATTRIB_OVERLOADED
+			semantic_written_overload = TRUE
 		end if
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 	end if
@@ -1881,6 +1905,7 @@ function cProcHeader _
 	dim as integer mode_is_explicit = any
 	dim as integer semantic_has_library
 	dim as integer semantic_written_convention, semantic_dynamic_string
+	dim as integer semantic_written_overload = FALSE
 	dim as string semantic_result_form = "special"
 	dim as LEX_LOCATION semantic_site, diagnostic_site
 	dim as integer diagnostic_header_errors = errGetCount( )
@@ -1930,7 +1955,7 @@ function cProcHeader _
 	end if
 
 	hParseProcHeaderAttributes( tk, options, is_memberproc, attrib, pattrib, _
-	                            mode, mode_is_explicit, palias, semantic_has_library, semantic_written_convention )
+	                            mode, mode_is_explicit, palias, semantic_has_library, semantic_written_convention, semantic_written_overload )
 	dim as integer semantic_has_alias = (palias <> NULL)
 	dim as longint semantic_callback_start = fbSemanticModelCallbackCount( )
 
@@ -2006,6 +2031,7 @@ function cProcHeader _
 				(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 			fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-prototype", id)
 			fbSemanticModelProcedureTyping(proc, tk, "prototype", semantic_result_form)
+			hSemanticWrittenOverload(proc, semantic_written_overload)
 			fbSemanticModelProcedureAbiInput(proc, "prototype", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_abi_site, _
 				semantic_written_convention, semantic_dynamic_string, tk, id)
 		end if
@@ -2269,6 +2295,7 @@ function cProcHeader _
 			(declaration_nonphysical = lexGetNonphysicalTokenCount( ))
 		fbSemanticModelExportDeclaration(proc, declaration_site, "procedure-definition", id)
 		fbSemanticModelProcedureTyping(proc, tk, "definition", semantic_result_form)
+		hSemanticWrittenOverload(proc, semantic_written_overload)
 		fbSemanticModelProcedureAbiInput(proc, "definition", semantic_has_library, semantic_has_alias, semantic_callback_start, semantic_abi_site, _
 			semantic_written_convention, semantic_dynamic_string, tk, id)
 	end if

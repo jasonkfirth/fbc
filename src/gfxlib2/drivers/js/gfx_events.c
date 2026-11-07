@@ -86,11 +86,11 @@ void fb_js_events_init(void)
 	//__fb_ctx.hooks.sleepproc = fb_js_sleep;
 
 	// we can't use SDL's key events because CAPSLOCK isn't handled by emscripten and the printable chars are always lowercase in SDL
-	__fb_ctx.hooks.inkeyproc  = NULL;
-	__fb_ctx.hooks.getkeyproc = NULL;
-	__fb_ctx.hooks.keyhitproc = NULL;
-	__fb_ctx.hooks.multikeyproc = NULL;
-	__fb_ctx.hooks.posteventproc = fb_hPostEvent;
+	fb_ctx.hooks.inkeyproc  = NULL;
+	fb_ctx.hooks.getkeyproc = NULL;
+	fb_ctx.hooks.keyhitproc = NULL;
+	fb_ctx.hooks.multikeyproc = NULL;
+	fb_ctx.hooks.posteventproc = fb_hPostEvent;
 
     // don't let SDL capture the keyboard
     __fb_js_ctx.doNotCaptureKeyboard = emscripten_run_script_int("Module['doNotCaptureKeyboard']? 1: 0;");

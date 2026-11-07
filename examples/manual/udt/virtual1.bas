@@ -5,6 +5,10 @@
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgVirtual
 '' --------
+''
+'' Purpose: Demonstrate object allocation and the topic above.
+'' Responsibilities: Check allocation before member access and release owned objects.
+'' This file intentionally does NOT change NEW's nullable allocation contract.
 
 '' Example with overriding subroutines
 
@@ -59,8 +63,12 @@ For i As Integer = 0 To 9
 		h = New Hello
 	End Select
 
+	'' NEW returns zero if allocation fails.
+	If h = 0 Then End 1
 	h->hi( )
 	Delete h
 Next
 
 Sleep
+
+'' end of virtual1.bas

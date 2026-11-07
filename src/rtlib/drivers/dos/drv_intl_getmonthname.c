@@ -8,9 +8,9 @@
 #include "../../fb.h"
 #include "fb_private_intl.h"
 
-FBSTRING *fb_DrvIntlGetMonthName( int month, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetMonthName( int month, int short_names )
 {
-    FBSTRING *result = NULL;
+    FBSTRING_ACCESS *result = NULL;
     size_t i;
     DOS_COUNTRY_INFO_GENERAL Info;
 

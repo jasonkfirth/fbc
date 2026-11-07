@@ -139,14 +139,14 @@ static void hPrintText( int fnum, const char *text, ssize_t length )
 	} else fb_PrintFixString( fnum, text, 0 );
 }
 
-static void hPrintField( int fnum, FBSTRING *source, ssize_t columns, int unicode )
+static void hPrintField( int fnum, FBSTRING_ACCESS *source, ssize_t columns, int unicode )
 {
 	ssize_t length = source && source->data ? FB_STRSIZE(source) : 0;
 	ssize_t count = unicode ? fb_hUtf8Count(source ? source->data : NULL, length) : length;
 	ssize_t bytes = unicode ? fb_hUtf8Offset(source ? source->data : NULL, length, columns) :
 		(length < columns ? length : columns);
 	ssize_t padding = count < columns ? columns - count : 0, i;
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	result = bytes <= FB_USTRING_MAX_BYTES - padding ? fb_hUStrAlloc_NoLock(bytes + padding) : NULL;
 	if( result != NULL && bytes + padding > 0 ) {
@@ -164,7 +164,7 @@ static void hPrintField( int fnum, FBSTRING *source, ssize_t columns, int unicod
 
 static int fb_PrintUsingFmtStr( int fnum );
 
-FBCALL int fb_PrintUsingInit( FBSTRING *fmtstr )
+FBCALL int fb_PrintUsingInit( FBSTRING_ACCESS *fmtstr )
 {
     FB_PRINTUSGCTX *ctx;
 
@@ -182,7 +182,7 @@ FBCALL int fb_PrintUsingInit( FBSTRING *fmtstr )
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-FBCALL int fb_PrintUsingInitUstr( FBSTRING *format )
+FBCALL int fb_PrintUsingInitUstr( FBSTRING_ACCESS *format )
 {
 	int result = fb_PrintUsingInit(format);
 	FB_PRINTUSGCTX *ctx = FB_TLSGETCTX( PRINTUSG );
@@ -375,7 +375,7 @@ static int fb_PrintUsingFmtStr( int fnum )
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-static int hPrintUsingString( int fnum, FBSTRING *s, int mask, int unicode )
+static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicode )
 {
 	FB_PRINTUSGCTX *ctx;
 	char buffer[BUFFERLEN+1];
@@ -488,12 +488,12 @@ static int hPrintUsingString( int fnum, FBSTRING *s, int mask, int unicode )
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-FBCALL int fb_PrintUsingStr( int fnum, FBSTRING *source, int mask )
+FBCALL int fb_PrintUsingStr( int fnum, FBSTRING_ACCESS *source, int mask )
 {
 	return hPrintUsingString(fnum, source, mask, FALSE);
 }
 
-FBCALL int fb_PrintUsingUstr( int fnum, FBSTRING *source, int mask )
+FBCALL int fb_PrintUsingUstr( int fnum, FBSTRING_ACCESS *source, int mask )
 {
 	return hPrintUsingString(fnum, source, mask, TRUE);
 }

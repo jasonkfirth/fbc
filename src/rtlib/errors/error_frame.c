@@ -305,6 +305,17 @@ FBCALL int fb_ErrorFrameLeave( void *storage )
 /* Nested error state and one-way owner transfers                             */
 /* ------------------------------------------------------------------------- */
 
+/* Cleanup is a transition into arbitrary caller code. Keep its temporary
+ * error context in one activation; outlining also prevents GCC from expanding
+ * those context copies through the frame-list traversal. */
+static void __attribute__((noinline)) hRunCleanup
+	( FB_ERRORCTX *error, FB_ERROR_FRAME_CLEANUP cleanup, void *data )
+{
+	FB_ERRORCTX saved_error = *error;
+	cleanup( data );
+	*error = saved_error;
+}
+
 void fb_ErrorFrameSaveState( FB_ERRORCTX *error )
 {
 	FB_ERRORFRAMECTX *context = hGetContext();
@@ -388,7 +399,7 @@ int fb_ErrorFrameDispatch( FB_ERRORCTX *error, FB_ERRHANDLER *target, int *fatal
 			hPopFrame( context, error );
 			context->unwinding = context->top;
 			if( cleanup != NULL )
-				cleanup( data );
+				hRunCleanup( error, cleanup, data );
 			if( context->top != context->unwinding ) {
 				context->unwinding = NULL;
 				*fatal_error = FB_RTERROR_ILLEGALFUNCTIONCALL;

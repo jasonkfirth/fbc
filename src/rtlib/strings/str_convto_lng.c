@@ -26,9 +26,9 @@
 /* Decimal conversion                                                        */
 /* ------------------------------------------------------------------------- */
 
-FBCALL FBSTRING *fb_LongintToStr ( long long num )
+FBCALL FBSTRING_ACCESS *fb_LongintToStr ( long long num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	int written;
 
 	/* alloc temp string */
@@ -38,21 +38,21 @@ FBCALL FBSTRING *fb_LongintToStr ( long long num )
 		written = snprintf( dst->data, (size_t)dst->size + 1, "%lld", num );
 		if( (written < 0) || (written > dst->size) ) {
 			fb_hStrDelTemp( dst );
-			return &__fb_ctx.null_desc;
+			return &fb_ctx.null_desc;
 		}
 
 		fb_hStrSetLength( dst, (size_t)written );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }
 
 /*:::::*/
-FBCALL FBSTRING *fb_ULongintToStr ( unsigned long long num )
+FBCALL FBSTRING_ACCESS *fb_ULongintToStr ( unsigned long long num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	int written;
 
 	/* alloc temp string */
@@ -62,13 +62,13 @@ FBCALL FBSTRING *fb_ULongintToStr ( unsigned long long num )
 		written = snprintf( dst->data, (size_t)dst->size + 1, "%llu", num );
 		if( (written < 0) || (written > dst->size) ) {
 			fb_hStrDelTemp( dst );
-			return &__fb_ctx.null_desc;
+			return &fb_ctx.null_desc;
 		}
 
 		fb_hStrSetLength( dst, (size_t)written );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }

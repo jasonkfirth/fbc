@@ -37,7 +37,7 @@ unsigned int fb_ConsoleColor( unsigned int fc, unsigned int bc, int flags )
 		bc = last_bc;
 	}
 
-	SetConsoleTextAttribute( __fb_out_handle, fc + (bc << 4) );
+	SetConsoleTextAttribute( FB_CONSOLE_OUTPUT_HANDLE, fc + (bc << 4) );
 
 	return cur;
 }
@@ -53,7 +53,7 @@ unsigned int fb_ConsoleGetColorAttEx( HANDLE hConsole )
 
 unsigned int fb_ConsoleGetColorAtt( void )
 {
-	return fb_ConsoleGetColorAttEx( __fb_out_handle );
+	return fb_ConsoleGetColorAttEx( FB_CONSOLE_OUTPUT_HANDLE );
 }
 
 /* end of drivers/win32/io_color.c */

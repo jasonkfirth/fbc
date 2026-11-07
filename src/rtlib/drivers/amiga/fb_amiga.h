@@ -14,8 +14,8 @@
     This file intentionally does NOT contain: - library ownership, graphics, sound, or generic m68k ABI policy
 */
 
-#ifndef __FB_AMIGA_H__
-#define __FB_AMIGA_H__
+#ifndef FB_RTLIB_AMIGA_H
+#define FB_RTLIB_AMIGA_H
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -25,9 +25,9 @@
 
 #define FBCALL
 #define FB_NEWLINE "\n"
-#define FB_NEWLINE_WSTR _LC("\n")
+#define FB_NEWLINE_WSTR FB_WCHAR_LITERAL("\n")
 #define FB_BINARY_NEWLINE "\r\n"
-#define FB_BINARY_NEWLINE_WSTR _LC("\r\n")
+#define FB_BINARY_NEWLINE_WSTR FB_WCHAR_LITERAL("\r\n")
 #define FB_LL_FMTMOD "ll"
 #define FB_CONSOLE_MAXPAGES 1
 

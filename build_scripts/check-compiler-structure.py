@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import tempfile
@@ -63,12 +64,26 @@ def handwritten_c_sources(compiler: Path) -> list[Path]:
             continue
         try:
             with path.open("rb") as source:
-                prelude = source.read(256)
+                prelude = source.read(4096)
         except FileNotFoundError:
             # Another compiler process may remove its temporary C emission.
             continue
-        # Native Windows text output uses CRLF; Unix hosts use LF. Both
-        # spellings must retain the exact emitter prelude and owning module.
+        # Deferred startup attributes precede declarations so a complete unit
+        # can choose one registration per priority. Accept only that emitted
+        # macro form, then require the ordinary scalar prelude and BASIC owner.
+        startup = re.match(
+            rb"(?:#define fb_c_startup_attr_[cd]_[0-9]{1,5} __attribute__\(\("
+            rb"(?:used|(?:constructor|destructor)(?:\([0-9]{1,5}\))?)\)\)\r?\n)+", prelude)
+        if startup:
+            prelude = prelude[startup.end():]
+        # A consistent stdio binding may precede the fixed scalar prelude.
+        # Match its narrow emitted form; unrelated C is still not a source input.
+        binding = re.match(
+            rb"typedef (?:void FILE|(?:struct|union) fb_type_[A-Za-z0-9_]+ FILE "
+            rb"__attribute__\(\(aligned\(1\)\)\));\r?\n", prelude)
+        if binding:
+            prelude = prelude[binding.end():]
+        # Native Windows text output uses CRLF; Unix hosts use LF.
         generated = path.with_suffix(".bas").is_file() and prelude.startswith((
             b"typedef   signed char       int8;\n",
             b"typedef   signed char       int8;\r\n",
@@ -95,9 +110,13 @@ def validate(root: Path, make: str = "make") -> tuple[int, int]:
         text = path.read_text(encoding="utf-8")
         header = text.split("\n\n", 1)[0]
         for field in ("Project:", "File: " + relative, "Purpose:", "Responsibilities:",
-                      "This file intentionally does NOT contain:"):
+                      "This file intentionally does NOT"):
             if field not in header:
                 failures.append(relative + ": header missing " + field)
+        # An exclusion list and a full sentence express the same ownership rule.
+        # Keep the existing list form, and require a verb/object for sentences.
+        if not re.search(r"This file intentionally does NOT (?:contain:|[a-z]+ [A-Za-z][^\n]+)", header):
+            failures.append(relative + ": header missing an exclusion list or sentence")
         # Both native FreeBASIC comment forms can identify the owning file.
         footers = ("'' end of " + relative, "/' end of " + relative + " '/")
         if not text.rstrip().endswith(footers):
@@ -175,9 +194,25 @@ def validate(root: Path, make: str = "make") -> tuple[int, int]:
         if handwritten_c_sources(fixture) != [helper]:
             failures.append("Structure check accepted a new handwritten C compiler helper")
         for newline in (b"\n", b"\r\n"):
-            helper.write_bytes(b"typedef   signed char       int8;" + newline)
-            if handwritten_c_sources(fixture):
-                failures.append("Structure check rejected generated C with its BASIC source")
+            scalar = b"typedef   signed char       int8;" + newline
+            for binding in (b"", b"typedef void FILE;" + newline,
+                            b"typedef struct fb_type_4FILE FILE __attribute__((aligned(1)));" + newline,
+                            b"typedef union fb_type_4FILE FILE __attribute__((aligned(1)));" + newline):
+                helper.write_bytes(binding + scalar)
+                if handwritten_c_sources(fixture):
+                    failures.append("Structure check rejected generated C with its BASIC source")
+                for attribute in (b"used", b"constructor(101)", b"destructor"):
+                    prefix = b"#define fb_c_startup_attr_c_101 __attribute__((" + attribute + b"))" + newline
+                    helper.write_bytes(prefix + binding + scalar)
+                    if handwritten_c_sources(fixture):
+                        failures.append("Structure check rejected deferred startup attributes")
+                    helper.write_bytes(prefix + binding + b"int helper(void) { return 0; }")
+                    if handwritten_c_sources(fixture) != [helper]:
+                        failures.append("Structure check accepted unrelated C after startup attributes")
+            helper.write_bytes(b"typedef void FILE;" + newline + b"int helper(void) { return 0; }")
+            if handwritten_c_sources(fixture) != [helper]:
+                failures.append("Structure check accepted unrelated C after a stdio typedef")
+        helper.write_bytes(b"typedef void FILE;\ntypedef   signed char       int8;\n")
         (fixture / "module.bas").unlink()
         if handwritten_c_sources(fixture) != [helper]:
             failures.append("Structure check accepted C without its BASIC source")
@@ -202,6 +237,15 @@ def validate(root: Path, make: str = "make") -> tuple[int, int]:
 
     if failures:
         raise ValueError("\n".join(failures))
+    # Each opcode keeps its real callback signature through storage and dispatch.
+    # Run the binding guard here so the ordinary structure check owns this rule.
+    callbacks = runpy.run_path(str(root / "build_scripts/check-x86-emitter-callbacks.py"))
+    callback_source = compiler / "backend/x86"
+    try:
+        callbacks["check"](callback_source)
+        callbacks["self_test"](callback_source)
+    except RuntimeError as error:
+        raise ValueError("X86 callback structure: " + str(error)) from error
     return len(files), len(hosts)
 
 

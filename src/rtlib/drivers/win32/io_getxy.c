@@ -26,13 +26,13 @@ void fb_ConsoleGetRawXYEx( HANDLE hConsole, int *col, int *row )
 
 void fb_ConsoleGetRawXY( int *col, int *row )
 {
-    fb_ConsoleGetRawXYEx( __fb_out_handle, col, row );
+    fb_ConsoleGetRawXYEx( FB_CONSOLE_OUTPUT_HANDLE, col, row );
 }
 
 FBCALL void fb_ConsoleGetXY( int *col, int *row )
 {
     CONSOLE_SCREEN_BUFFER_INFO info;
-    if( !GetConsoleScreenBufferInfo( __fb_out_handle, &info ) ) {
+    if( !GetConsoleScreenBufferInfo( FB_CONSOLE_OUTPUT_HANDLE, &info ) ) {
         if( col != NULL )
             *col = 0;
         if( row != NULL )

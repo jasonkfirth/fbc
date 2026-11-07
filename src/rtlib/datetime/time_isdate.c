@@ -8,7 +8,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL int fb_IsDate ( FBSTRING *s )
+FBCALL int fb_IsDate ( FBSTRING_ACCESS *s )
 {
     int year;
     int month;

@@ -65,7 +65,7 @@ enum PROFILE_OPTIONS
 /* String Storage */
 
 /* information about a single string */
-typedef struct _STRING_INFO
+typedef struct FB_STRING_INFO_
 {
 	int size;
 	int length;
@@ -73,36 +73,36 @@ typedef struct _STRING_INFO
 } STRING_INFO;
 
 /* block of memory to store strings */
-typedef struct _STRING_INFO_TB
+typedef struct FB_STRING_INFO_TB_
 {
 	unsigned char data[STRING_INFO_TB_SIZE];
-	struct _STRING_INFO_TB *next;
+	struct FB_STRING_INFO_TB_ *next;
 	int bytes_used;
 	int string_tb_id;
 } STRING_INFO_TB;
 
 /* first block in a list of string storage blocks */
-typedef struct _STRING_TABLE
+typedef struct FB_STRING_TABLE_
 {
 	STRING_INFO_TB *tb;
 } STRING_TABLE;
 
 /* block of memory for hashes */
-typedef struct _STRING_HASH_TB
+typedef struct FB_STRING_HASH_TB_
 {
 	STRING_INFO *items[STRING_HASH_TB_SIZE];
-	struct _STRING_HASH_TB *next;
+	struct FB_STRING_HASH_TB_ *next;
 } STRING_HASH_TB;
 
 /* first block of memory for hashes and associated string table */
-typedef struct _STRING_HASH_TABLE
+typedef struct FB_STRING_HASH_TABLE_
 {
 	STRING_TABLE *strings;
 	STRING_HASH_TB *tb;
 } STRING_HASH_TABLE;
 
 /* hash table for strings */
-typedef struct _STRING_HASH
+typedef struct FB_STRING_HASH_
 {
 	STRING_HASH_TABLE *strings_hash;
 	STRING_HASH_TABLE hash;
@@ -132,7 +132,7 @@ STRING_INFO *STRING_HASH_find( STRING_HASH *hash, const char *src, unsigned int 
 
 /* profiler global context */
 /* use FB_PROFILE_LOCK()/FB_PROFILE_UNLOCK when accessing */
-typedef struct _FB_PROFILER_GLOBAL
+typedef struct FB_PROFILER_GLOBAL_
 {
 	void *profiler_ctx;
 	STRING_TABLE strings;
@@ -144,7 +144,7 @@ typedef struct _FB_PROFILER_GLOBAL
 } FB_PROFILER_GLOBAL;
 
 /* information about the profiler internals */
-typedef struct _FB_PROFILER_METRICS
+typedef struct FB_PROFILER_METRICS_
 {
 	int count_threads;
 
@@ -192,7 +192,7 @@ FBCALL void               *fb_WstrProfileBeginProc( const FB_WCHAR *procname );
 FBCALL void               *fb_WstrProfileBeginCall( const FB_WCHAR *procname );
 FBCALL int                 fb_WstrProfileSetFileName( const FB_WCHAR *filename );
 FBCALL int                 fb_WstrProfileGetFileName( FB_WCHAR *filename, int capacity );
-FBCALL int                 fb_UStrProfileGetFileName( FBSTRING *filename, int capacity );
+FBCALL int                 fb_UStrProfileGetFileName( FBSTRING_ACCESS *filename, int capacity );
 FBCALL void                fb_WstrProfileIgnore( const FB_WCHAR *procname );
 FBCALL int                 fb_ProfileGetOptions( void );
 FBCALL int                 fb_ProfileSetOptions( int options );
@@ -211,5 +211,13 @@ void fb_hPROFILER_METRICS_Clear( FB_PROFILER_METRICS *metrics );
 void fb_hPROFILER_METRICS_Strings( FB_PROFILER_METRICS *metrics, STRING_TABLE *strings );
 void fb_hPROFILER_METRICS_HashTable( FB_PROFILER_METRICS *metrics, STRING_HASH_TABLE *hash );
 void fb_hPROFILER_METRICS_Global( FB_PROFILER_METRICS *metrics, FB_PROFILER_GLOBAL *global );
+
+/* Collectors expose opaque handles here. Their storage layout remains
+   private to each profiler implementation. */
+struct FB_PROFILER_CALLS_;
+struct FB_PROFILER_CYCLES_;
+FBCALL void fb_ProfileGetCallsMetrics( FB_PROFILER_METRICS *metrics );
+FBCALL struct FB_PROFILER_CALLS_ *fb_ProfileGetCallsProfiler( void );
+FBCALL struct FB_PROFILER_CYCLES_ *fb_ProfileGetCyclesProfiler( void );
 
 /* end of fb_profile.h */

@@ -18,6 +18,7 @@
 */
 
 #include "fb.h"
+#include "str_size.h"
 #include <stddef.h>
 
 /**********
@@ -28,7 +29,7 @@ static FB_LIST tmpdsList = { 0, NULL, NULL, NULL };
 
 static FB_STR_TMPDESC fb_tmpdsTB[FB_STR_TMPDESCRIPTORS];
 
-FBCALL FBSTRING *fb_hStrAllocTempDesc( void )
+FBCALL FBSTRING_ACCESS *fb_hStrAllocTempDesc( void )
 {
 	FB_STR_TMPDESC *dsc;
 
@@ -48,7 +49,7 @@ FBCALL FBSTRING *fb_hStrAllocTempDesc( void )
 	return &dsc->desc;
 }
 
-FBCALL int fb_hStrDelTempDesc( FBSTRING *str )
+FBCALL int fb_hStrDelTempDesc( FBSTRING_ACCESS *str )
 {
 	FB_STR_TMPDESC *item;
 	uintptr_t address = (uintptr_t)str;
@@ -78,18 +79,18 @@ FBCALL int fb_hStrDelTempDesc( FBSTRING *str )
 ** internal helper routines
 **********/
 
-/* alloc every 32-bytes */
-#define hStrRoundSize( size ) (((size) + 31) & ~31)
-
-FBCALL FBSTRING *fb_hStrAlloc( FBSTRING *str, ssize_t size )
+FBCALL FBSTRING_ACCESS *fb_hStrAlloc( FBSTRING_ACCESS *str, ssize_t size )
 {
-	ssize_t newsize = hStrRoundSize( size );
+	ssize_t newsize;
 
-	str->data = (char *)malloc( newsize + 1 );
+	if( str == NULL || !fb_hStrCapacity( size, FALSE, &newsize ) )
+		return NULL;
+
+	str->data = (char *)malloc( (size_t)newsize + 1 );
 	/* failed? try the original request */
 	if( str->data == NULL )
 	{
-		str->data = (char *)malloc( size + 1 );
+		str->data = (char *)malloc( (size_t)size + 1 );
 		if( str->data == NULL )
 		{
 			str->len = str->size = 0;
@@ -105,11 +106,13 @@ FBCALL FBSTRING *fb_hStrAlloc( FBSTRING *str, ssize_t size )
 	return str;
 }
 
-FBCALL FBSTRING *fb_hStrRealloc( FBSTRING *str, ssize_t size, int preserve )
+FBCALL FBSTRING_ACCESS *fb_hStrRealloc( FBSTRING_ACCESS *str, ssize_t size, int preserve )
 {
-	ssize_t newsize = hStrRoundSize( size );
-	/* plus 12.5% more */
-	newsize += (newsize >> 3);
+	ssize_t newsize;
+
+	if( str == NULL || !fb_hStrCapacity( size, TRUE, &newsize ) )
+		return NULL;
+
 
 	if( (str->data == NULL) ||
 		(size > str->size) ||
@@ -119,24 +122,24 @@ FBCALL FBSTRING *fb_hStrRealloc( FBSTRING *str, ssize_t size, int preserve )
 		{
 			fb_StrDelete( str );
 
-			str->data = (char *)malloc( newsize + 1 );
+			str->data = (char *)malloc( (size_t)newsize + 1 );
 			/* failed? try the original request */
 			if( str->data == NULL )
 			{
-				str->data = (char *)malloc( size + 1 );
+				str->data = (char *)malloc( (size_t)size + 1 );
 				newsize = size;
 			}
 		}
 		else
 		{
 			char *newbuffer;
-			newbuffer = (char *)realloc( str->data, newsize + 1 );
+			newbuffer = (char *)realloc( str->data, (size_t)newsize + 1 );
 
 			/* failed? try the original request */
 			if( newbuffer == NULL )
 			{
 				newsize = size;
-				newbuffer = (char *)realloc( str->data, newsize + 1 );
+				newbuffer = (char *)realloc( str->data, (size_t)newsize + 1 );
 				if( newbuffer == NULL )
 				{
 					return NULL;
@@ -154,12 +157,12 @@ FBCALL FBSTRING *fb_hStrRealloc( FBSTRING *str, ssize_t size, int preserve )
 		str->size = newsize;
 	}
 
-	fb_hStrSetLength( str, size );
+	fb_hStrSetLength( str, (size_t)size );
 
 	return str;
 }
 
-FBCALL FBSTRING *fb_hStrAllocTemp_NoLock( FBSTRING *str, ssize_t size )
+FBCALL FBSTRING_ACCESS *fb_hStrAllocTemp_NoLock( FBSTRING_ACCESS *str, ssize_t size )
 {
 	int try_alloc = str==NULL;
 
@@ -182,9 +185,9 @@ FBCALL FBSTRING *fb_hStrAllocTemp_NoLock( FBSTRING *str, ssize_t size )
 	return str;
 }
 
-FBCALL FBSTRING *fb_hStrAllocTemp( FBSTRING *str, ssize_t size )
+FBCALL FBSTRING_ACCESS *fb_hStrAllocTemp( FBSTRING_ACCESS *str, ssize_t size )
 {
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 
 	FB_STRLOCK( );
 
@@ -195,7 +198,7 @@ FBCALL FBSTRING *fb_hStrAllocTemp( FBSTRING *str, ssize_t size )
 	return res;
 }
 
-FBCALL int fb_hStrDelTemp_NoLock( FBSTRING *str )
+FBCALL int fb_hStrDelTemp_NoLock( FBSTRING_ACCESS *str )
 {
 	if( str == NULL )
 		return -1;
@@ -208,7 +211,7 @@ FBCALL int fb_hStrDelTemp_NoLock( FBSTRING *str )
 	return fb_hStrDelTempDesc( str );
 }
 
-FBCALL int fb_hStrDelTemp( FBSTRING *str )
+FBCALL int fb_hStrDelTemp( FBSTRING_ACCESS *str )
 {
 	int res;
 
@@ -225,7 +228,7 @@ FBCALL void fb_hStrCopy( char *dst, const char *src, ssize_t bytes )
 {
 	if( (src != NULL) && (bytes > 0) )
 	{
-		dst = (char *) FB_MEMCPYX( dst, src, bytes );
+		dst = (char *) FB_MEMCPYX( dst, src, (size_t)bytes );
 	}
 
 	/* add the null-term */
@@ -236,7 +239,7 @@ FBCALL void fb_hStrCopyN( char *dst, const char *src, ssize_t bytes )
 {
 	if( (src != NULL) && (bytes > 0) )
 	{
-		FB_MEMCPYX( dst, src, bytes );
+		FB_MEMCPYX( dst, src, (size_t)bytes );
 	}
 }
 

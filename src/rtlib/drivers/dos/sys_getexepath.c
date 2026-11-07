@@ -12,20 +12,20 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 	char *p;
 	ssize_t argv_len, len;
 
-	argv_len = strlen( __fb_ctx.argv[0] );
+	argv_len = strlen( fb_ctx.argv[0] );
 
 	/* check for drive letter - if there, get full path from argv[0] */
-	if( isalpha(__fb_ctx.argv[0][0]) && __fb_ctx.argv[0][1] == ':' )
+	if( isalpha(fb_ctx.argv[0][0]) && fb_ctx.argv[0][1] == ':' )
 	{
 		len = argv_len;
 		if( len >= maxlen)
 			return NULL;
 
-		memcpy( dst, __fb_ctx.argv[0], len );
+		memcpy( dst, fb_ctx.argv[0], len );
 		dst[len] = '\0';
 	}
 	/* check for \ at beginning - get drive letter from cwd */
-	else if( __fb_ctx.argv[0][0] == '\\' || __fb_ctx.argv[0][0] == '/' )
+	else if( fb_ctx.argv[0][0] == '\\' || fb_ctx.argv[0][0] == '/' )
 	{
 		len = 1 + argv_len;
 		if( len >= maxlen )
@@ -33,7 +33,7 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 
 		dst[0] = __fb_startup_cwd[0];
 		dst[1] = ':';
-		memcpy( dst + 2, __fb_ctx.argv[0], argv_len );
+		memcpy( dst + 2, fb_ctx.argv[0], argv_len );
 		dst[len] = '\0';
 	}
 	/* no drive letter, no \, so relative path - get cur dir from startup */
@@ -48,7 +48,7 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 
 		memcpy( dst, __fb_startup_cwd, cwd_len );
 		dst[cwd_len] = '\\';
-		memcpy( dst + cwd_len + 1, __fb_ctx.argv[0], argv_len );
+		memcpy( dst + cwd_len + 1, fb_ctx.argv[0], argv_len );
 		dst[len] = '\0';
 	}
 

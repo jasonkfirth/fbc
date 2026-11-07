@@ -212,7 +212,7 @@ sub fbSemanticModelStartupEmission( byval proc as FBSYMBOL ptr, byref kind as co
 	dim as integer valid = TRUE
 	select case stage
 	case "c"
-		valid = (role = "definition-attribute") or (role = "declaration-attribute") or (role = "array-entry")
+		valid = (role = "definition-attribute") or (role = "declaration-attribute") or (role = "array-entry") or (role = "wrapper-call")
 	case "llvm"
 		valid = (role = "array-entry")
 	case "gas"

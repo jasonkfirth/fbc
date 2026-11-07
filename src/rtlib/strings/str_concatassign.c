@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include "str_size.h"
 
 FBCALL void *fb_StrConcatAssign
 	(
@@ -16,15 +17,15 @@ FBCALL void *fb_StrConcatAssign
 		int fillrem
 	)
 {
-	FBSTRING *dstr;
+	FBSTRING_ACCESS *dstr;
 	const char *src_ptr;
-	ssize_t src_len, dst_len;
+	ssize_t src_len, dst_len, total;
 
 	if( dst == NULL )
 	{
 		/* delete temp? */
 		if( src_size == FB_STRSIZEVARLEN )
-			fb_hStrDelTemp( (FBSTRING *)src );
+			fb_hStrDelTemp( (FBSTRING_ACCESS *)src );
 
 		return dst;
 	}
@@ -38,12 +39,13 @@ FBCALL void *fb_StrConcatAssign
 		/* is dst var-len? */
 		if( dst_size == FB_STRSIZEVARLEN )
 		{
-			dstr = (FBSTRING *)dst;
+			dstr = (FBSTRING_ACCESS *)dst;
 			dst_len = FB_STRSIZE( dst );
 
-			fb_hStrRealloc( dstr, dst_len+src_len, FB_TRUE );
-
-			fb_hStrCopy( &dstr->data[dst_len], src_ptr, src_len );
+			/* Preserve the old descriptor when growth is unavailable. */
+			if( fb_hStrAddSize( dst_len, src_len, &total ) &&
+			    fb_hStrRealloc( dstr, total, FB_TRUE ) != NULL )
+				fb_hStrCopy( &dstr->data[dst_len], src_ptr, src_len );
 		}
 		else if( dst_size & FB_STRISFIXED )
 		{
@@ -52,7 +54,7 @@ FBCALL void *fb_StrConcatAssign
 		}
 		else
 		{
-			dst_len = strlen( (char *)dst );
+			dst_len = (ssize_t)strlen( (char *)dst );
 
 			/* don't check byte ptr's */
 			if( dst_size > 0 )
@@ -72,7 +74,7 @@ FBCALL void *fb_StrConcatAssign
 				/* fill reminder with null's */
 				dst_size -= (dst_len + src_len);
 				if( dst_size > 0 )
-					memset( &(((char *)dst)[dst_len+src_len]), 0, dst_size );
+					memset( &(((char *)dst)[dst_len+src_len]), 0, (size_t)dst_size );
 			}
 		}
 	}
@@ -80,7 +82,7 @@ FBCALL void *fb_StrConcatAssign
 
 	/* delete temp? */
 	if( src_size == FB_STRSIZEVARLEN )
-		fb_hStrDelTemp( (FBSTRING *)src );
+		fb_hStrDelTemp( (FBSTRING_ACCESS *)src );
 
 	return dst;
 }

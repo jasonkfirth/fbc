@@ -9,7 +9,7 @@
 #include <locale.h>
 #include "../../fb_private_thread.h"
 
-FB_RTLIB_CTX __fb_ctx /* not initialized */;
+FB_RTLIB_CTX fb_ctx /* not initialized */;
 static int __fb_is_inicnt = 0;
 
 /* called from fbrt0 */
@@ -21,7 +21,7 @@ void fb_hRtInit( void )
 		return;
 
 	/* initialize context */
-	memset( &__fb_ctx, 0, sizeof( FB_RTLIB_CTX ) );
+	memset( &fb_ctx, 0, sizeof( FB_RTLIB_CTX ) );
     
 	/* os-dep initialization */
 	fb_hInit( );
@@ -104,16 +104,16 @@ void fb_hRtExit( void )
 	   cleaned up. At least the DOS gfxlib clears the console on exit,
 	   thus any error messages must be printed after that or they would
 	   not be visible. */
-	if( __fb_ctx.errmsg )
-		fputs( __fb_ctx.errmsg, stderr );
+	if( fb_ctx.errmsg )
+		fputs( fb_ctx.errmsg, stderr );
 }
 
 /* called by FB program */
 FBCALL void fb_Init( int argc, char **argv, int lang )
 {
-	__fb_ctx.argc = argc;
-	__fb_ctx.argv = argv;
-	__fb_ctx.lang = lang;
+	fb_ctx.argc = argc;
+	fb_ctx.argv = argv;
+	fb_ctx.lang = lang;
 
 #ifdef HOST_ANDROID
 	/*
@@ -152,11 +152,11 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
    or fb_Die() in case of assert() failure or runtime error */
 FBCALL void fb_End( int errlevel )
 {
-	if( __fb_ctx.exit_sfxlib )
-		__fb_ctx.exit_sfxlib( );
+	if( fb_ctx.exit_sfxlib )
+		fb_ctx.exit_sfxlib( );
 
-	if( __fb_ctx.exit_gfxlib2 )
-		__fb_ctx.exit_gfxlib2( );
+	if( fb_ctx.exit_gfxlib2 )
+		fb_ctx.exit_gfxlib2( );
 
 #ifdef HOST_JS
     // global constructors and destructors are not supported by emscripten

@@ -29,7 +29,7 @@
 #include "../../fb.h"
 #include "../../fb_private_thread.h"
 
-FB_RTLIB_CTX __fb_ctx;
+FB_RTLIB_CTX fb_ctx;
 static int __fb_is_inicnt = 0;
 
 /* ------------------------------------------------------------------------- */
@@ -42,7 +42,7 @@ void fb_hRtInit(void)
     if (__fb_is_inicnt != 1)
         return;
 
-    memset(&__fb_ctx, 0, sizeof(FB_RTLIB_CTX));
+    memset(&fb_ctx, 0, sizeof(FB_RTLIB_CTX));
     fb_hInit();
 
 #ifdef ENABLE_MT
@@ -66,8 +66,8 @@ void fb_hRtExit(void)
     fb_TlsExit();
 #endif
 
-    if (__fb_ctx.errmsg != NULL)
-        fputs(__fb_ctx.errmsg, stderr);
+    if (fb_ctx.errmsg != NULL)
+        fputs(fb_ctx.errmsg, stderr);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -76,17 +76,17 @@ void fb_hRtExit(void)
 
 FBCALL void fb_Init(int argc, char **argv, int lang)
 {
-    __fb_ctx.argc = argc;
-    __fb_ctx.argv = argv;
-    __fb_ctx.lang = lang;
+    fb_ctx.argc = argc;
+    fb_ctx.argv = argv;
+    fb_ctx.lang = lang;
 }
 
 FBCALL void fb_End(int errlevel)
 {
-    if (__fb_ctx.exit_sfxlib != NULL)
-        __fb_ctx.exit_sfxlib();
-    if (__fb_ctx.exit_gfxlib2 != NULL)
-        __fb_ctx.exit_gfxlib2();
+    if (fb_ctx.exit_sfxlib != NULL)
+        fb_ctx.exit_sfxlib();
+    if (fb_ctx.exit_gfxlib2 != NULL)
+        fb_ctx.exit_gfxlib2();
 
     exit(errlevel);
 }

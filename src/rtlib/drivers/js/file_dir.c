@@ -7,9 +7,9 @@
  */
 #include "../../fb.h"
 
-FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
+FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_attrib )
 {
-	return &__fb_ctx.null_desc;
+	return &fb_ctx.null_desc;
 }
 
 /* end of drivers/js/file_dir.c */

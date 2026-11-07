@@ -516,7 +516,6 @@ private sub hAddJsLinkOptions( byref ldcline as string )
 		"ASYNCIFY_STACK_SIZE=65536" _
 	}
 
-	ldcline += " -Wno-warn-absolute-paths"
 	dim as DZSTRING emscripten_args
 	DZstrZero( emscripten_args )
 	for i as integer = 0 to ubound( emscripten_options )

@@ -10,9 +10,9 @@
 #include <windows.h> /* for MAX_PATH */
 #endif
 
-FBCALL FBSTRING *fb_CurDir( void )
+FBCALL FBSTRING_ACCESS *fb_CurDir( void )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	char		tmp[MAX_PATH];
 	ssize_t len;
 
@@ -26,10 +26,10 @@ FBCALL FBSTRING *fb_CurDir( void )
 		if( dst != NULL ) {
 			memcpy( dst->data, tmp, len + 1 );
 		} else {
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
 		}
 	} else {
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 	}
 
 	FB_UNLOCK();

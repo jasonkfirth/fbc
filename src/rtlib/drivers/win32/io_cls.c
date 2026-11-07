@@ -68,7 +68,7 @@ void fb_ConsoleClear( int mode )
     DBG_ASSERT(view_left <= view_right);
     DBG_ASSERT(view_top <= view_bottom);
 
-    fb_ConsoleClearViewRawEx( __fb_out_handle, view_left, view_top, view_right, view_bottom );
+    fb_ConsoleClearViewRawEx( FB_CONSOLE_OUTPUT_HANDLE, view_left, view_top, view_right, view_bottom );
 }
 
 /* end of drivers/win32/io_cls.c */

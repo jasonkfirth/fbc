@@ -150,6 +150,12 @@ headers gate their UTF-8 overloads on this marker and `FB_NO_USTRING`, retaining
 the existing compatibility switch for applications with a legacy `ustring`
 identifier or macro.
 
+A project that supplies its own `Replace` helper can define
+`FB_NO_STRING_REPLACE` before including `string.bi` or `vbcompat.bi`. This
+omits the byte, wide and UTF-8 `Replace` declarations while leaving the other
+string helpers and comparison constants available. Without the definition, all
+standard overloads remain enabled.
+
 ## Examples and tests
 
 - [Construction, conversion, slicing, and indexing](../examples/manual/strings/ustring.bas)

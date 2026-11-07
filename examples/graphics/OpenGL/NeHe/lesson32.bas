@@ -97,7 +97,7 @@ dim shared as integer mouse_x, mouse_y, mouse_b, mouse_down
 declare function LoadTGA(byval texture as TEXTUREIMAGE ptr, byref filename as string) as integer
 declare sub BuildFont ()
 declare sub glPrint cdecl(byval x as integer, byval y as integer, byref fmt as string, ...)
-declare function Compare (byval elem1 as objects ptr, byval elem2 as objects ptr) as integer
+declare function Compare cdecl (byval elem1 as const any ptr, byval elem2 as const any ptr) as long
 declare sub InitObject (byval num as integer)
 declare function Initialize () as integer
 declare sub Deinitialize ()
@@ -314,12 +314,16 @@ end sub
 
 '------------------------------------------------------------------------
 '' Compare Function *** MSDN CODE MODIFIED FOR THIS TUT ***
-function Compare (byval elem1 as objects ptr, byval elem2 as objects ptr) as integer
+function Compare cdecl (byval elem1 as const any ptr, byval elem2 as const any ptr) as long
 
-	if elem1->distance < elem2->distance then
+    '' qsort requires a C int result and read-only void pointer arguments.
+    dim as const objects ptr left_object = cptr(const objects ptr, elem1)
+    dim as const objects ptr right_object = cptr(const objects ptr, elem2)
+
+	if left_object->distance < right_object->distance then
 		'' If First Structure distance Is Less Than The Second Return -1
 		return  - 1
-	elseif elem1->distance > elem2->distance then
+	elseif left_object->distance > right_object->distance then
 		'' If First Structure distance Is Greater Than The Second Return 1
 		return  1
 	else
@@ -369,7 +373,7 @@ sub InitObject (byval num as integer)                '' Initialize An Object
 	''                      Number Of Elements To Sort
 	''                      Size Of Each Element
 	''                      Pointer To Our Compare Function
-	QSORT (@object_(0), level, sizeof (objects),  cast(any ptr, @Compare))
+	QSORT (@object_(0), level, sizeof (objects), @Compare)
 end sub
 
 '------------------------------------------------------------------------
@@ -705,3 +709,5 @@ sub drawscr ()                                           '' Draw Our Scene
 
 	glFlush ()                                            '' Flush The GL Rendering Pipeline
 end sub
+
+'' end of lesson32.bas

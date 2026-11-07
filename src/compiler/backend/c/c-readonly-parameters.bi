@@ -21,7 +21,6 @@ type CREADONLYPROC
 	parameters as CREADONLYPARAM ptr
 	private_proc as integer
 	returns_void as integer
-	external_call as integer
 	deferred_wrapper as integer
 end type
 
@@ -225,6 +224,7 @@ private function hCReadOnlyPrepare(byval proc as FBSYMBOL ptr, byval body as AST
 	var entry = cptr(CREADONLYPROC ptr, listNewNode(@c_readonly_procs))
 	entry->proc = proc
 	entry->private_proc = symbIsPrivate(proc)
+	if( entry->private_proc ) then hCLeafSeparateEntry(proc)
 	entry->returns_void = (symbGetProcRealType(proc) = FB_DATATYPE_VOID)
 	var implementation = hCUnalignedTempName() + "_readonly"
 	entry->identifier = ZstrDup(strptr(implementation))
@@ -259,20 +259,11 @@ end function
 
 private sub hCReadOnlyWriteWrapper(byval entry as CREADONLYPROC ptr)
 	var header = *entry->header.data
-	if( entry->private_proc andalso entry->external_call ) then
-		'' Direct calls already use the implementation. This generated ABI
-		'' forwarder should inline when an address-taken call permits it.
-		'' An observed ABI entry without a direct caller keeps an ordinary
-		'' definition. Unobserved private entries are filtered before this step.
+	if( entry->private_proc andalso c_leaf_opaque ) then
+		'' Raw assembly may require the original entry without a C reference.
+		'' Keep an out-of-line definition for that assembler-visible symbol.
 		assert(left(header, 7) = "static ")
-		if( c_leaf_opaque ) then
-			'' An assembly operand may name this entry point without a C use.
-			'' Keep its out-of-line ABI symbol even when all visible calls use
-			'' the implementation. A real caller established source reachability.
-			header = "static __attribute__((used)) " + mid(header, 8)
-		else
-			header = "static inline " + mid(header, 8)
-		end if
+		header = "static __attribute__((used)) " + mid(header, 8)
 	end if
 	sectionBegin()
 	hWriteLine(header)
@@ -301,7 +292,9 @@ end sub
 private sub hCReadOnlyWritePrivateWrappers()
 	var entry = cptr(CREADONLYPROC ptr, listGetHead(@c_readonly_procs))
 	while( entry <> NULL )
-		if( entry->deferred_wrapper andalso hCLeafNeeded(entry->proc) ) then hCReadOnlyWriteWrapper(entry)
+		'' Direct calls keep the implementation alive. Only reachable original
+		'' calls, addresses and required roots need the separate ABI wrapper.
+		if( entry->deferred_wrapper andalso hCLeafEntryNeeded(entry->proc) ) then hCReadOnlyWriteWrapper(entry)
 		entry = listGetNext(entry)
 	wend
 end sub

@@ -189,15 +189,15 @@ sub emitFlush( )
 			exit select
 
 		case EMIT_NODECLASS_BOP
-			cast( EMIT_BOPCB, emit.opFnTb[n->bop.op] )( _
+			emit.opFnTb[n->bop.op].bop( _
 				n->bop.dvreg, _
 				n->bop.svreg )
 
 		case EMIT_NODECLASS_UOP
-			cast( EMIT_UOPCB, emit.opFnTb[n->uop.op ] )( n->uop.dvreg )
+			emit.opFnTb[n->uop.op ].uop( n->uop.dvreg )
 
 		case EMIT_NODECLASS_REL
-			cast( EMIT_RELCB, emit.opFnTb[n->rel.op] )( _
+			emit.opFnTb[n->rel.op].rel( _
 				n->rel.rvreg, _
 				n->rel.label, _
 				n->rel.dvreg, _
@@ -205,26 +205,26 @@ sub emitFlush( )
 				n->options )
 
 		case EMIT_NODECLASS_STK
-			cast( EMIT_STKCB, emit.opFnTb[n->stk.op] )( _
+			emit.opFnTb[n->stk.op].stk( _
 				n->stk.vreg, _
 				n->stk.extra )
 
 		case EMIT_NODECLASS_BRC
-			cast( EMIT_BRCCB, emit.opFnTb[n->brc.op] )( _
+			emit.opFnTb[n->brc.op].brc( _
 				n->brc.vreg, _
 				n->brc.sym, _
 				n->brc.extra )
 
 		case EMIT_NODECLASS_SOP
-			cast( EMIT_SOPCB, emit.opFnTb[n->sop.op] )( n->sop.sym )
+			emit.opFnTb[n->sop.op].sop( n->sop.sym )
 
 		case EMIT_NODECLASS_LIT
-			cast( EMIT_LITCB, emit.opFnTb[EMIT_OP_LIT] )( n->lit.text )
+			emit.opFnTb[EMIT_OP_LIT].lit( n->lit.text )
 
 			ZstrFree( n->lit.text )
 
 		case EMIT_NODECLASS_JTB
-			cast( EMIT_JTBCB, emit.opFnTb[EMIT_OP_JMPTB] )( n->jtb.tbsym, _
+			emit.opFnTb[EMIT_OP_JMPTB].jtb( n->jtb.tbsym, _
 				n->jtb.values, n->jtb.labels, _
 				n->jtb.labelcount, n->jtb.deflabel, _
 				n->jtb.bias, n->jtb.span )
@@ -233,14 +233,14 @@ sub emitFlush( )
 			deallocate( n->jtb.labels )
 
 		case EMIT_NODECLASS_MEM
-			cast( EMIT_MEMCB, emit.opFnTb[n->mem.op] )( _
+			emit.opFnTb[n->mem.op].mem( _
 				n->mem.dvreg, _
 				n->mem.svreg, _
 				n->mem.bytes, _
 				n->mem.extra )
 
 		case EMIT_NODECLASS_DBG
-			cast( EMIT_DBGCB, emit.opFnTb[n->dbg.op] )( _
+			emit.opFnTb[n->dbg.op].dbg( _
 				n->dbg.sym, _
 				n->dbg.lnum, _
 				n->dbg.pos, _

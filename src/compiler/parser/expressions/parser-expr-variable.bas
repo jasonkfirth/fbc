@@ -28,7 +28,8 @@
 #include once "parser/parser.bi"
 
 declare sub fbSemanticModelStringIndex(byval result as ASTNODE ptr, _
-	byval operand_id as longint, byval index_id as longint)
+	byval operand_id as longint, byval index_id as longint, byval selected_id as longint, _
+	byref source_start as LEX_LOCATION, byval nonphysical_start as longint)
 
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
@@ -703,6 +704,7 @@ function cMemberDeref _
 		dim as LEX_LOCATION semantic_index_value_start, semantic_index_value_end
 		dim as longint semantic_index_value_nonphysical_start = 0
 		dim as longint semantic_index_value_nonphysical_end = 0
+		dim as longint semantic_selected_index = 0
 
 		select case( lexGetToken( ) )
 		'' ('->' DREF* UdtMember)*
@@ -801,7 +803,7 @@ function cMemberDeref _
 
 		'' '['
 		case CHAR_LBRACKET
-			if( export_semantics and (typeIsPtr( dtype ) or _
+			if( export_semantics and ((typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_STRUCT) or typeIsPtr( dtype ) or _
 				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_STRING) or _
 				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_USTRING) or _
 				(typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_FIXSTR) or _
@@ -840,10 +842,18 @@ function cMemberDeref _
 						(idxexpr, semantic_index_value_start, semantic_index_value_nonphysical_start, _
 						 semantic_index_value_end, semantic_index_value_nonphysical_end)
 				end if
-				varexpr = hStrIndexing( dtype, varexpr, hCheckIntegerIndex( idxexpr ) )
+				idxexpr = hCheckIntegerIndex( idxexpr )
+				if( export_semantics ) then
+					semantic_selected_index = fbSemanticModelSelectedArrayIndex(idxexpr, _
+						semantic_index_value_start, semantic_index_value_end, _
+						semantic_index_value_nonphysical_start, semantic_index_value_nonphysical_end)
+				end if
+				varexpr = hStrIndexing( dtype, varexpr, idxexpr )
 				if( export_semantics ) then
 					fbSemanticModelPointerIndexPrefix(varexpr, semantic_index_start, semantic_index_nonphysical)
-					fbSemanticModelStringIndex(varexpr, semantic_pointer, semantic_index)
+					fbSemanticModelStringIndex(varexpr, semantic_pointer, semantic_index, semantic_selected_index, _
+						semantic_index_start, semantic_index_nonphysical)
+					fbSemanticModelIndexConversion(varexpr, "string", semantic_index, semantic_selected_index, 0, 1)
 				end if
 				semantic_pointer = 0: semantic_index = 0
 				idxexpr = NULL
@@ -853,12 +863,27 @@ function cMemberDeref _
 
 			'' [] overloaded for UDT?
 			case FB_DATATYPE_STRUCT
+				dim as longint semantic_container_receiver = semantic_pointer
+				'' A UDT operator is not built-in pointer arithmetic. Its native
+				'' receiver identity belongs only to the accessor observation.
+				semantic_pointer = 0
 				dim as FB_ERRMSG err_num = FB_ERRMSG_OK
 				var proc = symbFindSelfBopOvlProc( AST_OP_PTRINDEX, varexpr, idxexpr, @err_num )
 				if( proc ) then
+					dim as string semantic_data_pointer
+					if( export_semantics ) then
+						semantic_index = fbSemanticModelOriginalExpression _
+							(idxexpr, semantic_index_value_start, semantic_index_value_nonphysical_start, _
+							 semantic_index_value_end, semantic_index_value_nonphysical_end)
+						semantic_data_pointer = fbSemanticModelContainerDataPointerCandidate(varexpr, proc, semantic_container_receiver, semantic_index)
+					end if
 					varexpr = astBuildCall( proc, varexpr, idxexpr )
 					if( varexpr = NULL ) then
 						exit function
+					end if
+					if( export_semantics ) then
+						fbSemanticModelPointerIndexPrefix(varexpr, semantic_index_start, semantic_index_nonphysical)
+						fbSemanticModelContainerDataPointerResult(varexpr, semantic_data_pointer, semantic_container_receiver, semantic_index)
 					end if
 				else
 					if( err_num = FB_ERRMSG_OK ) then
@@ -922,8 +947,14 @@ function cMemberDeref _
 					semantic_index = fbSemanticModelOriginalExpression _
 						(idxexpr, semantic_index_value_start, semantic_index_value_nonphysical_start, _
 						 semantic_index_value_end, semantic_index_value_nonphysical_end)
+					fbSemanticModelSubscriptReplacement(varexpr, idxexpr, semantic_pointer, semantic_index)
 				end if
 				idxexpr = hCheckIntegerIndex( idxexpr )
+				if( export_semantics ) then
+					semantic_selected_index = fbSemanticModelSelectedArrayIndex(idxexpr, _
+						semantic_index_value_start, semantic_index_value_end, _
+						semantic_index_value_nonphysical_start, semantic_index_value_nonphysical_end)
+				end if
 
 				'' null pointer checking
 				if( env.clopt.nullptrchk ) then
@@ -979,6 +1010,7 @@ function cMemberDeref _
 			if( (semantic_pointer > 0) and (semantic_index > 0) ) then
 				fbSemanticModelPointerIndexPrefix(varexpr, semantic_index_start, semantic_index_nonphysical)
 				fbSemanticModelPointerIndex(varexpr, semantic_pointer, semantic_index)
+				fbSemanticModelIndexConversion(varexpr, "pointer", semantic_index, semantic_selected_index, 0, 1)
 			else
 				fbSemanticModelExportCurrentExpressionPrefix(varexpr)
 			end if

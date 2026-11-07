@@ -470,6 +470,14 @@
 #define FB_RTL_ERRORFRAMESETTARGET      "fb_ErrorFrameSetTarget"
 #define FB_RTL_ERRORFRAMEGETTARGET      "fb_ErrorFrameGetTarget"
 #define FB_RTL_ERRORFRAMELEAVE          "fb_ErrorFrameLeave"
+#define FB_RTL_ERRORNATIVEOWNERCLEANUP "fb_ErrorNativeOwnerCleanupCurrent"
+#define FB_RTL_ERRORNATIVEOWNERLEAVE    "fb_ErrorNativeOwnerLeaveCurrent"
+#define FB_RTL_ERRORCRESUMEENTER "fb_ErrorCResumeEnter"
+#define FB_RTL_ERRORCRESUMETARGET "fb_ErrorCResumeTarget"
+#define FB_RTL_ERRORCRESUMEPOP "fb_ErrorCResumePop"
+#define FB_RTL_ERRORCRESUMECHECKPOINT "fb_ErrorCResumeCheckpoint"
+#define FB_RTL_ERRORNATIVEHANDLERFRAME "fb_ErrorNativeHandlerFrame"
+#define FB_RTL_ERRORNATIVEDISPATCH "fb_ErrorNativeDispatch"
 #define FB_RTL_ERRORGETNUM              "fb_ErrorGetNum"
 #define FB_RTL_ERRORSETNUM              "fb_ErrorSetNum"
 #define FB_RTL_ERRORRESUME              "fb_ErrorResume"
@@ -527,6 +535,8 @@
 #define FB_RTL_GOSUBPOP                 "fb_GosubPop"
 #define FB_RTL_GOSUBRETURN              "fb_GosubReturn"
 #define FB_RTL_GOSUBEXIT                "fb_GosubExit"
+#define FB_RTL_GOSUBPUSHTARGET          "fb_GosubPushTarget"
+#define FB_RTL_GOSUBRETURNTARGET        "fb_GosubReturnTarget"
 #define FB_RTL_SETJMP                   "fb_SetJmp"
 #define FB_RTL_FRAMEADDRESS             "fb_FrameAddress"
 
@@ -1164,6 +1174,15 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_ERRORFRAMESETTARGET
 	FB_RTL_IDX_ERRORFRAMEGETTARGET
 	FB_RTL_IDX_ERRORFRAMELEAVE
+	FB_RTL_IDX_GOSUBPUSHTARGET
+	FB_RTL_IDX_GOSUBRETURNTARGET
+	FB_RTL_IDX_ERRORNATIVEOWNERLEAVE
+	FB_RTL_IDX_ERRORCRESUMEENTER
+	FB_RTL_IDX_ERRORCRESUMETARGET
+	FB_RTL_IDX_ERRORCRESUMEPOP
+	FB_RTL_IDX_ERRORCRESUMECHECKPOINT
+	FB_RTL_IDX_ERRORNATIVEHANDLERFRAME
+	FB_RTL_IDX_ERRORNATIVEDISPATCH
 	FB_RTL_INDEXES
 end enum
 
@@ -1935,6 +1954,9 @@ declare sub rtlErrorSetHandler _
 		byval newhandler as ASTNODE ptr, _
 		byval savecurrent as integer _
 	)
+
+declare function rtlErrorNativeOwnerCleanup( ) as ASTNODE ptr
+declare sub rtlErrorNativeOwnerLeave( )
 
 declare function rtlErrorGetNum _
 	( _

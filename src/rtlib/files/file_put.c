@@ -105,7 +105,7 @@ int fb_FilePutDataEx
         		while (i--)
         		{
             		FB_WCHAR ch = pachText[i];
-            		if (ch == _LC('\n') || ch== _LC('\r') )
+            		if (ch == FB_WCHAR_LITERAL('\n') || ch== FB_WCHAR_LITERAL('\r') )
 	                	break;
         		}
 

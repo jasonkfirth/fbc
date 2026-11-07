@@ -74,7 +74,7 @@ static char *hFindNext( FB_DIRCTX *context, int *attributes )
 	return NULL;
 }
 
-static char *hFindFirst( FB_DIRCTX *context, FBSTRING *filespec,
+static char *hFindFirst( FB_DIRCTX *context, FBSTRING_ACCESS *filespec,
 	                     int requested_attributes, int *attributes )
 {
 	wchar_t *wide_filespec;
@@ -113,10 +113,10 @@ static char *hFindFirst( FB_DIRCTX *context, FBSTRING *filespec,
 	return hFindNext( context, attributes );
 }
 
-FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
+FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_attrib )
 {
 	FB_DIRCTX *context;
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	ssize_t filespec_length;
 	ssize_t name_length;
 	int temporary_attributes;
@@ -141,11 +141,11 @@ FBCALL FBSTRING *fb_Dir( FBSTRING *filespec, int attrib, int *out_attrib )
 		if( result != NULL )
 			fb_hStrCopy( result->data, name, name_length );
 		else
-			result = &__fb_ctx.null_desc;
+			result = &fb_ctx.null_desc;
 
 		free( name );
 	} else {
-		result = &__fb_ctx.null_desc;
+		result = &fb_ctx.null_desc;
 		*out_attrib = 0;
 	}
 

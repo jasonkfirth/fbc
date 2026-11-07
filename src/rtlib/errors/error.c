@@ -52,12 +52,12 @@ static void hAppendErrorMsg( int *pos, const char *fmt, ... )
 	remaining = FB_ERRMSG_SIZE - *pos;
 
 	va_start( args, fmt );
-	written = vsnprintf( &__fb_errmsg[*pos], remaining, fmt, args );
+	written = vsnprintf( &fb_errmsg[*pos], (size_t)remaining, fmt, args );
 	va_end( args );
 
 	if( written < 0 )
 	{
-		__fb_errmsg[*pos] = '\0';
+		fb_errmsg[*pos] = '\0';
 		return;
 	}
 
@@ -106,10 +106,10 @@ static void fb_Die
 
 		hAppendErrorMsg( &pos, "\n\n" );
 
-	__fb_errmsg[FB_ERRMSG_SIZE-1] = '\0';
+	fb_errmsg[FB_ERRMSG_SIZE-1] = '\0';
 
 	/* Let fb_hRtExit() show the message */
-	__fb_ctx.errmsg = __fb_errmsg;
+	fb_ctx.errmsg = fb_errmsg;
 
 	fb_End( err_num );
 }

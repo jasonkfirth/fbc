@@ -8,9 +8,12 @@ This file intentionally does NOT replace raw diagnostics or claim a clean sweep.
 
 # C emitter findings
 
-Warning cleanup remains unfinished. Completing the diagnostic inventory did not
-complete the requested emitter repairs. The results below retain failing checks,
-timeouts and residual warnings as unfinished work.
+Warning cleanup remains unfinished. The historical inventories and diagnostic
+runs cover selected inputs, not every source or build configuration. The results
+below retain failing checks, timeouts and residual warnings as unfinished work.
+The [November 1 continuation](c-emitter-current-status.md) records fresh compiler
+and unit checks, repaired helper contracts and UDP handles, and current ERROR
+failures. Its per-source ledger separates current qualification from inventory.
 
 The audit emits C without the driver's diagnostic suppressions and checks it
 with aggressive GCC warnings and Clang `-Weverything -Wwrite-strings`. The original 9,254-input
@@ -134,8 +137,14 @@ baseline is GCC 6,365 accepted / 101 errors and Clang 6,451 accepted / fifteen
 errors, with no unfinished C stages. `frozen-C-effective-qualification.json`
 records all 42 resolved stages and retains the failed first attempt. Original
 receipts remain unchanged; these results do not requalify current-source emission.
-Separate repair proofs classify the 116 original error stages, leaving one
-original assembly-label case open. Accepted C still has warnings.
+Separate repair proofs classified the 116 original error stages and left one
+original assembly-label case open. A later source-built compiler recheck of
+`tests/semantic-sidecar/bindings.bas` emitted C that GCC and Clang both compiled
+at O0 and O2 in GNU11 and GNU23. That closes the recorded object-compilation
+failure for this fixture; it does not qualify raw assembly labels in general
+or prove runtime behavior. The receipt is in
+`build/c-emitter-active-20261101/sidecar-assembly-recheck/`.
+Accepted C still has warnings.
 
 The commands, warning profiles, source-version boundaries and detailed receipts
 are documented in [C emitter diagnostic audit](c-emitter-audit.md). Evidence
@@ -339,5 +348,42 @@ source-format check; the complete repository guard is not reported as passing.
 | Runtime assumptions and analyzer target models | The retained v8b fifteen-context path-analysis pass completes twelve checks, times out on three and reports ten diagnostics through indirect error dispatch. Reduce those paths before classifying them as reachable source failures. |
 | Compiler failures and resource limits | Preserve the original GCC internal error and every timeout. A different generated C file passing does not repair GCC or complete an unfinished check. |
 | Generated GNU C constructs | Labels, computed jumps, temporaries and constructors still generate warnings. Historical output also contains dollar-sign identifiers; v45 eliminates that class on the current compiler graph. Retain counts and review the lowering contract rather than treating totals as defect counts. |
+
+## UCRT format context
+
+The selected fbrtLib audit used its default MSVCRT `I64` format spelling
+with a UCRT compiler. The project's `tests/README.md` documents `_UCRT=1`
+for that toolchain. Re-emitting the five affected modules in both ordinary
+and `ENABLE_MT` configurations with that documented define removed all 72
+GCC format warnings and introduced no GCC warnings in those ten checks.
+Clang still reports padding, reserved identifiers and unsafe buffer use.
+The original receipts remain unchanged; this corrects the build context,
+not the full corpus warning totals or the MSVCRT compatibility path.
+
+The subsequent 1,129-context production recheck emitted all sources with
+the promoted compiler. It used the documented UCRT define for 940 fbrtLib
+contexts and the three repaired screen modules. GCC reported 513 warnings
+and Clang reported 11,827, with no compilation failures. The previous run
+reported 591 and 11,899 respectively under the older source/configuration.
+Of the updated C outputs, 1,110 were byte-identical and reused their exact
+prior compiler results; the remaining 19 were compiled again. This selected
+cohort does not establish a clean full corpus.
+
+## Screen-device corpus runtime
+
+The FreeBASIC runtime corpus had three screen-device entry points that
+dereferenced a null file handle or a resolved handle with no device state.
+The current C runtime
+already checks both the resolved handle and its opaque screen state. The
+corpus implementation now follows that behavior, resets failed read lengths,
+and unlocks before returning. Its debug assertion also compares input length
+with the actual 16-byte buffer instead of the size of an integer expression.
+
+The old null case access-violated and the old assertion rejected a valid
+nine-byte input. The new `C:/fb_corpus/fbrtLib/tests/screen-handle-check.py`
+passed 32 runtime and 16 debug-assertion cases across GCC, Clang, GNU11,
+GNU23 and both compile-time thread settings. The test checks lock balance
+using stubs; it does not test concurrent threads or interactive console input.
+The six GCC null-dereference warnings in the selected contexts are gone.
 
 <!-- end of c-emitter-findings.md -->

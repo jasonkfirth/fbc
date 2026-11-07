@@ -89,7 +89,7 @@ void fb_GfxLine(void *target, const float x1, const float y1, const float x2,
 #if defined(FB_NUTTX_WITH_GFXLIB)
 extern int fb_nuttx_gfx_active(void);
 extern int fb_nuttx_gfx_print_buffer(const void *buffer, size_t len, int mask);
-extern FBSTRING *fb_nuttx_gfx_inkey(void);
+extern FBSTRING_ACCESS *fb_nuttx_gfx_inkey(void);
 extern int fb_nuttx_gfx_cls(int mode);
 extern int fb_nuttx_gfx_locate(int row, int col, int cursor);
 extern int fb_nuttx_gfx_get_x(void);
@@ -120,8 +120,8 @@ int fb_nuttx_gfx_print_buffer(const void *buffer, size_t len, int mask)
     return 0;
 }
 
-FBSTRING *fb_nuttx_gfx_inkey(void) FB_NUTTX_GFX_FALLBACK;
-FBSTRING *fb_nuttx_gfx_inkey(void)
+FBSTRING_ACCESS *fb_nuttx_gfx_inkey(void) FB_NUTTX_GFX_FALLBACK;
+FBSTRING_ACCESS *fb_nuttx_gfx_inkey(void)
 {
     return fb_nuttx_temp_string("", 0);
 }
@@ -337,7 +337,7 @@ uint32 fb_Color(const int32 foreground, const int32 background,
     return ((uint32)(background & 15) << 4) | (uint32)(foreground & 15);
 }
 
-FBSTRING *fb_Inkey(void)
+FBSTRING_ACCESS *fb_Inkey(void)
 {
     if (fb_nuttx_have_gfx_hooks())
         return fb_nuttx_gfx_inkey();
@@ -356,7 +356,7 @@ FBSTRING *fb_Inkey(void)
 
 void fb_PrintSPC(const int32 file_num, const int32 count);
 
-void fb_PrintString(const int32 file_num, const FBSTRING *s, const int32 add_newline)
+void fb_PrintString(const int32 file_num, const FBSTRING_ACCESS *s, const int32 add_newline)
 {
     FILE *stream;
 

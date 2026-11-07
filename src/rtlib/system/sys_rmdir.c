@@ -13,7 +13,7 @@
 #endif
 
 /*:::::*/
-FBCALL int fb_RmDir( FBSTRING *path )
+FBCALL int fb_RmDir( FBSTRING_ACCESS *path )
 {
 	int res;
 

@@ -70,7 +70,7 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t chars, int mask
 	for( ; chars; chars--, buffer++ )
 	{
 		++__fb_con.cur_x;
-		if( (*buffer == _LC('\n')) || (__fb_con.cur_x >= __fb_con.w) )
+		if( (*buffer == FB_WCHAR_LITERAL('\n')) || (__fb_con.cur_x >= __fb_con.w) )
 		{
 			__fb_con.cur_x = 1;
 			++__fb_con.cur_y;

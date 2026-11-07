@@ -7,10 +7,10 @@
  */
 #include "fb.h"
 
-static FB_WCHAR hex_table[16] = {_LC('0'),_LC('1'),_LC('2'),_LC('3'),
-								 _LC('4'),_LC('5'),_LC('6'),_LC('7'),
-								 _LC('8'),_LC('9'),_LC('A'),_LC('B'),
-								 _LC('C'),_LC('D'),_LC('E'),_LC('F')};
+static FB_WCHAR hex_table[16] = {FB_WCHAR_LITERAL('0'),FB_WCHAR_LITERAL('1'),FB_WCHAR_LITERAL('2'),FB_WCHAR_LITERAL('3'),
+								 FB_WCHAR_LITERAL('4'),FB_WCHAR_LITERAL('5'),FB_WCHAR_LITERAL('6'),FB_WCHAR_LITERAL('7'),
+								 FB_WCHAR_LITERAL('8'),FB_WCHAR_LITERAL('9'),FB_WCHAR_LITERAL('A'),FB_WCHAR_LITERAL('B'),
+								 FB_WCHAR_LITERAL('C'),FB_WCHAR_LITERAL('D'),FB_WCHAR_LITERAL('E'),FB_WCHAR_LITERAL('F')};
 
 FBCALL FB_WCHAR *fb_WstrHexEx_l ( unsigned long long num, int digits )
 {
@@ -43,7 +43,7 @@ FBCALL FB_WCHAR *fb_WstrHexEx_l ( unsigned long long num, int digits )
 		i -= 1;
 	}
 
-	s[digits] = _LC('\0');
+	s[digits] = FB_WCHAR_LITERAL('\0');
 	return s;
 }
 

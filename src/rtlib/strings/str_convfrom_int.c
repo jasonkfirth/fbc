@@ -52,7 +52,7 @@ FBCALL int fb_hStr2Int( char *src, ssize_t len )
 	return strtoul( p, NULL, 10 );
 }
 
-FBCALL int fb_VALINT ( FBSTRING *str )
+FBCALL int fb_VALINT ( FBSTRING_ACCESS *str )
 {
     int	val;
 

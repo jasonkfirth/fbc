@@ -1,4 +1,10 @@
-/* OpenGL gfx driver */
+/*
+	Project: FreeBASIC gfxlib2
+	File: gfx_driver_opengl_x11.c
+	Purpose: Register the X11 OpenGL driver with gfxlib2.
+	Responsibilities: Bind GL presentation and shared X11 window/input helpers.
+	This file does not decode platform events or implement OpenGL dispatch.
+*/
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_x11.h"
@@ -31,8 +37,8 @@ const GFXDRIVER fb_gfxDriverOpenGL =
 	fb_hGL_SetPalette,      /* void (*set_palette)(int index, int r, int g, int b); */
 	fb_hX11WaitVSync,       /* void (*wait_vsync)(void); */
 	fb_hX11GetMouse,        /* int (*get_mouse)(int *x, int *y, int *z, int *buttons, int *clip); */
-	NULL,                   /* int (*get_touch_count)(void); */
-	NULL,                   /* int (*get_touch)(int index, int *x, int *y, int *id); */
+	fb_hX11GetTouchCount,   /* int (*get_touch_count)(void); */
+	fb_hX11GetTouch,        /* int (*get_touch)(int index, int *x, int *y, int *id); */
 	fb_hX11SetMouse,        /* void (*set_mouse)(int x, int y, int cursor, int clip); */
 	fb_hX11SetWindowTitle,  /* void (*set_window_title)(char *title); */
 	fb_hX11SetWindowPos,    /* int (*set_window_pos)(int x, int y); */
@@ -282,3 +288,5 @@ static void driver_flip(void)
 }
 
 #endif
+
+/* end of gfx_driver_opengl_x11.c */

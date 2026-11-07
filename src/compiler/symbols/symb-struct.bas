@@ -231,10 +231,10 @@ private function hCalcPadding _
 			align = natalign
 		end if
 
-		'' Var-len STRINGs and dynamic array descriptors are managed by the
-		'' runtime through descriptor pointers.  Those runtime entry points
-		'' expect naturally aligned descriptors, so FIELD=N must not place
-		'' them at byte offsets that can fault on strict-alignment CPUs.
+		'' Keep the established natural offsets of STRINGs and array
+		'' descriptors even when FIELD=N reduces the record's alignment.
+		'' A packed parent or array stride can still unalign their actual
+		'' addresses; native runtime access views handle those addresses.
 		if( (typeIsDynamicString( typeGetDtAndPtrOnly( dtype ) )) or _
 		    ((attrib and FB_SYMBATTRIB_DESCRIPTOR) <> 0) ) then
 			align = natalign

@@ -1,3 +1,8 @@
+'' Project: FreeBASIC variant helper library
+'' File: variant-ctor.bas
+'' Purpose: Construct scalar, text and copied wrapper values.
+'' Responsibilities: Preserve OLE value and text ownership.
+'' This file intentionally does NOT declare the public wrapper ABI.
 
 
 #include once "variant.bi"
@@ -84,12 +89,8 @@ constructor VARIANT _
 
 	VariantInit( @this.var_ )
 
-	var wlen = MultiByteToWideChar(CP_ACP, NULL, rhs, &HFFFFFFFF, 0, 0)
-
 	V_VT(@this.var_) = VT_BSTR
-	V_BSTR(@this.var_) = SysAllocStringLen(NULL, wlen)
-
-	MultiByteToWideChar(CP_ACP, NULL, rhs, &HFFFFFFFF, V_BSTR(@this.var_), wlen)
+	V_BSTR(@this.var_) = hVarAllocBstrFromZstring( rhs )
 
 end constructor
 
@@ -105,3 +106,5 @@ constructor VARIANT _
 	V_BSTR(@this.var_) = SysAllocStringLen( rhs, len( *rhs ) )
 
 end constructor
+
+'' end of variant-ctor.bas

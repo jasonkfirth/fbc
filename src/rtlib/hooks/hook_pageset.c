@@ -15,8 +15,8 @@ FBCALL int fb_PageSet( int active, int visible )
 
 	FB_LOCK();
 
-	if( __fb_ctx.hooks.pagesetproc ) {
-		res = __fb_ctx.hooks.pagesetproc( active, visible );
+	if( fb_ctx.hooks.pagesetproc ) {
+		res = fb_ctx.hooks.pagesetproc( active, visible );
 	} else {
 		if( (active >= FB_CONSOLE_MAXPAGES) || (visible >= FB_CONSOLE_MAXPAGES) ) {
 			res = -1;

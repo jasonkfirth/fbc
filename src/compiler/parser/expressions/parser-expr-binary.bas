@@ -53,6 +53,7 @@
 #include once "tooling/semantic-hooks.bi"
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-recovery.bi"
+#include once "parser/expressions/source-comparison-warnings.bi"
 
 '' Capture typed operands before astNewBOP folds, promotes, or consumes them.
 '' The parser still owns the actual operation and its source token; tooling
@@ -61,8 +62,10 @@ private function hSourceBinaryOperation _
 	( byval op as integer, byval left_expr as ASTNODE ptr, byval right_expr as ASTNODE ptr, _
 	  byref source as LEX_LOCATION, byval extra as FBSYMBOL ptr = NULL, _
 	  byval options as AST_OPOPT = AST_OPOPT_DEFAULT ) as ASTNODE ptr
+	var comparison_fixed = hSourceComparisonFixed(op, left_expr, right_expr)
 	dim as longint operands = fbSemanticModelCaptureOperands(left_expr, right_expr, "binary", op, source)
 	dim as ASTNODE ptr result = astNewBOPWithOperands(op, left_expr, right_expr, extra, options, operands)
+	if( comparison_fixed and (result <> NULL) ) then errReportWarn(FB_WARNINGMSG_COMPARISONRANGE)
 	fbSemanticModelAttachOperands(result, operands)
 	return result
 end function

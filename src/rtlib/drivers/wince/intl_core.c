@@ -30,9 +30,9 @@
 /* Character-set conversion                                                  */
 /* ------------------------------------------------------------------------- */
 
-static FBSTRING *fb_hIntlConvertToWC( FBSTRING *source, UINT source_cp )
+static FBSTRING_ACCESS *fb_hIntlConvertToWC( FBSTRING_ACCESS *source, UINT source_cp )
 {
-    FBSTRING *res;
+    FBSTRING_ACCESS *res;
     int chars_required;
 
     FB_STRLOCK();
@@ -59,7 +59,7 @@ static FBSTRING *fb_hIntlConvertToWC( FBSTRING *source, UINT source_cp )
                              chars_required );
         *((WCHAR *)(res->data + terminator_index)) = 0;
     } else {
-        res = &__fb_ctx.null_desc;
+        res = &fb_ctx.null_desc;
     }
 
     fb_hStrDelTemp_NoLock( source );
@@ -68,9 +68,9 @@ static FBSTRING *fb_hIntlConvertToWC( FBSTRING *source, UINT source_cp )
     return res;
 }
 
-static FBSTRING *fb_hIntlConvertFromWC( FBSTRING *source, UINT dest_cp )
+static FBSTRING_ACCESS *fb_hIntlConvertFromWC( FBSTRING_ACCESS *source, UINT dest_cp )
 {
-    FBSTRING *res;
+    FBSTRING_ACCESS *res;
     int chars_required;
 
     FB_STRLOCK();
@@ -96,7 +96,7 @@ static FBSTRING *fb_hIntlConvertFromWC( FBSTRING *source, UINT dest_cp )
                              NULL );
         res->data[chars_required] = 0;
     } else {
-        res = &__fb_ctx.null_desc;
+        res = &fb_ctx.null_desc;
     }
 
     fb_hStrDelTemp_NoLock( source );
@@ -105,7 +105,7 @@ static FBSTRING *fb_hIntlConvertFromWC( FBSTRING *source, UINT dest_cp )
     return res;
 }
 
-FBSTRING *fb_hIntlConvertString( FBSTRING *source,
+FBSTRING_ACCESS *fb_hIntlConvertString( FBSTRING_ACCESS *source,
                                  int source_cp,
                                  int dest_cp )
 {

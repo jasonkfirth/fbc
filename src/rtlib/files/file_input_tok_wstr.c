@@ -63,7 +63,7 @@ static FB_WCHAR hSkipWhiteSpc( FB_INPUTCTX *ctx )
 		c = hReadChar( ctx );
 		if( c == FB_WEOF )
 			break;
-	} while( (c == _LC(' ')) || (c == _LC('\t')) );
+	} while( (c == FB_WCHAR_LITERAL(' ')) || (c == FB_WCHAR_LITERAL('\t')) );
 
 	return c;
 }
@@ -71,20 +71,20 @@ static FB_WCHAR hSkipWhiteSpc( FB_INPUTCTX *ctx )
 static void hSkipDelimiter( FB_INPUTCTX *ctx, FB_WCHAR c )
 {
 	/* skip white space */
-	while( (c == _LC(' ')) || (c == _LC('\t')) )
+	while( (c == FB_WCHAR_LITERAL(' ')) || (c == FB_WCHAR_LITERAL('\t')) )
 		c = hReadChar( ctx );
 
 	switch( c )
 	{
-	case _LC(','):
+	case FB_WCHAR_LITERAL(','):
 	case FB_WEOF:
 		break;
 
-    case _LC('\n'):
+    case FB_WCHAR_LITERAL('\n'):
         break;
 
-	case _LC('\r'):
-		if( (c = hReadChar( ctx )) != _LC('\n') )
+	case FB_WCHAR_LITERAL('\r'):
+		if( (c = hReadChar( ctx )) != FB_WCHAR_LITERAL('\n') )
 			hUnreadChar( ctx, c );
 		break;
 
@@ -115,18 +115,18 @@ void fb_FileInputNextTokenWstr( FB_WCHAR *buffer, ssize_t max_chars, int is_stri
 	{
 		switch( c )
 		{
-		case _LC('\n'):
+		case FB_WCHAR_LITERAL('\n'):
 			skipdelim = FALSE;
 			goto exit;
 
-		case _LC('\r'):
-			if( (c = hReadChar( ctx )) != _LC('\n') )
+		case FB_WCHAR_LITERAL('\r'):
+			if( (c = hReadChar( ctx )) != FB_WCHAR_LITERAL('\n') )
 				hUnreadChar( ctx, c );
 
 			skipdelim = FALSE;
 			goto exit;
 
-		case _LC('"'):
+		case FB_WCHAR_LITERAL('"'):
 			if( !isquote )
 			{
 				if( len == 0 )
@@ -146,7 +146,7 @@ void fb_FileInputNextTokenWstr( FB_WCHAR *buffer, ssize_t max_chars, int is_stri
 
 			break;
 
-		case _LC(','):
+		case FB_WCHAR_LITERAL(','):
 			if( !isquote )
 			{
 				skipdelim = FALSE;
@@ -155,8 +155,8 @@ void fb_FileInputNextTokenWstr( FB_WCHAR *buffer, ssize_t max_chars, int is_stri
 
 			goto savechar;
 
-		case _LC('\t'):
-		case _LC(' '):
+		case FB_WCHAR_LITERAL('\t'):
+		case FB_WCHAR_LITERAL(' '):
 			if( !isquote )
 			{
 				if( !is_string )
@@ -177,7 +177,7 @@ savechar:
 	}
 
 exit:
-	*buffer = _LC('\0');
+	*buffer = FB_WCHAR_LITERAL('\0');
 
 	/* skip comma or newline */
 	if( skipdelim )

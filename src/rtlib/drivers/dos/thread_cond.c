@@ -22,7 +22,7 @@ typedef struct FB_DOS_WAITER {
 	volatile int signaled;
 } FB_DOS_WAITER;
 
-struct _FBCOND {
+struct FBCOND_ {
 	FB_DOS_WAITER *head;
 	FB_DOS_WAITER *tail;
 };

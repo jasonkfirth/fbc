@@ -115,8 +115,13 @@ private function hDoAssign _
 			FB_DATATYPE_SHORT, FB_DATATYPE_USHORT, FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, _
 			FB_DATATYPE_LONG, FB_DATATYPE_ULONG, FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT, _
 			FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128, _
-			FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_STRING
+			FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_STRING, FB_DATATYPE_FIXSTR, FB_DATATYPE_ENUM
 			scalar_copy = TRUE
+		case FB_DATATYPE_STRUCT
+			'' Capture one accepted same-type value copy, never a field initializer
+			'' or a constructor selection that can consume/rewrite the original RHS.
+			scalar_copy = (ctx.subtype <> NULL) and (astGetDataType(expr) = FB_DATATYPE_STRUCT) and _
+				(astGetSubType(expr) = ctx.subtype) and (symbHasCtor(ctx.sym) = FALSE)
 		end select
 		if( scalar_copy ) then
 			dim as ASTNODE ptr semantic_left = astNewVAR(ctx.sym)

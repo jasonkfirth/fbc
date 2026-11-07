@@ -937,7 +937,7 @@ void fb_GfxPrintBuffer(const char *buffer, int mask)
 void fb_GfxPrintBufferWstrEx(const FB_WCHAR *buffer, size_t length,
 	int mask)
 {
-	FBSTRING *glyphs = fb_hGfxWideGlyphs(buffer, length);
+	FBSTRING_ACCESS *glyphs = fb_hGfxWideGlyphs(buffer, length);
 	if (glyphs == NULL)
 		return;
 	fb_GfxPrintBufferEx(glyphs->data, FB_STRSIZE(glyphs), mask);
@@ -1039,20 +1039,20 @@ int fb_gfx3_console_init_locked(FB_GFX3_MODE *mode)
 				console_state.columns, console_state.rows);
 		}
 	}
-	__fb_ctx.hooks.clsproc = fb_GfxClear;
-	__fb_ctx.hooks.colorproc = fb_GfxColor;
-	__fb_ctx.hooks.locateproc = fb_GfxLocate;
-	__fb_ctx.hooks.widthproc = fb_GfxWidth;
-	__fb_ctx.hooks.getxproc = fb_GfxGetX;
-	__fb_ctx.hooks.getyproc = fb_GfxGetY;
-	__fb_ctx.hooks.getxyproc = fb_GfxGetXY;
-	__fb_ctx.hooks.getsizeproc = fb_GfxGetSize;
-	__fb_ctx.hooks.printbuffproc = fb_GfxPrintBufferEx;
-	__fb_ctx.hooks.printbuffwproc = fb_GfxPrintBufferWstrEx;
-	__fb_ctx.hooks.viewupdateproc = fb_GfxViewUpdate;
-	__fb_ctx.hooks.readxyproc = fb_GfxReadXY;
-	__fb_ctx.hooks.pagecopyproc = fb_GfxPageCopy;
-	__fb_ctx.hooks.pagesetproc = fb_GfxPageSet;
+	fb_ctx.hooks.clsproc = fb_GfxClear;
+	fb_ctx.hooks.colorproc = fb_GfxColor;
+	fb_ctx.hooks.locateproc = fb_GfxLocate;
+	fb_ctx.hooks.widthproc = fb_GfxWidth;
+	fb_ctx.hooks.getxproc = fb_GfxGetX;
+	fb_ctx.hooks.getyproc = fb_GfxGetY;
+	fb_ctx.hooks.getxyproc = fb_GfxGetXY;
+	fb_ctx.hooks.getsizeproc = fb_GfxGetSize;
+	fb_ctx.hooks.printbuffproc = fb_GfxPrintBufferEx;
+	fb_ctx.hooks.printbuffwproc = fb_GfxPrintBufferWstrEx;
+	fb_ctx.hooks.viewupdateproc = fb_GfxViewUpdate;
+	fb_ctx.hooks.readxyproc = fb_GfxReadXY;
+	fb_ctx.hooks.pagecopyproc = fb_GfxPageCopy;
+	fb_ctx.hooks.pagesetproc = fb_GfxPageSet;
 	fb_ConsoleSetTopBotRows(-1, -1);
 	return FB_GFX3_OK;
 }
@@ -1061,7 +1061,7 @@ void fb_gfx3_console_shutdown_locked(FB_GFX3_MODE *mode)
 {
 	if (!console_state.initialized || (console_state.mode != mode))
 		return;
-	memset(&__fb_ctx.hooks, 0, sizeof(__fb_ctx.hooks));
+	memset(&fb_ctx.hooks, 0, sizeof(fb_ctx.hooks));
 	free(console_state.cells);
 	memset(&console_state, 0, sizeof(console_state));
 	fb_ConsoleSetTopBotRows(-1, -1);

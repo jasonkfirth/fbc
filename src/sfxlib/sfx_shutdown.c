@@ -103,11 +103,11 @@ void fb_sfxExit(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_ctx.idle_sfxlib == fb_sfxCooperativeDelay)
-        __fb_ctx.idle_sfxlib = NULL;
+    if (fb_ctx.idle_sfxlib == fb_sfxCooperativeDelay)
+        fb_ctx.idle_sfxlib = NULL;
 
-    if (__fb_ctx.exit_sfxlib == fb_sfxExit)
-        __fb_ctx.exit_sfxlib = NULL;
+    if (fb_ctx.exit_sfxlib == fb_sfxExit)
+        fb_ctx.exit_sfxlib = NULL;
 
     if (__fb_sfx == NULL)
     {
@@ -152,11 +152,11 @@ void fb_sfxAbort(void)
 {
     fb_sfxRuntimeLock();
 
-    if (__fb_ctx.idle_sfxlib == fb_sfxCooperativeDelay)
-        __fb_ctx.idle_sfxlib = NULL;
+    if (fb_ctx.idle_sfxlib == fb_sfxCooperativeDelay)
+        fb_ctx.idle_sfxlib = NULL;
 
-    if (__fb_ctx.exit_sfxlib == fb_sfxExit)
-        __fb_ctx.exit_sfxlib = NULL;
+    if (fb_ctx.exit_sfxlib == fb_sfxExit)
+        fb_ctx.exit_sfxlib = NULL;
 
     if (!__fb_sfx)
     {

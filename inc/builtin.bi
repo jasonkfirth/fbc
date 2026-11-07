@@ -1,5 +1,6 @@
 ''
 '' FreeBASIC compiler builtins
+'' File: builtin.bi
 ''
 '' This include exposes a core set of GCC/clang __builtin_* entry points to
 '' FreeBASIC code using normal DECLARE statements.
@@ -48,7 +49,12 @@ type __fb_builtin_bool as boolean alias "_Bool"
 #else
 	type __fb_builtin_clong as long alias "long"
 	type __fb_builtin_culong as ulong alias "long"
-	type __fb_builtin_size_t as uinteger
+	#if defined( __FB_JS__ )
+		'' WebAssembly's C size_t is unsigned long, even though it is 32-bit.
+		type __fb_builtin_size_t as uinteger alias "long"
+	#else
+		type __fb_builtin_size_t as uinteger
+	#endif
 #endif
 #endif
 

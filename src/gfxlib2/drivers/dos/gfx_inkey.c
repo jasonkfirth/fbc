@@ -121,9 +121,9 @@ int fb_GfxKeyHit(void)
 }
 
 /* Caller is expected to hold FB_LOCK() */
-FBSTRING *fb_GfxInkey(void)
+FBSTRING_ACCESS *fb_GfxInkey(void)
 {
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 	int ch;
 
 	FB_GRAPHICS_LOCK( );
@@ -133,7 +133,7 @@ FBSTRING *fb_GfxInkey(void)
 	if (__fb_gfx && (ch = get_key())) {
 		res = fb_hMakeInkeyStr( ch );
 	} else {
-		res = &__fb_ctx.null_desc;
+		res = &fb_ctx.null_desc;
 	}
 
 	FB_GRAPHICS_UNLOCK( );

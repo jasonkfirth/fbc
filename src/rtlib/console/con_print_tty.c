@@ -13,7 +13,7 @@
 #define FB_TCHAR_GET(p)                 (*(p))
 #define FB_TCHAR_ADVANCE(i,c)           i += c
 #define FB_TCHAR_GET_CHAR_SIZE(p)       1
-#define _TC(c)                          c
+#define FB_TCHAR_LITERAL(c)                          c
 
 #include "console/con_print_tty_uni.h"
 

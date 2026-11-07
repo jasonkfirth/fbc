@@ -7,9 +7,9 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_StrMid( FBSTRING *src, ssize_t start, ssize_t len )
+FBCALL FBSTRING_ACCESS *fb_StrMid( FBSTRING_ACCESS *src, ssize_t start, ssize_t len )
 {
-    FBSTRING 	*dst;
+    FBSTRING_ACCESS 	*dst;
 	ssize_t src_len;
 
 	FB_STRLOCK();
@@ -37,13 +37,13 @@ FBCALL FBSTRING *fb_StrMid( FBSTRING *src, ssize_t start, ssize_t len )
 				dst->data[len] = '\0';
             }
         	else
-        		dst = &__fb_ctx.null_desc;
+        		dst = &fb_ctx.null_desc;
         }
         else
-        	dst = &__fb_ctx.null_desc;
+        	dst = &fb_ctx.null_desc;
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	/* del if temp */
 	fb_hStrDelTemp_NoLock( src );

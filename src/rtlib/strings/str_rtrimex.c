@@ -7,15 +7,15 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_RTrimEx( FBSTRING *src, FBSTRING *pattern )
+FBCALL FBSTRING_ACCESS *fb_RTrimEx( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 	ssize_t len;
 
     if( src == NULL ) 
     {
         fb_hStrDelTemp( pattern );
-        return &__fb_ctx.null_desc;
+        return &fb_ctx.null_desc;
     }
 
    	FB_STRLOCK();
@@ -62,10 +62,10 @@ FBCALL FBSTRING *fb_RTrimEx( FBSTRING *src, FBSTRING *pattern )
             fb_hStrCopy( dst->data, src->data, len );
         }
         else
-            dst = &__fb_ctx.null_desc;
+            dst = &fb_ctx.null_desc;
     }
     else
-        dst = &__fb_ctx.null_desc;
+        dst = &fb_ctx.null_desc;
 
     /* del if temp */
     fb_hStrDelTemp_NoLock( src );

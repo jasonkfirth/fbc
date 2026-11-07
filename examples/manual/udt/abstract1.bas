@@ -5,6 +5,10 @@
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=KeyPgAbstract
 '' --------
+''
+'' Purpose: Demonstrate object allocation and the topic above.
+'' Responsibilities: Check allocation before member access and release owned objects.
+'' This file intentionally does NOT change NEW's nullable allocation contract.
 
 Type Hello Extends Object
 	Declare Abstract Sub hi( )
@@ -50,6 +54,10 @@ End Sub
 			h = New HelloEnglish
 		End Select
 
+		'' NEW returns zero if allocation fails.
+		If h = 0 Then End 1
 		h->hi( )
 		Delete h
 	Next
+
+'' end of abstract1.bas

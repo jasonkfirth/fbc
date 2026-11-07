@@ -7,9 +7,9 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_SPACE( ssize_t len )
+FBCALL FBSTRING_ACCESS *fb_SPACE( ssize_t len )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 
 	if( len > 0 )
 	{
@@ -24,10 +24,10 @@ FBCALL FBSTRING *fb_SPACE( ssize_t len )
 			dst->data[len] = '\0';
 		}
 		else
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
     }
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }

@@ -43,7 +43,7 @@ enum {
 /* ------------------------------------------------------------------------- */
 
 static int file_api_copy_path(char *path, size_t capacity,
-	FBSTRING *filename)
+	FBSTRING_ACCESS *filename)
 {
 	ssize_t length;
 	size_t copy_length;
@@ -924,7 +924,7 @@ static int file_api_load_bmp(FILE *file, void *destination,
 	return result;
 }
 
-int fb_gfx3_file_load_bitmap_pixels_locked(FBSTRING *filename,
+int fb_gfx3_file_load_bitmap_pixels_locked(FBSTRING_ACCESS *filename,
 	uint32_t depth, unsigned char **pixels, uint32_t *width,
 	uint32_t *height, uint32_t *pitch)
 {
@@ -1016,7 +1016,7 @@ static int file_api_has_extension(const char *path, const char expected[4])
 	return memcmp(actual, expected, sizeof(actual)) == 0;
 }
 
-FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *source,
+FBCALL int fb_GfxBsaveEx(FBSTRING_ACCESS *filename, void *source,
 	unsigned int size, void *palette, int bits_per_pixel)
 {
 	FB_GFX3_FILE_VIEW view;
@@ -1090,7 +1090,7 @@ FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *source,
 	return fb_ErrorSetNum(FB_RTERROR_FILEIO);
 }
 
-FBCALL int fb_GfxBsave(FBSTRING *filename, void *source,
+FBCALL int fb_GfxBsave(FBSTRING_ACCESS *filename, void *source,
 	unsigned int size, void *palette)
 {
 	return fb_GfxBsaveEx(filename, source, size, palette, 0);
@@ -1125,7 +1125,7 @@ static int file_api_load_raw(FILE *file, void *destination,
 	return result;
 }
 
-static int file_api_bload(FBSTRING *filename, void *destination,
+static int file_api_bload(FBSTRING_ACCESS *filename, void *destination,
 	void *palette)
 {
 	FILE *file;
@@ -1185,13 +1185,13 @@ static int file_api_bload(FBSTRING *filename, void *destination,
 	return fb_ErrorSetNum(FB_RTERROR_FILEIO);
 }
 
-FBCALL int fb_GfxBload(FBSTRING *filename, void *destination,
+FBCALL int fb_GfxBload(FBSTRING_ACCESS *filename, void *destination,
 	void *palette)
 {
 	return file_api_bload(filename, destination, palette);
 }
 
-FBCALL int fb_GfxBloadQB(FBSTRING *filename, void *destination,
+FBCALL int fb_GfxBloadQB(FBSTRING_ACCESS *filename, void *destination,
 	void *palette)
 {
 	return file_api_bload(filename, destination, palette);

@@ -21,9 +21,9 @@ FBCALL char *fb_hBoolToStr( char num )
 }
 
 /*:::::*/
-FBCALL FBSTRING *fb_BoolToStr ( char num )
+FBCALL FBSTRING_ACCESS *fb_BoolToStr ( char num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 
 	dst = fb_hStrAllocTemp( NULL, 8 );
 	if( dst != NULL )
@@ -34,7 +34,7 @@ FBCALL FBSTRING *fb_BoolToStr ( char num )
 	}
 	else
 	{
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 	}
 
 	return dst;

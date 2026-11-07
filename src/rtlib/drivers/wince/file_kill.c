@@ -23,7 +23,7 @@
 
 #include <windows.h>
 
-FBCALL int fb_FileKill( FBSTRING *str )
+FBCALL int fb_FileKill( FBSTRING_ACCESS *str )
 {
 	DWORD error = ERROR_SUCCESS;
 	int result = -1;

@@ -24,8 +24,8 @@ FBCALL FB_WCHAR *fb_FloatToWstr ( float num )
 		if( len > 0 )
 		{
 			d = &dst[len-1];
-			if( *d == _LC('.') )
-				*d = _LC('\0');
+			if( *d == FB_WCHAR_LITERAL('.') )
+				*d = FB_WCHAR_LITERAL('\0');
         }
     }
 
@@ -49,8 +49,8 @@ FBCALL FB_WCHAR *fb_DoubleToWstr ( double num )
 		if( len > 0 )
 		{
 			d = &dst[len-1];
-			if( *d == _LC('.') )
-				*d = _LC('\0');
+			if( *d == FB_WCHAR_LITERAL('.') )
+				*d = FB_WCHAR_LITERAL('\0');
         }
 	}
 

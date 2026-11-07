@@ -1,7 +1,7 @@
 /'
 	Project: FreeBASIC C backend
 	File: backend/c/c-generated-leaves.bi
-	Purpose: Omit unreachable private procedure bodies and their C declarations.
+	Purpose: Omit unreachable private bodies and unused external declarations.
 	Responsibilities: Own per-output C-name records, observe actual references,
 	trace private and adapter dependencies, retain roots, and compact checked spans.
 	This file intentionally does NOT contain: BASIC access flag, ABI or source diagnostic changes.
@@ -13,6 +13,8 @@ type CPROCLEAFSPAN as CPROCLEAFSPAN_
 type CPROCLEAF
 	name as zstring ptr
 	referenced as integer
+	abi_referenced as integer
+	separate_abi as integer
 	must_keep as integer
 	body_span as CPROCLEAFSPAN ptr
 	dependencies as CPROCLEAFEDGE ptr
@@ -21,11 +23,13 @@ end type
 
 type CPROCLEAFEDGE_
 	target as CPROCLEAF ptr
+	needs_abi as integer
 	next_edge as CPROCLEAFEDGE ptr
 end type
 
 type CPROCLEAFSPAN_
 	owner as CPROCLEAF ptr
+	needs_abi as integer
 	first as uinteger
 	last as uinteger
 	next_span as CPROCLEAFSPAN ptr
@@ -90,38 +94,64 @@ private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
 	if( entry = NULL ) then return NULL
 	'' Private visibility supplies no external C entry point. Startup,
 	'' exported and virtual entries still have callers outside this graph.
-	entry->must_keep or= symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
+	var required_entry = symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
 		symbGetIsModLevelProc(proc) or symbIsExport(proc) or symbIsVirtual(proc)
+	entry->must_keep or= required_entry
+	entry->abi_referenced or= required_entry
 	'' Debuggers may inspect source-defined private bodies even without a
 	'' C call. Generated default members have no independent source body;
 	'' retain those only through real calls, addresses and required roots.
 	if( env.clopt.debuginfo andalso ((proc->attrib and FB_SYMBATTRIB_INTERNAL) = 0) ) then
 		entry->must_keep = TRUE
+		entry->abi_referenced = TRUE
 	end if
 	return entry
 end function
 
-private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF ptr )
+private function hCLeafExternal(byval proc as FBSYMBOL ptr) as CPROCLEAF ptr
+	if( c_leaf_ready = FALSE or proc = NULL ) then return NULL
+	if( symbIsPrivate(proc) ) then return NULL
+	if( symbGetIsFuncPtr(proc) or symbGetIsParsed(proc) or symbGetProcIsEmitted(proc) ) then return NULL
+	'' A discarded private helper can leave this declaration's AST access
+	'' flag set. Keep only references from emitted roots and their dependencies.
+	var identifier = hGetCId(proc)
+	var entry = hCLeafGetName(identifier)
+	if( entry = NULL ) then return NULL
+	var required_entry = symbIsExport(proc) or symbIsVirtual(proc)
+	entry->must_keep or= required_entry
+	entry->abi_referenced or= required_entry
+	return entry
+end function
+
+private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF ptr, _
+	byval needs_abi as integer = TRUE )
 	if( target = NULL ) then exit sub
 	if( owner = NULL ) then
 		'' Public bodies and global initializers are roots outside private spans.
 		target->referenced = TRUE
+		target->abi_referenced or= needs_abi
 		exit sub
 	end if
-	if( target = owner ) then exit sub
+	'' A redirected recursive call needs only the implementation. An address
+	'' of the current procedure still needs its original ABI entry point.
+	if( target = owner andalso needs_abi = FALSE ) then exit sub
 	var edge = owner->dependencies
 	while( edge <> NULL )
-		if( edge->target = target ) then exit sub
+		if( edge->target = target ) then
+			edge->needs_abi or= needs_abi
+			exit sub
+		end if
 		edge = edge->next_edge
 	wend
 	edge = listNewNode(@c_leaf_edges)
 	edge->target = target
+	edge->needs_abi = needs_abi
 	edge->next_edge = owner->dependencies
 	owner->dependencies = edge
 end sub
 
-private sub hCLeafDependency( byval target as CPROCLEAF ptr )
-	hCLeafLink(c_leaf_current, target)
+private sub hCLeafDependency( byval target as CPROCLEAF ptr, byval needs_abi as integer = TRUE )
+	hCLeafLink(c_leaf_current, target, needs_abi)
 end sub
 
 '' The output owns every node and edge until pruning finishes. Edges borrow
@@ -151,6 +181,9 @@ private sub hCLeafReachable( )
 		var edge = entry->dependencies
 		while( edge <> NULL )
 			var target = edge->target
+			'' Address and adapter edges require the original C entry even if a
+			'' direct-call edge has already made its implementation reachable.
+			target->abi_referenced or= edge->needs_abi
 			if( target->referenced = FALSE ) then
 				target->referenced = TRUE
 				target->work_next = NULL
@@ -173,13 +206,24 @@ private function hCLeafNeeded(byval proc as FBSYMBOL ptr) as integer
 	return entry->referenced or entry->must_keep
 end function
 
-private sub hCLeafReference( byval sym as FBSYMBOL ptr )
+private function hCLeafEntryNeeded(byval proc as FBSYMBOL ptr) as integer
+	if( c_leaf_ready = FALSE or c_leaf_opaque ) then return TRUE
+	var entry = hCLeafGet(proc)
+	if( entry = NULL ) then return TRUE
+	return entry->abi_referenced
+end function
+
+private sub hCLeafSeparateEntry(byval proc as FBSYMBOL ptr)
+	var entry = hCLeafGet(proc)
+	if( entry <> NULL ) then entry->separate_abi = TRUE
+end sub
+
+private sub hCLeafReference( byval sym as FBSYMBOL ptr, byval needs_abi as integer = TRUE )
 	if( c_leaf_ready = FALSE ) then exit sub
 	if( symbIsProc(sym) ) then
-		if( symbIsPrivate(sym) ) then
-			var entry = hCLeafGet(sym)
-			if( entry <> NULL ) then hCLeafDependency(entry)
-		end if
+		var entry = hCLeafGet(sym)
+		if( entry = NULL ) then entry = hCLeafExternal(sym)
+		if( entry <> NULL ) then hCLeafDependency(entry, needs_abi)
 	elseif( symbIsVar(sym) andalso (symbGetIsLiteral(sym) = FALSE) ) then
 		if( (symbIsLocal(sym) = FALSE) or symbIsStatic(sym) ) then
 			hCGlobalStorageReference(sym)
@@ -200,13 +244,16 @@ private sub hCLeafCallback( byval target as FBSYMBOL ptr, byref identifier as st
 	'' A typed adapter belongs to its callers, not to the output as a whole.
 	'' Its original target is retained only when the adapter is reachable.
 	hCLeafDependency(adapter)
-	if( symbIsPrivate(target) ) then hCLeafLink(adapter, hCLeafGet(target))
+	var entry = hCLeafGet(target)
+	if( entry = NULL ) then entry = hCLeafExternal(target)
+	hCLeafLink(adapter, entry)
 end sub
 
 private function hCLeafSpan(byval entry as CPROCLEAF ptr, byval is_header as integer, _
-	byval first as uinteger, byval last as uinteger) as CPROCLEAFSPAN ptr
+	byval first as uinteger, byval last as uinteger, byval needs_abi as integer = FALSE) as CPROCLEAFSPAN ptr
 	var span = cptr(CPROCLEAFSPAN ptr, listNewNode(@c_leaf_spans))
 	span->owner = entry
+	span->needs_abi = needs_abi
 	span->first = first
 	span->last = last
 	if( is_header ) then
@@ -266,8 +313,13 @@ end sub
 
 private sub hCLeafPrototype( byval proc as FBSYMBOL ptr, byval first as uinteger )
 	var entry = hCLeafGet(proc)
-	if( entry = NULL orelse entry->body_span = NULL ) then exit sub
-	hCLeafAuxPrototype(proc, first)
+	if( entry = NULL ) then
+		entry = hCLeafExternal(proc)
+		if( entry = NULL ) then exit sub
+	elseif( entry->body_span = NULL ) then
+		exit sub
+	end if
+	hCLeafSpan(entry, TRUE, first, ctx.sections(0).bufferlen, TRUE)
 end sub
 
 private function hCLeafRangesValid( byval is_header as integer, byref section_entry as const SECTIONENTRY ) as integer
@@ -289,7 +341,8 @@ private sub hCLeafCompact( byval is_header as integer, byref section_entry as SE
 	dim as uinteger read_position = 0, write_position = 0
 	while( span <> NULL )
 		var entry = span->owner
-		if( (entry->referenced = FALSE) and (entry->must_keep = FALSE) ) then
+		if( ((entry->referenced = FALSE) and (entry->must_keep = FALSE)) or _
+		    (span->needs_abi andalso entry->separate_abi andalso (entry->abi_referenced = FALSE)) ) then
 			var first = span->first
 			var last = span->last
 			var bytes = first - read_position

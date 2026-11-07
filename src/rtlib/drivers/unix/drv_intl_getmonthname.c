@@ -19,10 +19,10 @@ const char *short_month_names[] = {
 };
 #endif
 
-FBSTRING *fb_DrvIntlGetMonthName( int month, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetMonthName( int month, int short_names )
 {
     const char *pszName;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
     size_t name_len;
 
     if( month < 1 || month > 12 )

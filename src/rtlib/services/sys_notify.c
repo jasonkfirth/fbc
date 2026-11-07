@@ -8,14 +8,14 @@
  */
 #include "fb_services.h"
 
-static int valid_string(const FBSTRING *text, size_t maximum, int allow_empty)
+static int valid_string(const FBSTRING_ACCESS *text, size_t maximum, int allow_empty)
 {
 	return text != NULL && (size_t)FB_STRSIZE(text) <= maximum &&
 		(allow_empty || FB_STRSIZE(text) != 0) &&
 		fb_hServiceUtf8(text->data, (size_t)FB_STRSIZE(text));
 }
 
-FBCALL int fb_NotifyCreate(FBSTRING *app_name, void **context)
+FBCALL int fb_NotifyCreate(FBSTRING_ACCESS *app_name, void **context)
 {
 	int result = FB_SERVICE_INVALID;
 	if (context != NULL && *context == NULL &&
@@ -25,7 +25,7 @@ FBCALL int fb_NotifyCreate(FBSTRING *app_name, void **context)
 	return result;
 }
 
-FBCALL int fb_NotifySend(void *context, FBSTRING *title, FBSTRING *body)
+FBCALL int fb_NotifySend(void *context, FBSTRING_ACCESS *title, FBSTRING_ACCESS *body)
 {
 	int result = FB_SERVICE_INVALID;
 	if (context != NULL && valid_string(title, FB_NOTIFY_TITLE_MAX, FALSE) &&

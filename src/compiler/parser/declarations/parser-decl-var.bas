@@ -2333,9 +2333,12 @@ private function hBuildAutoVarInitializer _
 				FB_DATATYPE_SHORT, FB_DATATYPE_USHORT, FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, _
 				FB_DATATYPE_LONG, FB_DATATYPE_ULONG, FB_DATATYPE_LONGINT, FB_DATATYPE_ULONGINT, _
 				FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128, _
-				FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_STRING
+				FB_DATATYPE_SINGLE, FB_DATATYPE_DOUBLE, FB_DATATYPE_STRING, FB_DATATYPE_FIXSTR, _
+				FB_DATATYPE_ENUM, FB_DATATYPE_STRUCT
 				scalar_copy = TRUE
 			end select
+			'' This branch has already excluded constructors. Enum and plain
+			'' record values are accepted builtin copies too, not field-list guesses.
 			if( scalar_copy ) then
 				dim as ASTNODE ptr semantic_left = astNewVAR(sym)
 				semantic_inputs = fbSemanticModelCaptureAssignmentInputs(semantic_left, expr, semantic_destination)

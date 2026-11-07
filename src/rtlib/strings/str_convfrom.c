@@ -77,7 +77,7 @@ FBCALL double fb_hStr2Double( char *src, ssize_t len )
 	return ret;
 }
 
-FBCALL double fb_VAL ( FBSTRING *str )
+FBCALL double fb_VAL ( FBSTRING_ACCESS *str )
 {
     double	val;
 

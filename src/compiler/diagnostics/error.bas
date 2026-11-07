@@ -117,6 +117,10 @@ declare function hMakeParamDesc _
 		( /'FB_WARNINGMSG_MISSINGANDROIDSYSROOT     '/ 1, @"GCC/Clang didn't provide a proper sysroot. You probably have to pass fbc an argument of the form '-sysroot $NDK/platforms/android-$API/arch-$ARCH'" ), _
 		( /'FB_WARNINGMSG_INVALIDUNICODESEQUENCE    '/ 2, @"Invalid or truncated unicode escape sequence" ), _
 		( /'FB_WARNINGMSG_SURROGATEPAIR             '/ 1, @"Surrogate or surrogate pair in unicode literal" ), _
+		( /'FB_WARNINGMSG_UNUSEDPARAMETER           '/ 0, @"Parameter is not read" ), _
+		( /'FB_WARNINGMSG_UNUSEDVARIABLE            '/ 0, @"Variable is not read" ), _
+		( /'FB_WARNINGMSG_COMPARISONRANGE           '/ 1, @"Comparison result is fixed by the operand range" ), _
+		( /'FB_WARNINGMSG_NULLACCESS                '/ 1, @"Memory access through a provably null pointer" ), _
 		( /'FB_WARNINGMSGS                          '/ 0, @"FB_WARNINGMSGS" ) _
 	}
 
@@ -829,6 +833,16 @@ sub errReportWarnEx _
 end sub
 
 '':::::
+sub errReportWarnAt(byval msgnum as integer, byval msgex as const zstring ptr, _
+	byval filename as const zstring ptr, byval linenum as integer)
+	'' The existing text and structured reporters share this display context.
+	'' Only its name is borrowed; no input stream or lexer position changes.
+	var saved_filename = env.inf.name
+	env.inf.name = *filename
+	errReportWarnEx(msgnum, msgex, linenum)
+	env.inf.name = saved_filename
+end sub
+
 sub errReportWarn _
 	( _
 		byval msgnum as integer, _

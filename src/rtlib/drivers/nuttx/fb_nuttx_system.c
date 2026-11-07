@@ -64,7 +64,7 @@ static void fb_nuttx_store_4_digits(char *text, int value)
     text[3] = (char)('0' + (value % 10));
 }
 
-FBSTRING *fb_Date(void)
+FBSTRING_ACCESS *fb_Date(void)
 {
     time_t now;
     struct tm *local_now;
@@ -91,7 +91,7 @@ FBSTRING *fb_Date(void)
     return fb_StrAllocTempDescZEx(text, 10);
 }
 
-FBSTRING *fb_Time(void)
+FBSTRING_ACCESS *fb_Time(void)
 {
     time_t now;
     struct tm *local_now;
@@ -153,10 +153,10 @@ void fb_Init(const int32 argc, char **argv, const int32 lang)
 
 void fb_End(const int32 status)
 {
-    if (__fb_ctx.errmsg != NULL) {
-        fputs(__fb_ctx.errmsg, stdout);
+    if (fb_ctx.errmsg != NULL) {
+        fputs(fb_ctx.errmsg, stdout);
         fflush(stdout);
-        __fb_ctx.errmsg = NULL;
+        fb_ctx.errmsg = NULL;
     }
 
     fb_nuttx_gfx_compat_exit();
@@ -253,7 +253,7 @@ void *fb_ErrorResumeNext(void)
     return NULL;
 }
 
-int32 fb_Chain(const FBSTRING *program)
+int32 fb_Chain(const FBSTRING_ACCESS *program)
 {
     /*
         NuttX can spawn tasks on some boards, but the QEMU smoke harness runs
@@ -268,7 +268,7 @@ int32 fb_Chain(const FBSTRING *program)
     return -1;
 }
 
-int32 fb_Exec(const FBSTRING *program, const FBSTRING *args)
+int32 fb_Exec(const FBSTRING_ACCESS *program, const FBSTRING_ACCESS *args)
 {
     /*
         Keep EXEC linked but unsupported in the built-in-app smoke runtime.
@@ -283,7 +283,7 @@ int32 fb_Exec(const FBSTRING *program, const FBSTRING *args)
     return -1;
 }
 
-int32 fb_Run(const FBSTRING *program, const FBSTRING *args)
+int32 fb_Run(const FBSTRING_ACCESS *program, const FBSTRING_ACCESS *args)
 {
     (void)program;
     (void)args;

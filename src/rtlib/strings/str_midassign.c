@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL void fb_StrAssignMid( FBSTRING *dst, ssize_t start, ssize_t len, FBSTRING *src )
+FBCALL void fb_StrAssignMid( FBSTRING_ACCESS *dst, ssize_t start, ssize_t len, FBSTRING_ACCESS *src )
 {
 	ssize_t src_len, dst_len;
 

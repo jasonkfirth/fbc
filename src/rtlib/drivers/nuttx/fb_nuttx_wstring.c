@@ -683,7 +683,7 @@ void *fb_WstrAssignToA_Init(void *dst_void, ssize_t dst_len,
 {
     char *buffer;
     int32 len;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
 
     len = fb_nuttx_wstr_len(src);
     buffer = (char *)malloc((size_t)len + 1);
@@ -748,7 +748,7 @@ ssize_t fb_wstr_ConvToA(char *dst, ssize_t dst_chars, const uint32_t *src)
     return i;
 }
 
-FBSTRING *fb_WstrToStr(const uint32_t *src)
+FBSTRING_ACCESS *fb_WstrToStr(const uint32_t *src)
 {
     char *buffer;
     int32 len;

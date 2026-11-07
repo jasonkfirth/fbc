@@ -24,9 +24,9 @@
 
 
 /*:::::*/
-FBCALL FBSTRING *fb_FloatToStr ( float num )
+FBCALL FBSTRING_ACCESS *fb_FloatToStr ( float num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 
 	/* alloc temp string */
 	dst = fb_hStrAllocTemp( NULL, 7+8 );
@@ -50,15 +50,15 @@ FBCALL FBSTRING *fb_FloatToStr ( float num )
 		fb_hStrSetLength( dst, tmp_len );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }
 
 /*:::::*/
-FBCALL FBSTRING *fb_DoubleToStr ( double num )
+FBCALL FBSTRING_ACCESS *fb_DoubleToStr ( double num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 
 	/* alloc temp string */
 	dst = fb_hStrAllocTemp( NULL, 16+8 );
@@ -82,7 +82,7 @@ FBCALL FBSTRING *fb_DoubleToStr ( double num )
 		fb_hStrSetLength( dst, tmp_len );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }

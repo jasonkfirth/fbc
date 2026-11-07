@@ -7,7 +7,7 @@
     Purpose:
 
         Own the X11 window used by a gfxlib3 renderer and select the native
-        DRM/GBM/EGL adapter when Linux has no desktop display.
+        Wayland or DRM/GBM/EGL adapter when Linux has no X11 window.
 
     Responsibilities:
 
@@ -16,6 +16,7 @@
         - expose Display and Window values for Vulkan Xlib surfaces
         - translate X11 keyboard, mouse, focus, close, and resize events
         - apply synchronized cursor and window requests on the render thread
+        - select compositor-managed Wayland before the X11 compatibility path
         - use native DRM/KMS and GLES when no desktop display is active
 
     This file intentionally does NOT contain:
@@ -28,6 +29,7 @@
 #include "../../gfx3_platform.h"
 #include "../../gfx3_input.h"
 #include "gfx3_platform_drm.h"
+#include "gfx3_platform_wayland.h"
 
 #if defined(HOST_LINUX) && !defined(DISABLE_X11)
 
@@ -39,6 +41,8 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include "../../../gfxlib2/drivers/unix/fb_x11_drop.h"
+#include "../../../gfxlib2/drivers/unix/fb_x11_key_text.h"
+#include "../../../gfxlib2/drivers/linux/fb_linux_maliit.h"
 
 #include "../../../rtlib/drivers/unix/fb_private_scancodes_x11.h"
 
@@ -463,6 +467,8 @@ static void platform_x11_destroy(void *state)
 
 	if (platform == NULL)
 		return;
+	/* An input callback must finish before the mode's input state is freed. */
+	fb_hLinuxMaliitCancelPending();
 	fb_gfx3_input_platform_window_info(platform->input, 0, 0, 0, 0, 0, 0);
 	if (platform->display != NULL) {
 		if (platform->drops.waiting)
@@ -724,17 +730,24 @@ static int platform_x11_probe_opengl(void)
 /* Event translation and window operations                                   */
 /* ------------------------------------------------------------------------- */
 
-static int platform_x11_translate_key(XKeyEvent *event, int scancode)
+static int platform_x11_translate_key(XKeyEvent *event, int scancode,
+	uint32_t *text_scalar)
 {
 	char text[8];
 	int length;
+	uint32_t scalar;
 
-	memset(text, 0, sizeof(text));
 	length = XLookupString(event, text, sizeof(text), NULL, NULL);
-	if (length == 1) {
-		if ((unsigned char)text[0] == 0x7F)
+	scalar = (length > 0) ? fb_hX11DecodeKeyText(text, (size_t)length) : 0u;
+	*text_scalar = 0u;
+	if ((length == 1) && (text[0] == '\0'))
+		return 0;
+	if (scalar) {
+		/* Preserve the extended DELETE key used by INKEY and SCREENEVENT. */
+		if (scalar == 0x7Fu)
 			return KEY_DEL;
-		return (unsigned char)text[0];
+		*text_scalar = scalar;
+		return (scalar <= 0xFFu) ? (int)scalar : 0;
 	}
 	return fb_hScancodeToExtendedKey(scancode);
 }
@@ -924,17 +937,23 @@ static void platform_x11_pump_events(void *state)
 			fb_gfx3_input_platform_mouse_button(platform->input, button,
 				FALSE, FALSE);
 			break;
+		case MappingNotify:
+			XRefreshKeyboardMapping(&event.xmapping);
+			break;
 		case KeyPress:
 			{
 				int scancode = platform_x11_scancode(
 					event.xkey.keycode);
+				uint32_t text_scalar;
 				int key = platform_x11_translate_key(&event.xkey,
-					scancode);
+					scancode, &text_scalar);
 
 				fb_gfx3_input_platform_key(platform->input,
 					EVENT_KEY_PRESS, scancode,
 					((key > 0) && (key <= 0xFF)) ? key : 0);
 				fb_gfx3_input_platform_character(platform->input, key, 1);
+				if (text_scalar > 0xFFu)
+					fb_gfx3_input_platform_text(platform->input, text_scalar);
 			}
 			break;
 		case KeyRelease:
@@ -945,15 +964,19 @@ static void platform_x11_pump_events(void *state)
 				XKeyEvent *translated = repeated ? &press : &event.xkey;
 				int scancode = platform_x11_scancode(
 					translated->keycode);
+				uint32_t text_scalar;
 				int key = platform_x11_translate_key(translated,
-					scancode);
+					scancode, &text_scalar);
 
 				fb_gfx3_input_platform_key(platform->input,
 					repeated ? EVENT_KEY_REPEAT : EVENT_KEY_RELEASE,
 					scancode, ((key > 0) && (key <= 0xFF)) ? key : 0);
-				if (repeated)
+				if (repeated) {
 					fb_gfx3_input_platform_character(platform->input,
 						key, 1);
+					if (text_scalar > 0xFFu)
+						fb_gfx3_input_platform_text(platform->input, text_scalar);
+				}
 			}
 			break;
 		case ConfigureNotify:
@@ -1118,6 +1141,8 @@ int fb_gfx3_platform_keyboard_overlay(void *platform,
 
 const FB_GFX3_PLATFORM_VTABLE *fb_gfx3_platform_default(void)
 {
+	if (fb_gfx3_platform_wayland_should_default())
+		return fb_gfx3_platform_wayland();
 	if (fb_gfx3_platform_drm_should_default())
 		return fb_gfx3_platform_drm();
 	return &__fb_gfx3_platform_x11;

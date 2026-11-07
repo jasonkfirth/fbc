@@ -43,7 +43,7 @@ static FB_WCHAR *hFloatToWstr( double value, int digits )
 	for( index = 0; index < length; index++ ) {
 		result[index] = (FB_WCHAR)(unsigned char)text[index];
 	}
-	result[length] = _LC('\0');
+	result[length] = FB_WCHAR_LITERAL('\0');
 
 	return result;
 }

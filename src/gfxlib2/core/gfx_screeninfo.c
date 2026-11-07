@@ -17,7 +17,7 @@ FBCALL void fb_GfxScreenInfo
 		ssize_t *bpp,
 		ssize_t *pitch,
 		ssize_t *refresh,
-		FBSTRING *driver
+		FBSTRING_ACCESS *driver
 	)
 {
 	const char *name;
@@ -57,7 +57,7 @@ FBCALL void fb_GfxScreenInfo32
 		int *bpp,
 		int *pitch,
 		int *refresh,
-		FBSTRING *driver
+		FBSTRING_ACCESS *driver
 	)
 {
 	ssize_t w, h, d, b, p, r;
@@ -78,7 +78,7 @@ FBCALL void fb_GfxScreenInfo64
 		long long *bpp,
 		long long *pitch,
 		long long *refresh,
-		FBSTRING *driver
+		FBSTRING_ACCESS *driver
 	)
 {
 	ssize_t w, h, d, b, p, r;

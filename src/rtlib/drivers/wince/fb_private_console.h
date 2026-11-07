@@ -98,8 +98,8 @@ int fb_ConsoleHasFocus( void );
     signatures shared with the Win32 runtime while always selecting the
     process-local logical page.
 */
-#define __fb_in_handle  fb_hConsoleGetHandle( TRUE )
-#define __fb_out_handle fb_hConsoleGetHandle( FALSE )
+#define FB_CONSOLE_INPUT_HANDLE  fb_hConsoleGetHandle( TRUE )
+#define FB_CONSOLE_OUTPUT_HANDLE fb_hConsoleGetHandle( FALSE )
 
 #define FB_CON_CORRECT_POSITION() ((void)0)
 #define FB_CONSOLE_WINDOW_EMPTY() FALSE

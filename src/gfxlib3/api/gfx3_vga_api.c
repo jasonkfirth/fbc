@@ -140,8 +140,8 @@ int fb_GfxOut(unsigned short port, unsigned char value)
 
 void fb_gfx3_vga_install_hooks_locked(void)
 {
-	__fb_ctx.hooks.inproc = fb_GfxIn;
-	__fb_ctx.hooks.outproc = fb_GfxOut;
+	fb_ctx.hooks.inproc = fb_GfxIn;
+	fb_ctx.hooks.outproc = fb_GfxOut;
 }
 
 /* end of gfx3_vga_api.c */

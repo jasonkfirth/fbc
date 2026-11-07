@@ -63,27 +63,29 @@ unsigned int fb_hUtf8Decode( const char *data, ssize_t length, ssize_t *offset )
 
 ssize_t fb_hUtf8Encode( char *data, unsigned int scalar )
 {
+	/* UTF-8 publishes byte representations, independently of plain char signedness. */
+	unsigned char *bytes = (unsigned char *)data;
 	if( (scalar > 0x10FFFF) || ((scalar >= 0xD800) && (scalar <= 0xDFFF)) )
 		scalar = FB_UTF8_REPLACEMENT;
 	if( scalar < 0x80 ) {
-		data[0] = scalar;
+		bytes[0] = (unsigned char)(scalar);
 		return 1;
 	}
 	if( scalar < 0x800 ) {
-		data[0] = 0xC0 | (scalar >> 6);
-		data[1] = 0x80 | (scalar & 0x3F);
+		bytes[0] = (unsigned char)(0xC0 | (scalar >> 6));
+		bytes[1] = (unsigned char)(0x80 | (scalar & 0x3F));
 		return 2;
 	}
 	if( scalar < 0x10000 ) {
-		data[0] = 0xE0 | (scalar >> 12);
-		data[1] = 0x80 | ((scalar >> 6) & 0x3F);
-		data[2] = 0x80 | (scalar & 0x3F);
+		bytes[0] = (unsigned char)(0xE0 | (scalar >> 12));
+		bytes[1] = (unsigned char)(0x80 | ((scalar >> 6) & 0x3F));
+		bytes[2] = (unsigned char)(0x80 | (scalar & 0x3F));
 		return 3;
 	}
-	data[0] = 0xF0 | (scalar >> 18);
-	data[1] = 0x80 | ((scalar >> 12) & 0x3F);
-	data[2] = 0x80 | ((scalar >> 6) & 0x3F);
-	data[3] = 0x80 | (scalar & 0x3F);
+	bytes[0] = (unsigned char)(0xF0 | (scalar >> 18));
+	bytes[1] = (unsigned char)(0x80 | ((scalar >> 12) & 0x3F));
+	bytes[2] = (unsigned char)(0x80 | ((scalar >> 6) & 0x3F));
+	bytes[3] = (unsigned char)(0x80 | (scalar & 0x3F));
 	return 4;
 }
 
@@ -113,10 +115,10 @@ ssize_t fb_hUtf8Offset( const char *data, ssize_t length, ssize_t count )
 /* Descriptor storage and ownership                                          */
 /* ------------------------------------------------------------------------- */
 
-FBSTRING *fb_hUStrAlloc_NoLock( ssize_t length )
+FBSTRING_ACCESS *fb_hUStrAlloc_NoLock( ssize_t length )
 {
-	FBSTRING *result;
-	if( length == 0 ) return &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result;
+	if( length == 0 ) return &fb_ctx.null_desc;
 	if( (length < 0) || (length > FB_USTRING_MAX_BYTES) ) {
 		fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		return NULL;
@@ -127,20 +129,20 @@ FBSTRING *fb_hUStrAlloc_NoLock( ssize_t length )
 	return result;
 }
 
-FBSTRING *fb_hUStrCopy_NoLock( const char *data, ssize_t length )
+FBSTRING_ACCESS *fb_hUStrCopy_NoLock( const char *data, ssize_t length )
 {
-	FBSTRING *result = fb_hUStrAlloc_NoLock( length );
+	FBSTRING_ACCESS *result = fb_hUStrAlloc_NoLock( length );
 	if( (result != NULL) && (length > 0) )
-		memcpy( result->data, data, length );
+		memcpy( result->data, data, (size_t)(length) );
 	return result;
 }
 
-FBSTRING *fb_hUStrNormalize_NoLock( const char *data, ssize_t length )
+FBSTRING_ACCESS *fb_hUStrNormalize_NoLock( const char *data, ssize_t length )
 {
 	ssize_t offset = 0, bytes = 0, width;
 	char encoded[4];
-	FBSTRING *result;
-	if( data == NULL ) return &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result;
+	if( data == NULL ) return &fb_ctx.null_desc;
 	while( offset < length ) {
 		width = fb_hUtf8Encode( encoded, fb_hUtf8Decode( data, length, &offset ) );
 		if( bytes > FB_USTRING_MAX_BYTES - width ) {
@@ -158,13 +160,13 @@ FBSTRING *fb_hUStrNormalize_NoLock( const char *data, ssize_t length )
 	return result;
 }
 
-void fb_hUStrDeletePair_NoLock( FBSTRING *first, FBSTRING *second )
+void fb_hUStrDeletePair_NoLock( FBSTRING_ACCESS *first, FBSTRING_ACCESS *second )
 {
 	fb_hStrDelTemp_NoLock( first );
 	if( second != first ) fb_hStrDelTemp_NoLock( second );
 }
 
-void fb_hUStrMove_NoLock( FBSTRING *dst, FBSTRING *src, int is_init )
+void fb_hUStrMove_NoLock( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src, int is_init )
 {
 	ssize_t flags;
 	/* Build the replacement before releasing the old buffer. This makes
@@ -175,41 +177,41 @@ void fb_hUStrMove_NoLock( FBSTRING *dst, FBSTRING *src, int is_init )
 	dst->data = src->data;
 	dst->len = FB_STRSIZE( src ) | flags;
 	dst->size = src->size;
-	if( src != &__fb_ctx.null_desc ) {
+	if( src != &fb_ctx.null_desc ) {
 		src->data = NULL;
 		fb_hStrDelTemp_NoLock( src );
 	}
 }
 
-FBCALL FBSTRING *fb_UStrToStr( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_UStrToStr( FBSTRING_ACCESS *src )
 {
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) )
 		result = fb_hUStrCopy_NoLock( src->data, FB_STRSIZE(src) );
 	fb_hStrDelTemp_NoLock( src );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBCALL FBSTRING *fb_UStrFromBytes( void *src, ssize_t size )
+FBCALL FBSTRING_ACCESS *fb_UStrFromBytes( void *src, ssize_t size )
 {
 	const char *data;
 	ssize_t length;
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	FB_STRSETUP_FIX( src, size, data, length );
 	result = fb_hUStrNormalize_NoLock( data, length );
 	if( size == FB_STRSIZEVARLEN ) fb_hStrDelTemp_NoLock( src );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
 static void *hAssign( void *dst, void *src, ssize_t size, int is_init )
 {
 	const char *data;
 	ssize_t length;
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	FB_STRSETUP_FIX( src, size, data, length );
 	result = fb_hUStrNormalize_NoLock( data, length );
@@ -247,7 +249,7 @@ FBCALL ssize_t fb_UStrLen( void *src, ssize_t size )
 	return result;
 }
 
-FBCALL unsigned int fb_UStrAsc( FBSTRING *src, ssize_t position )
+FBCALL unsigned int fb_UStrAsc( FBSTRING_ACCESS *src, ssize_t position )
 {
 	ssize_t offset, length;
 	unsigned int result = 0;
@@ -262,7 +264,7 @@ FBCALL unsigned int fb_UStrAsc( FBSTRING *src, ssize_t position )
 	return result;
 }
 
-FBCALL unsigned int fb_UStrIndex( FBSTRING *src, ssize_t index )
+FBCALL unsigned int fb_UStrIndex( FBSTRING_ACCESS *src, ssize_t index )
 {
 	/* Avoid overflowing the one-based ASC position for a maximal index. */
 	if( (index < 0) || (index >= FB_USTRING_MAX_BYTES) ) {
@@ -276,11 +278,11 @@ FBCALL unsigned int fb_UStrIndex( FBSTRING *src, ssize_t index )
 /* Concatenation and wide conversion                                         */
 /* ------------------------------------------------------------------------- */
 
-static FBSTRING *hConcat( void *first, ssize_t first_size, void *second, ssize_t second_size )
+static FBSTRING_ACCESS *hConcat( void *first, ssize_t first_size, void *second, ssize_t second_size )
 {
 	const char *data;
 	ssize_t length, first_length, second_length;
-	FBSTRING *a, *b, *result = NULL;
+	FBSTRING_ACCESS *a, *b, *result = NULL;
 	FB_STRLOCK();
 	FB_STRSETUP_FIX( first, first_size, data, length );
 	a = fb_hUStrNormalize_NoLock( data, length );
@@ -292,8 +294,8 @@ static FBSTRING *hConcat( void *first, ssize_t first_size, void *second, ssize_t
 		if( first_length <= FB_USTRING_MAX_BYTES - second_length ) {
 			result = fb_hUStrAlloc_NoLock( first_length + second_length );
 			if( (result != NULL) && (first_length + second_length > 0) ) {
-				if( first_length ) memcpy( result->data, a->data, first_length );
-				if( second_length ) memcpy( result->data + first_length, b->data, second_length );
+				if( first_length ) memcpy( result->data, a->data, (size_t)(first_length) );
+				if( second_length ) memcpy( result->data + first_length, b->data, (size_t)(second_length) );
 			}
 		} else fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 	}
@@ -304,24 +306,24 @@ static FBSTRING *hConcat( void *first, ssize_t first_size, void *second, ssize_t
 	return result;
 }
 
-FBCALL FBSTRING *fb_UStrConcat( FBSTRING *dst, void *first, ssize_t first_size, void *second, ssize_t second_size )
+FBCALL FBSTRING_ACCESS *fb_UStrConcat( FBSTRING_ACCESS *dst, void *first, ssize_t first_size, void *second, ssize_t second_size )
 {
-	FBSTRING *result = hConcat( first, first_size, second, second_size );
-	return result ? result : &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = hConcat( first, first_size, second, second_size );
+	return result ? result : &fb_ctx.null_desc;
 }
 
 FBCALL void *fb_UStrConcatAssign( void *dst, ssize_t dst_size, void *src, ssize_t src_size, int fill_rem )
 {
 	FBSTRING view = { NULL, 0, 0 };
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	if( dst == NULL ) {
 		if( src_size == FB_STRSIZEVARLEN ) fb_hStrDelTemp( src );
 		return NULL;
 	}
 	if( dst != NULL ) {
-		view.data = ((FBSTRING *)dst)->data;
+		view.data = ((FBSTRING_ACCESS *)dst)->data;
 		view.len = FB_STRSIZE(dst);
-		view.size = ((FBSTRING *)dst)->size;
+		view.size = ((FBSTRING_ACCESS *)dst)->size;
 	}
 	/* The destination is borrowed, even if its descriptor is temporary.
 	   hConcat consumes source temporaries, so self-concatenation must use
@@ -352,12 +354,12 @@ static unsigned int hWideDecode( const FB_WCHAR *src, ssize_t *offset )
 	return scalar;
 }
 
-FBSTRING *fb_hUStrFromWstr_NoLock( const FB_WCHAR *src )
+FBSTRING_ACCESS *fb_hUStrFromWstr_NoLock( const FB_WCHAR *src )
 {
 	ssize_t offset = 0, bytes = 0, width;
 	char encoded[4];
-	FBSTRING *result = NULL;
-	if( src == NULL ) result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = NULL;
+	if( src == NULL ) result = &fb_ctx.null_desc;
 	else {
 		while( src[offset] ) {
 			width = fb_hUtf8Encode( encoded, hWideDecode( src, &offset ) );
@@ -375,16 +377,16 @@ FBSTRING *fb_hUStrFromWstr_NoLock( const FB_WCHAR *src )
 	return result;
 }
 
-FBCALL FBSTRING *fb_UStrFromWstr( const FB_WCHAR *src )
+FBCALL FBSTRING_ACCESS *fb_UStrFromWstr( const FB_WCHAR *src )
 {
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	result = fb_hUStrFromWstr_NoLock( src );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBCALL FB_WCHAR *fb_UStrToWstr( FBSTRING *src )
+FBCALL FB_WCHAR *fb_UStrToWstr( FBSTRING_ACCESS *src )
 {
 	ssize_t offset = 0, length, units = 0;
 	unsigned int scalar;
@@ -405,12 +407,12 @@ FBCALL FB_WCHAR *fb_UStrToWstr( FBSTRING *src )
 				scalar = fb_hUtf8Decode( src->data, length, &offset );
 				if( (sizeof(FB_WCHAR) == 2) && (scalar > 0xFFFF) ) {
 					scalar -= 0x10000;
-					result[units++] = 0xD800 + (scalar >> 10);
-					result[units++] = 0xDC00 + (scalar & 0x3FF);
+					result[units++] = (FB_WCHAR)(0xD800 + (scalar >> 10));
+					result[units++] = (FB_WCHAR)(0xDC00 + (scalar & 0x3FF));
 				} else {
 					/* Byte-wide targets cannot represent non-Latin-1 scalars. */
 					if( (sizeof(FB_WCHAR) == 1) && (scalar > 0xFF) ) scalar = '?';
-					result[units++] = scalar;
+					result[units++] = (FB_WCHAR)scalar;
 				}
 			}
 			result[units] = 0;

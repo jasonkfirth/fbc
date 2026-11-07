@@ -7,10 +7,10 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_FileStrInput( ssize_t bytes, int fnum )
+FBCALL FBSTRING_ACCESS *fb_FileStrInput( ssize_t bytes, int fnum )
 {
     FB_FILE   *handle;
-	FBSTRING  *dst;
+	FBSTRING_ACCESS  *dst;
     size_t 	   len;
     int        res = FB_RTERROR_OK;
 
@@ -22,7 +22,7 @@ FBCALL FBSTRING *fb_FileStrInput( ssize_t bytes, int fnum )
     if( !FB_HANDLE_USED(handle) )
     {
 		FB_UNLOCK();
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
     dst = fb_hStrAllocTemp( NULL, bytes );
@@ -81,7 +81,7 @@ FBCALL FBSTRING *fb_FileStrInput( ssize_t bytes, int fnum )
         if( dst != NULL )
             fb_hStrDelTemp( dst );
 
-        dst = &__fb_ctx.null_desc;
+        dst = &fb_ctx.null_desc;
     }
 
     FB_UNLOCK();

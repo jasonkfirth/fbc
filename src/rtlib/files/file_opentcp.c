@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL int fb_FileOpenTcp( FBSTRING *str_filename, unsigned int mode,
+FBCALL int fb_FileOpenTcp( FBSTRING_ACCESS *str_filename, unsigned int mode,
                            unsigned int access, unsigned int lock,
                            int fnum, int len, const char *encoding )
 {
@@ -35,7 +35,7 @@ FBCALL int fb_FileOpenTcp( FBSTRING *str_filename, unsigned int mode,
 #endif
 }
 
-FBCALL int fb_FileOpenTcpServer( FBSTRING *str_filename, unsigned int mode,
+FBCALL int fb_FileOpenTcpServer( FBSTRING_ACCESS *str_filename, unsigned int mode,
                                  unsigned int access, unsigned int lock,
                                  int fnum, int len, const char *encoding )
 {

@@ -7,20 +7,20 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_LTrimAny 
+FBCALL FBSTRING_ACCESS *fb_LTrimAny 
 	( 
-		FBSTRING *src,
-		FBSTRING *pattern 
+		FBSTRING_ACCESS *src,
+		FBSTRING_ACCESS *pattern 
 	)
 {
 	const char *pachText = NULL;
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 	ssize_t len;
 
 	if( src == NULL )
 	{
 		fb_hStrDelTemp( pattern );
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
 	FB_STRLOCK();
@@ -54,10 +54,10 @@ FBCALL FBSTRING *fb_LTrimAny
 			fb_hStrCopy( dst->data, pachText, len );
 		}
 		else
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	/* del if temp */
 	fb_hStrDelTemp_NoLock( src );

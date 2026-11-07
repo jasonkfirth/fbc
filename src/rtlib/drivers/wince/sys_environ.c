@@ -186,9 +186,9 @@ const char *fb_hWinCEGetEnv( const char *name )
 /* FreeBASIC runtime API                                                     */
 /* ------------------------------------------------------------------------- */
 
-FBCALL FBSTRING *fb_GetEnviron( FBSTRING *varname )
+FBCALL FBSTRING_ACCESS *fb_GetEnviron( FBSTRING_ACCESS *varname )
 {
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	const char *value;
 	ssize_t length;
 
@@ -207,9 +207,9 @@ FBCALL FBSTRING *fb_GetEnviron( FBSTRING *varname )
 		if( result != NULL )
 			fb_hStrCopy( result->data, value, length );
 		else
-			result = &__fb_ctx.null_desc;
+			result = &fb_ctx.null_desc;
 	} else {
-		result = &__fb_ctx.null_desc;
+		result = &fb_ctx.null_desc;
 	}
 
 	/* Delete the descriptor when the caller supplied a temporary string. */
@@ -221,7 +221,7 @@ FBCALL FBSTRING *fb_GetEnviron( FBSTRING *varname )
 	return result;
 }
 
-FBCALL int fb_SetEnviron( FBSTRING *str )
+FBCALL int fb_SetEnviron( FBSTRING_ACCESS *str )
 {
 	int result = 0;
 

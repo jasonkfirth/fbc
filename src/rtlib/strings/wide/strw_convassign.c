@@ -38,7 +38,7 @@ FBCALL FB_WCHAR *fb_WstrAssignFromA
 
 	/* delete temp? */
 	if( src_size == FB_STRSIZEVARLEN )
-		fb_hStrDelTemp( (FBSTRING *)src );
+		fb_hStrDelTemp( (FBSTRING_ACCESS *)src );
 
 	return dst;
 }
@@ -77,13 +77,13 @@ FBCALL void *fb_WstrAssignToAEx
 		{
 			if( is_init == FB_FALSE )
 			{
-				fb_StrDelete( (FBSTRING *)dst );
+				fb_StrDelete( (FBSTRING_ACCESS *)dst );
 			}
 			else
 			{
-				((FBSTRING *)dst)->data = NULL;
-				((FBSTRING *)dst)->len = 0;
-				((FBSTRING *)dst)->size = 0;
+				((FBSTRING_ACCESS *)dst)->data = NULL;
+				((FBSTRING_ACCESS *)dst)->len = 0;
+				((FBSTRING_ACCESS *)dst)->size = 0;
 			}
 		}
 		else
@@ -93,14 +93,14 @@ FBCALL void *fb_WstrAssignToAEx
 			if( is_init == FB_FALSE )
 			{
 				if( FB_STRSIZE( dst ) != dst_chars )
-					fb_hStrRealloc( (FBSTRING *)dst, dst_chars, FB_FALSE );
+					fb_hStrRealloc( (FBSTRING_ACCESS *)dst, dst_chars, FB_FALSE );
 			}
 			else
 			{
-				fb_hStrAlloc( (FBSTRING *)dst, dst_chars );
+				fb_hStrAlloc( (FBSTRING_ACCESS *)dst, dst_chars );
 			}
 
-			ssize_t writtenchars = fb_wstr_ConvToA( ((FBSTRING *)dst)->data, dst_chars, src );
+			ssize_t writtenchars = fb_wstr_ConvToA( ((FBSTRING_ACCESS *)dst)->data, dst_chars, src );
 			fb_hStrSetLength( dst, writtenchars );
 		}
 	}

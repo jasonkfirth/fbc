@@ -37,6 +37,9 @@
 
 #include "../gfx3_image.h"
 #include "../gfx3_input.h"
+#ifdef HOST_LINUX
+#include "../drivers/linux/gfx3_mobile.h"
+#endif
 
 typedef struct FB_GFX3_STANDARD_MODE {
 	uint16_t width;
@@ -197,8 +200,14 @@ int fb_gfx3_api_apply_pending_resize_locked(FB_GFX3_DRAW_STATE *state)
 	*/
 	if (!state->mode->resizable)
 		return FB_GFX3_OK;
-	if (fb_gfx3_input_take_resize(&state->mode->input, &width, &height)) {
-		/* Keep the old framebuffer active while a SCREENLOCK pointer is live. */
+	/*
+		The renderer can queue a configure while BASIC holds SCREENLOCK. The
+		input queue retains it until the resize completes, so avoid repeatedly
+		entering mode_resize while the framebuffer pointer is live. The graphics
+		lock also protects changes to access_lock_count.
+	*/
+	if ((state->mode->access_lock_count == 0u) &&
+	    fb_gfx3_input_take_resize(&state->mode->input, &width, &height)) {
 		if ((width >= state->mode->console_font_width) &&
 		    (height >= state->mode->console_font_height))
 			result = fb_gfx3_mode_resize(state->mode, state, width, height);
@@ -258,8 +267,8 @@ static FB_GFX3_DRAW_STATE *api_get_draw_state(void)
 	return fb_gfx3_api_get_draw_state_locked();
 }
 
-/* Caller holds FB_LOCK() followed by FB_GRAPHICS_LOCK(). */
-static int api_close_mode(void)
+/* Caller holds the runtime locks and, on Linux, the mobile mode transition. */
+static int api_close_mode_during_transition(void)
 {
 	int result = FB_GFX3_OK;
 
@@ -273,13 +282,27 @@ static int api_close_mode(void)
 	return result;
 }
 
+/* Caller holds FB_LOCK() followed by FB_GRAPHICS_LOCK(). */
+static int api_close_mode(void)
+{
+	int result;
+#ifdef HOST_LINUX
+	fb_gfx3_linux_mode_transition_begin();
+#endif
+	result = api_close_mode_during_transition();
+#ifdef HOST_LINUX
+	fb_gfx3_linux_mode_transition_end(NULL);
+#endif
+	return result;
+}
+
 static void api_exit(void)
 {
 	FB_LOCK();
 	FB_GRAPHICS_LOCK();
 	api_close_mode();
-	if (__fb_ctx.exit_gfxlib2 == api_exit)
-		__fb_ctx.exit_gfxlib2 = NULL;
+	if (fb_ctx.exit_gfxlib2 == api_exit)
+		fb_ctx.exit_gfxlib2 = NULL;
 	FB_GRAPHICS_UNLOCK();
 	FB_UNLOCK();
 }
@@ -331,7 +354,10 @@ static int api_screen_res(int width, int height, int depth, int page_count,
 
 	FB_LOCK();
 	FB_GRAPHICS_LOCK();
-	api_close_mode();
+#ifdef HOST_LINUX
+	fb_gfx3_linux_mode_transition_begin();
+#endif
+	api_close_mode_during_transition();
 	memset(&config, 0, sizeof(config));
 	config.title = window_title;
 	config.width = (uint32_t)width;
@@ -391,11 +417,15 @@ static int api_screen_res(int width, int height, int depth, int page_count,
 			fb_gfx3_input_install_hooks_locked();
 			fb_gfx3_line_input_install_hooks_locked();
 			fb_gfx3_vga_install_hooks_locked();
-			__fb_ctx.exit_gfxlib2 = api_exit;
+			fb_ctx.exit_gfxlib2 = api_exit;
 		} else
-			api_close_mode();
+			api_close_mode_during_transition();
 	} else if (mode_is_active)
-		api_close_mode();
+		api_close_mode_during_transition();
+#ifdef HOST_LINUX
+	fb_gfx3_linux_mode_transition_end(
+		(result == FB_GFX3_OK && mode_is_active) ? &active_mode : NULL);
+#endif
 	FB_GRAPHICS_UNLOCK();
 	FB_UNLOCK();
 	return fb_ErrorSetNum(api_runtime_error(result));
@@ -462,7 +492,7 @@ FBCALL int fb_GfxScreenQB(int mode, int visible_page, int active_page)
 	return fb_ErrorSetNum(api_runtime_error(result));
 }
 
-FBCALL void fb_GfxSetWindowTitle(FBSTRING *title)
+FBCALL void fb_GfxSetWindowTitle(FBSTRING_ACCESS *title)
 {
 	ssize_t length;
 

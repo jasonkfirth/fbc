@@ -69,7 +69,7 @@ static int fb_hFileLineInputEx
                 /* create temporary string to ensure that NUL's are preserved ...
                  * this function wants the length WITH the NUL character!!! */
                 buffer[len] = 0;
-                FBSTRING *src = fb_StrAllocTempDescF( buffer, len + 1);
+                FBSTRING_ACCESS *src = fb_StrAllocTempDescF( buffer, len + 1);
                 if( readlen==0 ) {
                     fb_StrAssign( dst, dst_len, src, -1, fillrem );
                 } else {
@@ -86,7 +86,7 @@ static int fb_hFileLineInputEx
         if( readlen == 0 ) {
             /* del destine string */
             if( dst_len == -1 )
-                fb_StrDelete( (FBSTRING *)dst );
+                fb_StrDelete( (FBSTRING_ACCESS *)dst );
             else
                 *(char *)dst = '\0';
         }

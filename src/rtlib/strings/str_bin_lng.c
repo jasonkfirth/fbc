@@ -7,9 +7,9 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_BINEx_l ( unsigned long long num, int digits )
+FBCALL FBSTRING_ACCESS *fb_BINEx_l ( unsigned long long num, int digits )
 {
-	FBSTRING *s;
+	FBSTRING_ACCESS *s;
 	int i;
 	unsigned long long num2;
 
@@ -29,7 +29,7 @@ FBCALL FBSTRING *fb_BINEx_l ( unsigned long long num, int digits )
 
 	s = fb_hStrAllocTemp( NULL, digits );
 	if( s == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	i = digits - 1;
 	while( i >= 0 ) {
@@ -42,7 +42,7 @@ FBCALL FBSTRING *fb_BINEx_l ( unsigned long long num, int digits )
 	return s;
 }
 
-FBCALL FBSTRING *fb_BIN_l ( unsigned long long num )
+FBCALL FBSTRING_ACCESS *fb_BIN_l ( unsigned long long num )
 {
 	return fb_BINEx_l( num, 0 );
 }

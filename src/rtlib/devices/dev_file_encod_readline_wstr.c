@@ -23,7 +23,7 @@ int fb_DevFileReadLineEncodWstr( FB_FILE *handle, FB_WCHAR *dst, ssize_t max_cha
 	}
 
 	/* Clear string first, we're only using += concat assign below... */
-	dst[0] = _LC('\0');
+	dst[0] = FB_WCHAR_LITERAL('\0');
 
 	/* Read one byte at a time until CR and/or LF is found.
 	   The fb_FileGetDataEx() will handle the decoding. The length to read
@@ -38,25 +38,25 @@ int fb_DevFileReadLineEncodWstr( FB_FILE *handle, FB_WCHAR *dst, ssize_t max_cha
 			break;
 
 		/* CR? Check for following LF too, and skip it if it's there */
-		if( c[0] == _LC('\r') ) {
+		if( c[0] == FB_WCHAR_LITERAL('\r') ) {
 			res = fb_FileGetDataEx( handle, 0, c, 1, &len, FALSE, TRUE );
 			if( (res != FB_RTERROR_OK) || (len == 0) )
 				break;
 
 			/* No LF? Ok then, don't skip it yet */
-			if( c[0] != _LC('\n') )
+			if( c[0] != FB_WCHAR_LITERAL('\n') )
 				fb_FilePutBackEx( handle, c, 1 );
 
 			break;
 		}
 
 		/* LF? */
-		if( c[0] == _LC('\n') ) {
+		if( c[0] == FB_WCHAR_LITERAL('\n') ) {
 			break;
 		}
 
 		/* Any other char? Append to string, and continue... */
-		c[1] = _LC('\0');
+		c[1] = FB_WCHAR_LITERAL('\0');
 		fb_WstrConcatAssign( dst, max_chars, c );
 	}
 

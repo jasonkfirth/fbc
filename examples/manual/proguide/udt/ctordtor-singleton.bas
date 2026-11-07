@@ -5,6 +5,10 @@
 ''
 '' See Also: https://www.freebasic.net/wiki/wikka.php?wakka=ProPgCtorsAssignDtors2
 '' --------
+''
+'' Purpose: Demonstrate object allocation and the topic above.
+'' Responsibilities: Check allocation before member access and release owned objects.
+'' This file intentionally does NOT change NEW's nullable allocation contract.
 
 Type Singleton
 	Public:
@@ -44,6 +48,8 @@ End Destructor
 
 
 Dim As Singleton Ptr ps1 = Singleton.create()
+'' Creation can fail; the second create below deliberately returns zero.
+If ps1 = 0 Then End 1
 ps1->i = 1234
 Print ps1, ps1->i
 
@@ -53,6 +59,7 @@ Print ps2
 Singleton.suppress()
 
 Dim As Singleton Ptr ps3 = Singleton.create()
+If ps3 = 0 Then End 1
 Print ps3, ps3->i
 
 Singleton.suppress()
@@ -64,3 +71,5 @@ Singleton.suppress()
 'Dim As Singleton Ptr ps5 = New Singleton(*ps3)  '' forbidden
 
 Sleep
+
+'' end of ctordtor-singleton.bas

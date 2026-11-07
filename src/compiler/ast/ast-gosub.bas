@@ -34,8 +34,9 @@
 
 '' -gen option is used to select the GOSUB implementation:
 ''     - GAS backend will use CALL/RET
-''     - C backend will use setjmp/longjmp
-'' However, setjmp/longjmp implementation will also work with the GAS backend,
+''     - C backends use a local return-target stack
+''     - LLVM retains setjmp/longjmp
+'' The setjmp/longjmp implementation also works with the GAS backend,
 '' but since it is like 1000 times slower than CALL/RET, it isn't.  To explicitly
 '' select setjmp/longjmp implementation with ASM backend, use "-z gosub-setjmp"
 '' on the command line (jeffm)
@@ -43,6 +44,12 @@
 #define AsmBackend() _
 	( ( (env.clopt.backend = FB_BACKEND_GAS) or (env.clopt.backend = FB_BACKEND_GAS64) )and _
 	  (env.clopt.gosubsetjmp = FALSE) )
+
+'' C uses the same local CALL/RET operations, with runtime-owned return
+'' identifiers instead of setjmp. The assembly landing-pad choice stays separate.
+#define CBackend() _
+	( (env.clopt.backend = FB_BACKEND_GCC) or (env.clopt.backend = FB_BACKEND_CLANG) )
+#define DirectBackend() (AsmBackend() or CBackend())
 
 '' Both direct and computed dispatches enter the same native landing pad.
 '' Keeping this selection here also respects -z gosub-setjmp, which
@@ -88,7 +95,7 @@ sub astGosubAddInit( byval proc as FBSYMBOL ptr )
 
 	symbSetProcGosubSym( proc, sym )
 	symbSetProcStatGosub( proc )
-	fbSemanticModelProcedureState(proc, "gosub-allocated", iif(AsmBackend(), "call-ret", "setjmp"))
+	fbSemanticModelProcedureState(proc, "gosub-allocated", iif(DirectBackend(), "call-ret", "setjmp"))
 end sub
 
 sub astGosubAddJmp _
@@ -102,7 +109,9 @@ sub astGosubAddJmp _
 	'' make sure gosub-ctx var is declared
 	astGosubAddInit( proc )
 
-	if( AsmBackend() ) then
+	if( CBackend() ) then
+		astAdd( astNewBRANCH( AST_OP_CALL, l ) )
+	elseif( AsmBackend() ) then
 		'' ctx += 1
 		astAdd( astBuildVarInc( symbGetProcGosubSym( proc ), 1 ) )
 
@@ -135,7 +144,7 @@ sub astGosubAddJmp _
 		'' end if
 		astAdd( astNewLABEL( label ) )
 	end if
-	fbSemanticModelProcedureState(proc, "gosub-direct", iif(AsmBackend(), "call-ret", "setjmp"), NULL, l)
+	fbSemanticModelProcedureState(proc, "gosub-direct", iif(DirectBackend(), "call-ret", "setjmp"), NULL, l)
 
 end sub
 
@@ -151,7 +160,15 @@ sub astGosubAddJumpPtr _
 	'' make sure gosub-ctx var is declared
 	astGosubAddInit( proc )
 
-	if( AsmBackend() ) then
+	if( CBackend() ) then
+		'' The parser checks the selector before this saved return site.
+		'' A local dispatch label keeps computed GOSUB on the same CALL path.
+		label = symbAddLabel(NULL)
+		astAdd(astNewBRANCH(AST_OP_CALL, label))
+		astAdd(astNewBRANCH(AST_OP_JMP, exitlabel))
+		astAdd(astNewLABEL(label))
+		astAdd(jumptb)
+	elseif( AsmBackend() ) then
 		'' ctx += 1
 		astAdd( astBuildVarInc( symbGetProcGosubSym( proc ), 1 ) )
 
@@ -186,7 +203,7 @@ sub astGosubAddJumpPtr _
 		'' jump to exit label
 		astAdd( astNewBRANCH( AST_OP_JMP, exitlabel ) )
 	end if
-	fbSemanticModelProcedureState(proc, "gosub-computed", iif(AsmBackend(), "call-ret", "setjmp"), NULL, exitlabel)
+	fbSemanticModelProcedureState(proc, "gosub-computed", iif(DirectBackend(), "call-ret", "setjmp"), NULL, exitlabel)
 
 end sub
 
@@ -202,7 +219,7 @@ function astGosubAddReturn _
 	'' make sure gosub-ctx var is declared
 	astGosubAddInit( proc )
 
-	if( AsmBackend() ) then
+	if( AsmBackend() or (CBackend() and l = NULL) ) then
 
 		'' if( ctx <> 0 ) then
 		label = symbAddLabel( NULL )
@@ -214,8 +231,10 @@ function astGosubAddReturn _
 			  label, _
 			  FALSE ) )
 
-		'' ctx -= 1
-		astAdd( astBuildVarInc( symbGetProcGosubSym( proc ), -1 ) )
+		'' The C context is a pointer, maintained by the runtime target stack.
+		if( AsmBackend() ) then
+			astAdd( astBuildVarInc( symbGetProcGosubSym( proc ), -1 ) )
+		end if
 
 		'' RETURN
 		if( l = NULL ) then
@@ -291,7 +310,7 @@ function astGosubAddReturn _
 
 	end if
 
-	fbSemanticModelProcedureState(proc, "gosub-return", iif(AsmBackend(), "call-ret", "setjmp"), NULL, l)
+	fbSemanticModelProcedureState(proc, "gosub-return", iif(DirectBackend(), "call-ret", "setjmp"), NULL, l)
 
 end function
 
@@ -300,7 +319,7 @@ sub astGosubAddExit(byval proc as FBSYMBOL ptr)
 		if( AsmBackend() = FALSE ) then
 			astAdd( rtlGosubExit( astNewADDROF( astNewVAR( symbGetProcGosubSym( proc ) ) ) ) )
 		end if
-		fbSemanticModelProcedureState(proc, "gosub-exit", iif(AsmBackend(), "call-ret", "setjmp"))
+		fbSemanticModelProcedureState(proc, "gosub-exit", iif(DirectBackend(), "call-ret", "setjmp"))
 	end if
 end sub
 

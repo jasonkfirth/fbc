@@ -1,3 +1,8 @@
+'' Project: FreeBASIC variant helper library
+'' File: variant-gt-inv.bas
+'' Purpose: Implement the variant gt-inv overload family.
+'' Responsibilities: Preserve OLE value and text ownership.
+'' This file intentionally does NOT declare the public wrapper ABI.
 
 
 #define VARIANT_NOASSIGNMENT
@@ -33,7 +38,7 @@ operator > _
 
 	VariantInit( @tmp )
 	V_VT(@tmp) = VT_BSTR
-	V_BSTR(@tmp) = SysAllocStringByteLen( lhs, len( *lhs ) )
+	V_BSTR(@tmp) = hVarAllocBstrFromZstring( lhs )
 
 	operator = VarCmp( @tmp, @rhs.var_, NULL, 0 ) > VARCMP_EQ
 
@@ -59,3 +64,5 @@ operator > _
 	VariantClear( @tmp )
 
 end operator
+
+'' end of variant-gt-inv.bas

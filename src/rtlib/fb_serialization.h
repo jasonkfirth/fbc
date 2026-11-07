@@ -8,10 +8,10 @@
 #ifndef FB_SERIALIZATION_H
 #define FB_SERIALIZATION_H
 
-FBCALL FBSTRING *fb_Serialize( void *value, FBSTRING *schema, FBSTRING *program );
-FBCALL ssize_t fb_Deserialize( void *value, FBSTRING *schema, FBSTRING *program, FBSTRING *payload );
-FBCALL FBSTRING *fb_SerializeArray( FBARRAY *value, FBSTRING *schema, FBSTRING *program );
-FBCALL ssize_t fb_DeserializeArray( FBARRAY *value, FBSTRING *schema, FBSTRING *program, FBSTRING *payload );
+FBCALL FBSTRING_ACCESS *fb_Serialize( void *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program );
+FBCALL ssize_t fb_Deserialize( void *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program, FBSTRING_ACCESS *payload );
+FBCALL FBSTRING_ACCESS *fb_SerializeArray( FBARRAY_ACCESS *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program );
+FBCALL ssize_t fb_DeserializeArray( FBARRAY_ACCESS *value, FBSTRING_ACCESS *schema, FBSTRING_ACCESS *program, FBSTRING_ACCESS *payload );
 
 #endif
 

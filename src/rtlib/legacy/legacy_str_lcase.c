@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_LCASE( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_LCASE( FBSTRING_ACCESS *src )
 {
 	return fb_StrLcase2( src, 0 );
 }

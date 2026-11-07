@@ -1,5 +1,11 @@
 ''
 ''
+'' FreeBASIC CRT -- crt/stddef.bi
+''
+'' Defines the standard pointer-sized, character and null types used by
+'' C runtime declarations.  Target-specific aliases preserve the C ABI.
+'' This include does not implement runtime functions.
+''
 '' stddef -- header translated with help of SWIG FB wrapper
 ''
 '' NOTICE: This file is part of the FreeBASIC Compiler package and can't
@@ -14,9 +20,9 @@
 #ifdef __FB_BOOTSTRAP_COMPAT__
 	type ptrdiff_t as integer
 #else
-'' On LP64 targets, C's ptrdiff_t and size_t are long/unsigned long rather
-'' than long long.  Clang checks built-in CRT declarations against that spelling.
-#if defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
+'' LP64 and WebAssembly C use long/unsigned long for pointer-sized types.
+'' C compilers check declarations against those types, even when widths match.
+#if (defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )) or defined( __FB_JS__ )
 	type ptrdiff_t as integer alias "long"
 #else
 	type ptrdiff_t as integer
@@ -32,7 +38,7 @@
 	#ifndef ssize_t
 	type ssize_t as long
 	#endif
-#elseif defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )
+#elseif (defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )) or defined( __FB_JS__ )
 	#ifdef __FB_BOOTSTRAP_COMPAT__
 		type size_t as uinteger
 		#ifndef ssize_t
@@ -74,3 +80,5 @@
 #endif
 
 #endif
+
+'' end of crt/stddef.bi

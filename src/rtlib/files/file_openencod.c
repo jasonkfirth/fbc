@@ -10,7 +10,7 @@
 /*:::::*/
 FBCALL int fb_FileOpenEncod
 	(
-		FBSTRING *str,
+		FBSTRING_ACCESS *str,
 		unsigned int mode,
 		unsigned int access,
 		unsigned int lock,

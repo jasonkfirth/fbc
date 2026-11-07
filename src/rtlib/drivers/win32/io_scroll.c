@@ -56,7 +56,7 @@ void fb_ConsoleScroll( int nrows )
     fb_ConsoleGetView( &toprow, &botrow );
     fb_hConvertToConsole( &left, &toprow, &right, &botrow );
 
-    fb_ConsoleScrollRawEx( __fb_out_handle, left, toprow, right, botrow, nrows );
+    fb_ConsoleScrollRawEx( FB_CONSOLE_OUTPUT_HANDLE, left, toprow, right, botrow, nrows );
 }
 
 /* end of drivers/win32/io_scroll.c */

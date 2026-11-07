@@ -69,13 +69,13 @@ ssize_t fb_wstr_ConvToA(char *dst, ssize_t dst_chars, const FB_WCHAR *src)
 #endif
 }
 
-FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
+FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )
 {
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 	ssize_t chars;
 
 	if( src == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	chars = wcstombs( NULL, src, 0 );
 	if( chars < 0 )
@@ -90,11 +90,11 @@ FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
 		chars = fb_wstr_Len( src );
 	}
 	if( chars == 0 )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	dst = fb_hStrAllocTemp( NULL, chars );
 	if( dst == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	fb_wstr_ConvToA( dst->data, chars, src );
 

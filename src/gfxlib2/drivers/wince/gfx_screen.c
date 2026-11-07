@@ -520,7 +520,7 @@ static int set_mode
 	FB_LOCK( );
 
 	if( (mode == 0) || (w == 0) ) {
-        memset(&__fb_ctx.hooks, 0, sizeof(__fb_ctx.hooks));
+        memset(&fb_ctx.hooks, 0, sizeof(fb_ctx.hooks));
 
         if (flags != SCREEN_EXIT) {
             /* set and clear text screen mode or the width and line_len will be wrong */
@@ -530,34 +530,34 @@ static int set_mode
         /* reset viewport to console dimensions */
         fb_ConsoleSetTopBotRows(-1, -1);
 	} else {
-        __fb_ctx.hooks.inkeyproc = fb_GfxInkey;
-        __fb_ctx.hooks.getkeyproc = fb_GfxGetkey;
-        __fb_ctx.hooks.keyhitproc = fb_GfxKeyHit;
-        __fb_ctx.hooks.clsproc = fb_GfxClear;
-        __fb_ctx.hooks.colorproc = fb_GfxColor;
-        __fb_ctx.hooks.locateproc = fb_GfxLocate;
-        __fb_ctx.hooks.widthproc = fb_GfxWidth;
-        __fb_ctx.hooks.getxproc = fb_GfxGetX;
-        __fb_ctx.hooks.getyproc = fb_GfxGetY;
-        __fb_ctx.hooks.getxyproc = fb_GfxGetXY;
-        __fb_ctx.hooks.getsizeproc = fb_GfxGetSize;
-        __fb_ctx.hooks.printbuffproc = fb_GfxPrintBufferEx;
-        __fb_ctx.hooks.printbuffwproc = fb_GfxPrintBufferWstrEx;
-        __fb_ctx.hooks.readstrproc = fb_GfxReadStr;
-        __fb_ctx.hooks.multikeyproc = fb_GfxMultikey;
-        __fb_ctx.hooks.getmouseproc = fb_GfxGetMouse;
-        __fb_ctx.hooks.setmouseproc = fb_GfxSetMouse;
-        __fb_ctx.hooks.inproc = fb_GfxIn;
-        __fb_ctx.hooks.outproc = fb_GfxOut;
-        __fb_ctx.hooks.viewupdateproc = fb_GfxViewUpdate;
-        __fb_ctx.hooks.lineinputproc = fb_GfxLineInput;
-        __fb_ctx.hooks.lineinputwproc = fb_GfxLineInputWstr;
-        __fb_ctx.hooks.readxyproc = fb_GfxReadXY;
-        __fb_ctx.hooks.sleepproc = fb_GfxSleep;
-        __fb_ctx.hooks.isredirproc = fb_GfxIsRedir;
-        __fb_ctx.hooks.pagecopyproc = fb_GfxPageCopy;
-        __fb_ctx.hooks.pagesetproc = fb_GfxPageSet;
-        __fb_ctx.hooks.posteventproc = NULL;
+        fb_ctx.hooks.inkeyproc = fb_GfxInkey;
+        fb_ctx.hooks.getkeyproc = fb_GfxGetkey;
+        fb_ctx.hooks.keyhitproc = fb_GfxKeyHit;
+        fb_ctx.hooks.clsproc = fb_GfxClear;
+        fb_ctx.hooks.colorproc = fb_GfxColor;
+        fb_ctx.hooks.locateproc = fb_GfxLocate;
+        fb_ctx.hooks.widthproc = fb_GfxWidth;
+        fb_ctx.hooks.getxproc = fb_GfxGetX;
+        fb_ctx.hooks.getyproc = fb_GfxGetY;
+        fb_ctx.hooks.getxyproc = fb_GfxGetXY;
+        fb_ctx.hooks.getsizeproc = fb_GfxGetSize;
+        fb_ctx.hooks.printbuffproc = fb_GfxPrintBufferEx;
+        fb_ctx.hooks.printbuffwproc = fb_GfxPrintBufferWstrEx;
+        fb_ctx.hooks.readstrproc = fb_GfxReadStr;
+        fb_ctx.hooks.multikeyproc = fb_GfxMultikey;
+        fb_ctx.hooks.getmouseproc = fb_GfxGetMouse;
+        fb_ctx.hooks.setmouseproc = fb_GfxSetMouse;
+        fb_ctx.hooks.inproc = fb_GfxIn;
+        fb_ctx.hooks.outproc = fb_GfxOut;
+        fb_ctx.hooks.viewupdateproc = fb_GfxViewUpdate;
+        fb_ctx.hooks.lineinputproc = fb_GfxLineInput;
+        fb_ctx.hooks.lineinputwproc = fb_GfxLineInputWstr;
+        fb_ctx.hooks.readxyproc = fb_GfxReadXY;
+        fb_ctx.hooks.sleepproc = fb_GfxSleep;
+        fb_ctx.hooks.isredirproc = fb_GfxIsRedir;
+        fb_ctx.hooks.pagecopyproc = fb_GfxPageCopy;
+        fb_ctx.hooks.pagesetproc = fb_GfxPageSet;
+        fb_ctx.hooks.posteventproc = NULL;
         __fb_gfx = (FBGFX *)calloc(1, sizeof(FBGFX));
     }
 
@@ -757,8 +757,8 @@ static int set_mode
                This way we can at least ensure that gfxlib2 is cleaned up before
                the rtlib, regardless of what method that will use for clean-up. */
 
-            DBG_ASSERT( __fb_ctx.exit_gfxlib2 == NULL );
-            __fb_ctx.exit_gfxlib2 = exit_proc;
+            DBG_ASSERT( fb_ctx.exit_gfxlib2 == NULL );
+            fb_ctx.exit_gfxlib2 = exit_proc;
         }
     }
 
@@ -767,7 +767,7 @@ static int set_mode
 allocation_failed:
     release_gfx_mem();
     FB_LOCK( );
-    memset(&__fb_ctx.hooks, 0, sizeof(__fb_ctx.hooks));
+    memset(&fb_ctx.hooks, 0, sizeof(fb_ctx.hooks));
     FB_UNLOCK( );
     return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
 
@@ -912,7 +912,7 @@ FBCALL int fb_GfxScreenRes
 	return res;
 }
 
-FBCALL void fb_GfxSetWindowTitle(FBSTRING *title)
+FBCALL void fb_GfxSetWindowTitle(FBSTRING_ACCESS *title)
 {
 	FB_GRAPHICS_LOCK( );
 

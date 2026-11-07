@@ -8,6 +8,6 @@
 #include <windows.h>
 
 char *fb_hGetLocaleInfo( LCID Locale, LCTYPE LCType, char *pszBuffer, size_t uiSize );
-FBSTRING *fb_hIntlConvertString( FBSTRING *source, int source_cp, int dest_cp );
+FBSTRING_ACCESS *fb_hIntlConvertString( FBSTRING_ACCESS *source, int source_cp, int dest_cp );
 
 /* end of drivers/win32/fb_private_intl.h */

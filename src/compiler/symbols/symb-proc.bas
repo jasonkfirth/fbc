@@ -26,6 +26,7 @@
 #include once "core/fb.bi"
 #include once "core/fbint.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-constructor-string.bi"
 #include once "tooling/semantic-startup.bi"
 #include once "tooling/semantic-resolution.bi"
 #include once "tooling/semantic-prototypes.bi"
@@ -2673,6 +2674,7 @@ function symbFindClosestOvlProc _
 			if( is_match = FALSE ) then
 				function = fbSemanticModelResolutionEnd(semantic_scope, 0, semantic_confirmation, max_matchscore, matchcount, *err_num, NULL)
 			else
+				fbSemanticModelConstructorString(ovl_head_proc, closest_proc, args, arg_head, options)
 				function = fbSemanticModelResolutionEnd(semantic_scope, semantic_closest, semantic_confirmation, _
 					max_matchscore, matchcount, *err_num, closest_proc)
 			end if

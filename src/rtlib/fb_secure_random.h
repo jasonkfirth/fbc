@@ -11,8 +11,8 @@
  * The public call owns validation and failure clearing; platform helpers own
  * system access. This header contains no generator or process-wide RNG state.
  */
-#ifndef __FB_SECURE_RANDOM_H__
-#define __FB_SECURE_RANDOM_H__
+#ifndef FB_RTLIB_SECURE_RANDOM_H
+#define FB_RTLIB_SECURE_RANDOM_H
 
 #include "fb.h"
 

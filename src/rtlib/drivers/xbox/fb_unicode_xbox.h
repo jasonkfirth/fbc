@@ -19,32 +19,32 @@
 
 static __inline__ int fb_xbox_wstr_IsLower( FB_WCHAR c )
 {
-	return (c >= _LC('a')) && (c <= _LC('z'));
+	return (c >= FB_WCHAR_LITERAL('a')) && (c <= FB_WCHAR_LITERAL('z'));
 }
 
 static __inline__ int fb_xbox_wstr_IsUpper( FB_WCHAR c )
 {
-	return (c >= _LC('A')) && (c <= _LC('Z'));
+	return (c >= FB_WCHAR_LITERAL('A')) && (c <= FB_WCHAR_LITERAL('Z'));
 }
 
 static __inline__ FB_WCHAR fb_xbox_wstr_ToLower( FB_WCHAR c )
 {
-	return fb_xbox_wstr_IsUpper( c ) ? (c + (_LC('a') - _LC('A'))) : c;
+	return fb_xbox_wstr_IsUpper( c ) ? (c + (FB_WCHAR_LITERAL('a') - FB_WCHAR_LITERAL('A'))) : c;
 }
 
 static __inline__ FB_WCHAR fb_xbox_wstr_ToUpper( FB_WCHAR c )
 {
-	return fb_xbox_wstr_IsLower( c ) ? (c - (_LC('a') - _LC('A'))) : c;
+	return fb_xbox_wstr_IsLower( c ) ? (c - (FB_WCHAR_LITERAL('a') - FB_WCHAR_LITERAL('A'))) : c;
 }
 
 static __inline__ int fb_xbox_wstr_DigitValue( FB_WCHAR c )
 {
-	if( (c >= _LC('0')) && (c <= _LC('9')) )
-		return c - _LC('0');
-	if( (c >= _LC('a')) && (c <= _LC('z')) )
-		return c - _LC('a') + 10;
-	if( (c >= _LC('A')) && (c <= _LC('Z')) )
-		return c - _LC('A') + 10;
+	if( (c >= FB_WCHAR_LITERAL('0')) && (c <= FB_WCHAR_LITERAL('9')) )
+		return c - FB_WCHAR_LITERAL('0');
+	if( (c >= FB_WCHAR_LITERAL('a')) && (c <= FB_WCHAR_LITERAL('z')) )
+		return c - FB_WCHAR_LITERAL('a') + 10;
+	if( (c >= FB_WCHAR_LITERAL('A')) && (c <= FB_WCHAR_LITERAL('Z')) )
+		return c - FB_WCHAR_LITERAL('A') + 10;
 	return -1;
 }
 
@@ -61,11 +61,11 @@ static __inline__ unsigned long long fb_xbox_wcstoull( const FB_WCHAR *src, FB_W
 		return 0;
 	}
 
-	while( (*p == _LC(' ')) || (*p == _LC('\t')) )
+	while( (*p == FB_WCHAR_LITERAL(' ')) || (*p == FB_WCHAR_LITERAL('\t')) )
 		p++;
 
-	if( (*p == _LC('+')) || (*p == _LC('-')) ) {
-		negative = (*p == _LC('-'));
+	if( (*p == FB_WCHAR_LITERAL('+')) || (*p == FB_WCHAR_LITERAL('-')) ) {
+		negative = (*p == FB_WCHAR_LITERAL('-'));
 		p++;
 	}
 

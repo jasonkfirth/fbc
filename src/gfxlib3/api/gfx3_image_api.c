@@ -519,7 +519,7 @@ static int image_api_ensure_work_shadow_locked(FB_GFX3_DRAW_STATE *state,
 }
 
 static int image_api_get(void *target, float x1, float y1, float x2,
-	float y2, unsigned char *destination, int flags, FBARRAY *array,
+	float y2, unsigned char *destination, int flags, FBARRAY_ACCESS *array,
 	int use_new_header)
 {
 	FB_GFX3_DRAW_STATE *state;
@@ -700,14 +700,14 @@ done:
 }
 
 FBCALL int fb_GfxGet(void *target, float x1, float y1, float x2, float y2,
-	unsigned char *destination, int flags, FBARRAY *array)
+	unsigned char *destination, int flags, FBARRAY_ACCESS *array)
 {
 	return image_api_get(target, x1, y1, x2, y2, destination, flags,
 		array, TRUE);
 }
 
 FBCALL int fb_GfxGetQB(void *target, float x1, float y1, float x2, float y2,
-	unsigned char *destination, int flags, FBARRAY *array)
+	unsigned char *destination, int flags, FBARRAY_ACCESS *array)
 {
 	return image_api_get(target, x1, y1, x2, y2, destination, flags,
 		array, FALSE);

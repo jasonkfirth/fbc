@@ -51,7 +51,7 @@ FBCALL unsigned int fb_hStr2UInt( char *src, ssize_t len )
 	return strtoul( p, NULL, radix );
 }
 
-FBCALL unsigned int fb_VALUINT ( FBSTRING *str )
+FBCALL unsigned int fb_VALUINT ( FBSTRING_ACCESS *str )
 {
     unsigned int	val;
 

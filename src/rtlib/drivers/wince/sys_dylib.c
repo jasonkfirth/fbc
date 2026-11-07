@@ -39,7 +39,7 @@ static FARPROC hGetSymbol( HINSTANCE library, const char *name )
 	return procedure;
 }
 
-FBCALL void *fb_DylibLoad( FBSTRING *library )
+FBCALL void *fb_DylibLoad( FBSTRING_ACCESS *library )
 {
 	wchar_t *wide_name = NULL;
 	HINSTANCE result = NULL;
@@ -56,7 +56,7 @@ FBCALL void *fb_DylibLoad( FBSTRING *library )
 	return result;
 }
 
-FBCALL void *fb_DylibSymbol( void *library, FBSTRING *symbol )
+FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 {
 	HINSTANCE module = (HINSTANCE)library;
 	FARPROC procedure = NULL;

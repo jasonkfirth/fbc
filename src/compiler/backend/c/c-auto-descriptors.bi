@@ -64,6 +64,9 @@ private sub hCAutoDescCollect(byval n as ASTNODE ptr)
 			entry->preserve_data = symbHasCtor(backing) or symbHasDtor(backing)
 			'' A default constructor or clearing operation has a separate owner.
 			entry->referenced = (n->l <> NULL)
+			'' Keep user array storage available to the debugger even if its
+			'' compiler-generated descriptor has no surviving program use.
+			if( env.clopt.debuginfo ) then entry->backing_used = TRUE
 		end if
 	end if
 	hCAutoDescCollect(n->l)
@@ -174,6 +177,23 @@ private sub hCAutoDescReferences(byval n as ASTNODE ptr)
 	hCAutoDescReferences(n->r)
 end sub
 
+private sub hCAutoDescStatementReferences(byval n as ASTNODE ptr, byref fallthrough as integer)
+	if( n = NULL ) then exit sub
+	if( n->class = AST_NODECLASS_LINK ) then
+		hCAutoDescStatementReferences(n->l, fallthrough)
+		hCAutoDescStatementReferences(n->r, fallthrough)
+		exit sub
+	end if
+	if( n->class = AST_NODECLASS_LABEL ) then
+		if( symbGetIsAccessed(n->sym) ) then fallthrough = TRUE
+	end if
+	'' Match the statement loader: cleanup after END cannot read metadata,
+	'' while an incoming branch makes its label and cleanup reachable again.
+	if( fallthrough = FALSE ) then exit sub
+	hCAutoDescReferences(n)
+	if( astCStatementEndsFlow(n) ) then fallthrough = FALSE
+end sub
+
 private function hCAutoDescPrune(byval n as ASTNODE ptr) as integer
 	if( n = NULL ) then return FALSE
 	dim as CAUTODESC ptr entry = NULL
@@ -201,15 +221,19 @@ end function
 
 private function hCAutoDescBegin(byval first as ASTNODE ptr) as integer
 	hCAutoDescClear()
-	if( c_local_refs_complete = FALSE ) then return FALSE
+	'' Unlike user locals, an implicit fixed-array descriptor need not be
+	'' kept for the debugger when no program expression can read it. Inline
+	'' assembly and naked procedures still make that proof incomplete.
+	if( ctx.computedgotoopaque ) then return FALSE
 	var n = first
 	while( n <> NULL )
 		hCAutoDescCollect(n)
 		n = n->next
 	wend
+	dim as integer fallthrough = TRUE
 	n = first
 	while( n <> NULL )
-		hCAutoDescReferences(n)
+		hCAutoDescStatementReferences(n, fallthrough)
 		n = n->next
 	wend
 	'' An unread descriptor may be the only apparent use of an unread data
@@ -224,7 +248,7 @@ private function hCAutoDescBegin(byval first as ASTNODE ptr) as integer
 end function
 
 private function hCAutoDescUnused(byval sym as FBSYMBOL ptr) as integer
-	if( c_local_refs_complete = FALSE ) then return FALSE
+	if( ctx.computedgotoopaque ) then return FALSE
 	var entry = hCAutoDescGet(sym)
 	if( entry = NULL ) then return FALSE
 	return (entry->referenced = FALSE)

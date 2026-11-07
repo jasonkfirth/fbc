@@ -6,14 +6,33 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#include <limits.h>
+#include <string.h>
 
 #ifndef DISABLE_X11
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_x11.h"
+#include <X11/Xatom.h>
+#ifdef HOST_LINUX
+#include "../linux/fb_linux_maliit.h"
+#endif
 #include "../../../rtlib/drivers/unix/fb_private_scancodes_x11.h"
 #include <pthread.h>
+#if defined(__has_include)
+#if __has_include(<X11/extensions/XInput2.h>)
+#include <X11/extensions/XInput2.h>
+#define FB_X11_HAS_XINPUT2 1
+#endif
+#endif
+#ifndef FB_X11_HAS_XINPUT2
+#define FB_X11_HAS_XINPUT2 0
+#endif
+#if FB_X11_HAS_XINPUT2
+#include <dlfcn.h>
+#endif
 #include "fb_x11_drop.h"
+#include "fb_x11_key_text.h"
 
 static FB_X11_DROP drop_windows[3];
 
@@ -62,9 +81,63 @@ static int orig_rate, target_rate;
 static Rotation orig_rotation;
 static Cursor blank_cursor, arrow_cursor = None;
 static int is_running = FALSE, has_focus, cursor_shown, xlib_inited = FALSE;
+/* Pointer entry and presses also set has_focus for legacy mouse handling.
+ * Track the state reported to ScreenEvent separately: pointer activity must
+ * not suppress a subsequent FocusIn after we reported the window inactive. */
+static int focus_notified;
 /* Keep a one-shot latch of press events in case polling misses a short click. */
 static int mouse_x, mouse_y, mouse_wheel, mouse_hwheel, mouse_buttons, mouse_latched_buttons, mouse_on;
 static int mouse_x_root, mouse_y_root;
+
+static void hSetWindowFocus(int focused, EVENT *event)
+{
+	if (focused) {
+		has_focus = TRUE;
+		if (!focus_notified)
+			event->type = EVENT_WINDOW_GOT_FOCUS;
+		focus_notified = TRUE;
+	} else {
+		has_focus = FALSE;
+		focus_notified = FALSE;
+		event->type = EVENT_WINDOW_LOST_FOCUS;
+	}
+}
+
+/* ------------------------------------------------------------------------- */
+/* Optional XInput2 touch input                                               */
+/* ------------------------------------------------------------------------- */
+
+#if FB_X11_HAS_XINPUT2
+#define FB_X11_MAX_TOUCH_POINTS 16
+
+typedef struct FB_X11_TOUCH_POINT {
+	int active;
+	int id;
+	int source_id;
+	int detail_id;
+	int x;
+	int y;
+} FB_X11_TOUCH_POINT;
+
+typedef int (*FB_XI_QUERY_VERSION)(Display *, int *, int *);
+typedef int (*FB_XI_SELECT_EVENTS)(Display *, Window, XIEventMask *, int);
+
+typedef struct FB_X11_TOUCH_API {
+	void *library;
+	FB_XI_QUERY_VERSION query_version;
+	FB_XI_SELECT_EVENTS select_events;
+	int extension_opcode;
+	int enabled;
+} FB_X11_TOUCH_API;
+
+static FB_X11_TOUCH_API touch_api;
+static FB_X11_TOUCH_POINT touch_points[FB_X11_MAX_TOUCH_POINTS];
+static int touch_primary_id = -1;
+static int touch_primary_mouse_down;
+static int touch_next_id;
+/* The event thread writes contacts while applications poll them on another thread. */
+static pthread_mutex_t touch_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 static int calc_comp_height( int h )
 {
@@ -100,24 +173,26 @@ static int key_repeated(XEvent *event)
 	return FALSE;
 }
 
-static int translate_key(XEvent *event, int scancode)
+static int translate_key(XEvent *event, int scancode, uint32_t *text_scalar)
 {
-	unsigned char key[8];
-	int k;
+	char text[8];
+	int length;
+	uint32_t scalar;
 
-	if( XLookupString( &event->xkey, (char *)key, 8, NULL, NULL ) == 1 ) {
-		k = key[0];
-
-		/* Remap ASCII DEL to FB's extended keycode for DELETE,
-		   to match behaviour of console mode and other platforms */
-		if( k == 0x7F ) {
-			k = KEY_DEL;
-		}
-	} else {
-		k = fb_hScancodeToExtendedKey( scancode );
+	length = XLookupString(&event->xkey, text, sizeof(text), NULL, NULL);
+	scalar = (length > 0) ? fb_hX11DecodeKeyText(text, (size_t)length) : 0u;
+	*text_scalar = 0u;
+	if ((length == 1) && (text[0] == '\0'))
+		return 0;
+	if (scalar) {
+		/* Preserve the extended DELETE key used by INKEY and SCREENEVENT. */
+		if (scalar == 0x7Fu)
+			return KEY_DEL;
+		*text_scalar = scalar;
+		/* Larger Unicode scalars cannot be represented by legacy INKEY. */
+		return (scalar <= 0xFFu) ? (int)scalar : 0;
 	}
-
-	return k;
+	return fb_hScancodeToExtendedKey(scancode);
 }
 
 static void hOnAltEnter( void )
@@ -231,11 +306,378 @@ static void hFramebufferToWindow(int x, int y, int *window_x, int *window_y)
 		*window_y = fb_x11.draw_offset_y + (y * fb_x11.scale) + (fb_x11.scale / 2);
 }
 
+#if FB_X11_HAS_XINPUT2
+static int fb_hX11TouchFind(int source_id, int detail_id)
+{
+	int i;
+
+	for (i = 0; i < FB_X11_MAX_TOUCH_POINTS; i++) {
+		if (touch_points[i].active &&
+		    (touch_points[i].source_id == source_id) &&
+		    (touch_points[i].detail_id == detail_id))
+			return i;
+	}
+	return -1;
+}
+
+static int fb_hX11TouchFindId(int id)
+{
+	int i;
+
+	for (i = 0; i < FB_X11_MAX_TOUCH_POINTS; i++) {
+		if (touch_points[i].active && (touch_points[i].id == id))
+			return i;
+	}
+	return -1;
+}
+
+static int fb_hX11TouchAllocate(void)
+{
+	int i;
+
+	for (i = 0; i < FB_X11_MAX_TOUCH_POINTS; i++) {
+		if (!touch_points[i].active)
+			return i;
+	}
+	return -1;
+}
+
+static int fb_hX11TouchAllocateId(void)
+{
+	int attempts;
+
+	for (attempts = 0; attempts <= FB_X11_MAX_TOUCH_POINTS; attempts++) {
+		int candidate = touch_next_id;
+
+		touch_next_id = (touch_next_id == INT_MAX) ? 0 : touch_next_id + 1;
+		if (fb_hX11TouchFindId(candidate) < 0)
+			return candidate;
+	}
+	return -1;
+}
+
+static int fb_hX11TouchCoordinate(double coordinate)
+{
+	if (!(coordinate > (double)INT_MIN))
+		return INT_MIN;
+	if (coordinate >= (double)INT_MAX)
+		return INT_MAX;
+	return (int)coordinate;
+}
+
+static void fb_hX11PostTouchMouse(int type, int x, int y)
+{
+	EVENT event;
+	int old_x = mouse_x;
+	int old_y = mouse_y;
+
+	fb_hMemSet(&event, 0, sizeof(event));
+	event.type = type;
+	event.x = x;
+	event.y = y;
+	event.dx = x - old_x;
+	event.dy = y - old_y;
+	if ((type == EVENT_MOUSE_BUTTON_PRESS) ||
+	    (type == EVENT_MOUSE_BUTTON_RELEASE))
+		event.button = BUTTON_LEFT;
+	if (__fb_gfx->scanline_size != 1) {
+		event.y /= __fb_gfx->scanline_size;
+		event.dy /= __fb_gfx->scanline_size;
+	}
+	mouse_x = x;
+	mouse_y = y;
+	fb_hPostEvent(&event);
+}
+
+static void fb_hX11TouchShutdown(void)
+{
+	if (touch_api.library)
+		dlclose(touch_api.library);
+	memset(&touch_api, 0, sizeof(touch_api));
+	pthread_mutex_lock(&touch_mutex);
+	memset(touch_points, 0, sizeof(touch_points));
+	touch_primary_id = -1;
+	touch_primary_mouse_down = FALSE;
+	touch_next_id = 0;
+	pthread_mutex_unlock(&touch_mutex);
+}
+
+static int fb_hX11TouchLoad(Display *display)
+{
+	void *symbol;
+	int major = 2;
+	int minor = 2;
+	int first_event;
+	int first_error;
+
+	if (touch_api.library)
+		return TRUE;
+
+	touch_api.library = dlopen("libXi.so.6", RTLD_NOW | RTLD_LOCAL);
+	if (!touch_api.library)
+		touch_api.library = dlopen("libXi.so", RTLD_NOW | RTLD_LOCAL);
+	if (!touch_api.library)
+		return FALSE;
+
+	symbol = dlsym(touch_api.library, "XIQueryVersion");
+	if ((!symbol) || (sizeof(symbol) != sizeof(touch_api.query_version)))
+		goto failed;
+	memcpy(&touch_api.query_version, &symbol, sizeof(symbol));
+
+	symbol = dlsym(touch_api.library, "XISelectEvents");
+	if ((!symbol) || (sizeof(symbol) != sizeof(touch_api.select_events)))
+		goto failed;
+	memcpy(&touch_api.select_events, &symbol, sizeof(symbol));
+
+	if (!XQueryExtension(display, "XInputExtension", &touch_api.extension_opcode,
+			     &first_event, &first_error))
+		goto failed;
+	if ((touch_api.query_version(display, &major, &minor) != Success) ||
+	    (major < 2) || ((major == 2) && (minor < 2)))
+		goto failed;
+
+	return TRUE;
+
+failed:
+	fb_hX11TouchShutdown();
+	return FALSE;
+}
+
+static void fb_hX11TouchSelect(Display *display, Window window)
+{
+	unsigned char mask[XIMaskLen(XI_LASTEVENT)];
+	XIEventMask event_mask;
+
+	if ((window == None) || (!fb_hX11TouchLoad(display)))
+		return;
+
+	memset(mask, 0, sizeof(mask));
+	XISetMask(mask, XI_TouchBegin);
+	XISetMask(mask, XI_TouchUpdate);
+	XISetMask(mask, XI_TouchEnd);
+	event_mask.deviceid = XIAllDevices;
+	event_mask.mask_len = sizeof(mask);
+	event_mask.mask = mask;
+	touch_api.enabled = touch_api.select_events(display, window,
+		&event_mask, 1) == Success;
+}
+
+static void fb_hX11TouchReset(void)
+{
+	int release_mouse;
+
+	pthread_mutex_lock(&touch_mutex);
+	release_mouse = touch_primary_mouse_down;
+	if (release_mouse) {
+		mouse_buttons &= ~BUTTON_LEFT;
+		mouse_latched_buttons &= ~BUTTON_LEFT;
+	}
+	memset(touch_points, 0, sizeof(touch_points));
+	touch_primary_id = -1;
+	touch_primary_mouse_down = FALSE;
+	pthread_mutex_unlock(&touch_mutex);
+	if (release_mouse)
+		fb_hX11PostTouchMouse(EVENT_MOUSE_BUTTON_RELEASE, mouse_x, mouse_y);
+}
+
+static void fb_hX11TouchEvent(XEvent *event)
+{
+	XGenericEventCookie *cookie = &event->xcookie;
+	XIDeviceEvent *device_event;
+	int slot;
+	int inside;
+	int id;
+
+	if ((!touch_api.enabled) || (cookie->extension != touch_api.extension_opcode))
+		return;
+	if ((cookie->evtype != XI_TouchBegin) &&
+	    (cookie->evtype != XI_TouchUpdate) &&
+	    (cookie->evtype != XI_TouchEnd))
+		return;
+	if (!XGetEventData(fb_x11.display, cookie))
+		return;
+	pthread_mutex_lock(&touch_mutex);
+
+	device_event = (XIDeviceEvent *)cookie->data;
+	if ((!device_event) || (device_event->event != fb_x11.window))
+		goto done;
+
+	if (cookie->evtype == XI_TouchBegin) {
+		if (fb_hX11TouchFind(device_event->sourceid, device_event->detail) >= 0)
+			goto done;
+		slot = fb_hX11TouchAllocate();
+		id = fb_hX11TouchAllocateId();
+		if ((slot < 0) || (id < 0))
+			goto done;
+		touch_points[slot].active = TRUE;
+		touch_points[slot].id = id;
+		touch_points[slot].source_id = device_event->sourceid;
+		touch_points[slot].detail_id = device_event->detail;
+		hWindowToFramebuffer(fb_hX11TouchCoordinate(device_event->event_x),
+			fb_hX11TouchCoordinate(device_event->event_y),
+			&touch_points[slot].x, &touch_points[slot].y, &inside);
+		if (touch_primary_id < 0) {
+			touch_primary_id = id;
+			mouse_x_root = fb_hX11TouchCoordinate(device_event->root_x);
+			mouse_y_root = fb_hX11TouchCoordinate(device_event->root_y);
+			has_focus = TRUE;
+			mouse_on = inside;
+			if (inside) {
+				touch_primary_mouse_down = TRUE;
+				mouse_buttons |= BUTTON_LEFT;
+				mouse_latched_buttons |= BUTTON_LEFT;
+				mouse_on = TRUE;
+				fb_hX11PostTouchMouse(EVENT_MOUSE_MOVE,
+					touch_points[slot].x, touch_points[slot].y);
+				fb_hX11PostTouchMouse(EVENT_MOUSE_BUTTON_PRESS,
+					touch_points[slot].x, touch_points[slot].y);
+			}
+		}
+		goto done;
+	}
+
+	slot = fb_hX11TouchFind(device_event->sourceid, device_event->detail);
+	if (slot < 0)
+		goto done;
+	hWindowToFramebuffer(fb_hX11TouchCoordinate(device_event->event_x),
+			fb_hX11TouchCoordinate(device_event->event_y),
+			&touch_points[slot].x, &touch_points[slot].y, &inside);
+	id = touch_points[slot].id;
+	if (id == touch_primary_id) {
+		mouse_x_root = fb_hX11TouchCoordinate(device_event->root_x);
+		mouse_y_root = fb_hX11TouchCoordinate(device_event->root_y);
+		mouse_on = inside || touch_primary_mouse_down;
+		if (touch_primary_mouse_down)
+			fb_hX11PostTouchMouse(EVENT_MOUSE_MOVE,
+				touch_points[slot].x, touch_points[slot].y);
+		if (cookie->evtype == XI_TouchEnd) {
+			if (touch_primary_mouse_down) {
+				mouse_buttons &= ~BUTTON_LEFT;
+				fb_hX11PostTouchMouse(EVENT_MOUSE_BUTTON_RELEASE,
+					touch_points[slot].x, touch_points[slot].y);
+			}
+			touch_primary_mouse_down = FALSE;
+			touch_primary_id = -1;
+			mouse_on = inside;
+		}
+	}
+	if (cookie->evtype == XI_TouchEnd)
+		memset(&touch_points[slot], 0, sizeof(touch_points[slot]));
+
+done:
+	pthread_mutex_unlock(&touch_mutex);
+	XFreeEventData(fb_x11.display, cookie);
+}
+
+int fb_hX11GetTouchCount(void)
+{
+	int i;
+	int count = 0;
+
+	pthread_mutex_lock(&touch_mutex);
+	for (i = 0; i < FB_X11_MAX_TOUCH_POINTS; i++)
+		if (touch_points[i].active)
+			count++;
+	pthread_mutex_unlock(&touch_mutex);
+	return count;
+}
+
+int fb_hX11GetTouch(int index, int *x, int *y, int *id)
+{
+	int i;
+	int seen = 0;
+
+	if (index < 0)
+		return -1;
+	pthread_mutex_lock(&touch_mutex);
+	for (i = 0; i < FB_X11_MAX_TOUCH_POINTS; i++) {
+		if (!touch_points[i].active)
+			continue;
+		if (seen == index) {
+			if (x)
+				*x = touch_points[i].x;
+			if (y)
+				*y = touch_points[i].y;
+			if (id)
+				*id = touch_points[i].id;
+			pthread_mutex_unlock(&touch_mutex);
+			return 0;
+		}
+		seen++;
+	}
+	pthread_mutex_unlock(&touch_mutex);
+	return -1;
+}
+
+static int fb_hX11GetPrimaryTouch(int *x, int *y)
+{
+	int slot;
+
+	pthread_mutex_lock(&touch_mutex);
+	if (!touch_primary_mouse_down)
+		goto not_active;
+	slot = fb_hX11TouchFindId(touch_primary_id);
+	if (slot < 0)
+		goto not_active;
+	if (x)
+		*x = touch_points[slot].x;
+	if (y)
+		*y = touch_points[slot].y;
+	pthread_mutex_unlock(&touch_mutex);
+	return TRUE;
+
+not_active:
+	pthread_mutex_unlock(&touch_mutex);
+	return FALSE;
+}
+#else
+static void fb_hX11TouchSelect(Display *display, Window window)
+{
+	(void)display;
+	(void)window;
+}
+
+static void fb_hX11TouchReset(void)
+{
+}
+
+static void fb_hX11TouchEvent(XEvent *event)
+{
+	(void)event;
+}
+
+static void fb_hX11TouchShutdown(void)
+{
+}
+
+int fb_hX11GetTouchCount(void)
+{
+	return 0;
+}
+
+int fb_hX11GetTouch(int index, int *x, int *y, int *id)
+{
+	(void)index;
+	(void)x;
+	(void)y;
+	(void)id;
+	return -1;
+}
+
+static int fb_hX11GetPrimaryTouch(int *x, int *y)
+{
+	(void)x;
+	(void)y;
+	return FALSE;
+}
+#endif
+
 static void *window_thread(void *arg)
 {
 	XEvent event;
 	EVENT e;
 	int key, old_mouse_x, old_mouse_y;
+	uint32_t text_scalar;
 
 	(void)arg;
 
@@ -280,10 +722,7 @@ static void *window_thread(void *arg)
 			switch (event.type) {
 				case FocusIn:
 				case MapNotify:
-					if (!has_focus) {
-						has_focus = TRUE;
-						e.type = EVENT_WINDOW_GOT_FOCUS;
-					}
+					hSetWindowFocus(TRUE, &e);
 					/* fallthrough */
 
 				case Expose:
@@ -292,8 +731,9 @@ static void *window_thread(void *arg)
 
 				case FocusOut:
 					fb_hMemSet(__fb_gfx->key, FALSE, 128);
-					has_focus = mouse_on = FALSE;
-					e.type = EVENT_WINDOW_LOST_FOCUS;
+					fb_hX11TouchReset();
+					hSetWindowFocus(FALSE, &e);
+					mouse_on = FALSE;
 					break;
 
 				case EnterNotify:
@@ -399,6 +839,10 @@ static void *window_thread(void *arg)
 					}
 					break;
 
+				case MappingNotify:
+					XRefreshKeyboardMapping(&event.xmapping);
+					break;
+
 				case KeyPress:
 					if (has_focus) {
 						e.scancode = fb_x11keycode_to_scancode[event.xkey.keycode];
@@ -408,12 +852,12 @@ static void *window_thread(void *arg)
 						if( __fb_gfx->key[SC_ENTER] && __fb_gfx->key[SC_ALT] && !(fb_x11.flags & DRIVER_NO_SWITCH) ) {
 							hOnAltEnter( );
 						} else {
-							key = translate_key( &event, e.scancode );
-							if( key ) {
+							key = translate_key( &event, e.scancode, &text_scalar );
+							if( key )
 								fb_hPostKey( key );
-								/* Don't return extended keycodes in the ascii field */
-								e.ascii = ((key < 0) || (key > 0xFF)) ? 0 : key;
-							}
+							/* Don't return extended keycodes in the ascii field */
+							e.ascii = text_scalar ? (int)text_scalar :
+								(((key < 0) || (key > 0xFF)) ? 0 : key);
 						}
 
 						e.type = EVENT_KEY_PRESS;
@@ -423,9 +867,10 @@ static void *window_thread(void *arg)
 				case KeyRelease:
 					if (has_focus) {
 						e.scancode = fb_x11keycode_to_scancode[event.xkey.keycode];
-						key = translate_key( &event, e.scancode );
+						key = translate_key( &event, e.scancode, &text_scalar );
 						/* Don't return extended keycodes in the ascii field */
-						e.ascii = ((key < 0) || (key > 0xFF)) ? 0 : key;
+						e.ascii = text_scalar ? (int)text_scalar :
+							(((key < 0) || (key > 0xFF)) ? 0 : key);
 						if (key_repeated(&event)) {
 							if( key )
 								fb_hPostKey( key );
@@ -442,6 +887,10 @@ static void *window_thread(void *arg)
 						fb_hPostKey( KEY_QUIT );
 						e.type = EVENT_WINDOW_CLOSE;
 					}
+					break;
+
+				case GenericEvent:
+					fb_hX11TouchEvent(&event);
 					break;
 			}
 			if (e.type)
@@ -510,12 +959,19 @@ void fb_hX11LeaveFullscreen(void)
 	}
 }
 
+static Bool hMappedEvent(Display *display, XEvent *event, XPointer target)
+{
+	(void)display;
+	return event->type == MapNotify && event->xmap.event == *(Window *)target;
+}
+
 void WaitMapped(Window w)
 {
 	XEvent e;
-	do {
-		XMaskEvent(fb_x11.display, StructureNotifyMask, &e);
-	} while ((e.type != MapNotify) || (e.xmap.event != w));
+	/* Hildon can configure the usable client size before mapping finishes.
+	 * Leave that event queued so the window loop resizes the drawing child
+	 * and framebuffer, instead of retaining the larger startup geometry. */
+	XIfEvent(fb_x11.display, &e, hMappedEvent, (XPointer)&w);
 }
 
 void fb_hX11InitWindow(int x, int y)
@@ -665,6 +1121,7 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 
 	if (!fb_x11.window)
 		return -1;
+	fb_hX11TouchSelect(fb_x11.display, fb_x11.window);
 	fb_hX11DropInit(&drop_windows[0], fb_x11.display, fb_x11.window,
 		x11_drop_enabled, x11_drop_submit, NULL);
 	fb_hX11DropInit(&drop_windows[1], fb_x11.display, fb_x11.wmwindow,
@@ -687,15 +1144,16 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 #endif
 
 	size = XAllocSizeHints();
-	size->flags = PBaseSize | PMinSize | PMaxSize | PResizeInc;
+	size->flags = PBaseSize | PMinSize | PResizeInc;
+	/* The display size at startup is not a stable limit after RandR rotation. */
+	if (!(flags & DRIVER_RESIZABLE))
+		size->flags |= PMaxSize;
 	size->base_width = fb_x11.content_w;
 	size->base_height = fb_x11.content_h;
 	if (flags & DRIVER_RESIZABLE) {
 		size->min_width = 8;
 		size->min_height = (__fb_gfx && __fb_gfx->font) ?
 			__fb_gfx->font->h * __fb_gfx->scanline_size : 16;
-		size->max_width = XDisplayWidth(fb_x11.display, fb_x11.screen);
-		size->max_height = XDisplayHeight(fb_x11.display, fb_x11.screen);
 	} else {
 		size->min_width = fb_x11.content_w;
 		size->min_height = fb_x11.content_h;
@@ -715,6 +1173,21 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	XSetWMNormalHints(fb_x11.display, fb_x11.fswindow, size);
 	XSetWMNormalHints(fb_x11.display, fb_x11.wmwindow, size);
 	XFree(size);
+	/* Hildon keeps clients in a landscape surface unless they advertise
+	 * portrait support. Resize-capable windows can follow its portrait
+	 * configure events; fixed framebuffer windows keep their existing policy.
+	 * Only set this extension when its atom is already known to the server. */
+	if (flags & DRIVER_RESIZABLE) {
+		Atom portrait = XInternAtom(fb_x11.display,
+			"_HILDON_PORTRAIT_MODE_SUPPORT", True);
+		if (portrait != None) {
+			unsigned long supported = 1;
+			Window managed = (flags & DRIVER_NO_FRAME) ?
+				fb_x11.window : fb_x11.wmwindow;
+			XChangeProperty(fb_x11.display, managed, portrait, XA_CARDINAL,
+				32, PropModeReplace, (unsigned char *)&supported, 1);
+		}
+	}
 
 	if (flags & DRIVER_NO_FRAME) {
 		for (i = 0; i < 3; i++) {
@@ -798,7 +1271,9 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 		has_focus = FALSE;
 		mouse_on = FALSE;
 	}
+	focus_notified = has_focus;
 	mouse_buttons = mouse_latched_buttons = mouse_wheel = 0;
+	fb_hX11TouchReset();
 
 	pthread_mutex_init(&mutex, NULL);
 	pthread_cond_init(&cond, NULL);
@@ -818,6 +1293,10 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 
 void fb_hX11Exit(void)
 {
+#ifdef HOST_LINUX
+	/* Stop input callbacks before the X11 lock and mode storage are torn down. */
+	fb_hLinuxMaliitCancelPending();
+#endif
 	if (is_running) {
 		pthread_mutex_lock(&mutex);
 		is_running = FALSE;
@@ -863,6 +1342,7 @@ void fb_hX11Exit(void)
 		XCloseDisplay(fb_x11.display);
 		fb_x11.display = NULL;
 	}
+	fb_hX11TouchShutdown();
 }
 
 void fb_hX11Lock(void)
@@ -875,6 +1355,15 @@ void fb_hX11Unlock(void)
 {
 	XUnlockDisplay(fb_x11.display);
 	pthread_mutex_unlock(&mutex);
+}
+
+int fb_hX11WindowHasFocus(void)
+{
+	int focused;
+	fb_hX11Lock();
+	focused = focus_notified;
+	fb_hX11Unlock();
+	return focused;
 }
 
 void fb_hX11SetPalette(int index, int r, int g, int b)
@@ -900,6 +1389,7 @@ int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
 	Window root, child;
 	int root_x, root_y, win_x, win_y;
+	int touch_x, touch_y;
 	unsigned int buttons_mask;
 	const int invalid_coord = -1;
 
@@ -912,6 +1402,19 @@ int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 
 	/* prefer XQueryPointer to have a more responsive mouse position retrieval */
 	if (z) *z = mouse_wheel;
+	if (fb_hX11GetPrimaryTouch(&touch_x, &touch_y)) {
+		if (x)
+			*x = touch_x;
+		if (y)
+			*y = touch_y;
+		if (buttons)
+			*buttons = mouse_buttons | mouse_latched_buttons | BUTTON_LEFT;
+		if (clip)
+			*clip = fb_x11.mouse_clip;
+		if (buttons)
+			mouse_latched_buttons = 0;
+		return 0;
+	}
 	/* Keep a short-press visible once even if polling sees pointer outside. */
 	if ((!mouse_on) && (!mouse_latched_buttons) && (buttons == NULL))
 		return 0;

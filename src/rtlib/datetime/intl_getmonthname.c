@@ -38,9 +38,9 @@ static const char *pszMonthNamesShort[12] = {
 };
 
 /*:::::*/
-FBSTRING *fb_IntlGetMonthName( int month, int short_names, int disallow_localized )
+FBSTRING_ACCESS *fb_IntlGetMonthName( int month, int short_names, int disallow_localized )
 {
-    FBSTRING *res;
+    FBSTRING_ACCESS *res;
 
     if( month < 1 || month > 12 )
         return NULL;
@@ -55,7 +55,7 @@ FBSTRING *fb_IntlGetMonthName( int month, int short_names, int disallow_localize
     } else {
         res = fb_StrAllocTempDescZ( pszMonthNamesLong[month-1] );
     }
-    if( res==&__fb_ctx.null_desc )
+    if( res==&fb_ctx.null_desc )
         return NULL;
     return res;
 }

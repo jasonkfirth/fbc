@@ -7,14 +7,14 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_Inkey( void )
+FBCALL FBSTRING_ACCESS *fb_Inkey( void )
 {
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 
 	FB_LOCK();
 
-	if( __fb_ctx.hooks.inkeyproc )
-		res = __fb_ctx.hooks.inkeyproc( );
+	if( fb_ctx.hooks.inkeyproc )
+		res = fb_ctx.hooks.inkeyproc( );
 	else
 		res = fb_ConsoleInkey( );
 
@@ -33,8 +33,8 @@ FBCALL int fb_Getkey( void )
 	   the fb_ConsoleGetkey/fb_GfxGetkey to take care of synchronization
 	   themselves. */
 	FB_LOCK();
-	if( __fb_ctx.hooks.getkeyproc )
-		getkeyproc = __fb_ctx.hooks.getkeyproc;
+	if( fb_ctx.hooks.getkeyproc )
+		getkeyproc = fb_ctx.hooks.getkeyproc;
 	else
 		getkeyproc = fb_ConsoleGetkey;
 	FB_UNLOCK();
@@ -48,8 +48,8 @@ FBCALL int fb_KeyHit( void )
 
 	FB_LOCK();
 
-	if( __fb_ctx.hooks.keyhitproc )
-		res = __fb_ctx.hooks.keyhitproc( );
+	if( fb_ctx.hooks.keyhitproc )
+		res = fb_ctx.hooks.keyhitproc( );
 	else
 		res = fb_ConsoleKeyHit( );
 

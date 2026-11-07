@@ -5,23 +5,24 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
+#include "fb_abi.h"
 #ifndef FB_DATADESC_PACKED
 #define FB_DATADESC_PACKED FBPACKED
 #endif
 
-struct _FB_DATADESC {
+struct FB_DATADESC_ {
 	short 					len;
 	union {
 		char 				*zstr;
 		FB_WCHAR			*wstr;
 		void   				*ofs;
-		struct _FB_DATADESC *next;
+		struct FB_DATADESC_ *next;
 	};
 } FB_DATADESC_PACKED;
 
-typedef struct _FB_DATADESC FB_DATADESC;
+typedef struct FB_DATADESC_ FB_DATADESC;
 
-extern FB_DATADESC *__fb_data_ptr;
+extern FB_DATADESC *fb_data_ptr FB_RTLIB_SYMBOL("__fb_data_ptr");
 
 #define FB_DATATYPE_LINK -1
 #define FB_DATATYPE_OFS  -2

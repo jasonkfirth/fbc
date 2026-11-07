@@ -26,9 +26,9 @@
 /* QuickBASIC decimal conversion                                             */
 /* ------------------------------------------------------------------------- */
 
-FBCALL FBSTRING *fb_LongintToStrQB ( long long num )
+FBCALL FBSTRING_ACCESS *fb_LongintToStrQB ( long long num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	int written;
 
 	/* alloc temp string */
@@ -39,20 +39,20 @@ FBCALL FBSTRING *fb_LongintToStrQB ( long long num )
 		                    (num >= 0) ? " %lld" : "%lld", num );
 		if( (written < 0) || (written > dst->size) ) {
 			fb_hStrDelTemp( dst );
-			return &__fb_ctx.null_desc;
+			return &fb_ctx.null_desc;
 		}
 		fb_hStrSetLength( dst, (size_t)written );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }
 
 /*:::::*/
-FBCALL FBSTRING *fb_ULongintToStrQB ( unsigned long long num )
+FBCALL FBSTRING_ACCESS *fb_ULongintToStrQB ( unsigned long long num )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	int written;
 
 	/* alloc temp string */
@@ -63,12 +63,12 @@ FBCALL FBSTRING *fb_ULongintToStrQB ( unsigned long long num )
 		                    " %llu", num );
 		if( (written < 0) || (written > dst->size) ) {
 			fb_hStrDelTemp( dst );
-			return &__fb_ctx.null_desc;
+			return &fb_ctx.null_desc;
 		}
 		fb_hStrSetLength( dst, (size_t)written );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }

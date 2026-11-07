@@ -9,7 +9,7 @@
 #include <ctype.h>
 
 /*:::::*/
-FBCALL int fb_SetTime( FBSTRING *time )
+FBCALL int fb_SetTime( FBSTRING_ACCESS *time )
 {
 
 /* valid formats:

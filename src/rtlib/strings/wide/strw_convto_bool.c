@@ -7,8 +7,8 @@
  */
 #include "fb.h"
 
-static FB_WCHAR false_string[] = _LC( "false" );
-static FB_WCHAR true_string[] = _LC( "true" );
+static FB_WCHAR false_string[] = FB_WCHAR_LITERAL( "false" );
+static FB_WCHAR true_string[] = FB_WCHAR_LITERAL( "true" );
 
 /*:::::*/
 FBCALL FB_WCHAR *fb_hBoolToWstr( char num )

@@ -39,22 +39,22 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 
 	dst[0] = '\0';
 
-	if( (__fb_ctx.argc <= 0) || (__fb_ctx.argv == NULL) ||
-	    (__fb_ctx.argv[0] == NULL) )
+	if( (fb_ctx.argc <= 0) || (fb_ctx.argv == NULL) ||
+	    (fb_ctx.argv[0] == NULL) )
 		return NULL;
 
-	slash = strrchr( __fb_ctx.argv[0], '/' );
+	slash = strrchr( fb_ctx.argv[0], '/' );
 	if( slash == NULL )
 		return getcwd( dst, (size_t)maxlen );
 
-	length = (size_t)(slash - __fb_ctx.argv[0]);
+	length = (size_t)(slash - fb_ctx.argv[0]);
 	if( length == 0 )
 		length = 1;
 
 	if( length >= (size_t)maxlen )
 		return NULL;
 
-	memcpy( dst, __fb_ctx.argv[0], length );
+	memcpy( dst, fb_ctx.argv[0], length );
 	dst[length] = '\0';
 
 	return dst;

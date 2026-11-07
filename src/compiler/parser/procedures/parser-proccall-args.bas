@@ -23,13 +23,18 @@
 
 
 #include once "core/fb.bi"
+
 #include once "core/fbint.bi"
 #include once "support/containers/list.bi"
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "tooling/semantic-hooks.bi"
+#include once "tooling/semantic-collection-empty.bi"
+#include once "tooling/semantic-compare-contracts.bi"
 #include once "tooling/semantic-recovery.bi"
 #include once "tooling/semantic-resolution.bi"
+
+declare sub fbSemanticModelRetainCallReceiverType(byval reference as longint, byval dtype as integer)
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -296,7 +301,7 @@ end sub
 private function hGetVtableLookupIfNeeded _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval thisexpr as ASTNODE ptr, _
+		byref thisexpr as ASTNODE ptr, _
 		byval options as FB_PARSEROPT _
 	) as ASTNODE ptr
 
@@ -330,14 +335,23 @@ private function hExportCalleeBinding _
 	( byval proc as FBSYMBOL ptr, byval base_parent as FBSYMBOL ptr, _
 	  byval arg_list as FB_CALL_ARG_LIST ptr, byval source as LEX_LOCATION ptr ) as longint
 	if( source = NULL ) then return 0
+	dim as longint reference
 	if( arg_list->semantic_receiver <> NULL ) then
-		return fbSemanticModelExportCallBinding(proc, arg_list->semantic_receiver, *source, FALSE)
-	elseif( base_parent <> NULL ) then
-		if( symbIsStruct(base_parent) ) then
-			return fbSemanticModelExportCallBinding(proc, base_parent, *source, TRUE)
+		reference = fbSemanticModelExportCallBinding(proc, arg_list->semantic_receiver, *source, FALSE)
+	elseif( (base_parent <> NULL) andalso symbIsStruct(base_parent) ) then
+		reference = fbSemanticModelExportCallBinding(proc, base_parent, *source, TRUE)
+	else
+		reference = fbSemanticModelExportCallBinding(proc, NULL, *source, FALSE)
+	end if
+	'' Retain the receiver before astNewARG applies the getter's THIS type.
+	'' This distinguishes a mutable object using a CONST getter from an
+	'' object made CONST by its declaration or an explicit source cast.
+	if( symbIsMethod(proc) and (arg_list->head <> NULL) ) then
+		if( arg_list->head->expr <> NULL ) then
+			fbSemanticModelRetainCallReceiverType(reference, astGetFullType(arg_list->head->expr))
 		end if
 	end if
-	return fbSemanticModelExportCallBinding(proc, NULL, *source, FALSE)
+	return reference
 end function
 
 private function hOvlProcArgList _
@@ -451,6 +465,8 @@ private function hOvlProcArgList _
 	end if
 
 	dim as longint semantic_binding = 0
+	dim as FB_SEMANTIC_COMPARE_PROBE semantic_compare_probe
+	dim as FB_SEMANTIC_COLLECTION_EMPTY semantic_collection_empty
 
 	'' method?
 	if( symbIsMethod( proc ) ) then
@@ -474,6 +490,8 @@ private function hOvlProcArgList _
 		'' re-add the instance ptr
 		args += 1
 
+		fbSemanticModelCompareBegin(semantic_compare_probe, proc, arg_list->head->expr, arg_list->semantic_receiver)
+		fbSemanticModelCollectionEmptyBegin(semantic_collection_empty, proc, arg_list->head->expr, arg_list->semantic_receiver)
 		procexpr = hGetVtableLookupIfNeeded( proc, arg_list->head->expr, options )
 	else
 		'' remove the instance ptr
@@ -508,6 +526,7 @@ private function hOvlProcArgList _
 	for i = 0 to args-1
 		nxt = arg->next
 
+		fbSemanticModelCompareArgument(semantic_compare_probe, param, arg->expr, arg->mode)
 		if( astNewARG( procexpr, arg->expr, , arg->mode, arg->semantic_source ) = NULL ) then
 			errReport( FB_ERRMSG_PARAMTYPEMISMATCH )
 			'' error recovery: fake an expr (don't try to fake an arg,
@@ -533,6 +552,7 @@ private function hOvlProcArgList _
 	'' add the end-of-list optional args, if any
 	params = symbGetProcParams( proc )
 	do while( args < params )
+		fbSemanticModelCompareArgument(semantic_compare_probe, param, NULL, INVALID)
 		astNewARG( procexpr, NULL )
 
 		'' next
@@ -540,6 +560,8 @@ private function hOvlProcArgList _
 		param = param->next
 	loop
 
+	fbSemanticModelCompareFinish(semantic_compare_probe, semantic_binding)
+	fbSemanticModelCollectionEmptyFinish(semantic_collection_empty, semantic_binding)
 	function = procexpr
 end function
 
@@ -587,6 +609,8 @@ function cProcArgList _
 	end if
 
 	dim as longint semantic_binding = 0
+	dim as FB_SEMANTIC_COMPARE_PROBE semantic_compare_probe
+	dim as FB_SEMANTIC_COLLECTION_EMPTY semantic_collection_empty
 
 	'' method?
 	if( symbIsMethod( proc ) ) then
@@ -612,6 +636,8 @@ function cProcArgList _
 		'' (i.e. no virtual method pointers for now)
 		assert( ptrexpr = NULL )
 
+		fbSemanticModelCompareBegin(semantic_compare_probe, proc, arg_list->head->expr, arg_list->semantic_receiver)
+		fbSemanticModelCollectionEmptyBegin(semantic_collection_empty, proc, arg_list->head->expr, arg_list->semantic_receiver)
 		ptrexpr = hGetVtableLookupIfNeeded( proc, arg_list->head->expr, options )
 	else
 		'' remove the instance ptr
@@ -647,6 +673,7 @@ function cProcArgList _
 	do while( arg <> NULL )
 		dim as FB_CALL_ARG ptr nxt = arg->next
 
+		fbSemanticModelCompareArgument(semantic_compare_probe, param, arg->expr, arg->mode)
 		if( astNewARG( procexpr, arg->expr, , arg->mode ) = NULL ) then
 			astDelTree( procexpr )
 			return astBuildFakeCall( proc )
@@ -680,6 +707,7 @@ function cProcArgList _
 			end if
 		end if
 
+		fbSemanticModelCollectionEmptyFinish(semantic_collection_empty, semantic_binding)
 		return procexpr
 	end if
 
@@ -707,6 +735,7 @@ function cProcArgList _
 			end if
 
 			'' add to tree
+			fbSemanticModelCompareArgument(semantic_compare_probe, param, expr, mode)
 			if( astNewARG( procexpr, expr, , mode, @semantic_range ) = NULL ) then
 				'' error recovery: skip until next stmt or ')'
 				if( (options and FB_PARSEROPT_ISFUNC) <> 0 ) then
@@ -749,6 +778,7 @@ function cProcArgList _
 		end if
 
 		'' add to tree
+		fbSemanticModelCompareArgument(semantic_compare_probe, param, NULL, INVALID)
 		if( astNewARG( procexpr, NULL ) = NULL ) then
 			astDelTree( procexpr )
 			return astBuildFakeCall( proc )
@@ -759,6 +789,8 @@ function cProcArgList _
 		param = param->next
 	loop
 
+	fbSemanticModelCompareFinish(semantic_compare_probe, semantic_binding)
+	fbSemanticModelCollectionEmptyFinish(semantic_collection_empty, semantic_binding)
 	function = procexpr
 end function
 

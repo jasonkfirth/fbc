@@ -12,10 +12,10 @@
 /* Slices and scalar construction                                             */
 /* ------------------------------------------------------------------------- */
 
-FBCALL FBSTRING *fb_UStrMid( FBSTRING *src, ssize_t start, ssize_t count )
+FBCALL FBSTRING_ACCESS *fb_UStrMid( FBSTRING_ACCESS *src, ssize_t start, ssize_t count )
 {
 	ssize_t length, first, last;
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) && (start > 0) && (count != 0) ) {
 		length = FB_STRSIZE(src);
@@ -26,22 +26,22 @@ FBCALL FBSTRING *fb_UStrMid( FBSTRING *src, ssize_t start, ssize_t count )
 	}
 	fb_hStrDelTemp_NoLock( src );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBCALL FBSTRING *fb_UStrLeft( FBSTRING *src, ssize_t count )
+FBCALL FBSTRING_ACCESS *fb_UStrLeft( FBSTRING_ACCESS *src, ssize_t count )
 {
 	return fb_UStrMid( src, 1, count < 0 ? 0 : count );
 }
 
-FBCALL void fb_UStrLeftSelf( FBSTRING *dst, ssize_t count )
+FBCALL void fb_UStrLeftSelf( FBSTRING_ACCESS *dst, ssize_t count )
 {
 	ssize_t length;
 	if( dst == NULL ) return;
 	FB_STRLOCK();
 	if( count >= 0 ) {
 		length = fb_hUtf8Offset(dst->data, FB_STRSIZE(dst), count);
-		fb_hStrSetLength(dst, length);
+		fb_hStrSetLength(dst, (size_t)length);
 		if( dst->data != NULL ) dst->data[length] = 0;
 	}
 	/* Match LEFTSELF's existing temporary-descriptor ownership contract. */
@@ -64,10 +64,10 @@ FBCALL void fb_WstrLeftSelf( FB_WCHAR *dst, ssize_t count )
 	dst[offset] = 0;
 }
 
-FBCALL FBSTRING *fb_UStrRight( FBSTRING *src, ssize_t count )
+FBCALL FBSTRING_ACCESS *fb_UStrRight( FBSTRING_ACCESS *src, ssize_t count )
 {
 	ssize_t length, scalars, first;
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) && (count > 0) ) {
 		length = FB_STRSIZE(src);
@@ -77,14 +77,14 @@ FBCALL FBSTRING *fb_UStrRight( FBSTRING *src, ssize_t count )
 	}
 	fb_hStrDelTemp_NoLock( src );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBSTRING *fb_UStrChr( int count, ... )
+FBSTRING_ACCESS *fb_UStrChr( int count, ... )
 {
 	va_list args;
 	ssize_t bytes = 0, scalar;
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	int i;
 	FB_STRLOCK();
 	/* The parser permits at most 32 arguments, matching CHR/WCHR. */
@@ -98,20 +98,20 @@ FBSTRING *fb_UStrChr( int count, ... )
 				bytes += fb_hUtf8Encode( result->data + bytes, (unsigned int)scalar );
 			}
 			va_end( args );
-			fb_hStrSetLength( result, bytes );
+			fb_hStrSetLength( result, (size_t)bytes );
 			result->data[bytes] = 0;
 		}
 	}
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-static FBSTRING *hFill_NoLock( ssize_t count, unsigned int scalar )
+static FBSTRING_ACCESS *hFill_NoLock( ssize_t count, unsigned int scalar )
 {
 	char encoded[4];
 	ssize_t width, offset;
-	FBSTRING *result;
-	if( count <= 0 ) return &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result;
+	if( count <= 0 ) return &fb_ctx.null_desc;
 	width = fb_hUtf8Encode( encoded, scalar );
 	if( count > FB_USTRING_MAX_BYTES / width ) {
 		fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
@@ -120,42 +120,42 @@ static FBSTRING *hFill_NoLock( ssize_t count, unsigned int scalar )
 	result = fb_hUStrAlloc_NoLock( count * width );
 	if( result != NULL ) {
 		for( offset = 0; offset < count * width; offset += width )
-			memcpy( result->data + offset, encoded, width );
+			memcpy( result->data + offset, encoded, (size_t)(width) );
 	}
 	return result;
 }
 
-FBCALL FBSTRING *fb_UStrFill1( ssize_t count, ssize_t scalar )
+FBCALL FBSTRING_ACCESS *fb_UStrFill1( ssize_t count, ssize_t scalar )
 {
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	if( (scalar < 0) || (scalar > 0x10FFFF) ) scalar = FB_UTF8_REPLACEMENT;
 	result = hFill_NoLock( count, (unsigned int)scalar );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBCALL FBSTRING *fb_UStrFill2( ssize_t count, FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_UStrFill2( ssize_t count, FBSTRING_ACCESS *src )
 {
 	ssize_t offset = 0;
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) && (FB_STRSIZE(src) > 0) )
 		result = hFill_NoLock( count, fb_hUtf8Decode( src->data, FB_STRSIZE(src), &offset ) );
 	fb_hStrDelTemp_NoLock( src );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
 /* ------------------------------------------------------------------------- */
 /* Replacement and alignment                                                 */
 /* ------------------------------------------------------------------------- */
 
-FBCALL void fb_UStrAssignMid( FBSTRING *dst, ssize_t start, ssize_t count, FBSTRING *src )
+FBCALL void fb_UStrAssignMid( FBSTRING_ACCESS *dst, ssize_t start, ssize_t count, FBSTRING_ACCESS *src )
 {
 	ssize_t first, last, copied, replaced = 0, src_offset = 0;
 	ssize_t dst_length, src_length;
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	if( (dst != NULL) && (dst->data != NULL) && (src != NULL) &&
 	    (src->data != NULL) && (start > 0) && (count != 0) ) {
@@ -174,9 +174,9 @@ FBCALL void fb_UStrAssignMid( FBSTRING *dst, ssize_t start, ssize_t count, FBSTR
 		if( dst_length - (last - first) <= FB_USTRING_MAX_BYTES - copied ) {
 			result = fb_hUStrAlloc_NoLock( dst_length - (last - first) + copied );
 			if( result != NULL ) {
-				if( first ) memcpy( result->data, dst->data, first );
-				if( copied ) memcpy( result->data + first, src->data, copied );
-				if( dst_length > last ) memcpy( result->data + first + copied, dst->data + last, dst_length - last );
+				if( first ) memcpy( result->data, dst->data, (size_t)(first) );
+				if( copied ) memcpy( result->data + first, src->data, (size_t)(copied) );
+				if( dst_length > last ) memcpy( result->data + first + copied, dst->data + last, (size_t)(dst_length - last) );
 				fb_hUStrMove_NoLock( dst, result, FB_FALSE );
 			}
 		} else fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
@@ -185,10 +185,10 @@ FBCALL void fb_UStrAssignMid( FBSTRING *dst, ssize_t start, ssize_t count, FBSTR
 	FB_STRUNLOCK();
 }
 
-static void hAlign( FBSTRING *dst, FBSTRING *src, int right )
+static void hAlign( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src, int right )
 {
 	ssize_t capacity, count, copied, padding;
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	if( dst != NULL ) {
 		capacity = fb_hUtf8Count( dst->data, FB_STRSIZE(dst) );
@@ -200,11 +200,11 @@ static void hAlign( FBSTRING *dst, FBSTRING *src, int right )
 			result = fb_hUStrAlloc_NoLock( copied + padding );
 			if( (result != NULL) && (copied + padding > 0) ) {
 				if( right ) {
-					memset( result->data, ' ', padding );
-					if( copied ) memcpy( result->data + padding, src->data, copied );
+					memset( result->data, ' ', (size_t)(padding) );
+					if( copied ) memcpy( result->data + padding, src->data, (size_t)(copied) );
 				} else {
-					if( copied ) memcpy( result->data, src->data, copied );
-					memset( result->data + copied, ' ', padding );
+					if( copied ) memcpy( result->data, src->data, (size_t)(copied) );
+					memset( result->data + copied, ' ', (size_t)(padding) );
 				}
 			}
 			fb_hUStrMove_NoLock( dst, result, FB_FALSE );
@@ -214,12 +214,12 @@ static void hAlign( FBSTRING *dst, FBSTRING *src, int right )
 	FB_STRUNLOCK();
 }
 
-FBCALL void fb_UStrLset( FBSTRING *dst, FBSTRING *src )
+FBCALL void fb_UStrLset( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src )
 {
 	hAlign( dst, src, FB_FALSE );
 }
 
-FBCALL void fb_UStrSetIndex( FBSTRING *dst, ssize_t index, ssize_t scalar )
+FBCALL void fb_UStrSetIndex( FBSTRING_ACCESS *dst, ssize_t index, ssize_t scalar )
 {
 	char encoded[4];
 	FBSTRING source;
@@ -230,11 +230,11 @@ FBCALL void fb_UStrSetIndex( FBSTRING *dst, ssize_t index, ssize_t scalar )
 	}
 	if( (scalar < 0) || (scalar > 0x10FFFF) ) scalar = FB_UTF8_REPLACEMENT;
 	source.data = encoded;
-	source.len = source.size = fb_hUtf8Encode( encoded, scalar );
+	source.len = source.size = fb_hUtf8Encode( encoded, (unsigned int)scalar );
 	fb_UStrAssignMid( dst, index + 1, 1, &source );
 }
 
-FBCALL void fb_UStrRset( FBSTRING *dst, FBSTRING *src )
+FBCALL void fb_UStrRset( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src )
 {
 	hAlign( dst, src, FB_TRUE );
 }

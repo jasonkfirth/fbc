@@ -21,7 +21,7 @@
     the code easier to compare with the normal rtlib layout.
 */
 
-static void fb_nuttx_print_prompt(const FBSTRING *prompt)
+static void fb_nuttx_print_prompt(const FBSTRING_ACCESS *prompt)
 {
     if ((prompt == NULL) || (prompt->data == NULL) || (prompt->len <= 0))
         return;
@@ -198,7 +198,7 @@ static int fb_nuttx_input_bool_value(const char *text)
     return strtol(text, NULL, 10) != 0;
 }
 
-int32 fb_LineInput(const FBSTRING *prompt, void *dst, const int32 dst_len,
+int32 fb_LineInput(const FBSTRING_ACCESS *prompt, void *dst, const int32 dst_len,
     const int32 add_question, const int32 add_newline, const int32 is_input)
 {
     char buffer[FB_NUTTX_INPUT_BUFFER_SIZE];
@@ -218,7 +218,7 @@ int32 fb_LineInput(const FBSTRING *prompt, void *dst, const int32 dst_len,
     return 0;
 }
 
-int32 fb_ConsoleInput(const FBSTRING *prompt, const int32 add_question,
+int32 fb_ConsoleInput(const FBSTRING_ACCESS *prompt, const int32 add_question,
     const int32 add_newline)
 {
     (void)add_question;

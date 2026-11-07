@@ -3,7 +3,7 @@
 	File: backend/c/c-generated-storage.bi
 	Purpose: Omit unobserved private global storage from generated C.
 	Responsibilities: Record actual C uses, close static initializer dependencies,
-	and retain public, owned and thread-local storage.
+	and retain public, owned, thread-local and debugger-visible storage.
 	This file intentionally does NOT contain: Procedure liveness, initialization
 	evaluation, source access flag changes or public ABI changes.
 '/
@@ -12,6 +12,7 @@ type CGLOBALSTORAGE
 	name as zstring ptr
 	sym as FBSYMBOL ptr
 	needed as integer
+	debug_retained as integer
 	next_pending as CGLOBALSTORAGE ptr
 end type
 
@@ -130,6 +131,10 @@ private sub hCGlobalStorageRegister(byval sym as FBSYMBOL ptr)
 		'' Only the global-symbol traversal lends symbol pointers to this index.
 		'' Those symbols survive through the final global declaration pass.
 		entry->sym = sym
+		if( env.clopt.debuginfo andalso (entry->needed = FALSE) ) then
+			entry->debug_retained = TRUE
+			hCGlobalStorageReference(sym)
+		end if
 	else
 		'' Public and owned definitions remain roots even without body reads.
 		hCGlobalStorageInitializerReferences(symbGetTypeIniTree(sym))
@@ -139,8 +144,8 @@ end sub
 private sub hCGlobalStoragePrepare()
 	if( c_global_storage_ready = FALSE ) then exit sub
 	'' Opaque assembly can name storage without a typed C reference. Debug
-	'' output also preserves the original declaration ordering and contents.
-	if( c_leaf_opaque or env.clopt.debuginfo ) then exit sub
+	'' declarations remain roots, including their initializer dependencies.
+	if( c_leaf_opaque ) then exit sub
 	symbForEachGlobal(FB_SYMBCLASS_VAR, @hCGlobalStorageRegister)
 	while( c_global_storage_pending <> NULL )
 		var entry = c_global_storage_pending
@@ -158,6 +163,13 @@ private function hCGlobalStorageNeeded(byval sym as FBSYMBOL ptr) as integer
 	var entry = hCGlobalStorageGet(sym)
 	if( entry = NULL ) then return TRUE
 	return entry->needed
+end function
+
+private function hCGlobalStorageDebugRetained(byval sym as FBSYMBOL ptr) as integer
+	if( env.clopt.debuginfo = FALSE or c_global_storage_prepared = FALSE ) then return FALSE
+	if( hCGlobalStorageCandidate(sym) = FALSE ) then return FALSE
+	var entry = hCGlobalStorageGet(sym)
+	return (entry <> NULL) andalso entry->debug_retained
 end function
 
 /' end of backend/c/c-generated-storage.bi '/

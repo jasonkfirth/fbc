@@ -19,8 +19,8 @@
         - architecture baselines
 */
 
-#ifndef __FB_AROS_H__
-#define __FB_AROS_H__
+#ifndef FB_RTLIB_AROS_H
+#define FB_RTLIB_AROS_H
 
 #include <dos/dos.h>
 
@@ -41,8 +41,8 @@ int fb_hArosGetFileHandle( FILE *fp, BPTR *file_handle );
 fb_off_t fb_hArosGetFilePosition( FILE *fp );
 int fb_hArosSetFilePosition( FILE *fp, fb_off_t position, int whence );
 
-struct _FB_FILE;
-void fb_hArosGrowFileSize( struct _FB_FILE *handle );
+struct FB_FILE_;
+void fb_hArosGrowFileSize( struct FB_FILE_ *handle );
 
 #endif
 

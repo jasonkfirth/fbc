@@ -10,7 +10,7 @@
 
 int fb_ConsoleGetMaxRow( void )
 {
-	COORD max = GetLargestConsoleWindowSize( __fb_out_handle );
+	COORD max = GetLargestConsoleWindowSize( FB_CONSOLE_OUTPUT_HANDLE );
 	return (max.Y == 0) ? FB_SCRN_DEFAULT_HEIGHT : max.Y + 1;
 }
 

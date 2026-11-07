@@ -19,7 +19,7 @@
 #define SIGNAL		0
 #define BROADCAST	1
 
-struct _FBCOND {
+struct FBCOND_ {
 	/* data common to both implementations */
 	int waiters_count;
 	CRITICAL_SECTION waiters_count_lock;

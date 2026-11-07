@@ -14,7 +14,7 @@ static int fb_hIsMonth( const char *text, size_t text_len, const char **end_text
     const char *txt_end = text;
     int month;
     for( month=1; month!=13; ++month ) {
-        FBSTRING *sMonthName = fb_IntlGetMonthName( month, short_name, !localized );
+        FBSTRING_ACCESS *sMonthName = fb_IntlGetMonthName( month, short_name, !localized );
         DBG_ASSERT( sMonthName!=NULL );
         {
             size_t month_len = FB_STRSIZE( sMonthName );

@@ -26,10 +26,10 @@
 /* Localized month-name retrieval                                             */
 /* ------------------------------------------------------------------------- */
 
-FBSTRING *fb_DrvIntlGetMonthName( int month, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetMonthName( int month, int short_names )
 {
     LCTYPE locale_type;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
     char *name;
     size_t name_length;
 

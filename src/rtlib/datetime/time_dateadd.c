@@ -8,7 +8,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL double fb_DateAdd( FBSTRING *interval, double interval_value_arg, double serial )
+FBCALL double fb_DateAdd( FBSTRING_ACCESS *interval, double interval_value_arg, double serial )
 {
     int year, month, day, hour, minute, second;
     int carry_value, test_value;

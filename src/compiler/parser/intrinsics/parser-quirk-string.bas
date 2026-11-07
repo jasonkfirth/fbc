@@ -32,6 +32,19 @@
 #include once "tooling/semantic-expressions.bi"
 #include once "tooling/semantic-recovery.bi"
 
+declare sub fbSemanticModelStringSearch(byval result as ASTNODE ptr, byref kind as const string, _
+	byval haystack as longint, byval pattern as longint, byval start_at as longint, _
+	byval is_any as integer, byref first as LEX_LOCATION, byval nonphysical_start as longint)
+
+'' Capture each operand before the runtime lowering can replace or coerce its AST.
+private function hSemanticSearchInput(byref expr as ASTNODE ptr, byval dtype as integer) as longint
+	dim as LEX_LOCATION first = lexGetCurrentLocation()
+	dim as longint nonphysical_start = lexGetNonphysicalTokenCount()
+	hMatchExpressionEx(expr, dtype)
+	return fbSemanticModelOriginalExpression(expr, first, nonphysical_start, _
+		lexGetLastLocation(), lexGetNonphysicalTokenCount())
+end function
+
 declare function fbSemanticModelFullEnabled( ) as integer
 declare sub fbSemanticModelNativeByteInput _
 	( byval result as ASTNODE ptr, byval operand_id as longint, _
@@ -975,21 +988,28 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		hMatchLPRNT( )
-		hMatchExpressionEx( expr1, FB_DATATYPE_INTEGER )
+		dim as longint search_first = hSemanticSearchInput(expr1, FB_DATATYPE_INTEGER)
 		hMatchCOMMA( )
 		is_any = hMatch( FB_TK_ANY, LEXCHECK_POST_SUFFIX )
-		hMatchExpressionEx( expr2, FB_DATATYPE_STRING )
+		dim as longint search_second = hSemanticSearchInput(expr2, FB_DATATYPE_STRING)
+		dim as longint search_third, search_haystack, search_pattern, search_start
 		expr3 = NULL
 		if( is_any = FALSE ) then
 			if( hMatch( CHAR_COMMA ) ) then
 				is_any = hMatch( FB_TK_ANY, LEXCHECK_POST_SUFFIX )
-				hMatchExpressionEx( expr3, FB_DATATYPE_STRING )
+				search_third = hSemanticSearchInput(expr3, FB_DATATYPE_STRING)
 			end if
 		end if
 		if( expr3 = NULL ) then
+			search_haystack = search_first
+			search_pattern = search_second
 			expr3 = expr2
 			expr2 = expr1
 			expr1 = astNewCONSTi( 1 )
+		else
+			search_haystack = search_second
+			search_pattern = search_third
+			search_start = search_first
 		end if
 		hMatchRPRNT( )
 
@@ -999,6 +1019,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			expr1 = fbSemanticModelRecoveryNode( _
 				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
 				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
+		else
+			fbSemanticModelStringSearch(expr1, "instr", search_haystack, search_pattern, _
+				search_start, is_any, intrinsic_start, intrinsic_nonphysical_start)
 		end if
 
 		function = expr1
@@ -1007,12 +1030,13 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		hMatchLPRNT( )
-		hMatchExpressionEx( expr1, FB_DATATYPE_STRING )
+		dim as longint reverse_haystack = hSemanticSearchInput(expr1, FB_DATATYPE_STRING)
 		hMatchCOMMA( )
 		is_any = hMatch( FB_TK_ANY, LEXCHECK_POST_SUFFIX )
-		hMatchExpressionEx( expr2, FB_DATATYPE_STRING )
+		dim as longint reverse_pattern = hSemanticSearchInput(expr2, FB_DATATYPE_STRING)
+		dim as longint reverse_start
 		if( hMatch( CHAR_COMMA ) ) then
-			hMatchExpressionEx( expr3, FB_DATATYPE_INTEGER )
+			reverse_start = hSemanticSearchInput(expr3, FB_DATATYPE_INTEGER)
 		else
 			expr3 = astNewCONSTi( -1 )
 		end if
@@ -1024,6 +1048,9 @@ function cStringFunct(byval tk as FB_TOKEN) as ASTNODE ptr
 			expr1 = fbSemanticModelRecoveryNode( _
 				astNewCONSTi( 0 ), "replacement-constant", __FUNCTION__, _
 				"parser/intrinsics/parser-quirk-string.bas", __LINE__)
+		else
+			fbSemanticModelStringSearch(expr1, "instrrev", reverse_haystack, reverse_pattern, _
+				reverse_start, is_any, intrinsic_start, intrinsic_nonphysical_start)
 		end if
 
 		function = expr1

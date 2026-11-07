@@ -11,12 +11,12 @@
 
 #include "fb.h"
 
-const UTF_8 __fb_utf8_bmarkTb[7] = 
+const UTF_8 fb_utf8_bmarkTb[7] = 
 	{ 
 		0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC	
 	};
 
-const unsigned char __fb_utf8_trailingTb[256] =
+const unsigned char fb_utf8_trailingTb[256] =
 	{
 		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -28,7 +28,7 @@ const unsigned char __fb_utf8_trailingTb[256] =
 		2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,3,4,4,4,4,5,5,5,5
 	};
 
-const UTF_32 __fb_utf8_offsetsTb[6] =
+const UTF_32 fb_utf8_offsetsTb[6] =
 	{
 		0x00000000UL, 0x00003080UL, 0x000E2080UL, 0x03C82080UL, 0xFA082080UL, 0x82082080UL
 	};

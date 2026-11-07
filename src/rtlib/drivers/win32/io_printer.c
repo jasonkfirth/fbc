@@ -49,7 +49,7 @@ typedef struct _DEV_PRINTER_EMU_MODE {
 static
 void EmuBuild_LOGFONT( LOGFONT *lf,
                        W32_PRINTER_INFO *pInfo,
-                       unsigned uiCPI );
+                       int iCPI );
 static
     void EmuUpdateInfo( W32_PRINTER_INFO *pInfo );
 static
@@ -155,7 +155,7 @@ fb_hListDevFindName  ( FB_LIST *list, const char *pszPrinterName )
     return NULL;
 }
 
-static PRINTER_INFO_5 *GetDefaultPrinters( int *pCount )
+static PRINTER_INFO_5 *GetDefaultPrinters( DWORD *pCount )
 {
     DWORD dwNeeded = 0, dwReturned = 0;
     PRINTER_INFO_5 *result = NULL;
@@ -201,7 +201,7 @@ static PRINTER_INFO_5 *GetDefaultPrinters( int *pCount )
     return result;
 }
 
-static PRINTER_INFO_2 *GetPrinters( int *pCount )
+static PRINTER_INFO_2 *GetPrinters( DWORD *pCount )
 {
     DWORD dwNeeded = 0, dwReturned = 0;
     PRINTER_INFO_2 *result = NULL;
@@ -250,7 +250,7 @@ static PRINTER_INFO_2 *GetPrinters( int *pCount )
 static char *GetDefaultPrinterName(void)
 {
     char *result = NULL;
-    int count;
+    DWORD count;
     PRINTER_INFO_5 *printers = GetDefaultPrinters(&count);
     if( count==0 ) {
         HMODULE hMod = LoadLibrary(TEXT("winspool.drv"));
@@ -322,7 +322,7 @@ static int fb_hPrinterWstrBytes( size_t chars, DWORD *bytes )
 static void
 fb_hPrinterBuildListLocal( FB_LIST *list )
 {
-    int i, count;
+    DWORD i, count;
     PRINTER_INFO_2 *printers = GetPrinters(&count);
     for( i=0; i!=count; ++i ) {
         PRINTER_INFO_2 *printer = printers + i;
@@ -388,7 +388,8 @@ static int
 fb_hPrinterBuildListOther( FB_LIST *list, int iStartPort )
 {
     char Buffer[32];
-    int i, count, iPort = iStartPort - 1;
+    DWORD i, count;
+    int iPort = iStartPort - 1;
     PRINTER_INFO_2 *printers = GetPrinters(&count);
 
     for( i=0; i!=count; ++i ) {
@@ -621,17 +622,18 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDevice )
 static
 void EmuBuild_LOGFONT( LOGFONT *lf,
                        W32_PRINTER_INFO *pInfo,
-                       unsigned uiCPI )
+                       int iCPI )
 {
     memset( lf, 0, sizeof( LOGFONT ) );
-    lf->lfHeight = pInfo->Emu.dwDPI_Y*10/72;         /* default height */
+    /* Ten points at the device DPI; an inch contains 72 points. */
+    lf->lfHeight = pInfo->Emu.dwDPI_Y*10/72;
     lf->lfWeight = FW_NORMAL;
     lf->lfCharSet = OEM_CHARSET;
     lf->lfOutPrecision = OUT_DEFAULT_PRECIS;
     lf->lfClipPrecision = CLIP_DEFAULT_PRECIS;
     lf->lfQuality = DRAFT_QUALITY;
-    if( uiCPI!=0 ) {
-        lf->lfWidth = pInfo->Emu.dwDPI_X/uiCPI;
+    if( iCPI > 0 ) {
+        lf->lfWidth = pInfo->Emu.dwDPI_X/iCPI;
         lf->lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
         strcpy( lf->lfFaceName, "System" );
     } else {
@@ -643,16 +645,16 @@ void EmuBuild_LOGFONT( LOGFONT *lf,
 
 static void EmuUpdateInfo( W32_PRINTER_INFO *pInfo )
 {
-    TEXTMETRIC tm;
+    TEXTMETRIC tm = { 0 };
 
     SelectObject( pInfo->hDc, pInfo->Emu.hFont );
 
     GetTextMetrics( pInfo->hDc, &tm );
     pInfo->Emu.dwFontSizeX = tm.tmMaxCharWidth;
     pInfo->Emu.dwFontSizeY = tm.tmHeight;
-    if( pInfo->Emu.dwFontSizeX==0 )
+    if( pInfo->Emu.dwFontSizeX <= 0 )
         pInfo->Emu.dwFontSizeX = 1;
-    if( pInfo->Emu.dwFontSizeY==0 )
+    if( pInfo->Emu.dwFontSizeY <= 0 )
         pInfo->Emu.dwFontSizeY = 1;
 }
 
@@ -726,7 +728,7 @@ static void EmuPrint_RAW( W32_PRINTER_INFO *pInfo,
 }
 
 static
-void fb_hHookConPrinterScroll(struct _fb_ConHooks *handle,
+void fb_hHookConPrinterScroll(struct fb_ConHooks_ *handle,
                               int x1,
                               int y1,
                               int x2,
@@ -758,7 +760,7 @@ void fb_hHookConPrinterScroll(struct _fb_ConHooks *handle,
 }
 
 static
-int  fb_hHookConPrinterWrite (struct _fb_ConHooks *handle,
+int  fb_hHookConPrinterWrite (struct fb_ConHooks_ *handle,
                               const void *buffer,
                               size_t length )
 {
@@ -770,7 +772,7 @@ int  fb_hHookConPrinterWrite (struct _fb_ConHooks *handle,
 }
 
 static
-int  fb_hHookConPrinterWriteWstr (struct _fb_ConHooks *handle,
+int  fb_hHookConPrinterWriteWstr (struct fb_ConHooks_ *handle,
                               const void *buffer,
                               size_t length )
 {
@@ -796,7 +798,7 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
     hooks.Border.Right  =
         ( pInfo->Emu.dwSizeX - pInfo->Emu.dwFontSizeX + 1 ) / pInfo->Emu.dwFontSizeX;
     hooks.Border.Bottom =
-        ( pInfo->Emu.dwSizeY - pInfo->Emu.dwFontSizeX + 1 ) / pInfo->Emu.dwFontSizeY;
+        ( pInfo->Emu.dwSizeY - pInfo->Emu.dwFontSizeY + 1 ) / pInfo->Emu.dwFontSizeY;
 
     hooks.Coord.X = pInfo->Emu.dwCurrentX / pInfo->Emu.dwFontSizeX;
     hooks.Coord.Y = pInfo->Emu.dwCurrentY / pInfo->Emu.dwFontSizeY;
@@ -817,6 +819,8 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 									/* FormFeed */
 									iFound = TRUE;
 									break;
+							default:
+									break;
 							}
 							if( iFound ) {
 									chControl = ch;
@@ -836,6 +840,8 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 							case 12:
 									/* FormFeed */
 									fb_hHookConPrinterScroll( &hooks, 0, 0, 0, 0, 0 );
+									break;
+							default:
 									break;
 							}
 					}
@@ -858,6 +864,8 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 									/* FormFeed */
 									iFound = TRUE;
 									break;
+							default:
+									break;
 							}
 							if( iFound ) {
 									chControl = ch;
@@ -877,6 +885,8 @@ static void EmuPrint_TTY( W32_PRINTER_INFO *pInfo,
 							case 12:
 									/* FormFeed */
 									fb_hHookConPrinterScroll( &hooks, 0, 0, 0, 0, 0 );
+									break;
+							default:
 									break;
 							}
 					}
@@ -905,6 +915,9 @@ static void EmuPrint_ESC_P2( DEV_LPT_INFO *devInfo,
 }
 #endif
 
+/* WritePrinter declares its input data as LPVOID. Keep our borrowed
+   input const and retain the SDK conversion at the two call sites.
+   https://learn.microsoft.com/en-us/windows/win32/printdocs/writeprinter */
 int fb_PrinterWrite( DEV_LPT_INFO *devInfo, const void *data, size_t length )
 {
 		W32_PRINTER_INFO *pInfo = (W32_PRINTER_INFO*) devInfo->driver_opaque;

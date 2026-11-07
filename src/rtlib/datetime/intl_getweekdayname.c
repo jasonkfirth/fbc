@@ -28,9 +28,9 @@ static const char *pszWeekdayNamesShort[7] = {
 };
 
 /*:::::*/
-FBSTRING *fb_IntlGetWeekdayName( int weekday, int short_names, int disallow_localized )
+FBSTRING_ACCESS *fb_IntlGetWeekdayName( int weekday, int short_names, int disallow_localized )
 {
-    FBSTRING *res;
+    FBSTRING_ACCESS *res;
 
     if( weekday < 1 || weekday > 7 )
         return NULL;
@@ -45,7 +45,7 @@ FBSTRING *fb_IntlGetWeekdayName( int weekday, int short_names, int disallow_loca
     } else {
         res = fb_StrAllocTempDescZ( pszWeekdayNamesLong[weekday-1] );
     }
-    if( res==&__fb_ctx.null_desc )
+    if( res==&fb_ctx.null_desc )
         return NULL;
     return res;
 }

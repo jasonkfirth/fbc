@@ -203,7 +203,7 @@ static ssize_t fb_hFindNaive
 }
 #endif
 
-FBCALL ssize_t fb_StrInstr( ssize_t start, FBSTRING *src, FBSTRING *patt )
+FBCALL ssize_t fb_StrInstr( ssize_t start, FBSTRING_ACCESS *src, FBSTRING_ACCESS *patt )
 {
 	ssize_t r;
 

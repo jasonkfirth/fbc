@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL ssize_t fb_StrInstrRevAny( FBSTRING *src, FBSTRING *patt, ssize_t start )
+FBCALL ssize_t fb_StrInstrRevAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patt, ssize_t start )
 {
 	ssize_t r = 0;
 

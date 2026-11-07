@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL int fb_Chain ( FBSTRING *program )
+FBCALL int fb_Chain ( FBSTRING_ACCESS *program )
 {
     return fb_ExecEx( program, NULL, TRUE );
 }

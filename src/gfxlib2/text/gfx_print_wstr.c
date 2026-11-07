@@ -11,7 +11,7 @@
 
 void fb_GfxPrintBufferWstrEx(const FB_WCHAR *buffer, size_t len, int mask)
 {
-	FBSTRING *glyphs = fb_hGfxWideGlyphs(buffer, len);
+	FBSTRING_ACCESS *glyphs = fb_hGfxWideGlyphs(buffer, len);
 	if( glyphs == NULL ) return;
 	fb_GfxPrintBufferEx(glyphs->data, FB_STRSIZE(glyphs), mask);
 	fb_hStrDelTemp(glyphs);

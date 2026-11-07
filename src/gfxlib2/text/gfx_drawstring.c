@@ -78,7 +78,7 @@ static int parse_font(void *image, int target_bpp, FB_GFX_FONT *font,
 	return fb_hGfxParseFont(*pixels, width, height, row_pitch, font);
 }
 
-FBCALL int fb_GfxDrawStringSize(FBSTRING *string, int *width, int *height,
+FBCALL int fb_GfxDrawStringSize(FBSTRING_ACCESS *string, int *width, int *height,
 	void *font_image)
 {
 	FB_GFX_FONT font;
@@ -118,7 +118,7 @@ FBCALL int fb_GfxDrawString
 		float fx,
 		float fy,
 		int flags,
-		FBSTRING *string,
+		FBSTRING_ACCESS *string,
 		unsigned int color,
 		void *font,
 		int mode,

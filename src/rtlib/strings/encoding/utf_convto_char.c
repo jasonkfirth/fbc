@@ -10,9 +10,10 @@
  */
 
 #include "fb.h"
+#include "utf_size.h"
 
-extern const unsigned char __fb_utf8_trailingTb[256];
-extern const UTF_32 __fb_utf8_offsetsTb[6];
+/* Use the shared declarations so readers keep the same ABI labels. */
+
 
 #define FB_UTF8_MAX_TRAILING_BYTES 5
 
@@ -89,7 +90,7 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 	    charsleft = 0;
 	    do 
 	    {
-			extbytes = __fb_utf8_trailingTb[(unsigned int)*src];
+			extbytes = fb_utf8_trailingTb[(unsigned int)*src];
 	
 			c = 0;
 			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
@@ -119,16 +120,20 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			}
 
 			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
-				c -= __fb_utf8_offsetsTb[extbytes];
+				c -= fb_utf8_offsetsTb[extbytes];
 	
 			if( c > 255 )
 				c = '?';
 	
 			if( charsleft == 0 )
 			{
+				size_t allocation;
+				if( !fb_hUTFGrow( &dst_size, charsleft, sizeof( char ), &allocation ) ) {
+					free( buffer );
+					return NULL;
+				}
 				charsleft = 8;
-				dst_size += charsleft;
-				char *newbuffer = realloc( buffer, dst_size );
+				char *newbuffer = realloc( buffer, allocation );
 				if( newbuffer == NULL )
 				{
 					free( buffer );
@@ -138,7 +143,7 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 				dst = buffer + dst_size - charsleft;
 			}
 			
-			*dst++ = c;
+			*dst++ = (char)c;
 
 			if( c == 0 )
 				break;
@@ -153,7 +158,7 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 	    charsleft = *chars;
 	    while( charsleft > 0 )
 	    {
-			extbytes = __fb_utf8_trailingTb[*src];
+			extbytes = fb_utf8_trailingTb[*src];
 	
 			c = 0;
 			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
@@ -183,12 +188,12 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			}
 
 			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
-				c -= __fb_utf8_offsetsTb[extbytes];
+				c -= fb_utf8_offsetsTb[extbytes];
 
 			if( c > 255 )
 				c = '?';
 
-			*dst++ = c;
+			*dst++ = (char)c;
 
 			if( c == 0 )
 				break;
@@ -224,9 +229,13 @@ char *fb_hUTF16ToChar( const UTF_16 *src, char *dst, ssize_t *chars )
 	
 			if( charsleft == 0 )
 			{
+				size_t allocation;
+				if( !fb_hUTFGrow( &dst_size, charsleft, sizeof( char ), &allocation ) ) {
+					free( buffer );
+					return NULL;
+				}
 				charsleft = 8;
-				dst_size += charsleft;
-				char *newbuffer = realloc( buffer, dst_size );
+				char *newbuffer = realloc( buffer, allocation );
 				if( newbuffer == NULL )
 				{
 					free( buffer );
@@ -236,7 +245,7 @@ char *fb_hUTF16ToChar( const UTF_16 *src, char *dst, ssize_t *chars )
 				dst = buffer + dst_size - charsleft;
 			}
 			
-			*dst++ = c;
+			*dst++ = (char)c;
 
 			if( c == 0 )
 				break;
@@ -259,7 +268,7 @@ char *fb_hUTF16ToChar( const UTF_16 *src, char *dst, ssize_t *chars )
 				c = '?';
 			}
 
-			*dst++ = c;
+			*dst++ = (char)c;
 
 			if( c == 0 )
 				break;
@@ -291,9 +300,13 @@ char *fb_hUTF32ToChar( const UTF_32 *src, char *dst, ssize_t *chars )
 	
 			if( charsleft == 0 )
 			{
+				size_t allocation;
+				if( !fb_hUTFGrow( &dst_size, charsleft, sizeof( char ), &allocation ) ) {
+					free( buffer );
+					return NULL;
+				}
 				charsleft = 8;
-				dst_size += charsleft;
-				char *newbuffer = realloc( buffer, dst_size );
+				char *newbuffer = realloc( buffer, allocation );
 				if( newbuffer == NULL )
 				{
 					free( buffer );
@@ -303,7 +316,7 @@ char *fb_hUTF32ToChar( const UTF_32 *src, char *dst, ssize_t *chars )
 				dst = buffer + dst_size - charsleft;
 			}
 			
-			*dst++ = c;
+			*dst++ = (char)c;
 
 			if( c == 0 )
 				break;
@@ -322,7 +335,7 @@ char *fb_hUTF32ToChar( const UTF_32 *src, char *dst, ssize_t *chars )
 			if( c > 255 )
 				c = '?';
 
-			*dst++ = c;
+			*dst++ = (char)c;
 
 			if( c == 0 )
 				break;
@@ -338,6 +351,12 @@ char *fb_hUTF32ToChar( const UTF_32 *src, char *dst, ssize_t *chars )
 
 char *fb_UTFToChar( FB_FILE_ENCOD encod, const void *src, char *dst, ssize_t *chars )
 {
+	if( chars == NULL )
+		return NULL;
+	if( src == NULL || (dst != NULL && *chars < 0) ) {
+		*chars = 0;
+		return NULL;
+	}
 	switch( encod )
 	{
 	case FB_FILE_ENCOD_UTF8:

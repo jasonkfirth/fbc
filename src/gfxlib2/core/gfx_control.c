@@ -14,9 +14,9 @@
 #include "../drivers/win32/gfx_metrics.h"
 #endif
 
-FBCALL void fb_GfxControl_s( int what, FBSTRING *param )
+FBCALL void fb_GfxControl_s( int what, FBSTRING_ACCESS *param )
 {
-	FBSTRING *src;
+	FBSTRING_ACCESS *src;
 
 	if (!param)
 		return;
@@ -26,7 +26,7 @@ FBCALL void fb_GfxControl_s( int what, FBSTRING *param )
 	switch ( what ) {
 	case GET_WINDOW_TITLE:
 		if (!__fb_window_title )
-			src = &__fb_ctx.null_desc;
+			src = &fb_ctx.null_desc;
 		else
 			src = fb_StrAllocTempDescF( __fb_window_title, strlen(__fb_window_title) + 1 );
 		fb_StrAssign( param, -1, src, -1, FB_FALSE );
@@ -34,14 +34,14 @@ FBCALL void fb_GfxControl_s( int what, FBSTRING *param )
 
 	case GET_DRIVER_NAME:
 		if (!__fb_gfx)
-			src = &__fb_ctx.null_desc;
+			src = &fb_ctx.null_desc;
 		else
 			src = fb_StrAllocTempDescF( __fb_gfx->driver->name, strlen(__fb_gfx->driver->name) + 1 );
 		fb_StrAssign( param, -1, src, -1, FB_FALSE );
 		break;
 
 	case GET_GL_EXTENSIONS:
-		src = &__fb_ctx.null_desc;
+		src = &fb_ctx.null_desc;
 #ifndef DISABLE_OPENGL
 		if ((__fb_gfx) && (__fb_gfx->flags & OPENGL_SUPPORT))
 			src = fb_StrAllocTempDescF( __fb_gl_extensions, strlen(__fb_gl_extensions) + 1 );
@@ -81,9 +81,30 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 	if (!param4) param4 = &temp4;
 
 	if ((what == GET_WINDOW_METRICS) || (what == GET_SOFT_KEYBOARD) ||
+	    (what == GET_TOUCH_CAPABILITY) || (what == GET_DEVICE_CLASS) ||
 	    (what == SET_SOFT_KEYBOARD) || (what == SET_SOFT_KEYBOARD_REGION) ||
 	    (what == CLEAR_SOFT_KEYBOARD_REGIONS)) {
-#if defined(HOST_JS) || defined(HOST_ANDROID)
+		if (what == GET_DEVICE_CLASS) {
+			*param1 = FB_GFX_DEVICE_CLASS_UNKNOWN;
+			*param2 = *param3 = *param4 = 0;
+		}
+		if (what != GET_WINDOW_METRICS && what != GET_TOUCH_CAPABILITY &&
+		    what != GET_DEVICE_CLASS) {
+			int has_displayed_mode;
+
+			/* A null mode has no focused surface and must not summon a session OSK. */
+			FB_GRAPHICS_LOCK();
+			has_displayed_mode = (__fb_gfx != NULL) &&
+				(__fb_gfx->driver != NULL) &&
+				(__fb_gfx->driver != &__fb_gfxDriverNull);
+			FB_GRAPHICS_UNLOCK();
+			if (!has_displayed_mode) {
+				if (what == GET_SOFT_KEYBOARD)
+					*param1 = *param2 = *param3 = *param4 = 0;
+				return;
+			}
+		}
+#if defined(HOST_JS) || defined(HOST_ANDROID) || defined(HOST_LINUX)
 		fb_hMobileControl(what, param1, param2, param3, param4);
 #else
 		if (what == GET_WINDOW_METRICS) {
@@ -103,6 +124,11 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 			FB_GRAPHICS_UNLOCK();
 		} else if (what == GET_SOFT_KEYBOARD) {
 			*param1 = *param2 = *param3 = *param4 = 0;
+		} else if (what == GET_TOUCH_CAPABILITY) {
+			*param1 = -2;
+			*param2 = *param3 = *param4 = 0;
+		} else if (what == GET_DEVICE_CLASS) {
+			*param2 = *param3 = *param4 = 0;
 		}
 #endif
 		return;

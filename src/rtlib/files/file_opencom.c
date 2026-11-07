@@ -8,7 +8,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL int fb_FileOpenCom ( FBSTRING *str_filename, unsigned int mode,
+FBCALL int fb_FileOpenCom ( FBSTRING_ACCESS *str_filename, unsigned int mode,
                             unsigned int access, unsigned int lock,
                             int fnum, int len, const char *encoding )
 {

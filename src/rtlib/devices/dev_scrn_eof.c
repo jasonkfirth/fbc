@@ -9,7 +9,7 @@
 
 void fb_DevScrnFillInput( DEV_SCRN_INFO *info )
 {
-    FBSTRING *str;
+    FBSTRING_ACCESS *str;
     size_t len = 0;
 
     str = fb_Inkey( );

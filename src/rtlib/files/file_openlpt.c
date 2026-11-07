@@ -43,7 +43,7 @@ int fb_LPrintInit(void)
 }
 
 /*:::::*/
-FBCALL int fb_FileOpenLpt ( FBSTRING *str_filename, unsigned int mode,
+FBCALL int fb_FileOpenLpt ( FBSTRING_ACCESS *str_filename, unsigned int mode,
                             unsigned int access, unsigned int lock,
                             int fnum, int len, const char *encoding )
 {

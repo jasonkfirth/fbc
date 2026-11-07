@@ -403,11 +403,11 @@ int fb_hConsoleGfxMode
 		}
 
 		FB_LOCK( );
-		__fb_ctx.hooks.multikeyproc = NULL;
-		__fb_ctx.hooks.inkeyproc = NULL;
-		__fb_ctx.hooks.getkeyproc = NULL;
-		__fb_ctx.hooks.keyhitproc = NULL;
-		__fb_ctx.hooks.sleepproc = NULL;
+		fb_ctx.hooks.multikeyproc = NULL;
+		fb_ctx.hooks.inkeyproc = NULL;
+		fb_ctx.hooks.getkeyproc = NULL;
+		fb_ctx.hooks.keyhitproc = NULL;
+		fb_ctx.hooks.sleepproc = NULL;
 		FB_UNLOCK( );
 	} else {
 		if (__fb_con.keyboard_exit) {

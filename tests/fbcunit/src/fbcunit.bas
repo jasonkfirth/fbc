@@ -354,12 +354,11 @@ namespace fbcu
 	end sub
 
 	''
-	sub add_case _
+	private sub add_case _
 		( _
 			byval value as boolean, _
 			byval fil as const zstring ptr, _
 			byval lin as long, _
-			byval fun as const zstring ptr, _
 			byval msg as const zstring ptr _
 		)
 
@@ -996,7 +995,7 @@ namespace fbcu
 			end if
 		end if
 
-		add_case( value, fil, lin, fun, msg )
+		add_case( value, fil, lin, msg )
 
 	end sub
 

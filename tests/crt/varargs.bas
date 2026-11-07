@@ -1,3 +1,11 @@
+/'
+    Project: FreeBASIC compiler tests
+    File: crt/varargs.bas
+    Purpose: Check CRT variadic calls with the compiler's native va_list.
+    Responsibilities: Verify snprintf and vsprintf values and argument traversal.
+    This file intentionally does NOT implement formatting or variadic ABI lowering.
+'/
+
 #include "fbcunit.bi"
 
 '' HACK: provide our own type
@@ -24,7 +32,7 @@ SUITE( fbc_tests.crt.varargs )
 
 	END_TEST
 
-	sub call_vsprintf_proc cdecl( byval z as zstring ptr, fmt as zstring ptr, ... )
+	sub call_vsprintf_proc cdecl( byval z as zstring ptr, byval fmt as const zstring ptr, ... )
 		dim as cva_list args = any
 		cva_start( args, fmt )
 		#ifndef vsprintf
@@ -51,3 +59,5 @@ END_SUITE
 
 
 
+
+'' end of crt/varargs.bas

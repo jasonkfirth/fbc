@@ -227,10 +227,10 @@ static char *find_next(int *attrib)
 /* Public DIR entry point                                                    */
 /* ------------------------------------------------------------------------- */
 
-FBCALL FBSTRING *fb_Dir(FBSTRING *filespec, int attrib, int *out_attrib)
+FBCALL FBSTRING_ACCESS *fb_Dir(FBSTRING_ACCESS *filespec, int attrib, int *out_attrib)
 {
     FB_DIRCTX *context;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
     char *name;
     char *separator;
     int temporary_attrib;
@@ -325,11 +325,11 @@ FBCALL FBSTRING *fb_Dir(FBSTRING *filespec, int attrib, int *out_attrib)
         if (result != NULL)
             fb_hStrCopy(result->data, name, length);
         else
-            result = &__fb_ctx.null_desc;
+            result = &fb_ctx.null_desc;
     }
     else
     {
-        result = &__fb_ctx.null_desc;
+        result = &fb_ctx.null_desc;
         *out_attrib = 0;
     }
 

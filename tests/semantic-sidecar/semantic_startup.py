@@ -26,6 +26,10 @@ def validate_startup(model, number, subject_modules):
     declaration_orders, declaration_closures = defaultdict(dict), {}
     declaration_groups, declaration_inputs = {}, {}
     expected_declarations = defaultdict(list)
+    c_names = {(module, owner): spelling
+               for module, entries in model.emission_names.items()
+               for owner, stage, state, spelling, _ in entries
+               if stage == "c" and state == "selected"}
     for row in model.records["K"]:
         owner_module = subject_modules.get((row[1], int(row[2])))
         if row[3].startswith("declaration-type-group:"):
@@ -195,6 +199,13 @@ def validate_startup(model, number, subject_modules):
                 if fields[3] in ("definition-attribute", "declaration-attribute"):
                     if placement != "function-attribute" or selected_kind not in spelling or selected != (str(requested) if requested else ""):
                         raise ValueError("C startup attribute contradicts its selected kind or priority")
+                elif fields[3] == "wrapper-call":
+                    expected_wrapper = ("fb_c_startup_" + ("d_" if selected_kind == "destructor" else "c_")
+                                        + str(requested or 65535))
+                    callee = c_names.get((module, proc))
+                    if (placement != expected_wrapper or selected != (str(requested) if requested else "")
+                            or callee is None or spelling != callee + "()"):
+                        raise ValueError("C startup wrapper loses its priority, kind or selected callback name")
                 elif fields[3] != "array-entry" or selected_kind != "destructor" or not placement.startswith(".fini_array."):
                     raise ValueError("C startup emission invents another registration route")
             elif stage == "llvm":

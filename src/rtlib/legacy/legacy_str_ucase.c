@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_UCASE( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_UCASE( FBSTRING_ACCESS *src )
 {
 	return fb_StrUcase2( src, 0 );
 }

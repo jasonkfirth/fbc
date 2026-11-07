@@ -318,6 +318,79 @@
 				( typeAddrOf( typeSetIsConst( FB_DATATYPE_WCHAR ) ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
+		/' Native Win64 GAS handler activation retirement. '/ _
+		( _
+			@FB_RTL_ERRORNATIVEOWNERLEAVE, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			0 _
+		), _
+		/' C activation-local ERROR continuation APIs. '/ _
+		( _
+			@FB_RTL_ERRORCRESUMEENTER, NULL, _
+			typeAddrOf(FB_DATATYPE_VOID), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			3, _
+			{ _
+				(typeAddrOf(FB_DATATYPE_VOID), FB_PARAMMODE_BYVAL, FALSE), _
+				(typeAddrOf(typeSetIsConst(FB_DATATYPE_VOID)), FB_PARAMMODE_BYVAL, FALSE), _
+				(typeAddrOf(typeSetIsConst(FB_DATATYPE_VOID)), FB_PARAMMODE_BYVAL, FALSE) _
+			} _
+		), _
+		( _
+			@FB_RTL_ERRORCRESUMETARGET, NULL, _
+			typeAddrOf(FB_DATATYPE_VOID), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				(typeAddrOf(FB_DATATYPE_VOID), FB_PARAMMODE_BYVAL, FALSE) _
+			} _
+		), _
+		( _
+			@FB_RTL_ERRORCRESUMEPOP, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				(typeAddrOf(FB_DATATYPE_VOID), FB_PARAMMODE_BYVAL, FALSE) _
+			} _
+		), _
+		( _
+			@FB_RTL_ERRORCRESUMECHECKPOINT, @"_setjmp", _
+			FB_DATATYPE_LONG, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			2, _
+			{ _
+				(typeAddrOf(FB_DATATYPE_VOID), FB_PARAMMODE_BYVAL, FALSE), _
+				(typeAddrOf(FB_DATATYPE_VOID), FB_PARAMMODE_BYVAL, FALSE) _
+			} _
+		), _
+		( _
+			@FB_RTL_ERRORNATIVEHANDLERFRAME, NULL, _
+			typeAddrOf(FB_DATATYPE_VOID), FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				(typeAddrOf(FB_DATATYPE_VOID), FB_PARAMMODE_BYVAL, FALSE) _
+			} _
+		), _
+		/' Native dispatch owns the handler's outgoing stack argument area. '/ _
+		( _
+			@FB_RTL_ERRORNATIVEDISPATCH, NULL, _
+			FB_DATATYPE_VOID, FB_FUNCMODE_CDECL, _
+			NULL, FB_RTL_OPT_NONE, _
+			1, _
+			{ _
+				(typeAddrOf(FB_DATATYPE_VOID), FB_PARAMMODE_BYVAL, FALSE) _
+			} _
+		), _
+		/' Native local destruction must follow abandoned C worker cleanup. '/ _
+		( _
+			@FB_RTL_ERRORNATIVEOWNERCLEANUP, NULL, _
+			FB_DATATYPE_VOID, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			0 _
+		), _
 		/' EOL '/ _
 		( _
 			NULL _
@@ -486,6 +559,14 @@ sub rtlErrorSetHandler _
 	dim as ASTNODE ptr proc = any
 
 	''
+	if( env.clopt.backend = FB_BACKEND_GAS64 andalso env.clopt.target = FB_COMPTARGET_WIN32 andalso _
+	    fbGetCpuFamily() = FB_CPUFAMILY_X86_64 ) then
+		'' The public setter's leaf wrapper captures the native frame base.
+		'' Retire its metadata on every ordinary exit, even if registration
+		'' belonged to a conditional branch that did not execute.
+		parser.currproc->proc.ext->stats or= FB_PROCSTATS_NATIVEERROROWNER
+	end if
+
 	proc = astNewCALL( PROCLOOKUP( ERRORSETHANDLER ) )
 
 	'' byval newhandler as uint
@@ -628,6 +709,22 @@ function rtlErrorSetFuncName _
 		function = proc
 	end if
 
+end function
+
+'' The checked runtime hook terminates if a live child still references this
+'' frame; returning with retained metadata would leave an expired target.
+sub rtlErrorNativeOwnerLeave( )
+	astAdd( astNewCALL( PROCLOOKUP( ERRORNATIVEOWNERLEAVE ) ) )
+end sub
+
+'' No cache index is needed for this compiler-generated exit call. Keep the
+'' intrinsic's zero-argument ABI separate from the frame-pointer leaf thunk.
+function rtlErrorNativeOwnerCleanup( ) as ASTNODE ptr
+	var proc = symbLookupByNameAndClass( @symbGetGlobalNamespc(), _
+		@FB_RTL_ERRORNATIVEOWNERCLEANUP, FB_SYMBCLASS_PROC, FALSE, FALSE )
+	assert( proc <> NULL )
+	assert( symbGetIsRTL(proc) )
+	return astNewCALL( proc )
 end function
 
 '' end of runtime/rtl-error.bas

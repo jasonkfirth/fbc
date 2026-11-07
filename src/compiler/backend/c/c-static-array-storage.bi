@@ -49,7 +49,7 @@ end function
 
 private function hCStaticConstantGet(byref index as THASH, byval sym as FBSYMBOL ptr) as CSTATICCONSTANT ptr
 	if( sym = NULL ) then return NULL
-	var key = str(culngint(sym))
+	var key = str(culngint(cuint(sym)))
 	return hashLookup(@index, strptr(key))
 end function
 
@@ -64,7 +64,7 @@ private sub hCStaticConstantCollect(byval sym as FBSYMBOL ptr, byref entries as 
 			if( hCStaticConstantCandidate(sym) ) then
 				var entry = cptr(CSTATICCONSTANT ptr, listNewNode(@entries))
 				entry->sym = sym
-				var key = str(culngint(sym))
+				var key = str(culngint(cuint(sym)))
 				hashAdd(@index, ZstrDup(strptr(key)), entry, hashHash(strptr(key)))
 			end if
 		end select

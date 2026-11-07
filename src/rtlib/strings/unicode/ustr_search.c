@@ -12,7 +12,7 @@
 /* Scalar membership and substring search                                    */
 /* ------------------------------------------------------------------------- */
 
-static int hContains( FBSTRING *pattern, unsigned int scalar )
+static int hContains( FBSTRING_ACCESS *pattern, unsigned int scalar )
 {
 	ssize_t offset = 0, length;
 	if( (pattern == NULL) || (pattern->data == NULL) ) return FB_FALSE;
@@ -24,7 +24,7 @@ static int hContains( FBSTRING *pattern, unsigned int scalar )
 	return FB_FALSE;
 }
 
-static ssize_t hFind( FBSTRING *src, FBSTRING *pattern, ssize_t start, int any, int reverse )
+static ssize_t hFind( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern, ssize_t start, int any, int reverse )
 {
 	ssize_t length, pattern_length, count, offset = 0, next, position = 1, result = 0;
 	unsigned int scalar;
@@ -45,7 +45,7 @@ static ssize_t hFind( FBSTRING *src, FBSTRING *pattern, ssize_t start, int any, 
 				scalar = fb_hUtf8Decode( src->data, length, &next );
 				if( any ? hContains( pattern, scalar ) :
 				    ((pattern_length <= length - offset) &&
-				     (memcmp( src->data + offset, pattern->data, pattern_length ) == 0)) ) {
+				     (memcmp( src->data + offset, pattern->data, (size_t)(pattern_length) ) == 0)) ) {
 					result = position;
 					if( !reverse ) break;
 				}
@@ -59,22 +59,22 @@ static ssize_t hFind( FBSTRING *src, FBSTRING *pattern, ssize_t start, int any, 
 	return result;
 }
 
-FBCALL ssize_t fb_UStrInstr( ssize_t start, FBSTRING *src, FBSTRING *pattern )
+FBCALL ssize_t fb_UStrInstr( ssize_t start, FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hFind( src, pattern, start, FB_FALSE, FB_FALSE );
 }
 
-FBCALL ssize_t fb_UStrInstrAny( ssize_t start, FBSTRING *src, FBSTRING *pattern )
+FBCALL ssize_t fb_UStrInstrAny( ssize_t start, FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hFind( src, pattern, start, FB_TRUE, FB_FALSE );
 }
 
-FBCALL ssize_t fb_UStrInstrRev( FBSTRING *src, FBSTRING *pattern, ssize_t start )
+FBCALL ssize_t fb_UStrInstrRev( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern, ssize_t start )
 {
 	return hFind( src, pattern, start, FB_FALSE, FB_TRUE );
 }
 
-FBCALL ssize_t fb_UStrInstrRevAny( FBSTRING *src, FBSTRING *pattern, ssize_t start )
+FBCALL ssize_t fb_UStrInstrRevAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern, ssize_t start )
 {
 	return hFind( src, pattern, start, FB_TRUE, FB_TRUE );
 }
@@ -83,10 +83,10 @@ FBCALL ssize_t fb_UStrInstrRevAny( FBSTRING *src, FBSTRING *pattern, ssize_t sta
 /* Trimming                                                                  */
 /* ------------------------------------------------------------------------- */
 
-static FBSTRING *hTrim( FBSTRING *src, FBSTRING *pattern, int any, int left, int right )
+static FBSTRING_ACCESS *hTrim( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern, int any, int left, int right )
 {
 	ssize_t length, pattern_length, first = 0, last, next, previous, offset;
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) ) {
 		length = last = FB_STRSIZE(src);
@@ -97,7 +97,7 @@ static FBSTRING *hTrim( FBSTRING *src, FBSTRING *pattern, int any, int left, int
 				if( any ? hContains( pattern, fb_hUtf8Decode( src->data, length, &next ) ) :
 				    (pattern == NULL ? src->data[first] == ' ' :
 				     ((pattern_length > 0) && (pattern_length <= last - first) &&
-				      (memcmp( src->data + first, pattern->data, pattern_length ) == 0))) ) {
+				      (memcmp( src->data + first, pattern->data, (size_t)(pattern_length) ) == 0))) ) {
 					first = any ? next : first + (pattern ? pattern_length : 1);
 				} else break;
 			}
@@ -119,7 +119,7 @@ static FBSTRING *hTrim( FBSTRING *src, FBSTRING *pattern, int any, int left, int
 					--last;
 				} else {
 					if( (pattern_length <= 0) || (pattern_length > last - first) ||
-					    memcmp( src->data + last - pattern_length, pattern->data, pattern_length ) ) break;
+					    memcmp( src->data + last - pattern_length, pattern->data, (size_t)(pattern_length) ) ) break;
 					last -= pattern_length;
 				}
 			}
@@ -128,50 +128,50 @@ static FBSTRING *hTrim( FBSTRING *src, FBSTRING *pattern, int any, int left, int
 	}
 	fb_hUStrDeletePair_NoLock( src, pattern );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBCALL FBSTRING *fb_UStrTrim( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_UStrTrim( FBSTRING_ACCESS *src )
 {
 	return hTrim( src, NULL, FB_FALSE, FB_TRUE, FB_TRUE );
 }
 
-FBCALL FBSTRING *fb_UStrTrimEx( FBSTRING *src, FBSTRING *pattern )
+FBCALL FBSTRING_ACCESS *fb_UStrTrimEx( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hTrim( src, pattern, FB_FALSE, FB_TRUE, FB_TRUE );
 }
 
-FBCALL FBSTRING *fb_UStrTrimAny( FBSTRING *src, FBSTRING *pattern )
+FBCALL FBSTRING_ACCESS *fb_UStrTrimAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hTrim( src, pattern, FB_TRUE, FB_TRUE, FB_TRUE );
 }
 
-FBCALL FBSTRING *fb_UStrLTrim( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_UStrLTrim( FBSTRING_ACCESS *src )
 {
 	return hTrim( src, NULL, FB_FALSE, FB_TRUE, FB_FALSE );
 }
 
-FBCALL FBSTRING *fb_UStrLTrimEx( FBSTRING *src, FBSTRING *pattern )
+FBCALL FBSTRING_ACCESS *fb_UStrLTrimEx( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hTrim( src, pattern, FB_FALSE, FB_TRUE, FB_FALSE );
 }
 
-FBCALL FBSTRING *fb_UStrLTrimAny( FBSTRING *src, FBSTRING *pattern )
+FBCALL FBSTRING_ACCESS *fb_UStrLTrimAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hTrim( src, pattern, FB_TRUE, FB_TRUE, FB_FALSE );
 }
 
-FBCALL FBSTRING *fb_UStrRTrim( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_UStrRTrim( FBSTRING_ACCESS *src )
 {
 	return hTrim( src, NULL, FB_FALSE, FB_FALSE, FB_TRUE );
 }
 
-FBCALL FBSTRING *fb_UStrRTrimEx( FBSTRING *src, FBSTRING *pattern )
+FBCALL FBSTRING_ACCESS *fb_UStrRTrimEx( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hTrim( src, pattern, FB_FALSE, FB_FALSE, FB_TRUE );
 }
 
-FBCALL FBSTRING *fb_UStrRTrimAny( FBSTRING *src, FBSTRING *pattern )
+FBCALL FBSTRING_ACCESS *fb_UStrRTrimAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern )
 {
 	return hTrim( src, pattern, FB_TRUE, FB_FALSE, FB_TRUE );
 }

@@ -9,7 +9,7 @@
 
 FBCALL int fb_LineInput
 	(
-		FBSTRING *text,
+		FBSTRING_ACCESS *text,
 		void *dst,
 		ssize_t dst_len,
 		int fillrem,
@@ -20,7 +20,7 @@ FBCALL int fb_LineInput
     FB_LINEINPUTPROC lineinputproc;
 
     FB_LOCK();
-    lineinputproc = __fb_ctx.hooks.lineinputproc;
+    lineinputproc = fb_ctx.hooks.lineinputproc;
     FB_UNLOCK();
 
     if( lineinputproc )

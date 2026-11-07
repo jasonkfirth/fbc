@@ -88,20 +88,20 @@ ssize_t fb_wstr_ConvToA( char *dst, ssize_t dst_chars, const FB_WCHAR *src )
 	return chars;
 }
 
-FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
+FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )
 {
 	if( src == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	ssize_t chars = fb_wstr_Len( src );
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 
 	if( chars == 0 )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	dst = fb_hStrAllocTemp( NULL, chars );
 	if( dst == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	fb_wstr_ConvToA( dst->data, chars, src );
 	return dst;
@@ -167,23 +167,23 @@ ssize_t fb_wstr_ConvToA( char *dst, ssize_t dst_chars, const FB_WCHAR *src )
 	return bytes;
 }
 
-FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
+FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )
 {
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 	ssize_t chars;
 	ssize_t bytes;
 
 	if( src == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	chars = fb_wstr_Len( src );
 	if( chars == 0 )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	/* Worst case is up to 4 UTF-8 bytes per wide character. */
 	dst = fb_hStrAllocTemp( NULL, chars * 4 );
 	if( dst == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	bytes = fb_wstr_ConvToA( dst->data, chars * 4, src );
 	fb_hStrSetLength( dst, bytes );
@@ -191,7 +191,7 @@ FBCALL FBSTRING *fb_WstrToStr( const FB_WCHAR *src )
 	if( bytes == 0 )
 	{
 		fb_hStrDelTemp( dst );
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
 	return dst;

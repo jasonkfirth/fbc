@@ -129,10 +129,11 @@ private sub hMainBegin( )
 		case FB_BACKEND_GCC, FB_BACKEND_CLANG
 			id = *symbUniqueId( )
 		end select
-	else
+	elseif( id = "main" ) then
 		'' If the implicit main() will actually be called main() and be
 		'' public too, then the C backend needs to take care to emit
-		'' argv with the proper dtype...
+		'' argv with the proper dtype. Custom entry points retain the
+		'' ordinary BASIC pointer view used by their explicit declarations.
 		argv->stats or= FB_SYMBSTATS_ARGV
 	end if
 

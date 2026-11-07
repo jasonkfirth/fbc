@@ -227,7 +227,7 @@ int32 fb_FileFree(void)
     return 0;
 }
 
-int32 fb_FileOpen(const FBSTRING *filename, const uint32 mode,
+int32 fb_FileOpen(const FBSTRING_ACCESS *filename, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 len)
 {
@@ -298,7 +298,7 @@ int32 fb_FileOpen(const FBSTRING *filename, const uint32 mode,
     return 0;
 }
 
-static int fb_nuttx_string_equals_ascii_ci(const FBSTRING *text,
+static int fb_nuttx_string_equals_ascii_ci(const FBSTRING_ACCESS *text,
     const char *expected)
 {
     int32 i;
@@ -372,7 +372,7 @@ static int32 fb_nuttx_file_open_console(const uint32 mode, const int32 file_num)
     return 0;
 }
 
-int32 fb_FileOpenQB(FBSTRING *filename, const uint32 mode,
+int32 fb_FileOpenQB(FBSTRING_ACCESS *filename, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 len)
 {
@@ -387,7 +387,7 @@ int32 fb_FileOpenQB(FBSTRING *filename, const uint32 mode,
     return fb_FileOpen(filename, mode, access, lock, file_num, len);
 }
 
-int32 fb_FileOpenEncod(const FBSTRING *filename, const uint32 mode,
+int32 fb_FileOpenEncod(const FBSTRING_ACCESS *filename, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 len, const char *encoding)
 {
@@ -513,7 +513,7 @@ static int32 fb_nuttx_file_get_str_data(const int32 file_num,
     uint32 *bytes_read)
 {
     FILE *stream;
-    FBSTRING *dst_string;
+    FBSTRING_ACCESS *dst_string;
     char *buffer;
     int32 len;
     size_t got;
@@ -532,7 +532,7 @@ static int32 fb_nuttx_file_get_str_data(const int32 file_num,
     if (fb_nuttx_is_fixed_length(dst_len)) {
         len = fb_nuttx_decode_fixed_length(dst_len);
     } else {
-        dst_string = (FBSTRING *)dst;
+        dst_string = (FBSTRING_ACCESS *)dst;
         len = dst_string->len;
     }
 
@@ -765,7 +765,7 @@ int32 fb_FileGetStr(const int32 file_num, const int32 position,
     void *dst, const int32 dst_len)
 {
     FILE *stream;
-    FBSTRING *dst_string;
+    FBSTRING_ACCESS *dst_string;
     char *buffer;
     int32 len;
     size_t got;
@@ -781,7 +781,7 @@ int32 fb_FileGetStr(const int32 file_num, const int32 position,
     if (fb_nuttx_is_fixed_length(dst_len)) {
         len = fb_nuttx_decode_fixed_length(dst_len);
     } else {
-        dst_string = (FBSTRING *)dst;
+        dst_string = (FBSTRING_ACCESS *)dst;
         len = dst_string->len;
     }
 
@@ -835,7 +835,7 @@ int32 fb_FileLineInput(const int32 file_num, void *dst_void,
     return 0;
 }
 
-FBSTRING *fb_FileStrInput(const int32 chars, const int32 file_num)
+FBSTRING_ACCESS *fb_FileStrInput(const int32 chars, const int32 file_num)
 {
     FILE *stream;
     char *buffer;
@@ -992,7 +992,7 @@ int64_t fb_FileLocation(const int32 file_num)
     return fb_FileTell(file_num);
 }
 
-int32 fb_FileKill(const FBSTRING *filename)
+int32 fb_FileKill(const FBSTRING_ACCESS *filename)
 {
     char *path;
     int result;
@@ -1012,7 +1012,7 @@ int32 fb_FileKill(const FBSTRING *filename)
 }
 
 #if !defined(FB_NUTTX_USE_GENERIC_DIR) || (FB_NUTTX_USE_GENERIC_DIR == 0)
-int32 fb_MkDir(const FBSTRING *dirname)
+int32 fb_MkDir(const FBSTRING_ACCESS *dirname)
 {
     char *path;
     int result;
@@ -1031,7 +1031,7 @@ int32 fb_MkDir(const FBSTRING *dirname)
     return 0;
 }
 
-int32 fb_RmDir(const FBSTRING *dirname)
+int32 fb_RmDir(const FBSTRING_ACCESS *dirname)
 {
     char *path;
     int result;
@@ -1050,7 +1050,7 @@ int32 fb_RmDir(const FBSTRING *dirname)
     return 0;
 }
 
-int32 fb_ChDir(const FBSTRING *dirname)
+int32 fb_ChDir(const FBSTRING_ACCESS *dirname)
 {
     char *path;
     int result;
@@ -1080,7 +1080,7 @@ ssize_t fb_hGetCurrentDir(char *dst, const ssize_t maxlen)
     return (ssize_t)strlen(dst);
 }
 
-FBSTRING *fb_CurDir(void)
+FBSTRING_ACCESS *fb_CurDir(void)
 {
     char path[256];
     char *stored_path;
@@ -1507,7 +1507,7 @@ static int fb_nuttx_serial_configure(int fd,
 }
 #endif
 
-int32 fb_FileOpenCom(const FBSTRING *device, const uint32 mode,
+int32 fb_FileOpenCom(const FBSTRING_ACCESS *device, const uint32 mode,
     const uint32 access, const uint32 lock, const int32 file_num,
     const int32 reclen, const char *encoding)
 {

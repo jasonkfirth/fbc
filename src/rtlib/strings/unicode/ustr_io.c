@@ -57,14 +57,15 @@ static int hByte( USTR_READER *reader )
 
 static void hUnreadByte( USTR_READER *reader, int byte )
 {
-	unsigned char value = byte;
+	unsigned char value;
 	if( byte == EOF ) return;
+	value = (unsigned char)byte;
 	if( hEncoded( reader->file ) ) ungetc( byte, (FILE *)reader->file->opaque );
 	else if( FB_HANDLE_USED(reader->file) ) fb_FilePutBackEx( reader->file, &value, 1 );
 	else if( reader->input != NULL && reader->input->index > 0 ) --reader->input->index;
 }
 
-static int hUnit( USTR_READER *reader, int bytes )
+static int hUnit( USTR_READER *reader, size_t bytes )
 {
 	/* The encoded file device uses little-endian units after the BOM:
 	   UTF-16 has two-byte units, UTF-32 has four-byte scalar values. */
@@ -98,7 +99,7 @@ static int hReadScalar( USTR_READER *reader )
 			return EOF;
 		}
 		if( sizeof(FB_WCHAR) == 1 ) {
-			scalar = fb_hUtf8Decode( file->putback_buffer, file->putback_size, &offset );
+			scalar = (int)fb_hUtf8Decode( file->putback_buffer, (ssize_t)file->putback_size, &offset );
 		} else {
 			FB_WCHAR unit;
 			memcpy( &unit, file->putback_buffer, sizeof(unit) );
@@ -112,7 +113,7 @@ static int hReadScalar( USTR_READER *reader )
 				}
 			}
 		}
-		file->putback_size -= offset;
+		file->putback_size -= (size_t)offset;
 		memmove( file->putback_buffer, file->putback_buffer + offset, file->putback_size );
 		return scalar;
 	}
@@ -130,8 +131,8 @@ static int hReadScalar( USTR_READER *reader )
 	}
 	byte = hByte( reader );
 	if( byte == EOF ) return EOF;
-	bytes[0] = byte;
-	reader->raw[0] = byte;
+	((unsigned char *)bytes)[0] = (unsigned char)byte;
+	((unsigned char *)reader->raw)[0] = (unsigned char)byte;
 	reader->raw_size = 1;
 	if( byte < 0x80 ) return byte;
 	if( byte >= 0xC2 && byte <= 0xDF ) required = 2;
@@ -141,18 +142,18 @@ static int hReadScalar( USTR_READER *reader )
 	for( i = 1; i < required; ++i ) {
 		byte = hByte( reader );
 		if( byte == EOF ) return FB_UTF8_REPLACEMENT;
-		bytes[i] = byte;
+		((unsigned char *)bytes)[i] = (unsigned char)byte;
 		offset = 0;
 		fb_hUtf8Decode( bytes, i + 1, &offset );
 		if( offset != i + 1 ) {
 			hUnreadByte( reader, byte );
 			return FB_UTF8_REPLACEMENT;
 		}
-		reader->raw[i] = byte;
-		reader->raw_size = i + 1;
+		((unsigned char *)reader->raw)[i] = (unsigned char)byte;
+		reader->raw_size = (size_t)i + 1;
 	}
 	offset = 0;
-	return fb_hUtf8Decode( bytes, required, &offset );
+	return (int)fb_hUtf8Decode( bytes, required, &offset );
 }
 
 static void hPutback( USTR_READER *reader )
@@ -162,17 +163,17 @@ static void hPutback( USTR_READER *reader )
 	FB_WCHAR wide[2];
 	unsigned int scalar;
 	if( reader->pending == EOF ) return;
-	scalar = reader->pending;
+	scalar = (unsigned int)reader->pending;
 	if( hEncoded(reader->file) && sizeof(FB_WCHAR) > 1 ) {
 		count = 1;
-		wide[0] = scalar;
+		wide[0] = (FB_WCHAR)scalar;
 		if( sizeof(FB_WCHAR) == 2 && scalar > 0xFFFF ) {
 			scalar -= 0x10000;
-			wide[0] = 0xD800 + (scalar >> 10);
-			wide[1] = 0xDC00 + (scalar & 0x3FF);
+			wide[0] = (FB_WCHAR)(0xD800 + (scalar >> 10));
+			wide[1] = (FB_WCHAR)(0xDC00 + (scalar & 0x3FF));
 			count = 2;
 		}
-		fb_FilePutBackWstrEx( reader->file, wide, count );
+		fb_FilePutBackWstrEx( reader->file, wide, (size_t)count );
 	} else {
 		count = fb_hUtf8Encode( bytes, scalar );
 		if( FB_HANDLE_USED(reader->file) ) {
@@ -180,24 +181,24 @@ static void hPutback( USTR_READER *reader )
 			   can differ from U+FFFD, and also matters for file positions. */
 			if( !hEncoded(reader->file) && reader->raw_size > 0 )
 				fb_FilePutBackEx( reader->file, reader->raw, reader->raw_size );
-			else fb_FilePutBackEx( reader->file, bytes, count );
+			else fb_FilePutBackEx( reader->file, bytes, (size_t)count );
 		}
 		else if( reader->input != NULL ) reader->input->index = reader->index_before;
 	}
 }
 
-static int hAppend( FBSTRING *text, unsigned int scalar )
+static int hAppend( FBSTRING_ACCESS *text, unsigned int scalar )
 {
 	char bytes[4];
 	ssize_t count = fb_hUtf8Encode( bytes, scalar );
 	if( text->len > FB_USTRING_MAX_BYTES - count ||
 	    fb_hStrRealloc( text, text->len + count, TRUE ) == NULL ) return FB_RTERROR_OUTOFMEM;
-	memcpy( text->data + text->len - count, bytes, count );
+	memcpy( text->data + text->len - count, bytes, (size_t)(count) );
 	text->data[text->len] = 0;
 	return FB_RTERROR_OK;
 }
 
-static void hCommit( FBSTRING *dst, FBSTRING *text )
+static void hCommit( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *text )
 {
 	FB_STRLOCK();
 	fb_StrDelete( dst );
@@ -212,7 +213,7 @@ static void hCommit( FBSTRING *dst, FBSTRING *text )
 
 FBCALL int fb_UStrFileLineInput( int fnum, void *destination, ssize_t size, int fill )
 {
-	FBSTRING *dst = destination;
+	FBSTRING_ACCESS *dst = destination;
 	USTR_READER reader = { .file = FB_FILE_TO_HANDLE(fnum), .pending = EOF };
 	FBSTRING text = { NULL, 0, 0 };
 	int scalar, status = FB_RTERROR_OK;
@@ -229,7 +230,7 @@ FBCALL int fb_UStrFileLineInput( int fnum, void *destination, ssize_t size, int 
 				if( scalar != '\n' ) reader.pending = scalar;
 				break;
 			}
-			status = hAppend( &text, scalar );
+			status = hAppend( &text, (unsigned int)scalar );
 			if( status ) break;
 		}
 		hPutback( &reader );
@@ -244,7 +245,7 @@ FBCALL int fb_UStrFileLineInput( int fnum, void *destination, ssize_t size, int 
 FBCALL int fb_UStrInput( void *destination, ssize_t size, int fill )
 {
 	FB_INPUTCTX *input = FB_TLSGETCTX( INPUT );
-	FBSTRING *dst = destination;
+	FBSTRING_ACCESS *dst = destination;
 	USTR_READER reader;
 	if( dst == NULL ) return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	if( input == NULL ) return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
@@ -259,7 +260,7 @@ FBCALL int fb_UStrInput( void *destination, ssize_t size, int fill )
 		else if( scalar == '"' && quoted ) { scalar = hReadScalar( &reader ); break; }
 		else if( scalar == ',' && !quoted ) { delimiter = FALSE; break; }
 		else if( (scalar == ' ' || scalar == '\t') && !quoted ) break;
-		else if( (status = hAppend( &text, scalar )) != 0 ) break;
+		else if( (status = hAppend( &text, (unsigned int)scalar )) != 0 ) break;
 		scalar = hReadScalar( &reader );
 	}
 	if( scalar == '\r' || delimiter ) {
@@ -279,17 +280,17 @@ FBCALL int fb_UStrInput( void *destination, ssize_t size, int fill )
 
 FBCALL void fb_UStrDataRead( void *destination, ssize_t size, int fill )
 {
-	FBSTRING *dst = destination;
+	FBSTRING_ACCESS *dst = destination;
 	/* DATA's packed descriptor carries a 16-bit length and a pointer.
 	   The high length bit identifies wide text; other text lengths are
 	   byte counts. data.c owns the shared cursor, so reading and advancing
 	   it must be one operation under the runtime lock. */
 	FB_LOCK();
-	if( __fb_data_ptr == NULL || __fb_data_ptr->len == FB_DATATYPE_OFS ) fb_UStrAssign( dst, -1, NULL, 0, 0 );
-	else if( __fb_data_ptr->len & FB_DATATYPE_WSTR )
-		fb_UStrAssign( dst, -1, fb_UStrFromWstr( __fb_data_ptr->wstr ), -1, 0 );
+	if( fb_data_ptr == NULL || fb_data_ptr->len == FB_DATATYPE_OFS ) fb_UStrAssign( dst, -1, NULL, 0, 0 );
+	else if( fb_data_ptr->len & FB_DATATYPE_WSTR )
+		fb_UStrAssign( dst, -1, fb_UStrFromWstr( fb_data_ptr->wstr ), -1, 0 );
 	else
-		fb_UStrAssign( dst, -1, __fb_data_ptr->zstr, FB_STRISFIXED | __fb_data_ptr->len, 0 );
+		fb_UStrAssign( dst, -1, fb_data_ptr->zstr, FB_STRISFIXED | fb_data_ptr->len, 0 );
 	fb_DataNext();
 	FB_UNLOCK();
 }
@@ -310,17 +311,17 @@ static int hWriteEncoded( FB_FILE *file, const void *data, size_t length )
 		return fwrite( data, 1, length, stream ) == length ? 0 : FB_RTERROR_FILEIO;
 	if( length > (size_t)FB_USTRING_MAX_BYTES ) return FB_RTERROR_OUTOFMEM;
 	while( offset < (ssize_t)length ) {
-		scalar = fb_hUtf8Decode( text, length, &offset );
+		scalar = fb_hUtf8Decode( text, (ssize_t)length, &offset );
 		if( file->encod == FB_FILE_ENCOD_UTF32 ) {
 			fb_UTF32ToLE( buffer + used, scalar );
 			used += 4;
 		} else if( scalar > 0xFFFF ) {
 			scalar -= 0x10000;
-			fb_UTF16ToLE( buffer + used, 0xD800 + (scalar >> 10) );
-			fb_UTF16ToLE( buffer + used + 2, 0xDC00 + (scalar & 0x3FF) );
+			fb_UTF16ToLE( buffer + used, (UTF_16)(0xD800 + (scalar >> 10)) );
+			fb_UTF16ToLE( buffer + used + 2, (UTF_16)(0xDC00 + (scalar & 0x3FF)) );
 			used += 4;
 		} else {
-			fb_UTF16ToLE( buffer + used, scalar );
+			fb_UTF16ToLE( buffer + used, (UTF_16)scalar );
 			used += 2;
 		}
 		if( used > sizeof(buffer) - 4 ) {
@@ -343,23 +344,23 @@ static int hWriteScreen( FB_FILE *file, const void *buffer, size_t length )
 	if( length > (size_t)FB_USTRING_MAX_BYTES )
 		return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
 	borrowed.data = (char *)buffer;
-	borrowed.len = borrowed.size = length;
+	borrowed.len = borrowed.size = (ssize_t)length;
 	wide = fb_UStrToWstr(&borrowed);
 	if( wide == NULL && length != 0 ) return FB_RTERROR_OUTOFMEM;
 	while( offset < (ssize_t)length ) {
-		scalar = fb_hUtf8Decode(buffer, length, &offset);
+		scalar = fb_hUtf8Decode(buffer, (ssize_t)length, &offset);
 		units += sizeof(FB_WCHAR) == 2 && scalar > 0xFFFF ? 2 : 1;
 	}
 	/* The graphics wide hook owns glyph selection. Pass an explicit unit
 	   count so embedded NULs and UTF-16 pairs do not change the byte contract. */
-	result = fb_DevScrnWriteWstr(file, wide, units);
+	result = fb_DevScrnWriteWstr(file, wide, (size_t)units);
 	free(wide);
 	return result;
 }
 
 static int hWideScreen( void )
 {
-	if( __fb_ctx.hooks.printbuffwproc != NULL ) return TRUE;
+	if( fb_ctx.hooks.printbuffwproc != NULL ) return TRUE;
 #if defined(HOST_WIN32) && !defined(HOST_WINCE)
 	/* Native Windows consoles accept UTF-16 independently of their ANSI
 	   codepage. Redirected streams retain UTF-8 bytes; Win9x keeps its API. */
@@ -369,7 +370,7 @@ static int hWideScreen( void )
 #endif
 }
 
-static void hPrint( int fnum, FBSTRING *src, int mask, int write )
+static void hPrint( int fnum, FBSTRING_ACCESS *src, int mask, int write )
 {
 	FB_FILE_HOOKS hooks, *original = NULL;
 	FB_FILE *file;
@@ -398,12 +399,12 @@ static void hPrint( int fnum, FBSTRING *src, int mask, int write )
 	FB_UNLOCK();
 }
 
-FBCALL void fb_UStrPrint( int fnum, FBSTRING *src, int mask )
+FBCALL void fb_UStrPrint( int fnum, FBSTRING_ACCESS *src, int mask )
 {
 	hPrint( fnum, src, mask, FALSE );
 }
 
-FBCALL void fb_UStrWrite( int fnum, FBSTRING *src, int mask )
+FBCALL void fb_UStrWrite( int fnum, FBSTRING_ACCESS *src, int mask )
 {
 	hPrint( fnum, src, mask, TRUE );
 }

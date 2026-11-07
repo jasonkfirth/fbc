@@ -688,7 +688,7 @@ end function
 function astBuildVtableLookup _
 	( _
 		byval proc as FBSYMBOL ptr, _
-		byval thisexpr as ASTNODE ptr _
+		byref thisexpr as ASTNODE ptr _
 	) as ASTNODE ptr
 
 	dim as ASTNODE ptr p = any
@@ -716,9 +716,21 @@ function astBuildVtableLookup _
 
 		'' Get the vtable pointer of type ANY PTR PTR
 		const VTABLE_POINTER_DEPTH = 3
+		'' Arguments load before the call target. Capture a receiver with
+		'' side effects in THIS, then use its reference for the lookup.
+		dim as ASTNODE ptr before = NULL
+		if( astHasSideFx( thisexpr ) ) then
+			before = astMakeRef( thisexpr )
+		end if
 		p = astCloneTree( thisexpr )
+		thisexpr = astNewLINK( before, thisexpr, AST_LINK_RETURN_RIGHT )
 		p = astNewADDROF( p )
 		p = astNewCONV( typeMultAddrOf( FB_DATATYPE_VOID, VTABLE_POINTER_DEPTH ), NULL, p, AST_CONVOPT_DONTCHKPTR )
+		'' Check the receiver before reading its vptr. The abstract slot
+		'' check below validates the method address only after that load.
+		if( env.clopt.nullptrchk ) then
+			p = astBuildPTRCHK( p )
+		end if
 		p = astNewDEREF( p )
 
 		'' Apply the index

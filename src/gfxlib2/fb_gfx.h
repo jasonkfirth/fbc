@@ -598,9 +598,9 @@ extern "C" {
 extern FBCALL int fb_GfxScreen(int mode, int depth, int num_pages, int flags, int refresh_rate);
 extern FBCALL int fb_GfxScreenQB(int mode, int visible, int active);
 extern FBCALL int fb_GfxScreenRes(int width, int height, int depth, int num_pages, int flags, int refresh_rate);
-extern FBCALL void fb_GfxScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *bpp, ssize_t *pitch, ssize_t *refresh_rate, FBSTRING *driver);
-extern FBCALL void fb_GfxScreenInfo32(int *width, int *height, int *depth, int *bpp, int *pitch, int *refresh_rate, FBSTRING *driver);
-extern FBCALL void fb_GfxScreenInfo64(long long *width, long long  *height, long long  *depth, long long  *bpp, long long  *pitch, long long  *refresh_rate, FBSTRING *driver);
+extern FBCALL void fb_GfxScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *bpp, ssize_t *pitch, ssize_t *refresh_rate, FBSTRING_ACCESS *driver);
+extern FBCALL void fb_GfxScreenInfo32(int *width, int *height, int *depth, int *bpp, int *pitch, int *refresh_rate, FBSTRING_ACCESS *driver);
+extern FBCALL void fb_GfxScreenInfo64(long long *width, long long  *height, long long  *depth, long long  *bpp, long long  *pitch, long long  *refresh_rate, FBSTRING_ACCESS *driver);
 extern FBCALL int fb_GfxScreenList(int depth);
 extern FBCALL void *fb_GfxImageCreate(int width, int height, unsigned int color, int depth, int flags);
 extern FBCALL void *fb_GfxImageCreateQB(int width, int height, unsigned int color, int depth, int flags);
@@ -623,20 +623,20 @@ extern FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_
 extern FBCALL void fb_GfxWindow(float x1, float y1, float x2, float y2, int screen);
 extern FBCALL void fb_GfxLine(void *target, float x1, float y1, float x2, float y2, unsigned int color, int type, unsigned int style, int coord_type);
 extern FBCALL void fb_GfxEllipse(void *target, float x, float y, float radius, unsigned int color, float aspect, float start, float end, int fill, int coord_type);
-extern FBCALL int fb_GfxGet(void *target, float x1, float y1, float x2, float y2, unsigned char *dest, int coord_type, FBARRAY *array);
-extern FBCALL int fb_GfxGetQB(void *target, float x1, float y1, float x2, float y2, unsigned char *dest, int coord_type, FBARRAY *array);
+extern FBCALL int fb_GfxGet(void *target, float x1, float y1, float x2, float y2, unsigned char *dest, int coord_type, FBARRAY_ACCESS *array);
+extern FBCALL int fb_GfxGetQB(void *target, float x1, float y1, float x2, float y2, unsigned char *dest, int coord_type, FBARRAY_ACCESS *array);
 extern FBCALL int fb_GfxPut(void *target, float x, float y, unsigned char *src, int x1, int y1, int x2, int y2, int coord_type, int mode, PUTTER *putter, int alpha, BLENDER *blender, void *param);
 extern FBCALL int fb_GfxWaitVSync(void);
-extern FBCALL void fb_GfxPaint(void *target, float fx, float fy, unsigned int color, unsigned int border_color, FBSTRING *pattern, int mode, int coord_type);
-extern FBCALL void fb_GfxDraw(void *target, FBSTRING *command);
-extern FBCALL int fb_GfxDrawString(void *target, float fx, float fy, int coord_type, FBSTRING *string, unsigned int color, void *font, int mode, PUTTER *putter, BLENDER *blender, void *param);
-extern FBCALL int fb_GfxDrawStringSize(FBSTRING *string, int *width, int *height, void *font);
-extern FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING *pattern, unsigned int foreground, unsigned int background, unsigned int border, int relative);
+extern FBCALL void fb_GfxPaint(void *target, float fx, float fy, unsigned int color, unsigned int border_color, FBSTRING_ACCESS *pattern, int mode, int coord_type);
+extern FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command);
+extern FBCALL int fb_GfxDrawString(void *target, float fx, float fy, int coord_type, FBSTRING_ACCESS *string, unsigned int color, void *font, int mode, PUTTER *putter, BLENDER *blender, void *param);
+extern FBCALL int fb_GfxDrawStringSize(FBSTRING_ACCESS *string, int *width, int *height, void *font);
+extern FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING_ACCESS *pattern, unsigned int foreground, unsigned int background, unsigned int border, int relative);
 extern FBCALL int fb_GfxFlip(int from_page, int to_page);
 extern FBCALL void fb_GfxLock(void);
 extern FBCALL void fb_GfxUnlock(int start_line, int end_line);
 extern FBCALL void *fb_GfxScreenPtr(void);
-extern FBCALL void fb_GfxSetWindowTitle(FBSTRING *title);
+extern FBCALL void fb_GfxSetWindowTitle(FBSTRING_ACCESS *title);
 #ifdef __cplusplus
 extern "C" FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8);
 #else
@@ -649,15 +649,15 @@ extern FBCALL ssize_t fb_GfxGetTouchHit(ssize_t x1, ssize_t y1, ssize_t x2, ssiz
 extern FBCALL ssize_t fb_GfxGetTouchHitCircle(ssize_t x, ssize_t y, ssize_t radius);
 extern FBCALL int fb_GfxEvent(EVENT *event);
 extern FBCALL int fb_GfxDropEnable(int enabled);
-extern FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING *output);
-extern FBCALL void fb_GfxControl_s(int what, FBSTRING *param);
+extern FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING_ACCESS *output);
+extern FBCALL void fb_GfxControl_s(int what, FBSTRING_ACCESS *param);
 extern FBCALL void fb_GfxControl_i(int what, ssize_t *param1, ssize_t *param2, ssize_t *param3, ssize_t *param4);
 extern FBCALL void fb_GfxControl_i32(int what, int *param1, int *param2, int *param3, int *param4);
 extern FBCALL void fb_GfxControl_i64(int what, long long *param1, long long *param2, long long *param3, long long *param4);
-extern FBCALL int fb_GfxBload(FBSTRING *filename, void *dest, void *pal);
-extern FBCALL int fb_GfxBloadQB(FBSTRING *filename, void *dest, void *pal);
-extern FBCALL int fb_GfxBsave(FBSTRING *filename, void *src, unsigned int size, void *pal);
-extern FBCALL int fb_GfxBsaveEx(FBSTRING *filename, void *src, unsigned int size, void *pal, int bitsperpixel);
+extern FBCALL int fb_GfxBload(FBSTRING_ACCESS *filename, void *dest, void *pal);
+extern FBCALL int fb_GfxBloadQB(FBSTRING_ACCESS *filename, void *dest, void *pal);
+extern FBCALL int fb_GfxBsave(FBSTRING_ACCESS *filename, void *src, unsigned int size, void *pal);
+extern FBCALL int fb_GfxBsaveEx(FBSTRING_ACCESS *filename, void *src, unsigned int size, void *pal, int bitsperpixel);
 extern FBCALL void *fb_GfxGetGLProcAddress(const char *proc);
 
 /* Public API - QB compatibility */
@@ -667,7 +667,7 @@ extern FBCALL int fb_GfxStrigQB( int n );
 
 /* Runtime library hooks */
 int fb_GfxGetkey(void);
-FBSTRING *fb_GfxInkey(void);
+FBSTRING_ACCESS *fb_GfxInkey(void);
 int fb_GfxKeyHit(void);
 unsigned int fb_GfxColor(unsigned int fg_color, unsigned int bg_color, int flags);
 void fb_GfxClear(int mode);
@@ -688,7 +688,7 @@ int fb_GfxGetMouse(int *x, int *y, int *z, int *buttons, int *clip);
 int fb_GfxSetMouse(int x, int y, int cursor, int clip);
 int fb_GfxOut(unsigned short port, unsigned char value);
 int fb_GfxIn(unsigned short port);
-int fb_GfxLineInput( FBSTRING *text, void *dst, ssize_t dst_len, int fillrem, int addquestion, int addnewline );
+int fb_GfxLineInput( FBSTRING_ACCESS *text, void *dst, ssize_t dst_len, int fillrem, int addquestion, int addnewline );
 int fb_GfxLineInputWstr( const FB_WCHAR *text, FB_WCHAR *dst, ssize_t max_chars, int addquestion, int addnewline );
 unsigned int fb_GfxReadXY( int col, int row, int colorflag );
 void fb_GfxSleep( int msecs );

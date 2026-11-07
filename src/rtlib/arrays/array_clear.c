@@ -24,7 +24,7 @@
 
 #include "fb.h"
 
-FBCALL int fb_ArrayClear( FBARRAY *array )
+FBCALL int fb_ArrayClear( FBARRAY_ACCESS *array )
 {
 	if( array->ptr )
 		memset( array->ptr, 0, array->size );
@@ -32,7 +32,7 @@ FBCALL int fb_ArrayClear( FBARRAY *array )
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-FBCALL int fb_ArrayFill( FBARRAY *array, int fillchar )
+FBCALL int fb_ArrayFill( FBARRAY_ACCESS *array, int fillchar )
 {
 	if( array->ptr )
 		memset( array->ptr, fillchar, array->size );

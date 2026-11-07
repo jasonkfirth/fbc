@@ -21,7 +21,7 @@
     the code easier to compare with the normal rtlib layout.
 */
 
-FBSTRING *fb_Command(const int32 index)
+FBSTRING_ACCESS *fb_Command(const int32 index)
 {
     char *text;
     char *cursor;
@@ -76,7 +76,7 @@ FBSTRING *fb_Command(const int32 index)
     return fb_nuttx_temp_string("", 0);
 }
 
-FBSTRING *fb_ExePath(void)
+FBSTRING_ACCESS *fb_ExePath(void)
 {
     if ((fb_nuttx_argv != NULL) && (fb_nuttx_argc > 0) &&
         (fb_nuttx_argv[0] != NULL))
@@ -92,7 +92,7 @@ void fb_nuttx_set_args(int argc, char **argv)
     fb_nuttx_argv = argv;
 }
 
-int32 fb_Shell(const FBSTRING *command)
+int32 fb_Shell(const FBSTRING_ACCESS *command)
 {
     static char shell_name[] = "sh";
     static char shell_option[] = "-c";
@@ -180,12 +180,12 @@ static int fb_nuttx_set_environ_text(const char *text)
     return result;
 }
 
-FBSTRING *fb_GetEnviron(const FBSTRING *name)
+FBSTRING_ACCESS *fb_GetEnviron(const FBSTRING_ACCESS *name)
 {
     char *key;
     char *equals;
     char *value;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
 
     if ((name == NULL) || (name->data == NULL) || (name->len <= 0))
         return fb_nuttx_temp_string("", 0);
@@ -219,7 +219,7 @@ FBSTRING *fb_GetEnviron(const FBSTRING *name)
     return result;
 }
 
-int32 fb_SetEnviron(const FBSTRING *str)
+int32 fb_SetEnviron(const FBSTRING_ACCESS *str)
 {
     char *text;
     int result;

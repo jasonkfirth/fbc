@@ -48,8 +48,8 @@ FBCALL int fb_IdleStep(FB_IDLE_STATE *state, FB_IDLE_CALLBACK callback,
 FBCALL int fb_IdleStop(FB_IDLE_STATE *state);
 int fb_hIdleNow(double *seconds);
 
-FBCALL int fb_NotifyCreate(FBSTRING *app_name, void **context);
-FBCALL int fb_NotifySend(void *context, FBSTRING *title, FBSTRING *body);
+FBCALL int fb_NotifyCreate(FBSTRING_ACCESS *app_name, void **context);
+FBCALL int fb_NotifySend(void *context, FBSTRING_ACCESS *title, FBSTRING_ACCESS *body);
 FBCALL int fb_NotifyPoll(void *context);
 FBCALL int fb_NotifyClose(void *context);
 FBCALL int fb_NotifyDestroy(void **context);

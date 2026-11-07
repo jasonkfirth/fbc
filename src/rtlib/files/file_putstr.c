@@ -24,7 +24,7 @@ int fb_FilePutStrEx( FB_FILE *handle, fb_off_t pos, void *str, ssize_t str_len )
 
     /* del if temp */
     if( str_len == -1 )
-        fb_hStrDelTemp( (FBSTRING *)str );
+        fb_hStrDelTemp( (FBSTRING_ACCESS *)str );
 
     return res;
 }

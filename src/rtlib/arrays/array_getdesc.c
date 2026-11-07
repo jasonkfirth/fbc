@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL FBARRAY *fb_ArrayGetDesc( FBARRAY *array )
+FBCALL FBARRAY_ACCESS *fb_ArrayGetDesc( FBARRAY_ACCESS *array )
 {
 	return array;
 }

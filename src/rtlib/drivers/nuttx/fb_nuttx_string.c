@@ -24,14 +24,14 @@
 static int32 fb_nuttx_source_length(const void *src, const int32 src_len)
 {
     const char *text;
-    const FBSTRING *s;
+    const FBSTRING_ACCESS *s;
     int32 len;
 
     if (src == NULL)
         return 0;
 
     if (src_len == -1) {
-        s = (const FBSTRING *)src;
+        s = (const FBSTRING_ACCESS *)src;
 
         if ((s->data == NULL) || (s->len <= 0))
             return 0;
@@ -82,13 +82,13 @@ static int32 fb_nuttx_source_length(const void *src, const int32 src_len)
 
 static const char *fb_nuttx_source_data(const void *src, const int32 src_len)
 {
-    const FBSTRING *s;
+    const FBSTRING_ACCESS *s;
 
     if (src == NULL)
         return "";
 
     if (src_len == -1) {
-        s = (const FBSTRING *)src;
+        s = (const FBSTRING_ACCESS *)src;
 
         if (s->data == NULL)
             return "";
@@ -99,7 +99,7 @@ static const char *fb_nuttx_source_data(const void *src, const int32 src_len)
     return (const char *)src;
 }
 
-static int fb_nuttx_string_resize(FBSTRING *dst, const int32 len)
+static int fb_nuttx_string_resize(FBSTRING_ACCESS *dst, const int32 len)
 {
     char *new_data;
     size_t alloc_size;
@@ -125,7 +125,7 @@ static int fb_nuttx_string_resize(FBSTRING *dst, const int32 len)
     return 1;
 }
 
-static FBSTRING *fb_nuttx_zstring_assign(void *dst_void, const int32 dst_len,
+static FBSTRING_ACCESS *fb_nuttx_zstring_assign(void *dst_void, const int32 dst_len,
     const void *src, const int32 src_len, const int32 fill_rem)
 {
     char *dst;
@@ -168,10 +168,10 @@ static FBSTRING *fb_nuttx_zstring_assign(void *dst_void, const int32 dst_len,
     return fb_nuttx_temp_string(dst, copy_len);
 }
 
-FBSTRING *fb_StrAssign(void *dst_void, const int32 dst_len, const void *src,
+FBSTRING_ACCESS *fb_StrAssign(void *dst_void, const int32 dst_len, const void *src,
     const int32 src_len, const int32 fill_rem)
 {
-    FBSTRING *dst;
+    FBSTRING_ACCESS *dst;
     const char *src_data;
     int32 len;
     int32 fixed_len;
@@ -204,7 +204,7 @@ FBSTRING *fb_StrAssign(void *dst_void, const int32 dst_len, const void *src,
         return fb_nuttx_temp_string((char *)dst_void, fixed_len);
     }
 
-    dst = (FBSTRING *)dst_void;
+    dst = (FBSTRING_ACCESS *)dst_void;
     len = fb_nuttx_source_length(src, src_len);
 
     if (fb_nuttx_string_resize(dst, len) == 0)
@@ -218,12 +218,12 @@ FBSTRING *fb_StrAssign(void *dst_void, const int32 dst_len, const void *src,
     return dst;
 }
 
-FBSTRING *fb_StrInit(void *dst_void, const int32 dst_len, const void *src,
+FBSTRING_ACCESS *fb_StrInit(void *dst_void, const int32 dst_len, const void *src,
     const int32 src_len, const int32 fill_rem)
 {
-    FBSTRING *dst;
+    FBSTRING_ACCESS *dst;
 
-    dst = (FBSTRING *)dst_void;
+    dst = (FBSTRING_ACCESS *)dst_void;
 
     if (dst == NULL)
         return NULL;
@@ -235,8 +235,8 @@ FBSTRING *fb_StrInit(void *dst_void, const int32 dst_len, const void *src,
     return fb_StrAssign(dst_void, dst_len, src, src_len, fill_rem);
 }
 
-void fb_StrAssignMid(FBSTRING *dst, const int32 start, const int32 count,
-    const FBSTRING *src)
+void fb_StrAssignMid(FBSTRING_ACCESS *dst, const int32 start, const int32 count,
+    const FBSTRING_ACCESS *src)
 {
     const char *src_data;
     int32 src_len;
@@ -269,10 +269,10 @@ void fb_StrAssignMid(FBSTRING *dst, const int32 start, const int32 count,
         memcpy(dst->data + start_index, src_data, (size_t)copy_len);
 }
 
-FBSTRING *fb_StrConcatAssign(void *dst_void, const int32 dst_len,
+FBSTRING_ACCESS *fb_StrConcatAssign(void *dst_void, const int32 dst_len,
     const void *src, const int32 src_len, const int32 fill_rem)
 {
-    FBSTRING *dst;
+    FBSTRING_ACCESS *dst;
     const char *src_data;
     int32 old_len;
     int32 add_len;
@@ -280,7 +280,7 @@ FBSTRING *fb_StrConcatAssign(void *dst_void, const int32 dst_len,
     (void)dst_len;
     (void)fill_rem;
 
-    dst = (FBSTRING *)dst_void;
+    dst = (FBSTRING_ACCESS *)dst_void;
     add_len = fb_nuttx_source_length(src, src_len);
 
     if ((dst == NULL) || (add_len <= 0))
@@ -300,7 +300,7 @@ FBSTRING *fb_StrConcatAssign(void *dst_void, const int32 dst_len,
     return dst;
 }
 
-FBSTRING *fb_StrConcat(FBSTRING *dst, void *str1, const int32 str1_len,
+FBSTRING_ACCESS *fb_StrConcat(FBSTRING_ACCESS *dst, void *str1, const int32 str1_len,
     void *str2, const int32 str2_len)
 {
     const char *str1_data;
@@ -336,14 +336,14 @@ FBSTRING *fb_StrConcat(FBSTRING *dst, void *str1, const int32 str1_len,
     return dst;
 }
 
-FBSTRING *fb_StrAllocTempDescZ(const char *text)
+FBSTRING_ACCESS *fb_StrAllocTempDescZ(const char *text)
 {
     return fb_StrAllocTempDescZEx(text, -1);
 }
 
-FBSTRING *fb_StrAllocTempResult(FBSTRING *src)
+FBSTRING_ACCESS *fb_StrAllocTempResult(FBSTRING_ACCESS *src)
 {
-    FBSTRING *desc;
+    FBSTRING_ACCESS *desc;
 
     if (src == NULL)
         return fb_nuttx_temp_string("", 0);
@@ -358,7 +358,7 @@ FBSTRING *fb_StrAllocTempResult(FBSTRING *src)
 
 #if !defined(FB_NUTTX_USE_GENERIC_STR_FILL) || \
     (FB_NUTTX_USE_GENERIC_STR_FILL == 0)
-FBSTRING *fb_StrFill2(const ssize_t count, FBSTRING *src)
+FBSTRING_ACCESS *fb_StrFill2(const ssize_t count, FBSTRING_ACCESS *src)
 {
     FBSTRING result;
     const char *src_data;
@@ -392,7 +392,7 @@ FBSTRING *fb_StrFill2(const ssize_t count, FBSTRING *src)
 #endif
 
 static void fb_nuttx_fixed_set(void *dst_void, const int32 dst_len,
-    const FBSTRING *src, const int right_align)
+    const FBSTRING_ACCESS *src, const int right_align)
 {
     char *dst;
     const char *src_data;
@@ -429,7 +429,7 @@ static void fb_nuttx_fixed_set(void *dst_void, const int32 dst_len,
         memcpy(dst + start, src_data, (size_t)copy_len);
 }
 
-void fb_StrLset(FBSTRING *dst, FBSTRING *src)
+void fb_StrLset(FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src)
 {
     int32 copy_len;
 
@@ -454,7 +454,7 @@ void fb_StrLset(FBSTRING *dst, FBSTRING *src)
     dst->data[dst->len] = '\0';
 }
 
-void fb_StrRset(FBSTRING *dst, FBSTRING *src)
+void fb_StrRset(FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src)
 {
     int32 copy_len;
     int32 pad_len;
@@ -482,19 +482,19 @@ void fb_StrRset(FBSTRING *dst, FBSTRING *src)
     dst->data[dst->len] = '\0';
 }
 
-void fb_StrLsetANA(void *dst_void, const int32 dst_len, const FBSTRING *src)
+void fb_StrLsetANA(void *dst_void, const int32 dst_len, const FBSTRING_ACCESS *src)
 {
     fb_nuttx_fixed_set(dst_void, dst_len, src, 0);
 }
 
-void fb_StrRsetANA(void *dst_void, const int32 dst_len, const FBSTRING *src)
+void fb_StrRsetANA(void *dst_void, const int32 dst_len, const FBSTRING_ACCESS *src)
 {
     fb_nuttx_fixed_set(dst_void, dst_len, src, 1);
 }
 
 static char *fb_nuttx_set_data(void *str, const int32 encoded_size)
 {
-    FBSTRING *descriptor;
+    FBSTRING_ACCESS *descriptor;
 
     if (str == NULL)
         return NULL;
@@ -502,21 +502,21 @@ static char *fb_nuttx_set_data(void *str, const int32 encoded_size)
     if (encoded_size != -1)
         return (char *)str;
 
-    descriptor = (FBSTRING *)str;
+    descriptor = (FBSTRING_ACCESS *)str;
 
     return descriptor->data;
 }
 
 static int32 fb_nuttx_set_length(void *str, const int32 encoded_size)
 {
-    FBSTRING *descriptor;
+    FBSTRING_ACCESS *descriptor;
     size_t measured_len;
 
     if (str == NULL)
         return 0;
 
     if (encoded_size == -1) {
-        descriptor = (FBSTRING *)str;
+        descriptor = (FBSTRING_ACCESS *)str;
 
         if (descriptor->len <= 0)
             return 0;
@@ -595,11 +595,11 @@ void fb_StrRsetEx(void *dst, const int32 dst_size,
     fb_nuttx_str_set_ex(dst, dst_size, src, src_size, 1);
 }
 
-void fb_StrDelete(const FBSTRING *s)
+void fb_StrDelete(const FBSTRING_ACCESS *s)
 {
-    FBSTRING *owned;
+    FBSTRING_ACCESS *owned;
 
-    owned = (FBSTRING *)s;
+    owned = (FBSTRING_ACCESS *)s;
 
     if ((owned != NULL) && (owned->data != NULL) && (owned->size > 0)) {
         free(owned->data);
@@ -609,14 +609,14 @@ void fb_StrDelete(const FBSTRING *s)
     }
 }
 
-int fb_hStrDelTemp(FBSTRING *s)
+int fb_hStrDelTemp(FBSTRING_ACCESS *s)
 {
     (void)s;
 
     return 0;
 }
 
-FBSTRING *fb_hStrAllocTemp_NoLock(FBSTRING *str, const ssize_t size)
+FBSTRING_ACCESS *fb_hStrAllocTemp_NoLock(FBSTRING_ACCESS *str, const ssize_t size)
 {
     FBSTRING result;
 
@@ -638,12 +638,12 @@ FBSTRING *fb_hStrAllocTemp_NoLock(FBSTRING *str, const ssize_t size)
     return fb_StrAllocTempResult(&result);
 }
 
-FBSTRING *fb_hStrAllocTemp(FBSTRING *str, const ssize_t size)
+FBSTRING_ACCESS *fb_hStrAllocTemp(FBSTRING_ACCESS *str, const ssize_t size)
 {
     return fb_hStrAllocTemp_NoLock(str, size);
 }
 
-int fb_hStrDelTemp_NoLock(FBSTRING *s)
+int fb_hStrDelTemp_NoLock(FBSTRING_ACCESS *s)
 {
     fb_hStrDelTemp(s);
 
@@ -665,7 +665,7 @@ void fb_hStrCopy(char *dst, const char *src, const ssize_t bytes)
     dst[bytes] = '\0';
 }
 
-static FBSTRING *fb_nuttx_temp_copy(const char *src, const int32 len)
+static FBSTRING_ACCESS *fb_nuttx_temp_copy(const char *src, const int32 len)
 {
     char *buffer;
 
@@ -688,7 +688,7 @@ static FBSTRING *fb_nuttx_temp_copy(const char *src, const int32 len)
     return fb_nuttx_temp_string(buffer, len);
 }
 
-static int32 fb_nuttx_trim_pattern_len(const FBSTRING *pattern)
+static int32 fb_nuttx_trim_pattern_len(const FBSTRING_ACCESS *pattern)
 {
     if ((pattern == NULL) || (pattern->data == NULL) || (pattern->len <= 0))
         return 0;
@@ -696,7 +696,7 @@ static int32 fb_nuttx_trim_pattern_len(const FBSTRING *pattern)
     return pattern->len;
 }
 
-static int fb_nuttx_trim_any_has_char(const FBSTRING *pattern, const char ch)
+static int fb_nuttx_trim_any_has_char(const FBSTRING_ACCESS *pattern, const char ch)
 {
     int32 i;
     int32 len;
@@ -711,7 +711,7 @@ static int fb_nuttx_trim_any_has_char(const FBSTRING *pattern, const char ch)
     return 0;
 }
 
-static FBSTRING *fb_nuttx_trim_result(const char *data, const int32 len)
+static FBSTRING_ACCESS *fb_nuttx_trim_result(const char *data, const int32 len)
 {
     if ((data == NULL) || (len <= 0))
         return fb_nuttx_temp_string("", 0);
@@ -719,7 +719,7 @@ static FBSTRING *fb_nuttx_trim_result(const char *data, const int32 len)
     return fb_nuttx_temp_copy(data, len);
 }
 
-FBSTRING *fb_LTrimEx(FBSTRING *src, FBSTRING *pattern)
+FBSTRING_ACCESS *fb_LTrimEx(FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern)
 {
     const char *data;
     int32 len;
@@ -751,7 +751,7 @@ FBSTRING *fb_LTrimEx(FBSTRING *src, FBSTRING *pattern)
     return fb_nuttx_trim_result(data, len);
 }
 
-FBSTRING *fb_LTrimAny(FBSTRING *src, FBSTRING *pattern)
+FBSTRING_ACCESS *fb_LTrimAny(FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern)
 {
     const char *data;
     int32 len;
@@ -770,7 +770,7 @@ FBSTRING *fb_LTrimAny(FBSTRING *src, FBSTRING *pattern)
     return fb_nuttx_trim_result(data, len);
 }
 
-FBSTRING *fb_RTrimEx(FBSTRING *src, FBSTRING *pattern)
+FBSTRING_ACCESS *fb_RTrimEx(FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern)
 {
     const char *data;
     int32 len;
@@ -800,7 +800,7 @@ FBSTRING *fb_RTrimEx(FBSTRING *src, FBSTRING *pattern)
     return fb_nuttx_trim_result(data, len);
 }
 
-FBSTRING *fb_RTrimAny(FBSTRING *src, FBSTRING *pattern)
+FBSTRING_ACCESS *fb_RTrimAny(FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern)
 {
     const char *data;
     int32 len;
@@ -817,25 +817,25 @@ FBSTRING *fb_RTrimAny(FBSTRING *src, FBSTRING *pattern)
     return fb_nuttx_trim_result(data, len);
 }
 
-FBSTRING *fb_TrimEx(FBSTRING *src, FBSTRING *pattern)
+FBSTRING_ACCESS *fb_TrimEx(FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern)
 {
-    FBSTRING *left;
+    FBSTRING_ACCESS *left;
 
     left = fb_LTrimEx(src, pattern);
 
     return fb_RTrimEx(left, pattern);
 }
 
-FBSTRING *fb_TrimAny(FBSTRING *src, FBSTRING *pattern)
+FBSTRING_ACCESS *fb_TrimAny(FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern)
 {
-    FBSTRING *left;
+    FBSTRING_ACCESS *left;
 
     left = fb_LTrimAny(src, pattern);
 
     return fb_RTrimAny(left, pattern);
 }
 
-static void fb_nuttx_read_binary_string(const FBSTRING *s, void *dst,
+static void fb_nuttx_read_binary_string(const FBSTRING_ACCESS *s, void *dst,
     const size_t bytes)
 {
     size_t copy_len;
@@ -856,7 +856,7 @@ static void fb_nuttx_read_binary_string(const FBSTRING *s, void *dst,
     memcpy(dst, s->data, copy_len);
 }
 
-FBSTRING *fb_MKI(const int32 value)
+FBSTRING_ACCESS *fb_MKI(const int32 value)
 {
     int16_t stored;
 
@@ -865,7 +865,7 @@ FBSTRING *fb_MKI(const int32 value)
     return fb_nuttx_temp_copy((const char *)&stored, (int32)sizeof(stored));
 }
 
-FBSTRING *fb_MKSHORT(const int16_t value)
+FBSTRING_ACCESS *fb_MKSHORT(const int16_t value)
 {
     int16_t stored;
 
@@ -874,7 +874,7 @@ FBSTRING *fb_MKSHORT(const int16_t value)
     return fb_nuttx_temp_copy((const char *)&stored, (int32)sizeof(stored));
 }
 
-FBSTRING *fb_MKL(const int32 value)
+FBSTRING_ACCESS *fb_MKL(const int32 value)
 {
     int32 stored;
 
@@ -883,7 +883,7 @@ FBSTRING *fb_MKL(const int32 value)
     return fb_nuttx_temp_copy((const char *)&stored, (int32)sizeof(stored));
 }
 
-FBSTRING *fb_MKLONGINT(const int64_t value)
+FBSTRING_ACCESS *fb_MKLONGINT(const int64_t value)
 {
     int64_t stored;
 
@@ -892,7 +892,7 @@ FBSTRING *fb_MKLONGINT(const int64_t value)
     return fb_nuttx_temp_copy((const char *)&stored, (int32)sizeof(stored));
 }
 
-FBSTRING *fb_MKS(const float value)
+FBSTRING_ACCESS *fb_MKS(const float value)
 {
     float stored;
 
@@ -901,7 +901,7 @@ FBSTRING *fb_MKS(const float value)
     return fb_nuttx_temp_copy((const char *)&stored, (int32)sizeof(stored));
 }
 
-FBSTRING *fb_MKD(const double value)
+FBSTRING_ACCESS *fb_MKD(const double value)
 {
     double stored;
 
@@ -910,7 +910,7 @@ FBSTRING *fb_MKD(const double value)
     return fb_nuttx_temp_copy((const char *)&stored, (int32)sizeof(stored));
 }
 
-int16_t fb_CVSHORT(const FBSTRING *s)
+int16_t fb_CVSHORT(const FBSTRING_ACCESS *s)
 {
     int16_t value;
 
@@ -919,7 +919,7 @@ int16_t fb_CVSHORT(const FBSTRING *s)
     return value;
 }
 
-int32 fb_CVL(const FBSTRING *s)
+int32 fb_CVL(const FBSTRING_ACCESS *s)
 {
     int32 value;
 
@@ -928,7 +928,7 @@ int32 fb_CVL(const FBSTRING *s)
     return value;
 }
 
-int64_t fb_CVLONGINT(const FBSTRING *s)
+int64_t fb_CVLONGINT(const FBSTRING_ACCESS *s)
 {
     int64_t value;
 
@@ -937,7 +937,7 @@ int64_t fb_CVLONGINT(const FBSTRING *s)
     return value;
 }
 
-float fb_CVS(const FBSTRING *s)
+float fb_CVS(const FBSTRING_ACCESS *s)
 {
     float value;
 
@@ -946,7 +946,7 @@ float fb_CVS(const FBSTRING *s)
     return value;
 }
 
-double fb_CVD(const FBSTRING *s)
+double fb_CVD(const FBSTRING_ACCESS *s)
 {
     double value;
 
@@ -955,7 +955,7 @@ double fb_CVD(const FBSTRING *s)
     return value;
 }
 
-ssize_t fb_StrInstrAny(ssize_t start, FBSTRING *src, FBSTRING *patt)
+ssize_t fb_StrInstrAny(ssize_t start, FBSTRING_ACCESS *src, FBSTRING_ACCESS *patt)
 {
     ssize_t size_src;
     ssize_t size_patt;

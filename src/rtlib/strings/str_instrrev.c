@@ -106,7 +106,7 @@ static ssize_t fb_hFindNaive
 }
 #endif
 
-FBCALL ssize_t fb_StrInstrRev( FBSTRING *src, FBSTRING *patt, ssize_t start )
+FBCALL ssize_t fb_StrInstrRev( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patt, ssize_t start )
 {
 	ssize_t r = 0;
 

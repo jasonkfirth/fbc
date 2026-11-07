@@ -51,7 +51,7 @@ end sub
 
 private function hCScalarStoreGet(byval sym as FBSYMBOL ptr) as CSCALARSTORE ptr
 	if( sym = NULL orelse c_scalar_store_index.list = NULL ) then return NULL
-	var key = str(culngint(sym))
+	var key = str(culngint(cuint(sym)))
 	return hashLookup(@c_scalar_store_index, strptr(key))
 end function
 
@@ -69,6 +69,72 @@ private function hCScalarStoreType(byval dtype as integer) as integer
 	return FALSE
 end function
 
+'' Only these unary memory instructions have a complete storage contract in
+'' their token stream: one named scalar is read and written, plus CPU flags.
+'' Quoted assembly, stack/register addressing, calls, labels and all other
+'' instructions retain the opaque fallback. This is not an assembler parser.
+private function hCScalarAsmReferencesComplete(byval token as ASTASMTOK ptr) as integer
+	if( env.clopt.asmsyntax <> FB_ASMSYNTAX_INTEL ) then return FALSE
+	select case as const fbGetCpuFamily()
+	case FB_CPUFAMILY_X86, FB_CPUFAMILY_X86_64
+	case else
+		return FALSE
+	end select
+	enum
+		EXPECT_OPCODE
+		EXPECT_SIZE
+		EXPECT_PTR
+		EXPECT_OPEN
+		EXPECT_SYMBOL
+		EXPECT_CLOSE
+		EXPECT_END
+	end enum
+	var state = EXPECT_OPCODE
+	dim as integer saw_operand = FALSE
+	while( token <> NULL )
+		if( token->type = AST_ASMTOK_SYMB ) then
+			if( state <> EXPECT_SYMBOL ) then return FALSE
+			var sym = token->sym
+			if( sym = NULL orelse symbIsVar(sym) = FALSE ) then return FALSE
+			if( symbIsDescriptor(sym) or symbGetArrayDimensions(sym) <> 0 ) then return FALSE
+			if( typeGetClass(symbGetFullType(sym)) <> FB_DATACLASS_INTEGER ) then return FALSE
+			state = EXPECT_CLOSE
+			saw_operand = TRUE
+		elseif( token->type = AST_ASMTOK_TEXT ) then
+			if( token->text = NULL ) then return FALSE
+			var text = lcase(*token->text)
+			if( text = NEWLINE ) then
+				if( state <> EXPECT_END ) then return FALSE
+				state = EXPECT_OPCODE
+			elseif( len(trim(text)) <> 0 ) then
+				select case as const state
+				case EXPECT_OPCODE
+					if( text <> "inc" and text <> "dec" ) then return FALSE
+				case EXPECT_SIZE
+					select case text
+					case "byte", "word", "dword", "qword"
+					case else
+						return FALSE
+					end select
+				case EXPECT_PTR
+					if( text <> "ptr" ) then return FALSE
+				case EXPECT_OPEN
+					if( text <> "[" ) then return FALSE
+				case EXPECT_CLOSE
+					if( text <> "]" ) then return FALSE
+				case else
+					return FALSE
+				end select
+				state += 1
+			end if
+		else
+			return FALSE
+		end if
+		token = token->next
+	wend
+	return saw_operand and ((state = EXPECT_END) or (state = EXPECT_OPCODE))
+end function
+
 private function hCScalarStoreHasLifetime(byval sym as FBSYMBOL ptr) as integer
 	if( symbHasCtor(sym) or symbHasDtor(sym) ) then return TRUE
 	'' Match the expression-temporary ownership handled by astDtorListRemoveRef.
@@ -84,7 +150,22 @@ end function
 
 private function hCScalarStoreCandidate(byval sym as FBSYMBOL ptr) as integer
 	if( sym = NULL orelse symbIsVar(sym) = FALSE ) then return FALSE
-	if( symbIsLocal(sym) = FALSE orelse symbIsParamVar(sym) ) then return FALSE
+	if( symbIsLocal(sym) = FALSE ) then return FALSE
+	'' Debuggers retain named BASIC storage, but compiler scratch bindings
+	'' have no source identity. Their unread stores use the same lifetime
+	'' and escape proof as ordinary non-debug lowering.
+	if( env.clopt.debuginfo andalso _
+	    (symbIsTemp(sym) = FALSE) andalso (symbGetIsImplicit(sym) = FALSE) ) then return FALSE
+	if( symbIsParamVar(sym) ) then
+		'' A BYVAL integer or pointer binding belongs to this invocation. Its
+		'' stores may disappear only after the ordinary read/escape analysis.
+		'' Keep debugger bindings, caller-owned modes and lifetime-bearing
+		'' values under their existing contracts.
+		if( env.clopt.debuginfo or symbIsParamVarByVal(sym) = FALSE ) then return FALSE
+		if( typeGetClass(symbGetFullType(sym)) <> FB_DATACLASS_INTEGER ) then return FALSE
+		if( hCScalarStoreHasLifetime(sym) ) then return FALSE
+		return hCScalarStoreType(symbGetFullType(sym))
+	end if
 	if( (sym->attrib and (FB_SYMBATTRIB_SHARED or _
 	    FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN or _
 	    FB_SYMBATTRIB_IMPORT or FB_SYMBATTRIB_FUNCRESULT or FB_SYMBATTRIB_DESCRIPTOR)) <> 0 ) then return FALSE
@@ -137,7 +218,7 @@ private sub hCScalarStoreCollect(byval n as ASTNODE ptr)
 		if( c_scalar_store_index.list = NULL ) then hashInit(@c_scalar_store_index, 256, TRUE)
 		var entry = cptr(CSCALARSTORE ptr, listNewNode(@c_scalar_stores))
 		entry->sym = n->sym
-		var key = str(culngint(n->sym))
+		var key = str(culngint(cuint(n->sym)))
 		hashAdd(@c_scalar_store_index, ZstrDup(strptr(key)), entry, hashHash(strptr(key)))
 	end if
 	hCScalarStoreCollect(n->l)
@@ -276,8 +357,9 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 			if( target->l->sym = NULL ) then return NULL
 			if( typeGetDtAndPtrOnly(symbGetFullType(target->l->sym)) <> FB_DATATYPE_STRUCT ) then return NULL
 			'' Only ordinary bounded scalar member stores are owned here.
-			'' Pointer fields, bitfields and effectful values keep their record.
-			if( typeIsPtr(target->dtype) or hCScalarStoreType(target->dtype) = FALSE ) then return NULL
+			'' Pure pointer fields own an address value, not the pointee's lifetime.
+			'' Bitfields and effectful values still keep their record.
+			if( hCScalarStoreType(target->dtype) = FALSE ) then return NULL
 			if( hCScalarStoreDiscardable(n->r) = FALSE ) then return NULL
 			record_field = TRUE
 			target = target->l
@@ -285,7 +367,9 @@ private function hCScalarStoreTarget(byval n as ASTNODE ptr) as CSCALARSTORE ptr
 		if( hCScalarStoreDiscardable(n->r) = FALSE ) then
 			'' Keep the complete AST and its loader/lifetime ownership. The C
 			'' store owner discards only the destination, in a typed value context.
-			if( typeIsPtr(target->dtype) ) then return NULL
+			'' Object pointers have a standard C conversion to const void*.
+			'' A procedure address is not an object pointer; retain that binding.
+			if( typeGetDtAndPtrOnly(target->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION) ) then return NULL
 			if( hCScalarStoreType(target->dtype) = FALSE ) then return NULL
 			value_context = TRUE
 		end if
@@ -342,6 +426,16 @@ end sub
 
 private sub hCScalarStoreReferences(byval n as ASTNODE ptr, byval value_used as integer, byval effects_only as integer = FALSE, byval dependency_owner as CSCALARSTORE ptr = NULL)
 	if( n = NULL ) then exit sub
+	if( n->class = AST_NODECLASS_ASM ) then
+		'' Complete ASM operands are unconditional read/address roots. General
+		'' assembly disables the pass before this traversal can prune storage.
+		var token = n->asm.tokhead
+		while( token <> NULL )
+			if( token->type = AST_ASMTOK_SYMB ) then hCScalarStoreRemember(token->sym)
+			token = token->next
+		wend
+		exit sub
+	end if
 	if( dependency_owner <> NULL ) then
 		'' Calls and their arguments are already unconditional effect roots.
 		'' The other reads matter only if this assignment's destination is live.
@@ -570,7 +664,11 @@ end function
 
 private function hCScalarStoresBegin(byval proc as FBSYMBOL ptr, byval first as ASTNODE ptr) as integer
 	hCScalarStoresClear()
-	if( c_local_refs_complete = FALSE ) then return FALSE
+	if( c_local_refs_complete = FALSE ) then
+		'' Debug mode disables general local removal, independently of scan
+		'' completeness. Admit only scratch candidates in a non-opaque body.
+		if( env.clopt.debuginfo = FALSE or ctx.computedgotoopaque ) then return FALSE
+	end if
 	var n = first
 	while( n <> NULL )
 		hCScalarStoreCollect(n)

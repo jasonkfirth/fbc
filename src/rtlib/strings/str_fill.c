@@ -7,9 +7,9 @@
  */
 #include "fb.h"
 
-FBCALL FBSTRING *fb_StrFill1( ssize_t cnt, int fchar )
+FBCALL FBSTRING_ACCESS *fb_StrFill1( ssize_t cnt, int fchar )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 
 	if( cnt > 0 )
 	{
@@ -23,17 +23,17 @@ FBCALL FBSTRING *fb_StrFill1( ssize_t cnt, int fchar )
 			dst->data[cnt] = '\0';
 		}
 		else
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }
 
-FBCALL FBSTRING *fb_StrFill2( ssize_t cnt, FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_StrFill2( ssize_t cnt, FBSTRING_ACCESS *src )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	int fchar;
 
 	if( (cnt > 0) && (src != NULL) && (src->data != NULL) && (FB_STRSIZE( src ) > 0) ) {
@@ -41,7 +41,7 @@ FBCALL FBSTRING *fb_StrFill2( ssize_t cnt, FBSTRING *src )
 		dst = fb_StrFill1( cnt, fchar );
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	/* del if temp */
 	fb_hStrDelTemp( src );

@@ -152,7 +152,6 @@ endif
 BASE_WARN_CFLAGS := \
   -Wall \
   -Wextra \
-  -Wno-unused-parameter \
   -Werror=implicit-function-declaration
 
 BASE_WARN_CXXFLAGS := \
@@ -700,34 +699,6 @@ FBC_FORWARD_CFLAGS := $(filter-out -Wp%,$(FBC_FORWARD_CFLAGS))
 FBC_WCFLAGS := $(foreach f,$(FBC_FORWARD_CFLAGS),-Wc $(f))
 
 ALLFBCFLAGS += $(FBC_WCFLAGS)
-
-##############################################################################
-# Generated C warning suppressions
-##############################################################################
-
-# Keep these after forwarded -Wall/-Wextra so generated compiler/runtime C stays
-# quiet without weakening diagnostics for handwritten C sources.
-GENERATED_C_WARN_SUPPRESS := \
-  -Wc -Wno-missing-field-initializers
-
-ifeq ($(TOOLCHAIN_CC_IS_CLANG),yes)
-GENERATED_C_WARN_SUPPRESS += \
-  -Wc -Wno-sometimes-uninitialized \
-  -Wc -Wno-unused-but-set-variable \
-  -Wc -Wno-unused-function \
-  -Wc -Wno-unused-label \
-  -Wc -Wno-unused-variable
-else ifneq ($(filter linux cygwin darwin win32 win64,$(TARGET_OS)),)
-GENERATED_C_WARN_SUPPRESS += \
-  -Wc -Wno-builtin-declaration-mismatch \
-  -Wc -Wno-maybe-uninitialized \
-  -Wc -Wno-type-limits
-endif
-
-ALLFBCFLAGS   += $(GENERATED_C_WARN_SUPPRESS)
-ALLFBRTCFLAGS += $(GENERATED_C_WARN_SUPPRESS)
-ALLFBRTLFLAGS += $(GENERATED_C_WARN_SUPPRESS)
-
 
 #############################
 # end of toolchain-flags.mk

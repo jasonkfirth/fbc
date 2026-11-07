@@ -601,28 +601,14 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			'' enable all warnings
 			ln += "-Wall "
 
-			'' -Wno-unused-but-set-variable and the warning it suppresses were introduced
-			'' in GCC 4.6. Don't pass that flag to avoid an error on earlier GCC. As a
-			'' result, to disable the warning on 4.6+ need to disable all unused warnings...
-			'' ln += "-Wno-unused-label -Wno-unused-function -Wno-unused-variable "
-			'' ln += "-Wno-unused-but-set-variable "
-			ln += "-Wno-unused "
-
 		else
 			'' Some target/backend combinations require the C compiler to use
 			'' its integrated assembler. Compile generated C directly to object
 			'' code and skip hAssembleModule() for them.
-			ln += "-c -nostdlib -nostdinc -Wall -Wno-unused-label " + _
-				"-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable "
-			if( fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS ) then
-				ln += "-Wno-warn-absolute-paths "
-			end if
-
+			ln += "-c -nostdlib -nostdinc -Wall "
 		end if
 
-		'' Don't warn about non-standard main() signature
-		'' (we emit "ubyte **argv" instead of "char **argv")
-		ln += "-Wno-main "
+		'' Keep C compiler diagnostics available to -Wall and user-supplied -Wc options.
 
 		'' helps finding ir-hlc bugs
 		ln += "-Werror-implicit-function-declaration "
@@ -675,23 +661,6 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 		'' Keep pointer compatibility diagnostics enabled. Call lowering must
 		'' preserve declared qualifiers and runtime ABI types; these diagnostics
 		'' catch regressions in the generated C.
-
-		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_GCC ) then
-			'' GCC 6 added -Wmisleading-indentation to -Wall.  The check is not
-			'' useful for machine-generated C and has severe scaling costs in GCC 9
-			'' and older when the generated translation unit is large.
-			ln += "-Wno-misleading-indentation "
-		end if
-
-		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
-			ln += "-Wno-builtin-requires-header "
-			'' Clang's uninitialized-variable analysis follows computed error
-			'' jumps through generated temporaries. Large BASIC procedures can
-			'' spend minutes in this C warning pass. BASIC initialization and ANY
-			'' storage are handled before C emission; disable this costly pass.
-			'' An explicit -Wc -Wuninitialized can enable it for emitter debugging.
-			ln += "-Wno-uninitialized "
-		end if
 
 		if( fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
 			ln += "-g "

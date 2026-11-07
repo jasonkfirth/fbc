@@ -1,3 +1,8 @@
+'' FreeBASIC CRT -- crt/stdint.bi
+''
+'' Defines the fixed-width and pointer-sized integer types and constants
+'' used by C runtime declarations.  This include does not implement them.
+''
 #ifndef __crt_stdint_bi__
 #define __crt_stdint_bi__
 
@@ -35,10 +40,18 @@ type uint_fast16_t as uint16_t
 type uint_fast32_t as uint32_t
 type uint_fast64_t as uint64_t
 
-#ifndef intptr_t
-type intptr_t as integer
+#if ((defined( __FB_64BIT__ ) and defined( __FB_UNIX__ )) or defined( __FB_JS__ )) and not defined( __FB_BOOTSTRAP_COMPAT__ )
+	'' These targets use C long for pointer-sized integer types.
+	#ifndef intptr_t
+		type intptr_t as integer alias "long"
+	#endif
+	type uintptr_t as uinteger alias "long"
+#else
+	#ifndef intptr_t
+		type intptr_t as integer
+	#endif
+	type uintptr_t as uinteger
 #endif
-type uintptr_t as uinteger
 
 type intmax_t as int64_t
 type uintmax_t as uint64_t
@@ -154,3 +167,5 @@ type uintmax_t as uint64_t
 #define UINTMAX_C(c) c##ULL
 
 #endif
+
+'' end of crt/stdint.bi

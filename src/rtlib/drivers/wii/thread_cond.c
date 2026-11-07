@@ -23,7 +23,7 @@
 #include "../../fb_private_thread.h"
 #include <ogc/cond.h>
 
-struct _FBCOND {
+struct FBCOND_ {
 	cond_t id;
 };
 

@@ -1,4 +1,10 @@
-/* X11 gfx driver */
+/*
+	Project: FreeBASIC gfxlib2
+	File: gfx_driver_x11.c
+	Purpose: Register the X11 framebuffer driver and present changed scanlines.
+	Responsibilities: Bind native helpers, convert pixels, and transfer images.
+	This file does not decode input events or implement drawing primitives.
+*/
 
 #ifndef DISABLE_X11
 
@@ -21,8 +27,8 @@ const GFXDRIVER fb_gfxDriverX11 =
 	fb_hX11SetPalette,      /* void (*set_palette)(int index, int r, int g, int b); */
 	fb_hX11WaitVSync,       /* void (*wait_vsync)(void); */
 	fb_hX11GetMouse,        /* int (*get_mouse)(int *x, int *y, int *z, int *buttons, int *clip); */
-	NULL,                   /* int (*get_touch_count)(void); */
-	NULL,                   /* int (*get_touch)(int index, int *x, int *y, int *id); */
+	fb_hX11GetTouchCount,   /* int (*get_touch_count)(void); */
+	fb_hX11GetTouch,        /* int (*get_touch)(int index, int *x, int *y, int *id); */
 	fb_hX11SetMouse,        /* void (*set_mouse)(int x, int y, int cursor, int clip); */
 	fb_hX11SetWindowTitle,  /* void (*set_window_title)(char *title); */
 	fb_hX11SetWindowPos,    /* int (*set_window_pos)(int x, int y); */
@@ -359,8 +365,19 @@ static void x11_exit(void)
 static void x11_update(void)
 {
 	int i, y, h;
+	int any_dirty = FALSE;
 	
 	fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
+	/* The window thread still services input on idle frames. Avoid converting
+	 * the whole framebuffer when there are no changed rows to present. */
+	for (i = 0; i < fb_x11.h; i++) {
+		if (__fb_gfx->dirty[i]) {
+			any_dirty = TRUE;
+			break;
+		}
+	}
+	if (!any_dirty)
+		return;
 	blitter((unsigned char *)image->data, image->bytes_per_line);
 	for (i = 0; i < fb_x11.h; i++) {
 		if (__fb_gfx->dirty[i]) {
@@ -461,3 +478,5 @@ static int driver_resize(int width, int height)
 }
 
 #endif
+
+/* end of gfx_driver_x11.c */

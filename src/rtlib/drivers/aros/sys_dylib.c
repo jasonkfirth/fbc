@@ -20,13 +20,13 @@
 
 #include "../../fb.h"
 
-FBCALL void *fb_DylibLoad( FBSTRING *library )
+FBCALL void *fb_DylibLoad( FBSTRING_ACCESS *library )
 {
 	fb_hStrDelTemp( library );
 	return NULL;
 }
 
-FBCALL void *fb_DylibSymbol( void *library, FBSTRING *symbol )
+FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 {
 	(void)library;
 	fb_hStrDelTemp( symbol );

@@ -201,7 +201,7 @@ done:
 	return node;
 }
 
-FBCALL void *fb_Gfx3SurfaceLoad(FBSTRING *filename, int depth,
+FBCALL void *fb_Gfx3SurfaceLoad(FBSTRING_ACCESS *filename, int depth,
 	unsigned int usage)
 {
 	FB_GFX3_GPU_SURFACE_NODE *node = NULL;
@@ -270,7 +270,7 @@ unlock:
 FBCALL void *fb_Gfx3SurfaceLoadWstr(const FB_WCHAR *filename, int depth,
 	unsigned int usage)
 {
-	FBSTRING *utf8;
+	FBSTRING_ACCESS *utf8;
 	/* Convert before acquiring the graphics lock. The existing loader owns
 	   the temporary descriptor and the platform's UTF-8 file operation. */
 	FB_STRLOCK();

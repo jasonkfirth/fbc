@@ -18,7 +18,7 @@ int fb_GfxLineInputWstr
 		int addnewline
 	)
 {
-    FBSTRING *tmp_result;
+    FBSTRING_ACCESS *tmp_result;
 
     /*
         Console input is collected through the normal byte-oriented console

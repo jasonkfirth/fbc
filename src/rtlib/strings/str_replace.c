@@ -9,11 +9,11 @@
 #include "fb.h"
 #include "strings/str_vb_private.h"
 
-FBCALL FBSTRING *fb_StrReplace( FBSTRING *src, FBSTRING *find,
-                               FBSTRING *replacement, ssize_t start,
+FBCALL FBSTRING_ACCESS *fb_StrReplace( FBSTRING_ACCESS *src, FBSTRING_ACCESS *find,
+                               FBSTRING_ACCESS *replacement, ssize_t start,
                                ssize_t count, int compare )
 {
-	FBSTRING *dst = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *dst = &fb_ctx.null_desc;
 	ssize_t src_len, find_len, repl_len, offset, pos, matches, length, written;
 	int error = FB_RTERROR_OK;
 
@@ -59,7 +59,7 @@ FBCALL FBSTRING *fb_StrReplace( FBSTRING *src, FBSTRING *find,
 		goto done;
 	dst = fb_hStrAllocTemp_NoLock( NULL, length );
 	if( dst == NULL ) {
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 		error = FB_RTERROR_OUTOFMEM;
 		goto done;
 	}

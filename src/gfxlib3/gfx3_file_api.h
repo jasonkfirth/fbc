@@ -43,7 +43,7 @@ void fb_gfx3_file_release_view(FB_GFX3_FILE_VIEW *view);
 int fb_gfx3_file_commit_screen_locked(FB_GFX3_FILE_VIEW *view,
 	uint32_t width, uint32_t height);
 
-int fb_gfx3_file_load_bitmap_pixels_locked(FBSTRING *filename,
+int fb_gfx3_file_load_bitmap_pixels_locked(FBSTRING_ACCESS *filename,
 	uint32_t depth, unsigned char **pixels, uint32_t *width,
 	uint32_t *height, uint32_t *pitch);
 

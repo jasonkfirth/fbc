@@ -9,9 +9,9 @@
 #include "fb_private_console.h"
 
 /* Caller is expected to hold FB_LOCK() */
-FBSTRING *fb_ConsoleInkey( void )
+FBSTRING_ACCESS *fb_ConsoleInkey( void )
 {
-	FBSTRING *res = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *res = &fb_ctx.null_desc;
 
 	/*
 	 * Browser-hosted programs often poll INKEY in loops that relied on the

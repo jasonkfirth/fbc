@@ -88,11 +88,26 @@ sub UnreadOutOfRange()
 	dim as long unused_value = FPOperand(4)
 end sub
 
+sub UnreadObjectPointer()
+	dim as any ptr unused_value = cptr(any ptr, cint(FPOperand(0)))
+end sub
+
+sub UnreadPointerBoundary()
+	dim as any ptr unused_value = cptr(any ptr, cint(FPOperand(4)))
+end sub
+
+sub UnreadLocalPointer()
+	type LocalRecord
+		marker as integer
+	end type
+	dim as LocalRecord ptr unused_value = cptr(LocalRecord ptr, cint(FPOperand(0)))
+end sub
+
 '' Populate signaling-NaN copies before clearing the exception state for a case.
 stored_value = FPOperand(7)
 stored_array(0) = stored_value
 for mode as long = 0 to 3
-	for case_index as long = 0 to 15
+	for case_index as long = 0 to 18
 		dim as long expected_calls = 1
 		dim as long live_result = 0
 		VERIFY(FPBegin(mode) = 0)
@@ -115,6 +130,9 @@ for mode as long = 0 to 3
 		case 13: UnreadUnsigned128()
 		case 14: UnreadBoolean()
 		case 15: UnreadUnsignedBoundary()
+		case 16: UnreadObjectPointer()
+		case 17: UnreadPointerBoundary()
+		case 18: UnreadLocalPointer()
 		end select
 		VERIFY(FPCalls() = expected_calls)
 		VERIFY(FPMode() = mode)

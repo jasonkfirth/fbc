@@ -1,17 +1,25 @@
+/'
+	Project: FreeBASIC compiler tests
+	File: cast-nullptr.bas
+	Purpose: Test conversions between null pointers and integer types.
+	Responsibilities: Check assignments and values passed to typed procedures.
+	This file intentionally does NOT contain: non-null pointer conversion tests.
+'/
+
 #include "fbcunit.bi"
 
 SUITE( fbc_tests.numbers.cast_nullptr )
 
-	private sub f_b   ( byval i as byte     ) : end sub
-	private sub f_sh  ( byval i as short    ) : end sub
-	private sub f_l   ( byval i as long     ) : end sub
-	private sub f_ll  ( byval i as longint  ) : end sub
-	private sub f_i   ( byval i as integer  ) : end sub
-	private sub f_ub  ( byval i as ubyte    ) : end sub
-	private sub f_ush ( byval i as ushort   ) : end sub
-	private sub f_ul  ( byval i as ulong    ) : end sub
-	private sub f_ull ( byval i as ulongint ) : end sub
-	private sub f_ui  ( byval i as uinteger ) : end sub
+	private sub f_b   ( byval i as byte     ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_sh  ( byval i as short    ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_l   ( byval i as long     ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_ll  ( byval i as longint  ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_i   ( byval i as integer  ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_ub  ( byval i as ubyte    ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_ush ( byval i as ushort   ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_ul  ( byval i as ulong    ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_ull ( byval i as ulongint ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
+	private sub f_ui  ( byval i as uinteger ) : CU_ASSERT_EQUAL( i, 0 ) : end sub
 
 	TEST( all )
 		dim p as any ptr
@@ -91,3 +99,5 @@ SUITE( fbc_tests.numbers.cast_nullptr )
 	END_TEST
 
 END_SUITE
+
+/' end of cast-nullptr.bas '/

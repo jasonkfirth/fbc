@@ -9,9 +9,9 @@
 #include <time.h>
 
 /*:::::*/
-FBCALL FBSTRING *fb_Time ( void )
+FBCALL FBSTRING_ACCESS *fb_Time ( void )
 {
-	FBSTRING        *dst;
+	FBSTRING_ACCESS        *dst;
 	time_t          rawtime;
 	struct tm       *ptm;
 
@@ -27,7 +27,7 @@ FBCALL FBSTRING *fb_Time ( void )
 	    ((dst = fb_hStrAllocTemp( NULL, 2+1+2+1+2 )) != NULL) /* done last so it's not leaked */ ) {
 		sprintf( dst->data, "%02d:%02d:%02d", ptm->tm_hour, ptm->tm_min, ptm->tm_sec );
 	} else {
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 	}
 
 	FB_UNLOCK();

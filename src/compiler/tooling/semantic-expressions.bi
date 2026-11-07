@@ -9,6 +9,26 @@
 
 #include once "ast/ast.bi"
 #include once "lexer/lex.bi"
+#include once "tooling/semantic-compare-contracts.bi"
+#include once "tooling/semantic-collection-empty.bi"
+#include once "tooling/semantic-constructor-string.bi"
+#include once "tooling/semantic-index-conversion.bi"
+
+
+declare sub fbSemanticModelExportSubscriptReplacementCount( )
+declare sub fbSemanticModelRetainCallReceiverType(byval reference as longint, byval dtype as integer)
+declare sub fbSemanticModelRetainCallReceiver _
+    ( byval reference as longint, byval receiver as FBSYMBOL ptr )
+declare sub fbSemanticModelSubscriptReplacement _
+    ( byval pointer_expr as ASTNODE ptr, byval index_expr as ASTNODE ptr, _
+      byval pointer_id as longint, byval index_id as longint )
+
+declare function fbSemanticModelContainerDataPointerCandidate _
+    ( byval receiver_expr as ASTNODE ptr, byval indexer as FBSYMBOL ptr, _
+      byval receiver_id as longint, byval index_id as longint ) as string
+declare sub fbSemanticModelContainerDataPointerResult(byval result as ASTNODE ptr, byref payload as string, _
+    byval receiver_id as longint, byval index_id as longint)
+declare sub fbSemanticModelExportContainerDataPointerCount( )
 
 declare sub fbSemanticModelResetExpressions( )
 

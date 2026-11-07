@@ -9,11 +9,11 @@
 
 char *fb_hGetExeName( char *dst, ssize_t maxlen )
 {
-	const char *p = strrchr( __fb_ctx.argv[0], '/' );
+	const char *p = strrchr( fb_ctx.argv[0], '/' );
 	if( p )
 		strlcpy( dst, p + 1, maxlen );
 	else
-		strlcpy( dst, __fb_ctx.argv[0], maxlen );
+		strlcpy( dst, fb_ctx.argv[0], maxlen );
 	return dst;
 }
 

@@ -7,28 +7,27 @@
  */
 #include "fb.h"
 
-void fb_hArrayDtorStr( FBARRAY *array, FB_DEFCTOR dtor, size_t keep_idx )
+void fb_hArrayDtorStr( FBARRAY_ACCESS *array, FB_DEFCTOR dtor, size_t keep_idx )
 {
 	size_t elements;
-	FBSTRING *this_;
+	FBSTRING_ACCESS *this_;
 
 	if( array->ptr == NULL )
 		return;
 
 	elements = fb_ArrayLen( array );
 
-	/* call dtors in the inverse order */
-	this_ = (FBSTRING *)array->ptr + (elements-1);
-
+	/* Count down before forming an element address. Decrementing the
+	   pointer after element zero would leave the physical allocation. */
 	while( elements > keep_idx ) {
+		--elements;
+		this_ = (FBSTRING_ACCESS *)array->ptr + elements;
 		if( this_->data != NULL )
 			fb_StrDelete( this_ );
-		--this_;
-		--elements;
 	}
 }
 
-FBCALL void fb_ArrayDestructStr( FBARRAY *array )
+FBCALL void fb_ArrayDestructStr( FBARRAY_ACCESS *array )
 {
 	fb_hArrayDtorStr( array, NULL, 0 );
 }

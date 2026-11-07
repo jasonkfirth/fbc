@@ -9,9 +9,9 @@
 #include "fb.h"
 #include "strings/str_vb_private.h"
 
-FBCALL FBSTRING *fb_StrReverse( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_StrReverse( FBSTRING_ACCESS *src )
 {
-	FBSTRING *dst = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *dst = &fb_ctx.null_desc;
 	ssize_t len, i;
 	int error = FB_RTERROR_OK;
 
@@ -22,7 +22,7 @@ FBCALL FBSTRING *fb_StrReverse( FBSTRING *src )
 	} else if( len > 0 ) {
 		dst = fb_hStrAllocTemp_NoLock( NULL, len );
 		if( dst == NULL ) {
-			dst = &__fb_ctx.null_desc;
+			dst = &fb_ctx.null_desc;
 			error = FB_RTERROR_OUTOFMEM;
 		} else {
 			for( i = 0; i < len; ++i )

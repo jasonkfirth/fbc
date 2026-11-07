@@ -1,3 +1,9 @@
+'' Project: FreeBASIC compiler tests
+'' File: dim/shadowing.bas
+'' Purpose: Check array and implicit-field name shadowing.
+'' Responsibilities: Verify bounds and compare live local and field addresses.
+'' This file intentionally does NOT dereference expired local storage.
+
 # include "fbcunit.bi"
 
 SUITE( fbc_tests.dim_.shadowing )
@@ -101,27 +107,29 @@ SUITE( fbc_tests.dim_.shadowing )
 			i as integer
 			array(0 to 1) as integer
 
-			declare function f1( ) as integer ptr
-			declare function f2( ) as integer ptr
+			declare function f1( ) as integer
+			declare function f2( ) as integer
 		end type
 
-		function UDT.f1( ) as integer ptr
+		function UDT.f1( ) as integer
 			dim i as integer
-			function = @i
+			function = (@i <> @this.i)
 		end function
 
-		function UDT.f2( ) as integer ptr
+		function UDT.f2( ) as integer
 			dim array(0 to 1) as integer
-			function = @array(0)
+			function = (@array(0) <> @this.array(0))
 		end function
 
 		'' dim shadowing implicit THIS field
 		TEST( default )
 			dim x as UDT
-			CU_ASSERT( @x.i <> x.f1( ) )
-			CU_ASSERT( @x.array(0) <> x.f2( ) )
+			CU_ASSERT( x.f1( ) )
+			CU_ASSERT( x.f2( ) )
 		END_TEST
 
 	END_TEST_GROUP
 
 END_SUITE
+
+'' end of dim/shadowing.bas

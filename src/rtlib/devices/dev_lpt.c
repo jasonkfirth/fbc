@@ -28,7 +28,7 @@ static FB_FILE *fb_DevLptFindDeviceByName( int iPort, char * filename, int no_re
 	/* Test if the printer is already open. */
 	for( i=0; i<FB_MAX_FILES; ++i )
 	{
-		FB_FILE *handle = __fb_ctx.fileTB + i;
+		FB_FILE *handle = fb_ctx.fileTB + i;
 		if( handle->type == FB_FILE_TYPE_PRINTER )
 		{
 			if( no_redir==FALSE || handle->redirection_to==NULL )

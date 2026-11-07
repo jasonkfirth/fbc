@@ -9,7 +9,7 @@
 #include <errno.h>
 
 /*:::::*/
-FBCALL int fb_FileKill( FBSTRING *str )
+FBCALL int fb_FileKill( FBSTRING_ACCESS *str )
 {
 	int res = 0, err = 0;
 

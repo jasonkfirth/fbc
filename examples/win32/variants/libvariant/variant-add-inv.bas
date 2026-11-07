@@ -1,3 +1,8 @@
+'' Project: FreeBASIC variant helper library
+'' File: variant-add-inv.bas
+'' Purpose: Implement the variant add-inv overload family.
+'' Responsibilities: Preserve OLE value and text ownership.
+'' This file intentionally does NOT declare the public wrapper ABI.
 
 
 #define VARIANT_NOASSIGNMENT
@@ -39,7 +44,7 @@ operator + _
 	VariantInit( @tmp )
 	VariantInit( @res )
 	V_VT(@tmp) = VT_BSTR
-	V_BSTR(@tmp) = SysAllocStringByteLen( lhs, len( *lhs ) )
+	V_BSTR(@tmp) = hVarAllocBstrFromZstring( lhs )
 
 	VarAdd( @tmp, @rhs.var_, @res )
 
@@ -70,3 +75,5 @@ operator + _
 	return VARIANT( res, FALSE )
 
 end operator
+
+'' end of variant-add-inv.bas

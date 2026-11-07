@@ -5,8 +5,41 @@
 ''     disjoint from user symbols. Linker names are handled by declaration aliases.
 '' This file intentionally does NOT contain: symbol identity or ABI changes.
 
+private function hCIsC23Keyword( byval rawname as const zstring ptr ) as integer
+	if( rawname = NULL ) then return FALSE
+	select case *rawname
+	case "alignas", "alignof", "bool", "constexpr", "false", "nullptr", _
+	     "static_assert", "thread_local", "true", "typeof_unqual"
+		return TRUE
+	end select
+	return FALSE
+end function
+
+'' Windows GCC requires ordinary C tokens for TLS relocations. When a
+'' global name needs encoding, plain identifier-shaped object names can be
+'' preserved with an assembler alias instead of an asm-labelled C token.
+private function hCUsesWindowsTlsAlias( byval sym as FBSYMBOL ptr ) as integer
+	if( env.clopt.target <> FB_COMPTARGET_WIN32 orelse sym = NULL ) then return FALSE
+	if( symbIsVar(sym) = FALSE orelse symbIsLocal(sym) orelse _
+	    symbIsThreadLocal(sym) = FALSE ) then return FALSE
+	var rawname = symbGetMangledName(sym)
+	if( rawname = NULL ) then return FALSE
+	if( len(*rawname) = 0 ) then return FALSE
+	for i as integer = 0 to len(*rawname) - 1
+		select case (*rawname)[i]
+		case asc("A") to asc("Z"), asc("a") to asc("z"), asc("_")
+		case asc("0") to asc("9")
+			if( i = 0 ) then return FALSE
+		case else
+			return FALSE
+		end select
+	next
+	return TRUE
+end function
+
 private function hCNameNeedsEncoding( byval rawname as const zstring ptr ) as integer
 	if( rawname = NULL ) then return FALSE
+	if( hCIsC23Keyword(rawname) ) then return TRUE
 	if( left(*rawname, 5) = "fb_c_" or left(*rawname, 8) = "fb_type_" or _
 	    left(*rawname, 5) = "__FB_" ) then return TRUE
 	'' C reserves names beginning with an underscore and a capital letter.
@@ -30,7 +63,7 @@ private function hCNameNeedsEncoding( byval rawname as const zstring ptr ) as in
 			return TRUE
 		end select
 	next
-	'' GNU C11 also provides keywords and builtin type names beyond ISO C's core.
+	'' C23 and GNU C also provide keywords and builtin type names beyond C11.
 	select case *rawname
 	case "boolean", "int8", "uint8", "int16", "uint16", "int32", "uint32", _
 	     "int64", "uint64", "FBSTRING", "__builtin_va_list", "__int128", _
@@ -99,14 +132,55 @@ private function hCUseEmulatedTlsName( byval sym as FBSYMBOL ptr, byval rawname 
 			return FALSE
 		end select
 	next
-	return has_dollar
+	if( has_dollar ) then return TRUE
+	'' An asm label on a reserved external TLS name also changes GCC's TLS
+	'' relocation spelling on these targets. Keep the original C token until
+	'' it can be renamed without changing the object reference.
+	if( symbIsLocal(sym) = FALSE andalso len(*rawname) > 0 andalso _
+	    (*rawname)[0] = asc("_") andalso hCNameNeedsEncoding(rawname) = FALSE ) then return TRUE
+	return FALSE
+end function
+
+private function hCSymbolNeedsEncoding( byval sym as FBSYMBOL ptr ) as integer
+	if( sym = NULL ) then return FALSE
+	var rawname = symbGetMangledName(sym)
+	if( rawname = NULL ) then return FALSE
+	'' FILE is the C stdio type name. Ordinary object/procedure identifiers
+	'' share its namespace; record fields and tags have separate namespaces.
+	if( *rawname = "FILE" andalso (symbIsVar(sym) or symbIsProc(sym)) ) then return TRUE
+	if( hCNameNeedsEncoding(rawname) ) then return TRUE
+	if( len(*rawname) = 0 orelse (*rawname)[0] <> asc("_") ) then return FALSE
+	if( symbIsProc(sym) andalso symbGetIsRTL(sym) andalso *rawname = "_setjmp" ) then return TRUE
+	'' These CRT/library exports and initialization hooks have ordinary
+	'' linker symbols. Keep unknown underscore-prefixed procedure spellings
+	'' available to the C compiler: they can denote native intrinsics.
+	if( symbIsProc(sym) ) then
+		select case *rawname
+		case "_strtoi64", "_strtoui64", "_wcstoi64", "_wcstoui64", _
+		     "_errno", "__acrt_iob_func", "_access", "_strdup", "_stricmp", _
+		     "_strnicmp", "_itoa", "_ultoa", "_i64toa", "_ui64toa", _
+		     "_itow", "_ultow", "_i64tow", "_ui64tow", _
+		     "_chdir", "_putenv", "_rmdir", "_beep", _
+		     "_fileno", "_get_osfhandle", "_setmode", "__WSAFDIsSet", _
+		     "__caca0_get_event", "__lzo_init_v2", "_initwin_1", "_initwin_2", _
+		     "__CONSTRUC", "__DESTRUC"
+			return TRUE
+		case else
+			return FALSE
+		end select
+	end if
+	'' Double-underscore names are reserved at every scope. A single leading
+	'' underscore is reserved at file scope, where globals live.
+	if( len(*rawname) > 1 andalso memcmp(rawname, @"__", 2) = 0 ) then return TRUE
+	if( symbIsVar(sym) andalso symbIsLocal(sym) = FALSE ) then return TRUE
+	return FALSE
 end function
 
 private function hGetCId( byval sym as FBSYMBOL ptr ) as string
 	var rawname = symbGetMangledName( sym )
 	if( rawname = NULL ) then return ""
 	if( hCUseEmulatedTlsName(sym, rawname) ) then return *rawname
-	if( hCNameNeedsEncoding(rawname) = FALSE ) then return *rawname
+	if( hCSymbolNeedsEncoding(sym) = FALSE ) then return *rawname
 	return hEncodeCName( rawname, "fb_c_sym_" )
 end function
 
@@ -114,7 +188,8 @@ private function hGetCFieldId( byval fld as FBSYMBOL ptr ) as string
 	'' Field names are C source tokens; the BASIC layout and names stay intact.
 	var rawname = symbGetName( fld )
 	if( rawname = NULL ) then return ""
-	if( hCNameNeedsEncoding(rawname) = FALSE ) then return *rawname
+	if( hCNameNeedsEncoding(rawname) = FALSE andalso _
+	    (len(*rawname) < 2 orelse memcmp(rawname, @"__", 2) <> 0) ) then return *rawname
 	return hEncodeCName( rawname, "fb_c_field_" )
 end function
 

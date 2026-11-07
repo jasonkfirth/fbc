@@ -20,8 +20,8 @@
         - graphics or sound backend declarations
 */
 
-#ifndef __FB_WINCE_H__
-#define __FB_WINCE_H__
+#ifndef FB_RTLIB_WINCE_H
+#define FB_RTLIB_WINCE_H
 
 #include <malloc.h>
 #include <sys/types.h>
@@ -36,11 +36,11 @@
 
 /* newline for console/file I/O */
 #define FB_NEWLINE "\r\n"
-#define FB_NEWLINE_WSTR _LC("\r\n")
+#define FB_NEWLINE_WSTR FB_WCHAR_LITERAL("\r\n")
 
 /* newline for printer I/O */
 #define FB_BINARY_NEWLINE "\r\n"
-#define FB_BINARY_NEWLINE_WSTR _LC("\r\n")
+#define FB_BINARY_NEWLINE_WSTR FB_WCHAR_LITERAL("\r\n")
 
 #define FB_LL_FMTMOD "ll"
 

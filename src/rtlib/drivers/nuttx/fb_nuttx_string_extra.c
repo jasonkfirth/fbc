@@ -24,7 +24,7 @@
 #if !defined(FB_NUTTX_USE_GENERIC_STR_EXTRA) || \
     (FB_NUTTX_USE_GENERIC_STR_EXTRA == 0)
 
-FBSTRING *fb_LEFT(const FBSTRING *s, const int32 len)
+FBSTRING_ACCESS *fb_LEFT(const FBSTRING_ACCESS *s, const int32 len)
 {
     int32 copy_len;
 
@@ -39,7 +39,7 @@ FBSTRING *fb_LEFT(const FBSTRING *s, const int32 len)
     return fb_nuttx_temp_copy(s->data, copy_len);
 }
 
-FBSTRING *fb_RIGHT(const FBSTRING *s, const int32 len)
+FBSTRING_ACCESS *fb_RIGHT(const FBSTRING_ACCESS *s, const int32 len)
 {
     int32 copy_len;
 
@@ -54,7 +54,7 @@ FBSTRING *fb_RIGHT(const FBSTRING *s, const int32 len)
     return fb_nuttx_temp_copy(s->data + (s->len - copy_len), copy_len);
 }
 
-FBSTRING *fb_StrMid(const FBSTRING *s, const int32 start, const int32 len)
+FBSTRING_ACCESS *fb_StrMid(const FBSTRING_ACCESS *s, const int32 start, const int32 len)
 {
     int32 copy_len;
     int32 offset;
@@ -74,8 +74,8 @@ FBSTRING *fb_StrMid(const FBSTRING *s, const int32 start, const int32 len)
     return fb_nuttx_temp_copy(s->data + offset, copy_len);
 }
 
-int32 fb_StrInstr(const int32 start, const FBSTRING *haystack,
-    const FBSTRING *needle)
+int32 fb_StrInstr(const int32 start, const FBSTRING_ACCESS *haystack,
+    const FBSTRING_ACCESS *needle)
 {
     const char *found;
     int32 offset;
@@ -98,7 +98,7 @@ int32 fb_StrInstr(const int32 start, const FBSTRING *haystack,
     return (int32)(found - haystack->data) + 1;
 }
 
-int32 fb_StrInstrRev(const FBSTRING *haystack, const FBSTRING *needle,
+int32 fb_StrInstrRev(const FBSTRING_ACCESS *haystack, const FBSTRING_ACCESS *needle,
     const int32 start)
 {
     int32 last_start;
@@ -169,7 +169,7 @@ int32 fb_StrLen(const void *src, const int32 src_len)
     return fb_nuttx_source_length(src, src_len);
 }
 
-static FBSTRING *fb_nuttx_case_convert(const FBSTRING *s, int (*convert)(int))
+static FBSTRING_ACCESS *fb_nuttx_case_convert(const FBSTRING_ACCESS *s, int (*convert)(int))
 {
     char *buffer;
     int32 i;
@@ -197,21 +197,21 @@ static FBSTRING *fb_nuttx_case_convert(const FBSTRING *s, int (*convert)(int))
     return fb_nuttx_temp_string(buffer, s->len);
 }
 
-FBSTRING *fb_StrUcase2(const FBSTRING *s, const int32 mode)
+FBSTRING_ACCESS *fb_StrUcase2(const FBSTRING_ACCESS *s, const int32 mode)
 {
     (void)mode;
 
     return fb_nuttx_case_convert(s, toupper);
 }
 
-FBSTRING *fb_StrLcase2(const FBSTRING *s, const int32 mode)
+FBSTRING_ACCESS *fb_StrLcase2(const FBSTRING_ACCESS *s, const int32 mode)
 {
     (void)mode;
 
     return fb_nuttx_case_convert(s, tolower);
 }
 
-FBSTRING *fb_TRIM(const FBSTRING *s)
+FBSTRING_ACCESS *fb_TRIM(const FBSTRING_ACCESS *s)
 {
     const char *start;
     const char *finish;
@@ -234,7 +234,7 @@ FBSTRING *fb_TRIM(const FBSTRING *s)
     return fb_nuttx_temp_copy(start, len);
 }
 
-FBSTRING *fb_LTRIM(const FBSTRING *s)
+FBSTRING_ACCESS *fb_LTRIM(const FBSTRING_ACCESS *s)
 {
     const char *start;
     const char *finish;
@@ -254,7 +254,7 @@ FBSTRING *fb_LTRIM(const FBSTRING *s)
     return fb_nuttx_temp_copy(start, len);
 }
 
-FBSTRING *fb_RTRIM(const FBSTRING *s)
+FBSTRING_ACCESS *fb_RTRIM(const FBSTRING_ACCESS *s)
 {
     const char *start;
     const char *finish;

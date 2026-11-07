@@ -27,7 +27,7 @@ int fb_ConsoleLineInputWstr
 		int addnewline
 	)
 {
-    FBSTRING *tmp_result;
+    FBSTRING_ACCESS *tmp_result;
 
     /* !!!FIXME!!! no support for unicode input */
 

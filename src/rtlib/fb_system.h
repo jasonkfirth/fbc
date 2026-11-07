@@ -24,23 +24,23 @@ FBCALL void         fb_MemCopyClear     ( unsigned char *dst, size_t dstlen,
 
 FBCALL void         fb_Beep             ( void );
 
-FBCALL FBSTRING    *fb_Command          ( int argc );
-FBCALL FBSTRING    *fb_GetEnviron       ( FBSTRING *varname );
-FBCALL int          fb_SetEnviron       ( FBSTRING *str );
-FBCALL FBSTRING    *fb_CurDir           ( void );
-FBCALL FBSTRING    *fb_ExePath          ( void );
-FBCALL int          fb_Shell            ( FBSTRING *program );
+FBCALL FBSTRING_ACCESS    *fb_Command          ( int argc );
+FBCALL FBSTRING_ACCESS    *fb_GetEnviron       ( FBSTRING_ACCESS *varname );
+FBCALL int          fb_SetEnviron       ( FBSTRING_ACCESS *str );
+FBCALL FBSTRING_ACCESS    *fb_CurDir           ( void );
+FBCALL FBSTRING_ACCESS    *fb_ExePath          ( void );
+FBCALL int          fb_Shell            ( FBSTRING_ACCESS *program );
        int          fb_hShell           ( char *program );
-FBCALL int          fb_Run              ( FBSTRING *program, FBSTRING *args );
-FBCALL int          fb_Chain            ( FBSTRING *program );
-FBCALL int          fb_Exec             ( FBSTRING *program, FBSTRING *args );
-FBCALL int          fb_ExecEx           ( FBSTRING *program, FBSTRING *args, int do_wait );
+FBCALL int          fb_Run              ( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args );
+FBCALL int          fb_Chain            ( FBSTRING_ACCESS *program );
+FBCALL int          fb_Exec             ( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args );
+FBCALL int          fb_ExecEx           ( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_wait );
        int          fb_hParseArgs       ( char *dst, const char *src, ssize_t length );
 
 FBCALL size_t       fb_GetMemAvail      ( int mode );
 
-FBCALL void        *fb_DylibLoad        ( FBSTRING *library );
-FBCALL void        *fb_DylibSymbol      ( void *library, FBSTRING *symbol );
+FBCALL void        *fb_DylibLoad        ( FBSTRING_ACCESS *library );
+FBCALL void        *fb_DylibSymbol      ( void *library, FBSTRING_ACCESS *symbol );
 FBCALL void 	   *fb_DylibSymbolByOrd ( void *library, short int symbol );
 FBCALL void         fb_DylibFree        ( void *library );
 
@@ -56,5 +56,18 @@ FBCALL int          fb_Wait             ( unsigned short port, int val_and, int 
 
        void         fb_hRtInit          ( void );
        void         fb_hRtExit          ( void );
+
+/* GPIO backends use the C calling convention. Directory statement entries
+   retain FBCALL and the shared string descriptor contract. */
+int fb_GpioPinOpen(const int pin);
+int fb_GpioPinOpenDevice(const char *device);
+int fb_GpioPinClose(const int handle);
+int fb_GpioPinRead(const int handle);
+int fb_GpioPinWrite(const int handle, const int value);
+int fb_GpioPinGetType(const int handle);
+int fb_GpioPinSetType(const int handle, const int pin_type);
+FBCALL int fb_ChDir( FBSTRING_ACCESS *path );
+FBCALL int fb_MkDir( FBSTRING_ACCESS *path );
+FBCALL int fb_RmDir( FBSTRING_ACCESS *path );
 
 /* end of fb_system.h */

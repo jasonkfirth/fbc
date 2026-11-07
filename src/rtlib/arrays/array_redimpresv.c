@@ -9,7 +9,7 @@
 
 int fb_hArrayRealloc
 	(
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		size_t element_len,
 		int doclear,
 		FB_DEFCTOR ctor,
@@ -21,7 +21,7 @@ int fb_hArrayRealloc
 {
 	size_t i, elements, size;
 	ssize_t diff;
-	FBARRAYDIM *dim;
+	FBARRAYDIM_ACCESS *dim;
 	ssize_t lbTB[FB_MAXDIMENSIONS] = {0};
 	ssize_t ubTB[FB_MAXDIMENSIONS] = {0};
 	unsigned char *this_;
@@ -91,7 +91,7 @@ int fb_hArrayRealloc
 	DBG_ASSERT( array->element_len == element_len || array->element_len == 0 );
 	DBG_ASSERT( array->dimensions == dimensions || array->dimensions == 0 );
 
-	array->data = ((unsigned char *)array->ptr) + diff;
+	array->data = (void *)((uintptr_t)array->ptr + (uintptr_t)diff);
 	array->size = size;
 	array->element_len = element_len;
 	array->dimensions = dimensions;
@@ -108,7 +108,7 @@ int fb_hArrayRealloc
 
 static int hRedim
 	(
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		size_t element_len,
 		int doclear,
 		int isvarlen,
@@ -133,7 +133,7 @@ static int hRedim
 
 int fb_ArrayRedimPresvEx
 	(
-		FBARRAY *array,
+		FBARRAY_ACCESS *array,
 		size_t element_len,
 		int doclear,
 		int isvarlen,

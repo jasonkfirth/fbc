@@ -10,6 +10,7 @@
  */
 
 #include "fb.h"
+#include "utf_size.h"
 
 static void hUTF16ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_t *total_bytes )
 {
@@ -54,7 +55,7 @@ static void hUTF16ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 			c >>= 6;
 			/* fall through */
 		case 1:
-			*--dst = (c | __fb_utf8_bmarkTb[bytes]);
+			*--dst = (UTF_8)(c | fb_utf8_bmarkTb[bytes]);
 		}
 
 		dst += bytes;
@@ -98,7 +99,7 @@ static void hUTF32ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 			c >>= 6;
 			/* fall through */
 		case 1:
-			*--dst = (c | __fb_utf8_bmarkTb[bytes]);
+			*--dst = (UTF_8)(c | fb_utf8_bmarkTb[bytes]);
 		}
 
 		dst += bytes;
@@ -109,11 +110,15 @@ static void hUTF32ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 
 static char *hToUTF8( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
+	size_t allocation;
+
+	if( !fb_hUTFBytes( chars, 4, &allocation ) )
+		return NULL;
 	if( chars > 0 )
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( chars * 4 );
+			dst = malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -137,7 +142,7 @@ static char *hToUTF8( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *by
 	return dst;
 }
 
-static void hCharToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, ssize_t *bytes )
+static void hCharToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst )
 {
 	while( chars > 0 )
 	{
@@ -146,44 +151,25 @@ static void hCharToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, ssize
 	}
 }
 
-static UTF_16 *hUTF32ToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, ssize_t *bytes )
+/* The caller either owns a sufficiently large output buffer or has
+   allocated the checked worst-case size. Never realloc caller-owned storage. */
+static void hUTF32ToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, ssize_t *bytes )
 {
-	UTF_16 *buffer = dst;
-	ssize_t i, dst_size = *bytes;
 	UTF_32 c;
 
-	i = 0;
 	while( chars > 0 )
 	{
-		c = *src++;
+		c = (UTF_32)*src++;
 		if( c > UTF16_MAX_BMP )
 		{
-			if( *bytes == dst_size )
-			{
-				dst_size += sizeof( UTF_16 ) * 8;
-				UTF_16 *newbuffer = realloc( buffer, dst_size );
-				if( newbuffer == NULL )
-				{
-					free( buffer );
-					return NULL;
-				}
-				buffer = newbuffer;
-				dst = (UTF_16 *)buffer;
-			}
-
-			*bytes += sizeof( UTF_16 );
-
 			c -= UTF16_HALFBASE;
-			dst[i++] = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
+			*dst++ = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
 			c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
+			*bytes += (ssize_t)sizeof( UTF_16 );
 		}
-
-		dst[i++] = (UTF_16)c;
-
+		*dst++ = (UTF_16)c;
 		--chars;
 	}
-
-	return buffer;
 }
 
 static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *bytes )
@@ -191,13 +177,17 @@ static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	/* UTF16/UTF32 conversion APIs expose native typed code units.
 	   Encoded file output normalizes these units to little endian. */
 
-	*bytes = chars * sizeof( UTF_16 );
+	size_t allocation;
+
+	if( !fb_hUTFBytes( chars, ((sizeof( FB_WCHAR ) == sizeof( UTF_32 )) ? 4 : 2), &allocation ) )
+		return NULL;
+	*bytes = chars * (ssize_t)sizeof( UTF_16 );
 
 	if( chars > 0 )
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( (size_t)*bytes );
+			dst = malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -206,22 +196,22 @@ static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	switch( sizeof( FB_WCHAR ) )
 	{
 	case sizeof( char ):
-		hCharToUTF16( src, chars, (UTF_16 *)dst, bytes );
+		hCharToUTF16( src, chars, (UTF_16 *)dst );
 		break;
 
 	case sizeof( UTF_16 ):
-		memcpy( dst, src, chars * sizeof( UTF_16 ) );
+		memcpy( dst, src, (size_t)*bytes );
 		break;
 
 	case sizeof( UTF_32 ):
-        dst = (char *)hUTF32ToUTF16( src, chars, (UTF_16 *)dst, bytes );
+        hUTF32ToUTF16( src, chars, (UTF_16 *)dst, bytes );
 		break;
 	}
 
 	return dst;
 }
 
-static void hCharToUTF32( const FB_WCHAR *src, ssize_t chars, UTF_32 *dst, ssize_t *bytes )
+static void hCharToUTF32( const FB_WCHAR *src, ssize_t chars, UTF_32 *dst )
 {
 	while( chars > 0 )
 	{
@@ -242,7 +232,7 @@ static void hUTF16ToUTF32( const FB_WCHAR *src, ssize_t chars, UTF_32 *dst, ssiz
 			c = ((c - UTF16_SUR_HIGH_START) << UTF16_HALFSHIFT) +
 			     (((UTF_32)*src++) - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
 
-			*bytes -= sizeof( UTF_32 );
+			*bytes -= (ssize_t)sizeof( UTF_32 );
 			--chars;
 		}
 
@@ -257,13 +247,17 @@ static char *hToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	/* UTF16/UTF32 conversion APIs expose native typed code units.
 	   Encoded file output normalizes these units to little endian. */
 
-	*bytes = chars * sizeof( UTF_32 );
+	size_t allocation;
+
+	if( !fb_hUTFBytes( chars, sizeof( UTF_32 ), &allocation ) )
+		return NULL;
+	*bytes = chars * (ssize_t)sizeof( UTF_32 );
 
 	if( chars > 0 )
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( (size_t)*bytes );
+			dst = malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -272,7 +266,7 @@ static char *hToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	switch( sizeof( FB_WCHAR ) )
 	{
 	case sizeof( char ):
-		hCharToUTF32( src, chars, (UTF_32 *)dst, bytes );
+		hCharToUTF32( src, chars, (UTF_32 *)dst );
 		break;
 
 	case sizeof( UTF_16 ):
@@ -280,7 +274,7 @@ static char *hToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 		break;
 
 	case sizeof( UTF_32 ):
-		memcpy( dst, src, chars * sizeof( UTF_32 ) );
+		memcpy( dst, src, (size_t)*bytes );
 		break;
 
 	default:
@@ -307,6 +301,11 @@ char *fb_WCharToUTF
 		ssize_t *bytes
 	)
 {
+	if( bytes == NULL )
+		return NULL;
+	*bytes = 0;
+	if( chars < 0 || (chars > 0 && src == NULL) )
+		return NULL;
 	switch( encod )
 	{
 	case FB_FILE_ENCOD_UTF8:

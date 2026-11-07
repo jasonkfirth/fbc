@@ -19,7 +19,7 @@
 #include <unistd.h>
 #endif
 
-FBCALL int fb_ChDir( FBSTRING *path )
+FBCALL int fb_ChDir( FBSTRING_ACCESS *path )
 {
 	int res;
 

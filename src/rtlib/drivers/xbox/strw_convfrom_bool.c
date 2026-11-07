@@ -9,8 +9,8 @@
 
 static FB_WCHAR hAsciiToUpper( FB_WCHAR ch )
 {
-	if( (ch >= _LC('a')) && (ch <= _LC('z')) )
-		return ch - (_LC('a') - _LC('A'));
+	if( (ch >= FB_WCHAR_LITERAL('a')) && (ch <= FB_WCHAR_LITERAL('z')) )
+		return ch - (FB_WCHAR_LITERAL('a') - FB_WCHAR_LITERAL('A'));
 
 	return ch;
 }

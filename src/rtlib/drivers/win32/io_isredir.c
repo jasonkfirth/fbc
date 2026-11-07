@@ -11,7 +11,7 @@
 int fb_ConsoleIsRedirected( int is_input )
 {
 	DWORD mode;
-	return (GetConsoleMode( (is_input ? __fb_in_handle : __fb_out_handle), &mode ) == 0) ? FB_TRUE : FB_FALSE;
+	return (GetConsoleMode( (is_input ? FB_CONSOLE_INPUT_HANDLE : FB_CONSOLE_OUTPUT_HANDLE), &mode ) == 0) ? FB_TRUE : FB_FALSE;
 }
 
 /* end of drivers/win32/io_isredir.c */

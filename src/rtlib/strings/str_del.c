@@ -8,7 +8,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL void fb_StrDelete ( FBSTRING *str )
+FBCALL void fb_StrDelete ( FBSTRING_ACCESS *str )
 {
     if( (str == NULL) || (str->data == NULL) )
     	return;

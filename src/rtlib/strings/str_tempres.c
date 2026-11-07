@@ -8,9 +8,9 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL FBSTRING *fb_StrAllocTempResult ( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_StrAllocTempResult ( FBSTRING_ACCESS *src )
 {
- 	FBSTRING *dsc;
+ 	FBSTRING_ACCESS *dsc;
 
 	FB_STRLOCK();
 	
@@ -18,7 +18,7 @@ FBCALL FBSTRING *fb_StrAllocTempResult ( FBSTRING *src )
  	dsc = fb_hStrAllocTempDesc( );
     if( dsc == NULL ) {
     	FB_STRUNLOCK();
-    	return &__fb_ctx.null_desc;
+    	return &fb_ctx.null_desc;
     }
 
     /* copy just the descriptor, setting it as a temp string */

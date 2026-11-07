@@ -71,49 +71,49 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #include <wchar.h>
 #include <wctype.h>
 #define FB_WCHAR wchar_t
-#define _LC(c) L ## c
+#define FB_WCHAR_LITERAL(c) L ## c
 #define FB_WEOF ((FB_WCHAR)WEOF)
 
 #include "fb_unicode_riscos.h"
 
 #ifndef FB_WSTR_FROM_INT
 #define FB_WSTR_FROM_INT( buffer, num ) \
-    swprintf( buffer, sizeof( int ) * 3 + 1, _LC("%d"), (int) (num) )
+    swprintf( buffer, sizeof( int ) * 3 + 1, FB_WCHAR_LITERAL("%d"), (int) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT
 #define FB_WSTR_FROM_UINT( buffer, num ) \
-    swprintf( buffer, sizeof( unsigned int ) * 3 + 1, _LC("%u"), (unsigned) (num) )
+    swprintf( buffer, sizeof( unsigned int ) * 3 + 1, FB_WCHAR_LITERAL("%u"), (unsigned) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT_OCT
 #define FB_WSTR_FROM_UINT_OCT( buffer, num ) \
-    swprintf( buffer, sizeof( int ) * 4 + 1, _LC("%o"), (unsigned) (num) )
+    swprintf( buffer, sizeof( int ) * 4 + 1, FB_WCHAR_LITERAL("%o"), (unsigned) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_INT64
 #define FB_WSTR_FROM_INT64( buffer, num ) \
-    swprintf( buffer, sizeof( long long ) * 3 + 1, _LC("%lld"), (long long) (num) )
+    swprintf( buffer, sizeof( long long ) * 3 + 1, FB_WCHAR_LITERAL("%lld"), (long long) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT64
 #define FB_WSTR_FROM_UINT64( buffer, num ) \
-    swprintf( buffer, sizeof( unsigned long long ) * 3 + 1, _LC("%llu"), (unsigned long long) (num) )
+    swprintf( buffer, sizeof( unsigned long long ) * 3 + 1, FB_WCHAR_LITERAL("%llu"), (unsigned long long) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_UINT64_OCT
 #define FB_WSTR_FROM_UINT64_OCT( buffer, num ) \
-    swprintf( buffer, sizeof( long long ) * 4 + 1, _LC("%llo"), (unsigned long long) (num) )
+    swprintf( buffer, sizeof( long long ) * 4 + 1, FB_WCHAR_LITERAL("%llo"), (unsigned long long) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_FLOAT
 #define FB_WSTR_FROM_FLOAT( buffer, num ) \
-    swprintf( buffer, 7+8 + 1, _LC("%.7g"), (double) (num) )
+    swprintf( buffer, 7+8 + 1, FB_WCHAR_LITERAL("%.7g"), (double) (num) )
 #endif
 
 #ifndef FB_WSTR_FROM_DOUBLE
 #define FB_WSTR_FROM_DOUBLE( buffer, num ) \
-    swprintf( buffer, 16+8 + 1, _LC("%.16g"), (double) (num) )
+    swprintf( buffer, 16+8 + 1, FB_WCHAR_LITERAL("%.16g"), (double) (num) )
 #endif
 
 /* Calculate the number of characters between two pointers. */
@@ -183,7 +183,7 @@ static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t
 		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
 
 	/* The destination may be a packed field, so do not dereference it. */
-	const FB_WCHAR terminator = _LC('\0');
+	const FB_WCHAR terminator = FB_WCHAR_LITERAL('\0');
 	memcpy( dst, &terminator, sizeof( terminator ) );
 }
 
@@ -202,7 +202,7 @@ static __inline__ void fb_wstr_Fill( FB_WCHAR *dst, FB_WCHAR c, ssize_t chars )
 	for( i = 0; i < chars; i++ )
 		*dst++ = c;
 	/* add null-term */
-	*dst = _LC('\0');
+	*dst = FB_WCHAR_LITERAL('\0');
 }
 
 /* Skip all characters (c) from the beginning of the string, max 'n' chars. */

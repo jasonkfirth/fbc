@@ -12,10 +12,10 @@ FBCALL void fb_FileReset ( void )
 {
 	int i;
 
-	if( __fb_ctx.do_file_reset == FALSE )
+	if( fb_ctx.do_file_reset == FALSE )
 		return;
 
-	__fb_ctx.do_file_reset = FALSE;
+	fb_ctx.do_file_reset = FALSE;
 
     FB_LOCK();
 

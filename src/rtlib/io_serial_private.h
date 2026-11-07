@@ -18,12 +18,12 @@
         - ownership of parsed OPEN COM options
 */
 
-#ifndef __FB_IO_SERIAL_PRIVATE_H__
-#define __FB_IO_SERIAL_PRIVATE_H__
+#ifndef FB_RTLIB_IO_SERIAL_PRIVATE_H
+#define FB_RTLIB_IO_SERIAL_PRIVATE_H
 
 #if defined HOST_WIN32
 	#include <windows.h>
-	typedef struct _W32_SERIAL_INFO {
+	typedef struct FB_W32_SERIAL_INFO_ {
 		HANDLE hDevice;
 		int iPort;
 		FB_SERIAL_OPTIONS *pOptions;
@@ -36,7 +36,7 @@
 	 * compile whith -llockdev
 	 */
 	/* #define HAS_LOCKDEV 1 */
-	typedef struct _LINUX_SERIAL_INFO {
+	typedef struct FB_LINUX_SERIAL_INFO_ {
 		int sfd;
 		struct termios oldtty, newtty;
 		#ifdef HAS_LOCKDEV
@@ -53,7 +53,7 @@
 #elif defined HOST_AROS || defined HOST_AMIGA
 	struct MsgPort;
 	struct IOExtSer;
-	typedef struct _AROS_SERIAL_INFO {
+	typedef struct FB_AROS_SERIAL_INFO_ {
 		struct MsgPort *reply_port;
 		struct IOExtSer *request;
 		FB_SERIAL_OPTIONS *pOptions;
@@ -61,7 +61,7 @@
 	} AROS_SERIAL_INFO;
 	typedef AROS_SERIAL_INFO AMIGA_SERIAL_INFO;
 #elif defined HOST_RISCOS
-	typedef struct _RISCOS_SERIAL_INFO {
+	typedef struct FB_RISCOS_SERIAL_INFO_ {
 		FB_SERIAL_OPTIONS *pOptions;
 		int old_input_stream;
 		int old_state;

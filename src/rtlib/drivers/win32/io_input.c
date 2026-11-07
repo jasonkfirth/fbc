@@ -256,7 +256,7 @@ void fb_hConsolePutBackEvents( void )
         DWORD dwEventsWritten = 0;
         size_t count = (key_idx > key_tail) ? (KEY_BUFFER_LEN - key_idx) : (key_tail - key_idx);
 
-        WriteConsoleInput( __fb_in_handle,
+        WriteConsoleInput( FB_CONSOLE_INPUT_HANDLE,
                            input_events + key_idx,
                            count,
                            &dwEventsWritten );
@@ -403,11 +403,11 @@ int fb_ConsoleProcessEvents( void )
     fb_hInitControlHandler();
 
     do {
-        if( !PeekConsoleInput( __fb_in_handle, &ir, 1, &dwRead ) )
+        if( !PeekConsoleInput( FB_CONSOLE_INPUT_HANDLE, &ir, 1, &dwRead ) )
             dwRead = 0;
 
         if( dwRead > 0 ) {
-            ReadConsoleInput( __fb_in_handle, &ir, 1, &dwRead );
+            ReadConsoleInput( FB_CONSOLE_INPUT_HANDLE, &ir, 1, &dwRead );
 
             FB_LOCK();
 

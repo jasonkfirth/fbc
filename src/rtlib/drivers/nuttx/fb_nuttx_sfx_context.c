@@ -32,7 +32,7 @@
 */
 #define FB_NUTTX_WEAK __attribute__((weak))
 
-FB_RTLIB_CTX __fb_ctx FB_NUTTX_WEAK;
-char __fb_errmsg[FB_ERRMSG_SIZE] FB_NUTTX_WEAK;
+FB_RTLIB_CTX fb_ctx FB_NUTTX_WEAK;
+char fb_errmsg[FB_ERRMSG_SIZE] FB_NUTTX_WEAK;
 
 /* end of drivers/nuttx/fb_nuttx_sfx_context.c */

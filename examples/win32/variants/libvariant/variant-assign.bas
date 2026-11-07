@@ -1,3 +1,8 @@
+'' Project: FreeBASIC variant helper library
+'' File: variant-assign.bas
+'' Purpose: Implement the variant assign overload family.
+'' Responsibilities: Preserve OLE value and text ownership.
+'' This file intentionally does NOT declare the public wrapper ABI.
 
 
 #include once "variant.bi"
@@ -26,7 +31,9 @@ operator VARIANT.let _
 		byref rhs as VARIANT _
 	)
 
-	VariantClear( @this.var_ )
+	if( @this.var_ = @rhs.var_ ) then exit operator
+
+	'' VariantCopy releases the initialized destination itself.
 	VariantCopy( @this.var_, @rhs.var_ )
 
 end operator
@@ -37,7 +44,9 @@ operator VARIANT.let _
 		byref rhs as VARIANT_ _
 	)
 
-	VariantClear( @this.var_ )
+	if( @this.var_ = @rhs ) then exit operator
+
+	'' VariantCopy releases the initialized destination itself.
 	VariantCopy( @this.var_, @rhs )
 
 end operator
@@ -51,7 +60,7 @@ operator VARIANT.let _
 	VariantClear( @this.var_ )
 
 	V_VT(@this.var_) = VT_BSTR
-	V_BSTR(@this.var_) = SysAllocStringByteLen( rhs, len( *rhs ) )
+	V_BSTR(@this.var_) = hVarAllocBstrFromZstring( rhs )
 
 end operator
 
@@ -67,3 +76,5 @@ operator VARIANT.let _
 	V_BSTR(@this.var_) = SysAllocStringLen( rhs, len( *rhs ) )
 
 end operator
+
+'' end of variant-assign.bas

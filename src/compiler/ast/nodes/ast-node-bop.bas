@@ -31,6 +31,7 @@
 #include once "ast/ast.bi"
 #include once "support/numeric/fp-policy.bi"
 #include once "tooling/semantic-expressions.bi"
+#include once "tooling/semantic-collection-empty.bi"
 #include once "tooling/semantic-numeric-conversions.bi"
 
 '':::::
@@ -833,6 +834,7 @@ end function
 		proc = symbFindBopOvlProc( op, l, r, @err_num )
 		if( proc <> NULL ) then
 			'' build a proc call
+			if( (op = AST_OP_EQ) or (op = AST_OP_NE) ) then return fbSemanticModelCollectionEmptyComparisonCall(proc, l, r)
 			return astBuildCall( proc, l, r )
 		else
 			if( err_num <> FB_ERRMSG_OK ) then

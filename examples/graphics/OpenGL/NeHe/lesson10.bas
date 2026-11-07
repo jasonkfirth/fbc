@@ -1,3 +1,9 @@
+'' Project: FreeBASIC NeHe OpenGL examples
+'' File: lesson10.bas
+'' Purpose: Load and display a textured sector.
+'' Responsibilities: Parse world data, render the sector and handle navigation.
+'' This file intentionally does NOT define shared graphics or CRT bindings.
+
 ''
 '' This Code Was Created By Jeff Molofee 2000
 '' A HUGE Thanks To Fredric Echols For Cleaning Up
@@ -251,7 +257,8 @@ end sub
 '-------------------------------------------------------------------------------
 sub SetupWorld()
 	dim as single x, y, z, u, v         '' 3D And Texture Coordinates
-	dim as integer numtriangles         '' Number Of Triangles In Sector
+	'' sscanf %d writes a C int, which is LONG on every target.
+	dim as long numtriangles            '' Number Of Triangles In Sector
 	dim oneline as string               '' String To Store Data In
 	dim as integer gl_loop, vert
 	dim fp as integer
@@ -288,3 +295,5 @@ sub SetupWorld()
 	next
 	close #fp
 end sub
+
+'' end of lesson10.bas

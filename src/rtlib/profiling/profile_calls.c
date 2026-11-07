@@ -116,7 +116,7 @@ void fb_PROFILECTX_Destructor( void* );
 
 /* calls profiler global context */
 /* use FB_PROFILE_LOCK()/FB_PROFILE_UNLOCK when accessing */
-typedef struct _FB_PROFILER_CALLS
+typedef struct FB_PROFILER_CALLS_
 {
 	FB_PROFILER_GLOBAL *global;
 	FB_PROFILER_THREAD *main_thread;

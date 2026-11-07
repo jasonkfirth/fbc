@@ -1,3 +1,9 @@
+'' Project: FreeBASIC Windows CRT bindings
+'' File: crt/win32/stdio.bi
+'' Purpose: Describe Windows C stream types and stdio entry points.
+'' Responsibilities: Keep UCRT and legacy MSVCRT declarations consistent with their ABI.
+'' This file intentionally does NOT contain stream implementations.
+
 ''
 ''
 '' stdio -- header translated with help of SWIG FB wrapper
@@ -30,6 +36,11 @@
 #define STDERR_FILENO 2
 
 type _iobuf
+#if defined(__FB_64BIT__)
+	'' UCRT exposes an opaque stream represented by one pointer. The older
+	'' MSVCRT fields below are not part of its public FILE layout.
+	_Placeholder as any ptr
+#else
 	_ptr as zstring ptr
 	_cnt as long
 	_base as zstring ptr
@@ -38,6 +49,7 @@ type _iobuf
 	_charbuf as long
 	_bufsiz as long
 	_tmpfname as zstring ptr
+#endif
 end type
 
 type FILE as _iobuf
@@ -49,7 +61,7 @@ extern "c"
 	'' Keep the legacy stream table only for 32-bit targets that can still be
 	'' linked against MSVCRT40 for Windows 95 compatibility.
 #if defined(__FB_64BIT__)
-	declare function __acrt_iob_func(byval index as uinteger) as FILE ptr
+	declare function __acrt_iob_func(byval index as ulong) as FILE ptr
 	#define stdin (__acrt_iob_func(STDIN_FILENO))
 	#define stdout (__acrt_iob_func(STDOUT_FILENO))
 	#define stderr (__acrt_iob_func(STDERR_FILENO))
@@ -94,3 +106,5 @@ declare function _tempnam (byval as zstring ptr, byval as zstring ptr) as zstrin
 end extern
 
 #endif
+
+'' end of crt/win32/stdio.bi

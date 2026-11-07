@@ -342,10 +342,10 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
 
                 if( supress_keypress )
                 {
-                    if(__fb_ctx.hooks.posteventproc != NULL)
+                    if(fb_ctx.hooks.posteventproc != NULL)
                     {
                         EVENT fb_event = { .type = EVENT_KEY_PRESS, .scancode = scancode, .ascii = scancode };
-                        __fb_ctx.hooks.posteventproc(&fb_event);
+                        fb_ctx.hooks.posteventproc(&fb_event);
                     }
 
                 }
@@ -364,10 +364,10 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
                 {
                     js_key_buffer_add(keycode);
 
-                    if(__fb_ctx.hooks.posteventproc != NULL)
+                    if(fb_ctx.hooks.posteventproc != NULL)
                     {
                         EVENT fb_event = { .type = EVENT_KEY_PRESS, .scancode = scancode, .ascii = keycode };
-                        __fb_ctx.hooks.posteventproc(&fb_event);
+                        fb_ctx.hooks.posteventproc(&fb_event);
                     }
                 }
             }
@@ -379,10 +379,10 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
         {
             scancode = js_multikey_handler(keyEvent->keyCode, keyEvent->location, FALSE);
 
-            if(__fb_ctx.hooks.posteventproc != NULL)
+            if(fb_ctx.hooks.posteventproc != NULL)
             {
                 EVENT fb_event = { .type = EVENT_KEY_RELEASE, .scancode = scancode, .ascii = keycode };
-                __fb_ctx.hooks.posteventproc(&fb_event);
+                fb_ctx.hooks.posteventproc(&fb_event);
             }
 
             return 1;
@@ -402,14 +402,14 @@ EMSCRIPTEN_KEEPALIVE void fb_hJsTextInput(int key)
 	if ((key <= 0) || (key > 255))
 		return;
 	js_key_buffer_add((unsigned int)key);
-	if (__fb_ctx.hooks.posteventproc != NULL) {
+	if (fb_ctx.hooks.posteventproc != NULL) {
 		event.type = EVENT_KEY_PRESS;
 		event.ascii = key;
 		if (key == 8) event.scancode = SC_BACKSPACE;
 		if (key == 13) event.scancode = SC_ENTER;
 		if (key == 9) event.scancode = SC_TAB;
 		if (key == 27) event.scancode = SC_ESCAPE;
-		__fb_ctx.hooks.posteventproc(&event);
+		fb_ctx.hooks.posteventproc(&event);
 	}
 }
 

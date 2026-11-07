@@ -26,9 +26,12 @@
 package org.freebasic.android;
 
 import android.content.Context;
+import android.os.Build;
+import android.view.inputmethod.InputMethodManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.InputConnection;
@@ -60,6 +63,18 @@ public class FreeBasicInputView extends EditText {
 
     public FreeBasicInputView(Context context) {
         super(context);
+        /* This invisible transport serves every BASIC editor. It is not an
+         * Android account/password field and must not summon autofill UI.
+         * Reflection retains the APK template's API-23 compile contract. */
+        if (Build.VERSION.SDK_INT >= 26) {
+            try {
+                // View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS, API 26.
+                View.class.getMethod("setImportantForAutofill", int.class)
+                    .invoke(this, 8);
+            } catch (ReflectiveOperationException error) {
+                // An older vendor framework can omit this optional facility.
+            }
+        }
 
         /*
             Some older Android IMEs bypass the InputConnection wrapper and
@@ -179,6 +194,29 @@ public class FreeBasicInputView extends EditText {
         }
 
         return handled;
+    }
+
+    @Override
+    public boolean onKeyPreIme(int keyCode, KeyEvent event) {
+        /* Before API 30, editor focus without a docked IME is ambiguous.
+         * Back release confirms dismissal: stop serving this hidden editor
+         * so layout observation can report hidden instead of unknown. Handle
+         * the release here so dismissing the IME does not close the activity.
+         * Modern releases retain their authoritative WindowInsets path. */
+        if (Build.VERSION.SDK_INT < 30 && keyCode == KeyEvent.KEYCODE_BACK &&
+            event != null && event.getAction() == KeyEvent.ACTION_UP &&
+            !event.isCanceled() && hasFocus()) {
+            InputMethodManager manager = (InputMethodManager)getContext()
+                .getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (manager != null) {
+                manager.hideSoftInputFromWindow(getWindowToken(), 0);
+            }
+            clearFocus();
+            setFocusable(false);
+            setFocusableInTouchMode(false);
+            return true;
+        }
+        return super.onKeyPreIme(keyCode, event);
     }
 
     @Override

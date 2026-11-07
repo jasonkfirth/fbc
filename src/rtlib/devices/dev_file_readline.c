@@ -15,7 +15,7 @@ static char *hWrapper( char *buffer, size_t count, FILE *fp )
 int fb_DevFileReadLineDumb
 	( 
 		FILE *fp, 
-		FBSTRING *dst, 
+		FBSTRING_ACCESS *dst, 
 		fb_FnDevReadString pfnReadString 
 	)
 {
@@ -117,7 +117,7 @@ int fb_DevFileReadLineDumb
 
 }
 
-int fb_DevFileReadLine( FB_FILE *handle, FBSTRING *dst )
+int fb_DevFileReadLine( FB_FILE *handle, FBSTRING_ACCESS *dst )
 {
     int res;
     FILE *fp;

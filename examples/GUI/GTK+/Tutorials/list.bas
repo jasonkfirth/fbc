@@ -1,3 +1,9 @@
+' Project: FreeBASIC GTK examples
+' File: examples/GUI/GTK+/Tutorials/list.bas
+' Purpose: Demonstrate GtkList items and selection callbacks.
+' Responsibilities: Build the list and format its bounded C int labels.
+' This file intentionally does NOT provide shared CRT declarations.
+
 ' List.bas
 ' Translated from C to FB by TinyCla, 2006
 
@@ -28,7 +34,7 @@ Declare Sub sigh_print_selection Cdecl ( Byval gtklist As GtkWidget Ptr, Byval f
 	Dim As GtkWidget Ptr button
 	Dim As GtkWidget Ptr list_item
 	Dim As GList Ptr dlist
-	Dim As Integer i
+	Dim As Long i
 	Dim As Zstring * 64 buffer
 
 	' Initialize GTK (and subsequently GDK)
@@ -237,3 +243,5 @@ Sub sigh_print_selection Cdecl ( Byval gtklist As GtkWidget Ptr, Byval func_data
 	Loop
 	g_print (!"\n")
 End Sub
+
+' end of list.bas

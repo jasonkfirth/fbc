@@ -1,20 +1,20 @@
+'' Project: FreeBASIC variant helper library
+'' File: variant.bi
+'' Purpose: Share the Windows VARIANT ABI with library callers.
+'' Responsibilities: Declare the native record alias and wrapper operations.
+'' This file intentionally does NOT implement conversions or own caller values.
+
 #ifndef __VARIANT_BI__
 #define __VARIANT_BI__
 
-#ifdef VARIANT_ISBUILDING
-	#include once "windows.bi"
-	#include once "win/ole2.bi"
+#include once "windows.bi"
+#include once "win/ole2.bi"
 
-	'' older fbc packages (before 2015) had this forward declaration in
-	'' inc/win/oaidl.bi - having it here allows this library to be compiled
-	'' (but has not been tested for correctness / completeness)
+'' The wrapper and archive must share the native record's size, alignment
+'' and type identity. A byte-array placeholder cannot preserve this ABI.
+'' Capture the Windows type before VARIANT below becomes the wrapper name.
+#ifndef VARIANT_
 	type VARIANT_ as VARIANT
-#else
-	#ifndef VARIANT_
-		type VARIANT_
-			reserved(0 to 16-1) as byte
-		end type
-	#endif
 #endif
 
 #inclib "variant"
@@ -67,6 +67,7 @@ type VARIANT
  #endif
 
 	'' cast
+	'' The returned native value owns a copy; release it with VariantClear.
 	declare operator cast ( ) as VARIANT_
 	declare operator cast ( ) as integer
 	declare operator cast ( ) as uinteger
@@ -552,3 +553,5 @@ declare operator >= ( byval lhs as wstring ptr, byref rhs as VARIANT ) as intege
 
 
 #endif
+
+'' end of variant.bi

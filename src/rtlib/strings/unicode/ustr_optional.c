@@ -13,11 +13,11 @@
 /* Unicode comparison and bounded matching                                   */
 /* ------------------------------------------------------------------------- */
 
-static FBSTRING *hFold_NoLock( FBSTRING *src )
+static FBSTRING_ACCESS *hFold_NoLock( FBSTRING_ACCESS *src )
 {
 	ssize_t offset = 0, bytes = 0, width, length = src ? FB_STRSIZE(src) : 0;
 	char folded[12]; /* A full mapping has at most three four-byte scalars. */
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	while( offset < length ) {
 		width = fb_hUtf8Fold( fb_hUtf8Decode( src->data, length, &offset ), folded );
 		if( bytes > FB_USTRING_MAX_BYTES - width ) return NULL;
@@ -31,13 +31,13 @@ static FBSTRING *hFold_NoLock( FBSTRING *src )
 	return result;
 }
 
-static int hMatch( FBSTRING *src, ssize_t position, FBSTRING *pattern, int compare, ssize_t *end )
+static int hMatch( FBSTRING_ACCESS *src, ssize_t position, FBSTRING_ACCESS *pattern, int compare, ssize_t *end )
 {
 	ssize_t length = FB_STRSIZE(src), wanted = FB_STRSIZE(pattern), offset = position, matched = 0, width;
 	char folded[12];
 	if( wanted == 0 ) return FALSE;
 	if( compare == 0 ) {
-		if( wanted > length - position || memcmp(src->data + position, pattern->data, wanted) != 0 ) return FALSE;
+		if( wanted > length - position || memcmp(src->data + position, pattern->data, (size_t)(wanted)) != 0 ) return FALSE;
 		*end = position + wanted;
 		return TRUE;
 	}
@@ -45,16 +45,16 @@ static int hMatch( FBSTRING *src, ssize_t position, FBSTRING *pattern, int compa
 	   "s" cannot select half of that scalar's two-character fold mapping. */
 	while( offset < length && matched < wanted ) {
 		width = fb_hUtf8Fold( fb_hUtf8Decode(src->data, length, &offset), folded );
-		if( width > wanted - matched || memcmp(folded, pattern->data + matched, width) != 0 ) return FALSE;
+		if( width > wanted - matched || memcmp(folded, pattern->data + matched, (size_t)(width)) != 0 ) return FALSE;
 		matched += width;
 	}
 	*end = offset;
 	return matched == wanted;
 }
 
-FBCALL int fb_UStrComp( FBSTRING *first, FBSTRING *second, int compare )
+FBCALL int fb_UStrComp( FBSTRING_ACCESS *first, FBSTRING_ACCESS *second, int compare )
 {
-	FBSTRING *a = first ? first : &__fb_ctx.null_desc, *b = second ? second : &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *a = first ? first : &fb_ctx.null_desc, *b = second ? second : &fb_ctx.null_desc;
 	ssize_t length1, length2, common;
 	int result = 0, error = FB_RTERROR_OK;
 	FB_STRLOCK();
@@ -66,7 +66,7 @@ FBCALL int fb_UStrComp( FBSTRING *first, FBSTRING *second, int compare )
 			length1 = FB_STRSIZE(a);
 			length2 = FB_STRSIZE(b);
 			common = length1 < length2 ? length1 : length2;
-			if( common ) result = memcmp(a->data, b->data, common);
+			if( common ) result = memcmp(a->data, b->data, (size_t)(common));
 			if( result == 0 ) result = (length1 > length2) - (length1 < length2);
 			else result = result > 0 ? 1 : -1;
 		}
@@ -82,9 +82,9 @@ FBCALL int fb_UStrComp( FBSTRING *first, FBSTRING *second, int compare )
 /* Reversal and replacement                                                  */
 /* ------------------------------------------------------------------------- */
 
-FBCALL FBSTRING *fb_UStrReverse( FBSTRING *src )
+FBCALL FBSTRING_ACCESS *fb_UStrReverse( FBSTRING_ACCESS *src )
 {
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	ssize_t length = src && src->data ? FB_STRSIZE(src) : 0;
 	ssize_t first, offset = 0, output = length;
 	FB_STRLOCK();
@@ -94,17 +94,17 @@ FBCALL FBSTRING *fb_UStrReverse( FBSTRING *src )
 			first = offset;
 			fb_hUtf8Decode(src->data, length, &offset);
 			output -= offset - first;
-			memcpy(result->data + output, src->data + first, offset - first);
+			memcpy(result->data + output, src->data + first, (size_t)(offset - first));
 		}
 	}
 	fb_hStrDelTemp_NoLock(src);
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBCALL FBSTRING *fb_UStrReplace( FBSTRING *src, FBSTRING *find, FBSTRING *replacement, ssize_t start, ssize_t count, int compare )
+FBCALL FBSTRING_ACCESS *fb_UStrReplace( FBSTRING_ACCESS *src, FBSTRING_ACCESS *find, FBSTRING_ACCESS *replacement, ssize_t start, ssize_t count, int compare )
 {
-	FBSTRING *result = &__fb_ctx.null_desc, *pattern = find;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc, *pattern = find;
 	ssize_t length = src && src->data ? FB_STRSIZE(src) : 0;
 	ssize_t replacement_length = replacement && replacement->data ? FB_STRSIZE(replacement) : 0;
 	ssize_t offset, position, end, size, matches = 0, left, output = 0;
@@ -130,24 +130,24 @@ FBCALL FBSTRING *fb_UStrReplace( FBSTRING *src, FBSTRING *find, FBSTRING *replac
 		} else fb_hUtf8Decode(src->data, length, &position);
 	}
 	result = fb_hUStrAlloc_NoLock(size);
-	if( result == NULL ) { error = FB_RTERROR_OUTOFMEM; result = &__fb_ctx.null_desc; goto done; }
+	if( result == NULL ) { error = FB_RTERROR_OUTOFMEM; result = &fb_ctx.null_desc; goto done; }
 	position = offset;
 	left = matches;
 	while( left > 0 ) {
 		if( hMatch(src, position, pattern, compare, &end) ) {
-			if( replacement_length ) memcpy(result->data + output, replacement->data, replacement_length);
+			if( replacement_length ) memcpy(result->data + output, replacement->data, (size_t)(replacement_length));
 			output += replacement_length;
 			position = end;
 			--left;
 		} else {
 			end = position;
 			fb_hUtf8Decode(src->data, length, &end);
-			memcpy(result->data + output, src->data + position, end - position);
+			memcpy(result->data + output, src->data + position, (size_t)(end - position));
 			output += end - position;
 			position = end;
 		}
 	}
-	if( position < length ) memcpy(result->data + output, src->data + position, length - position);
+	if( position < length ) memcpy(result->data + output, src->data + position, (size_t)(length - position));
 done:
 	if( compare == 1 && pattern != find ) fb_hStrDelTemp_NoLock(pattern);
 	fb_hUStrDeletePair_NoLock(src, find);
@@ -157,7 +157,7 @@ done:
 	return result;
 }
 
-FBCALL FBSTRING *fb_UStrFormat( double value, FBSTRING *mask )
+FBCALL FBSTRING_ACCESS *fb_UStrFormat( double value, FBSTRING_ACCESS *mask )
 {
 	return fb_UStrFromBytes(fb_StrFormat(value, mask), FB_STRSIZEVARLEN);
 }
@@ -168,11 +168,11 @@ FBCALL FBSTRING *fb_UStrFormat( double value, FBSTRING *mask )
 
 enum { TEXT_BYTES, TEXT_WIDE, TEXT_UTF8 };
 
-static FBSTRING *hCopy_NoLock( const void *value, int kind )
+static FBSTRING_ACCESS *hCopy_NoLock( const void *value, int kind )
 {
-	const FBSTRING *str = value;
+	const FBSTRING_ACCESS *str = value;
 	if( kind == TEXT_WIDE ) return fb_hUStrFromWstr_NoLock(value);
-	if( str == NULL || str->data == NULL ) return &__fb_ctx.null_desc;
+	if( str == NULL || str->data == NULL ) return &fb_ctx.null_desc;
 	if( kind == TEXT_BYTES ) return fb_hUStrCopy_NoLock(str->data, FB_STRSIZE(str));
 	return fb_hUStrNormalize_NoLock(str->data, FB_STRSIZE(str));
 }
@@ -184,9 +184,9 @@ static void hRelease_NoLock( void *a, int kind1, void *b, int kind2, void *c, in
 	if( kind3 != TEXT_WIDE && c != a && c != b ) fb_hStrDelTemp_NoLock(c);
 }
 
-static FBSTRING *hReplace( void *source, int kind1, void *find, int kind2, void *replacement, int kind3, ssize_t start, ssize_t count, int compare )
+static FBSTRING_ACCESS *hReplace( void *source, int kind1, void *find, int kind2, void *replacement, int kind3, ssize_t start, ssize_t count, int compare )
 {
-	FBSTRING *a, *b, *c, *result;
+	FBSTRING_ACCESS *a, *b, *c, *result;
 	FB_STRLOCK();
 	a = hCopy_NoLock(source, kind1);
 	b = hCopy_NoLock(find, kind1 != TEXT_BYTES && kind2 == TEXT_BYTES ? TEXT_UTF8 : kind2);
@@ -196,7 +196,7 @@ static FBSTRING *hReplace( void *source, int kind1, void *find, int kind2, void 
 	if( a == NULL || b == NULL || c == NULL ) {
 		fb_hStrDelTemp(a); fb_hStrDelTemp(b); fb_hStrDelTemp(c);
 		fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 	result = kind1 == TEXT_BYTES ? fb_StrReplace(a, b, c, start, count, compare) : fb_UStrReplace(a, b, c, start, count, compare);
 	return result;
@@ -204,7 +204,7 @@ static FBSTRING *hReplace( void *source, int kind1, void *find, int kind2, void 
 
 static int hCompare( void *first, int kind1, void *second, int kind2, int compare )
 {
-	FBSTRING *a, *b;
+	FBSTRING_ACCESS *a, *b;
 	FB_STRLOCK();
 	a = hCopy_NoLock(first, kind1 == TEXT_BYTES ? TEXT_UTF8 : kind1);
 	b = hCopy_NoLock(second, kind2 == TEXT_BYTES ? TEXT_UTF8 : kind2);
@@ -218,8 +218,8 @@ static int hCompare( void *first, int kind1, void *second, int kind2, int compar
 	return fb_UStrComp(a, b, compare);
 }
 
-#define TEXT_TYPE_s FBSTRING *
-#define TEXT_TYPE_u FBSTRING *
+#define TEXT_TYPE_s FBSTRING_ACCESS *
+#define TEXT_TYPE_u FBSTRING_ACCESS *
 #define TEXT_TYPE_w FB_WCHAR *
 #define TEXT_KIND_s TEXT_BYTES
 #define TEXT_KIND_u TEXT_UTF8

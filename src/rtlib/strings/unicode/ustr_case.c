@@ -117,7 +117,7 @@ static ssize_t hConvert( const char *data, ssize_t length, char *output, int mod
 		for( i = 0; i < count; ++i ) {
 			width = fb_hUtf8Encode( encoded, mapped[i] );
 			if( bytes > FB_USTRING_MAX_BYTES - width ) return -1;
-			if( output != NULL ) memcpy( output + bytes, encoded, width );
+			if( output != NULL ) memcpy( output + bytes, encoded, (size_t)(width) );
 			bytes += width;
 		}
 		if( !hIgnorable( scalar ) ) preceding_cased = hCased( scalar );
@@ -125,9 +125,9 @@ static ssize_t hConvert( const char *data, ssize_t length, char *output, int mod
 	return bytes;
 }
 
-static FBSTRING *hCase( FBSTRING *src, int mode, int lower )
+static FBSTRING_ACCESS *hCase( FBSTRING_ACCESS *src, int mode, int lower )
 {
-	FBSTRING *result = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	ssize_t bytes, length;
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) ) {
@@ -139,15 +139,15 @@ static FBSTRING *hCase( FBSTRING *src, int mode, int lower )
 	}
 	fb_hStrDelTemp_NoLock( src );
 	FB_STRUNLOCK();
-	return result ? result : &__fb_ctx.null_desc;
+	return result ? result : &fb_ctx.null_desc;
 }
 
-FBCALL FBSTRING *fb_UStrUcase( FBSTRING *src, int mode )
+FBCALL FBSTRING_ACCESS *fb_UStrUcase( FBSTRING_ACCESS *src, int mode )
 {
 	return hCase( src, mode, FB_FALSE );
 }
 
-FBCALL FBSTRING *fb_UStrLcase( FBSTRING *src, int mode )
+FBCALL FBSTRING_ACCESS *fb_UStrLcase( FBSTRING_ACCESS *src, int mode )
 {
 	return hCase( src, mode, FB_TRUE );
 }

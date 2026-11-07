@@ -17,7 +17,7 @@
 #define FB_GFX_PAINT_PACKED_MAX_ROWS 64
 
 /* Native uint32 colors occupy bytes 0..7; subsequent bytes are packed rows. */
-static int fb_hGfxPackPattern(unsigned char *data, FBSTRING *pattern,
+static int fb_hGfxPackPattern(unsigned char *data, FBSTRING_ACCESS *pattern,
 	unsigned int foreground, unsigned int background)
 {
 	ssize_t rows;

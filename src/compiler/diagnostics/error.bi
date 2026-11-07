@@ -430,6 +430,10 @@ enum FB_WARNINGMSG
 	FB_WARNINGMSG_MISSINGANDROIDSYSROOT
 	FB_WARNINGMSG_INVALIDUNICODESEQUENCE
 	FB_WARNINGMSG_SURROGATEPAIR
+	FB_WARNINGMSG_UNUSEDPARAMETER
+	FB_WARNINGMSG_UNUSEDVARIABLE
+	FB_WARNINGMSG_COMPARISONRANGE
+	FB_WARNINGMSG_NULLACCESS
 
 	FB_WARNINGMSGS
 end enum
@@ -485,6 +489,11 @@ declare sub errReport _
 		byval isbefore as integer = FALSE, _
 		byval customText as const zstring ptr = 0 _
 	)
+
+'' Delayed source diagnostics retain their declaration file independently of
+'' the lexer's current include file. Reporting does not rescan that source.
+declare sub errReportWarnAt(byval msgnum as integer, byval msgex as const zstring ptr, _
+	byval filename as const zstring ptr, byval linenum as integer)
 
 declare sub errReportWarn _
 	( _

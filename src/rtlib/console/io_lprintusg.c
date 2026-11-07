@@ -12,7 +12,7 @@
 #include "fb.h"
 
 /*:::::*/
-FBCALL int fb_LPrintUsingInit( FBSTRING *fmtstr )
+FBCALL int fb_LPrintUsingInit( FBSTRING_ACCESS *fmtstr )
 {
     int res = fb_LPrintInit();
     if( res!=FB_RTERROR_OK )
@@ -21,7 +21,7 @@ FBCALL int fb_LPrintUsingInit( FBSTRING *fmtstr )
 }
 
 /*:::::*/
-FBCALL int fb_LPrintUsingInitUstr( FBSTRING *fmtstr )
+FBCALL int fb_LPrintUsingInitUstr( FBSTRING_ACCESS *fmtstr )
 {
     int res = fb_LPrintInit();
     if( res!=FB_RTERROR_OK )

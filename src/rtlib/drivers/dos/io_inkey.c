@@ -9,14 +9,14 @@
 #include "fb_private_console.h"
 #include <conio.h>
 
-FBSTRING *fb_ConsoleInkey( void )
+FBSTRING_ACCESS *fb_ConsoleInkey( void )
 {
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 
 	if( fb_ConsoleKeyHit( ) ) {
 		res = fb_hMakeInkeyStr( fb_ConsoleGetkey( ) );
 	} else {
-		res = &__fb_ctx.null_desc;
+		res = &fb_ctx.null_desc;
 	}
 
 	return res;

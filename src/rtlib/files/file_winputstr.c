@@ -60,7 +60,7 @@ FBCALL FB_WCHAR *fb_FileWstrInput( ssize_t chars, int fnum )
 
 		if( res == FB_RTERROR_OK )
 		{
-			dst[read_chars] = _LC('\0');
+			dst[read_chars] = FB_WCHAR_LITERAL('\0');
 		}
 		else
 		{

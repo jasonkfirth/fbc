@@ -26,7 +26,7 @@ void fb_ConsoleGetScreenSizeEx( HANDLE hConsole, int *cols, int *rows )
 
 FBCALL void fb_ConsoleGetScreenSize( int *cols, int *rows )
 {
-    fb_ConsoleGetScreenSizeEx( __fb_out_handle, cols, rows );
+    fb_ConsoleGetScreenSizeEx( FB_CONSOLE_OUTPUT_HANDLE, cols, rows );
 }
 
 /* end of drivers/win32/io_screensize.c */

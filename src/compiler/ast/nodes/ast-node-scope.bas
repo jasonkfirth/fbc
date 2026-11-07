@@ -30,8 +30,13 @@
 #include once "parser/parser.bi"
 #include once "ast/ast.bi"
 #include once "backend/ir.bi"
+#include once "runtime/rtl.bi"
 #include once "tooling/semantic-blocks.bi"
 #include once "tooling/semantic-lifetimes.bi"
+
+declare function irhlcErrorNeedsCleanupBoundary(byval body as ASTNODE ptr) as integer
+declare sub irhlcErrorRegisterRecoveryBoundary(byval proc as FBSYMBOL ptr, _
+	byval label as FBSYMBOL ptr, byval branch as ASTNODE ptr, byval target as FBSYMBOL ptr)
 
 declare sub fbSemanticModelAttachPendingScopeExitSource(byval branch as ASTNODE ptr)
 declare function fbSemanticModelEnabled( ) as integer
@@ -195,16 +200,32 @@ function astScopeUpdBreakList( byval proc as ASTNODE ptr ) as integer
 	dim as ASTNODE ptr n = any
 
 	function = FALSE
+	dim as integer recovery_edges = FALSE
+	if( env.clopt.backend = FB_BACKEND_GCC or env.clopt.backend = FB_BACKEND_CLANG ) then
+		recovery_edges = irhlcErrorNeedsCleanupBoundary(proc->l)
+	end if
 
 	'' for each break in this proc..
 	n = proc->block.breaklist.head
 	do while( n <> NULL )
+
+		if( recovery_edges ) then
+			'' Both explicit exits and ordinary GOTOs can destroy source locals.
+			'' A selected callback returns before those destructors execute.
+			var boundary = symbAddLabel(NULL)
+			astAddAfter(astNewLABEL(boundary), astGetPrev(n->l))
+			irhlcErrorRegisterRecoveryBoundary(proc->sym, boundary, n->l, n->sym)
+		end if
 
 		'' EXIT SUB | FUNCTION?
 		if( n->sym = proc->block.exitlabel ) then
 			'' special case due the non implicit scope block, that
 			'' can't be created for procs because the implicit
 			'' main() function
+			'' The following local destructors must run after abandoned callees.
+			if( proc->sym->proc.ext->stats and FB_PROCSTATS_NATIVEERROROWNER ) then
+				astAddAfter( rtlErrorNativeOwnerCleanup(), astGetPrev(n->l) )
+			end if
 			hDelLocals( n, FALSE )
 
 		else

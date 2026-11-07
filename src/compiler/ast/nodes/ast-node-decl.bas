@@ -133,6 +133,7 @@ function astNewDECL _
 	n = astNewNode( AST_NODECLASS_DECL, FB_DATATYPE_INVALID )
 
 	n->sym = sym
+	astWarnDeclareVariable(sym)
 	if( do_defaultinit ) then
 		n->l = hDefaultInit( sym )
 	end if

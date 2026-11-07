@@ -71,6 +71,13 @@ endif
 RTLIB_SRC_TARGET_ASM := $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/*.s)
 RTLIB_SRC_TARGET_ARCH_ASM := $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/$(TARGET_ARCH)/*.s)
 
+# Cygwin shares the Win32 driver tree, but retains its existing ERROR ABI.
+# The native activation bridge is qualified for the Win32 x86-64 target only.
+ifneq ($(TARGET_OS),win32)
+RTLIB_SRC_TARGET_ARCH := $(filter-out $(RTLIB_DRIVER_DIR)/win32/x86_64/error.c $(RTLIB_DRIVER_DIR)/win32/x86_64/error_frame.c,$(RTLIB_SRC_TARGET_ARCH))
+RTLIB_SRC_TARGET_ARCH_ASM := $(filter-out $(RTLIB_DRIVER_DIR)/win32/x86_64/error_set_handler_win64.s,$(RTLIB_SRC_TARGET_ARCH_ASM))
+endif
+
 $(eval $(call rtlib_check_names,$(RTLIB_SRC_UNIX),shared Unix layer))
 $(eval $(call rtlib_check_names,$(RTLIB_SRC_TARGET) $(RTLIB_SRC_TARGET_ASM),target layer))
 $(eval $(call rtlib_check_names,$(RTLIB_SRC_TARGET_ARCH) $(RTLIB_SRC_TARGET_ARCH_ASM),target architecture layer))

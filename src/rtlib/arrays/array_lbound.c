@@ -22,24 +22,25 @@
 
    Note: The dimension count can be set (in the descriptor) even for unallocated
    arrays, as it's fixed and determines the descriptor size. */
-FBCALL ssize_t fb_ArrayLBound( FBARRAY *array, ssize_t dimension )
+FBCALL ssize_t fb_ArrayLBound( FBARRAY_ACCESS *array, ssize_t dimension )
 {
-	/* given dimension is 1-based */
-	dimension -= 1;
+	/* Keep the dimension 1-based until it has been validated below. */
 
 	/* Querying dimTB's lbound? */
-	if( dimension == -1 ) {
+	if( dimension == 0 ) {
 		return 1;
 	}
 
 	/* Querying dimension's lbound. */
 
+	/* PTR identifies storage; virtual DATA can have zero address bits.
+	   Validate the 1-based dimension before subtracting, even at SSIZE_MIN. */
 	/* unallocated array or out-of-bound dimension? */
-	if( (array->data == NULL) ||
-	    (dimension < 0) || ((size_t)dimension >= array->dimensions) ) {
+	if( (array->ptr == NULL) ||
+	    (dimension < 1) || ((size_t)dimension > array->dimensions) ) {
 		return 0;
 	}
-	return array->dimTB[dimension].lbound;
+	return array->dimTB[dimension - 1].lbound;
 }
 
 /* end of arrays/array_lbound.c */

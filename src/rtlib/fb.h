@@ -6,8 +6,9 @@
  *     memory, string and synchronization helpers available to runtime modules.
  * This file intentionally does NOT contain: compiler parsing or graphics drivers.
  */
-#ifndef __FB_H__
-#define __FB_H__
+#ifndef FB_RTLIB_H
+#define FB_RTLIB_H
+#include "fb_abi.h"
 
 /* Must be included before any system headers due to certain #defines */
 #include "fb_config.h"
@@ -382,12 +383,12 @@ extern "C" {
 #define fb_hSign( x ) (((x) < 0) ? -1 : 1)
 
 /* internal lists */
-typedef struct _FB_LISTELEM {
-    struct _FB_LISTELEM    *prev;
-    struct _FB_LISTELEM    *next;
+typedef struct FB_LISTELEM_ {
+    struct FB_LISTELEM_    *prev;
+    struct FB_LISTELEM_    *next;
 } FB_LISTELEM;
 
-typedef struct _FB_LIST {
+typedef struct FB_LIST_ {
     int                cnt;      /* Number of used elements */
     FB_LISTELEM        *head;    /* First used element */
     FB_LISTELEM        *tail;    /* Last used element */
@@ -426,7 +427,7 @@ void                fb_hListDynElemRemove   ( FB_LIST *list, FB_LISTELEM *elem )
 #include "fb_oop.h"
 #include "fb_legacy.h"
 
-FBSTRING *fb_hMakeInkeyStr( int ch );
+FBSTRING_ACCESS *fb_hMakeInkeyStr( int ch );
 int fb_hScancodeToExtendedKey( int scancode );
 
 /* This should match fbc's lang enum */
@@ -452,7 +453,7 @@ typedef struct FB_RTLIB_CTX_ {
 	void          (*exit_gfxlib2)(void);
 } FB_RTLIB_CTX;
 
-extern FB_RTLIB_CTX __fb_ctx;
+extern FB_RTLIB_CTX fb_ctx FB_RTLIB_SYMBOL("__fb_ctx");
 
 #endif /*__FB_H__*/
 

@@ -7,12 +7,12 @@
  */
 #include "../../fb.h"
 
-FBCALL void *fb_DylibLoad( FBSTRING *library )
+FBCALL void *fb_DylibLoad( FBSTRING_ACCESS *library )
 {
 	return NULL;
 }
 
-FBCALL void *fb_DylibSymbol( void *library, FBSTRING *symbol )
+FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 {
 	return NULL;
 }

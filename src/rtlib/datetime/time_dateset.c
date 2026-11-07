@@ -20,7 +20,7 @@
  *
  * @see fb_Date()
  */
-FBCALL int fb_SetDate( FBSTRING *date )
+FBCALL int fb_SetDate( FBSTRING_ACCESS *date )
 {
 	if( (date != NULL) && (date->data != NULL) )
 	{

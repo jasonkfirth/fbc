@@ -24,7 +24,7 @@ static void fb_hPrintStrEx( FB_FILE *handle, const char *s, size_t len, int mask
 }
 
 /*:::::*/
-void fb_PrintStringEx ( FB_FILE *handle, FBSTRING *s, int mask )
+void fb_PrintStringEx ( FB_FILE *handle, FBSTRING_ACCESS *s, int mask )
 {
     if( (s == NULL) || (s->data == NULL) )
     	fb_PrintVoidEx( handle, mask );
@@ -36,7 +36,7 @@ void fb_PrintStringEx ( FB_FILE *handle, FBSTRING *s, int mask )
 }
 
 /*:::::*/
-FBCALL void fb_PrintString ( int fnum, FBSTRING *s, int mask )
+FBCALL void fb_PrintString ( int fnum, FBSTRING_ACCESS *s, int mask )
 {
     fb_PrintStringEx(FB_FILE_TO_HANDLE(fnum), s, mask);
 }

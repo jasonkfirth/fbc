@@ -42,10 +42,10 @@ static void fb_hArosShiftRightOne( FB_AROS_M68K_UINT64_WORDS *value )
 	value->word.high >>= 1;
 }
 
-FBCALL FBSTRING *fb_BINEx_l( unsigned long long num, int digits )
+FBCALL FBSTRING_ACCESS *fb_BINEx_l( unsigned long long num, int digits )
 {
 	FB_AROS_M68K_UINT64_WORDS remaining;
-	FBSTRING *result;
+	FBSTRING_ACCESS *result;
 	int index;
 
 	if( digits <= 0 ) {
@@ -63,7 +63,7 @@ FBCALL FBSTRING *fb_BINEx_l( unsigned long long num, int digits )
 
 	result = fb_hStrAllocTemp( NULL, digits );
 	if( result == NULL ) {
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 	}
 
 	remaining.number = num;
@@ -76,7 +76,7 @@ FBCALL FBSTRING *fb_BINEx_l( unsigned long long num, int digits )
 	return result;
 }
 
-FBCALL FBSTRING *fb_BIN_l( unsigned long long num )
+FBCALL FBSTRING_ACCESS *fb_BIN_l( unsigned long long num )
 {
 	return fb_BINEx_l( num, 0 );
 }

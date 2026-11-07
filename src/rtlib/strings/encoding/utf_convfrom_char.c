@@ -6,14 +6,19 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include "utf_size.h"
 
 static char *hToUTF8( const char *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
+	size_t allocation;
+
+	if( !fb_hUTFBytes( chars, 2, &allocation ) )
+		return NULL;
 	if( chars > 0 )
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( chars * 2 );
+			dst = malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -33,13 +38,17 @@ static char *hToUTF16( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 	/* UTF16/UTF32 conversion APIs expose native typed code units.
 	   Encoded file output normalizes these units to little endian. */
 
-	*bytes = chars * sizeof( UTF_16 );
+	size_t allocation;
+
+	if( !fb_hUTFBytes( chars, sizeof( UTF_16 ), &allocation ) )
+		return NULL;
+	*bytes = chars * (ssize_t)sizeof( UTF_16 );
 
 	if( chars > 0 )
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( (size_t)*bytes );
+			dst = malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -62,13 +71,17 @@ static char *hToUTF32( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 	/* UTF16/UTF32 conversion APIs expose native typed code units.
 	   Encoded file output normalizes these units to little endian. */
 
-	*bytes = chars * sizeof( UTF_32 );
+	size_t allocation;
+
+	if( !fb_hUTFBytes( chars, sizeof( UTF_32 ), &allocation ) )
+		return NULL;
+	*bytes = chars * (ssize_t)sizeof( UTF_32 );
 
 	if( chars > 0 )
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( (size_t)*bytes );
+			dst = malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -93,6 +106,11 @@ char *fb_CharToUTF
 		ssize_t *bytes
 	)
 {
+	if( bytes == NULL )
+		return NULL;
+	*bytes = 0;
+	if( chars < 0 || (chars > 0 && src == NULL) )
+		return NULL;
 	switch( encod )
 	{
 	case FB_FILE_ENCOD_UTF8:

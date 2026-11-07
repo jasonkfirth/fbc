@@ -11,9 +11,9 @@
 /* Path APIs take terminated bytes. Unlike locale-based STRING conversion,
    these adapters keep all scalars and are independent of LC_CTYPE. The
    underlying platform provider continues to own the filesystem operation. */
-static FBSTRING *hPath( const FB_WCHAR *path )
+static FBSTRING_ACCESS *hPath( const FB_WCHAR *path )
 {
-	FBSTRING *text;
+	FBSTRING_ACCESS *text;
 	FB_STRLOCK();
 	text = fb_hUStrFromWstr_NoLock(path);
 	FB_STRUNLOCK();
@@ -23,7 +23,7 @@ static FBSTRING *hPath( const FB_WCHAR *path )
 #define WIDE_PATH(name, result_type, operation, failure) \
 FBCALL result_type name( const FB_WCHAR *path ) \
 { \
-	FBSTRING *text = hPath(path); \
+	FBSTRING_ACCESS *text = hPath(path); \
 	if( text == NULL ) return failure; \
 	result_type result = operation(text->data ? text->data : ""); \
 	fb_hStrDelTemp(text); \
@@ -37,7 +37,7 @@ WIDE_PATH(fb_WideFileGetAttr, int, fb_FileGetAttr, -1)
 
 FBCALL int fb_WideFileSetAttr( const FB_WCHAR *path, int attributes )
 {
-	FBSTRING *text = hPath(path);
+	FBSTRING_ACCESS *text = hPath(path);
 	int result;
 	if( text == NULL ) return FB_RTERROR_OUTOFMEM;
 	result = fb_FileSetAttr(text->data ? text->data : "", attributes);
@@ -47,8 +47,8 @@ FBCALL int fb_WideFileSetAttr( const FB_WCHAR *path, int attributes )
 
 FBCALL int fb_WideFileCopy( const FB_WCHAR *source, const FB_WCHAR *destination )
 {
-	FBSTRING *src = hPath(source);
-	FBSTRING *dst = hPath(destination);
+	FBSTRING_ACCESS *src = hPath(source);
+	FBSTRING_ACCESS *dst = hPath(destination);
 	int result;
 	if( src == NULL || dst == NULL ) result = FB_RTERROR_OUTOFMEM;
 	else result = fb_FileCopy(src->data ? src->data : "", dst->data ? dst->data : "");
@@ -59,7 +59,7 @@ FBCALL int fb_WideFileCopy( const FB_WCHAR *source, const FB_WCHAR *destination 
 
 FBCALL int fb_WideFileCopyFromBytes( const char *source, const FB_WCHAR *destination )
 {
-	FBSTRING *dst = hPath(destination);
+	FBSTRING_ACCESS *dst = hPath(destination);
 	int result;
 	if( dst == NULL ) return FB_RTERROR_OUTOFMEM;
 	result = fb_FileCopy(source, dst->data ? dst->data : "");
@@ -69,7 +69,7 @@ FBCALL int fb_WideFileCopyFromBytes( const char *source, const FB_WCHAR *destina
 
 FBCALL int fb_WideFileCopyToBytes( const FB_WCHAR *source, const char *destination )
 {
-	FBSTRING *src = hPath(source);
+	FBSTRING_ACCESS *src = hPath(source);
 	int result;
 	if( src == NULL ) return FB_RTERROR_OUTOFMEM;
 	result = fb_FileCopy(src->data ? src->data : "", destination);

@@ -17,7 +17,7 @@
 #if defined(HOST_DOS) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
 	#include "drivers/dos/fb_dos_thread.h"
 	struct FB_DOS_MUTEX_WAITER;
-	struct _FBMUTEX {
+	struct FBMUTEX_ {
 		int owner;
 		unsigned int depth;
 		struct FB_DOS_MUTEX_WAITER *head;
@@ -27,23 +27,23 @@
 
 #if defined HOST_UNIX
 	#include <pthread.h>
-	struct _FBMUTEX {
+	struct FBMUTEX_ {
 		pthread_mutex_t id;
 	};
 #elif defined HOST_WIN32
 	#include <windows.h>
-	struct _FBMUTEX {
+	struct FBMUTEX_ {
 		HANDLE id;
 	};
 #elif defined HOST_XBOX
 	#include <windows.h>
-	struct _FBMUTEX {
+	struct FBMUTEX_ {
 		CRITICAL_SECTION id;
 	};
 #elif defined HOST_WII
 	#include <ogc/lwp.h>
 	#include <ogc/mutex.h>
-	struct _FBMUTEX {
+	struct FBMUTEX_ {
 		mutex_t id;
 	};
 #endif
@@ -84,7 +84,7 @@
    a void*, because pthread_t doesn't have to be an integer or pointer, and
    furthermore, zero may be a valid value for it. */
 
-typedef enum _FBTHREADFLAGS
+typedef enum FBTHREADFLAGS_
 {
 	FBTHREAD_NONE = 0,
 	FBTHREAD_MAIN = 1,
@@ -92,7 +92,7 @@ typedef enum _FBTHREADFLAGS
 	FBTHREAD_DETACHED = 4
 } FBTHREADFLAGS;
 
-struct _FBTHREAD {
+struct FBTHREAD_ {
 #if defined HOST_DOS
 	int id;
 	void *opaque;
@@ -120,7 +120,7 @@ typedef struct {
 	FBTHREAD         *thread;
 } FBTHREADINFO;
 
-typedef struct _FB_FBTHREADCTX
+typedef struct FB_FBTHREADCTX_
 {
 	FBTHREAD	*self;
 } FB_FBTHREADCTX;

@@ -21,7 +21,7 @@
     the code easier to compare with the normal rtlib layout.
 */
 
-FBSTRING *fb_IntToStr(const int32 value)
+FBSTRING_ACCESS *fb_IntToStr(const int32 value)
 {
     char buffer[32];
 
@@ -30,7 +30,7 @@ FBSTRING *fb_IntToStr(const int32 value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-FBSTRING *fb_UIntToStr(const uint32 value)
+FBSTRING_ACCESS *fb_UIntToStr(const uint32 value)
 {
     char buffer[32];
 
@@ -39,7 +39,7 @@ FBSTRING *fb_UIntToStr(const uint32 value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-FBSTRING *fb_IntToStrQB(const int32 value)
+FBSTRING_ACCESS *fb_IntToStrQB(const int32 value)
 {
     char buffer[32];
 
@@ -48,7 +48,7 @@ FBSTRING *fb_IntToStrQB(const int32 value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-FBSTRING *fb_UIntToStrQB(const uint32 value)
+FBSTRING_ACCESS *fb_UIntToStrQB(const uint32 value)
 {
     char buffer[32];
 
@@ -57,7 +57,7 @@ FBSTRING *fb_UIntToStrQB(const uint32 value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-FBSTRING *fb_LongintToStr(const int64_t value)
+FBSTRING_ACCESS *fb_LongintToStr(const int64_t value)
 {
     char buffer[32];
 
@@ -66,7 +66,7 @@ FBSTRING *fb_LongintToStr(const int64_t value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-FBSTRING *fb_LongintToStrQB(const int64_t value)
+FBSTRING_ACCESS *fb_LongintToStrQB(const int64_t value)
 {
     char buffer[32];
 
@@ -75,7 +75,7 @@ FBSTRING *fb_LongintToStrQB(const int64_t value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-FBSTRING *fb_ULongintToStr(const uint64_t value)
+FBSTRING_ACCESS *fb_ULongintToStr(const uint64_t value)
 {
     char buffer[32];
 
@@ -84,7 +84,7 @@ FBSTRING *fb_ULongintToStr(const uint64_t value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-FBSTRING *fb_ULongintToStrQB(const uint64_t value)
+FBSTRING_ACCESS *fb_ULongintToStrQB(const uint64_t value)
 {
     char buffer[32];
 
@@ -93,7 +93,7 @@ FBSTRING *fb_ULongintToStrQB(const uint64_t value)
     return fb_nuttx_temp_copy(buffer, fb_nuttx_string_length(buffer, -1));
 }
 
-static FBSTRING *fb_nuttx_float_string(char *buffer, const size_t buffer_size)
+static FBSTRING_ACCESS *fb_nuttx_float_string(char *buffer, const size_t buffer_size)
 {
     int32 len;
 
@@ -109,7 +109,7 @@ static FBSTRING *fb_nuttx_float_string(char *buffer, const size_t buffer_size)
     return fb_nuttx_temp_copy(buffer, len);
 }
 
-FBSTRING *fb_FloatToStr(const float value)
+FBSTRING_ACCESS *fb_FloatToStr(const float value)
 {
     char buffer[32];
 
@@ -119,7 +119,7 @@ FBSTRING *fb_FloatToStr(const float value)
     return fb_nuttx_float_string(buffer, sizeof(buffer));
 }
 
-FBSTRING *fb_FloatToStrQB(const float value)
+FBSTRING_ACCESS *fb_FloatToStrQB(const float value)
 {
     char buffer[32];
 
@@ -129,7 +129,7 @@ FBSTRING *fb_FloatToStrQB(const float value)
     return fb_nuttx_float_string(buffer, sizeof(buffer));
 }
 
-FBSTRING *fb_DoubleToStr(const double value)
+FBSTRING_ACCESS *fb_DoubleToStr(const double value)
 {
     char buffer[64];
 
@@ -139,7 +139,7 @@ FBSTRING *fb_DoubleToStr(const double value)
     return fb_nuttx_float_string(buffer, sizeof(buffer));
 }
 
-FBSTRING *fb_DoubleToStrQB(const double value)
+FBSTRING_ACCESS *fb_DoubleToStrQB(const double value)
 {
     char buffer[64];
 
@@ -150,7 +150,7 @@ FBSTRING *fb_DoubleToStrQB(const double value)
 }
 
 #if !defined(FB_NUTTX_USE_GENERIC_STR_BASE) || (FB_NUTTX_USE_GENERIC_STR_BASE == 0)
-static FBSTRING *fb_nuttx_unsigned_to_base_ex(uint64_t value,
+static FBSTRING_ACCESS *fb_nuttx_unsigned_to_base_ex(uint64_t value,
     const uint32 base, int32 digit_count)
 {
     static const char digit_chars[] = "0123456789ABCDEF";
@@ -188,182 +188,182 @@ static FBSTRING *fb_nuttx_unsigned_to_base_ex(uint64_t value,
         (int32)((int)sizeof(buffer) - 1 - pos));
 }
 
-static FBSTRING *fb_nuttx_unsigned_to_base(uint64_t value, const uint32 base)
+static FBSTRING_ACCESS *fb_nuttx_unsigned_to_base(uint64_t value, const uint32 base)
 {
     return fb_nuttx_unsigned_to_base_ex(value, base, 0);
 }
 
-FBSTRING *fb_HEX_i(const uint32 value);
-FBSTRING *fb_OCT_i(const uint32 value);
-FBSTRING *fb_BIN_i(const uint32 value);
+FBSTRING_ACCESS *fb_HEX_i(const uint32 value);
+FBSTRING_ACCESS *fb_OCT_i(const uint32 value);
+FBSTRING_ACCESS *fb_BIN_i(const uint32 value);
 
-FBSTRING *fb_HEX(const int32 value)
+FBSTRING_ACCESS *fb_HEX(const int32 value)
 {
     return fb_HEX_i((uint32)value);
 }
 
-FBSTRING *fb_OCT(const int32 value)
+FBSTRING_ACCESS *fb_OCT(const int32 value)
 {
     return fb_OCT_i((uint32)value);
 }
 
-FBSTRING *fb_BIN(const int32 value)
+FBSTRING_ACCESS *fb_BIN(const int32 value)
 {
     return fb_BIN_i((uint32)value);
 }
 
-FBSTRING *fb_HEX_b(const uint8_t value)
+FBSTRING_ACCESS *fb_HEX_b(const uint8_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 16);
 }
 
-FBSTRING *fb_HEX_s(const uint16_t value)
+FBSTRING_ACCESS *fb_HEX_s(const uint16_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 16);
 }
 
-FBSTRING *fb_HEX_i(const uint32 value)
+FBSTRING_ACCESS *fb_HEX_i(const uint32 value)
 {
     return fb_nuttx_unsigned_to_base(value, 16);
 }
 
-FBSTRING *fb_HEX_l(const uint64_t value)
+FBSTRING_ACCESS *fb_HEX_l(const uint64_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 16);
 }
 
-FBSTRING *fb_HEX_p(const void *value)
+FBSTRING_ACCESS *fb_HEX_p(const void *value)
 {
     return fb_nuttx_unsigned_to_base((uintptr_t)value, 16);
 }
 
-FBSTRING *fb_HEXEx_b(const uint8_t value, const int32 digits)
+FBSTRING_ACCESS *fb_HEXEx_b(const uint8_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 16, digits);
 }
 
-FBSTRING *fb_HEXEx_s(const uint16_t value, const int32 digits)
+FBSTRING_ACCESS *fb_HEXEx_s(const uint16_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 16, digits);
 }
 
-FBSTRING *fb_HEXEx_i(const uint32 value, const int32 digits)
+FBSTRING_ACCESS *fb_HEXEx_i(const uint32 value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 16, digits);
 }
 
-FBSTRING *fb_HEXEx_l(const uint64_t value, const int32 digits)
+FBSTRING_ACCESS *fb_HEXEx_l(const uint64_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 16, digits);
 }
 
-FBSTRING *fb_HEXEx_p(const void *value, const int32 digits)
+FBSTRING_ACCESS *fb_HEXEx_p(const void *value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex((uintptr_t)value, 16, digits);
 }
 
-FBSTRING *fb_OCT_b(const uint8_t value)
+FBSTRING_ACCESS *fb_OCT_b(const uint8_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 8);
 }
 
-FBSTRING *fb_OCT_s(const uint16_t value)
+FBSTRING_ACCESS *fb_OCT_s(const uint16_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 8);
 }
 
-FBSTRING *fb_OCT_i(const uint32 value)
+FBSTRING_ACCESS *fb_OCT_i(const uint32 value)
 {
     return fb_nuttx_unsigned_to_base(value, 8);
 }
 
-FBSTRING *fb_OCT_l(const uint64_t value)
+FBSTRING_ACCESS *fb_OCT_l(const uint64_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 8);
 }
 
-FBSTRING *fb_OCT_p(const void *value)
+FBSTRING_ACCESS *fb_OCT_p(const void *value)
 {
     return fb_nuttx_unsigned_to_base((uintptr_t)value, 8);
 }
 
-FBSTRING *fb_OCTEx_b(const uint8_t value, const int32 digits)
+FBSTRING_ACCESS *fb_OCTEx_b(const uint8_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 8, digits);
 }
 
-FBSTRING *fb_OCTEx_s(const uint16_t value, const int32 digits)
+FBSTRING_ACCESS *fb_OCTEx_s(const uint16_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 8, digits);
 }
 
-FBSTRING *fb_OCTEx_i(const uint32 value, const int32 digits)
+FBSTRING_ACCESS *fb_OCTEx_i(const uint32 value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 8, digits);
 }
 
-FBSTRING *fb_OCTEx_l(const uint64_t value, const int32 digits)
+FBSTRING_ACCESS *fb_OCTEx_l(const uint64_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 8, digits);
 }
 
-FBSTRING *fb_OCTEx_p(const void *value, const int32 digits)
+FBSTRING_ACCESS *fb_OCTEx_p(const void *value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex((uintptr_t)value, 8, digits);
 }
 
-FBSTRING *fb_BIN_b(const uint8_t value)
+FBSTRING_ACCESS *fb_BIN_b(const uint8_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 2);
 }
 
-FBSTRING *fb_BIN_s(const uint16_t value)
+FBSTRING_ACCESS *fb_BIN_s(const uint16_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 2);
 }
 
-FBSTRING *fb_BIN_i(const uint32 value)
+FBSTRING_ACCESS *fb_BIN_i(const uint32 value)
 {
     return fb_nuttx_unsigned_to_base(value, 2);
 }
 
-FBSTRING *fb_BIN_l(const uint64_t value)
+FBSTRING_ACCESS *fb_BIN_l(const uint64_t value)
 {
     return fb_nuttx_unsigned_to_base(value, 2);
 }
 
-FBSTRING *fb_BIN_p(const void *value)
+FBSTRING_ACCESS *fb_BIN_p(const void *value)
 {
     return fb_nuttx_unsigned_to_base((uintptr_t)value, 2);
 }
 
-FBSTRING *fb_BINEx_b(const uint8_t value, const int32 digits)
+FBSTRING_ACCESS *fb_BINEx_b(const uint8_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 2, digits);
 }
 
-FBSTRING *fb_BINEx_s(const uint16_t value, const int32 digits)
+FBSTRING_ACCESS *fb_BINEx_s(const uint16_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 2, digits);
 }
 
-FBSTRING *fb_BINEx_i(const uint32 value, const int32 digits)
+FBSTRING_ACCESS *fb_BINEx_i(const uint32 value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 2, digits);
 }
 
-FBSTRING *fb_BINEx_l(const uint64_t value, const int32 digits)
+FBSTRING_ACCESS *fb_BINEx_l(const uint64_t value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex(value, 2, digits);
 }
 
-FBSTRING *fb_BINEx_p(const void *value, const int32 digits)
+FBSTRING_ACCESS *fb_BINEx_p(const void *value, const int32 digits)
 {
     return fb_nuttx_unsigned_to_base_ex((uintptr_t)value, 2, digits);
 }
 #endif
 
-double fb_VAL(const FBSTRING *s)
+double fb_VAL(const FBSTRING_ACCESS *s)
 {
     if ((s == NULL) || (s->data == NULL))
         return 0.0;
@@ -371,7 +371,7 @@ double fb_VAL(const FBSTRING *s)
     return strtod(s->data, NULL);
 }
 
-int32 fb_VALINT(const FBSTRING *s)
+int32 fb_VALINT(const FBSTRING_ACCESS *s)
 {
     if ((s == NULL) || (s->data == NULL))
         return 0;
@@ -379,7 +379,7 @@ int32 fb_VALINT(const FBSTRING *s)
     return (int32)strtol(s->data, NULL, 0);
 }
 
-uint32 fb_VALUINT(const FBSTRING *s)
+uint32 fb_VALUINT(const FBSTRING_ACCESS *s)
 {
     if ((s == NULL) || (s->data == NULL))
         return 0;
@@ -387,7 +387,7 @@ uint32 fb_VALUINT(const FBSTRING *s)
     return (uint32)strtoul(s->data, NULL, 0);
 }
 
-int64_t fb_VALLNG(const FBSTRING *s)
+int64_t fb_VALLNG(const FBSTRING_ACCESS *s)
 {
     if ((s == NULL) || (s->data == NULL))
         return 0;
@@ -395,7 +395,7 @@ int64_t fb_VALLNG(const FBSTRING *s)
     return (int64_t)strtoll(s->data, NULL, 0);
 }
 
-uint64_t fb_VALULNG(const FBSTRING *s)
+uint64_t fb_VALULNG(const FBSTRING_ACCESS *s)
 {
     if ((s == NULL) || (s->data == NULL))
         return 0;
@@ -465,7 +465,7 @@ int64_t fb_CVLONGINTFROMD(const double value)
 /* Character string helpers                                                  */
 /* ------------------------------------------------------------------------- */
 
-FBSTRING *fb_CHR(const int32 count, ...)
+FBSTRING_ACCESS *fb_CHR(const int32 count, ...)
 {
     char *buffer;
     va_list args;
@@ -491,7 +491,7 @@ FBSTRING *fb_CHR(const int32 count, ...)
     return fb_nuttx_temp_string(buffer, count);
 }
 
-uint32 fb_ASC(const FBSTRING *s, const int32 position)
+uint32 fb_ASC(const FBSTRING_ACCESS *s, const int32 position)
 {
     if ((s == NULL) || (s->data == NULL) || (position <= 0))
         return 0;
@@ -504,7 +504,7 @@ uint32 fb_ASC(const FBSTRING *s, const int32 position)
 
 #if !defined(FB_NUTTX_USE_GENERIC_STR_FILL) || \
     (FB_NUTTX_USE_GENERIC_STR_FILL == 0)
-static FBSTRING *fb_nuttx_fill_string(const int32 len, const int32 ch)
+static FBSTRING_ACCESS *fb_nuttx_fill_string(const int32 len, const int32 ch)
 {
     char *buffer;
 
@@ -522,12 +522,12 @@ static FBSTRING *fb_nuttx_fill_string(const int32 len, const int32 ch)
     return fb_nuttx_temp_string(buffer, len);
 }
 
-FBSTRING *fb_SPACE(const int32 len)
+FBSTRING_ACCESS *fb_SPACE(const int32 len)
 {
     return fb_nuttx_fill_string(len, ' ');
 }
 
-FBSTRING *fb_StrFill1(const int32 len, const int32 ch)
+FBSTRING_ACCESS *fb_StrFill1(const int32 len, const int32 ch)
 {
     return fb_nuttx_fill_string(len, ch);
 }

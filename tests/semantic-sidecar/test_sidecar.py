@@ -5881,6 +5881,10 @@ Next
         from startup_lifecycle import check_modes_and_transport
         check_modes_and_transport(self)
 
+    def test_native_startup_grouped_c_calls_keep_selected_names_kind_and_priority(self) -> None:
+        from startup_lifecycle import check_grouped_c_calls
+        check_grouped_c_calls(self)
+
     def test_native_startup_rejects_invented_or_missing_lifecycle_facts(self) -> None:
         from startup_lifecycle import check_rejection
         check_rejection(self)

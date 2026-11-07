@@ -151,7 +151,7 @@ static int32 fb_nuttx_dir_entry_attrib(const char *name)
     return attrib;
 }
 
-FBSTRING *fb_DirNext(int32 *out_attrib)
+FBSTRING_ACCESS *fb_DirNext(int32 *out_attrib)
 {
     struct dirent *entry;
 
@@ -176,7 +176,7 @@ FBSTRING *fb_DirNext(int32 *out_attrib)
     return fb_nuttx_temp_string("", 0);
 }
 
-FBSTRING *fb_Dir(const FBSTRING *pattern, const int32 attrib, int32 *out_attrib)
+FBSTRING_ACCESS *fb_Dir(const FBSTRING_ACCESS *pattern, const int32 attrib, int32 *out_attrib)
 {
     char *path;
     char *slash;
@@ -249,10 +249,10 @@ FBSTRING *fb_Dir(const FBSTRING *pattern, const int32 attrib, int32 *out_attrib)
     return fb_DirNext(out_attrib);
 }
 
-FBSTRING *fb_DirNext64(int64_t *out_attrib)
+FBSTRING_ACCESS *fb_DirNext64(int64_t *out_attrib)
 {
     int32 narrowed_attrib;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
 
     narrowed_attrib = 0;
     result = fb_DirNext(&narrowed_attrib);
@@ -263,11 +263,11 @@ FBSTRING *fb_DirNext64(int64_t *out_attrib)
     return result;
 }
 
-FBSTRING *fb_Dir64(const FBSTRING *pattern, const int32 attrib,
+FBSTRING_ACCESS *fb_Dir64(const FBSTRING_ACCESS *pattern, const int32 attrib,
     int64_t *out_attrib)
 {
     int32 narrowed_attrib;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
 
     narrowed_attrib = 0;
     result = fb_Dir(pattern, attrib, &narrowed_attrib);

@@ -7,15 +7,15 @@
  */
 #include "fb.h"
 
-FBSTRING *fb_CHR ( int args, ... )
+FBSTRING_ACCESS *fb_CHR ( int args, ... )
 {
-	FBSTRING 	*dst;
+	FBSTRING_ACCESS 	*dst;
 	va_list 	ap;
 	unsigned int num;
 	int i;
 
 	if( args <= 0 )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
 	va_start( ap, args );
 
@@ -32,7 +32,7 @@ FBSTRING *fb_CHR ( int args, ... )
 		dst->data[args] = '\0';
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	va_end( ap );
 

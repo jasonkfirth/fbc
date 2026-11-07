@@ -10,15 +10,12 @@
  */
 
 #include "fb.h"
+#include "utf_size.h"
 
-extern const unsigned char __fb_utf8_trailingTb[256];
-extern const UTF_32 __fb_utf8_offsetsTb[6];
+/* Use the shared declarations so readers keep the same ABI labels. */
+
 
 #define FB_UTF8_MAX_TRAILING_BYTES 5
-
-char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars );
-char *fb_hUTF16ToChar( const UTF_16 *src, char *dst, ssize_t *chars );
-char *fb_hUTF32ToChar( const UTF_32 *src, char *dst, ssize_t *chars );
 
 static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 {
@@ -33,7 +30,7 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 	    charsleft = 0;
 	    do 
 	    {
-			extbytes = __fb_utf8_trailingTb[(unsigned int)*src];
+			extbytes = fb_utf8_trailingTb[(unsigned int)*src];
 	
 			c = 0;
 			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
@@ -63,19 +60,19 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 
 			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
-				c -= __fb_utf8_offsetsTb[extbytes];
+				c -= fb_utf8_offsetsTb[extbytes];
 
 			/* Ensure we have room for at least 2 UTF16 units (surrogate pair) */
 			if( charsleft < 2 )
 			{
-				/* If we still have room for 1 char, reclaim it */
-				dst_size -= charsleft;
-
-				/* Make room for some chars */
+				size_t allocation;
+				if( !fb_hUTFGrow( &dst_size, charsleft, sizeof( FB_WCHAR ), &allocation ) ) {
+					free( buffer );
+					return NULL;
+				}
 				charsleft = 8;
-				dst_size += charsleft;
 
-				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, allocation );
 				if( newbuffer == NULL )
 				{
 					free( buffer );
@@ -86,12 +83,12 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 
 			if( c <= UTF16_MAX_BMP )
-				*dst++ = c;
+				*dst++ = (FB_WCHAR)c;
 			else
 			{
-				c -= UTF16_HALFBASE;
-				*dst++ = ((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
-				*dst++ = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
+				UTF_32 supplementary = c - UTF16_HALFBASE;
+				*dst++ = (FB_WCHAR)((supplementary >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
+				*dst++ = (FB_WCHAR)((supplementary & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 				--charsleft;
 			}
 	
@@ -108,7 +105,7 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 	    charsleft = *chars;
 	    while( charsleft > 0 )
 	    {
-			extbytes = __fb_utf8_trailingTb[*src];
+			extbytes = fb_utf8_trailingTb[*src];
 	
 			c = 0;
 			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
@@ -138,17 +135,17 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 
 			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
-				c -= __fb_utf8_offsetsTb[extbytes];
+				c -= fb_utf8_offsetsTb[extbytes];
 
 			if( c <= UTF16_MAX_BMP )
-				*dst++ = c;
+				*dst++ = (FB_WCHAR)c;
 			else
 			{
-				c -= UTF16_HALFBASE;
-				*dst++ = ((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
+				UTF_32 supplementary = c - UTF16_HALFBASE;
+				*dst++ = (FB_WCHAR)((supplementary >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
 				if( charsleft > 1 )
 				{
-					*dst++ = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
+					*dst++ = (FB_WCHAR)((supplementary & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 					--charsleft;
 				}
 			}
@@ -178,7 +175,7 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 	    charsleft = 0;
 	    do 
 	    {
-			extbytes = __fb_utf8_trailingTb[(unsigned int)*src];
+			extbytes = fb_utf8_trailingTb[(unsigned int)*src];
 	
 			c = 0;
 			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
@@ -208,13 +205,17 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 
 			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
-				c -= __fb_utf8_offsetsTb[extbytes];
+				c -= fb_utf8_offsetsTb[extbytes];
 
 			if( charsleft == 0 )
 			{
+				size_t allocation;
+				if( !fb_hUTFGrow( &dst_size, charsleft, sizeof( FB_WCHAR ), &allocation ) ) {
+					free( buffer );
+					return NULL;
+				}
 				charsleft = 8;
-				dst_size += charsleft;
-				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, allocation );
 				if( newbuffer == NULL )
 				{
 					free( buffer );
@@ -224,7 +225,7 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 				dst = buffer + dst_size - charsleft;
 			}
 			
-			*dst++ = c;
+			*dst++ = (FB_WCHAR)c;
 	
 			if( c == 0 )
 				break;
@@ -239,7 +240,7 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 	    charsleft = *chars;
 	    while( charsleft > 0 )
 	    {
-			extbytes = __fb_utf8_trailingTb[*src];
+			extbytes = fb_utf8_trailingTb[*src];
 	
 			c = 0;
 			if( extbytes > FB_UTF8_MAX_TRAILING_BYTES )
@@ -269,9 +270,9 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 
 			if( extbytes <= FB_UTF8_MAX_TRAILING_BYTES )
-				c -= __fb_utf8_offsetsTb[extbytes];
+				c -= fb_utf8_offsetsTb[extbytes];
 
-			*dst++ = c;
+			*dst++ = (FB_WCHAR)c;
 
 			if( c == 0 )
 				break;
@@ -312,17 +313,20 @@ static FB_WCHAR *hUTF16ToUTF16( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 {
 	/* Have to determine and return actual string length */
 	ssize_t len = 0;
+	size_t allocation;
 	if( dst == NULL ) {
 		while( src[len] )
 			len++;
-		dst = malloc( (len + 1) * sizeof( FB_WCHAR ) );
+		if( len == FB_STRSIZEMSK || !fb_hUTFBytes( len + 1, sizeof( FB_WCHAR ), &allocation ) )
+			return NULL;
+		dst = malloc( allocation );
 		if( dst == NULL )
 			return NULL;
-		memcpy( dst, src, (len + 1) * sizeof( FB_WCHAR ) );
+		memcpy( dst, src, allocation );
 	} else {
 		while( (len < *chars) && src[len] )
 			len++;
-		memcpy( dst, src, len * sizeof( FB_WCHAR ) );
+		memcpy( dst, src, (size_t)len * sizeof( FB_WCHAR ) );
 		if (len < *chars)
 			/* The input buffer has a trailing NUL character, copy it */
 			dst[len] = 0;
@@ -333,7 +337,7 @@ static FB_WCHAR *hUTF16ToUTF16( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 
 static FB_WCHAR *hUTF16ToUTF32( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars )
 {
-	UTF_16 c;
+	UTF_32 c;
 	ssize_t charsleft;
 	FB_WCHAR *buffer = dst;
 	
@@ -352,9 +356,13 @@ static FB_WCHAR *hUTF16ToUTF32( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 	
 			if( charsleft == 0 )
 			{
+				size_t allocation;
+				if( !fb_hUTFGrow( &dst_size, charsleft, sizeof( FB_WCHAR ), &allocation ) ) {
+					free( buffer );
+					return NULL;
+				}
 				charsleft = 8;
-				dst_size += charsleft;
-				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, allocation );
 				if( newbuffer == NULL ) {
 					free( buffer );
 					return NULL;
@@ -363,7 +371,7 @@ static FB_WCHAR *hUTF16ToUTF32( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 				dst = buffer + dst_size - charsleft;
 			}
 			
-			*dst++ = c;
+			*dst++ = (FB_WCHAR)c;
 
 			if( c == 0 )
 				break;
@@ -385,7 +393,7 @@ static FB_WCHAR *hUTF16ToUTF32( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 				     ((FB_WCHAR)*src++ - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
 			}
 
-			*dst++ = c;
+			*dst++ = (FB_WCHAR)c;
 
 			if( c == 0 )
 				break;
@@ -436,13 +444,13 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 			/* Ensure we have room for at least 2 UTF16 units (surrogate pair) */
 			if( charsleft < 2 )
 			{
-				/* If we still have room for 1 char, reclaim it */
-				dst_size -= charsleft;
-
-				/* Make room for some chars */
+				size_t allocation;
+				if( !fb_hUTFGrow( &dst_size, charsleft, sizeof( FB_WCHAR ), &allocation ) ) {
+					free( buffer );
+					return NULL;
+				}
 				charsleft = 8;
-				dst_size += charsleft;
-				FB_WCHAR *newbuffer = realloc( buffer, dst_size * sizeof( FB_WCHAR ) );
+				FB_WCHAR *newbuffer = realloc( buffer, allocation );
 				if( newbuffer == NULL ) {
 					free( buffer );
 					return NULL;
@@ -459,7 +467,7 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 				--charsleft;
 			}
 			
-			*dst++ = c;
+			*dst++ = (FB_WCHAR)c;
 
 			if( c == 0 )
 				break;
@@ -487,7 +495,7 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 				c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 			}
 
-			*dst++ = c;
+			*dst++ = (FB_WCHAR)c;
 
 			if( c == 0 )
 				break;
@@ -505,17 +513,20 @@ static FB_WCHAR *hUTF32ToUTF32( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 {
 	/* Have to determine and return actual string length */
 	ssize_t len = 0;
+	size_t allocation;
 	if( dst == NULL ) {
 		while( src[len] )
 			len++;
-		dst = malloc( (len + 1) * sizeof( FB_WCHAR ) );
+		if( len == FB_STRSIZEMSK || !fb_hUTFBytes( len + 1, sizeof( FB_WCHAR ), &allocation ) )
+			return NULL;
+		dst = malloc( allocation );
 		if( dst == NULL )
 			return NULL;
-		memcpy( dst, src, (len + 1) * sizeof( FB_WCHAR ) );
+		memcpy( dst, src, allocation );
 	} else {
 		while( (len < *chars) && src[len] )
 			len++;
-		memcpy( dst, src, len * sizeof( FB_WCHAR ) );
+		memcpy( dst, src, (size_t)len * sizeof( FB_WCHAR ) );
 		/* Can't copy trailing NUL character if dst is too small */
 		if (len < *chars)
 			dst[len] = 0;
@@ -552,6 +563,12 @@ static FB_WCHAR *hUTF32ToWChar( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
    pairs (if WCHAR is 16 bit) as 2. */
 FB_WCHAR *fb_UTFToWChar( FB_FILE_ENCOD encod, const void *src, FB_WCHAR *dst, ssize_t *chars )
 {
+	if( chars == NULL )
+		return NULL;
+	if( src == NULL || (dst != NULL && *chars < 0) ) {
+		*chars = 0;
+		return NULL;
+	}
 	switch( encod )
 	{
 	case FB_FILE_ENCOD_UTF8:

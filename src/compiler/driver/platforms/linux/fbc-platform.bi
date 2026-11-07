@@ -165,6 +165,10 @@ private sub fbcLinuxPlatformAddGfxLibs( )
 		exit sub
 	end if
 
+	'' glibc versions before 2.34 provide shm_open through librt.  The native
+	'' Wayland framebuffer backend uses it for compositor-shared pixel buffers.
+	fbcLinuxPlatformAddLibraryIfPresent( "rt" )
+
 	'' Cross sysroots are commonly framebuffer-only.  Query the target compiler
 	'' instead of making a host-side X11 installation part of the target ABI.
 	if( fbcLinuxPlatformHasLibrary( "X11" ) ) then

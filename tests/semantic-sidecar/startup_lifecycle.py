@@ -328,4 +328,32 @@ def check_declarator_integrity(test):
                     row[4] = "\t".join(fields)
             Model(text_rows(rows))
 
+def check_grouped_c_calls(test):
+    source = test.source((test.root / "tests/compiler-support/c-startup-groups.bas").read_text(),
+                         "c-startup-groups.bas")
+    for backend in ("gcc", "clang"):
+        for target in ("win32-x86", "win32-x86_64"):
+            with test.subTest(backend=backend, target=target):
+                model = test.compile(source, backend=backend, extra=("-target", target))
+                calls = [row for row in model.startup_lifecycles[1]["startup-emission"].values()
+                         if row[3] == "wrapper-call"]
+                test.assertEqual(len(calls), 8)
+                test.assertEqual(len({row[6] for row in calls}), 4)
+                text = test.emission_path(source.stem, backend).read_text()
+                for fields in calls:
+                    test.assertIn(fields[7] + ";", text)
+                for slot, replacement in ((1, "destructor"), (4, "201"), (5, "201"),
+                                          (6, "fb_c_startup_c_201"), (7, "another_callback()"),
+                                          (3, "declaration-attribute")):
+                    with test.subTest(slot=slot), test.assertRaises(ValueError):
+                        rows = [row.copy() for row in model.rows]
+                        packet = next(row for row in rows if row[0] == "K"
+                                      and row[3].startswith("startup-emission:")
+                                      and row[4].split("\t")[1] == "constructor")
+                        fields = packet[4].split("\t")
+                        fields[slot] = replacement
+                        packet[4] = "\t".join(fields)
+                        Model(text_rows(rows))
+
+
 # end of startup_lifecycle.py

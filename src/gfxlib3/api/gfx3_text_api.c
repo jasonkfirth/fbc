@@ -693,7 +693,7 @@ static int text_draw_custom_font_runs(FB_GFX3_DRAW_STATE *state,
 /* Public DRAW STRING ABI                                                    */
 /* ------------------------------------------------------------------------- */
 
-FBCALL int fb_GfxDrawStringSize(FBSTRING *string, int *width, int *height,
+FBCALL int fb_GfxDrawStringSize(FBSTRING_ACCESS *string, int *width, int *height,
 	void *font_image)
 {
 	FB_GFX3_IMAGE_VIEW image;
@@ -730,7 +730,7 @@ done:
 }
 
 FBCALL int fb_GfxDrawString(void *target, float x, float y, int flags,
-	FBSTRING *string, unsigned int color, void *font_image, int mode,
+	FBSTRING_ACCESS *string, unsigned int color, void *font_image, int mode,
 	PUTTER *putter, BLENDER *blender, void *parameter)
 {
 	FB_GFX3_DRAW_STATE *state;

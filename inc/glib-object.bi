@@ -1,4 +1,8 @@
 '' FreeBASIC binding for glib-2.44.1
+'' File: glib-object.bi
+'' Purpose: Declare the GObject type, property, signal and object APIs.
+'' Responsibilities: Preserve native layouts and adapt the type-definition macros.
+'' This file intentionally does NOT implement GObject or application callbacks.
 ''
 '' based on the C header files:
 ''   GObject - GLib Type, Object, Parameter and Signal Library
@@ -324,7 +328,13 @@ declare function g_type_get_type_registration_serial() as guint
 	_G_DEFINE_TYPE_EXTENDED_END()
 #endmacro
 
-#define G_DEFINE_TYPE_WITH_PRIVATE(TN, t_n, T_P) G_DEFINE_TYPE_EXTENDED(TN, t_n, T_P, 0, G_ADD_PRIVATE(TN))
+'' Expand the private-data block inside the type body, after the outer macro's
+'' arguments have been parsed. Its multiline expansion is not an argument.
+#macro G_DEFINE_TYPE_WITH_PRIVATE(TN, t_n, T_P)
+	_G_DEFINE_TYPE_EXTENDED_BEGIN(TN, t_n, T_P, 0)
+	G_ADD_PRIVATE(TN)
+	_G_DEFINE_TYPE_EXTENDED_END()
+#endmacro
 #define G_DEFINE_ABSTRACT_TYPE(TN, t_n, T_P) G_DEFINE_TYPE_EXTENDED(TN, t_n, T_P, G_TYPE_FLAG_ABSTRACT, )
 #macro G_DEFINE_ABSTRACT_TYPE_WITH_CODE(TN, t_n, T_P, _C_)
 	_G_DEFINE_TYPE_EXTENDED_BEGIN(TN, t_n, T_P, G_TYPE_FLAG_ABSTRACT)
@@ -333,7 +343,11 @@ declare function g_type_get_type_registration_serial() as guint
 	end scope
 	_G_DEFINE_TYPE_EXTENDED_END()
 #endmacro
-#define G_DEFINE_ABSTRACT_TYPE_WITH_PRIVATE(TN, t_n, T_P) G_DEFINE_TYPE_EXTENDED(TN, t_n, T_P, G_TYPE_FLAG_ABSTRACT, G_ADD_PRIVATE(TN))
+#macro G_DEFINE_ABSTRACT_TYPE_WITH_PRIVATE(TN, t_n, T_P)
+	_G_DEFINE_TYPE_EXTENDED_BEGIN(TN, t_n, T_P, G_TYPE_FLAG_ABSTRACT)
+	G_ADD_PRIVATE(TN)
+	_G_DEFINE_TYPE_EXTENDED_END()
+#endmacro
 #macro G_DEFINE_TYPE_EXTENDED(TN, t_n, T_P, _f_, _C_)
 	_G_DEFINE_TYPE_EXTENDED_BEGIN(TN, t_n, T_P, _f_)
 	scope
@@ -365,12 +379,17 @@ declare function g_type_get_type_registration_serial() as guint
 #define G_PRIVATE_FIELD(TypeName, inst, field_type, field_name) G_STRUCT_MEMBER(field_type, inst, G_PRIVATE_OFFSET(TypeName, field_name))
 #macro _G_DEFINE_TYPE_EXTENDED_CLASS_INIT(TypeName, type_name)
 	extern "C"
-		private sub type_name##_class_intern_init(byval klass as gpointer)
+		'' GObject invokes two-argument callbacks. Keep the public macro's
+		'' one-argument user routines behind callbacks with the exact C ABI.
+		private sub type_name##_class_intern_init(byval klass as gpointer, byval class_data as gpointer)
 			type_name##_parent_class = g_type_class_peek_parent(klass)
 			if TypeName##_private_offset <> 0 then
 				g_type_class_adjust_private_offset(klass, @TypeName##_private_offset)
 			end if
 			type_name##_class_init(cptr(TypeName##Class ptr, klass))
+		end sub
+		private sub type_name##_instance_intern_init(byval instance as GTypeInstance ptr, byval class_data as gpointer)
+			type_name##_init(cptr(TypeName ptr, instance))
 		end sub
 	end extern
 #endmacro
@@ -391,9 +410,9 @@ declare function g_type_get_type_registration_serial() as guint
 					TYPE_PARENT, _
 					g_intern_static_string(#TypeName), _
 					sizeof(TypeName##Class), _
-					cast(GClassInitFunc, @type_name##_class_intern_init), _
+					@type_name##_class_intern_init, _
 					sizeof(TypeName), _
-					cast(GInstanceInitFunc, @type_name##_init), _
+					@type_name##_instance_intern_init, _
 					cast(GTypeFlags, flags) _
 				)
 				scope
@@ -409,6 +428,9 @@ declare function g_type_get_type_registration_serial() as guint
 #macro _G_DEFINE_INTERFACE_EXTENDED_BEGIN(TypeName, type_name, TYPE_PREREQ)
 	extern "C"
 		declare sub type_name##_default_init(byval klass as TypeName##Interface ptr)
+		private sub type_name##_default_intern_init(byval klass as gpointer, byval class_data as gpointer)
+			type_name##_default_init(cptr(TypeName##Interface ptr, klass))
+		end sub
 		function type_name##_get_type() as GType
 			static as gsize g_define_type_id__volatile = 0
 			if g_once_init_enter(@g_define_type_id__volatile) then
@@ -416,7 +438,7 @@ declare function g_type_get_type_registration_serial() as guint
 					G_TYPE_INTERFACE, _
 					g_intern_static_string(#TypeName), _
 					sizeof(TypeName##Interface), _
-					cast(GClassInitFunc, @type_name##_default_init), _
+					@type_name##_default_intern_init, _
 					0, _
 					cast(GInstanceInitFunc, NULL), _
 					cast(GTypeFlags, 0) _
@@ -1518,6 +1540,9 @@ end type
 		dim shared as GType type_name##_type_id = 0
 		dim shared as gint TypeName##_private_offset
 		_G_DEFINE_TYPE_EXTENDED_CLASS_INIT(TypeName, type_name)
+		private sub type_name##_class_intern_finalize(byval klass as gpointer, byval class_data as gpointer)
+			type_name##_class_finalize(cptr(TypeName##Class ptr, klass))
+		end sub
 		private function type_name##_get_instance_private(byval self as TypeName ptr) as gpointer
 			return G_STRUCT_MEMBER_P(self, TypeName##_private_offset)
 		end function
@@ -1530,13 +1555,13 @@ end type
 				sizeof(TypeName##Class), _
 				cast(GBaseInitFunc, NULL), _
 				cast(GBaseFinalizeFunc, NULL), _
-				cast(GClassInitFunc, @type_name##_class_intern_init), _
-				cast(GClassFinalizeFunc, @type_name##_class_finalize), _
+				@type_name##_class_intern_init, _
+				@type_name##_class_intern_finalize, _
 				NULL, _
 				sizeof(TypeName), _
 				0, _
-				cast(GInstanceInitFunc, @type_name##_init), _
-				NULL
+				@type_name##_instance_intern_init, _
+				NULL _
 			)
 			type_name##_type_id = g_type_module_register_type( _
 				type_module, _
@@ -1713,3 +1738,5 @@ end extern
 #ifdef __FB_WIN32__
 #pragma pop(msbitfields)
 #endif
+
+'' end of glib-object.bi

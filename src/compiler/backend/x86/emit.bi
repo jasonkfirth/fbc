@@ -438,9 +438,23 @@ type EMIT_VTBL
 	) as const zstring ptr
 end type
 
-'' Opcode slots retain function-pointer storage. EMIT_NODECLASS selects the
-'' concrete callback type before a call; this storage type is never called.
-type EMIT_OPCB as sub( )
+'' EMIT_NODECLASS selects the active callback member. Store and call that
+'' exact signature; the opcode table still occupies one pointer per slot.
+union EMIT_OPCB
+	nop as EMIT_NOPCB
+	bop as EMIT_BOPCB
+	uop as EMIT_UOPCB
+	rel as EMIT_RELCB
+	stk as EMIT_STKCB
+	brc as EMIT_BRCCB
+	sop as EMIT_SOPCB
+	lit as EMIT_LITCB
+	jtb as EMIT_JTBCB
+	mem as EMIT_MEMCB
+	dbg as EMIT_DBGCB
+end union
+
+#assert( sizeof( EMIT_OPCB ) = sizeof( EMIT_NOPCB ) )
 
 type EMITCTX
 	inited                              as integer

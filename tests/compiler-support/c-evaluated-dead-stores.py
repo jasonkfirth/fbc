@@ -75,8 +75,8 @@ def main():
                 after, warnings = observations[generator, 'candidate', opt]
                 if before != after:
                     raise RuntimeError('evaluation differs from reference: ' + generator + opt)
-                if warnings['-Wunused-but-set-variable=']:
-                    raise RuntimeError('discarded scalar destinations remain')
+                if warnings:
+                    raise RuntimeError('candidate generated C has native warnings: ' + str(warnings))
                 if any(count > old_warnings[flag] for flag, count in warnings.items()):
                     raise RuntimeError('new native warnings: ' + generator + opt)
         print('C_EVALUATED_DEAD_STORES_PASS comparisons=4')

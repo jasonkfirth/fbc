@@ -3,6 +3,7 @@
 '' Purpose: Recover declared C member paths from typed constant IR offsets.
 '' Responsibilities: Match field representation, nested records and fixed array
 ''     elements without consuming the base expression on an unsuccessful search.
+''     Preserve virtual-origin provenance when the declared field is descriptor DATA.
 '' This file intentionally does NOT contain: raw-memory casts or symbol mutation.
 
 private function hCMemberTypeMatches _
@@ -49,7 +50,7 @@ private function hFindCMemberPath _
 	  byval wantedsubtype as FBSYMBOL ptr, byref path as string, _
 	  byref actualdtype as integer, byref actualsubtype as FBSYMBOL ptr, _
 	  byval depth as integer = 0, byval address_only as integer = FALSE, _
-	  byval read_value as integer = FALSE ) as integer
+	  byval read_value as integer = FALSE, byval virtual_origin as integer ptr = NULL ) as integer
 
 	'' The type model rejects recursive by-value records. Keep an independent
 	'' limit here so malformed internal metadata cannot recurse indefinitely.
@@ -123,10 +124,15 @@ private function hFindCMemberPath _
 					select case typeGetDtAndPtrOnly(fielddtype)
 					case FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
 					case else
+						dim as integer child_virtual_origin = FALSE
 						if( hFindCMemberPath(fielddtype, fieldsubtype, localoffset, wanted, _
 						    wantedsubtype, tail, actualdtype, actualsubtype, depth + 1, address_only, _
-					    (read_value andalso (symbIsRef(fld) = FALSE))) ) then
+					    (read_value andalso (symbIsRef(fld) = FALSE)), @child_virtual_origin) ) then
 							path += tail
+							if( virtual_origin <> NULL ) then
+								*virtual_origin = child_virtual_origin or (symbIsDescriptor(subtype) andalso _
+								    symbGetOfs(fld) = symb.fbarray_data andalso localoffset = 0 andalso typeIsPtr(fielddtype))
+							end if
 							return TRUE
 						end if
 					end select
@@ -150,6 +156,39 @@ private function exprTryCMember _
 	'' integer address arithmetic or an incompatible field representation.
 	var origin = base_expr
 	do
+		'' Value formation uses native address bits. A byte copy can still
+		'' name a proved constant member slot without reading that slot
+		'' through another pointer type. Recover only this generated shape.
+		if( address_only andalso origin->class = EXPRCLASS_CAST andalso typeIsPtr(origin->dtype) ) then
+			var native_address = origin->l
+			if( native_address->class = EXPRCLASS_BOP andalso typeIsPtr(native_address->dtype) = FALSE andalso _
+			    typeGetClass(native_address->dtype) = FB_DATACLASS_INTEGER andalso typeIsSigned(native_address->dtype) = FALSE andalso _
+			    typeGetSize(native_address->dtype) = env.pointersize ) then
+				var displacement = native_address->r
+				if( displacement->class = EXPRCLASS_CAST andalso displacement->dtype = FB_DATATYPE_UINT ) then
+					if( displacement->l->class = EXPRCLASS_IMM andalso _
+					    typeGetClass(displacement->l->dtype) = FB_DATACLASS_INTEGER andalso _
+					    typeIsPtr(displacement->l->dtype) = FALSE ) then displacement = displacement->l
+				end if
+				if( (native_address->op = AST_OP_ADD or native_address->op = AST_OP_SUB) andalso _
+				    native_address->l->class = EXPRCLASS_CAST andalso native_address->l->dtype = FB_DATATYPE_UINT andalso _
+				    hCByteOffsetPointer(native_address->l->l->dtype) andalso displacement->class = EXPRCLASS_IMM andalso _
+				    typeGetClass(displacement->dtype) = FB_DATACLASS_INTEGER andalso typeIsPtr(displacement->dtype) = FALSE andalso _
+				    displacement->val.i >= 0 ) then
+					var delta = displacement->val.i
+					if( env.pointersize = 4 andalso delta > 2147483647ll ) then return NULL
+					if( native_address->op = AST_OP_SUB ) then delta = -delta
+					if( delta > 0 ) then
+						if( offset > 9223372036854775807ll - delta ) then return NULL
+					elseif( delta < 0 ) then
+						if( offset < (-9223372036854775807ll - 1ll) - delta ) then return NULL
+					end if
+					offset += delta
+					origin = native_address->l->l
+					continue do
+				end if
+			end if
+		end if
 		select case origin->class
 		case EXPRCLASS_CAST
 			'' Pointer casts also encode the final access type, for example
@@ -213,15 +252,19 @@ private function exprTryCMember _
 	end if
 	dim as string path
 	dim as integer actualdtype
+	dim as integer virtual_origin = FALSE
 	dim as FBSYMBOL ptr actualsubtype
 	if( hFindCMemberPath(dtype, subtype, offset, wanted, wantedsubtype, _
-	    path, actualdtype, actualsubtype, 0, address_only, read_declared_value) = FALSE ) then return NULL
+	    path, actualdtype, actualsubtype, 0, address_only, read_declared_value, @virtual_origin) = FALSE ) then return NULL
 	if( len(path) = 0 and is_pointer = FALSE ) then return NULL
 	if( is_pointer ) then
 		if( len(hCAlignmentViewName(dtype, subtype)) = 0 ) then return NULL
 	end if
 	if( is_pointer and len(path) > 0 ) then path = "->" + mid(path, 2)
 	var result = exprNew(EXPRCLASS_MEMBER, actualdtype, actualsubtype)
+	'' Only reading DATA produces a virtual pointer value; its slot address
+	'' and ordinary pointer fields retain their existing C address contract.
+	result->virtual_origin = virtual_origin and (not address_only) and (not write_value)
 	'' A const record view also qualifies its field lvalue. Preserve the type
 	'' actually printed in C so a later mutable ABI argument cannot mistake
 	'' this address for an already compatible, unqualified pointer.
@@ -232,6 +275,11 @@ private function exprTryCMember _
 	if( is_pointer ) then
 		if( write_value ) then
 			result->member_view = C_MEMBER_VIEW_WRITE
+		elseif( read_value andalso subtype <> NULL andalso symbIsDescriptor(subtype) andalso _
+		        typeIsPtr(actualdtype) = FALSE andalso typeGetDtOnly(actualdtype) = FB_DATATYPE_INTEGER andalso offset >= 0 ) then
+			'' A generic descriptor can view a shorter fixed-rank descriptor.
+			'' Read only the requested scalar bytes, not a larger C record.
+			result->member_view = C_MEMBER_VIEW_DESCRIPTOR_READ
 		else
 			result->member_view = C_MEMBER_VIEW_VALUE
 		end if

@@ -8,9 +8,9 @@
 #include "fb.h"
 
 /* Builds the string to be returned by the console/gfx inkey() functions */
-FBSTRING *fb_hMakeInkeyStr( int key )
+FBSTRING_ACCESS *fb_hMakeInkeyStr( int key )
 {
-	FBSTRING *res;
+	FBSTRING_ACCESS *res;
 
 	if( key > 0xFF ) {
 		/* 2-byte extended keycode */

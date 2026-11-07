@@ -56,7 +56,7 @@ static void            fb_hListDevElemFree  ( FB_LIST *list, DEV_INFO_WIDTH *nod
 static FB_LIST *dev_info_widths = NULL;
 
 /*:::::*/
-FBCALL int fb_WidthDev( FBSTRING *dev, int width )
+FBCALL int fb_WidthDev( FBSTRING_ACCESS *dev, int width )
 {
     int cur = width;
     DEV_INFO_WIDTH *node;

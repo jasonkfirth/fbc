@@ -14,7 +14,7 @@
 
 #include "../../fb.h"
 
-FBSTRING *fb_DrvIntlGetWeekdayName(int weekday, int short_names)
+FBSTRING_ACCESS *fb_DrvIntlGetWeekdayName(int weekday, int short_names)
 {
 	return NULL;
 }

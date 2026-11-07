@@ -8,12 +8,12 @@
 #include "../../fb.h"
 #include "fb_private_intl.h"
 
-FBSTRING *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
+FBSTRING_ACCESS *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
 {
     char *pszName = NULL;
     size_t name_len;
     LCTYPE lctype;
-    FBSTRING *result;
+    FBSTRING_ACCESS *result;
 
     if( weekday < 1 || weekday > 7 )
         return NULL;

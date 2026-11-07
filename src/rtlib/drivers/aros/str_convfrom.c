@@ -586,7 +586,7 @@ FBCALL double fb_hStr2Double( char *source, ssize_t length )
 	return result;
 }
 
-FBCALL double fb_VAL( FBSTRING *string )
+FBCALL double fb_VAL( FBSTRING_ACCESS *string )
 {
 	double value;
 

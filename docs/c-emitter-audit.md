@@ -10,10 +10,13 @@ This file intentionally does NOT equate successful compilation with correct code
 
 The [ranked findings](c-emitter-findings.md) summarize open compiler/runtime work,
 scoped repairs and the evidence needed for follow-up.
+The [current continuation](c-emitter-current-status.md) records the November 1
+compiler/unit checks, UDP handle repair, structure guard and remaining coverage.
 
-The diagnostic inventory is complete, but warning cleanup and structural repairs
-remain active. Accepted C, a completed inventory, or a documented open defect
-does not satisfy the goal of fixing the emitter.
+The recorded inventories and audits cover only their named inputs. Additional
+projects, targets and unselected sources, warning cleanup, and structural
+repairs remain active. Accepted C, a completed inventory, or a documented open
+defect does not satisfy the goal of fixing the emitter.
 
 `build_scripts/audit-c-emitter.py` checks generated C independently of the
 compiler driver's warning suppressions. It accepts an explicit JSON plan and
@@ -99,6 +102,25 @@ python build_scripts/test-c-emitter-labels.py --fbc /path/to/fbc \
   --runtime-dir /path/to/win64-runtime --baseline /path/to/old-fbc
 ```
 
+The keyword and Win64 variadic aggregate controls can also be run directly:
+
+```powershell
+python tests/compiler-support/c23-keyword-check.py --fbc C:/path/to/fbc.exe --prefix C:/path/to/prefix --gcc C:/path/to/gcc.exe --clang C:/path/to/clang.exe
+python tests/compiler-support/windows-vararg-aggregates-check.py --fbc C:/path/to/fbc.exe --prefix C:/path/to/prefix --gcc C:/path/to/gcc.exe --clang C:/path/to/clang.exe --llc C:/path/to/llc.exe
+python tests/compiler-support/builtin-address-check.py --fbc C:/path/to/fbc.exe --prefix C:/path/to/prefix --include inc --gcc C:/path/to/gcc.exe --clang C:/path/to/clang.exe
+python tests/compiler-support/pointer-sized-types-check.py --fbc C:/path/to/fbc.exe --prefix C:/path/to/prefix --include inc --fallback-include inc --gcc C:/path/to/gcc.exe --clang C:/path/to/clang.exe
+```
+
+The builtin and pointer-sized type tests use the Windows cross toolchain; they
+run Win64 binaries and compile Win32, Linux and WebAssembly objects. The
+pointer-sized type check also compares emitted declarations with the C
+compiler's actual target types. These object checks do not run foreign targets.
+
+The variadic test executes Windows binaries and requires an LLVM compiler with
+the x86-64 target. The keyword test requires GCC's Win32 multilib and Clang's
+WebAssembly target. It checks Win32 and WebAssembly objects without executing
+them.
+
 These cover Win32/Win64 C emission and both C backend selections. Each output
 directory must be new. `--expect-rejection` verifies the preserved compiler's
 specific diagnostic in the qualifier/control-flow checks. The segment check
@@ -124,12 +146,49 @@ dataflow analysis. `-fwrapv`, `-fno-strict-aliasing`, `-frounding-math` and
 `-fno-math-errno` preserve the C backend's language contract. Removing those
 options would test different arithmetic, aliasing or floating-point semantics.
 
-The ordinary driver suppresses unused constructs, some GCC indentation checks,
-and Clang uninitialized analysis. This audit removes its blanket incompatible
-pointer-type suppression after repairing the generated casts and null comparisons.
-Compiler build flags add missing-initializer, builtin-declaration,
-maybe-uninitialized and type-limit suppressions. The audit bypasses those
-command builders rather than overriding a subset of their flags.
+The ordinary GCC and Clang driver no longer adds blanket warning suppressions.
+The JavaScript link command also leaves its absolute-path warning enabled.
+Normal compiler and runtime Make flags no longer append generated-C warning
+suppressions or disable unused-parameter warnings in the base C flags. An
+explicit user `-Wc` or `CFLAGS` choice is still passed through. The separate
+bootstrap-minimal and target-specific toolchain policies are not covered by
+this change. The audit invokes the C compilers independently so its full
+warning profiles and commands remain explicit.
+
+Generated C supports both GNU11 and C23. When a procedure must retain an ABI
+parameter but neither the optimized BASIC tree nor the emitted body uses it,
+the C23 definition omits its name. The GNU11 definition retains the name and
+its unused-parameter warning; no unused attribute is added. The compiler chooses
+the appropriate definition from `__STDC_VERSION__`. A C23-capable GCC or Clang
+can be selected explicitly with `-Wc -std=gnu23`; older C compilers continue to
+use the GNU11-compatible definition. Debug output and opaque assembly keep
+parameter names because their uses cannot be determined as safely.
+This applies to private direct calls as well as public and callback procedures;
+the argument types, argument evaluation and calling convention do not change.
+
+The private-parameter candidate passed 224 compiler modules, 703 selected unit
+inputs, 1,129 selected project configurations and another 239 project inputs
+without GCC or Clang errors. Compared with the preceding matching project and
+unit audits, it removed 25 and 10 unused-parameter warnings respectively from
+each C compiler. The 239-input C23 run still reports 1,810 GCC warnings,
+including 1,463 computed-goto diagnostics and 70 possible-uninitialized
+diagnostics. These counts do not cover the entire corpus.
+
+The C23 keyword and Windows TLS identifier follow-up passed the same 224
+compiler modules, 703 unit inputs, 1,129 project configurations and 239
+additional project inputs without C compiler errors. Their warning counts did
+not change from the preceding matching audits. Its separate mixed-language and
+thread-local regression matrix is described in `c-emitter-identifiers.md`.
+
+The call-type initialization follow-up gives each C call argument fresh type
+state and selects the LLVM Windows variadic aggregate type before using it.
+Its 224-module compiler audit removed one Clang conditional-uninitialized and
+one sometimes-uninitialized warning, leaving 0 GCC and 5,021 Clang warnings.
+The same selected unit and project inputs compiled without errors and retained
+their prior warning counts. Win64 C and LLVM tests exercised variadic records
+of sizes 1, 2, 4, 8 and 16 bytes. The bundled Windows LLVM toolchain lacks an
+AArch64 backend; matching IR was assembled separately with Linux LLVM, without
+claiming an AArch64 execution.
 
 ## Receipts and interpretation
 

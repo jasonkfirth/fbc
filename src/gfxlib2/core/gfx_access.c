@@ -43,6 +43,10 @@ FBCALL void fb_GfxUnlock(int start_line, int end_line)
 		if (__fb_gfx->lock_count == 0)
 		{
 			__fb_gfx->driver->unlock();
+			/* SCREENUNLOCK ends a caller-owned frame. Internal driver
+			   unlocks pass an empty range and may occur inside a draw. */
+			if (start_line <= end_line)
+				fb_hApplyPendingResize();
 		}
 	}
 

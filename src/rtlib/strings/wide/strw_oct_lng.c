@@ -33,12 +33,12 @@ FBCALL FB_WCHAR *fb_WstrOctEx_l ( unsigned long long num, int digits )
 
 	i = digits - 1;
 	while( i >= 0 ) {
-		s[i] = _LC('0') + (num & 7); /* '0'..'7' */
+		s[i] = FB_WCHAR_LITERAL('0') + (num & 7); /* '0'..'7' */
 		num >>= 3;
 		i -= 1;
 	}
 
-	s[digits] = _LC('\0');
+	s[digits] = FB_WCHAR_LITERAL('\0');
 	return s;
 }
 

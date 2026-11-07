@@ -15,7 +15,7 @@ static const char *pszDefaultQuestion = "? ";
 
 int fb_ConsoleLineInput
 	(
-		FBSTRING *text,
+		FBSTRING_ACCESS *text,
 		void *dst,
 		ssize_t dst_len,
 		int fillrem,
@@ -23,7 +23,7 @@ int fb_ConsoleLineInput
 		int addnewline
 	)
 {
-    FBSTRING *tmp_result;
+    FBSTRING_ACCESS *tmp_result;
 
     FB_LOCK();
 
@@ -72,7 +72,7 @@ static char *hWrapper( char *buffer, size_t count, FILE *fp )
 
 int fb_ConsoleLineInput
 	(
-		FBSTRING *text,
+		FBSTRING_ACCESS *text,
 		void *dst,
 		ssize_t dst_len,
 		int fillrem,

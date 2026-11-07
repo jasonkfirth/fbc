@@ -150,6 +150,8 @@ namespace FB
 		GET_X86_MMX_ENABLED         = 18, _
 		GET_WINDOW_METRICS          = 19, _
 		GET_SOFT_KEYBOARD           = 20, _
+		GET_TOUCH_CAPABILITY         = 21, _
+		GET_DEVICE_CLASS            = 22, _
 		_
 		GET_GL_COLOR_BITS           = 37, _
 		GET_GL_COLOR_RED_BITS       = 38, _
@@ -167,6 +169,11 @@ namespace FB
 		_
 		GET_GL_2D_MODE              = 82, _
 		GET_GL_SCALE                = 83
+
+	const as integer _
+		GFX_DEVICE_CLASS_UNKNOWN     = 0, _
+		GFX_DEVICE_CLASS_DESKTOP     = 1, _
+		GFX_DEVICE_CLASS_HANDHELD    = 2
 
 	'' Setters:
 	const as integer _
@@ -203,9 +210,21 @@ namespace FB
 
 	'' GET_WINDOW_METRICS: usable width, height, layout DPI, rotation (degrees).
 	'' Browser dimensions are CSS pixels; Android uses native pixels and 160-DPI
-	'' layout density. Desktop backends without metrics use the current screen.
+	'' layout density; Linux reports drawable geometry, DPI and display rotation.
+	'' GET_TOUCH_CAPABILITY: p1 reports -1 for touch, 0 for no touch, -2 unknown.
+	'' GET_DEVICE_CLASS: p1 returns GFX_DEVICE_CLASS_*. Linux recognizes known
+	'' mobile sessions and SMBIOS handheld/tablet chassis; unknown stays unknown.
 	'' GET_SOFT_KEYBOARD: observed visibility (-1/0, -2 unknown), availability.
-	'' SET_SOFT_KEYBOARD: nonzero requests show, zero requests hide. Desktop no-op.
+	'' When known, p3/p4 give the keyboard top and height in drawable pixels;
+	'' a zero height means the occluded region is unknown or not visible.
+	'' Linux detects session keyboards asynchronously. Initially visibility may
+	'' be unknown and availability may be zero; poll again for the observed state.
+	'' SET_SOFT_KEYBOARD: nonzero requests show, zero requests hide. Desktop
+	'' sessions without a supported on-screen keyboard remain a no-op.
+	'' Wayland requests require a focused text-input surface. Send the active
+	'' field region so the compositor can place the keyboard caret correctly.
+	'' A compositor may overlay the keyboard without shrinking drawable metrics,
+	'' so GET_WINDOW_METRICS does not report the keyboard-occluded content area.
 	'' Browser focus needs a user gesture. Publish editable canvas rectangles with
 	'' SET_SOFT_KEYBOARD_REGION (x,y,w,h), clearing them before each layout pass.
 	'' This lets a trusted pointer event focus an IME target on the first tap.

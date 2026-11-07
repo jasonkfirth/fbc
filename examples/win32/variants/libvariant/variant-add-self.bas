@@ -1,3 +1,8 @@
+'' Project: FreeBASIC variant helper library
+'' File: variant-add-self.bas
+'' Purpose: Implement the variant add-self overload family.
+'' Responsibilities: Preserve OLE value and text ownership.
+'' This file intentionally does NOT declare the public wrapper ABI.
 
 
 #include once "variant.bi"
@@ -53,7 +58,7 @@ operator VARIANT.+= _
 	VariantInit( @tmp )
 	VariantInit( @res )
 	V_VT(@tmp) = VT_BSTR
-	V_BSTR(@tmp) = SysAllocStringByteLen( rhs, len( *rhs ) )
+	V_BSTR(@tmp) = hVarAllocBstrFromZstring( rhs )
 
 	if VarAdd( @this.var_, @tmp, @res ) = 0 then
 		VariantClear( @this.var_ )
@@ -85,3 +90,5 @@ operator VARIANT.+= _
 	VariantClear( @tmp )
 
 end operator
+
+'' end of variant-add-self.bas

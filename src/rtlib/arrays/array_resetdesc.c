@@ -7,7 +7,7 @@
  */
 #include "fb.h"
 
-FBCALL void fb_ArrayResetDesc( FBARRAY *array )
+FBCALL void fb_ArrayResetDesc( FBARRAY_ACCESS *array )
 {
 	array->data = NULL;
 	array->ptr = NULL;

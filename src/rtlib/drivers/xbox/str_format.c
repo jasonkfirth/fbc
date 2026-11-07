@@ -229,7 +229,7 @@ void fb_hGetNumberParts
 }
 
 static
-FBSTRING *fb_hBuildDouble
+FBSTRING_ACCESS *fb_hBuildDouble
 	(
 		double num,
 		char decimal_point,
@@ -238,7 +238,7 @@ FBSTRING *fb_hBuildDouble
 {
 	char FixPart[128], FracPart[128], chSign;
 	ssize_t LenFix, LenFrac, LenSign, LenDecPoint, LenTotal;
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 
 	fb_hGetNumberParts( num,
 	                    FixPart, &LenFix,
@@ -268,7 +268,7 @@ FBSTRING *fb_hBuildDouble
 		dst->data[LenTotal] = 0;
 	}
 	else
-		dst = &__fb_ctx.null_desc;
+		dst = &fb_ctx.null_desc;
 
 	return dst;
 }
@@ -335,7 +335,7 @@ static double hRound
 static
 int fb_hProcessMask
 	(
-		FBSTRING *dst,
+		FBSTRING_ACCESS *dst,
 		const char *mask,
 		ssize_t mask_length,
 		double value,
@@ -912,7 +912,7 @@ int fb_hProcessMask
 							}
 						}
 						if( chCurrent=='t' && count==5 ) {
-							FBSTRING *tmp;
+							FBSTRING_ACCESS *tmp;
 							i += count-1;
 							fb_IntlGetTimeFormat( FixPart, sizeof(FixPart), FALSE );
 							tmp = fb_hStrFormat ( value,
@@ -942,7 +942,7 @@ int fb_hProcessMask
 								do_add = TRUE;
 							}
 						} else if( chCurrent=='d' && count==5 ) {
-							FBSTRING *tmp;
+							FBSTRING_ACCESS *tmp;
 							i += count-1;
 							fb_IntlGetDateFormat( FixPart, sizeof(FixPart), FALSE );
 							tmp = fb_hStrFormat ( value,
@@ -979,7 +979,7 @@ int fb_hProcessMask
 							}
 						} else if( chCurrent=='d' && (count==3 || count==4) ) {
 							int weekday = fb_Weekday( value, FB_WEEK_DAY_SUNDAY );
-							FBSTRING *tmp = fb_WeekdayName( weekday, (count==3), FB_WEEK_DAY_SUNDAY );
+							FBSTRING_ACCESS *tmp = fb_WeekdayName( weekday, (count==3), FB_WEEK_DAY_SUNDAY );
 							i += count-1;
 							if( !do_output ) {
 								pInfo->length_min += FB_STRSIZE( tmp );
@@ -1093,7 +1093,7 @@ int fb_hProcessMask
 							}
 						} else if( chCurrent=='M' && (count==3 || count==4) ) {
 							int month = fb_Month( value );
-							FBSTRING *tmp = fb_MonthName( month, (count==3) );
+							FBSTRING_ACCESS *tmp = fb_MonthName( month, (count==3) );
 							i += count-1;
 							if( !do_output ) {
 								pInfo->length_min += FB_STRSIZE( tmp );
@@ -1265,14 +1265,14 @@ int fb_hProcessMask
 	return TRUE;
 }
 
-FBCALL FBSTRING *fb_hStrFormat
+FBCALL FBSTRING_ACCESS *fb_hStrFormat
 	(
 		double value,
 		const char *mask,
 		size_t mask_length
 	)
 {
-	FBSTRING *dst = &__fb_ctx.null_desc;
+	FBSTRING_ACCESS *dst = &fb_ctx.null_desc;
 	const char *pszIntlResult;
 	char chDecimalPoint, chThousandsSep, chDateSep, chTimeSep;
 
@@ -1314,7 +1314,7 @@ FBCALL FBSTRING *fb_hStrFormat
 			if( dst == NULL )
 			{
 				fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
-				dst = &__fb_ctx.null_desc;
+				dst = &fb_ctx.null_desc;
 			}
 			else
 			{
@@ -1331,13 +1331,13 @@ FBCALL FBSTRING *fb_hStrFormat
 	return dst;
 }
 
-FBCALL FBSTRING *fb_StrFormat
+FBCALL FBSTRING_ACCESS *fb_StrFormat
 	(
 		double value,
-		FBSTRING *mask
+		FBSTRING_ACCESS *mask
 	)
 {
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 
 	dst = fb_hStrFormat( value, mask->data, FB_STRSIZE(mask) );
 

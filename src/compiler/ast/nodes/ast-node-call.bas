@@ -192,6 +192,9 @@ private sub hCopyStringsBack( byval f as ASTNODE ptr )
 	loop
 end sub
 
+declare function irhlcErrorUDTCallBegin( byval call_node as ASTNODE ptr ) as integer
+declare sub irhlcErrorUDTCallComplete( byval index as integer, byval is_dtor as integer )
+
 function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	static as integer reclevel = 0
 	'' totalstackbytes is the sum of all args and padding currently on the stack
@@ -211,7 +214,11 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	'' ARGs can contain CALLs themselves, then astLoadCALL() will recurse
 	reclevel += 1
 
+	dim as integer c_owner_resource = -1
 	proc = n->sym
+	if( ast.doemit and (env.clopt.backend = FB_BACKEND_GCC or env.clopt.backend = FB_BACKEND_CLANG) ) then
+		c_owner_resource = irhlcErrorUDTCallBegin(n)
+	end if
 
 	if( (env.clopt.backend = FB_BACKEND_GAS) andalso _
 	    ((env.target.options and FB_TARGETOPT_STACKALIGN16) <> 0) ) then
@@ -469,6 +476,10 @@ function astLoadCALL( byval n as ASTNODE ptr ) as IRVREG ptr
 	end if
 
 	hCopyStringsBack( n )
+
+	'' A guarded destructor call also guards profiling and deferred argument
+	'' work. Close its owner transition after the complete call sequence.
+	if( c_owner_resource >= 0 ) then irhlcErrorUDTCallComplete(c_owner_resource, symbIsDestructor1(proc))
 
 	reclevel -= 1
 

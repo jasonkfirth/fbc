@@ -9,12 +9,12 @@
 #include <strings.h>
 
 /*:::::*/
-FBCALL int fb_FileOpenShort( FBSTRING *str_file_mode,
+FBCALL int fb_FileOpenShort( FBSTRING_ACCESS *str_file_mode,
                              int fnum,
-                             FBSTRING *filename,
+                             FBSTRING_ACCESS *filename,
                              int len,
-                             FBSTRING *str_access_mode,
-                             FBSTRING *str_lock_mode)
+                             FBSTRING_ACCESS *str_access_mode,
+                             FBSTRING_ACCESS *str_lock_mode)
 {
     unsigned file_mode = 0;
     int access_mode = -1, lock_mode = -1;

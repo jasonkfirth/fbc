@@ -57,7 +57,7 @@ FBCALL unsigned long long fb_hStr2ULongint( char *src, ssize_t len )
 }
 
 /*:::::*/
-FBCALL unsigned long long fb_VALULNG ( FBSTRING *str )
+FBCALL unsigned long long fb_VALULNG ( FBSTRING_ACCESS *str )
 {
     unsigned long long val;
 

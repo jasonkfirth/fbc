@@ -16,9 +16,9 @@
 
 #include "../../fb.h"
 
-FBCALL FBSTRING *fb_Command ( int arg )
+FBCALL FBSTRING_ACCESS *fb_Command ( int arg )
 {
-	FBSTRING *dst;
+	FBSTRING_ACCESS *dst;
 	ssize_t i, len;
 
 	/* return all arguments? */
@@ -27,26 +27,26 @@ FBCALL FBSTRING *fb_Command ( int arg )
 		char *p;
 
 		/* no args? */
-		if( __fb_ctx.argc <= 1 )
-			return &__fb_ctx.null_desc;
+		if( fb_ctx.argc <= 1 )
+			return &fb_ctx.null_desc;
 
 		/* concatenate all args but 0 */
 		len = 0;
-		for( i = 1; i < __fb_ctx.argc; i++ )
-			len += strlen( __fb_ctx.argv[i] );
+		for( i = 1; i < fb_ctx.argc; i++ )
+			len += strlen( fb_ctx.argv[i] );
 
-		dst = fb_hStrAllocTemp( NULL, len + __fb_ctx.argc-2 );
+		dst = fb_hStrAllocTemp( NULL, len + fb_ctx.argc-2 );
 		if( dst == NULL )
-			return &__fb_ctx.null_desc;
+			return &fb_ctx.null_desc;
 
 		dst->data[0] = '\0';
 		p = dst->data;
-		for( i = 1; i < __fb_ctx.argc; i++ )
+		for( i = 1; i < fb_ctx.argc; i++ )
 		{
-			size_t arg_len = strlen( __fb_ctx.argv[i] );
-			memcpy( p, __fb_ctx.argv[i], arg_len );
+			size_t arg_len = strlen( fb_ctx.argv[i] );
+			memcpy( p, fb_ctx.argv[i], arg_len );
 			p += arg_len;
-			if( i != __fb_ctx.argc-1 )
+			if( i != fb_ctx.argc-1 )
 				*p++ = ' ';
 		}
 		*p = '\0';
@@ -55,15 +55,15 @@ FBCALL FBSTRING *fb_Command ( int arg )
 	}
 
     /* return just one argument */
-	if( arg >= __fb_ctx.argc )
-	    return &__fb_ctx.null_desc;
+	if( arg >= fb_ctx.argc )
+	    return &fb_ctx.null_desc;
 
-	len = strlen( __fb_ctx.argv[arg] );
+	len = strlen( fb_ctx.argv[arg] );
 	dst = fb_hStrAllocTemp( NULL, len );
 	if( dst == NULL )
-		return &__fb_ctx.null_desc;
+		return &fb_ctx.null_desc;
 
-	memcpy( dst->data, __fb_ctx.argv[arg], len + 1 );
+	memcpy( dst->data, fb_ctx.argv[arg], len + 1 );
 
 	if( arg == 0 )
 	{

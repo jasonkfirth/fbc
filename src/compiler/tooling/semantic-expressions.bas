@@ -13,12 +13,18 @@
 #include once "tooling/semantic-source.bi"
 #include once "tooling/semantic-coordinates.bi"
 #include once "tooling/semantic-macros.bi"
+#include once "tooling/semantic-math-constant.bi"
 #include once "tooling/semantic-preprocessor.bi"
 #include once "symbols/symb.bi"
 #include once "tooling/semantic-extra-facts.bi"
 #include once "tooling/semantic-numeric-conversions.bi"
 #include once "tooling/semantic-array-initializer-closure-export.bi"
 
+'' Parser literal events, not folded CONST nodes. Reset for each module;
+'' independent closure prevents removal of an entire number receipt family.
+dim shared as longint semantic_number_literal_count, semantic_constant_atom_count, semantic_group_input_count
+
+declare sub fbSemanticModelLiteralTokenSource(byval expression as longint, byval token as FBTOKEN ptr)
 declare sub fbSemanticModelExportCurrentExpressionPrefix(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportCurrentExpressionPrefixNonPhysical(byval expr as ASTNODE ptr)
 declare sub fbSemanticModelExportExpressionDistinct _
@@ -71,6 +77,7 @@ sub fbSemanticModelConstantExpression _
 		kind = "boolean-literal"
 	end if
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	semantic_constant_atom_count += 1
 	fbSemanticModelAppendDetail(prefix + "constant-symbol" + TABCHAR + fbSemanticModelNumber(symbol_id))
 	fbSemanticModelAppendDetail(prefix + "constant-atom-kind" + TABCHAR + kind)
 end sub
@@ -246,11 +253,18 @@ sub fbSemanticModelNumericLiteralExpression(byval expr as ASTNODE ptr, byval tok
 	fbSemanticModelExportExpression(expr, token->source, token->source, counter, counter)
 	dim as longint identity = expr->semantic_expression
 	if( identity = 0 ) then exit sub
+	if( semantic_number_literal_count >= 1000000 ) then
+		fbSemanticModelFailAt("number literal observation limit exceeded"): exit sub
+	end if
+	semantic_number_literal_count += 1
+	fbSemanticModelLiteralTokenSource(identity, token)
+
 	dim as string token_text = token->text
 	if( (len(token_text) = 0) or (len(token_text) > FB_MAXLITLEN) ) then
 		fbSemanticModelFailAt("semantic-expressions.bas:65")
 		exit sub
 	end if
+	if( typeGetClass(token->dtype) = FB_DATACLASS_FPOINT ) then fbSemanticModelMathConstantInputs(identity)
 	dim as string literal_kind = "integer"
 	dim as string literal_base = "decimal"
 	if( typeGetClass(token->dtype) = FB_DATACLASS_FPOINT ) then literal_kind = "float"
@@ -274,6 +288,8 @@ sub fbSemanticModelNumericLiteralExpression(byval expr as ASTNODE ptr, byval tok
 		fbSemanticModelAppendDetail(prefix + "original-float-text" + TABCHAR + fbSemanticModelEscape(original_text))
 		fbSemanticModelAppendDetail(prefix + "original-float-text-complete" + TABCHAR + _
 			fbSemanticModelNumber(abs(token->numeric_original_length <= 1024)))
+		'' Retained separately by the lexer; textual precision must not lose it.
+		fbSemanticModelAppendDetail(prefix + "original-float-leading-zeros" + TABCHAR + fbSemanticModelNumber(token->numeric_original_leading_zeros))
 		fbSemanticModelAppendDetail(prefix + "original-float-digits" + TABCHAR + fbSemanticModelNumber(token->numeric_original_digits))
 		fbSemanticModelAppendDetail(prefix + "original-float-exponent" + TABCHAR + fbSemanticModelNumber(abs(token->numeric_original_exponent)))
 		if( fbSemanticModelMacroProvenanceEnabled( ) ) then
@@ -319,6 +335,7 @@ type SEMANTIC_EXPRESSION_OPERANDS
 	right as longint
 	result as longint
 	group_input_operands as longint
+	group_context as integer
 	kind as zstring * 24
 	code as zstring * 64
 	source as LEX_LOCATION
@@ -450,7 +467,26 @@ sub fbSemanticModelNativeByteInput _
 	semantic_native_byte_count += 1
 end sub
 
+#include once "tooling/semantic-subscript-replacements.bi"
+#include once "tooling/semantic-container-data-pointer.bi"
+#include once "tooling/semantic-compare-contracts-impl.bi"
+#include once "tooling/semantic-collection-empty-impl.bi"
+#include once "tooling/semantic-constructor-string-impl.bi"
+#include once "tooling/semantic-index-conversion-impl.bi"
+
+dim shared as longint semantic_pointer_address_input_count
+
 sub fbSemanticModelResetExpressions( )
+	semantic_pointer_address_input_count = 0
+	semantic_group_input_count = 0
+	semantic_constant_atom_count = 0
+	semantic_number_literal_count = 0
+	hResetSubscriptReceivers( )
+	hResetContainerDataPointer( )
+	hResetCompareContracts( )
+	hResetCollectionEmpty( )
+	hResetConstructorString( )
+	hResetIndexConversion( )
 	semantic_native_byte_count = 0
 	semantic_string_index_count = 0
 	expression_transfer_work_left = SEMANTIC_EXPRESSION_TRANSFER_WORK
@@ -566,6 +602,7 @@ end sub
 
 sub fbSemanticModelAttachExpression(byval node as ASTNODE ptr, byval identity as longint)
 	if( (node = NULL) or (identity = 0) ) then exit sub
+	dim as longint prior_expression = node->semantic_expression
 	node->semantic_expression = identity
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	dim as longint link = node->semantic_expressions
@@ -577,6 +614,20 @@ sub fbSemanticModelAttachExpression(byval node as ASTNODE ptr, byval identity as
 		if( expression_links[link - 1].expression = identity ) then exit sub
 		link = expression_links[link - 1].previous
 	wend
+	'' A BYREF call's value is represented by a dereference around the
+	'' selected CALL. Record that source relationship while both nodes still
+	'' exist; later unused-result optimization may discard the dereference.
+	if( (prior_expression = 0) andalso (node->class = AST_NODECLASS_DEREF) ) then
+		dim as ASTNODE ptr call_node = node->l
+		if( call_node <> NULL ) then
+			if( (call_node->class = AST_NODECLASS_CALL) andalso (call_node->sym <> NULL) ) then
+				if( symbIsReturnByRef(call_node->sym) andalso (call_node->semantic_binding > 0) ) then
+					fbSemanticModelAppendDetail("H" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+						TABCHAR + "binding" + TABCHAR + fbSemanticModelNumber(call_node->semantic_binding) + TABCHAR + "byref-result-binding" + TABCHAR + "0")
+				end if
+			end if
+		end if
+	end if
 	if( expression_link_count >= SEMANTIC_EXPRESSION_MAX_LINKS ) then
 		fbSemanticModelFailAt("semantic-expressions.bas:245")
 		exit sub
@@ -751,6 +802,12 @@ function fbSemanticModelCaptureOperands _
 		'' parser receipt. Retain that allocation's earlier operation separately;
 		'' arbitrary provenance links cannot establish value equivalence.
 		.group_input_operands = 0
+		.group_context = 0
+		if( kind = "group" ) then
+			if( op < 0 or op > 15 ) then fbSemanticModelFailAt("invalid parser grouping context"): return 0
+			.group_context = op
+			if( fbSemanticModelFullEnabled() ) then semantic_group_input_count += 1
+		end if
 		if( (kind = "group") andalso (left_expr <> NULL) ) then
 			.group_input_operands = left_expr->semantic_operands
 		end if
@@ -979,6 +1036,10 @@ sub fbSemanticModelExportOperands(byval node as ASTNODE ptr, byval identity as l
 		if( .result <> 0 ) then exit sub
 		.result = identity
 		fbSemanticModelStatementOperandExport( )
+		if( .kind = "group" and fbSemanticModelFullEnabled() ) then
+			fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
+				TABCHAR + "group-parse-context" + TABCHAR + fbSemanticModelNumber(.group_context))
+		end if
 		if( .selected_numeric ) then
 			fbSemanticModelAppendDetail("K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + _
 				TABCHAR + "numeric-selected-left-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(.selected_left_dtype)))
@@ -1577,6 +1638,7 @@ sub fbSemanticModelPointerAddress _
 	dim as longint subtype_id = fbSemanticModelSymbolId(subtype)
 	if( subtype <> NULL ) then fbSemanticModelExportSymbolDetails(subtype)
 	dim as string prefix = "K" + TABCHAR + "expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR
+	semantic_pointer_address_input_count += 1
 	fbSemanticModelAppendDetail(prefix + "pointer-address-kind" + TABCHAR + address_kind)
 	fbSemanticModelAppendDetail(prefix + "pointer-address-dtype" + TABCHAR + fbSemanticModelTypeNumber(culng(dtype)))
 	fbSemanticModelAppendDetail(prefix + "pointer-address-subtype" + TABCHAR + fbSemanticModelNumber(subtype_id))
@@ -1636,9 +1698,17 @@ end function
 '' Each original operand and index has a stable earlier E identity and the
 '' result owns the group, including unevaluated LEN/SIZEOF access contexts.
 sub fbSemanticModelStringIndex _
-	( byval result as ASTNODE ptr, byval operand_id as longint, byval index_id as longint )
+	( byval result as ASTNODE ptr, byval operand_id as longint, byval index_id as longint, _
+	  byval selected_id as longint, byref source_start as LEX_LOCATION, byval nonphysical_start as longint )
 	if( (fbSemanticModelFullEnabled( ) = FALSE) or (result = NULL) ) then exit sub
 	if( lex.ctx->semantic_probe ) then exit sub
+	'' Folding can reuse the operand AST for the indexed result. Give the
+	'' result its own occurrence after the selected index was recorded.
+	if( (selected_id > 0) andalso (result->semantic_expression <= selected_id) ) then
+		dim as LEX_LOCATION source_end = lexGetLastLocation( )
+		fbSemanticModelExportExpressionDistinct(result, source_start, source_end, _
+			nonphysical_start, lexGetNonphysicalTokenCount( ))
+	end if
 	dim as longint identity = result->semantic_expression
 	if( (identity <= 0) or (operand_id <= 0) or (index_id <= 0) ) then
 		fbSemanticModelFailAt("string subscript original inputs")
@@ -1830,6 +1900,7 @@ sub fbSemanticModelArraySubscripts _
 	for dimension as integer = 0 to rank - 1
 		fbSemanticModelAppendDetail(prefix + "array-subscript-index:" + fbSemanticModelNumber(dimension) + TABCHAR + fbSemanticModelNumber(indices(dimension)))
 		fbSemanticModelAppendDetail(prefix + "array-subscript-selected-index:" + fbSemanticModelNumber(dimension) + TABCHAR + fbSemanticModelNumber(selected_indices(dimension)))
+		fbSemanticModelIndexConversion(result, "array", indices(dimension), selected_indices(dimension), dimension, rank)
 	next
 	fbSemanticModelAppendDetail("H" + TABCHAR + "symbol" + TABCHAR + fbSemanticModelNumber(symbol_id) + TABCHAR + _
 		"expression" + TABCHAR + fbSemanticModelNumber(identity) + TABCHAR + "array-subscript" + TABCHAR + "0")
@@ -2155,6 +2226,54 @@ sub fbSemanticModelNumericConversionSource _
 	expr->semantic_expression = original_expression
 	fbSemanticModelNumericConversion(expr, target_dtype, target_subtype, options)
 	expr->semantic_expression = saved_expression
+end sub
+
+sub fbSemanticModelNumberLiteralCounts( )
+	if( fbSemanticModelFullEnabled() = FALSE ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc())) + TABCHAR + _
+		"number-literal-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + TABCHAR + _
+		fbSemanticModelNumber(semantic_number_literal_count))
+end sub
+
+'' Each actual parser atom has one kind and one resolved symbol. Keep a
+'' module total independently of K rows so absent atoms cannot look clean.
+sub fbSemanticModelConstantAtomCounts()
+	if( fbSemanticModelFullEnabled() = FALSE ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc())) + TABCHAR + _
+		"parsed-constant-atom-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + TABCHAR + _
+		fbSemanticModelNumber(semantic_constant_atom_count))
+end sub
+
+'' Group receipts are bound once, before AST clones share their source
+'' links. Require every typed grammar capture to reach its exported EX group.
+sub fbSemanticModelGroupInputCounts()
+	if( fbSemanticModelFullEnabled() = FALSE ) then exit sub
+	dim as longint observed = 0
+	for index as integer = 0 to expression_operand_count - 1
+		with expression_operands[index]
+			if( .kind = "group" ) then
+				if( .result <= 0 ) then fbSemanticModelFailAt("typed group has no exported expression"): exit sub
+				observed += 1
+			end if
+		end with
+	next
+	if( observed <> semantic_group_input_count ) then fbSemanticModelFailAt("typed group closure mismatch"): exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc())) + TABCHAR + _
+		"parsed-group-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + TABCHAR + _
+		fbSemanticModelNumber(semantic_group_input_count))
+end sub
+
+'' Count actual address observations independently of any consumer. The
+'' existing kind/type/operand/temporary fields remain the only value inputs.
+sub fbSemanticModelPointerAddressCounts()
+	if( fbSemanticModelFullEnabled() = FALSE ) then exit sub
+	fbSemanticModelAppendDetail("K" + TABCHAR + "symbol" + TABCHAR + _
+		fbSemanticModelNumber(fbSemanticModelSymbolId(@symbGetGlobalNamespc())) + TABCHAR + _
+		"parsed-pointer-address-count:" + fbSemanticModelNumber(fbSemanticModelModuleIdentity()) + TABCHAR + _
+		fbSemanticModelNumber(semantic_pointer_address_input_count))
 end sub
 
 '' end of tooling/semantic-expressions.bas

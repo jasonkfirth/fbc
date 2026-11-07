@@ -1,3 +1,9 @@
+'' Project: FreeBASIC NeHe OpenGL examples
+'' File: 3Dobject.bi
+'' Purpose: Load and draw the shadow demonstration's triangle geometry.
+'' Responsibilities: Read mesh values, connect faces and render shadows.
+'' This file intentionally does NOT create windows or handle input.
+
 #ifndef _3DOBJECT_H_
 #define _3DOBJECT_H_
 '' vertex in 3d-coordinate system
@@ -45,26 +51,42 @@ private function ReadObject(byref st as string, byval o as glObject ptr) as inte
 	dim as integer file
 	dim as uinteger i
 	dim oneline as string * 256
+	'' C scanf %u writes ULONG, independently of the native record width.
+	dim as ulong point_count, plane_count, p0, p1, p2
+	dim as integer loaded = false
+
+	if o = 0 then return false
 
 	file = freefile
 	if (open(st, for input, as #file)<>0) then  return 0
 
 	''points
 	readstr(file, oneline)
-	sscanf(strptr(oneline), "%d", @o->nPoints)
+	if sscanf(strptr(oneline), "%u", @point_count) <> 1 orelse _
+	   point_count < 1 orelse point_count > ubound(o->points) then
+		goto read_done
+	end if
+	o->nPoints = point_count
 	for i=1 to o->nPoints
 		readstr(file, oneline)
-		sscanf(strptr(oneline), "%f %f %f", @o->points(i).x, @o->points(i).y, @o->points(i).z)
+		if sscanf(strptr(oneline), "%f %f %f", @o->points(i).x, @o->points(i).y, @o->points(i).z) <> 3 then
+			goto read_done
+		end if
 	next
 	''planes
 	readstr(file, oneline)
-	sscanf(strptr(oneline), "%d", @o->nPlanes)
+	if sscanf(strptr(oneline), "%u", @plane_count) <> 1 orelse _
+	   plane_count < 1 orelse plane_count > ubound(o->planes) + 1 then
+		goto read_done
+	end if
+	o->nPlanes = plane_count
 	for i=0 to o->nPlanes-1
 		readstr(file, oneline)
-		sscanf(strptr(oneline), "%d %d %d %f %f %f %f %f %f %f %f %f", _
-			@o->planes(i).p(0), _
-			@o->planes(i).p(1), _
-			@o->planes(i).p(2), _
+		'' Three point indices and nine normal components make one face.
+		if sscanf(strptr(oneline), "%u %u %u %f %f %f %f %f %f %f %f %f", _
+			@p0, _
+			@p1, _
+			@p2, _
 			@o->planes(i).normals(0).x, _
 			@o->planes(i).normals(0).y, _
 			@o->planes(i).normals(0).z, _
@@ -73,15 +95,29 @@ private function ReadObject(byref st as string, byval o as glObject ptr) as inte
 			@o->planes(i).normals(1).z, _
 			@o->planes(i).normals(2).x, _
 			@o->planes(i).normals(2).y, _
-			@o->planes(i).normals(2).z)
+			@o->planes(i).normals(2).z) <> 12 orelse _
+		   p0 < 1 orelse p0 > point_count orelse _
+		   p1 < 1 orelse p1 > point_count orelse _
+		   p2 < 1 orelse p2 > point_count then
+			goto read_done
+		end if
+		o->planes(i).p(0) = p0
+		o->planes(i).p(1) = p1
+		o->planes(i).p(2) = p2
 	next
+	loaded = true
+read_done:
+	'' Every successful OPEN reaches this one close, including parse failures.
 	close #file
-	return true
+	return loaded
 end function
 
 '' connectivity procedure - based on Gamasutra's article
 '' hard to explain here
 private sub SetConnectivity(byval o as glObject ptr)
+
+	'' A single face has no neighbours; avoid unsigned nPlanes - 2.
+	if o->nPlanes < 2 then exit sub
 	dim as uinteger p1i, p2i, p1j, p2j
 	dim as uinteger b1i, b2i, b1j, b2j
 	dim as uinteger i, j, ki, kj
@@ -295,3 +331,5 @@ private sub  CastShadow(byval o as glObject ptr, byval lp as single ptr)
 end sub
 
 #endif '' _3DOBJECT_H_
+
+'' end of 3Dobject.bi

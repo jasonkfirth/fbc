@@ -55,7 +55,7 @@ FBCALL char fb_hStr2Bool( char *src, ssize_t len )
 }
 
 /*:::::*/
-FBCALL char fb_VALBOOL ( FBSTRING *str )
+FBCALL char fb_VALBOOL ( FBSTRING_ACCESS *str )
 {
     int	val;
 

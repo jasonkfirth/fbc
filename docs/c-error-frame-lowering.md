@@ -450,4 +450,11 @@ does not complete canonical AST outlining, general captured-storage lifetime,
 normal/abrupt cleanup lowering or broader compiler qualification. Those remain
 required before the global-handler defect can be called repaired.
 
+The [November 2 current-source integration](c-emitter-error-owner-current.md)
+now qualifies a complete private 224-unit compiler graph, its C fixed point,
+264 native cases and 20 Win32 object checks. It preserves the accepted
+canonical compiler and installed binaries. General object/partial-construction
+unwinding, remaining control-flow forms and semantic qualification remain
+required; the private capability barrier is not a production unwinder.
+
 <!-- end of c-error-frame-lowering.md -->

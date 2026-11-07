@@ -11,7 +11,7 @@
 
 static int FirstDyLibCall = 0;
 
-FBCALL void *fb_DylibLoad( FBSTRING *library )
+FBCALL void *fb_DylibLoad( FBSTRING_ACCESS *library )
 {
 	void *res = NULL;
 
@@ -37,7 +37,7 @@ FBCALL void *fb_DylibLoad( FBSTRING *library )
 	return res;
 }
 
-FBCALL void *fb_DylibSymbol( void *library, FBSTRING *symbol )
+FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 {
 	void *proc = NULL;
 

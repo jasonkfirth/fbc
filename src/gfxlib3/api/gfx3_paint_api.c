@@ -770,7 +770,7 @@ static int paint(void *target, float x, float y, unsigned int color,
 }
 
 FBCALL void fb_GfxPaint(void *target, float x, float y, unsigned int color,
-	unsigned int border_color, FBSTRING *pattern, int paint_mode, int flags)
+	unsigned int border_color, FBSTRING_ACCESS *pattern, int paint_mode, int flags)
 {
 	unsigned char data[FB_GFX3_PAINT_PATTERN_MAX] = { 0 };
 	ssize_t string_size;
@@ -788,7 +788,7 @@ FBCALL void fb_GfxPaint(void *target, float x, float y, unsigned int color,
 		paint_mode, flags));
 }
 
-FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING *pattern,
+FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING_ACCESS *pattern,
 	unsigned int foreground, unsigned int background, unsigned int border,
 	int relative)
 {
