@@ -528,12 +528,15 @@ def main() -> int:
                 if runtime_query.returncode:
                     print("Windows runtime directory query failed\n" + runtime_query.stderr)
                     return 1
-                printer_runtime = native_path(runtime_query.stdout.strip()) / "libfb.a"
+                printer_runtime_dir = native_path(runtime_query.stdout.strip())
+                printer_runtime = printer_runtime_dir / "libfb.a"
+                # This C client uses runtime helpers. Initialize their context
+                # and TLS through the same startup object as BASIC clients.
                 printer_build = subprocess.run(
                     [os.environ.get("GCC") or "gcc", *printer_arch, "-std=gnu2x", "-O2",
                      "-Wall", "-Wextra", "-fno-strict-aliasing", "-ffunction-sections",
                      "-fdata-sections", str(root / "tests/compiler-support/win32-printer-geometry.c"),
-                     "-Wl,--gc-sections", str(printer_runtime),
+                     "-Wl,--gc-sections", str(printer_runtime_dir / "fbrt0.o"), str(printer_runtime),
                      "-lwinspool", "-lgdi32", "-lm", "-mthreads", "-o", str(printer_exe)],
                     cwd=working, text=True, capture_output=True, timeout=120, check=False)
                 if printer_build.returncode:
@@ -542,7 +545,7 @@ def main() -> int:
                 printer_run = subprocess.run([str(printer_exe)], cwd=working, text=True,
                                              capture_output=True, timeout=30, check=False)
                 if printer_run.returncode or "PRINTER_GEOMETRY_PASS" not in printer_run.stdout:
-                    print(f"Win32 printer geometry failed\n{printer_run.stdout}{printer_run.stderr}")
+                    print(f"Win32 printer geometry failed (exit {printer_run.returncode})\n{printer_run.stdout}{printer_run.stderr}")
                     return 1
                 print("win32/printer-geometry: passed")
                 for console_wide in (False, True):
@@ -730,6 +733,9 @@ def main() -> int:
                 if name in ("gosub-values", "label-flag-layout") and backend not in ("gcc", "clang"):
                     continue
                 if name == "asm-att-llvm" and backend != "llvm":
+                    continue
+                if name == "asm-att-llvm" and architecture not in ("x86", "686", "x86_64", ""):
+                    print(f"{backend}/{name}: x86 assembly fixture is unavailable on {architecture}")
                     continue
                 executable = working / (backend + "-" + name)
                 input_source = root / source

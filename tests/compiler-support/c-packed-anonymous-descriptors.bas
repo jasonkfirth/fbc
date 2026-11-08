@@ -73,8 +73,17 @@ union ExplicitChoice
     end type
 end union
 
+type ChoiceWrapper
+    prefix as ubyte
+    choice as ExplicitChoice
+    suffix as ubyte
+end type
+
 dim shared initialized as TrivialState = (7, 11, &h1234u, {13, 17})
 dim shared initialized_choice as ExplicitChoice = (53, &h11223344ul, 59)
+'' Nested storage must retain the union's alignment as well as its field offsets.
+dim shared initialized_wrappers(0 to 1) as ChoiceWrapper = { _
+    (61, (53, &h11223344ul, 59), 67), (71, (53, &h11223344ul, 59), 73) }
 
 private sub fill_anonymous(byref state as AnonymousState)
     state.prefix = 17
@@ -150,6 +159,12 @@ private sub exercise()
     if check_explicit(dynamic_records(1)) = 0 then end 88
     if check_trivial(initialized) = 0 then end 90
     if check_choice(initialized_choice) = 0 then end 91
+    for index as integer = 0 to 1
+        if check_choice(initialized_wrappers(index).choice) = 0 then end 92
+    next index
+    if initialized_wrappers(0).prefix <> 61 or initialized_wrappers(0).suffix <> 67 then end 93
+    if initialized_wrappers(1).prefix <> 71 or initialized_wrappers(1).suffix <> 73 then end 94
+    if cuint(@initialized_wrappers(1)) - cuint(@initialized_wrappers(0)) <> sizeof(ChoiceWrapper) then end 95
 end sub
 
 exercise()

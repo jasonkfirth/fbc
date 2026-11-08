@@ -139,7 +139,8 @@ jobs:
     name: Linux ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    # Serial semantic contracts and both corpora exceeded the old job budget.
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
@@ -250,7 +251,7 @@ jobs:
     runs-on: windows-latest
     # The x86 smoke suite can take 90 minutes on hosted Windows runners.
     # Leave time for bootstrap, fbctests, syntax checks, and examples.
-    timeout-minutes: 150
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
@@ -570,7 +571,8 @@ jobs:
     name: macOS ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    # Keep the complete serial qualification within one bounded native job.
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
@@ -769,7 +771,7 @@ jobs:
     runs-on: windows-11-arm
     # Native ARM64 reaches the example checks after about 106 minutes. Allow
     # the full example run and job cleanup to finish after the semantic suite.
-    timeout-minutes: 150
+    timeout-minutes: 240
 
     defaults:
       run:

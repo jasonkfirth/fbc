@@ -216,6 +216,7 @@ dim shared as BUILTIN builtins(0 to BUILTIN__COUNT-1) => _
 type IRLLVMVARINISCOPE
 	is_array as byte
 	is_packed as byte
+	has_alignment_wrapper as byte
 	has_padding as byte
 	openlength as byte
 	contentstart as integer
@@ -1085,6 +1086,11 @@ private function hEmitProcHeader _
 		if( proc->pattrib and FB_PROCATTRIB_NAKED ) then
 			ln += " naked"
 		elseif( (is_proto = FALSE) andalso (ast.proc.curr <> NULL) ) then
+			'' The Win64 legacy ERROR bridge captures the caller's RBP. Keep
+			'' that frame stable even when a handler is installed in a callee.
+			var needs_frame = (env.clopt.target = FB_COMPTARGET_WIN32) and _
+				(fbGetCpuFamily() = FB_CPUFAMILY_X86_64)
+			dim as integer needs_noredzone = FALSE
 			'' PUSH and CALL in user assembly can overwrite a leaf procedure's
 			'' red zone. Keep asm operands in a frame whose addresses stay valid
 			'' while the user temporarily changes RSP. Other procedures keep the
@@ -1092,11 +1098,14 @@ private function hEmitProcHeader _
 			var node = ast.proc.curr->l
 			while( node <> NULL )
 				if( node->class = AST_NODECLASS_ASM ) then
-					ln += " noredzone ""frame-pointer""=""all"""
+					needs_frame = TRUE
+					needs_noredzone = TRUE
 					exit while
 				end if
 				node = node->next
 			wend
+			if( needs_noredzone ) then ln += " noredzone"
+			if( needs_frame ) then ln += " ""frame-pointer""=""all"""
 		end if
 	end if
 
@@ -1544,8 +1553,21 @@ private function hUDTUsesPackedLayout( byval s as FBSYMBOL ptr ) as integer
 	'' Some i386 LLVM targets give i128 less than FreeBASIC's 16-byte alignment.
 	'' Preserve the compiler-computed member offsets instead of relying on that
 	'' target data layout for aggregates that contain 128-bit values.
-	return ((s->udt.align > 0) and (s->udt.align < 8)) or _
-	       (hUsesI386Integer128ABI( ) andalso hUDTHasInteger128Value( s ))
+	if( ((s->udt.align > 0) and (s->udt.align < 8)) or _
+	    (hUsesI386Integer128ABI( ) andalso hUDTHasInteger128Value( s )) ) then return TRUE
+	'' Anonymous members are flattened. Their own packing can place a scalar
+	'' at an offset that LLVM's ordinary struct layout cannot represent.
+	if( symbGetUDTIsUnion( s ) or symbGetUDTHasAnonUnion( s ) ) then
+		var fld = symbUdtGetFirstField( s )
+		while( fld )
+			if( symbIsDynamic( fld ) = FALSE ) then
+				var alignment = typeCalcNaturalAlign( symbGetType( fld ), symbGetSubtype( fld ) )
+				if( (alignment > 1) andalso ((fld->ofs mod alignment) <> 0) ) then return TRUE
+			end if
+			fld = symbUdtGetNextInitableField( fld )
+		wend
+	end if
+	return FALSE
 end function
 
 private function hUDTHasExplicitPadding( byval s as FBSYMBOL ptr ) as integer
@@ -1637,6 +1659,9 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr )
 	'' on i386 i128 fields. Use explicit gaps where needed to preserve offsets.
 	var packed = hUDTUsesPackedLayout( s )
 	var has_padding = hUDTHasExplicitPadding( s )
+	var alignmenttype = hUDTAlignmentType( s )
+	var has_alignment_wrapper = packed and (len( alignmenttype ) > 0)
+	if( has_alignment_wrapper ) then ln += ".payload"
 
 	ln += " = type "
 	if( packed ) then ln += "<"
@@ -1674,8 +1699,7 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr )
 		DZstrConcatAssign( fields, "[" & (s->lgt - struct_offset) & " x i8]" )
 		fieldcount += 1
 	end if
-	var alignmenttype = hUDTAlignmentType( s )
-	if( len( alignmenttype ) > 0 ) then
+	if( (len( alignmenttype ) > 0) and (has_alignment_wrapper = FALSE) ) then
 		if( fieldcount > 0 ) then DZstrConcatAssign( fields, ", " )
 		DZstrConcatAssign( fields, alignmenttype )
 	end if
@@ -1690,6 +1714,12 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr )
 	if( packed ) then ln += ">"
 
 	hWriteLine( ln )
+	if( has_alignment_wrapper ) then
+		'' A zero-sized outer member restores union alignment without inserting
+		'' padding between the explicitly positioned payload fields.
+		hWriteLine( hGetUDTName( s ) + " = type { " + hGetUDTName( s ) + _
+			".payload, " + alignmenttype + " }" )
+	end if
 
 	symbResetIsBeingEmitted( s )
 end sub
@@ -4506,6 +4536,7 @@ private sub _emitVarIniScopeBegin( byval sym as FBSYMBOL ptr, byval is_array as 
 	end if
 	ctx.variniscopes(ctx.variniscopelevel).is_array = is_array
 	ctx.variniscopes(ctx.variniscopelevel).is_packed = FALSE
+	ctx.variniscopes(ctx.variniscopelevel).has_alignment_wrapper = FALSE
 	ctx.variniscopes(ctx.variniscopelevel).has_padding = FALSE
 	ctx.variniscopes(ctx.variniscopelevel).sym = sym
 	ctx.variniscopes(ctx.variniscopelevel).expected_elements = 0
@@ -4546,8 +4577,13 @@ private sub _emitVarIniScopeBegin( byval sym as FBSYMBOL ptr, byval is_array as 
 				hUDTHasExplicitPadding( sym->subtype )
 		end if
 		if( ctx.variniscopes(ctx.variniscopelevel).is_packed ) then
-			ctx.varini += "<{ "
-			ctx.variniscopes(ctx.variniscopelevel).openlength = 3
+			dim as string opening = "<{ "
+			if( len( hUDTAlignmentType( sym->subtype ) ) > 0 ) then
+				ctx.variniscopes(ctx.variniscopelevel).has_alignment_wrapper = TRUE
+				opening = "{ " + hGetUDTName( sym->subtype ) + ".payload " + opening
+			end if
+			ctx.varini += opening
+			ctx.variniscopes(ctx.variniscopelevel).openlength = len( opening )
 		else
 			ctx.varini += "{ "
 			ctx.variniscopes(ctx.variniscopelevel).openlength = 2
@@ -4593,7 +4629,8 @@ private sub _emitVarIniScopeEnd( )
 				end if
 			end if
 			var alignmenttype = hUDTAlignmentType( sym->subtype )
-			if( len( alignmenttype ) > 0 ) then
+			if( (len( alignmenttype ) > 0) and _
+			    (ctx.variniscopes(ctx.variniscopelevel).has_alignment_wrapper = FALSE) ) then
 				ctx.varini += alignmenttype + " zeroinitializer, "
 			end if
 		end if
@@ -4618,6 +4655,10 @@ private sub _emitVarIniScopeEnd( )
 		ctx.varini += " ]"
 	elseif( ctx.variniscopes(ctx.variniscopelevel).is_packed ) then
 		ctx.varini += " }>"
+		if( ctx.variniscopes(ctx.variniscopelevel).has_alignment_wrapper ) then
+			var sym = ctx.variniscopes(ctx.variniscopelevel).sym
+			ctx.varini += ", " + hUDTAlignmentType( sym->subtype ) + " zeroinitializer }"
+		end if
 	else
 		ctx.varini += " }"
 	end if

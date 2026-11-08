@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- CI/compiler: preserve Win64 LLVM frames for legacy ERROR captures and packed anonymous union offsets with an outer alignment carrier; add nested initialized-array coverage and validate expression and recovery smoke models through the independent schema reader, retain footer-boundary rejection, scope the LLVM AT&T assembly fixture to x86, initialize the printer C client through its paired runtime startup object and report its exit code, and extend bounded native CI budgets after observed job timeouts. Qualify the 224-unit C fixed point, semantic smoke, native LLVM capture controls and compiler structure without replacing installed binaries.
 - compiler/C and Win64 runtime: integrate activation-local ERROR continuations and owner cleanup into the main compiler with target-scoped x86-64 runtime and assembler providers; preserve the legacy Cygwin ERROR ABI and retain explicit unsupported-resource and foreign-frame boundaries.
 - compiler/C backend: group private ERROR capture fields by storage alignment while preserving logical capture identities, the runtime prefix, initialization order and cleanup order.
 - compiler/C backend: analyze eligible procedure bodies independently when a module contains opaque assembly, retain explicit assembler storage roots, and omit unreferenced implicit static descriptors while preserving backing arrays and debug output.

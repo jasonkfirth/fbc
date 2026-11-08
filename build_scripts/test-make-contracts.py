@@ -521,20 +521,18 @@ def test_cppflags_forwarding(root: Path, working: Path) -> None:
 
 def test_semantic_footer_boundary(root: Path, working: Path) -> None:
     source = (root / "mk/tests/compiler/smoke.mk").read_text(encoding="utf-8")
-    programs = re.findall(
-        r"@awk -F '\\t' -v minimum_schema=[^\n]* '\\\n(.*?)' \\\n\s*\"\$\(TEST_TMP\)/([^\"]+)\"",
-        source, re.S,
-    )
-    selected = [body for body, name in programs if name == "semantic-recovery.tsv"]
-    require(len(selected) == 1, "could not locate the production recovery-model validator")
-    program = selected[0].replace("\\\n", "").replace("$$", "$")
-    write(working / "validate.awk", program)
+    require('check-semantic-smoke-expressions.py" --root "$(rootdir)" --recovery '
+            '"$(TEST_TMP)/semantic-recovery.tsv"' in source,
+            "could not locate the production recovery-model validator")
     rows = ["FBCSEM\t27\texpression", "M\tfixture", "D\tfixture",
-            "E\t1\t1\tfixture.bas\t3\t0\t3\t1\t0\t0\tnone\tnone\t0\t0\t0\tdouble",
+            "E\t1\t1\tfixture.bas\t3\t0\t3\t1\t0\t0\t\tnone\t0\t0\t0\tdouble",
             "R\t27\t1", "RECOVERY\t27\t1\t1\t1\t0\t1\t1"]
-    command = ["awk", "-F", "\t", "-v", "minimum_schema=15", "-f", "validate.awk"]
+    artifact = working / "recovery.tsv"
+    command = [sys.executable, "-B", str(root / "build_scripts/check-semantic-smoke-expressions.py"),
+               "--root", str(root), "--recovery", str(artifact)]
     for trailing, expected in (("", True), ("FILE\t1\t2\t3\t4\t5\t6\n", False)):
-        result = subprocess.run(command, cwd=working, input="\n".join(rows) + "\n" + trailing,
+        write(artifact, "\n".join(rows) + "\n" + trailing)
+        result = subprocess.run(command, cwd=working,
                                 capture_output=True, text=True, timeout=10, check=False)
         require((result.returncode == 0) == expected,
                 "semantic recovery validator accepted records after its footer", result)
