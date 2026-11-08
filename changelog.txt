@@ -435,6 +435,7 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- tests/MSYS: accept the same executable with and without its .exe suffix in the native-path regression, and exercise both spellings.
 - compiler/semantic tooling: retain valid level-zero unused-value warning policies and leave malformed legacy-byte lines without editable coordinates while preserving later physical lines.
 - tests/semantic tooling: validate current floating leading-zero and read-only call metadata without weakening corruption checks; distinguish LLVM IR coverage from runtime checks requiring llc.
 - rtlib/MinGW: parse long-double constants independently of the global numeric locale on legacy MSVCRT, using the bounded native-precision parser already shared with Haiku.
