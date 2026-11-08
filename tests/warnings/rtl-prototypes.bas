@@ -1,3 +1,9 @@
+'' Project: FreeBASIC runtime declaration tests
+'' File: rtl-prototypes.bas
+'' Purpose: Compare compiler runtime declarations with their public signatures.
+'' Responsibilities: Preserve parameter modes, widths and calling conventions.
+'' This file intentionally does NOT call the runtime procedures.
+
 #macro ID( text )
 	#print text
 #endmacro
@@ -869,7 +875,8 @@
 
 	ID( function fb_GfxDrawString )
 	scope
-		dim chk as function fbcall ( byval as any ptr = 0, byval as const single, byval as const single, byval as const long, byref as const string, byval as const ulong, byval as const any ptr = 0, byval as const long, byval as any ptr, byval as any ptr = 0, byval as any ptr ) as integer
+		'' The C runtime returns int, which remains 32 bits on 64-bit targets.
+		dim chk as function fbcall ( byval as any ptr = 0, byval as const single, byval as const single, byval as const long, byref as const string, byval as const ulong, byval as const any ptr = 0, byval as const long, byval as any ptr, byval as any ptr = 0, byval as any ptr ) as long
 		chk = procptr( fb_GfxDrawString )
 	end scope
 
@@ -3484,3 +3491,5 @@
 		dim chk as function fbcall ( byref as any, byref as any ) as long
 		chk = procptr( fb_IsTypeOf )
 	end scope
+
+'' end of rtl-prototypes.bas

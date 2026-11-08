@@ -1,3 +1,8 @@
+	Parameter is not read, I
+	Parameter is not read, I
+	Parameter is not read, I
+	Parameter is not read, I
+	Parameter is not read, I
 no warnings:
 2 warnings:
 	Suspicious pointer assignment
@@ -29,3 +34,6 @@ no warnings:
 2 warnings:
 	Suspicious pointer assignment
 	Calling convention mismatch in function pointer
+	Variable is not read, PDEFAULT
+	Variable is not read, PCDECL
+	Variable is not read, PSTDCALL

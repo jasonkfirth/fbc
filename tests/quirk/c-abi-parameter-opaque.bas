@@ -7,6 +7,8 @@
 	This file does not change calling conventions or assembly-visible operands.
 '/
 
+#include once "../compiler-support/c-opaque-nop.bi"
+
 #macro CHECK( condition )
 	if( (condition) = 0 ) then
 		end 1
@@ -14,9 +16,7 @@
 #endmacro
 
 function OpaqueIgnored(byval ignored_value as integer, byval result as integer) as integer
-	asm
-		nop
-	end asm
+	compiler_test_opaque_nop()
 	return result
 end function
 

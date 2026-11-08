@@ -118,3 +118,21 @@ CONST INTEGER PTR PTR
 CONST INTEGER PTR CONST PTR
 CONST INTEGER CONST PTR PTR
 CONST INTEGER CONST PTR CONST PTR
+	Variable is not read, PZ
+	Variable is not read, PW
+	Variable is not read, PZ
+	Variable is not read, PS
+	Variable is not read, PI
+	Variable is not read, P
+	Variable is not read, D
+	Variable is not read, F
+	Variable is not read, ULL
+	Variable is not read, LL
+	Variable is not read, UL
+	Variable is not read, L
+	Variable is not read, UI
+	Variable is not read, I
+	Variable is not read, USH
+	Variable is not read, SH
+	Variable is not read, UB
+	Variable is not read, B

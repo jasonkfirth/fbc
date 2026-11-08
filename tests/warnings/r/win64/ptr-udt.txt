@@ -1,3 +1,4 @@
+	Parameter is not read, __FB_RHS__
 no warnings:
 1 warning:
 	Suspicious pointer assignment
@@ -47,3 +48,4 @@ no warning:
 2 warnings:
 	Suspicious pointer assignment
 	Suspicious pointer assignment
+	Variable is not read, PRTTI1

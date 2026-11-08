@@ -6,6 +6,7 @@ warning expected
 	Suffix ignored in 'not%'
 warning expected
 	Suffix ignored in 'let%'
+	Variable is not read, I
 ---- parser-compound-do.bas ----
 2 warnings expected
 	Suffix ignored in 'do%'
@@ -171,6 +172,9 @@ warning expected
 	Suffix ignored in 'as%'
 	Suffix ignored in 'byref%'
 	Suffix ignored in 'any%'
+	Parameter is not read, A
+	Parameter is not read, Y
+	Parameter is not read, X
 ---- parser-decl-proc.bas ----
 2 warnings expected
 	Suffix ignored in 'declare%'
@@ -367,6 +371,7 @@ warning expected
 	Suffix ignored in 'shl%'
 warning expected
 	Suffix ignored in 'shr%'
+	Parameter is not read, __FB_RHS__
 warning expected
 	Suffix ignored in 'is%'
 ---- parser-expr-function.bas ----
@@ -434,6 +439,7 @@ warning expected
 	Suffix ignored in 'function%'
 	Suffix ignored in 'as%'
 	Suffix ignored in 'option%'
+	Parameter is not read, __FB_RHS__
 2 warnings expected
 	Suffix ignored in 'virtual%'
 	Suffix ignored in 'override%'
@@ -459,6 +465,8 @@ warning expected
 warning expected
 	Suffix ignored in 'destructor%'
 ---- parser-proccall-args.bas ----
+	Parameter is not read, I
+	Parameter is not read, I
 warning expected
 	Suffix ignored in 'byval%'
 warning expected
@@ -807,10 +815,12 @@ warning expected
 	Suffix ignored in 'delete%'
 warning expected
 	Suffix ignored in 'any%'
+	Variable is not read, X
 ---- parser-quirk-on.bas ----
 ---- parser-quirk-peekpoke.bas ----
 warning expected
 	Suffix ignored in 'poke%'
+	Memory access through a provably null pointer
 warning expected
 	Suffix ignored in 'peek%'
 ---- parser-quirk-string.bas ----
@@ -882,10 +892,10 @@ warning expected
 	Suffix ignored in 'rset%'
 ---- parser-quirk-thread.bas ----
 none expected
-suffix-fb.bas(1201) error 4: Duplicated definition, found 'thread' in 'sub thread( )'
 2 warnings expected
 	Suffix ignored in 'threadcall%'
-suffix-fb.bas(1204) error 289: Expected sub, found 'thread' in 'dim thrptr as any ptr = threadcall% thread%()'
+	Suffix ignored in 'thread%'
+suffix-fb.bas(1204) error 288: Unsupported function in 'dim thrptr as any ptr = threadcall% thread%()'
 ---- parser-quirk-vafirst.bas ----
 warning expected
 	Suffix ignored in 'cva_start%'

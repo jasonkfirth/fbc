@@ -19,6 +19,8 @@ no warnings for explicit BYVAL passed to BYREF AS ANY:
 no warnings for passing global var addrof (OFFSET nodes):
 ---
 other warnings for similar situations with other parameter types:
+	Parameter is not read, I
+	Parameter is not read, P
 no warning (correct usage):
 4 warnings (passing pointer to scalar):
 	Passing pointer to scalar, at parameter 1 (i) of F1()

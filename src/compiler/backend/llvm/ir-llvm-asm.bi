@@ -5,7 +5,7 @@
 ''
 '' Purpose:
 ''
-''     Emit one LLVM asm call for a consecutive sequence of x86 instructions.
+''     Emit one LLVM asm call for a consecutive sequence of target instructions.
 ''
 '' Responsibilities:
 ''
@@ -50,6 +50,24 @@ end function
 private sub hAsmClobbers( byref constraints as string )
 	'' BASIC asm has no explicit clobber list. Assume general registers and
 	'' vector registers may change. The user must restore stack/frame pointers.
+	if( fbGetCpuFamily() = FB_CPUFAMILY_AARCH64 ) then
+		'' X18 is platform-reserved on Windows and Darwin. X29 is the frame
+		'' pointer; both must remain intact, along with the stack pointer.
+		for i as integer = 0 to 28
+			if( (i <> 18) or ((env.clopt.target <> FB_COMPTARGET_WIN32) and _
+			    (env.clopt.target <> FB_COMPTARGET_DARWIN)) ) then
+				constraints += ",~{x" & i & "}"
+			end if
+		next
+		constraints += ",~{lr}"
+		for i as integer = 0 to 31
+			constraints += ",~{v" & i & "}"
+		next
+		exit sub
+	elseif( (fbGetCpuFamily() <> FB_CPUFAMILY_X86) and _
+	        (fbGetCpuFamily() <> FB_CPUFAMILY_X86_64) ) then
+		exit sub
+	end if
 	if( fbGetCpuFamily() = FB_CPUFAMILY_X86_64 ) then
 		constraints += ",~{rax},~{rbx},~{rcx},~{rdx},~{rsi},~{rdi}"
 		for i as integer = 8 to 15
@@ -129,7 +147,9 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	constraints += "~{cc},~{memory}"
 	hAsmClobbers( constraints )
 	dim as string dialect
-	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+	if( ((fbGetCpuFamily() = FB_CPUFAMILY_X86) or _
+	     (fbGetCpuFamily() = FB_CPUFAMILY_X86_64)) and _
+	    (env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL) ) then
 		dialect = " inteldialect"
 	end if
 	hWriteLine( "call void asm sideeffect alignstack" + dialect + " """ + escaped + """, """ + _

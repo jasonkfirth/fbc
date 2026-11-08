@@ -2,7 +2,9 @@
 none expected
 none expected
 none expected
+	Parameter is not read, __FB_RHS__
 none expected
+	Parameter is not read, __FB_RHS__
 none expected
 5 UBYTE PTR to follow
 UBYTE PTR
@@ -421,8 +423,16 @@ none expected
 none expected
 none expected
 ---- Regression Checks
+	Parameter is not read, S
 warning expected
 	CONST qualifier discarded
+warning expected
+	CONST qualifier discarded
+none expected
+	Parameter is not read, I
+	Parameter is not read, I
+	Parameter is not read, X
+	Parameter is not read, X
 warning expected
 	CONST qualifier discarded
 none expected
@@ -435,6 +445,71 @@ none expected
 warning expected
 	CONST qualifier discarded
 none expected
-warning expected
-	CONST qualifier discarded
-none expected
+	Variable is not read, CICP
+	Variable is not read, CI_P
+	Variable is not read, _ICP
+	Variable is not read, _I_P
+	Variable is not read, CI__
+	Variable is not read, _I__
+	Variable is not read, CICP
+	Variable is not read, CI_P
+	Variable is not read, _ICP
+	Variable is not read, _I_P
+	Variable is not read, CI__
+	Variable is not read, _I__
+	Variable is not read, PTR_NOCONST
+	Variable is not read, PTR_CONST
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P2
+	Variable is not read, P3
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P3
+	Variable is not read, P2
+	Variable is not read, P1
+	Variable is not read, P0
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, P
+	Variable is not read, K
+	Variable is not read, I
+	Variable is not read, K
+	Variable is not read, I

@@ -145,6 +145,7 @@ sub fb_GfxEllipse
 sub fb_GfxPaint
 sub fb_GfxDraw
 function fb_GfxDrawString
+	Suspicious pointer assignment
 sub fb_GfxView
 sub fb_GfxWindow
 sub fb_GfxPalette
@@ -155,6 +156,7 @@ sub fb_GfxPaletteGet64
 sub fb_GfxPaletteGetUsing
 sub fb_GfxPaletteGetUsing64
 function fb_GfxPut
+	Suspicious pointer assignment
 function fb_GfxGet
 function fb_GfxScreen
 function fb_GfxScreenQB
@@ -200,15 +202,35 @@ sub screencontrol alias "fb_GfxControl_i32"
 sub screencontrol alias "fb_GfxControl_i64"
 function screenglproc alias "fb_GfxGetGLProcAddress"
 sub fb_hPutTrans
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutPSet
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutPReset
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutAnd
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutOr
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutXor
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutAlpha
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutBlend
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutAdd
+	Suspicious pointer assignment
+	CONST qualifier discarded
 sub fb_hPutCustom
+	Suspicious pointer assignment
+	CONST qualifier discarded
 ---- rtlMath
 function fb___divdi3 alias "__divdi3"
 function fb___udivdi3 alias "__udivdi3"
@@ -508,11 +530,11 @@ function dir alias "fb_Dir64"
 function settime alias "fb_SetTime"
 function setdate alias "fb_SetDate"
 function threadcreate alias "fb_ThreadCreate"
-rtl-prototypes.bas(3309) error 288: Unsupported function, found ')' in 'chk = procptr( threadcreate )'
+rtl-prototypes.bas(3316) error 288: Unsupported function, found ')' in 'chk = procptr( threadcreate )'
 sub threadwait alias "fb_ThreadWait"
-rtl-prototypes.bas(3315) error 288: Unsupported function, found ')' in 'chk = procptr( threadwait )'
+rtl-prototypes.bas(3322) error 288: Unsupported function, found ')' in 'chk = procptr( threadwait )'
 function fb_ThreadCall
-rtl-prototypes.bas(3321) error 288: Unsupported function, found ')' in 'chk = procptr( fb_ThreadCall )'
+rtl-prototypes.bas(3328) error 288: Unsupported function, found ')' in 'chk = procptr( fb_ThreadCall )'
 function mutexcreate alias "fb_MutexCreate"
 sub mutexdestroy alias "fb_MutexDestroy"
 sub mutexlock alias "fb_MutexLock"

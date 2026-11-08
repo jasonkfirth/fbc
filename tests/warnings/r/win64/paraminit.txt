@@ -1,70 +1,121 @@
+	Parameter is not read, I
+	Parameter is not read, I
+	Parameter is not read, I
+	Parameter is not read, A
+	Parameter is not read, A
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, X
 no warning:
+	Parameter is not read, I
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 no warning:
+	Parameter is not read, N
 mismatch addrof var:
 	Mismatching parameter initializer, at parameter 1 (n) of test23()
+	Parameter is not read, N
 mismatch addrof proc:
 	Mismatching parameter initializer, at parameter 1 (n) of test24()
+	Parameter is not read, N
 mismatch anon type:
 	Mismatching parameter initializer, at parameter 1 (n) of test25()
+	Parameter is not read, N
 mismatch anon type:
 	Mismatching parameter initializer, at parameter 1 (n) of test26()
+	Parameter is not read, N
 mismatch bop:
 	Mismatching parameter initializer, at parameter 1 (n) of test27()
+	Parameter is not read, N
 mismatch const:
 	Mismatching parameter initializer, at parameter 1 (n) of test28()
+	Parameter is not read, N
 mismatch call:
 	Mismatching parameter initializer, at parameter 1 (n) of test29()
+	Parameter is not read, N
 mismatch arg:
 	Mismatching parameter initializer, at parameter 1 (n) of test30()
+	Parameter is not read, N
 mismatch arg:
 	Mismatching parameter initializer, at parameter 1 (n) of test31()
+	Parameter is not read, N
 mismatch const:
 	Mismatching parameter initializer, at parameter 1 (n) of test32()
+	Parameter is not read, N
 mismatch ctorcall:
 	Mismatching parameter initializer, at parameter 1 (x) of test33()
+	Parameter is not read, X
 mismatch field:
 	Mismatching parameter initializer, at parameter 1 (i) of test34()
+	Parameter is not read, I
 mismatch array:
 	Mismatching parameter initializer, at parameter 1 (n) of test35()
+	Parameter is not read, N
 mismatch idx:
 	Mismatching parameter initializer, at parameter 1 (n) of test36()
+	Parameter is not read, N
 mismatch iif:
 	Mismatching parameter initializer, at parameter 1 (n) of test37()
+	Parameter is not read, N
 mismatch const:
 	Mismatching parameter initializer, at parameter 1 (n) of test38()
+	Parameter is not read, N
 mismatch const:
 	Mismatching parameter initializer, at parameter 1 (n) of test39()
+	Parameter is not read, N
 mismatch const:
 	Mismatching parameter initializer, at parameter 1 (n) of test40()
+	Parameter is not read, N
 mismatch const:
 	Mismatching parameter initializer, at parameter 1 (n) of test41()
+	Parameter is not read, N
 mismatch string:
 	Mismatching parameter initializer, at parameter 1 (n) of test42()
+	Parameter is not read, N
 mismatch string:
 	Mismatching parameter initializer, at parameter 1 (n) of test43()
+	Parameter is not read, N
 mismatch string:
 	Mismatching parameter initializer, at parameter 1 (n) of test44()
+	Parameter is not read, N
 mismatch uop:
 	Mismatching parameter initializer, at parameter 1 (n) of test45()
+	Parameter is not read, N
 mismatch var:
 	Mismatching parameter initializer, at parameter 1 (n) of test46()
+	Parameter is not read, N

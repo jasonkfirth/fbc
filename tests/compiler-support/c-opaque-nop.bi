@@ -6,14 +6,16 @@
 #ifndef FBC_TEST_OPAQUE_NOP_BI
 #define FBC_TEST_OPAQUE_NOP_BI
 
-'' __FB_ASM__ describes x86 syntax only. Other C targets use raw instruction
-'' tokens by default; Darwin instead expects a GNU assembly string expression.
-#if defined(__FB_X86__)
-    #if __FB_ASM__ = "att"
+'' C backends accept a GNU string expression in AT&T mode and on Darwin.
+'' LLVM instead consumes instruction text directly on every target.
+#if (__FB_BACKEND__ = "gcc") or (__FB_BACKEND__ = "clang")
+    #if defined(__FB_X86__)
+        #if __FB_ASM__ = "att"
+            #define FBC_TEST_GNU_ASM_TEXT
+        #endif
+    #elseif defined(__FB_DARWIN__)
         #define FBC_TEST_GNU_ASM_TEXT
     #endif
-#elseif defined(__FB_DARWIN__)
-    #define FBC_TEST_GNU_ASM_TEXT
 #endif
 
 #macro compiler_test_opaque_nop()

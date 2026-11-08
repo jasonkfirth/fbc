@@ -9,3 +9,4 @@ warning expected
 none expected
 ---- Procedure ----
 none expected
+	Variable is not read, A

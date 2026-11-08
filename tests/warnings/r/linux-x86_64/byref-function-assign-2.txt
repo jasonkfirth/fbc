@@ -1,29 +1,39 @@
+	Parameter is not read, I
 --- 1 ---
 no warning:
 1 warning:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
+	Parameter is not read, I
 --- 2 ---
 1 warning:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
+	Parameter is not read, I
 --- 3 ---
 no warning:
 1 warning:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
+	Parameter is not read, I
 --- 4 ---
 1 warning:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
+	Parameter is not read, I
 --- 5 ---
 1 warning:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
 no warning:
+	Parameter is not read, I
 --- 6 ---
 1 warning:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
 no warning:
+	Parameter is not read, I
+	Parameter is not read, D
 --- 7 ---
 2 warnings:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result
+	Parameter is not read, I
+	Parameter is not read, D
 --- 8 ---
 2 warnings:
 	'=' parsed as equality operator in function argument, not assignment to BYREF function result

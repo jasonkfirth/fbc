@@ -867,7 +867,12 @@ private sub hAppendProcAsmClobbers( byref ln as string )
 		hAppendClobber( ln, @"x15" )
 		hAppendClobber( ln, @"x16" )
 		hAppendClobber( ln, @"x17" )
-		hAppendClobber( ln, @"x18" )
+		'' Windows and Darwin reserve X18 for platform state. Other AAPCS64
+		'' targets may allocate it, so retain the ordinary clobber there.
+		if( (env.clopt.target <> FB_COMPTARGET_WIN32) and _
+		    (env.clopt.target <> FB_COMPTARGET_DARWIN) ) then
+			hAppendClobber( ln, @"x18" )
+		end if
 		hAppendClobber( ln, @"x19" )
 		hAppendClobber( ln, @"x20" )
 		hAppendClobber( ln, @"x21" )

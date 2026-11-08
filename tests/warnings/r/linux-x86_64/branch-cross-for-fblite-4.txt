@@ -1,1 +1,2 @@
 no warnings:
+	Variable is not read, C

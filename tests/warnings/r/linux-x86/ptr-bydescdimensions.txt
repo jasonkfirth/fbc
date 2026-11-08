@@ -14,6 +14,10 @@
 	Suspicious pointer assignment
 	Suspicious pointer assignment
 	Suspicious pointer assignment
+	Parameter is not read, ARRAY
+	Parameter is not read, ARRAY
+	Parameter is not read, ARRAY
+	Parameter is not read, ARRAY
 ----------------------------------------------
 no warning:
 1 warning:
@@ -130,3 +134,7 @@ no warning:
 1 warning:
 	Suspicious pointer assignment
 no warning:
+	Variable is not read, A8
+	Variable is not read, A2
+	Variable is not read, A1
+	Variable is not read, A0

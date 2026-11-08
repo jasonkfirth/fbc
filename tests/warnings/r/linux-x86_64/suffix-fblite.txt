@@ -1,6 +1,7 @@
 parser-assignment.bas ----
 warning expected
 	Suffix ignored in 'let%'
+	Variable is not read, I
 parser-comment.bas ----
 warning expected
 	Suffix ignored in 'once%'

@@ -1,4 +1,5 @@
 resulting types should be 3 * INTEGER PTR and 3 * DerivedUdt PTR
+	Parameter is not read, __FB_RHS__
 INTEGER PTR
 INTEGER PTR
 INTEGER PTR
@@ -18,3 +19,10 @@ should all be UINTEGER PTR:
 UINTEGER PTR
 UINTEGER PTR
 UINTEGER PTR
+	Variable is not read, I
+	Variable is not read, STATICI
+	Variable is not read, PL
+	Variable is not read, I
+	Variable is not read, PDERIVED
+	Variable is not read, PINTEGER
+	Variable is not read, PANY

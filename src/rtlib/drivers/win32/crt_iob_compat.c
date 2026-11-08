@@ -55,7 +55,10 @@ enum {
    Returning that table preserves the expected FILE pointer ABI without
    requiring a newer MSVCRT DLL on Windows 95.
 */
-void *FB_CRT_CDECL FB_CRT_WEAK __iob_func( void )
+/* Keep the archive entry strong. A weak PE/COFF function can be discarded
+   while MinGW's direct __iob_func call remains unresolved after section GC.
+   The CRT calls it before main, so runtime initialization cannot repair it. */
+void *FB_CRT_CDECL __iob_func( void )
 {
 	return __p__iob( );
 }

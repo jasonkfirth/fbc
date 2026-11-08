@@ -464,6 +464,7 @@ def main() -> int:
             # an architecture name copied from the GCC command-line interface.
             source = working / "llvm-aarch64.bas"
             source.write_text('function increment( byval value as longint ) as longint\n'
+                              '    asm\n        nop\n    end asm\n'
                               '    return value + 1\nend function\n', encoding="utf-8")
             command = [*compiler_args, "-rr",
                        "-gen", "llvm", "-target", "win32", "-arch", "aarch64",
@@ -483,6 +484,25 @@ def main() -> int:
                 return 1
             print("LLVM/aarch64: assembly emission passed")
             if clang is not None:
+                # The C emitter must also preserve Windows' reserved X18.
+                # Cross-compile its ASM body so a warning cannot wait until
+                # the native ARM64 job to reveal an invalid clobber list.
+                emitted = subprocess.run(
+                    [*compiler_args, "-r", "-gen", "gcc", "-target", "win32",
+                     "-arch", "aarch64", str(source)], cwd=working, text=True,
+                    capture_output=True, timeout=120, check=False)
+                if emitted.returncode:
+                    print("C/aarch64: emission failed\n" + emitted.stdout + emitted.stderr)
+                    return 1
+                compiled = subprocess.run(
+                    [clang, "--target=aarch64-w64-windows-gnu", "-std=gnu2x",
+                     "-Wall", "-Wextra", "-Werror", "-nostdinc", "-c",
+                     str(source.with_suffix(".c")), "-o", str(working / "asm-aarch64.o")],
+                    cwd=working, text=True, capture_output=True, timeout=120, check=False)
+                if compiled.returncode:
+                    print("C/aarch64: assembly clobbers failed\n" + compiled.stdout + compiled.stderr)
+                    return 1
+                print("C/aarch64: assembly clobbers passed")
                 # Assemble both Windows x86 targets with the detected host
                 # Clang. Its default CPU must not decide the object's word size.
                 # The first COFF header field identifies i386 (0x14c) or AMD64
