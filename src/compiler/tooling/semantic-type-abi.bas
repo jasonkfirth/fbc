@@ -51,11 +51,11 @@ private function hStableBaseType(byval base_type as integer) as integer
 end function
 
 function fbSemanticModelTypeCode(byval dtype as longint) as longint
-	if( stable_type_abi = FALSE ) then return dtype
 	'' Raw type fields are unsigned 32-bit values. The base and builtin
 	'' mangling subtype are independent five-bit fields; pointer depth,
 	'' constness, ByRef flags and invalid-type sentinels must survive exactly.
 	dim as ulong bits = culng(dtype)
+	if( stable_type_abi = FALSE ) then return clngint(bits)
 	dim as integer base_type = bits and FB_DT_TYPEMASK
 	dim as integer mangled_type = (bits and FB_DT_MANGLEMASK) shr FB_DT_MANGLEPOS
 	bits = (bits and not culng(FB_DT_TYPEMASK or FB_DT_MANGLEMASK)) or _

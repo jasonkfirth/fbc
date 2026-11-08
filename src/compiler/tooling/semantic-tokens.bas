@@ -39,7 +39,7 @@ sub fbSemanticModelConsumedToken( byval token as FBTOKEN ptr )
 	dim as integer union_value, suffix_known, suffix_char, numeric_known, string_known
 	dim as integer original_length, original_digits, original_dot, original_exponent, original_zeros, payload, macro_units
 	dim as integer truncated, type_known
-	dim as longint wire_type = FB_DATATYPE_INVALID
+	dim as longint wire_type = fbSemanticModelTypeCode(FB_DATATYPE_INVALID)
 	if( token->class = FB_TKCLASS_STRLITERAL and token->dtype = FB_DATATYPE_WCHAR ) then
 		text_kind = "wide-units"
 		for index as integer = 0 to token->len - 1
@@ -92,7 +92,7 @@ sub fbSemanticModelConsumedToken( byval token as FBTOKEN ptr )
 		macro_valid = abs(token->source.macro_unit_valid <> FALSE)
 	end if
 	dim as string value = fbSemanticModelNumber(token->id) + TABCHAR + fbSemanticModelNumber(token->class) + TABCHAR + _
-		fbSemanticModelNumber(culng(token->dtype)) + TABCHAR + fbSemanticModelNumber(abs(type_known)) + TABCHAR + _
+		fbSemanticModelTypeNumber(culng(token->dtype)) + TABCHAR + fbSemanticModelNumber(abs(type_known)) + TABCHAR + _
 		fbSemanticModelNumber(wire_type) + TABCHAR + fbSemanticModelNumber(token->len) + TABCHAR + text_kind + TABCHAR + _
 		fbSemanticModelEscape(text) + TABCHAR + fbSemanticModelNumber(abs(token->after_space <> FALSE)) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentStatement()) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentContext()) + TABCHAR + _

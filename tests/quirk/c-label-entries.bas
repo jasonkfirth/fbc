@@ -18,9 +18,15 @@ asm_target:
 
 dispatch:
 	#if defined(__FB_X86__)
+		#if __FB_ASM__ = "intel"
 		asm
 			jmp asm_target
 		end asm
+		#else
+		asm
+			"jmp %l0" : : : : asm_target
+		end asm
+		#endif
 	#else
 		goto asm_target
 	#endif
