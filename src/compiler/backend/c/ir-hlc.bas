@@ -5405,6 +5405,9 @@ private function exprNewVREG _
 			end if
 			if( vreg->vidx <> NULL ) then
 				if( byte_index = NULL ) then byte_index = exprNewVREG(vreg->vidx)
+				'' A virtual array base uses unsigned native address arithmetic.
+				'' Scaled enum indices must use that width and signedness too.
+				if( is_c_array ) then byte_index = exprNewCAST( FB_DATATYPE_UINT, NULL, byte_index )
 				l = exprNewBOP( AST_OP_ADD, l, byte_index )
 			end if
 			if( vreg->ofs <> 0 ) then
@@ -5562,6 +5565,7 @@ private function exprNewVREGAddr _
 			end if
 			if( vreg->vidx <> NULL ) then
 				if( byte_index = NULL ) then byte_index = exprNewVREG(vreg->vidx)
+				if( is_c_array ) then byte_index = exprNewCAST( FB_DATATYPE_UINT, NULL, byte_index )
 				l = exprNewBOP( AST_OP_ADD, l, byte_index )
 			end if
 			if( vreg->ofs <> 0 ) then

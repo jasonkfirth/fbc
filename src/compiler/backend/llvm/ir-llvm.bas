@@ -4422,18 +4422,19 @@ private sub _emitVarIniOfs _
 	var ptrtype = hEmitType( ptrdtype, ptrsubtype )
 
 	if( ofs <> 0 ) then
-		var inttype = hEmitType( FB_DATATYPE_UINT, NULL )
-
-		'' Emit inline LLVM instructions for something like: cptr(cint(@rhs) + ofs)
-
-		'' %0 = ptrtoint foo* @global to i32
-		s = "ptrtoint (" + ptrtype + " " + s + " to " + inttype + ")"
-
-		'' %1 = add (i32 %0), i32 <offset>
-		s = "add (" + inttype + " " + s + ", " + inttype + " " & ofs & ")"
-
-		'' %2 = inttoptr (i32 %1) to foo*
-		s = "inttoptr (" + inttype + " " + s + " to " + ptrtype + ")"
+		'' Keep the byte displacement in pointer arithmetic. Integer addition
+		'' can become an unsigned COFF relocation addend on 32-bit targets.
+		'' Descriptor bases may precede their storage, so this is not inbounds.
+		var byteofs = ofs
+		if( fbIs64bit( ) = FALSE ) then byteofs = clng( byteofs )
+		if( ptrtype <> "i8*" ) then
+			s = "bitcast (" + ptrtype + " " + s + " to i8*)"
+		end if
+		var inttype = hEmitType( FB_DATATYPE_INTEGER, NULL )
+		s = "getelementptr (i8, i8* " + s + ", " + inttype + " " & byteofs & ")"
+		ptrdtype = typeAddrOf( FB_DATATYPE_VOID )
+		ptrsubtype = NULL
+		ptrtype = "i8*"
 	end if
 
 	hMaybeAddConv( s, symdtype, sym->subtype, symtype, ptrdtype, ptrsubtype, ptrtype )

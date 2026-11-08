@@ -65,7 +65,8 @@ Private Function DecodeCvaAggregates (ByVal arguments As Cva_List) As LongInt
     Dim As AggregateMemory memory_value = Cva_Arg(arguments, AggregateMemory)
 
     Return rr.first_value * 1000000000000 + rr.second_value * 100000000000 + _
-           small_value.first_value * 10000000000 + small_value.second_value * 1000000000 + _
+           Cast(LongInt, small_value.first_value) * 10000000000 + _
+           Cast(LongInt, small_value.second_value) * 1000000000 + _
            Cast(LongInt, x_value.floating_value) * 100000000 + _
            rx.integer_part * 10000000 + Cast(LongInt, rx.floating_part) * 1000000 + _
            Cast(LongInt, xr.floating_part) * 100000 + xr.integer_part * 10000 + _
@@ -80,7 +81,7 @@ Function ReadCvaAggregates CDecl Alias "read_cva_aggregates" _
 End Function
 
 Function ReadCvaLongDouble CDecl Alias "read_cva_longdouble" _
-    (ByVal arguments As Cva_List) As Integer
+    (ByVal arguments As Cva_List) As Long
     Dim As CLongDouble value = fb_LongDoubleVaArg(arguments)
     Return -CInt(value = 1.75#)
 End Function
@@ -110,9 +111,11 @@ Declare Function cva_aggregate_registers CDecl _
 Declare Function cva_aggregate_overflow CDecl _
     Alias "cva_aggregate_overflow" () As LongInt
 Declare Function cva_longdouble_register CDecl _
-    Alias "cva_longdouble_register" () As Integer
+    Alias "cva_longdouble_register" () As Long
 Declare Sub cva_write_longdouble_precision CDecl _
     Alias "cva_write_longdouble_precision" (ByVal destination As Any Ptr)
+Declare Function cva_longdouble_has_extra_precision CDecl _
+    Alias "cva_longdouble_has_extra_precision" () As Long
 #if defined( __FB_X86__ ) and defined( __FB_LINUX__ )
 Declare Function cva_longdouble_identity CDecl _
     Alias "cva_longdouble_identity" (ByVal value As CLongDouble) As CLongDouble
@@ -159,15 +162,18 @@ Dim As CLongDouble literal_value = CLongDoubleFromStringValue( _
 Dim As CLongDouble c_literal_value
 cva_write_longdouble_precision(@c_literal_value)
 If (literal_value = c_literal_value) <> -1 Then End 10
-If (literal_value > CLongDoubleFromStringValue(StrPtr(!"1.0"))) <> -1 Then End 11
+'' Darwin and Windows ARM64 use binary64 long double. Compare with the
+'' native C result, including its rounding, rather than requiring x87 precision.
+If (literal_value > CLongDoubleFromStringValue(StrPtr(!"1.0"))) <> _
+    -cva_longdouble_has_extra_precision() Then End 11
 Dim As CLongDouble fractional_value = _
     CLongDoubleFromStringValue(StrPtr(!"1.75"))
 If Cast(Long, fractional_value) <> 1 Then End 12
 If Cast(Long, CLongDoubleFromStringValue(StrPtr(!"-1.75"))) <> -1 Then End 13
 If Cast(ULong, fractional_value) <> 1 Then End 14
 
-Dim As CLongDouble fixed_input = CLongDoubleFromDoubleValue(1.75#)
 #if defined( __FB_X86__ ) and defined( __FB_LINUX__ )
+Dim As CLongDouble fixed_input = CLongDoubleFromDoubleValue(1.75#)
 If Cast(Double, cva_longdouble_identity(fixed_input)) <> 1.75# Then End 6
 If Cast(Double, cva_longdouble_transform(fixed_input)) <> 4.0# Then End 7
 If Cast(Double, cva_longdouble_add( _

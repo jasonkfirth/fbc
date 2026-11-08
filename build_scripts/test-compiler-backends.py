@@ -525,6 +525,19 @@ def main() -> int:
                               f"{compiled.stdout}{compiled.stderr}")
                         return 1
                     print(f"LLVM/win32-{architecture}: object compilation passed")
+                # Static array descriptors can point before their storage.
+                # Exercise their signed relocations through LLVM and Clang's
+                # COFF assembler even when the native compiler is 64-bit.
+                compiled = subprocess.run(
+                    [*compiler_args, "-c", "-gen", "llvm", "-target", "win32", "-arch", "686",
+                     str(root / "tests/compiler-support/c-opaque-local-metadata.bas"),
+                     "-o", str(working / "llvm-win32-metadata.o")],
+                    cwd=working, text=True, capture_output=True, timeout=120, check=False,
+                    env={**os.environ, "LLC": llc, "CLANG": clang})
+                if compiled.returncode:
+                    print("LLVM/win32: descriptor relocations failed\n" + compiled.stdout + compiled.stderr)
+                    return 1
+                print("LLVM/win32: descriptor relocations passed")
         try:
             target = subprocess.run([str(options.fbc.resolve()), "-print", "target"],
                                     cwd=working, text=True, capture_output=True,
@@ -747,7 +760,7 @@ def main() -> int:
             print(f"C ABI fixture: {error}")
             return 1
         for backend in backends:
-            for name, source, expected in fixtures:
+            for fixture_index, (name, source, expected) in enumerate(fixtures):
                 if name in ("wide-libc", "long-literals", "procedure-address-identity", "deep-reachability", "destructor-reachability", "array-virtual-origins") and backend not in ("gcc", "clang"):
                     continue
                 if name in ("gosub-values", "label-flag-layout") and backend not in ("gcc", "clang"):
@@ -757,7 +770,10 @@ def main() -> int:
                 if name == "asm-att-llvm" and architecture not in ("x86", "686", "x86_64", ""):
                     print(f"{backend}/{name}: x86 assembly fixture is unavailable on {architecture}")
                     continue
-                executable = working / (backend + "-" + name)
+                # Windows can classify an unmanifested 32-bit executable as
+                # an installer when its name contains "patch", including
+                # "dispatch". These are ordinary test programs.
+                executable = working / (backend + "-test-" + str(fixture_index))
                 input_source = root / source
                 if name.startswith("c-abi"):
                     input_source = working / (backend + "-" + name + ".bas")

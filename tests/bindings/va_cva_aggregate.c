@@ -123,6 +123,13 @@ void cva_write_longdouble_precision(void *destination)
     memcpy(destination, &value, sizeof(value));
 }
 
+int cva_longdouble_has_extra_precision(void)
+{
+    /* Native long double can have the same precision as double. Keep the
+       expected comparison consistent with the literal written above. */
+    return 1.0000000000000001L > 1.0L;
+}
+
 #if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
 long double cva_longdouble_identity(long double value)
 {
