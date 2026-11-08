@@ -11,12 +11,11 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import signal
 import subprocess
 import tempfile
 import zlib
-from native_c_support import is_gnu_compiler, native_command
+from native_c_support import is_gnu_compiler, native_command, native_path, resolve_executable
 
 
 def sha(path):
@@ -40,11 +39,12 @@ def main():
     for name in ('fbc', 'gcc', 'clang'):
         command = getattr(args, name)
         if command:
-            resolved = shutil.which(command)
-            if resolved is None:
+            try:
+                resolved = resolve_executable(command)
+            except FileNotFoundError:
                 parser.error('Cannot resolve ' + name + ' executable: ' + command)
-            setattr(args, name, str(Path(resolved).resolve(strict=True)))
-    args.prefix = str(Path(args.prefix).resolve(strict=True))
+            setattr(args, name, str(resolved))
+    args.prefix = str(native_path(args.prefix).resolve(strict=True))
     source = Path(__file__).resolve().parent
     parent = args.work_dir.resolve(strict=True)
     files = [Path(__file__), source / 'c-record-pointer-dependencies.bas',

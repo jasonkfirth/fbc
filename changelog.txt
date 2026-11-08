@@ -435,6 +435,10 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- compiler/semantic tooling: retain valid level-zero unused-value warning policies and leave malformed legacy-byte lines without editable coordinates while preserving later physical lines.
+- tests/semantic tooling: validate current floating leading-zero and read-only call metadata without weakening corruption checks; distinguish LLVM IR coverage from runtime checks requiring llc.
+- rtlib/MinGW: parse long-double constants independently of the global numeric locale on legacy MSVCRT, using the bounded native-precision parser already shared with Haiku.
+- tests/C backends: normalize native executable paths before MSYS discovery and hashing, use portable opaque assembly fixtures, and assemble Linux ELF32 controls with an explicit Clang target on non-ELF hosts.
 - rtlib/Haiku: preserve native long-double parsing with the MIT-licensed musl conversion algorithm and a bounded string reader; qualify exact rounding against host CRT values and the native Haiku aggregate/locale regressions.
 - rtlib/NetBSD and Unix: retain the available explicit-locale conversion API on NetBSD and declare off_t through its owning system header in strict C builds.
 - build/CI: pin warning controls to explicit x86 targets, normalize native Windows diagnostic paths under MSYS, probe C23 dialect spellings, retain native ABI checks with Clang, and reserve GCC LTO diagnostics for GNU GCC.

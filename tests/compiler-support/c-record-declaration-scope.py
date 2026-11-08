@@ -14,7 +14,7 @@ import signal
 import subprocess
 import tempfile
 import zlib
-from native_c_support import native_command
+from native_c_support import native_command, native_path, resolve_executable
 
 
 def sha(path):
@@ -33,8 +33,11 @@ def main():
     parser.add_argument('--instrument', action='store_true')
     parser.add_argument('--native-control', action='store_true')
     args = parser.parse_args()
-    args.fbc = str(Path(args.fbc).resolve(strict=True))
-    prefix = Path(args.prefix).resolve(strict=True)
+    args.fbc = str(resolve_executable(args.fbc))
+    args.gcc = str(resolve_executable(args.gcc))
+    if args.clang:
+        args.clang = str(resolve_executable(args.clang))
+    prefix = native_path(args.prefix).resolve(strict=True)
     source = Path(__file__).with_suffix('.bas')
     files = [Path(__file__), source, Path(args.fbc), Path(args.gcc)]
     if args.clang:

@@ -33,9 +33,8 @@ public function SharedRead cdecl alias "readonly_shared_entry"(byval text as zst
 end function
 
 #ifdef CHECK_OPAQUE
-asm
-	nop
-end asm
+#include once "c-opaque-nop.bi"
+compiler_test_opaque_nop()
 #endif
 
 if DirectRead("A") <> 65 then end 1

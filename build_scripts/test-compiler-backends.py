@@ -206,6 +206,12 @@ def main() -> int:
     ]
     with tempfile.TemporaryDirectory(prefix="fbc-backends-") as temporary:
         working = Path(temporary)
+        native_support = subprocess.run(
+            [sys.executable, '-B', str(root / 'tests/compiler-support/test_native_c_support.py')],
+            cwd=working, text=True, capture_output=True, timeout=30, check=False)
+        if native_support.returncode:
+            print('native compiler support contracts failed\n' + native_support.stdout + native_support.stderr)
+            return 1
         # Source diagnostics must survive changes in C warning cleanup and
         # remain consistent for the native assembly producers as well.
         source_warnings = subprocess.run(
@@ -1613,10 +1619,10 @@ def main() -> int:
             arithmetic_object = working / "gas-int128-arithmetic.o"
             # MinGW's native assembler produces COFF and cannot consume the
             # ELF directives selected by linux-x86. Use an explicit ELF target.
-            if os.name == "nt" and clang is not None:
+            if clang is not None:
                 assemble_command = [clang, "-target", "i386-linux-gnu", "-c", "-x", "assembler",
                                     str(assembly), "-o", str(arithmetic_object)]
-            elif os.name != "nt" or os.environ.get("AS"):
+            elif system == "linux" and architecture in ("x86", "686", "x86_64"):
                 assemble_command = [os.environ.get("AS") or "as", "--32", "-o",
                                     str(arithmetic_object), str(assembly)]
             else:

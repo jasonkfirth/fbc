@@ -8,12 +8,11 @@ This file intentionally does NOT run platform-specific assembler or fault probes
 #lang "fb"
 
 #include once "crt/string.bi"
+#include once "c-opaque-nop.bi"
 
 private sub returning_context(byval early_exit as long)
     if strcmp(erfn, "RETURNING_CONTEXT") <> 0 then end 91
-    asm
-        mov eax, eax
-    end asm
+    compiler_test_opaque_nop()
     if early_exit then exit sub
     if strcmp(ermn, "") = 0 then end 92
 end sub
@@ -21,9 +20,7 @@ end sub
 private sub terminating_context()
     if strcmp(erfn, "TERMINATING_CONTEXT") <> 0 then end 93
     if strcmp(ermn, "") = 0 then end 94
-    asm
-        mov eax, eax
-    end asm
+    compiler_test_opaque_nop()
     print "C_TERMINATING_CONTEXT_PASS"
     end 0
 end sub

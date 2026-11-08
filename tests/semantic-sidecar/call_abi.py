@@ -65,6 +65,24 @@ def check_choices(test):
                 modes = arguments(model, next(iter(calls(model, test.one(model, "CallModes", "procedure")))))
                 test.assertEqual(len(modes), 3)
                 test.assertTrue(all(int(row[8]) & POINTER_MASK for row in modes))
+                if backend != "llvm":
+                    test.assertEqual(modes[1][5], "readonly-implementation")
+                    test.assertEqual(int(modes[1][8]), int(modes[1][6]) | 1024)
+                    # Accept the implementation's const pointee, while still
+                    # rejecting fabricated types that change its call contract.
+                    if target == "linux-x86_64":
+                        for damage in ("mutable", "scalar", "different-base"):
+                            with test.subTest(damage=damage), test.assertRaises(ValueError):
+                                rows = [row.copy() for row in model.rows]
+                                row = next(row for row in rows if row[0] == "K"
+                                           and row[3].startswith("emitted-abi-argument:")
+                                           and row[4].split("\t")[5] == "readonly-implementation")
+                                fields = row[4].split("\t")
+                                dtype = int(fields[8])
+                                fields[8] = str(dtype & ~1024 if damage == "mutable" else
+                                                dtype & ~POINTER_MASK if damage == "scalar" else dtype ^ 1)
+                                row[4] = "\t".join(fields)
+                                Model(text_rows(rows))
                 test.assertTrue(any(row[2] == "indirect" and row[7] != "0" for row in facts["call"].values()))
                 test.assertTrue(any(row[2] == "indirect" and row[7] == "0" for row in facts["call"].values()))
                 test.assertTrue(all(row[2] == "direct" for row in wide.values()))

@@ -5,9 +5,11 @@ Responsibilities: Exercise older C23 spellings and Clang's GNU command alias.
 This file intentionally does NOT compile fixtures or change diagnostic policy.
 """
 import subprocess
+from pathlib import Path
+import sys
 import unittest
 from unittest.mock import patch
-from native_c_support import c23_standard, is_gnu_compiler, native_command
+from native_c_support import c23_standard, is_gnu_compiler, native_command, resolve_executable
 
 
 class NativeCompilerContracts(unittest.TestCase):
@@ -22,6 +24,12 @@ class NativeCompilerContracts(unittest.TestCase):
             self.assertEqual(c23_standard('gcc-13'), 'gnu2x')
             self.assertEqual(len(run.call_args_list), 2)
             self.assertNotIn('-std=gnu11', str(run.call_args_list))
+
+    def test_real_native_executable_path(self):
+        command = sys.executable
+        if sys.platform in ('msys', 'cygwin'):
+            command = subprocess.check_output(['cygpath', '-w', command], text=True).strip()
+        self.assertEqual(resolve_executable(command), Path(sys.executable).resolve(strict=True))
 
     def test_missing_c23_mode_fails_instead_of_downgrading(self):
         with patch('native_c_support.subprocess.run', return_value=

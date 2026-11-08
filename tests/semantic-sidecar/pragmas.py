@@ -180,7 +180,7 @@ def check_corruption(test):
 
 def check_runtime(test):
     source = test.source(SCALARS, "pragma-runtime.bas")
-    for backend in test.backends:
+    for backend in test.runtime_backends():
         outputs = []
         for mode in ("off", "full", "expressions", "bindings"):
             executable = test.working / ("pragma-" + backend + "-" + mode + (".exe" if test.native_windows else ""))

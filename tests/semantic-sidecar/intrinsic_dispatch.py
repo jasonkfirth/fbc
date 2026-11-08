@@ -342,7 +342,7 @@ dim first as double = abs(sin(NextValue()))
 dim skipped as double = iif(0, abs(NextValue()), 0)
 print calls
 """, "intrinsic-runtime.bas")
-    for backend in test.backends:
+    for backend in test.runtime_backends():
         baseline = None
         for mode in ("off", "full", "bindings", "expressions"):
             executable = test.working / ("intrinsic-runtime.exe" if test.native_windows else "intrinsic-runtime")

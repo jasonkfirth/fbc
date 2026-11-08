@@ -25,17 +25,21 @@ def policy_fields(value, number, *, warning_levels=False):
         raise ValueError("Diagnostic target or lexer state is invalid")
     if fields[0] == "0" and fields[7] != "0":
         raise ValueError("Uninitialized reporter invents parameter contexts")
-    if warning_levels and fields[12] not in ("-1", "1", "2", "3"):
+    if warning_levels and fields[12] not in ("-1", "0", "1", "2", "3"):
         raise ValueError("Invalid native warning catalog level")
     return fields
 
 
-def validate_warning_level(fields, severity):
+def validate_warning_level(fields, severity, code):
     if len(fields) != 13:
         return
     level = int(fields[12])
     if severity != "warning" and level != -1:
         raise ValueError("Ordinary error invents a warning catalog level")
+    # The two native unused-value warnings have catalog level zero. Other
+    # warnings cannot acquire that level through a mutated artifact.
+    if level == 0 and int(code) not in (54, 55):
+        raise ValueError("Warning invents a level-zero catalog entry")
     if severity == "warning" and level != -1 and level < int(fields[4]):
         raise ValueError("Suppressed warning claims an accepted observation")
 
@@ -115,7 +119,7 @@ def validate_diagnostic_contexts(model, number, subject_modules):
             raise ValueError("Reported diagnostic or parameter coverage is incomplete")
         if context[6] == "1" and diagnostic[2] != "warning":
             raise ValueError("Ordinary error claims warning promotion")
-        validate_warning_level(context, diagnostic[2])
+        validate_warning_level(context, diagnostic[2], diagnostic[3])
         actual = observed.setdefault(module, [0, 0, 0, 0])
         actual[0] += 1
         actual[1] += diagnostic[2] == "error"

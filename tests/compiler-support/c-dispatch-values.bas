@@ -7,6 +7,7 @@
 '/
 #lang "fblite"
 option gosub
+#include once "c-opaque-nop.bi"
 
 private function resumed_value(byval seed as integer) as integer
     dim values(0 to 3) as integer
@@ -42,9 +43,7 @@ private sub fallthrough_value(byref result_value as integer)
     dim values(0 to 3) as integer
     values(3) = 19
     on local error goto handler
-    asm
-        nop
-    end asm
+    compiler_test_opaque_nop()
     error 24
     result_value = values(3)
     goto done

@@ -69,6 +69,8 @@ int main(void)
 #endif
 #if defined(__MINGW32__) && defined(_UCRT)
     assert(_configthreadlocale(0) == original_mode);
+#endif
+#if defined(__MINGW32__)
     assert(non_c_locale);
 #endif
     printf("LONGDOUBLE_STRING_LOCALE=PASS non_c=%d precision=%d\n",

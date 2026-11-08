@@ -72,7 +72,8 @@ sub fbSemanticDiagnosticsPolicy( byval initialized as integer, byval options as 
 	byval show_source as integer, byval error_count as integer, byval promoted as integer, byval warning_level as integer )
 	hDiagnosticContextClear( )
 	if( (diagnostic_output = NULL) and (fbSemanticModelEnabled( ) = FALSE) ) then exit sub
-	if( (warning_level < -1) or (warning_level = 0) or (warning_level > FB_WARNINGMSGS_HIGHEST_LEVEL) ) then
+	'' Level zero is used by the native unused-parameter/variable warnings.
+	if( (warning_level < -1) or (warning_level > FB_WARNINGMSGS_HIGHEST_LEVEL) ) then
 		diagnostic_failed = TRUE
 		fbSemanticModelFailAt("invalid native warning catalog level")
 		exit sub

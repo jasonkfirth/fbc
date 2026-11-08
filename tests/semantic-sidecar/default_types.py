@@ -170,7 +170,7 @@ def check_corruption(test):
 
 def check_runtime(test):
     source = test.source('#lang "fblite"\ndefint a-z\naValue = 2\ndefsng b\nbValue = 3.5\ndefstr c\ncValue = "ok"\nprint aValue; bValue; cValue\n', "default-runtime.bas")
-    for backend in test.backends:
+    for backend in test.runtime_backends():
         outputs = []
         for mode in ("off", "full", "expressions", "bindings"):
             executable = test.working / ("default-" + backend + "-" + mode + (".exe" if test.native_windows else ""))

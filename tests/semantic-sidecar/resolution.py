@@ -505,7 +505,7 @@ dim value as CastValue
 print Accept(value)
 print conversions
 """, "resolution-cast-runtime.bas")
-    for backend in test.backends:
+    for backend in test.runtime_backends():
         expected = None
         for mode in ("off", "full", "expressions", "bindings"):
             executable = test.working / ("resolution-cast.exe" if test.native_windows else "resolution-cast")
@@ -535,7 +535,7 @@ print Pick(Tick())
 if 0 then print Pick(Tick())
 print calls
 ''', "resolution-runtime.bas")
-    for backend in test.backends:
+    for backend in test.runtime_backends():
         baseline = None
         for mode in ("off", "full", "expressions", "bindings"):
             executable = test.working / ("resolution-runtime.exe" if test.native_windows else "resolution-runtime")

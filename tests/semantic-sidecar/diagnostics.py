@@ -153,7 +153,7 @@ class Diagnostics:
                 context = policy_fields(row[2], number, warning_levels=result.warning_levels)
                 if context[6] == "1" and result.records[identity - 1][3] != "warning":
                     raise ValueError("Ordinary error claims warning promotion")
-                validate_warning_level(context, result.records[identity - 1][3])
+                validate_warning_level(context, result.records[identity - 1][3], result.records[identity - 1][4])
                 result.contexts[identity] = context
             elif row[0] == "DP":
                 identity = integer(row[1], 1, len(result.records))

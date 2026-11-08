@@ -2381,12 +2381,17 @@ class Model:
             if not keys and not (available and decimal_float):
                 continue
             expected = required | {"original-float-provenance"} if has_transport else required
+            if module is not None and self.capabilities[module].get("original-float-width-inputs") == "available":
+                expected = expected | {"original-float-leading-zeros"}
             if domain != "expression" or not available or not decimal_float or keys != expected:
                 raise ValueError("Incomplete original float literal inputs")
             text = properties["original-float-text"]
             complete = properties["original-float-text-complete"]
             exponent = properties["original-float-exponent"]
             digits = number(properties["original-float-digits"], 0)
+            if "original-float-leading-zeros" in properties:
+                if number(properties["original-float-leading-zeros"], 0) > 1048576:
+                    raise ValueError("Original float leading-zero count exceeds its bound")
             if not 1 <= len(text) <= 1024 or complete not in ("0", "1") or exponent not in ("0", "1") or digits > 1048576:
                 raise ValueError("Invalid original float literal bounds")
             if any(character not in "0123456789.eEdD+-" for character in text):

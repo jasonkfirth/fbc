@@ -11,12 +11,11 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import signal
 import subprocess
 import tempfile
 import zlib
-from native_c_support import is_gnu_compiler, native_command, native_path
+from native_c_support import is_gnu_compiler, native_command, native_path, resolve_executable
 
 
 def sha(path):
@@ -35,10 +34,11 @@ def main():
     root = Path(__file__).resolve().parents[2]
     owner = root / 'examples/win32/variants'
     library = owner / 'libvariant'
-    prefix = Path(args.prefix).resolve(strict=True)
-    tools = [('gcc', shutil.which(args.gcc))]
+    args.fbc = str(resolve_executable(args.fbc))
+    prefix = native_path(args.prefix).resolve(strict=True)
+    tools = [('gcc', str(resolve_executable(args.gcc)))]
     if args.clang:
-        tools.append(('clang', shutil.which(args.clang)))
+        tools.append(('clang', str(resolve_executable(args.clang))))
     if any(not tool for _, tool in tools):
         raise RuntimeError('a requested C compiler is unavailable')
     gcc = tools[0][1]

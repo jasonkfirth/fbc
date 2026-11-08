@@ -9,6 +9,7 @@ from functools import lru_cache
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 
 
@@ -16,6 +17,16 @@ def native_path(filename):
     if os.name != 'nt' and re.match(r'^[A-Za-z]:[\\/]', filename):
         filename = subprocess.check_output(['cygpath', '-u', filename], text=True).strip()
     return Path(filename)
+
+
+def resolve_executable(command):
+    # An environment variable such as GCC can contain a native drive path
+    # even when shutil/pathlib are running inside MSYS. Normalize before both
+    # executable discovery and strict resolution so hashes use the real file.
+    resolved = shutil.which(str(native_path(str(command))))
+    if resolved is None:
+        raise FileNotFoundError('Cannot resolve executable: ' + str(command))
+    return native_path(resolved).resolve(strict=True)
 
 
 @lru_cache(maxsize=None)

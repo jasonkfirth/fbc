@@ -227,31 +227,9 @@ private function hResolveColumn _
 	if( (decoder_column < 0) or (hReadLine(source, line_number) = FALSE) ) then
 		return FALSE
 	end if
-	if( coordinate_format = FBFILE_FORMAT_ASCII ) then
-		'' Unmarked input permits legacy bytes as well as UTF-8. Use the same
-		'' column state as lexEatChar instead of requiring declared UTF-8 here.
-		'' A pending malformed sequence can temporarily share a lexer column;
-		'' only a completed boundary supplies an unambiguous byte coordinate.
-		dim as integer byte_column = 0, continuations_left = 0, sequence_first = 0
-		dim as integer selected_byte = -1
-		for byte_index as integer = 0 to len(coordinate_text) - 1
-			if( (byte_column = decoder_column) and (continuations_left = 0) ) then
-				if( coordinate_line_validity > 0 ) then
-					column = decoder_column
-					offset = coordinate_offset + byte_index
-					return TRUE
-				end if
-				selected_byte = byte_index
-			end if
-			lexAdvanceByteColumn(coordinate_text[byte_index], byte_column, continuations_left, sequence_first)
-		next
-		coordinate_line_validity = 1
-		if( (byte_column = decoder_column) and (continuations_left = 0) ) then selected_byte = len(coordinate_text)
-		if( selected_byte < 0 ) then return FALSE
-		column = decoder_column
-		offset = coordinate_offset + selected_byte
-		return TRUE
-	end if
+	'' The parser may accept legacy bytes, but editable UTF-16 coordinates
+	'' require an unambiguous whole line. An undecodable line stays
+	'' unverified without invalidating later physical lines.
 	if( coordinate_line_validity < 0 ) then return FALSE
 	dim as integer index = 0
 	dim as integer decoded = 0, canonical = 0, selected = -1, selected_column = -1

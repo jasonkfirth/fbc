@@ -46,9 +46,8 @@ dim shared callback_entry as function cdecl(byval as long) as long = @prototype_
 
 #ifdef OPAQUE_PROOF
     '' Inline assembly prevents this output from proving its complete call graph.
-    asm
-        nop
-    end asm
+    #include once "c-opaque-nop.bi"
+    compiler_test_opaque_nop()
 #endif
 
 if live_helper(11) <> 21 then end 1

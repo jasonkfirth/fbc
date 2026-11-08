@@ -645,6 +645,16 @@ class SidecarTests(unittest.TestCase):
             return self.compiler_path(path)
         return str(path)
 
+    def runtime_backends(self):
+        # Emission and semantic transport do not require llc. Actual LLVM
+        # execution does, independently of which Python host runs the suite.
+        for backend in self.backends:
+            if backend == "llvm" and shutil.which(os.environ.get("LLC") or "llc") is None:
+                with self.subTest(backend=backend):
+                    self.skipTest("LLVM runtime execution requires llc; emission checks remain enabled")
+                continue
+            yield backend
+
     def create_symlink(self, target: str, destination: Path) -> None:
         if self.native_windows and sys.platform == "cygwin":
             # MSYS2's default symlink mode copies the target. Start ln with
@@ -2011,13 +2021,7 @@ print value
                              "this.value = initial + 1\nconstructorCalls += 1\nend constructor\n"
                              "sub consumeTrivial(byval item as TrivialArgument)\nprint item.value\nend sub\n"
                              "consumeTrivial(17)\nsub exercise()\nconsumeTrivial(23)\nend sub\nexercise()\nprint constructorCalls\n")
-        for backend in self.backends:
-            # Most semantic checks stop at emitted IR. This case executes
-            # the result, so LLVM also needs its external code generator.
-            if backend == "llvm" and shutil.which(os.environ.get("LLC") or "llc") is None:
-                with self.subTest(backend=backend):
-                    self.skipTest("LLVM runtime execution requires llc")
-                continue
+        for backend in self.runtime_backends():
             outputs = []
             for mode in ("off", "full", "bindings"):
                 with self.subTest(backend=backend, mode=mode):
@@ -5686,6 +5690,7 @@ Next
                 self.assertEqual({values["original-float-text"] for values in observations}, {"1.23456789", "1.25e-3"})
                 for values in observations:
                     self.assertEqual(values["original-float-text-complete"], "1")
+                    self.assertEqual(values["original-float-leading-zeros"], "0")
                     self.assertEqual(values["original-float-exponent"], str(int("e" in values["original-float-text"])))
                     self.assertGreater(int(values["original-float-initializer-symbol"]), 0)
                 self.assertEqual(self.emission_path(source.stem, backend).read_bytes(), emission)

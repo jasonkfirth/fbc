@@ -7,17 +7,20 @@ This file intentionally does NOT infer source arguments or machine locations.
 
 from collections import defaultdict
 import re
+from semantic_frontend_abi import BASE_MASK, POINTER_MASK, CONST_MASK, MANGLE_MASK, POINTER_STEP
 
 FEATURE = "selected-call-abi"
 BUILTIN_FEATURE = "llvm-builtin-call-lowering"
 LIMIT, TEXT_BYTES = 1000000, 65536
-# Native and stable-v1 reserve bits 5..8 for pointer depth.
-POINTER_MASK = 0x1e0
+# Match typeAddrOf/typeDeref: bit 9 qualifies the value itself, bit 10 its
+# first pointee. Selecting a fresh implementation pointer drops value const.
+VALUE_CONST = 1 << 9
+POINTEE_CONST = VALUE_CONST << 1
 PREFIXES = ("emitted-abi-call:", "emitted-abi-argument:", "emitted-abi-call-end:", "emitted-abi-call-counts:",
             "emitted-abi-builtin:", "emitted-abi-builtin-count:")
 KINDS = frozenset(("value", "variadic-value", "hidden-result", "unmapped-value", "i386-int128-low",
                    "i386-int128-high", "memory-byval", "va-list-decay", "array-callback", "libc-adjusted",
-                   "graphics-blender", "graphics-blender-context"))
+                   "graphics-blender", "graphics-blender-context", "readonly-implementation"))
 
 
 def validate_call_abi(model, number, subject_modules):
@@ -190,6 +193,18 @@ def validate_call_abi(model, number, subject_modules):
                 raise ValueError("LLVM call memory argument loses its actual byval attributes")
             if kind in ("array-callback", "libc-adjusted", "graphics-blender", "graphics-blender-context") and call[1] != "c":
                 raise ValueError("C call adaptation appears in another backend")
+            if kind == "readonly-implementation":
+                formal = model.symbols[param]
+                original = int(formal[4])
+                if mode == "byref":
+                    original = ((original & BASE_MASK) | ((original & POINTER_MASK) + POINTER_STEP)
+                                | ((original & CONST_MASK) << 1) | (original & MANGLE_MASK))
+                selected_dtype = (original & (BASE_MASK | POINTER_MASK | (CONST_MASK & ~VALUE_CONST) | MANGLE_MASK)) | POINTEE_CONST
+                if (call[1] != "c" or mode not in ("byval", "byref")
+                        or (original & POINTER_MASK) != POINTER_STEP or original & POINTEE_CONST
+                        or dtype != selected_dtype or fields[9] != formal[5]
+                        or model.primitives[module - 1][original & 31][2] not in ("zstring", "wstring", "byte", "ubyte")):
+                    raise ValueError("Read-only implementation call changes more than its pointee qualifier")
             if kind == "array-callback" and dtype is not None:
                 raise ValueError("C callback adaptation invents a BASIC selected type")
             if kind in ("graphics-blender", "graphics-blender-context"):
