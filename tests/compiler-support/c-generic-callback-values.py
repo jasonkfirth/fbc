@@ -9,10 +9,11 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+from native_c_support import native_command
 
 
 def run(command, execute=False):
-    command = list(map(str, command))
+    command = native_command(command)
     result = subprocess.run(command, capture_output=True, text=True, timeout=15 if execute else 90,
         creationflags=subprocess.BELOW_NORMAL_PRIORITY_CLASS if os.name == 'nt' else 0)
     output = result.stdout + result.stderr

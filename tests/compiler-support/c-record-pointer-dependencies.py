@@ -16,6 +16,7 @@ import signal
 import subprocess
 import tempfile
 import zlib
+from native_c_support import is_gnu_compiler, native_command
 
 
 def sha(path):
@@ -74,7 +75,7 @@ def main():
         exe = work / ('unit.exe' if os.name == 'nt' else 'unit')
 
         def run(command, execute=False):
-            command = list(map(str, command))
+            command = native_command(command)
             assert not any(v == '-w' or v.startswith('-Wno-') for v in command)
             process = subprocess.Popen(command, cwd=work, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 creationflags=subprocess.BELOW_NORMAL_PRIORITY_CLASS if os.name == 'nt' else 0,
@@ -133,7 +134,7 @@ def main():
                         run([executable, *flags, *definitions, '-c', source / 'c-record-pointer-dependencies.c', '-o', observer])
                         run([args.fbc, '-prefix', args.prefix, obj, observer, '-x', exe])
                         execute()
-            for standard in standards:
+            for standard in (standards if is_gnu_compiler(args.gcc) else ()):
                 flags = ['-std=' + standard, '-O2', '-flto', *common, *diagnostics['gcc'], *instruments]
                 run([args.gcc, *flags, '-nostdinc', '-c', cpp, '-o', obj])
                 run([args.gcc, *flags, *definitions, '-c', source / 'c-record-pointer-dependencies.c', '-o', observer])
@@ -149,7 +150,8 @@ def main():
             'checks': checks, 'emissions': emissions, 'successful_executions': runs,
             'instrumented': args.instrument, 'baseline': args.baseline,
             'runtime_prefix': args.prefix, 'whole_runtime_instrumentation_claimed': False}, indent=2) + '\n')
-    print('C_RECORD_POINTER_DEPENDENCIES_PASS runs=' + str(runs))
+    print('C_RECORD_POINTER_DEPENDENCIES_PASS runs=' + str(runs) +
+          ' gcc_lto=' + ('checked' if is_gnu_compiler(args.gcc) else 'unavailable; native ABI checked'))
 
 
 if __name__ == '__main__':

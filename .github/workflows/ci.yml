@@ -71,6 +71,9 @@ jobs:
       - name: Check analyzer and platform contracts
         run: python3 -B build_scripts/test-ci-platform-contracts.py
 
+      - name: Check native compiler capability contracts
+        run: python3 -B -m unittest discover -s tests/compiler-support -p test_native_c_support.py
+
       - name: Upload C/C++ lint diagnostics
         if: failure()
         uses: actions/upload-artifact@v7

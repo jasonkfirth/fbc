@@ -13,6 +13,7 @@ import argparse
 from collections import Counter
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -20,6 +21,14 @@ import tempfile
 
 
 WARNING = re.compile(r"^(.+?)\((\d+)\)(?: error)? warning (\d+)\((\d+)\): (.+)$", re.M)
+
+
+def diagnostic_path(filename: str) -> Path:
+    # MSYS Python sees /d/... while the native compiler reports D:\... .
+    # Convert only native drive paths; keep ordinary POSIX paths unchanged.
+    if os.name != "nt" and re.match(r"^[A-Za-z]:[\\/]", filename):
+        filename = subprocess.check_output(["cygpath", "-u", filename], text=True).strip()
+    return Path(filename).resolve()
 
 
 def expected(case: int, bits: int, level: str) -> Counter:
@@ -70,7 +79,7 @@ def main() -> int:
         def emit(compiler, generator, bits, case, level, flags=(), promote=False):
             command = [str(compiler.resolve()), "-prefix", str(args.prefix.resolve()),
                        "-gen", generator, "-asm", "intel", "-r", "-m", source.stem,
-                       *(["-target", "win32"] if bits == 32 else []),
+                       "-target", "linux", "-arch", "686" if bits == 32 else "x86_64",
                        *([] if level == "default" else ["-w", level]),
                        *(["-w", "error"] if promote else []), *flags,
                        "-d", f"SOURCE_WARNING_CASE={case}", str(source), "-o", str(output)]
@@ -90,9 +99,9 @@ def main() -> int:
             for match in matches:
                 filename, line, code = match[1], int(match[2]), int(match[3])
                 if case == 11:
-                    assert Path(filename).resolve() == include.resolve() and line == declaration_line, text
+                    assert diagnostic_path(filename) == include.resolve() and line == declaration_line, text
                 else:
-                    assert Path(filename).resolve() == source.resolve(), text
+                    assert diagnostic_path(filename) == source.resolve(), text
                     assert 0 < line <= len(source.read_text().splitlines()), text
                 if case == 1 and code == 54:
                     assert match[5].endswith(", IGNORED"), text

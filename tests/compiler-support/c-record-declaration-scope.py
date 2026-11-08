@@ -14,6 +14,7 @@ import signal
 import subprocess
 import tempfile
 import zlib
+from native_c_support import native_command
 
 
 def sha(path):
@@ -63,7 +64,7 @@ def main():
         exe = work / ('unit.exe' if os.name == 'nt' else 'unit')
 
         def run(command, execute=False):
-            command = list(map(str, command))
+            command = native_command(command)
             assert not any(v == '-w' or v.startswith('-Wno-') for v in command)
             process = subprocess.Popen(command, cwd=work, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 creationflags=subprocess.BELOW_NORMAL_PRIORITY_CLASS if os.name == 'nt' else 0,

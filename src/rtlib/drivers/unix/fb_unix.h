@@ -5,6 +5,7 @@
  * Responsibilities: Target-specific runtime support for unix.
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
+#include <sys/types.h>
 #include <unistd.h>
 #include <termios.h>
 

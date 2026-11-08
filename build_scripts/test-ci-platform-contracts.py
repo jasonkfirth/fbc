@@ -48,6 +48,9 @@ def main():
              root / 'tests/rtlib/js-exepath-bounds.c',
              root / 'src/rtlib/drivers/js/sys_getexepath.c', '-o', executable])
         print(run([executable]).strip())
+        run([options.gcc, '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+             root / 'tests/rtlib/longdouble-parse.c', '-lm', '-o', executable])
+        print(run([executable]).strip())
         # Reject accidental dependencies on CE's absent locale header, without
         # substituting a fake runtime implementation or linking foreign code.
         (work / 'locale.h').write_text('#error CE must not include locale.h\n')

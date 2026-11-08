@@ -435,6 +435,11 @@ Version 1.20.5
 - tests/documentation: added DOS provider probes for PDMLWP, Sound Blaster, PC speaker, AC'97, Watt-32, graphics, TCP, FreeDOS and DOSBox-X runs, enabled matching optional DOS unit/log suites, added `#cmdline`, gas64 array-index, and sfx intrinsic regression cases, and documented the compatibility services, direct-include results, DOS provider boundaries, AC'97 behavior, and SuperDuel integration findings.
 
 [fixed]
+- rtlib/Haiku: preserve native long-double parsing with the MIT-licensed musl conversion algorithm and a bounded string reader; qualify exact rounding against host CRT values and the native Haiku aggregate/locale regressions.
+- rtlib/NetBSD and Unix: retain the available explicit-locale conversion API on NetBSD and declare off_t through its owning system header in strict C builds.
+- build/CI: pin warning controls to explicit x86 targets, normalize native Windows diagnostic paths under MSYS, probe C23 dialect spellings, retain native ABI checks with Clang, and reserve GCC LTO diagnostics for GNU GCC.
+- tests/RISC OS: match fbcunit string parameter constness to the shared interface; keep the compiler-fragment alignment fixture in the compiler-source backend suite instead of installed language-test packages.
+- tests/Windows ARM64: query the compiler-selected runtime directory and preserve the native architecture when building printer, console and variant ABI controls.
 - compiler/C backend: preserve ordinary AROS emulated-TLS identifiers without GNU asm labels, and check both C producers with an emulated-TLS object regression.
 - rtlib/long double: use scoped POSIX thread locales where strtold_l is unavailable, preserve borrowed locale ownership, and support the Windows CE CRT without locale.h or silent precision loss.
 - build/CI: model Emscripten signatures and standalone fixture configuration for Cppcheck, keep GNU-asm parser limits narrow, retain uninitialized-value controls, and correct actual buffer bounds and mock pointer contracts.

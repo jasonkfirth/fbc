@@ -16,6 +16,15 @@
 #define __USER_LABEL_PREFIX__
 #endif
 
+/* The unix64 lint configuration uses the x86 extended-precision format.
+ * Cppcheck does not obtain float.h's format macros from a system header. */
+#ifndef LDBL_MANT_DIG
+#define LDBL_MANT_DIG 64
+#endif
+#ifndef LDBL_MAX_EXP
+#define LDBL_MAX_EXP 16384
+#endif
+
 /* EM_JS bodies are JavaScript, not C. Preserve their C-facing signatures;
  * browser tests exercise the JavaScript implementation separately. */
 #ifndef EM_JS

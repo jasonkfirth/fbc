@@ -167,6 +167,7 @@ def main() -> int:
          "C_ERROR_CAPTURE_LAYOUT_PASS"),
         ("startup-declarations", "tests/compiler-support/c-startup-declarations.bas",
          "C_STARTUP_DECLARATIONS_PASS\nC_STARTUP_DECLARATIONS_CLEANUP_PASS"),
+        ("storage-alignment-owner", "tests/compiler-support/c-storage-alignment-owner.bas", ""),
         ("reserved-names", "tests/compiler-support/c-reserved-names.bas",
          "C_RESERVED_NAMES_PASS\nC_RESERVED_DESTRUCTOR_PASS"),
         ("terminating-context", "tests/compiler-support/c-terminating-context.bas",
@@ -511,14 +512,22 @@ def main() -> int:
             if system == "win64" and not architecture:
                 architecture = "x86_64"
             if system in ("win32", "win64"):
+                sys.path.insert(0, str(root / "tests/compiler-support"))
+                from native_c_support import native_path
                 printer_exe = working / "win32-printer-geometry.exe"
-                printer_arch = "-m64" if system == "win64" or architecture == "x86_64" else "-m32"
-                printer_lib = "win64" if printer_arch == "-m64" else "win32"
+                printer_arch = (["-m64"] if architecture == "x86_64" else
+                                ["-m32"] if architecture in ("", "x86", "686") else [])
+                runtime_query = subprocess.run([*compiler_args, "-print", "fblibdir"],
+                    cwd=working, text=True, capture_output=True, timeout=30, check=False)
+                if runtime_query.returncode:
+                    print("Windows runtime directory query failed\n" + runtime_query.stderr)
+                    return 1
+                printer_runtime = native_path(runtime_query.stdout.strip()) / "libfb.a"
                 printer_build = subprocess.run(
-                    [os.environ.get("GCC") or "gcc", printer_arch, "-std=gnu23", "-O2",
+                    [os.environ.get("GCC") or "gcc", *printer_arch, "-std=gnu2x", "-O2",
                      "-Wall", "-Wextra", "-fno-strict-aliasing", "-ffunction-sections",
                      "-fdata-sections", str(root / "tests/compiler-support/win32-printer-geometry.c"),
-                     "-Wl,--gc-sections", str(toolchain_prefix / "lib/freebasic" / printer_lib / "libfb.a"),
+                     "-Wl,--gc-sections", str(printer_runtime),
                      "-lwinspool", "-lgdi32", "-lm", "-mthreads", "-o", str(printer_exe)],
                     cwd=working, text=True, capture_output=True, timeout=120, check=False)
                 if printer_build.returncode:
@@ -534,11 +543,11 @@ def main() -> int:
                     console_kind = "wide" if console_wide else "narrow"
                     console_exe = working / f"win32-console-buffer-{console_kind}.exe"
                     console_build = subprocess.run(
-                        [os.environ.get("GCC") or "gcc", printer_arch, "-std=gnu23", "-O2",
+                        [os.environ.get("GCC") or "gcc", *printer_arch, "-std=gnu2x", "-O2",
                          "-Wall", "-Wextra", "-fno-strict-aliasing", "-ffunction-sections",
                          "-fdata-sections", *(["-DCONSOLE_BUFFER_WIDE"] if console_wide else []),
                          str(root / "tests/compiler-support/win32-console-buffer.c"),
-                         "-Wl,--gc-sections", str(toolchain_prefix / "lib/freebasic" / printer_lib / "libfb.a"),
+                         "-Wl,--gc-sections", str(printer_runtime),
                          "-lm", "-mthreads", "-o", str(console_exe)],
                         cwd=working, text=True, capture_output=True, timeout=120, check=False)
                     if console_build.returncode:

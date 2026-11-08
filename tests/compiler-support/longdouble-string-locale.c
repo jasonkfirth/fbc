@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#if defined(__unix__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__)
+#if !defined(__NetBSD__) && (defined(__unix__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__))
 #define FB_TEST_POSIX_LOCALE 1
 #endif
 

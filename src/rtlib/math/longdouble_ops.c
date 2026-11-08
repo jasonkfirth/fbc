@@ -35,6 +35,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "extended_math.h"
+#ifdef __HAIKU__
+#include "longdouble_parse.h"
+#endif
 
 enum {
 	FB_LONGDOUBLE_BOP_ADD = 1,
@@ -163,10 +166,17 @@ void fb_LongDoubleFromDouble(void *destination, double value,
 void fb_LongDoubleFromString(void *destination, const char *text,
 			     unsigned int storage_size)
 {
-	char *end;
 	long double value;
 
 	if (text == NULL) abort();
+#ifdef __HAIKU__
+	/* Haiku's strtold and scanf currently narrow through double. The local
+	 * parser keeps the native significand and never changes locale state. */
+	size_t consumed;
+	value = fb_hParseLongDouble(text, &consumed);
+	if ((consumed == 0) || (text[consumed] != '\0')) abort();
+#else
+	char *end;
 #if defined(_WIN32_WCE)
 	/* CE's minimal CRT has no locale header or locale objects. Its numeric
 	 * conversion uses the C format, and ARM CE has no wider long double. */
@@ -200,6 +210,12 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 	if (c_locale == NULL) abort();
 	value = (long double)_strtod_l(text, &end, c_locale);
 	_free_locale(c_locale);
+#elif defined(__NetBSD__)
+	/* NetBSD exposes locale-taking conversions, but not POSIX uselocale. */
+	locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+	if (c_locale == (locale_t)0) abort();
+	value = strtold_l(text, &end, c_locale);
+	freelocale(c_locale);
 #elif defined(__unix__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__)
 	locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
 	locale_t previous_locale;
@@ -223,6 +239,7 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 	value = strtold(text, &end);
 #endif
 	if ((end == text) || (*end != '\0')) abort();
+#endif
 	longdouble_store(destination, storage_size, value);
 }
 
