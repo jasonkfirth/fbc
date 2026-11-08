@@ -25,6 +25,11 @@ private sub hProperty( byref key as const string, byref value as const string )
 		fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + key + TABCHAR + fbSemanticModelEscape(value))
 end sub
 
+private function hRawTypeNumber( byval dtype as longint ) as string
+	'' The raw token type stays native when the adjacent wire type uses stable-v1.
+	return fbSemanticModelNumber(clngint(culng(dtype)))
+end function
+
 sub fbSemanticModelConsumedToken( byval token as FBTOKEN ptr )
 	if( fbSemanticModelFullEnabled( ) = FALSE ) then exit sub
 	if( lex.ctx = NULL ) then exit sub
@@ -92,7 +97,7 @@ sub fbSemanticModelConsumedToken( byval token as FBTOKEN ptr )
 		macro_valid = abs(token->source.macro_unit_valid <> FALSE)
 	end if
 	dim as string value = fbSemanticModelNumber(token->id) + TABCHAR + fbSemanticModelNumber(token->class) + TABCHAR + _
-		fbSemanticModelTypeNumber(culng(token->dtype)) + TABCHAR + fbSemanticModelNumber(abs(type_known)) + TABCHAR + _
+		hRawTypeNumber(culng(token->dtype)) + TABCHAR + fbSemanticModelNumber(abs(type_known)) + TABCHAR + _
 		fbSemanticModelNumber(wire_type) + TABCHAR + fbSemanticModelNumber(token->len) + TABCHAR + text_kind + TABCHAR + _
 		fbSemanticModelEscape(text) + TABCHAR + fbSemanticModelNumber(abs(token->after_space <> FALSE)) + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelCurrentStatement()) + TABCHAR + fbSemanticModelNumber(fbSemanticModelCurrentContext()) + TABCHAR + _
