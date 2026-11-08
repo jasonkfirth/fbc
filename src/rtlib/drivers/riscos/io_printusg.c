@@ -499,6 +499,10 @@ static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicod
 			fb_PrintVoid( fnum, FB_PRINT_NEWLINE );
 
 		fb_StrDelete( &ctx->fmtstr );
+		/* The final value can leave an unmatched field. The following
+		   USING end call must not revisit the released mask storage. */
+		ctx->ptr = NULL;
+		ctx->chars = 0;
 
 	}
 
@@ -1274,6 +1278,10 @@ static int hPrintNumber
 	if( mask & FB_PRINT_ISLAST )
 	{
 		fb_StrDelete( &ctx->fmtstr );
+		/* The final value can leave an unmatched field. The following
+		   USING end call must not revisit the released mask storage. */
+		ctx->ptr = NULL;
+		ctx->chars = 0;
 	}
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
