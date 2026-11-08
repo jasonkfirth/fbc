@@ -340,6 +340,9 @@ def check_collector_guards(test):
     test.assertFalse(invocation.modules)
     test.assertEqual(invocation.records[0][2], "0")
     test.assertEqual(invocation.contexts[1][11], "0")
+    zero = Diagnostics.read(test.working / "level-zero-guard.fbcdia")
+    test.assertEqual(len(zero.records), 1)
+    test.assertEqual(zero.contexts[1][12], "0")
 
 def check_warning_levels(test):
     source = test.source("function CatalogWarning() as long\nend function\n", "catalog-warning.bas")

@@ -15,7 +15,7 @@ import signal
 import subprocess
 import tempfile
 import zlib
-from native_c_support import is_gnu_compiler, native_command, native_path, resolve_executable
+from native_c_support import is_gnu_compiler, native_command, native_machine_flags, native_path, resolve_executable
 
 
 def sha(path):
@@ -57,7 +57,7 @@ def main():
     standards = ('gnu11', 'gnu23') if args.matrix else ('gnu23',)
     optimizations = ('0', '2') if args.matrix else ('2',)
     tools = [('gcc', args.gcc)] + ([('clang', args.clang)] if args.clang else [])
-    common = ['-fno-strict-aliasing', '-fwrapv', '-frounding-math', '-fno-math-errno']
+    common = [*native_machine_flags(args.fbc), '-fno-strict-aliasing', '-fwrapv', '-frounding-math', '-fno-math-errno']
     diagnostics = {
         'gcc': ['-Wall', '-Wextra', '-Wpedantic', '-Wconversion', '-Wsign-conversion',
             '-Wcast-qual', '-Wcast-align=strict', '-Wpointer-arith', '-Wstrict-prototypes',
@@ -140,7 +140,7 @@ def main():
                 run([args.gcc, *flags, *definitions, '-c', source / 'c-record-pointer-dependencies.c', '-o', observer])
                 # Materialize the mixed declarations before the ordinary BASIC
                 # link, so platform library selection remains the driver's job.
-                run([args.gcc, '-flto', '-O2', '-nostdlib', '-r', '-flinker-output=nolto-rel',
+                run([args.gcc, *native_machine_flags(args.fbc), '-flto', '-O2', '-nostdlib', '-r', '-flinker-output=nolto-rel',
                     '-Werror=lto-type-mismatch', '-o', combined, obj, observer])
                 run([args.fbc, '-prefix', args.prefix, combined, '-x', exe])
                 execute()

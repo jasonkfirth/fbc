@@ -15,7 +15,7 @@ from sidecar import Model
 def check_structure(test):
     source = test.fixture("native-blocks.bas")
     choices = [(backend, ()) for backend in test.backends]
-    choices += [("gas", ("-target", "linux-x86")), ("gas64", ())]
+    choices += [("gas", ("-target", "linux-x86")), ("gas64", ("-target", "linux-x86_64"))]
     for backend, extra in choices:
         with test.subTest(backend=backend):
             test.invoke([source], mode="off", backend=backend, extra=extra)

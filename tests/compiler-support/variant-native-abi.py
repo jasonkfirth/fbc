@@ -96,8 +96,8 @@ def main():
             return output
 
         target = run([args.fbc, '-print', 'target']).decode().strip()
-        if target not in ('win64', 'win64-x86_64', 'win32', 'win32-x86'):
-            raise RuntimeError('variant native execution requires a Windows x86 target: ' + target)
+        if target not in ('win64', 'win64-x86_64', 'win32', 'win32-x86', 'win32-aarch64'):
+            raise RuntimeError('variant native execution requires a supported Windows target: ' + target)
         system = target.split('-')[0]
         architecture = target.partition('-')[2]
         machine = (['-m64'] if system == 'win64' or architecture == 'x86_64' else

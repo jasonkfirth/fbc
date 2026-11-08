@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
-from native_c_support import native_command
+from native_c_support import native_command, native_machine_flags
 
 
 def run(command, execute=False):
@@ -39,6 +39,7 @@ def main():
     profiles = [(std, opt) for std in (args.standard or ('gnu11', 'gnu23'))
         for opt in (args.optimization or ('0', '2'))]
     programs = 0
+    machine = native_machine_flags(args.fbc)
     with tempfile.TemporaryDirectory(prefix='generic-callback-', dir=parent) as directory:
         work = Path(directory).resolve(strict=True)
         if work == parent or not work.is_relative_to(parent):
@@ -55,7 +56,7 @@ def main():
                         '-Wsign-conversion', '-Wcast-qual', '-Wwrite-strings', '-Wstrict-prototypes',
                         '-Wmissing-prototypes', '-Wformat=2', '-Wdeclaration-after-statement']
                     for standard, optimization in profiles:
-                        flags = ['-std=' + standard, '-O' + optimization, '-fno-strict-aliasing', '-fwrapv', *diagnostics]
+                        flags = [*machine, '-std=' + standard, '-O' + optimization, '-fno-strict-aliasing', '-fwrapv', *diagnostics]
                         if sum(p.stat().st_size for p in work.iterdir() if p.is_file()) > 8 * 1024 * 1024:
                             raise RuntimeError('generic callback scratch exceeded its byte cap')
                         run([compiler, *flags, '-nostdinc', '-c', cf, '-o', obj])

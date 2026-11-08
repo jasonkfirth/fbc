@@ -124,6 +124,15 @@ print #1, captured;
 close #1
 observing = FALSE
 
+'' The native unused-parameter warning has catalog level zero. It must be
+'' publishable without replacing the artifact used by the failure controls.
+if( fbSemanticDiagnosticsBegin("level-zero-guard.fbcdia") = FALSE ) then end 10
+fbSemanticDiagnosticsModule(env.inf.name)
+fbSemanticDiagnosticsPolicy(TRUE, 0, FALSE, 0, FALSE, 0)
+fbSemanticModelDiagnostic("warning", FB_WARNINGMSG_UNUSEDPARAMETER, 1, @"unused parameter", NULL, NULL)
+fbSemanticDiagnosticsFinishModule("accepted", 0)
+if( fbSemanticDiagnosticsEnd(TRUE) = FALSE ) then end 11
+
 '' Each failed attempt uses the same destination. The previous valid artifact
 '' must survive both the unescaped input bounds and the escaped record bound.
 for failure_case as integer = 0 to 5
@@ -140,7 +149,8 @@ for failure_case as integer = 0 to 5
 		dim as string escaped_oversized = string(400000, chr(1))
 		fbSemanticDiagnosticsParameter(NULL, 0, 1, strptr(escaped_oversized))
 	case 3
-		fbSemanticDiagnosticsPolicy(TRUE, 0, FALSE, 0, FALSE, 0)
+		'' Level zero is valid for unused-value warnings; -3 is invalid.
+		fbSemanticDiagnosticsPolicy(TRUE, 0, FALSE, 0, FALSE, -3)
 	case 4
 		fbSemanticDiagnosticsPolicy(TRUE, 0, FALSE, 0, FALSE, -2)
 	case 5

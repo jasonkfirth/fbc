@@ -19,7 +19,7 @@ def fields_for(model, family, symbol, slot=0):
 def check_lists_and_instances(test):
     source = test.fixture("startup-lifecycle.bas")
     choices = [(backend, ()) for backend in test.backends]
-    choices += [("gas", ("-target", "linux-x86")), ("gas64", ())]
+    choices += [("gas", ("-target", "linux-x86")), ("gas64", ("-target", "linux-x86_64"))]
     for backend, extra in choices:
         with test.subTest(backend=backend):
             test.invoke([source], mode="off", backend=backend, extra=extra)
@@ -246,7 +246,8 @@ def check_legacy_order_and_shared(test):
                          'VisitStartupLabel:\n'
                          'return\nend sub\nLegacyStartupOrder()\n', "startup-legacy.bas")
     choices = [(backend, ()) for backend in test.backends]
-    choices += [("gas", ("-target", "linux-x86")), ("gas64", ()), ("gas64", ("-z", "gosub-setjmp"))]
+    choices += [("gas", ("-target", "linux-x86")), ("gas64", ("-target", "linux-x86_64")),
+                ("gas64", ("-target", "linux-x86_64", "-z", "gosub-setjmp"))]
     for backend, extra in choices:
         with test.subTest(backend=backend, route="legacy", options=extra):
             test.invoke([source], mode="off", backend=backend, extra=extra)

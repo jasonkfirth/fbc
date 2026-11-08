@@ -6516,7 +6516,7 @@ private sub hEmitComputedGotoAddress( )
 		'' target must continue to omit this workaround.
 		assert( ctx.procentrylabel <> NULL )
 		hWriteLine( "#if defined(__clang__)", TRUE )
-		hWriteLine( "(void)&&" + hGetCId( ctx.procentrylabel ) + ";" )
+		hWriteLine( "__extension__ (void)&&" + hGetCId( ctx.procentrylabel ) + ";" )
 		hWriteLine( "#endif", TRUE )
 		ctx.computedgotoentry = TRUE
 		ctx.computedgotoaddress = TRUE
@@ -6539,9 +6539,17 @@ private sub _emitJumpPtr( byval v1 as IRVREG ptr )
 	end if
 	'' An unclassified indirect transfer keeps GNU label representation for
 	'' the complete procedure. Known ERROR returns never leave their scope.
+	'' Both label addresses and indirect jumps are intentional GNU C syntax.
+	'' Mark the whole jump expression so pedantic checks retain their scope
+	'' for ordinary generated C around this transfer.
+	'' Capture the destination once and trap NULL instead of jumping to it.
+	'' The explicit exit also avoids Clang's unreachable statement-expression
+	'' diagnostic for an expression containing only an indirect jump.
 	c_resume_enabled = FALSE
 	hEmitComputedGotoAddress()
-	hWriteLine("goto *" + jumptarget + ";")
+	hWriteLine("__extension__ ({ const void* const fb_c_jump_target = " + jumptarget + _
+		"; if (fb_c_jump_target != 0) goto *fb_c_jump_target; });")
+	hWriteLine("__builtin_trap();")
 end sub
 
 private sub _emitBranch( byval op as integer, byval label as FBSYMBOL ptr )

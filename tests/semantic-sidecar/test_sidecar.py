@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 import codecs
+import errno
 import hashlib
 import json
 from pathlib import Path
@@ -687,6 +688,16 @@ class SidecarTests(unittest.TestCase):
         path = self.working / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
+        return path
+
+    def byte_source(self, content: bytes, name: bytes) -> Path:
+        path = self.working / os.fsdecode(name)
+        try:
+            path.write_bytes(content)
+        except OSError as error:
+            if error.errno == errno.EILSEQ:
+                self.skipTest("Filesystem requires valid Unicode filenames")
+            raise
         return path
 
     def emission_path(self, stem: str, backend: str) -> Path:

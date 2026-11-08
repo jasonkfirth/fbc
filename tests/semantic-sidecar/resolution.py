@@ -421,8 +421,7 @@ def check_contexts(test):
 def check_source_bytes(test):
     if test.native_windows:
         test.skipTest("Raw non-UTF-8 filenames require a POSIX host")
-    source = test.working / os.fsdecode(b"resolution-%\t-\xff.bas")
-    source.write_bytes(NUMERIC.encode("ascii"))
+    source = test.byte_source(NUMERIC.encode("ascii"), b"resolution-%\t-\xff.bas")
     base = [str(test.compiler), "-prefix", str(test.toolchain_prefix), "-r", str(source)]
     baseline = subprocess.run(base, cwd=test.working, capture_output=True, timeout=60)
     test.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)

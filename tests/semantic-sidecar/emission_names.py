@@ -47,6 +47,15 @@ def names_for(model, name):
             for owner, stage, state, spelling, reason in events if owner in wanted}
 
 
+def object_name(model, spelling, module=1):
+    # Mach-O and 32-bit Windows C objects prefix external symbols, including
+    # C++ mangled names. C/LLVM source identifiers do not acquire that prefix.
+    context = model.contexts[module - 1]
+    prefixed = (context[2].startswith("darwin") or
+                context[2].split('-')[0] in ("win32", "cygwin", "xbox") and context[6] == "4")
+    return ("_" if prefixed else "") + spelling
+
+
 def check_names(test):
     source = source_fixture(test)
     for backend in test.backends:
@@ -55,11 +64,11 @@ def check_names(test):
             baseline = test.emission_path(source.stem, backend).read_bytes()
             model = test.compile(source, backend=backend)
             test.assertEqual(model.capabilities[1][FEATURE], "available")
-            test.assertEqual(names_for(model, "BOUNDC")["object"], ("selected", "BoundC", ""))
-            test.assertEqual(names_for(model, "ALIASEDBASIC")["object"], ("selected", "c_style_name", ""))
-            test.assertEqual(names_for(model, "BOUNDCPP")["object"], ("selected", "_Z8BoundCppiz", ""))
-            test.assertEqual(names_for(model, "FOREIGN_DATA")["object"], ("selected", "external_data", ""))
-            test.assertEqual(names_for(model, "PUBLIC_DATA")["object"], ("selected", "public_data", ""))
+            test.assertEqual(names_for(model, "BOUNDC")["object"], ("selected", object_name(model, "BoundC"), ""))
+            test.assertEqual(names_for(model, "ALIASEDBASIC")["object"], ("selected", object_name(model, "c_style_name"), ""))
+            test.assertEqual(names_for(model, "BOUNDCPP")["object"], ("selected", object_name(model, "_Z8BoundCppiz"), ""))
+            test.assertEqual(names_for(model, "FOREIGN_DATA")["object"], ("selected", object_name(model, "external_data"), ""))
+            test.assertEqual(names_for(model, "PUBLIC_DATA")["object"], ("selected", object_name(model, "public_data"), ""))
             test.assertEqual(names_for(model, "FOREIGN_TLS")["object"], ("unavailable", "", "backend-tls"))
             test.assertFalse(names_for(model, "PROTOTYPEONLY"))
             if backend in ("gcc", "clang"):
@@ -101,17 +110,19 @@ def check_builtins(test):
             baseline = test.emission_path(source.stem, backend).read_bytes()
             model = test.compile(source, backend=backend)
             facts = names_for(model, "CopyBytes")
-            expected = (("unavailable", "", "backend-intrinsic") if backend == "gcc"
-                        else ("selected", "memcpy", ""))
+            gcc_alias = model.contexts[0][2].startswith("darwin")
+            expected = (("unavailable", "", "backend-intrinsic") if backend == "gcc" and not gcc_alias
+                        else ("selected", object_name(model, "memcpy"), ""))
             test.assertEqual(facts["object"], expected)
             stage = "llvm" if backend == "llvm" else "c"
-            if backend == "clang":
-                # Clang gets an ordinary C identifier with an explicit libc
-                # asm alias. Inspect that emitted declaration, not its name
+            if backend == "clang" or backend == "gcc" and gcc_alias:
+                # These C paths use an ordinary identifier with an explicit
+                # libc asm alias. Inspect that declaration, not the name
                 # allocator's private counter.
                 identifier = facts[stage][1]
                 test.assertEqual(facts[stage][0], "selected")
-                test.assertTrue(any(identifier in line and '"memcpy"' in line and "__asm__" in line
+                alias = '"' + object_name(model, "memcpy") + '"'
+                test.assertTrue(any(identifier in line and alias in line and "__asm__" in line
                                     for line in baseline.decode().splitlines()))
             else:
                 test.assertEqual(facts[stage], ("selected", "@memcpy" if backend == "llvm" else "__builtin_memcpy", ""))
@@ -142,12 +153,12 @@ def check_transport_and_objects(test):
         state, spelling, _ = names_for(model, name)["object"]
         test.assertEqual(state, "selected")
         test.assertIn(spelling, object_symbols)
-    secondary = test.source('sub SecondaryAlias alias "secondary_native"()\nend sub\nSecondaryAlias()\n', "secondary.bas")
+    secondary = test.source('sub SecondaryAlias cdecl alias "secondary_native"()\nend sub\nSecondaryAlias()\n', "secondary.bas")
     _, artifact = test.invoke([source, secondary])
     multiple = Model.read(artifact)
     test.assertEqual(set(multiple.emission_names), {1, 2})
     test.assertTrue(all(multiple.symbols[owner][2].upper() != "SECONDARYALIAS" for owner, *_ in multiple.emission_names[1]))
-    test.assertEqual(names_for(multiple, "SecondaryAlias")["object"], ("selected", "secondary_native", ""))
+    test.assertEqual(names_for(multiple, "SecondaryAlias")["object"], ("selected", object_name(multiple, "secondary_native", 2), ""))
 
 
 def check_rejection(test):

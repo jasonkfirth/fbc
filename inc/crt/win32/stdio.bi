@@ -37,8 +37,9 @@
 
 type _iobuf
 #if defined(__FB_64BIT__)
-	'' UCRT exposes an opaque stream represented by one pointer. The older
-	'' MSVCRT fields below are not part of its public FILE layout.
+	'' Keep 64-bit streams opaque, matching UCRT's one-pointer public record.
+	'' MinGW can also bridge these pointers to legacy MSVCRT streams; its
+	'' larger record is not exposed or copied through this interface.
 	_Placeholder as any ptr
 #else
 	_ptr as zstring ptr
@@ -56,10 +57,9 @@ type FILE as _iobuf
 
 extern "c"
 
-	'' All supported 64-bit Windows targets use the Universal CRT.  In
-	'' particular, UCRT64 does not export the older __iob_func entry point.
-	'' Keep the legacy stream table only for 32-bit targets that can still be
-	'' linked against MSVCRT40 for Windows 95 compatibility.
+	'' UCRT exports the indexed accessor; MinGW supplies a compatible bridge
+	'' for legacy MSVCRT. Index through that API instead of assuming a FILE
+	'' stride. The 32-bit binding retains the Windows 95-era stream table.
 #if defined(__FB_64BIT__)
 	declare function __acrt_iob_func(byval index as ulong) as FILE ptr
 	#define stdin (__acrt_iob_func(STDIN_FILENO))

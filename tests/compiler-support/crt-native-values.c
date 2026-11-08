@@ -16,6 +16,7 @@ struct fb_crt_file_holder {
 
 size_t fb_crt_file_size(void);
 size_t fb_crt_file_offset(void);
+int fb_crt_file_is_opaque(void);
 void *fb_crt_stream(unsigned stream_index);
 int fb_crt_errno(int *slot, int expected);
 int fb_crt_append(void *stream);
@@ -28,6 +29,15 @@ size_t fb_crt_file_size(void)
 size_t fb_crt_file_offset(void)
 {
     return offsetof(struct fb_crt_file_holder, stream);
+}
+
+int fb_crt_file_is_opaque(void)
+{
+#ifdef _UCRT
+    return 1;
+#else
+    return 0;
+#endif
 }
 
 void *fb_crt_stream(unsigned stream_index)

@@ -131,9 +131,7 @@ def check_transport(test):
 def check_source_bytes(test):
     if test.native_windows:
         test.skipTest("Raw non-UTF-8 byte filenames require a POSIX host")
-    filename = os.fsdecode(b"recovery-%\t-\xff.bas")
-    source = test.working / filename
-    source.write_bytes(b"print 1 +\n")
+    source = test.byte_source(b"print 1 +\n", b"recovery-%\t-\xff.bas")
     artifact = test.working / "recovery-byte-path.tsv"
     base = [str(test.compiler), "-prefix", str(test.toolchain_prefix), "-r", str(source)]
     baseline = subprocess.run(base, cwd=test.working, capture_output=True, timeout=60)

@@ -23,7 +23,7 @@ def check_graphs(test):
     choices = [(backend, test.fixture(name), ("-exx",)) for backend in test.backends
                for name in ("ir-control-flow.bas", "ir-control-legacy.bas", "ir-control-error.bas")]
     choices += [(backend, assembly, ()) for backend in test.backends]
-    choices += [("gas64", test.fixture("ir-control-legacy.bas"), ("-exx",)),
+    choices += [("gas64", test.fixture("ir-control-legacy.bas"), ("-exx", "-target", "linux-x86_64")),
                 ("gas", test.fixture("ir-control-legacy.bas"), ("-exx", "-target", "linux-x86"))]
     for backend, source, extra in choices:
         with test.subTest(backend=backend, fixture=source.name):

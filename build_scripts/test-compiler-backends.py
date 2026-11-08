@@ -662,8 +662,8 @@ def main() -> int:
                     return 1
                 fixtures.append(("stdio-contract", "tests/compiler-support/stdio-contract.bas", ""))
                 if system == "win64":
-                    # Compare the public UCRT record and accessors with the
-                    # actual SDK, then exchange bytes through the same stream.
+                    # Compare opaque UCRT layouts when exposed by the SDK,
+                    # then check stream identity and I/O with either CRT.
                     crt_object = working / "crt-native-values.o"
                     c_build = subprocess.run(
                         [os.environ.get("GCC") or "gcc", "-m64", "-std=c99",
@@ -953,7 +953,7 @@ def main() -> int:
                     matches_expected = (len(fields) == 5 and fields[0] == expected
                                         and all(field.isdecimal() for field in fields[1:]))
                 if executed.returncode or not matches_expected:
-                    print(f"{backend}/{name}: execution failed\n{executed.stdout}{executed.stderr}")
+                    print(f"{backend}/{name}: execution failed (exit {executed.returncode})\n{executed.stdout}{executed.stderr}")
                     return 1
                 print(f"{backend}/{name}: passed")
                 if name == "virtual-receiver-checked":

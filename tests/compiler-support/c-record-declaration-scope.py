@@ -14,7 +14,7 @@ import signal
 import subprocess
 import tempfile
 import zlib
-from native_c_support import native_command, native_path, resolve_executable
+from native_c_support import native_command, native_machine_flags, native_path, resolve_executable
 
 
 def sha(path):
@@ -46,7 +46,7 @@ def main():
     tools = [('gcc', args.gcc)] + ([('clang', args.clang)] if args.clang else [])
     standards = ('gnu11', 'gnu23') if args.matrix else ('gnu23',)
     optimizations = ('0', '2') if args.matrix else ('2',)
-    common = ['-fno-strict-aliasing', '-fwrapv', '-frounding-math', '-fno-math-errno',
+    common = [*native_machine_flags(args.fbc), '-fno-strict-aliasing', '-fwrapv', '-frounding-math', '-fno-math-errno',
         '-Werror=incompatible-pointer-types']
     diagnostics = {
         'gcc': ['-Wall', '-Wextra', '-Wpedantic', '-Wconversion', '-Wsign-conversion',

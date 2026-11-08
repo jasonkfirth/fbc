@@ -1,8 +1,8 @@
 """Project: FreeBASIC native C regression support
 File: native_c_support.py
-Purpose: Select equivalent C dialect and diagnostic spellings for native tools.
+Purpose: Select native C dialects, diagnostic spellings and ABI machine modes.
 Responsibilities: Probe capabilities without assuming that a command named gcc
-is GNU GCC, and keep GCC-only LTO checks separate from native ABI value checks.
+is GNU GCC, match BASIC pointer widths, and keep GNU LTO checks separate.
 This file intentionally does NOT suppress warnings or weaken language modes.
 """
 from functools import lru_cache
@@ -27,6 +27,20 @@ def resolve_executable(command):
     if resolved is None:
         raise FileNotFoundError('Cannot resolve executable: ' + str(command))
     return native_path(resolved).resolve(strict=True)
+
+
+@lru_cache(maxsize=None)
+def native_machine_flags(fbc):
+    result = subprocess.run([str(fbc), '-print', 'target'], text=True,
+                            capture_output=True, timeout=30, check=True)
+    target = result.stdout.strip()
+    # MSYS may expose a 64-bit Clang alongside a 32-bit BASIC compiler.
+    # ARM targets use their native toolchain without x86 machine switches.
+    if target in ('win32', 'win32-x86', 'linux-x86'):
+        return ('-m32',)
+    if target in ('win64', 'win64-x86_64', 'linux-x86_64'):
+        return ('-m64',)
+    return ()
 
 
 @lru_cache(maxsize=None)

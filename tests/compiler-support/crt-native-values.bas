@@ -14,6 +14,7 @@ end type
 extern "C"
 	declare function fb_crt_file_size() as size_t
 	declare function fb_crt_file_offset() as size_t
+	declare function fb_crt_file_is_opaque() as long
 	declare function fb_crt_stream(byval stream_index as ulong) as any ptr
 	declare function fb_crt_errno(byval slot as long ptr, byval expected as long) as long
 	declare function fb_crt_append(byval stream as any ptr) as long
@@ -22,9 +23,14 @@ end extern
 #ifdef __FB_64BIT__
 type StreamAccessor as function cdecl(byval as ulong) as FILE ptr
 dim getter as StreamAccessor = procptr(__acrt_iob_func)
-if sizeof(FILE) <> fb_crt_file_size() then end 1
-dim holder as FileHolder
-if cuint(@holder.stream) - cuint(@holder) <> fb_crt_file_offset() then end 2
+'' The 64-bit binding treats FILE as opaque. UCRT exposes that same public
+'' record; legacy MSVCRT exposes a larger record that must remain behind
+'' a pointer here. Stream identity and actual I/O are checked for both CRTs.
+if fb_crt_file_is_opaque() then
+	if sizeof(FILE) <> fb_crt_file_size() then end 1
+	dim holder as FileHolder
+	if cuint(@holder.stream) - cuint(@holder) <> fb_crt_file_offset() then end 2
+end if
 for stream_index as ulong = 0 to 2
 	if cptr(any ptr, getter(stream_index)) <> fb_crt_stream(stream_index) then end 3
 next

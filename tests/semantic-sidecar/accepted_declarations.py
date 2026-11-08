@@ -145,9 +145,10 @@ def check_literal_snapshots(test):
         source = test.fixture(filename)
         for backend in ("gcc", "gas64"):
             with test.subTest(fixture=filename, backend=backend):
-                test.invoke([source], mode="off", backend=backend)
+                extra = ("-target", "linux-x86_64") if backend == "gas64" else ()
+                test.invoke([source], mode="off", backend=backend, extra=extra)
                 baseline = test.emission_path(source.stem, backend).read_bytes()
-                model = test.compile(source, backend=backend)
+                model = test.compile(source, backend=backend, extra=extra)
                 prefixes = [row for row in model.records["K"] if row[3] == "literal-target-wide-prefix"]
                 test.assertTrue(prefixes)
                 test.assertEqual(len({row[2] for row in prefixes}), len(prefixes))

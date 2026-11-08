@@ -33,7 +33,9 @@ def check_payloads(test):
                            "load_assembly_label:\nnop\nend asm\nend sub\n", "load-assembly.bas")
     for backend in test.backends:
         with test.subTest(backend=backend, fixture="assembly"):
-            model = test.compile(assembly, backend=backend)
+            # Line joining is the x86 Intel-syntax path. Keep the ordinary
+            # payload checks native, and select that path explicitly here.
+            model = test.compile(assembly, backend=backend, extra=("-target", "linux-x86_64", "-asm", "intel"))
             state = model.native_load_payloads[1]
             entry_tokens = [row for sequence in state["assembly"].values() for row in sequence.values()]
             output = model.native_assembly_outputs[1]

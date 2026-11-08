@@ -1,6 +1,6 @@
 """Project: FreeBASIC semantic sidecar tests
 File: assignment_initializers.py
-Purpose: Verify original scalar initializer inputs before assignment conversion.
+Purpose: Verify original initializer inputs before assignment conversion.
 Responsibilities: DIM/VAR, typed constants, deliberate exclusions and emission.
 This file intentionally does NOT infer initialization from source spelling.
 """
@@ -58,9 +58,11 @@ def check_initializers(test):
                 names.add(model.symbols[int(left[13])][2].lower())
                 test.assertEqual(model.types[int(left[13])][18], 'source')
                 test.assertEqual(fields[3:6], ['assign', 'builtin', '0'])
+            # Same-type records without constructors now retain their original
+            # copy initializer, alongside scalar and allocation initializers.
             test.assertEqual(names, {'integervalue', 'floatingvalue', 'textvalue', 'pointervalue',
                                    'inferredvalue', 'staticvalue', 'arraypointer',
-                                   'declaredallocation', 'inferredallocation'})
+                                   'declaredallocation', 'inferredallocation', 'second'})
             test.assertTrue(all(model.statement_endings[int(row[3].split(':')[1])][2] == 'declaration'
                                 for row in entries))
             for mode in ('bindings', 'expressions'):
