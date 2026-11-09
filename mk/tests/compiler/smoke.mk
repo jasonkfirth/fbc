@@ -412,14 +412,19 @@ compiler-indirect-goto-smoke:
 	$(call _mt_echo,Indirect goto C backend smoke test)
 	@mkdir -p "$(TEST_TMP)"
 	@printf "%s\n" \
+		'#lang "fblite"' \
 		'sub probe()' \
-		'    dim a() as integer' \
-		'    redim a(0 to 15)' \
+		'    on local error goto handler' \
+		'    error 24' \
+		'    exit sub' \
+		'handler:' \
+		'    resume next' \
 		'end sub' \
 		'probe()' \
 		> "$(TEST_TMP)/indirect-goto.bas"
-	$(call _mt_run,$(TEST_FBC_CMD) -gen gcc -e -r "$(TEST_TMP)/indirect-goto.bas" -x "$(TEST_TMP)/indirect-goto")
-	@grep -Fq 'goto *' "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: indirect goto C output was not produced"; exit 1; }
+	$(call _mt_run,$(TEST_FBC_CMD) -gen gcc -e -r "$(TEST_TMP)/indirect-goto.bas" -o "$(TEST_TMP)/indirect-goto.c")
+	@test -f "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: indirect goto C output was not produced"; exit 1; }
+	@grep -Fq 'goto *' "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: indirect goto C dispatch was not emitted"; exit 1; }
 	@grep -Fq '(void)&&' "$(TEST_TMP)/indirect-goto.c" || { echo "ERROR: clang indirect goto workaround missing"; exit 1; }
 	$(call _mt_run,$(CC) -x c -c "$(TEST_TMP)/indirect-goto.c" -o "$(TEST_TMP)/indirect-goto.o")
 	@rm -rf "$(TEST_TMP)" "$(LOG_DIR)"

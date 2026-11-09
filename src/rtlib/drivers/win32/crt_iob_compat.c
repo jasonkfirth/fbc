@@ -11,12 +11,13 @@
 
     Responsibilities:
 
-        - provide __iob_func() when 32-bit x86 uses an older target C runtime
         - route MinGW's indexed stream access to the Windows 95 stream table
         - map numbered stat imports to their 32-bit Windows 95 equivalents
-        - keep the compatibility symbol inside programs that actually need it
+        - keep the compatibility symbols inside programs that actually need them
 
-    This file intentionally does NOT contain: - general C runtime replacements
+    This file intentionally does NOT contain:
+
+        - general C runtime replacements
         - stream allocation or ownership
         - operating-system version detection
 */
@@ -35,9 +36,9 @@
 	#define FB_CRT_WEAK
 #endif
 
-extern void *FB_CRT_CDECL __p__iob( void );
 extern int FB_CRT_CDECL _stat( const char *path, void *status );
 extern int FB_CRT_CDECL _wstat( const unsigned short *path, void *status );
+extern void *FB_CRT_CDECL __iob_func( void );
 
 typedef int (FB_CRT_CDECL *FB_CRT_STAT_PROC)( const char *path, void *status );
 typedef int (FB_CRT_CDECL *FB_CRT_WSTAT_PROC)( const unsigned short *path,
@@ -50,23 +51,11 @@ enum {
 };
 
 /*
-   Recent MinGW headers route standard streams through __iob_func().  The
-   older Microsoft runtime exposes the same stream table through __p__iob().
-   Returning that table preserves the expected FILE pointer ABI without
-   requiring a newer MSVCRT DLL on Windows 95.
-*/
-/* Keep the archive entry strong. A weak PE/COFF function can be discarded
-   while MinGW's direct __iob_func call remains unresolved after section GC.
-   The CRT calls it before main, so runtime initialization cannot repair it. */
-void *FB_CRT_CDECL __iob_func( void )
-{
-	return __p__iob( );
-}
-
-/*
    Current MinGW headers obtain stdin, stdout, and stderr by indexing the
    stream table through __acrt_iob_func().  MSVCRT40 predates that helper, but
    its FILE entries use the same 32-byte layout expected by 32-bit MinGW.
+   The __iob_func() fallback is kept in a separate archive member so a CRT
+   that already provides it does not get a duplicate definition.
 */
 static void *FB_CRT_CDECL fb_CrtAcrtIobFunc( unsigned int index )
 {
