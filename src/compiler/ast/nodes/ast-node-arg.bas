@@ -598,6 +598,8 @@ private function hCheckVarargParam _
 	case FB_DATACLASS_UDT
 		'' C variadic arguments may carry aggregates by value. Their layout and
 		'' register classification are preserved by the selected call backend.
+		'' The GAS32 stack emitter needs the aggregate byte count to copy it.
+		n->arg.lgt = symbGetSizeOf( astGetSubType( n->l ) )
 
 	case else
 		errReport( FB_ERRMSG_PARAMTYPEMISMATCHAT )
