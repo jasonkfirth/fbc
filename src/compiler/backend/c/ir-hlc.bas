@@ -4538,7 +4538,14 @@ private sub hSym2Text( byref s as string, byval sym as FBSYMBOL ptr, byval nativ
 	else
 		if( symbIsLabel( sym ) ) then
 			if( sym = ctx.procentrylabel ) then symbSetIsAccessed( sym )
-			s += hCResumeAddress(sym)
+			var label_address = hCResumeAddress(sym)
+			'' Clang needs a real GNU label-address expression in procedures
+			'' containing computed gotos. Error-continuation lowering can replace
+			'' that expression with a helper call, which does not satisfy Clang.
+			if( sectionInsideProc() and left(label_address, 2) = "&&" ) then
+				ctx.computedgotoaddress = TRUE
+			end if
+			s += label_address
 			exit sub
 		elseif( symbIsProc( sym ) ) then
 			s += "&"
@@ -4662,11 +4669,6 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 		hSym2Text( ctx.exprtext, n->sym, TRUE )
 
 	case EXPRCLASS_SYM
-		'' The symbol formatter also serves expression dumps. Only an address
-		'' flushed into C satisfies Clang's computed-goto requirement.
-		if( symbIsLabel( n->sym ) and sectionInsideProc( ) ) then
-			ctx.computedgotoaddress = TRUE
-		end if
 		hSym2Text( ctx.exprtext, n->sym, TRUE )
 
 	case EXPRCLASS_CAST
