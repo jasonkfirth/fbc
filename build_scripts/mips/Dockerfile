@@ -68,7 +68,7 @@ ARG NCURSES_SHA256=6931283d9ac87c5073f30b6290c4c75f21632bb4fc3603ac8100812bed248
 # Ubuntu publishes the MIPS libc sysroots but not matching libffi development
 # packages. Build the small dependency once per ABI so THREADCALL remains a
 # supported runtime feature instead of becoming a target-specific omission.
-RUN curl -fsSL \
+RUN curl -fsSL --retry 10 --retry-max-time 300 \
         "https://github.com/libffi/libffi/releases/download/v${LIBFFI_VERSION}/libffi-${LIBFFI_VERSION}.tar.gz" \
         -o /tmp/libffi.tar.gz \
     && printf '%s  %s\n' "${LIBFFI_SHA256}" /tmp/libffi.tar.gz \

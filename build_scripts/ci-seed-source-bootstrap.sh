@@ -94,16 +94,35 @@ case "$(uname -s 2>/dev/null || true)" in
 		;;
 esac
 
-if [ ! -f "$ARCHIVE" ]; then
+DOWNLOAD_TEMP=""
+cleanup_download_temp() {
+	if [ -n "$DOWNLOAD_TEMP" ]; then
+		rm -f -- "$DOWNLOAD_TEMP"
+	fi
+}
+trap cleanup_download_temp EXIT
+
+# A failed or interrupted download must not leave a partial archive that a
+# later invocation mistakes for a reusable bootstrap source package.
+ARCHIVE_VALID=0
+if [ -f "$ARCHIVE" ] && xz -t "$ARCHIVE" >/dev/null 2>&1; then
+	ARCHIVE_VALID=1
+fi
+
+if [ "$ARCHIVE_VALID" -eq 0 ]; then
 	command -v curl >/dev/null 2>&1 || {
 		echo "ERROR: curl is required to download the source bootstrap archive" >&2
 		exit 1
 	}
 
 	mkdir -p "$(dirname "$ARCHIVE")"
-	curl --fail --location --retry 5 \
+	DOWNLOAD_TEMP="${ARCHIVE}.part.$$"
+	curl --fail --location --retry 10 --retry-max-time 300 \
 		"https://github.com/freebasic/fbc/releases/download/${BOOTSTRAP_VERSION}/${PACKAGE}.tar.xz" \
-		--output "$ARCHIVE"
+		--output "$DOWNLOAD_TEMP"
+	xz -t "$DOWNLOAD_TEMP"
+	mv -f -- "$DOWNLOAD_TEMP" "$ARCHIVE"
+	DOWNLOAD_TEMP=""
 fi
 
 ##############################################################################
