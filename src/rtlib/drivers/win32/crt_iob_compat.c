@@ -38,7 +38,7 @@
 
 extern int FB_CRT_CDECL _stat( const char *path, void *status );
 extern int FB_CRT_CDECL _wstat( const unsigned short *path, void *status );
-extern void *FB_CRT_CDECL __iob_func( void );
+extern void *FB_CRT_CDECL __p__iob( void );
 
 typedef int (FB_CRT_CDECL *FB_CRT_STAT_PROC)( const char *path, void *status );
 typedef int (FB_CRT_CDECL *FB_CRT_WSTAT_PROC)( const unsigned short *path,
@@ -54,12 +54,10 @@ enum {
    Current MinGW headers obtain stdin, stdout, and stderr by indexing the
    stream table through __acrt_iob_func().  MSVCRT40 predates that helper, but
    its FILE entries use the same 32-byte layout expected by 32-bit MinGW.
-   The __iob_func() fallback is kept in a separate archive member so a CRT
-   that already provides it does not get a duplicate definition.
 */
 static void *FB_CRT_CDECL fb_CrtAcrtIobFunc( unsigned int index )
 {
-	unsigned char *streams = (unsigned char *)__iob_func( );
+	unsigned char *streams = (unsigned char *)__p__iob( );
 
 	return streams + (index * FB_CRT_FILE_SIZE);
 }
