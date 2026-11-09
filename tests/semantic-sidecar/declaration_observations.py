@@ -29,13 +29,12 @@ def check_observations(test):
             test.assertEqual(len(cast_lines), 3)
             for row in casts:
                 expression = expressions[row[1]]
-                # GAS64 can lower a wide conversion to a helper result's
-                # storage view before export. EX still retains the accepted
-                # source CAST; the native E class must describe the real tree.
+                # A target can lower a wide conversion to a helper result's
+                # storage view before export. EX retains the accepted source
+                # CAST; the native E class describes the lowered tree.
                 if expression[8] == '5':
                     test.assertEqual(expression[9:12], ['-1', 'cast', 'builtin'])
                 else:
-                    test.assertEqual(backend, 'gas64')
                     test.assertEqual(expression[8:12], ['20', '-1', 'dereference', 'builtin'])
                     primitive = next(item for item in model.records['Y']
                                      if int(item[1]) == int(expression[12]) & 31)

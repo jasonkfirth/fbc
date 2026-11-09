@@ -623,6 +623,7 @@ class SidecarTests(unittest.TestCase):
         self.working = Path(self.temporary.name)
         self.sequence = 0
         self.compiler_paths: dict[Path, str] = {}
+        self.compiler_input_paths: dict[Path, str] = {}
 
     def compiler_path(self, path: Path) -> str:
         # MSYS2 converts process arguments, but cannot convert paths recorded
@@ -640,10 +641,16 @@ class SidecarTests(unittest.TestCase):
         return self.compiler_paths[path]
 
     def compiler_input_path(self, path: Path) -> str:
-        # Driver receipts retain argument spelling. FILE/SRC and include
-        # locations use compiler_path() after the compiler opens the file.
+        # MSYS converts POSIX process arguments to mixed-slash Windows paths.
+        # Driver receipts retain that spelling; FILE/SRC locations use the
+        # compiler's native path after it opens the file.
         if self.native_windows and os.name != "nt":
-            return self.compiler_path(path)
+            if path not in self.compiler_input_paths:
+                converted = subprocess.run(["cygpath", "-a", "-m", str(path)], text=True,
+                                           capture_output=True, timeout=10, check=True)
+                self.compiler_input_paths[path] = converted.stdout.rstrip("\r\n")
+                self.assertTrue(self.compiler_input_paths[path], "cygpath returned an empty argument path")
+            return self.compiler_input_paths[path]
         return str(path)
 
     def runtime_backends(self):
@@ -3588,7 +3595,7 @@ print SEM_EMPTY joined3
                         expected_units = b"hello" if encoding == "ascii" else tuple(map(ord, "hello"))
                         self.assertEqual(model.macro_units(argument[3], argument[4]), expected_units)
                         self.assertEqual(argument[5:7], ["1", "1"])
-                        self.assertEqual(argument[7], str(source))
+                        self.assertEqual(argument[7], self.compiler_path(source))
                         self.assertGreater((int(argument[10]), int(argument[11])), (int(argument[8]), int(argument[9])))
                         self.assertEqual(outcomes["SEM_EMPTY"], [""])
                         self.assertEqual(outcomes["SEM_COUNT"], ["__FB_ARG_COUNT__(1,2,3)"])

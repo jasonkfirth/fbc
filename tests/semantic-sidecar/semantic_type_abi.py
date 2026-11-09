@@ -109,7 +109,8 @@ def check_type_bits(test) -> None:
     module = test.root / "src/compiler/tooling/semantic-type-abi.bas"
     object_path = test.working / "type-abi.o"
     executable = test.working / ("type-abi.exe" if test.native_windows else "type-abi")
-    flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if test.native_windows else {}
+    flags = ({"creationflags": subprocess.CREATE_NO_WINDOW}
+             if test.native_windows and hasattr(subprocess, "CREATE_NO_WINDOW") else {})
     # An existing SDK can have an older library layout than the compiler tree.
     # Let its native driver link the emitted objects, as the bootstrap build
     # does, rather than making the test copy or rearrange SDK libraries.

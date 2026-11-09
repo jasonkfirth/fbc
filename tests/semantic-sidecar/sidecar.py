@@ -255,11 +255,31 @@ SOURCE_OPERATORS = {
 def filesystem_path(value: str | Path) -> Path:
     """Translate native compiler paths only at the host filesystem boundary."""
     text = str(value)
-    if sys.platform == "win32" and any(0xDC80 <= ord(char) <= 0xDCFF for char in text):
-        # The Windows runtime accepts strict UTF-8, then the active ANSI code
-        # page. unescape() retains legacy bytes; convert only at the I/O edge.
-        # Wire identities, expected sizes and source digests stay unchanged.
-        text = text.encode("utf-8", errors="surrogateescape").decode("mbcs", errors="strict")
+    if sys.platform in ("win32", "cygwin") and any(0xDC80 <= ord(char) <= 0xDCFF for char in text):
+        if sys.platform == "win32":
+            encoding = "mbcs"
+        else:
+            # Cygwin's filesystem encoding is UTF-8, but a native Win32
+            # compiler can serialize paths using the active ANSI code page.
+            import ctypes
+            get_acp = ctypes.CDLL("kernel32.dll").GetACP
+            get_acp.restype = ctypes.c_uint
+            encoding = "cp" + str(get_acp())
+        # Decode only escaped bytes. Valid UTF-8 text in the same path is
+        # already Unicode and must not be reinterpreted as ANSI bytes.
+        chunks = []
+        index = 0
+        while index < len(text):
+            if not 0xDC80 <= ord(text[index]) <= 0xDCFF:
+                chunks.append(text[index])
+                index += 1
+                continue
+            start = index
+            while index < len(text) and 0xDC80 <= ord(text[index]) <= 0xDCFF:
+                index += 1
+            raw = text[start:index].encode("utf-8", errors="surrogateescape")
+            chunks.append(raw.decode(encoding, errors="strict"))
+        text = "".join(chunks)
     if sys.platform == "cygwin" and PureWindowsPath(text).is_absolute():
         # MSYS can stat a Windows path directly, but POSIX pathlib.resolve()
         # does not understand its drive or backslash separators. cygpath uses

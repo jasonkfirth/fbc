@@ -66,7 +66,7 @@ def check_callbacks(test):
     model = test.compile(source)
     once = [scope for scope in model.pragma_scopes.values() if scope["callback"] and scope["callback"][3] == "once"]
     test.assertEqual(len(once), 1)
-    test.assertEqual(once[0]["begin"][7], str(include))
+    test.assertEqual(once[0]["begin"][7], test.compiler_path(include))
 
 
 def check_recovery(test):

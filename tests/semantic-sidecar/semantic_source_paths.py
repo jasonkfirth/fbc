@@ -30,7 +30,8 @@ def check_windows_source_paths(test) -> None:
         _, path = test.invoke([source], extra=("-semantic-type-abi", "native"))
         model = Model.read(path)
         original_rows = [row[:] for row in model.rows]
-        test.assertTrue(any(filesystem_path(row[2]).name == header.name for row in model.files.values()))
+        test.assertTrue(any(filesystem_path(row[2]).name == header.name for row in model.files.values()),
+                        [row[2] for row in model.files.values()])
         model.validate_physical_locations()
         model.verified_source_contents()
         test.assertEqual(model.rows, original_rows, "Filesystem access changed a wire identity")
