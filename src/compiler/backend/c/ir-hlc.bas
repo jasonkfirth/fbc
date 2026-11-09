@@ -1054,7 +1054,11 @@ private function hGetMangledNameForASM _
 	end if
 
 	'' Builtins with a libc ABI must also resolve when used as addresses.
-	if( len( libcname ) > 0 ) then
+	if( symbIsImport( sym ) andalso (symbGetClass( sym ) = FB_SYMBCLASS_VAR) ) then
+		'' Imported variables are emitted as pointers, so the asm name must refer
+		'' to the import-address-table slot rather than the exported data itself.
+		mangled = *symbGetMangledName( sym )
+	elseif( len( libcname ) > 0 ) then
 		mangled = libcname
 	elseif( ((symbGetMangling(sym) = FB_MANGLING_RTLIB) or _
 	     ((symbGetMangling(sym) = FB_MANGLING_CDECL) and _
