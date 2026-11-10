@@ -1,7 +1,7 @@
 ' TEST_MODE : COMPILE_AND_RUN_OK
 '
 ' Project: FreeBASIC compiler regression tests
-' File: llvm-duplicate-extern-global.bas
+' File: tests/llvm/llvm-duplicate-extern-global.bas
 ' Purpose: Ensure multiple BASIC declarations for one C global emit one LLVM symbol.
 ' Responsibilities: Compare the CRT stdout declaration with a C alias.
 ' This file intentionally does NOT contain: LLVM backend implementation code.

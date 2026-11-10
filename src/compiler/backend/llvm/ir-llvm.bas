@@ -2418,7 +2418,7 @@ private function hEmitInt _
 		return iif( value, "1", "0" )
 	end if
 
-	select case( dtype )
+	select case( typeGetDtOnly( dtype ) )
 	case FB_DATATYPE_INTEGER, FB_DATATYPE_UINT, _
 	     FB_DATATYPE_LONG, FB_DATATYPE_ULONG, _
 	     FB_DATATYPE_ENUM, FB_DATATYPE_INTEGER128, FB_DATATYPE_UINTEGER128

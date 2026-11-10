@@ -1,7 +1,7 @@
 ' Project: FreeBASIC compiler tests
 ' File: tests/crt/clong-variadic-constant.bas
 ' Purpose: Preserve CLong and CULong types for constants passed to C varargs.
-' Responsibilities: Compile checked %jd and %ju calls through the GCC backend.
+' Responsibilities: Compile checked %ld and %lu calls through the GCC backend.
 ' This file intentionally does NOT contain: C backend code or printf support.
 ' TEST_MODE : COMPILE_AND_RUN_OK
 
@@ -17,13 +17,13 @@
 
 Dim formatted As ZString * 64
 
-If sprintf(@formatted, "%jd", Cast(CLong, -128)) < 0 Then End 1
+If sprintf(@formatted, "%ld", Cast(CLong, -128)) < 0 Then End 1
 If formatted <> "-128" Then End 2
 
-If sprintf(@formatted, "%ju", Cast(CULong, 127)) < 0 Then End 3
+If sprintf(@formatted, "%lu", Cast(CULong, 127)) < 0 Then End 3
 If formatted <> "127" Then End 4
 
-If sprintf(@formatted, "%ju", Cast(CULong, &Hffffffffffffffff)) < 0 Then End 5
+If sprintf(@formatted, "%lu", Cast(CULong, &Hffffffffffffffff)) < 0 Then End 5
 If formatted <> "18446744073709551615" Then End 6
 
 #endif
