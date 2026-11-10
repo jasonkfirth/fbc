@@ -50,9 +50,9 @@ const WILDCARD_PORT = TEST_PORT + 2
 #endif
 
 ' Formatted transfers and peer-closure notification can be delayed when the
-' hosted VM is busy.  Give each network state change twenty seconds while the
-' controller retains a separate one-minute deadlock bound for both workers.
-const STREAM_WAIT_ITERATIONS = 20000
+' hosted VM is busy. Give each network state change one minute while the
+' controller retains a separate three-minute deadlock bound for both workers.
+const STREAM_WAIT_ITERATIONS = 60000
 const CONTROLLER_WAIT_ITERATIONS = STREAM_WAIT_ITERATIONS * 3
 
 ' The burst performs one runtime call per byte. Allow two minutes of requested
@@ -331,6 +331,8 @@ sub client_thread( byval userdata as any ptr )
 	saw_client_eoc = (eoc( client ) <> 0)
 	if( saw_client_eoc = FALSE ) then
 		client_error = 5
+		print "client EOC timeout client_step="; client_step; _
+		      " eof="; eof( client )
 	end if
 
 	close #client
