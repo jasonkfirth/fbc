@@ -110,12 +110,14 @@ def check_builtins(test):
             baseline = test.emission_path(source.stem, backend).read_bytes()
             model = test.compile(source, backend=backend)
             facts = names_for(model, "CopyBytes")
-            gcc_alias = model.contexts[0][2].startswith("darwin")
-            expected = (("unavailable", "", "backend-intrinsic") if backend == "gcc" and not gcc_alias
+            target = model.contexts[0][2]
+            gcc_uses_clang = target.startswith("darwin") or target == "win32-aarch64"
+            uses_clang_c = backend == "clang" or (backend == "gcc" and gcc_uses_clang)
+            expected = (("unavailable", "", "backend-intrinsic") if backend == "gcc" and not gcc_uses_clang
                         else ("selected", object_name(model, "memcpy"), ""))
             test.assertEqual(facts["object"], expected)
             stage = "llvm" if backend == "llvm" else "c"
-            if backend == "clang" or backend == "gcc" and gcc_alias:
+            if uses_clang_c:
                 # These C paths use an ordinary identifier with an explicit
                 # libc asm alias. Inspect that declaration, not the name
                 # allocator's private counter.
