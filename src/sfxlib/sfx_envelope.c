@@ -159,6 +159,10 @@ float fb_sfxEnvelopeProcess(FB_SFXVOICE *voice, float dt)
     if (!__fb_sfx)
         return 0.0f;
 
+    /* Mixer paths apply the same bounds check before reading this table. */
+    if (voice->envelope < 0 || voice->envelope >= FB_SFX_MAX_ENVELOPES)
+        return 0.0f;
+
     env = &__fb_sfx->envelopes[voice->envelope];
 
     level = voice->env_level;

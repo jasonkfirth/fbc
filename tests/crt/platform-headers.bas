@@ -8,6 +8,7 @@
 
 #include once "crt.bi"
 #include once "crt/stdint.bi"
+#include once "crt/stdlib.bi"
 #include once "crt/limits.bi"
 #include once "crt/locale.bi"
 #include once "crt/setjmp.bi"
@@ -17,6 +18,14 @@
 #assert sizeof(ptrdiff_t) = sizeof(any ptr)
 #assert sizeof(int32_t) = 4
 #assert sizeof(int64_t) = 8
+#assert RAND_MAX >= 32767
+#if defined(__FB_WIN32__) and not defined(__FB_CYGWIN__)
+	#assert RAND_MAX = &h7fff
+#elseif defined(__FB_XBOX__)
+	#assert RAND_MAX = &h7fff
+#else
+	#assert RAND_MAX = &h7fffffff
+#endif
 
 '' Wii and Xbox provide the standard C runtime, without a Unix process model.
 '' Process bindings are checked where the SDK supplies an actual interface.

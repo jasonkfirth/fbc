@@ -116,7 +116,10 @@ private function hIsCLongDoubleType _
 
 	if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT ) then return FALSE
 	if( subtype = NULL ) then return FALSE
-	return (*symbGetName( subtype ) = "CLONGDOUBLE")
+	'' The source alias resolves to its byte-backed UDT during ABI lowering.
+	var subtype_name = ucase( *symbGetName( subtype ) )
+	return (subtype_name = "CLONGDOUBLE") orElse _
+	       (subtype_name = "__CLONGDOUBLE_STORAGE")
 end function
 
 private function hUsesCLongDoubleCABI( byval proc as FBSYMBOL ptr ) as integer

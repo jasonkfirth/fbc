@@ -36,12 +36,26 @@ static int get_mouse_touch_locked(int *x, int *y, int *id)
 	int z = 0;
 	int buttons = 0;
 	int clip = 0;
+	int fast_state;
 
-	if ((!__fb_gfx) || (!__fb_gfx->driver->get_mouse))
+	if (!__fb_gfx)
 		return -1;
 
-	if (__fb_gfx->driver->get_mouse(x, y, &z, &buttons, &clip) != 0)
-		return -1;
+	/* The mouse fallback shares a cached sample when the driver can provide it.
+	   A known outside-window pointer is not a touch contact and needs no query. */
+	if (__fb_gfx->get_mouse_fast) {
+		fast_state = __fb_gfx->get_mouse_fast(x, y, &z, &buttons, &clip);
+		if (fast_state < 0)
+			return -1;
+		if ((fast_state == 0) && ((!__fb_gfx->driver) || (!__fb_gfx->driver->get_mouse) ||
+			(__fb_gfx->driver->get_mouse(x, y, &z, &buttons, &clip) != 0)))
+			return -1;
+	} else {
+		if ((!__fb_gfx->driver) || (!__fb_gfx->driver->get_mouse))
+			return -1;
+		if (__fb_gfx->driver->get_mouse(x, y, &z, &buttons, &clip) != 0)
+			return -1;
+	}
 
 	if ((buttons & BUTTON_LEFT) == 0)
 		return -1;
@@ -50,6 +64,36 @@ static int get_mouse_touch_locked(int *x, int *y, int *id)
 		*id = 0;
 
 	return 0;
+}
+
+/*
+	Use the driver-maintained pointer sample before taking its display lock.
+	The X11 event thread holds that lock while presenting frames, so a cached
+	mouse contact must not wait for presentation to finish.
+
+	Return 1 for a contact, 0 for a known absence, and -1 when the driver needs
+	its normal locked mouse query to initialize the cache.
+*/
+static int get_mouse_touch_cached(int *x, int *y, int *id)
+{
+	int z = 0;
+	int buttons = 0;
+	int clip = 0;
+	int fast_state;
+
+	if ((!__fb_gfx) || (!__fb_gfx->get_mouse_fast))
+		return -1;
+
+	fast_state = __fb_gfx->get_mouse_fast(x, y, &z, &buttons, &clip);
+	if (fast_state == 0)
+		return -1;
+	if ((fast_state < 0) || ((buttons & BUTTON_LEFT) == 0))
+		return 0;
+
+	if (id)
+		*id = 0;
+
+	return 1;
 }
 
 static int get_platform_touch_locked(int index, int *x, int *y, int *id)
@@ -68,23 +112,6 @@ static int get_platform_touch_count_locked(void)
 	return __fb_gfx->driver->get_touch_count();
 }
 
-static int get_touch_locked(int index, int *x, int *y, int *id)
-{
-	int count;
-
-	if (index < 0)
-		return -1;
-
-	count = get_platform_touch_count_locked();
-	if (count > 0)
-		return get_platform_touch_locked(index, x, y, id);
-
-	if (index == 0)
-		return get_mouse_touch_locked(x, y, id);
-
-	return -1;
-}
-
 FBCALL ssize_t fb_GfxGetTouchCount(void)
 {
 	int count = 0;
@@ -95,18 +122,28 @@ FBCALL ssize_t fb_GfxGetTouchCount(void)
 
 	if (__fb_gfx)
 	{
-		DRIVER_LOCK();
-		count = get_platform_touch_count_locked();
+		if (__fb_gfx->driver && __fb_gfx->driver->get_touch_count) {
+			DRIVER_LOCK();
+			count = get_platform_touch_count_locked();
+			DRIVER_UNLOCK();
+		}
 		if (count <= 0)
 		{
 			int x = 0;
 			int y = 0;
 			int id = 0;
+			int cached_contact;
 
-			if (get_mouse_touch_locked(&x, &y, &id) == 0)
+			cached_contact = get_mouse_touch_cached(&x, &y, &id);
+			if (cached_contact > 0) {
 				count = 1;
+			} else if (cached_contact < 0) {
+				DRIVER_LOCK();
+				if (get_mouse_touch_locked(&x, &y, &id) == 0)
+					count = 1;
+				DRIVER_UNLOCK();
+			}
 		}
-		DRIVER_UNLOCK();
 	}
 
 	FB_GRAPHICS_UNLOCK( );
@@ -121,6 +158,9 @@ FBCALL ssize_t fb_GfxGetTouch(ssize_t index, ssize_t *x, ssize_t *y, ssize_t *id
 	int iy = -1;
 	int iid = 0;
 	int failure = TRUE;
+	int platform_count = 0;
+	int use_platform_touch = FALSE;
+	int cached_contact;
 
 	FB_GRAPHICS_LOCK( );
 
@@ -128,11 +168,29 @@ FBCALL ssize_t fb_GfxGetTouch(ssize_t index, ssize_t *x, ssize_t *y, ssize_t *id
 
 	if (__fb_gfx && (index >= 0) && (index <= INT_MAX))
 	{
-		DRIVER_LOCK();
-		failure = get_touch_locked((int)index, &ix, &iy, &iid);
+		if (__fb_gfx->driver && __fb_gfx->driver->get_touch_count) {
+			DRIVER_LOCK();
+			platform_count = get_platform_touch_count_locked();
+			if (platform_count > 0) {
+				failure = get_platform_touch_locked((int)index, &ix, &iy, &iid);
+				use_platform_touch = TRUE;
+			}
+			DRIVER_UNLOCK();
+		}
+
+		if ((!use_platform_touch) && (index == 0)) {
+			cached_contact = get_mouse_touch_cached(&ix, &iy, &iid);
+			if (cached_contact > 0) {
+				failure = FALSE;
+			} else if (cached_contact < 0) {
+				DRIVER_LOCK();
+				failure = get_mouse_touch_locked(&ix, &iy, &iid);
+				DRIVER_UNLOCK();
+			}
+		}
+
 		if (!failure && (__fb_gfx->scanline_size != 1))
 			iy /= __fb_gfx->scanline_size;
-		DRIVER_UNLOCK();
 	}
 
 	FB_GRAPHICS_UNLOCK( );

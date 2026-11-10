@@ -2248,6 +2248,7 @@ static void test_alpha_primitive_null_backend(void)
 	FB_GFX3_SURFACE surface;
 	FB_GFX3_RECT clip = { 0, 0, 7, 7 };
 	FB_GFX3_POINT point;
+	FB_GFX3_GLYPH glyph;
 	const uint32_t destination = 0xFF204060u;
 	const uint32_t source = 0x8030C080u;
 	const uint32_t transparent_source = 0x0030C080u;
@@ -2285,6 +2286,28 @@ static void test_alpha_primitive_null_backend(void)
 	CHECK(color == expected);
 	CHECK(fb_gfx3_surface_read_pixel(&surface, 4, 5, &color) == FB_GFX3_OK);
 	CHECK(color == expected);
+
+	memset(&glyph, 0, sizeof(glyph));
+	glyph.x = 4;
+	glyph.y = 0;
+	glyph.foreground = 0xFFEEDDCCu;
+	glyph.background = 0xFF102030u;
+	glyph.width = 2;
+	glyph.height = 2;
+	glyph.flags = FB_GFX3_GLYPH_BACKGROUND;
+	glyph.row[0] = 0x80u;
+	glyph.row[1] = 0x40u;
+	CHECK(fb_gfx3_surface_glyphs(&surface, &clip, &glyph, 1) ==
+		FB_GFX3_OK);
+	CHECK(fb_gfx3_context_flush(&context) == FB_GFX3_OK);
+	CHECK(fb_gfx3_surface_read_pixel(&surface, 4, 0, &color) == FB_GFX3_OK);
+	CHECK(color == glyph.foreground);
+	CHECK(fb_gfx3_surface_read_pixel(&surface, 5, 0, &color) == FB_GFX3_OK);
+	CHECK(color == glyph.background);
+	CHECK(fb_gfx3_surface_read_pixel(&surface, 4, 1, &color) == FB_GFX3_OK);
+	CHECK(color == glyph.background);
+	CHECK(fb_gfx3_surface_read_pixel(&surface, 5, 1, &color) == FB_GFX3_OK);
+	CHECK(color == glyph.foreground);
 
 	point.x = 7;
 	point.y = 7;

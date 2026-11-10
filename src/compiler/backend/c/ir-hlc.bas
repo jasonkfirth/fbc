@@ -1376,7 +1376,10 @@ private function hIsCLongDoubleType _
 
 	if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT ) then return FALSE
 	if( subtype = NULL ) then return FALSE
-	return (*symbGetName( subtype ) = "CLONGDOUBLE")
+	'' A typedef can resolve to its byte-backed storage UDT before C ABI lowering.
+	var subtype_name = ucase( *symbGetName( subtype ) )
+	return (subtype_name = "CLONGDOUBLE") orElse _
+	       (subtype_name = "__CLONGDOUBLE_STORAGE")
 end function
 
 private function hUsesCLongDoubleCABI( byval proc as FBSYMBOL ptr ) as integer
@@ -1966,6 +1969,11 @@ private sub hEmitVarDecl _
 			selected_object_name = object_name
 		end if
 	end if
+	dim as integer object_natural_align = _
+		typeCalcNaturalAlign( dtype, sym->subtype )
+	if( sym->var_.align > object_natural_align ) then
+		ln += " __attribute__((aligned(" + str( sym->var_.align ) + ")))"
+	end if
 	if( fbSemanticModelObjectNameNeeded(sym) ) then
 		if( symbIsThreadLocal(sym) ) then
 			fbSemanticModelEmissionName(sym, "object", "", "unavailable", "backend-tls")
@@ -2485,8 +2493,13 @@ private function hCRecordAlignment( byval udt as FBSYMBOL ptr ) as integer
 	'' Compare this effective alignment before omitting a parent's packing.
 	var fld = symbUdtGetFirstField( udt )
 	while( fld <> NULL )
+		if( fld->var_.align > alignment andalso _
+		    ((packing <= 0) orelse (fld->var_.align <= packing)) ) then
+			alignment = fld->var_.align
+		end if
 		if( hFieldNeedsRuntimeAlignment( fld ) ) then
 			var fieldalign = typeCalcNaturalAlign( symbGetType( fld ), symbGetSubtype( fld ) )
+			if( fld->var_.align > fieldalign ) then fieldalign = fld->var_.align
 			if( fieldalign > alignment ) then alignment = fieldalign
 		end if
 		fld = symbUdtGetNextField( fld )
@@ -2497,6 +2510,7 @@ end function
 private sub hEmitCRecordField _
 	( byval fld as FBSYMBOL ptr, byval align as integer, byval explicitlayout as integer )
 	dim as integer skip = FALSE, dtype = any
+	dim as integer field_typealign = any, naturalalign = any, effectivealign = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as DZSTRING ln
 	DZstrZero( ln )
@@ -2506,6 +2520,13 @@ private sub hEmitCRecordField _
 	dtype = symbGetType( fld ) or typeGetConstMask( symbGetFullType( fld ) )
 	dtype = typeUnsetIsConst( dtype )
 	subtype = symbGetSubtype( fld )
+	field_typealign = fld->var_.align
+	naturalalign = typeCalcNaturalAlign( dtype, subtype )
+	if( field_typealign > naturalalign ) then _
+		naturalalign = field_typealign
+	effectivealign = naturalalign
+	if( (align > 0) andalso (align < effectivealign) ) then _
+		effectivealign = align
 	DZstrAssign( ln, hEmitType( dtype, subtype, TRUE ) )
 	DZstrConcatAssign( ln, " " + hGetCFieldId( fld ) )
 	DZstrConcatAssign( ln, hEmitArrayDecl( fld ) )
@@ -2513,17 +2534,36 @@ private sub hEmitCRecordField _
 	'' Field alignment (FIELD = N)?
 	if( explicitlayout ) then
 		'' The explicit body owns alignment; gaps above own offsets.
+		if( field_typealign > 0 ) then
+			if( effectivealign > typeCalcNaturalAlign( dtype, subtype ) ) then
+				DZstrConcatAssign( ln, _
+					" __attribute__((aligned(" + str( effectivealign ) + ")))" )
+			elseif( effectivealign < typeCalcNaturalAlign( dtype, subtype ) ) then
+				DZstrConcatAssign( ln, _
+					" __attribute__((packed, aligned(" + str( effectivealign ) + ")))" )
+			end if
+			skip = TRUE
+		end if
 	elseif( env.clopt.target = FB_COMPTARGET_RISCOS ) then
 		'' The enclosing RISC OS structure is packed to remove GCC's
 		'' four-byte aggregate minimum. Restore each field's effective
 		'' FreeBASIC alignment explicitly inside that packed body.
-		var effectivealign = typeCalcNaturalAlign( dtype, subtype )
+		effectivealign = naturalalign
 		if( (hFieldNeedsRuntimeAlignment( fld ) = FALSE) andalso _
 		    (align > 0) andalso (align < effectivealign) ) then
 			effectivealign = align
 		end if
 		DZstrConcatAssign( ln, _
 			" __attribute__((aligned(" + str( effectivealign ) + ")))" )
+	elseif( field_typealign > 0 ) then
+		if( effectivealign > typeCalcNaturalAlign( dtype, subtype ) ) then
+			DZstrConcatAssign( ln, _
+				" __attribute__((aligned(" + str( effectivealign ) + ")))" )
+		elseif( effectivealign < typeCalcNaturalAlign( dtype, subtype ) ) then
+			DZstrConcatAssign( ln, _
+				" __attribute__((packed, aligned(" + str( effectivealign ) + ")))" )
+		end if
+		skip = TRUE
 	elseif( align > 0 ) then
 		'' The aligned(N) attribute alone increases the alignment,
 		'' together with packed it decreases it.
@@ -2552,7 +2592,8 @@ private sub hEmitCRecordField _
 	'' smaller alignment than the natural or specified alignment of the
 	'' parent structure has to be specified explicitly,
 	'' otherwise the field will be packed too.
-	if( explicitlayout = FALSE andalso (align <= 0 orelse skip) ) then
+	if( explicitlayout = FALSE andalso (align <= 0 orelse skip) andalso _
+	    (field_typealign = 0) ) then
 		if( typeGet( dtype ) = FB_DATATYPE_STRUCT ) then
 			var effectivealign = typeCalcNaturalAlign( dtype, subtype )
 			if ( align > 0 andalso align < effectivealign ) then
@@ -2700,7 +2741,21 @@ private sub hEmitStruct( byval s as FBSYMBOL ptr, byval is_ptr as integer )
 			hEmitStructWithFields( s )
 		end if
 	else
-		hWriteLine( "uint8 fb_c_struct_body[" & symbGetSizeOf( s ) & "];", TRUE )
+		'' A byte body hides bitfield members, but the record still has its ABI alignment.
+		var body_alignment = s->udt.natalign
+		var explicit_alignment = symbGetUDTAlign( s )
+		if( (explicit_alignment > 0) andalso _
+		    (explicit_alignment < body_alignment) ) then
+			body_alignment = explicit_alignment
+		end if
+		var body_declaration = "uint8 fb_c_struct_body[" & _
+		                       symbGetSizeOf( s ) & "]"
+		if( (env.clopt.target <> FB_COMPTARGET_RISCOS) andalso _
+		    (body_alignment > 1) ) then
+			body_declaration += " __attribute__((aligned(" & _
+			                    str( body_alignment ) & ")))"
+		end if
+		hWriteLine( body_declaration & ";", TRUE )
 	end if
 
 	'' Close the UDT body. Give RISC OS aggregates the effective alignment
@@ -3541,10 +3596,12 @@ private function exprNewCAST _
 
 	'' Don't cast if l has a compatible type (e.g. 32bit int vs. 32bit long)
 	'' (same class, same size, same signedness, no pointers involved,
-	'' both booleans or none). C char is distinct from BASIC's unsigned
-	'' character value because plain char signedness depends on the target.
+	'' both booleans or none). Keep C ABI types with distinct spellings because
+	'' varargs and formatting distinguish CLong from LongInt. C char is distinct
+	'' from BASIC's unsigned character value because plain char is target-specific.
 	if( (typeGetSizeType( l->dtype ) = typeGetSizeType( dtype )) and _
 	    (not typeIsPtr( l->dtype )) and (not typeIsPtr( dtype )) and _
+	    (typeGetMangleDt( l->dtype ) = typeGetMangleDt( dtype )) and _
 	    ((typeGetDtAndPtrOnly(l->dtype) = FB_DATATYPE_CHAR) = _
 	     (typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_CHAR)) ) then
 		return l
@@ -3933,6 +3990,16 @@ private function exprNewBOP _
 			exprFreeNode( ptrcast )
 		end if
 	end if
+
+	'' C only defines relational pointer ordering within one object. FreeBASIC
+	'' compares native addresses, so lower these values before C evaluates them.
+	select case as const( op )
+	case AST_OP_GT, AST_OP_LT, AST_OP_GE, AST_OP_LE
+		if( typeIsPtr(l->dtype) or typeIsPtr(r->dtype) ) then
+			l = exprNewCAST(FB_DATATYPE_UINT, NULL, l)
+			r = exprNewCAST(FB_DATATYPE_UINT, NULL, r)
+		end if
+	end select
 
 	'' BASIC compares native addresses, including null, unrelated objects
 	'' and procedure pointers. C ordering only covers positions within one

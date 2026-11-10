@@ -11,9 +11,14 @@ FBCALL char *fb_hStrSkipChar( char *s, ssize_t len, int c )
 {
 	char *p = s;
 
-	if( s != NULL )
-		while( (--len >= 0) && ((int)*p == c) )
-			++p;
+	if( s == NULL )
+		return s;
+
+	while( (len > 0) && ((int)*p == c) )
+	{
+		++p;
+		--len;
+	}
 
     return p;
 }
@@ -27,9 +32,14 @@ FBCALL char *fb_hStrSkipCharRev( char *s, ssize_t len, int c )
 
 	p = &s[len-1];
 
-    /* fixed-len's are filled with null's as in PB, strip them too */
-    while( (--len >= 0) && (((int)*p == c) || ((int)*p == 0) ) )
+    /* Fixed-length strings can be NUL-padded, so strip NUL bytes as well. */
+	while( (len > 0) && (((int)*p == c) || ((int)*p == 0) ) )
+	{
+		if( len == 1 )
+			return NULL;
 		--p;
+		--len;
+	}
 
     return p;
 }

@@ -16,7 +16,7 @@
 # the preceding physical call is exported separately as an editable prefix.
 SEMANTIC_MODEL_SMOKE_MIN_SCHEMA := 15
 
-.PHONY: compiler-smoke compiler-semantic-model-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
+.PHONY: compiler-smoke compiler-clongdouble-abi-smoke compiler-semantic-model-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
 compiler-smoke: libs
 	$(call _mt_echo,Compiler smoke test)
 	@mkdir -p "$(TEST_TMP)"
@@ -26,6 +26,22 @@ ifneq ($(CAN_RUN),)
 	@./"$(TEST_TMP)/smoke$(EXEEXT)" >/dev/null 2>&1 && echo "==> RUN OK"
 endif
 	$(call _mt_cleanup_success)
+
+ifeq ($(TARGET_OS)/$(TARGET_ARCH),linux/x86_64)
+ifneq ($(CAN_RUN),)
+compiler-clongdouble-abi-smoke: compiler
+	$(call _mt_echo,CLongDouble C ABI smoke test)
+	$(call _mt_run,$(MAKE) rtlib BUILD_FBC="$(abspath $(FBC_EXE))")
+	$(TEST_TOOLCHAIN_ENV) $(PYTHON) "$(rootdir)/build_scripts/test-clongdouble-c-abi.py" \
+		--root "$(rootdir)" --fbc "$(abspath $(FBC_EXE))" --cc "$(CC)"
+else
+compiler-clongdouble-abi-smoke:
+	$(call _mt_echo,CLongDouble C ABI test skipped; target executable cannot run)
+endif
+else
+compiler-clongdouble-abi-smoke:
+	$(call _mt_echo,CLongDouble C ABI test skipped; Linux x86-64 is required)
+endif
 
 compiler-semantic-model-smoke: compiler
 	$(call _mt_echo,Compiler semantic model smoke test)

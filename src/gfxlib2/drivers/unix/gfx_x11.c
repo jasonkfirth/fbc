@@ -70,6 +70,7 @@ X11DRIVER fb_x11;
 
 static pthread_t thread;
 static pthread_mutex_t mutex;
+static pthread_mutex_t mouse_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cond;
 
 static Drawable root_window;
@@ -87,6 +88,7 @@ static int is_running = FALSE, has_focus, cursor_shown, xlib_inited = FALSE;
 static int focus_notified;
 /* Keep a one-shot latch of press events in case polling misses a short click. */
 static int mouse_x, mouse_y, mouse_wheel, mouse_hwheel, mouse_buttons, mouse_latched_buttons, mouse_on;
+static int mouse_state_initialized;
 static int mouse_x_root, mouse_y_root;
 
 static void hSetWindowFocus(int focused, EVENT *event)
@@ -713,12 +715,32 @@ static void *window_thread(void *arg)
 		 * XSync(fb_x11.display, False);
 		 */
 		while (XPending(fb_x11.display)) {
+			int update_mouse_state;
+			int lock_mouse_state;
+
 			e.type = 0;
 			XNextEvent(fb_x11.display, &event);
 			if (fb_hX11DropEvent(&drop_windows[0], &event) ||
 			    fb_hX11DropEvent(&drop_windows[1], &event) ||
 			    fb_hX11DropEvent(&drop_windows[2], &event))
 				continue;
+			update_mouse_state =
+				(event.type == FocusOut) ||
+				(event.type == EnterNotify) ||
+				(event.type == LeaveNotify) ||
+				(event.type == MotionNotify) ||
+				(event.type == ButtonPress) ||
+				(event.type == ButtonRelease);
+			lock_mouse_state = update_mouse_state ||
+				(event.type == FocusIn) ||
+				(event.type == MapNotify) ||
+				(event.type == GenericEvent) ||
+				(event.type == KeyPress) ||
+				(event.type == KeyRelease);
+			if (lock_mouse_state)
+				pthread_mutex_lock(&mouse_state_mutex);
+			if (update_mouse_state)
+				mouse_state_initialized = TRUE;
 			switch (event.type) {
 				case FocusIn:
 				case MapNotify:
@@ -738,8 +760,16 @@ static void *window_thread(void *arg)
 
 				case EnterNotify:
 					has_focus = TRUE;
-					mouse_on = TRUE;
+					hWindowToFramebuffer(event.xcrossing.x,
+					                     event.xcrossing.y, &mouse_x, &mouse_y,
+					                     &mouse_on);
+					mouse_buttons =
+						(event.xcrossing.state & Button1Mask ? BUTTON_LEFT : 0) |
+						(event.xcrossing.state & Button3Mask ? BUTTON_RIGHT : 0) |
+						(event.xcrossing.state & Button2Mask ? BUTTON_MIDDLE : 0);
 					e.type = EVENT_MOUSE_ENTER;
+					e.x = mouse_x;
+					e.y = mouse_y;
 					break;
 
 				case LeaveNotify:
@@ -893,6 +923,8 @@ static void *window_thread(void *arg)
 					fb_hX11TouchEvent(&event);
 					break;
 			}
+			if (lock_mouse_state)
+				pthread_mutex_unlock(&mouse_state_mutex);
 			if (e.type)
 				fb_hPostEvent(&e);
 		}
@@ -1265,11 +1297,13 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	if (flags & DRIVER_FULLSCREEN) {
 		has_focus = TRUE;
 		mouse_on = TRUE;
+		mouse_state_initialized = TRUE;
 		mouse_x = fb_x11.content_w >> 1;
 		mouse_y = fb_x11.content_h >> 1;
 	} else {
 		has_focus = FALSE;
 		mouse_on = FALSE;
+		mouse_state_initialized = FALSE;
 	}
 	focus_notified = has_focus;
 	mouse_buttons = mouse_latched_buttons = mouse_wheel = 0;
@@ -1281,6 +1315,9 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	if (!pthread_create(&thread, NULL, window_thread, NULL)) {
 		pthread_cond_wait(&cond, &mutex);
 		pthread_mutex_unlock(&mutex);
+		if (is_running)
+			if (__fb_gfx)
+				__fb_gfx->get_mouse_fast = fb_hX11GetMouseFast;
 		if (is_running)
 			return 0;
 		pthread_join(thread, NULL);
@@ -1297,6 +1334,8 @@ void fb_hX11Exit(void)
 	/* Stop input callbacks before the X11 lock and mode storage are torn down. */
 	fb_hLinuxMaliitCancelPending();
 #endif
+	if (__fb_gfx)
+		__fb_gfx->get_mouse_fast = NULL;
 	if (is_running) {
 		pthread_mutex_lock(&mutex);
 		is_running = FALSE;
@@ -1385,13 +1424,43 @@ void fb_hX11WaitVSync(void)
 	usleep(1000000 / ((fb_x11.refresh_rate > 0) ? fb_x11.refresh_rate : 60));
 }
 
+int fb_hX11GetMouseFast(int *x, int *y, int *z, int *buttons, int *clip)
+{
+	int available;
+
+	pthread_mutex_lock(&mouse_state_mutex);
+	if (mouse_on) {
+		available = 1;
+	} else if ((!mouse_state_initialized) || mouse_buttons || mouse_latched_buttons) {
+		available = 0;
+	} else {
+		available = -1;
+	}
+	if (available > 0) {
+		if (x) *x = mouse_x;
+		if (y) *y = mouse_y;
+		if (z) *z = mouse_wheel;
+		if (buttons) {
+			*buttons = mouse_buttons | mouse_latched_buttons;
+			mouse_latched_buttons = 0;
+		}
+		if (clip) *clip = fb_x11.mouse_clip;
+	}
+	pthread_mutex_unlock(&mouse_state_mutex);
+
+	return available;
+}
+
 int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
 	Window root, child;
 	int root_x, root_y, win_x, win_y;
+	int query_x, query_y, query_inside;
 	int touch_x, touch_y;
 	unsigned int buttons_mask;
 	const int invalid_coord = -1;
+	int cached_inside;
+	int cached_clip;
 
 	if (x)
 		*x = invalid_coord;
@@ -1400,7 +1469,9 @@ int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 	if (buttons)
 		*buttons = 0;
 
-	/* prefer XQueryPointer to have a more responsive mouse position retrieval */
+	pthread_mutex_lock(&mouse_state_mutex);
+	cached_inside = mouse_on;
+	cached_clip = fb_x11.mouse_clip;
 	if (z) *z = mouse_wheel;
 	if (fb_hX11GetPrimaryTouch(&touch_x, &touch_y)) {
 		if (x)
@@ -1413,37 +1484,85 @@ int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 			*clip = fb_x11.mouse_clip;
 		if (buttons)
 			mouse_latched_buttons = 0;
+		pthread_mutex_unlock(&mouse_state_mutex);
 		return 0;
 	}
 	/* Keep a short-press visible once even if polling sees pointer outside. */
-	if ((!mouse_on) && (!mouse_latched_buttons) && (buttons == NULL))
+	if ((!mouse_on) && (!mouse_latched_buttons) && (buttons == NULL)) {
+		if (clip) *clip = cached_clip;
+		pthread_mutex_unlock(&mouse_state_mutex);
 		return 0;
-
-	if (XQueryPointer(fb_x11.display, fb_x11.window, &root, &child, &root_x, &root_y, &win_x, &win_y, &buttons_mask)) {
-		if (x) *x = win_x;
-		if (y) *y = win_y;
-		hWindowToFramebuffer(win_x, win_y, x, y, NULL);
-		if (buttons) {
-			*buttons = (buttons_mask & Button1Mask ? 0x1 : 0) |
-				   (buttons_mask & Button3Mask ? 0x2 : 0) |
-				   (buttons_mask & Button2Mask ? 0x4 : 0);
-			*buttons |= mouse_latched_buttons;
-		}
-	} else {
+	}
+	/*
+		MotionNotify and button events already keep this state current while the
+		pointer is inside the window. Reuse it instead of synchronously asking
+		the X server for the same position on every GETMOUSE call. A pointer
+		dragged outside the window still uses XQueryPointer below.
+	*/
+	if (cached_inside) {
 		if (x) *x = mouse_x;
 		if (y) *y = mouse_y;
-		if (buttons) *buttons = mouse_buttons | mouse_latched_buttons;
+		if (buttons) {
+			*buttons = mouse_buttons | mouse_latched_buttons;
+			mouse_latched_buttons = 0;
+		}
+		if (clip) *clip = cached_clip;
+		pthread_mutex_unlock(&mouse_state_mutex);
+		return 0;
 	}
-	if (buttons) {
-		mouse_latched_buttons = 0;
+	pthread_mutex_unlock(&mouse_state_mutex);
+
+	if (XQueryPointer(fb_x11.display, fb_x11.window, &root, &child, &root_x, &root_y, &win_x, &win_y, &buttons_mask)) {
+		query_x = win_x;
+		query_y = win_y;
+		query_inside = FALSE;
+		hWindowToFramebuffer(win_x, win_y, &query_x, &query_y, &query_inside);
+		/*
+			When a window is mapped underneath a stationary pointer, some window
+			managers omit the initial EnterNotify. Seed the event cache from this
+			one synchronous query so later GETMOUSE calls can use the fast path.
+		*/
+		pthread_mutex_lock(&mouse_state_mutex);
+		mouse_x = query_x;
+		mouse_y = query_y;
+		mouse_on = query_inside;
+		mouse_state_initialized = TRUE;
+		mouse_buttons = (buttons_mask & Button1Mask ? 0x1 : 0) |
+				(buttons_mask & Button3Mask ? 0x2 : 0) |
+				(buttons_mask & Button2Mask ? 0x4 : 0);
+		if (query_inside)
+			has_focus = TRUE;
+		mouse_x_root = root_x;
+		mouse_y_root = root_y;
+		if (x) *x = mouse_x;
+		if (y) *y = mouse_y;
+		if (buttons) {
+			*buttons = mouse_buttons | mouse_latched_buttons;
+			mouse_latched_buttons = 0;
+		}
+		cached_clip = fb_x11.mouse_clip;
+		pthread_mutex_unlock(&mouse_state_mutex);
+	} else {
+		pthread_mutex_lock(&mouse_state_mutex);
+		if (x) *x = mouse_x;
+		if (y) *y = mouse_y;
+		if (buttons) {
+			*buttons = mouse_buttons | mouse_latched_buttons;
+			mouse_latched_buttons = 0;
+		}
+		cached_clip = fb_x11.mouse_clip;
+		pthread_mutex_unlock(&mouse_state_mutex);
 	}
 
-	if (clip) *clip = fb_x11.mouse_clip;
+	if (clip) *clip = cached_clip;
 	return 0;
 }
 
 void fb_hX11SetMouse(int x, int y, int show, int clip)
 {
+	int warp_x = 0, warp_y = 0, warp_pointer = FALSE;
+
+	pthread_mutex_lock(&mouse_state_mutex);
 	if ((x != (int)0x80000000 || y != (int)0x80000000) && has_focus) {
 		if (x == (int)0x80000000) {
 			x = mouse_x;
@@ -1458,8 +1577,21 @@ void fb_hX11SetMouse(int x, int y, int show, int clip)
 		mouse_on = TRUE;
 		mouse_x = x;
 		mouse_y = y;
+		mouse_state_initialized = TRUE;
+		warp_x = mouse_x;
+		warp_y = mouse_y;
+		warp_pointer = TRUE;
+	}
+	if (clip == 0)
+		fb_x11.mouse_clip = FALSE;
+	else if (clip > 0)
+		fb_x11.mouse_clip = TRUE;
+	pthread_mutex_unlock(&mouse_state_mutex);
 
-		hFramebufferToWindow(mouse_x, mouse_y, &x, &y);
+	if (warp_pointer) {
+		x = warp_x;
+		y = warp_y;
+		hFramebufferToWindow(x, y, &x, &y);
 		XWarpPointer(fb_x11.display, None, fb_x11.window, 0, 0, 0, 0, x, y);
 	}
 	if ((show > 0) && (!cursor_shown)) {
@@ -1473,11 +1605,9 @@ void fb_hX11SetMouse(int x, int y, int show, int clip)
 		cursor_shown = FALSE;
 	}
 	if (clip == 0) {
-		fb_x11.mouse_clip = FALSE;
 		XUngrabPointer(fb_x11.display, CurrentTime);
 	}
 	else if (clip > 0) {
-		fb_x11.mouse_clip = TRUE;
 		while (1) {
 			if (XGrabPointer(fb_x11.display, fb_x11.window, True, 0, GrabModeAsync, GrabModeAsync, fb_x11.window, None, CurrentTime) == GrabSuccess)
 				break;

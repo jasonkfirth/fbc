@@ -2109,6 +2109,9 @@ function cVarDecl _
 		end if
 		sym = hAddVar( sym, parent, id, palias, dtype, subtype, lgt, addsuffix, _
 		               attrib, dimensions, have_bounds, dTB(), chain_, token, diagnostic_site )
+		if( sym <> NULL andalso semantic_type_alias <> NULL andalso _
+		    typeGetPtrCnt(semantic_type_alias->typ) = typeGetPtrCnt(dtype) ) then _
+			sym->var_.align = semantic_type_alias->typealign
 		if( token = FB_TK_EXTERN ) then
 			fbSemanticModelDeclarationRepeat(sym, "extern", semantic_repeated_extern, semantic_site)
 		end if

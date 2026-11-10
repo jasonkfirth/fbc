@@ -118,4 +118,59 @@ SUITE( fbc_tests.structs.bitfield_packing )
 		END_TEST
 	END_TEST_GROUP
 
+	TEST_GROUP( bitfieldsInNestedRecords )
+		type BitfieldPayload
+			low : 3 as ushort
+			high : 13 as ushort
+			height as ushort
+		end type
+
+		type NaturallyAlignedRecord
+			prefix as ubyte
+			payload as BitfieldPayload
+			suffix as ubyte
+		end type
+
+		type PackedRecord field = 1
+			prefix as ubyte
+			payload as BitfieldPayload
+			suffix as ubyte
+		end type
+
+		TEST( layout_and_access )
+			CU_ASSERT( sizeof( BitfieldPayload ) = 4 )
+			CU_ASSERT( offsetof( NaturallyAlignedRecord, payload ) = 2 )
+			CU_ASSERT( offsetof( NaturallyAlignedRecord, suffix ) = 6 )
+			CU_ASSERT( sizeof( NaturallyAlignedRecord ) = 8 )
+			CU_ASSERT( offsetof( PackedRecord, payload ) = 1 )
+			CU_ASSERT( offsetof( PackedRecord, suffix ) = 5 )
+			CU_ASSERT( sizeof( PackedRecord ) = 6 )
+
+			'' Distinct values make offset and bitfield-storage mistakes visible.
+			dim natural as NaturallyAlignedRecord
+			natural.prefix = &h12
+			natural.payload.low = 5
+			natural.payload.high = &h1234
+			natural.payload.height = &h5678
+			natural.suffix = &h9a
+			CU_ASSERT( natural.prefix = &h12 )
+			CU_ASSERT( natural.payload.low = 5 )
+			CU_ASSERT( natural.payload.high = &h1234 )
+			CU_ASSERT( natural.payload.height = &h5678 )
+			CU_ASSERT( natural.suffix = &h9a )
+
+			dim packed as PackedRecord
+			packed.prefix = &h34
+			packed.payload.low = 3
+			packed.payload.high = &h1567
+			packed.payload.height = &h1234
+			packed.suffix = &h56
+			CU_ASSERT( packed.prefix = &h34 )
+			CU_ASSERT( packed.payload.low = 3 )
+			CU_ASSERT( packed.payload.high = &h1567 )
+			CU_ASSERT( packed.payload.height = &h1234 )
+			CU_ASSERT( packed.suffix = &h56 )
+		END_TEST
+	END_TEST_GROUP
+
 END_SUITE

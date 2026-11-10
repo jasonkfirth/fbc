@@ -1079,6 +1079,54 @@ done:
 	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
 }
 
+FBCALL int fb_Gfx3DrawLines(const FB_GFX3_COMPAT_LINE *lines, int count)
+{
+	FB_GFX3_DRAW_STATE *state;
+	int result = FB_GFX3_INVALID;
+
+	if ((count < 0) ||
+	    ((uint32_t)count > FB_GFX3_CONTEXT_PENDING_LINE_LIMIT) ||
+	    ((count != 0) && (lines == NULL)))
+		goto done;
+	FB_GRAPHICS_LOCK();
+	state = fb_gfx3_api_get_draw_state_locked();
+	if (state == NULL)
+		goto unlock;
+	if (state->work_page >= state->mode->page_count)
+		goto unlock;
+	result = fb_gfx3_compat_lines_logical(state, lines, (uint32_t)count);
+
+unlock:
+	FB_GRAPHICS_UNLOCK();
+done:
+	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+}
+
+FBCALL int fb_Gfx3DrawRectangles(
+	const FB_GFX3_COMPAT_RECTANGLE *rectangles, int count)
+{
+	FB_GFX3_DRAW_STATE *state;
+	int result = FB_GFX3_INVALID;
+
+	if ((count < 0) ||
+	    ((uint32_t)count > FB_GFX3_CONTEXT_PENDING_RECTANGLE_LIMIT) ||
+	    ((count != 0) && (rectangles == NULL)))
+		goto done;
+	FB_GRAPHICS_LOCK();
+	state = fb_gfx3_api_get_draw_state_locked();
+	if (state == NULL)
+		goto unlock;
+	if (state->work_page >= state->mode->page_count)
+		goto unlock;
+	result = fb_gfx3_compat_rectangles_logical(state, rectangles,
+		(uint32_t)count);
+
+unlock:
+	FB_GRAPHICS_UNLOCK();
+done:
+	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
+}
+
 /* ------------------------------------------------------------------------- */
 /* Standard primitive target compatibility                                   */
 /* ------------------------------------------------------------------------- */

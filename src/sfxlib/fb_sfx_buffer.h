@@ -89,6 +89,9 @@ typedef FB_SFX_RINGBUFFER FB_SFXRINGBUFFER;
 /*
     Initialize a ring buffer.
 
+    A successfully initialized buffer owns its data allocation. Call
+    fb_sfxRingBufferShutdown() before initializing that object again.
+
     Parameters:
 
         rb      ring buffer structure

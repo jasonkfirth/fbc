@@ -204,7 +204,7 @@ int fb_gfx3_gl_points_batch(FB_GFX3_OPENGL_STATE *state,
 		items, GL_STREAM_DRAW);
 	state->gl.bind_buffer_base(GL_SHADER_STORAGE_BUFFER, 2,
 		state->blit_batch_buffer);
-	if (state->blit_batch_generation >= (UINT32_MAX >> 13))
+	if (state->blit_batch_generation >= (UINT32_MAX >> 15))
 		result = opengl_blit_batch_winner_ensure(state, destination, TRUE);
 	else
 		result = opengl_blit_batch_winner_ensure(state, destination, FALSE);
@@ -219,7 +219,7 @@ int fb_gfx3_gl_points_batch(FB_GFX3_OPENGL_STATE *state,
 	state->gl.uniform_1ui(state->points_batch_count_location,
 		(uint32_t)total_points);
 	state->gl.uniform_1ui(state->points_batch_key_location,
-		(generation << 13) | 1u);
+		(generation << 15) | 1u);
 	state->gl.dispatch_compute(groups_x, 1, 1);
 	state->gl.memory_barrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT |
 		GL_SHADER_STORAGE_BARRIER_BIT);
@@ -836,6 +836,10 @@ static int opengl_primitive_rectangle_coverage(
 	return TRUE;
 }
 
+/*
+ * Validate payloads and eligibility before the packer runs. The packer can
+ * then populate GPU items without repeating primitive range checks.
+ */
 uint32_t fb_gfx3_gl_primitive_batch_count(
 	FB_GFX3_COMMAND *const *commands, uint32_t available,
 	uint32_t *primitive_count_result)
@@ -1065,9 +1069,6 @@ static int opengl_primitive_batch_add_line(
 		return FB_GFX3_INVALID;
 	difference_x = llabs((long long)line->x2 - line->x1);
 	difference_y = llabs((long long)line->y2 - line->y1);
-	if (((line->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
-	    (difference_x > 32767) || (difference_y > 32767))
-		return FB_GFX3_UNSUPPORTED;
 	line_count = (uint32_t)((difference_x > difference_y) ?
 		difference_x : difference_y) + 1u;
 	if (line_count > *maximum_coverage_count)
@@ -1128,12 +1129,6 @@ static int opengl_primitive_batch_add_ellipse(
 	if ((destination == NULL) || (ellipse == NULL) || (item == NULL) ||
 	    (order == 0u))
 		return FB_GFX3_INVALID;
-	if (((ellipse->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
-	    !(ellipse->radius_x >= 0.0f) ||
-	    !(ellipse->radius_x <= 32767.0f) ||
-	    !(ellipse->radius_y >= 0.0f) ||
-	    !(ellipse->radius_y <= 32767.0f))
-		return FB_GFX3_UNSUPPORTED;
 	item->geometry_x1 = ellipse->center_x;
 	item->geometry_y1 = ellipse->center_y;
 	memcpy(&item->geometry_x2_or_radius_x, &ellipse->radius_x,
@@ -1190,8 +1185,6 @@ static int opengl_primitive_batch_add_point(
 	if ((destination == NULL) || (command_clip == NULL) || (point == NULL) ||
 	    (item == NULL) || (order == 0u))
 		return FB_GFX3_INVALID;
-	if ((point->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u)
-		return FB_GFX3_UNSUPPORTED;
 	item->geometry_x1 = point->x;
 	item->geometry_y1 = point->y;
 	item->color = point->color;
@@ -1446,7 +1439,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 		items, GL_STREAM_DRAW);
 	state->gl.bind_buffer_base(GL_SHADER_STORAGE_BUFFER, 2,
 		state->blit_batch_buffer);
-	if (state->blit_batch_generation >= (UINT32_MAX >> 13))
+	if (state->blit_batch_generation >= (UINT32_MAX >> 15))
 		result = opengl_blit_batch_winner_ensure(state, destination, TRUE);
 	else
 		result = opengl_blit_batch_winner_ensure(state, destination, FALSE);
@@ -1457,7 +1450,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 	state->gl.bind_image_texture(0, state->blit_batch_winner_texture, 0,
 		GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 	state->gl.uniform_1ui(state->primitive_batch_key_location,
-		generation << 13);
+		generation << 15);
 	state->gl.dispatch_compute(groups_x, primitive_count, 1u);
 	state->gl.memory_barrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT |
 		GL_SHADER_STORAGE_BARRIER_BIT);
@@ -1498,7 +1491,7 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 	const FB_GFX3_LINE_COMMAND *packed_lines, FB_GFX3_HANDLE target,
 	uint64_t sequence, uint32_t count)
 {
-	FB_GFX3_OPENGL_LINE_BATCH_ITEM items[FB_GFX3_OPENGL_LINE_BATCH_LIMIT];
+	FB_GFX3_OPENGL_LINE_BATCH_ITEM *items = NULL;
 	const FB_GFX3_LINE_COMMAND *first;
 	FB_GFX3_OPENGL_SURFACE *destination = NULL;
 	FB_GFX3_RECT clip;
@@ -1531,6 +1524,17 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 	if (!fb_gfx3_gl_clip_rect(destination, &first->clip, &clip)) {
 		fb_gfx3_resource_release(state->resources, target);
 		return FB_GFX3_OK;
+	}
+	/*
+		Keep the largest supported batch off the thread stack. The 32,767-entry
+		buffer is about one MiB, which is too close to the default Windows stack
+		limit for a renderer call chain.
+	*/
+	items = (FB_GFX3_OPENGL_LINE_BATCH_ITEM *)malloc(
+		(size_t)count * sizeof(*items));
+	if (items == NULL) {
+		fb_gfx3_resource_release(state->resources, target);
+		return FB_GFX3_OUT_OF_MEMORY;
 	}
 	for (index = 0; index < count; index++) {
 		const FB_GFX3_LINE_COMMAND *payload;
@@ -1625,7 +1629,7 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 		(GLsizeiptr)(count * sizeof(items[0])), items, GL_STREAM_DRAW);
 	state->gl.bind_buffer_base(GL_SHADER_STORAGE_BUFFER, 2,
 		state->blit_batch_buffer);
-	if (state->blit_batch_generation >= (UINT32_MAX >> 13))
+	if (state->blit_batch_generation >= (UINT32_MAX >> 15))
 		result = opengl_blit_batch_winner_ensure(state, destination, TRUE);
 	else
 		result = opengl_blit_batch_winner_ensure(state, destination, FALSE);
@@ -1640,7 +1644,7 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 	state->gl.uniform_1ui(state->line_batch_style_location,
 		first->style & 0xFFFFu);
 	state->gl.uniform_1ui(state->line_batch_key_location,
-		(generation << 13) | 1u);
+		(generation << 15) | 1u);
 	state->gl.dispatch_compute(groups_x, count, 1);
 	state->gl.memory_barrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT |
 		GL_SHADER_STORAGE_BARRIER_BIT);
@@ -1670,6 +1674,7 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 
 done:
 	fb_gfx3_resource_release(state->resources, target);
+	free(items);
 	return result;
 }
 
@@ -1890,7 +1895,7 @@ int fb_gfx3_gl_ellipse_batch(FB_GFX3_OPENGL_STATE *state,
 		(GLsizeiptr)(count * sizeof(items[0])), items, GL_STREAM_DRAW);
 	state->gl.bind_buffer_base(GL_SHADER_STORAGE_BUFFER, 2,
 		state->blit_batch_buffer);
-	if (state->blit_batch_generation >= (UINT32_MAX >> 13))
+	if (state->blit_batch_generation >= (UINT32_MAX >> 15))
 		result = opengl_blit_batch_winner_ensure(state, destination, TRUE);
 	else
 		result = opengl_blit_batch_winner_ensure(state, destination, FALSE);
@@ -1901,7 +1906,7 @@ int fb_gfx3_gl_ellipse_batch(FB_GFX3_OPENGL_STATE *state,
 	state->gl.bind_image_texture(0, state->blit_batch_winner_texture, 0,
 		GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 	state->gl.uniform_1ui(state->ellipse_batch_key_location,
-		(generation << 13) | 1u);
+		(generation << 15) | 1u);
 	state->gl.dispatch_compute(1, 1, count);
 	state->gl.memory_barrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT |
 		GL_SHADER_STORAGE_BARRIER_BIT);

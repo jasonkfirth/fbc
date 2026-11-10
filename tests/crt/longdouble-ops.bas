@@ -35,6 +35,32 @@ SUITE( fbc_tests.crt.longdouble )
 		#endif
 	END_TEST
 
+	TEST( longdouble_record_alignment )
+		'' C aligns x86-64 long double to 16 bytes, which affects enclosing
+		'' unions and records even though the binding stores it as bytes.
+		type LongDoubleValue
+			union
+				value as clongdouble
+				pointer as any ptr
+			end union
+		end type
+		type TaggedLongDouble
+			tag as long
+			value as LongDoubleValue
+		end type
+
+		#if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
+			#assert sizeof( TaggedLongDouble ) = 32
+			#assert offsetof( TaggedLongDouble, value ) = 16
+		#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
+			#assert sizeof( TaggedLongDouble ) = 16
+			#assert offsetof( TaggedLongDouble, value ) = 8
+		#else
+			#assert sizeof( TaggedLongDouble ) = 16
+			#assert offsetof( TaggedLongDouble, value ) = 4
+		#endif
+	END_TEST
+
 	TEST( longdouble_arithmetic )
 		dim as clongdouble left = CLongDoubleFromDoubleValue( 7.25# )
 		dim as clongdouble right = CLongDoubleFromDoubleValue( 2.5# )
@@ -64,6 +90,16 @@ SUITE( fbc_tests.crt.longdouble )
 			CU_ASSERT( precise > rounded_as_double )
 			CU_ASSERT( precise <> rounded_as_double )
 			CU_ASSERT_EQUAL( cast( ulongint, precise ), 9007199254740993ull )
+		#endif
+	END_TEST
+
+	TEST( longdouble_string_precision )
+		#if sizeof( clongdouble ) > sizeof( double )
+			dim as zstring * 32 decimal_text = "1.0000000000000001"
+			dim as clongdouble parsed_value, one = CLongDoubleFromDoubleValue( 1.0# )
+
+			fb_LongDoubleFromString( @parsed_value, strptr( decimal_text ), sizeof( parsed_value ) )
+			CU_ASSERT( parsed_value > one )
 		#endif
 	END_TEST
 

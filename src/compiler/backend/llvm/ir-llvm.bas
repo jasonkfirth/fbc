@@ -243,6 +243,8 @@ type IRLLVMCONTEXT
 	dtorcount           as integer
 	definedprocs        as TSTRSET
 	declaredprocs       as TSTRSET
+	definedvars         as TSTRSET
+	declaredvars        as TSTRSET
 	udtnames            as TSTRSET
 	udtnamecount        as integer
 	localnames          as TSTRSET
@@ -1356,6 +1358,20 @@ private function hGlobalVarLinkage( byval sym as FBSYMBOL ptr, byval has_initial
 	return ""
 end function
 
+private sub hRememberGlobalVarDefinition( byval sym as FBSYMBOL ptr )
+	if( symbIsExtern( sym ) or symbIsLocal( sym ) or _
+	    symbGetIsDynamic( sym ) or symbGetIsLiteral( sym ) ) then
+		exit sub
+	end if
+	if( hGlobalVarLinkage( sym, FALSE ) = "private" ) then
+		exit sub
+	end if
+	var global_name = symbGetMangledName( sym )
+	if( global_name <> NULL ) then
+		strsetAdd( @ctx.definedvars, *global_name, 0 )
+	end if
+end sub
+
 private sub hEmitVariable( byval sym as FBSYMBOL ptr )
 	dim as string ln
 	dim as integer is_global = any, length = any
@@ -1430,11 +1446,22 @@ private sub hEmitVariable( byval sym as FBSYMBOL ptr )
 		'' An EXTERN is a declaration. Defining it here creates duplicate
 		'' symbols when several modules use the same BASIC or runtime global.
 		if( symbGetIsAccessed( sym ) ) then
-			ln = hEmitVarName( sym ) + " = external"
+			var external_name = hEmitVarName( sym )
+			'' Several BASIC symbols may refer to one C linker global.
+			if( hashLookup( @ctx.definedvars.hash, strptr( external_name ) ) <> NULL ) then
+				exit sub
+			end if
+			if( hashLookup( @ctx.declaredvars.hash, strptr( external_name ) ) <> NULL ) then
+				exit sub
+			end if
+			strsetAdd( @ctx.declaredvars, external_name, 0 )
+			ln = external_name + " = external"
 			if( symbIsThreadLocal( sym ) ) then ln += " thread_local"
 			ln += " global " + hEmitSymType( sym )
 			storage_alignment = hInteger128StorageAlignment( _
 				symbGetType( sym ), symbGetSubtype( sym ) )
+			if( sym->var_.align > storage_alignment ) then _
+				storage_alignment = sym->var_.align
 			if( storage_alignment > 0 ) then _
 				ln += ", align " + str( storage_alignment )
 			hWriteLine( ln )
@@ -1468,6 +1495,8 @@ private sub hEmitVariable( byval sym as FBSYMBOL ptr )
 	end if
 	storage_alignment = hInteger128StorageAlignment( _
 		symbGetType( sym ), symbGetSubtype( sym ) )
+	if( sym->var_.align > storage_alignment ) then _
+		storage_alignment = sym->var_.align
 	if( storage_alignment > 0 ) then
 		ln += ", align " + str( storage_alignment )
 	elseif( symbGetType( sym ) = FB_DATATYPE_WCHAR ) then
@@ -1571,8 +1600,20 @@ private function hUDTUsesPackedLayout( byval s as FBSYMBOL ptr ) as integer
 end function
 
 private function hUDTHasExplicitPadding( byval s as FBSYMBOL ptr ) as integer
-	return hUDTUsesPackedLayout( s ) or _
-		symbGetUDTIsUnion( s ) or symbGetUDTHasAnonUnion( s )
+	if( hUDTUsesPackedLayout( s ) or _
+	    symbGetUDTIsUnion( s ) or symbGetUDTHasAnonUnion( s ) ) then
+		return TRUE
+	end if
+	dim as FBSYMBOL ptr fld = symbUdtGetFirstField( s )
+	while( fld )
+		if( symbIsDynamic( fld ) = FALSE andalso _
+		    (fld->var_.align > typeCalcNaturalAlign( _
+		        symbGetFullType( fld ), symbGetSubtype( fld ) )) ) then
+			return TRUE
+		end if
+		fld = symbUdtGetNextField( fld )
+	wend
+	return FALSE
 end function
 
 private function hInteger128StorageAlignment _
@@ -1592,12 +1633,29 @@ private function hInteger128StorageAlignment _
 end function
 
 private function hUDTAlignmentType( byval s as FBSYMBOL ptr ) as string
+	dim as integer aggregate_align = s->udt.natalign
+	if( (s->udt.align > 0) and (s->udt.align < aggregate_align) ) then _
+		aggregate_align = s->udt.align
 	if( (s->udt.align > 0) and (s->udt.align < 8) ) then return ""
-	if( symbGetUDTIsUnion( s ) or symbGetUDTHasAnonUnion( s ) ) then
-		'' Only the first union member occupies LLVM storage. An empty
-		'' array preserves the alignment required by the other members.
-		return "[0 x i" & (s->udt.natalign * 8) & "]"
+
+	'' A union's non-first members do not occupy LLVM storage. An empty array
+	'' also preserves alignment raised by a typedef-aligned scalar field.
+	dim as integer needs_alignment_storage = _
+		symbGetUDTIsUnion( s ) or symbGetUDTHasAnonUnion( s )
+	if( needs_alignment_storage = FALSE ) then
+		dim as FBSYMBOL ptr fld = symbUdtGetFirstField( s )
+		while( fld )
+			if( symbIsDynamic( fld ) = FALSE andalso _
+			    (fld->var_.align > typeCalcNaturalAlign( _
+			        symbGetFullType( fld ), symbGetSubtype( fld ) )) ) then
+				needs_alignment_storage = TRUE
+				exit while
+			end if
+			fld = symbUdtGetNextField( fld )
+		wend
 	end if
+	if( needs_alignment_storage andalso aggregate_align > 1 ) then _
+		return "[0 x i" & (aggregate_align * 8) & "]"
 	return ""
 end function
 
@@ -1797,6 +1855,8 @@ private function _emitBegin( ) as integer
 	hWriteLine( "target triple = """ + hLLVMTargetTriple( ) + """" )
 	strsetInit( @ctx.definedprocs, 64 )
 	strsetInit( @ctx.declaredprocs, 64 )
+	strsetInit( @ctx.definedvars, 64 )
+	strsetInit( @ctx.declaredvars, 64 )
 	strsetInit( @ctx.udtnames, 64 )
 	ctx.udtnamecount = 0
 	strsetInit( @ctx.localnames, 64 )
@@ -1843,6 +1903,7 @@ private sub _emitEnd( )
 
 	'' Then the variables
 	hWriteLine( "" )
+	symbForEachGlobal( FB_SYMBCLASS_VAR, @hRememberGlobalVarDefinition )
 	symbForEachGlobal( FB_SYMBCLASS_VAR, @hMaybeEmitGlobalVar )
 
 	'' DATA array initializers can reference globals by taking their address,
@@ -1881,6 +1942,8 @@ private sub _emitEnd( )
 	end if
 	strsetEnd( @ctx.definedprocs )
 	strsetEnd( @ctx.declaredprocs )
+	strsetEnd( @ctx.definedvars )
+	strsetEnd( @ctx.declaredvars )
 	strsetEnd( @ctx.udtnames )
 	strsetEnd( @ctx.localnames )
 	strsetEnd( @ctx.addressedlabels )
@@ -1982,6 +2045,8 @@ private sub _procAllocArg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr
 	ln = hEmitVarName( sym ) + " = alloca "
 	ln += hEmitType( dtype, subtype )
 	var storage_alignment = hInteger128StorageAlignment( dtype, subtype )
+	if( sym->var_.align > storage_alignment ) then _
+		storage_alignment = sym->var_.align
 	if( storage_alignment > 0 ) then ln += ", align " + str( storage_alignment )
 	hWriteLine( ln )
 
@@ -4237,6 +4302,8 @@ end sub
 private sub _emitVarIniEnd( byval sym as FBSYMBOL ptr )
 	var storage_alignment = hInteger128StorageAlignment( _
 		symbGetType( sym ), symbGetSubtype( sym ) )
+	if( sym->var_.align > storage_alignment ) then _
+		storage_alignment = sym->var_.align
 	if( storage_alignment > 0 ) then _
 		ctx.varini += ", align " + str( storage_alignment )
 	hWriteLine( ctx.varini )

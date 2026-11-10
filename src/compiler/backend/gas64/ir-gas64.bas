@@ -3016,6 +3016,7 @@ private sub hemitvariable( byval sym as FBSYMBOL ptr )
 				asm_info("stk="+Str(ctx.stk))
 				if  symbGetType( sym )=FB_DATATYPE_STRUCT then
 					align=sym->subtype->udt.natalign
+					if( sym->var_.align > align ) then align=sym->var_.align
 					asm_info("length udt="+Str(sym->lgt)+" natalign="+Str(align)+" unpadlgt="+Str(sym->subtype->udt.unpadlgt))
 					if align<4 then
 						asm_info("Natalign= changed for 4")
@@ -3023,7 +3024,9 @@ private sub hemitvariable( byval sym as FBSYMBOL ptr )
 					end if
 					ctx.stk=(length+ctx.stk+align-1) And (Not(align-1))
 				else
-					ctx.stk=(length+ctx.stk+lgt-1) And (Not(lgt-1))
+					align=lgt
+					if( sym->var_.align > align ) then align=sym->var_.align
+					ctx.stk=(length+ctx.stk+align-1) And (Not(align-1))
 				end if
 				asm_info("stk1="+Str(ctx.stk))
 				sym->ofs=-ctx.stk
@@ -3049,12 +3052,13 @@ private sub hemitvariable( byval sym as FBSYMBOL ptr )
 		else
 			align=sym->lgt
 		end if
+		if( sym->var_.align > align ) then align=sym->var_.align
 		asm_info("var total size="+Str(length)+"align="+str(align))
 		align=pw2(align) ''must be a power of 2
 		if( typeIsInteger128Scalar( symbGetType( sym ) ) ) then
 			if( align > 16 ) then align = 16
-		elseif( align > 8 ) then
-			align = 8
+		elseif( align > 16 ) then
+			align = 16
 		end if
 		'if symbIsPublic( sym ) then
 		'    asm_info("Not for variable report please : .globl "+*symbGetMangledName( sym ))
@@ -3652,7 +3656,10 @@ private function hIsCLongDoubleType _
 
 	if( typeGetDtAndPtrOnly( dtype ) <> FB_DATATYPE_STRUCT ) then return FALSE
 	if( subtype = NULL ) then return FALSE
-	return (*symbGetName( subtype ) = "CLONGDOUBLE")
+	'' The source alias resolves to its byte-backed UDT during ABI lowering.
+	var subtype_name = ucase( *symbGetName( subtype ) )
+	return (subtype_name = "CLONGDOUBLE") orElse _
+	       (subtype_name = "__CLONGDOUBLE_STORAGE")
 end function
 
 private function hUsesSystemVCAbi _
@@ -8969,6 +8976,7 @@ private sub _emitvarinibegin( byval sym as FBSYMBOL ptr )
 			align=typeGetSize(symbGetType( sym ))
 		end if
 	end if
+	if( sym->var_.align > align ) then align=sym->var_.align
 	asm_section(".data")
 	if symbIsPublic( sym ) then
 		asm_code(".globl "+*symbGetMangledName( sym ))

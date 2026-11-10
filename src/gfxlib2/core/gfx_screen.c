@@ -304,6 +304,12 @@ int fb_hApplyPendingResize(void)
 		return 0;
 	if (!__fb_gfx->driver || !__fb_gfx->driver->resize)
 		return -1;
+	/*
+		Resize requests are sparse. Check the volatile request before taking the
+		driver lock; if publication is in progress, the next event poll retries.
+	*/
+	if ((__fb_gfx->pending_width <= 0) || (__fb_gfx->pending_height <= 0))
+		return 0;
 
 	/*
 		The native window thread publishes both dimensions while holding the

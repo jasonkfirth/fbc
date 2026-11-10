@@ -25,7 +25,10 @@ FBCALL FBSTRING_ACCESS *fb_TRIM( FBSTRING_ACCESS *src )
 		if( len > 0 )
 		{
 			src_ptr = fb_hStrSkipCharRev( src->data, len, 32 );
-			len = (ssize_t)(src_ptr - src->data) + 1;
+			if( src_ptr == NULL )
+				len = 0;
+			else
+				len = (ssize_t)(src_ptr - src->data) + 1;
 		}
 	}
 

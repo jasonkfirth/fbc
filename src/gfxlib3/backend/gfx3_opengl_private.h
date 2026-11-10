@@ -42,17 +42,16 @@
 #define FB_GFX3_OPENGL_LOCAL_SIZE_Y 16u
 #define FB_GFX3_OPENGL_POINT_GROUP_SIZE 64u
 /*
-	The lower thirteen bits of a winner entry identify one ordered command in
-	this batch. This permits one complete 6,000-line primitive fixture to reach
-	the ordered winner/resolve path without fragmenting into six full resolves.
-	The remaining bits hold a generation tag so an old winner texture value can
-	never be mistaken for a current frame.  This matches the renderer's bounded
-	8192-command drain and avoids repeated whole-frame resolve passes.
+	The lower fifteen bits of a winner entry identify one ordered primitive in
+	this batch. This lets a dense CAD frame use one winner/resolve pass instead
+	of repeating a full-frame resolve for each 8,191-item chunk. The remaining
+	bits hold a generation tag so an old winner texture value cannot be mistaken
+	for a current frame.
 */
 /*
 	The raster batch does not encode an item index in a winner texture. Four
 	ordinary 1,024-sprite frames therefore share one instance upload and draw
-	without weakening the thirteen-bit limits used by the compute winner paths.
+	without weakening the winner-index limits used by compute paths.
 */
 #define FB_GFX3_OPENGL_RASTER_BLIT_BATCH_LIMIT 4096u
 /* Filled boxes use ordinary framebuffer raster order, not winner tags. */
@@ -63,9 +62,9 @@
 	remains exact for source-over and Boolean PUT modes as well as opaque PUT.
 */
 #define FB_GFX3_OPENGL_ALPHA_TILE_MAX_TILES 65536u
-/* Opaque ordered lines use the same thirteen-bit winner-tag representation. */
-#define FB_GFX3_OPENGL_LINE_BATCH_LIMIT 8191u
-/* Opaque point-command runs use the same thirteen-bit winner-tag representation. */
+/* Opaque ordered primitive batches use a fifteen-bit winner index. */
+#define FB_GFX3_OPENGL_LINE_BATCH_LIMIT 32767u
+/* Point-command runs retain their smaller per-batch storage bound. */
 #define FB_GFX3_OPENGL_POINTS_BATCH_LIMIT 8191u
 /* Bound per-pixel tile replay when console output repeatedly overwrites cells. */
 #define FB_GFX3_OPENGL_GLYPH_BATCH_LIMIT 8191u
@@ -583,6 +582,7 @@ int fb_gfx3_gl_present(FB_GFX3_OPENGL_STATE *state,
 	FB_GFX3_COMMAND *command);
 int fb_gfx3_gl_present_handle(FB_GFX3_OPENGL_STATE *state,
 	FB_GFX3_HANDLE handle, uint64_t sequence);
+/* Requires a command range accepted by fb_gfx3_gl_primitive_batch_count. */
 int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 	FB_GFX3_COMMAND *const *commands, uint32_t command_count,
 	uint32_t primitive_count);

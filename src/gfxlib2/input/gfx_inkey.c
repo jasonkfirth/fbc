@@ -19,6 +19,18 @@
 static int key_buffer[KEY_BUFFER_LEN], key_head = 0, key_tail = 0;
 static int key_buffer_changed = FALSE;
 
+static void lock_key_buffer(void)
+{
+	if ((__fb_gfx) && (__fb_gfx->event_mutex))
+		fb_MutexLock(__fb_gfx->event_mutex);
+}
+
+static void unlock_key_buffer(void)
+{
+	if ((__fb_gfx) && (__fb_gfx->event_mutex))
+		fb_MutexUnlock(__fb_gfx->event_mutex);
+}
+
 static void poll_events(void)
 {
 	if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
@@ -30,43 +42,42 @@ int fb_hGfxInputBufferChanged( void )
 	int res;
 
 	FB_GRAPHICS_LOCK( );
-	DRIVER_LOCK();
+	lock_key_buffer();
 
     res = key_buffer_changed;
     key_buffer_changed = FALSE;
 
-	DRIVER_UNLOCK();
+	unlock_key_buffer();
 	FB_GRAPHICS_UNLOCK( );
 
 	return res;
 }
 
-/* Only called from gfx drivers; caller is expected to hold DRIVER_LOCK() */
+/* Drivers post keys without waiting for the display to finish presenting. */
 void fb_hPostKey(int key)
 {
+	lock_key_buffer();
 	key_buffer[key_tail] = key;
 	if (((key_tail + 1) & (KEY_BUFFER_LEN - 1)) == key_head)
 		key_head = (key_head + 1) & (KEY_BUFFER_LEN - 1);
     key_tail = (key_tail + 1) & (KEY_BUFFER_LEN - 1);
     key_buffer_changed = TRUE;
+	unlock_key_buffer();
 }
 
 static int get_key(void)
 {
 	int key = 0;
 
-	DRIVER_LOCK();
+	lock_key_buffer();
 
 	if (key_head != key_tail) {
 		key = key_buffer[key_head];
 		key_head = (key_head + 1) & (KEY_BUFFER_LEN - 1);
 	}
-
-    /* Reset the status for "key buffer changed" when a key
-     * was removed from the input queue. */
-    fb_hGfxInputBufferChanged();
-
-	DRIVER_UNLOCK();
+	/* INKEY and INPUT SLEEP share the pending-key notification state. */
+	key_buffer_changed = FALSE;
+	unlock_key_buffer();
 
 	return key;
 }
@@ -110,11 +121,11 @@ int fb_GfxKeyHit(void)
 
 	poll_events( );
 
-	DRIVER_LOCK();
+	lock_key_buffer();
 
 	res = (key_head != key_tail? 1: 0);
 
-	DRIVER_UNLOCK();
+	unlock_key_buffer();
 	FB_GRAPHICS_UNLOCK( );
 
 	return res;

@@ -18,6 +18,21 @@
 #include once "crt/unix/stdlib.bi"
 #endif
 
+'' RAND_MAX must match the C runtime that supplies rand(). The Microsoft CRT
+'' uses 0x7fff; Unix, Cygwin, DOS, and the supported embedded runtimes used by
+'' FBC expose the 31-bit range. Xbox follows the Microsoft CRT value.
+#if defined(__FB_CYGWIN__)
+#undef RAND_MAX
+#define RAND_MAX &h7fffffff
+#endif
+#ifndef RAND_MAX
+#if defined(__FB_XBOX__)
+#define RAND_MAX &h7fff
+#else
+#define RAND_MAX &h7fffffff
+#endif
+#endif
+
 type div_t
 	quot as long
 	rem_ as long

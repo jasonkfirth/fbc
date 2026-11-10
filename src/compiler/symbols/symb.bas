@@ -736,6 +736,7 @@ function symbNewSymbol _
 
 	s->typ = dtype
 	s->subtype = subtype
+	s->typealign = 0
 
 	'' QB quirks
 	if( (options and FB_SYMBOPT_UNSCOPE) <> 0 ) then

@@ -12,7 +12,8 @@
     Responsibilities:
 
         - allocate deterministic CPU reference surfaces
-        - execute transfers, clear, point, line, box, ellipse, blit, and readback
+        - execute transfers, clear, points, batched lines, rectangles, glyphs,
+          ellipse, blit, and readback
         - manage surfaces through the common generation-tagged registry
         - provide immediate fence completion for headless tests
 
@@ -773,6 +774,169 @@ static int null_rectangle(FB_GFX3_NULL_STATE *state,
 		return result;
 	if (null_clip_rect(surface, &payload->clip, &clip))
 		null_draw_box(surface, &clip, payload);
+	fb_gfx3_resource_release(state->resources, command->target);
+	return FB_GFX3_OK;
+}
+
+/*
+	The context combines adjacent LINE calls but keeps each clip, dash style,
+	and alpha flag in its record. Hold the target once for the complete ordered
+	packet, then use the same CPU rasterizer as the single-line command.
+*/
+static int null_lines(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
+{
+	const FB_GFX3_LINES_COMMAND *payload;
+	FB_GFX3_NULL_SURFACE *surface;
+	size_t line_bytes;
+	size_t expected_size;
+	uint32_t index;
+	int result;
+
+	if (fb_gfx3_command_payload_size(command) <
+	    offsetof(FB_GFX3_LINES_COMMAND, line))
+		return FB_GFX3_INVALID;
+	payload = (const FB_GFX3_LINES_COMMAND *)command->payload;
+	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->line[0]),
+	     &line_bytes) != FB_GFX3_OK) ||
+	    (fb_gfx3_size_add(offsetof(FB_GFX3_LINES_COMMAND, line), line_bytes,
+	     &expected_size) != FB_GFX3_OK) ||
+	    (expected_size != fb_gfx3_command_payload_size(command)))
+		return FB_GFX3_INVALID;
+
+	result = null_surface_retain(state, command, &surface);
+	if (result != FB_GFX3_OK)
+		return result;
+	for (index = 0u; index < payload->count; ++index) {
+		const FB_GFX3_LINE_COMMAND *line = &payload->line[index];
+		FB_GFX3_RECT clip;
+
+		if (null_clip_rect(surface, &line->clip, &clip))
+			null_draw_line(surface, &clip, line->x1, line->y1,
+				line->x2, line->y2, line->color, line->style,
+				line->flags);
+	}
+	fb_gfx3_resource_release(state->resources, command->target);
+	return FB_GFX3_OK;
+}
+
+/*
+	Filled and outline rectangle records share one packet in the context layer.
+	Validate the complete packet before writing any pixels so a malformed later
+	record cannot leave a partial batch on the reference surface.
+*/
+static int null_rectangles(FB_GFX3_NULL_STATE *state,
+	FB_GFX3_COMMAND *command)
+{
+	const FB_GFX3_RECTANGLES_COMMAND *payload;
+	FB_GFX3_NULL_SURFACE *surface;
+	size_t rectangle_bytes;
+	size_t expected_size;
+	uint32_t index;
+	int result;
+
+	if (fb_gfx3_command_payload_size(command) <
+	    offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle))
+		return FB_GFX3_INVALID;
+	payload = (const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+	if ((fb_gfx3_size_multiply(payload->count,
+	     sizeof(payload->rectangle[0]), &rectangle_bytes) != FB_GFX3_OK) ||
+	    (fb_gfx3_size_add(offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle),
+	     rectangle_bytes, &expected_size) != FB_GFX3_OK) ||
+	    (expected_size != fb_gfx3_command_payload_size(command)))
+		return FB_GFX3_INVALID;
+	for (index = 0u; index < payload->count; ++index) {
+		const FB_GFX3_RECTANGLE_COMMAND *rectangle =
+			&payload->rectangle[index];
+
+		if ((rectangle->x1 > rectangle->x2) ||
+		    (rectangle->y1 > rectangle->y2))
+			return FB_GFX3_INVALID;
+	}
+
+	result = null_surface_retain(state, command, &surface);
+	if (result != FB_GFX3_OK)
+		return result;
+	for (index = 0u; index < payload->count; ++index) {
+		const FB_GFX3_RECTANGLE_COMMAND *rectangle =
+			&payload->rectangle[index];
+		FB_GFX3_RECT clip;
+
+		if (null_clip_rect(surface, &rectangle->clip, &clip))
+			null_draw_box(surface, &clip, rectangle);
+	}
+	fb_gfx3_resource_release(state->resources, command->target);
+	return FB_GFX3_OK;
+}
+
+/*
+	Glyph rows use bit seven for the leftmost pixel. A zero bit only writes when
+	the record requests its copied background colour; clipping and colour masks
+	match the other reference primitives.
+*/
+static int null_glyphs(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
+{
+	const FB_GFX3_GLYPHS_COMMAND *payload;
+	FB_GFX3_NULL_SURFACE *surface;
+	FB_GFX3_RECT clip;
+	size_t glyph_bytes;
+	size_t expected_size;
+	uint32_t glyph_index;
+	int result;
+
+	if (fb_gfx3_command_payload_size(command) <
+	    offsetof(FB_GFX3_GLYPHS_COMMAND, glyph))
+		return FB_GFX3_INVALID;
+	payload = (const FB_GFX3_GLYPHS_COMMAND *)command->payload;
+	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->glyph[0]),
+	     &glyph_bytes) != FB_GFX3_OK) ||
+	    (fb_gfx3_size_add(offsetof(FB_GFX3_GLYPHS_COMMAND, glyph), glyph_bytes,
+	     &expected_size) != FB_GFX3_OK) ||
+	    (expected_size != fb_gfx3_command_payload_size(command)))
+		return FB_GFX3_INVALID;
+	for (glyph_index = 0u; glyph_index < payload->count; ++glyph_index) {
+		const FB_GFX3_GLYPH *glyph = &payload->glyph[glyph_index];
+
+		if ((glyph->width == 0u) || (glyph->width > 8u) ||
+		    (glyph->height == 0u) || (glyph->height > 16u) ||
+		    ((glyph->flags & ~(uint32_t)FB_GFX3_GLYPH_BACKGROUND) != 0u))
+			return FB_GFX3_INVALID;
+	}
+
+	result = null_surface_retain(state, command, &surface);
+	if (result != FB_GFX3_OK)
+		return result;
+	if (!null_clip_rect(surface, &payload->clip, &clip)) {
+		fb_gfx3_resource_release(state->resources, command->target);
+		return FB_GFX3_OK;
+	}
+	for (glyph_index = 0u; glyph_index < payload->count; ++glyph_index) {
+		const FB_GFX3_GLYPH *glyph = &payload->glyph[glyph_index];
+		uint32_t row_index;
+
+		for (row_index = 0u; row_index < glyph->height; ++row_index) {
+			int64_t y = (int64_t)glyph->y + row_index;
+			uint32_t column_index;
+			uint32_t row_mask = glyph->row[row_index];
+
+			if ((y < clip.y1) || (y > clip.y2))
+				continue;
+			for (column_index = 0u; column_index < glyph->width;
+			     ++column_index) {
+				int64_t x = (int64_t)glyph->x + column_index;
+				uint32_t bit = 0x80u >> column_index;
+
+				if ((x < clip.x1) || (x > clip.x2))
+					continue;
+				if ((row_mask & bit) != 0u)
+					null_put_pixel(surface, (int)x, (int)y,
+						glyph->foreground);
+				else if ((glyph->flags &
+					  FB_GFX3_GLYPH_BACKGROUND) != 0u)
+					null_put_pixel(surface, (int)x, (int)y,
+						glyph->background);
+			}
+		}
+	}
 	fb_gfx3_resource_release(state->resources, command->target);
 	return FB_GFX3_OK;
 }
@@ -1551,8 +1715,14 @@ static int null_execute_one(FB_GFX3_NULL_STATE *state,
 		return null_points(state, command);
 	case FB_GFX3_COMMAND_LINE:
 		return null_line(state, command);
+	case FB_GFX3_COMMAND_LINES:
+		return null_lines(state, command);
 	case FB_GFX3_COMMAND_RECTANGLE:
 		return null_rectangle(state, command);
+	case FB_GFX3_COMMAND_RECTANGLES:
+		return null_rectangles(state, command);
+	case FB_GFX3_COMMAND_GLYPHS:
+		return null_glyphs(state, command);
 	case FB_GFX3_COMMAND_ELLIPSE:
 		return null_ellipse(state, command);
 	case FB_GFX3_COMMAND_BLIT:

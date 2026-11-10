@@ -102,7 +102,10 @@ function symbIsGAS32CLongDoubleCAbiResult( byval proc as FBSYMBOL ptr ) as integ
 		exit function
 	end if
 
-	function = (ucase( *symbGetName( subtype ) ) = "CLONGDOUBLE")
+	'' The alias may already be resolved to its backing storage UDT.
+	var subtype_name = ucase( *symbGetName( subtype ) )
+	function = (subtype_name = "CLONGDOUBLE") orElse _
+	           (subtype_name = "__CLONGDOUBLE_STORAGE")
 end function
 
 function symbProcReturnsOnStack( byval proc as FBSYMBOL ptr ) as integer

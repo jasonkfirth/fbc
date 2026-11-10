@@ -382,6 +382,7 @@ help:
 	@echo "  log-tests               Run compiler log tests"
 	@echo "  warning-tests           Run warning tests"
 	@echo "  compiler-smoke          Build and run a small compiler smoke test"
+	@echo "  compiler-clongdouble-abi-smoke Check CLongDouble C ABI arguments and returns"
 	@echo "  compiler-semantic-model-smoke Validate compiler semantic model output"
 	@echo "  compiler-riscv32-smoke  Check linux-riscv32 target codegen/compile"
 	@echo "  compiler-riscv64-smoke  Check linux-riscv64 target codegen/compile"

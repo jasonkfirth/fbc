@@ -224,7 +224,8 @@ function symbAddTypedef _
 		byval id as const zstring ptr, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
-		byval lgt as longint _
+		byval lgt as longint, _
+		byval typealign as integer _
 	) as FBSYMBOL ptr
 
 	dim as FBSYMBOL ptr t = any
@@ -242,6 +243,7 @@ function symbAddTypedef _
 
 	''
 	t->lgt = lgt
+	t->typealign = typealign
 
 	'' check for forward references
 	if( symb.fwdrefcnt > 0 ) then

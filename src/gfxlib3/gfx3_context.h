@@ -92,8 +92,8 @@ typedef struct FB_GFX3_SURFACE {
 #define FB_GFX3_IMAGE_CACHE_ATLAS_COLUMNS 16u
 #define FB_GFX3_IMAGE_CACHE_ATLAS_ROWS 8u
 #define FB_GFX3_CONTEXT_PENDING_COMMAND_LIMIT 1024u
-/* OpenGL's ordered winner key reserves 13 bits for a line index. */
-#define FB_GFX3_CONTEXT_PENDING_LINE_LIMIT 8191u
+/* OpenGL's ordered winner key supports fifteen bits for a line index. */
+#define FB_GFX3_CONTEXT_PENDING_LINE_LIMIT 32767u
 /* Matches the renderer's normal command drain and bounds producer storage. */
 #define FB_GFX3_CONTEXT_PENDING_RECTANGLE_LIMIT 1024u
 /* Storage ceiling for backend-selected packed BLIT packet limits. */
@@ -280,6 +280,8 @@ int fb_gfx3_surface_line(FB_GFX3_SURFACE *surface,
 int fb_gfx3_surface_line_graphics_locked(FB_GFX3_SURFACE *surface,
 	const FB_GFX3_RECT *clip, int x1, int y1, int x2, int y2,
 	uint32_t color, uint32_t style, uint32_t flags);
+int fb_gfx3_surface_lines_graphics_locked(FB_GFX3_SURFACE *surface,
+	const FB_GFX3_LINE_COMMAND *lines, uint32_t count);
 int fb_gfx3_surface_rectangle(FB_GFX3_SURFACE *surface,
 	const FB_GFX3_RECT *clip, int x1, int y1, int x2, int y2,
 	uint32_t color, uint32_t style, int filled, uint32_t flags);

@@ -209,7 +209,8 @@ private function hCalcPadding _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
 		byval attrib as FB_SYMBATTRIB = FB_SYMBATTRIB_NONE, _
-		byval observed as FB_SEMANTIC_LAYOUT_DECISION ptr = NULL _
+		byval observed as FB_SEMANTIC_LAYOUT_DECISION ptr = NULL, _
+		byval typealign as integer = 0 _
 	) as integer
 
 	dim as integer natalign = any
@@ -217,6 +218,7 @@ private function hCalcPadding _
 	dim as FB_SEMANTIC_LAYOUT_REASON semantic_reason = FB_SEMLAYOUT_NATURAL
 
 	natalign = typeCalcNaturalAlign( dtype, subtype )
+	if( typealign > natalign ) then natalign = typealign
 
 	'' default?
 	if( align = 0 ) then
@@ -410,7 +412,8 @@ function symbAddField _
 		byval subtype as FBSYMBOL ptr, _
 		byval lgt as longint, _
 		byval bits as integer, _
-		byval attrib as FB_SYMBATTRIB _
+		byval attrib as FB_SYMBATTRIB, _
+		byval typealign as integer _
 	) as FBSYMBOL ptr
 
 	dim as FBSYMBOL ptr sym = any, tail = any, base_parent = any, _
@@ -509,7 +512,9 @@ function symbAddField _
 
 	'' Add padding for normal fields (neither bitfield nor fake array)
 	if( alloc_field ) then
-		pad = hCalcPadding( offset, parent->udt.align, dtype, subtype, attrib, @semantic_layout )
+		pad = hCalcPadding( _
+			offset, parent->udt.align, dtype, subtype, attrib, @semantic_layout, _
+			typealign)
 		if( pad > 0 ) then
 
 			'' bitfield?
@@ -538,7 +543,7 @@ function symbAddField _
 		end if
 
 		'' update largest field len
-		elen = typeCalcNaturalAlign( dtype, subtype )
+		elen = semantic_layout.natural
 		'' larger?
 		if( elen > parent->udt.natalign ) then
 			parent->udt.natalign = elen
@@ -574,6 +579,7 @@ function symbAddField _
 	sym->lgt = lgt
 	sym->ofs = offset
 	symbVarInitFields( sym )
+	sym->var_.align = typealign
 	symbVarInitArrayDimensions( sym, dimensions, dTB() )
 	if( desc ) then
 		sym->var_.array.desc = desc

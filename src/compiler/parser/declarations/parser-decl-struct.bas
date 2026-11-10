@@ -489,6 +489,7 @@ private function hAddAndInitField _
 	) as integer
 
 	dim as FBSYMBOL ptr sym = any, dtor = any
+	dim as integer typealign = 0
 
 	fbSemanticModelTypeShapeArray(dims)
 
@@ -527,7 +528,11 @@ private function hAddAndInitField _
 		end if
 	end if
 
-	sym = symbAddField( parent, id, dims, dTB(), dtype, subtype, lgt, bits, attrib )
+	if( semantic_type_alias <> NULL andalso _
+	    typeGetPtrCnt(semantic_type_alias->typ) = typeGetPtrCnt(dtype) ) then _
+		typealign = semantic_type_alias->typealign
+	sym = symbAddField( _
+		parent, id, dims, dTB(), dtype, subtype, lgt, bits, attrib, typealign)
 	if( sym = NULL ) then
 		errReportEx( FB_ERRMSG_DUPDEFINITION, id )
 		exit function

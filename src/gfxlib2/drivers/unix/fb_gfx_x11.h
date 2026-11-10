@@ -66,6 +66,7 @@ extern void fb_hX11WaitVSync(void);
 extern int fb_hX11GetMouse(int *x, int *y, int *z, int *buttons, int *clip);
 extern int fb_hX11GetTouchCount(void);
 extern int fb_hX11GetTouch(int index, int *x, int *y, int *id);
+extern int fb_hX11GetMouseFast(int *x, int *y, int *z, int *buttons, int *clip);
 extern void fb_hX11SetMouse(int x, int y, int cursor, int clip);
 extern void fb_hX11SetWindowTitle(char *title);
 extern int fb_hX11SetWindowPos(int x, int y);

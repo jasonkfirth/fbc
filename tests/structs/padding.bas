@@ -2,6 +2,11 @@
 
 SUITE( fbc_tests.structs.padding )
 
+	type AlignedInt as long field = 8
+	type AlignedIntAlias as AlignedInt
+	dim shared globalAlignedValue as AlignedInt
+	dim shared globalAlignedAliasValue as AlignedIntAlias
+
 	'' On 32bit Win32/MinGW, ARM, JS/wasm, Xbox, PowerPC and MIPS,
 	'' doubles/longints are aligned to 8, but on 32bit x86 Linux, BSD
 	'' and DOS, doubles/longints are aligned to 4.
@@ -1523,6 +1528,40 @@ SUITE( fbc_tests.structs.padding )
 		dim x2 as UDT2 = ((11,22))
 		CU_ASSERT( x2.x1.a = 11 )
 		CU_ASSERT( x2.x1.b = 22 )
+	END_TEST
+
+	TEST( typedefAlignment )
+		'' A type alias can raise object alignment without changing its size.
+
+		type AlignedRecord
+			prefix as byte
+			value as AlignedInt
+			suffix as byte
+		end type
+
+		type AlignedAliasRecord
+			prefix as byte
+			value as AlignedIntAlias
+			suffix as byte
+		end type
+
+		#assert sizeof( AlignedInt ) = sizeof( long )
+		#assert offsetof( AlignedRecord, value ) = 8
+		#assert offsetof( AlignedRecord, suffix ) = 12
+		#assert sizeof( AlignedRecord ) = 16
+		#assert offsetof( AlignedAliasRecord, value ) = 8
+		#assert offsetof( AlignedAliasRecord, suffix ) = 12
+		#assert sizeof( AlignedAliasRecord ) = 16
+
+		#ifdef __FB_64BIT__
+		dim localValue as AlignedInt
+		dim values(0 to 1) as AlignedInt
+		CU_ASSERT( (CULngInt( @globalAlignedValue ) and 7) = 0 )
+		CU_ASSERT( (CULngInt( @globalAlignedAliasValue ) and 7) = 0 )
+		CU_ASSERT( (CULngInt( @localValue ) and 7) = 0 )
+		CU_ASSERT( (CULngInt( @values(0) ) and 7) = 0 )
+		CU_ASSERT( CULngInt( @values(1) ) - CULngInt( @values(0) ) = 4 )
+		#endif
 	END_TEST
 	
 END_SUITE

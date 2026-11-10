@@ -391,6 +391,11 @@ private function hCheckSameTypeCONV _
 	if( typeGetDtAndPtrOnly( ldtype ) <> typeGetDtAndPtrOnly( to_dtype ) ) then
 		exit function
 	end if
+	'' Preserve builtin C aliases such as CLong even when their FB type has
+	'' the same width and signedness as the source expression.
+	if( typeGetMangleDt( ldtype ) <> typeGetMangleDt( to_dtype ) ) then
+		exit function
+	end if
 
 	if( l->subtype <> to_subtype ) then
 		exit function

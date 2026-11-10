@@ -1578,6 +1578,48 @@ int fb_gfx3_surface_line_graphics_locked(FB_GFX3_SURFACE *surface,
 		style, flags, TRUE);
 }
 
+int fb_gfx3_surface_lines_graphics_locked(FB_GFX3_SURFACE *surface,
+	const FB_GFX3_LINE_COMMAND *lines, uint32_t count)
+{
+	FB_GFX3_LINES_COMMAND *payload;
+	FB_GFX3_COMMAND *command;
+	size_t line_bytes;
+	size_t payload_size;
+	uint32_t index;
+	int result;
+
+	if (!surface_is_valid(surface) ||
+	    ((surface->usage & FB_GFX3_SURFACE_RENDER_TARGET) == 0u) ||
+	    (count > FB_GFX3_CONTEXT_PENDING_LINE_LIMIT) ||
+	    ((count != 0u) && (lines == NULL)))
+		return FB_GFX3_INVALID;
+	if (count == 0u)
+		return FB_GFX3_OK;
+	if ((fb_gfx3_size_multiply(count, sizeof(lines[0]), &line_bytes) !=
+	     FB_GFX3_OK) ||
+	    (fb_gfx3_size_add(offsetof(FB_GFX3_LINES_COMMAND, line), line_bytes,
+	     &payload_size) != FB_GFX3_OK))
+		return FB_GFX3_INVALID;
+	for (index = 0u; index < count; index++) {
+		if ((lines[index].clip.x1 > lines[index].clip.x2) ||
+		    (lines[index].clip.y1 > lines[index].clip.y2) ||
+		    ((lines[index].flags & ~FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u))
+			return FB_GFX3_INVALID;
+	}
+	command = fb_gfx3_command_create(FB_GFX3_COMMAND_LINES, payload_size);
+	if (command == NULL)
+		return FB_GFX3_OUT_OF_MEMORY;
+	command->target = surface->handle;
+	payload = (FB_GFX3_LINES_COMMAND *)command->payload;
+	payload->count = count;
+	memset(payload->reserved, 0, sizeof(payload->reserved));
+	memcpy(payload->line, lines, line_bytes);
+	result = context_submit_async_locked(surface->context, command);
+	if (result != FB_GFX3_OK)
+		fb_gfx3_command_destroy(command);
+	return result;
+}
+
 static int context_surface_rectangle(FB_GFX3_SURFACE *surface,
 	const FB_GFX3_RECT *clip, int x1, int y1, int x2, int y2,
 	uint32_t color, uint32_t style, int filled, uint32_t flags,

@@ -59,12 +59,17 @@ typedef XVisualInfo *(*FB_GFX3_GLX_GET_VISUAL)(Display *display,
 	FB_GFX3_GLX_FB_CONFIG config);
 typedef FB_GFX3_GLX_VOID_FUNCTION (*FB_GFX3_GLX_GET_PROC_ADDRESS)(
 	const unsigned char *name);
+typedef const char *(*FB_GFX3_GLX_QUERY_EXTENSIONS_STRING)(
+	Display *display, int screen);
 typedef void (*FB_GFX3_GLX_DESTROY_CONTEXT)(Display *display,
 	FB_GFX3_GLX_CONTEXT context);
 typedef Bool (*FB_GFX3_GLX_MAKE_CURRENT)(Display *display,
 	FB_GFX3_GLX_DRAWABLE drawable, FB_GFX3_GLX_CONTEXT context);
 typedef void (*FB_GFX3_GLX_SWAP_BUFFERS)(Display *display,
 	FB_GFX3_GLX_DRAWABLE drawable);
+typedef void (*FB_GFX3_GLX_SWAP_INTERVAL_EXT)(Display *display,
+	FB_GFX3_GLX_DRAWABLE drawable, int interval);
+typedef int (*FB_GFX3_GLX_SWAP_INTERVAL_MESA)(unsigned int interval);
 typedef FB_GFX3_GLX_CONTEXT (*FB_GFX3_GLX_CREATE_CONTEXT_ATTRIBUTES)(
 	Display *display, FB_GFX3_GLX_FB_CONFIG config,
 	FB_GFX3_GLX_CONTEXT shared_context, Bool direct, const int *attributes);
@@ -211,6 +216,31 @@ static void platform_x11_publish_mouse_move(FB_GFX3_PLATFORM_X11 *platform,
 	platform_x11_client_to_logical(platform, client_x, client_y,
 		&logical_x, &logical_y);
 	fb_gfx3_input_platform_mouse_move(platform->input, logical_x, logical_y);
+}
+
+static void platform_x11_prepare_button_position(FB_GFX3_PLATFORM_X11 *platform,
+	int root_x, int root_y)
+{
+	Window child;
+	int client_x, client_y;
+	int pointer_known;
+
+	fb_MutexLock(platform->input->mutex);
+	pointer_known = platform->input->initialized &&
+		platform->input->mouse_inside &&
+		(platform->input->mouse_x >= 0) && (platform->input->mouse_y >= 0);
+	fb_MutexUnlock(platform->input->mutex);
+	if (pointer_known)
+		return;
+
+	/* X11 button coordinates can be relative to a child GL drawable. Translate
+	   the root position to the owned window before posting the pointer snapshot. */
+	if (XTranslateCoordinates(platform->display,
+	    RootWindow(platform->display, platform->screen), platform->window,
+	    root_x, root_y, &client_x, &client_y, &child)) {
+		fb_gfx3_input_platform_mouse_enter(platform->input);
+		platform_x11_publish_mouse_move(platform, client_x, client_y);
+	}
 }
 
 static void platform_x11_publish_window_info(FB_GFX3_PLATFORM_X11 *platform)
@@ -540,6 +570,26 @@ static int platform_x11_load_extension_function(
 	return FB_GFX3_OK;
 }
 
+static int platform_x11_has_glx_extension(const char *extensions,
+	const char *name)
+{
+	size_t name_length;
+	const char *match;
+
+	if ((extensions == NULL) || (name == NULL) || (name[0] == '\0'))
+		return FALSE;
+	name_length = strlen(name);
+	match = extensions;
+	while ((match = strstr(match, name)) != NULL) {
+		if (((match == extensions) || (match[-1] == ' ')) &&
+		    ((match[name_length] == '\0') ||
+		     (match[name_length] == ' ')))
+			return TRUE;
+		match += name_length;
+	}
+	return FALSE;
+}
+
 static int platform_x11_probe_opengl(void)
 {
 	void *library = dlopen("libGL.so.1", RTLD_NOW | RTLD_LOCAL);
@@ -560,6 +610,9 @@ static int platform_x11_create_opengl(void **destination,
 	FB_GFX3_GLX_DESTROY_CONTEXT destroy_context = NULL;
 	FB_GFX3_GLX_MAKE_CURRENT make_current = NULL;
 	FB_GFX3_GLX_SWAP_BUFFERS swap_buffers = NULL;
+	FB_GFX3_GLX_QUERY_EXTENSIONS_STRING query_extensions = NULL;
+	FB_GFX3_GLX_SWAP_INTERVAL_EXT swap_interval_ext = NULL;
+	FB_GFX3_GLX_SWAP_INTERVAL_MESA swap_interval_mesa = NULL;
 	FB_GFX3_GLX_CREATE_CONTEXT_ATTRIBUTES create_context = NULL;
 	FB_GFX3_GLX_FB_CONFIG *configs = NULL;
 	XVisualInfo *visual = NULL;
@@ -667,6 +720,31 @@ static int platform_x11_create_opengl(void **destination,
 	     platform->context)) {
 		result = FB_GFX3_UNSUPPORTED;
 		goto cleanup;
+	}
+	if (platform_x11_load_library_function(platform->opengl_library,
+	    "glXQueryExtensionsString", &query_extensions,
+	    sizeof(query_extensions)) == FB_GFX3_OK) {
+		const char *extensions = query_extensions(platform->display,
+			platform->screen);
+
+		/*
+			Match the Windows OpenGL backend: ordinary presentation is not
+			implicitly throttled to vertical blank. SCREENSYNC remains the
+			explicit synchronization boundary for applications that need it.
+		*/
+		if (platform_x11_has_glx_extension(extensions,
+		    "GLX_EXT_swap_control") &&
+		    (platform_x11_load_extension_function(get_proc_address,
+		     "glXSwapIntervalEXT", &swap_interval_ext,
+		     sizeof(swap_interval_ext)) == FB_GFX3_OK)) {
+			swap_interval_ext(platform->display, platform->window, 0);
+		} else if (platform_x11_has_glx_extension(extensions,
+		    "GLX_MESA_swap_control") &&
+		    (platform_x11_load_extension_function(get_proc_address,
+		     "glXSwapIntervalMESA", &swap_interval_mesa,
+		     sizeof(swap_interval_mesa)) == FB_GFX3_OK)) {
+			(void)swap_interval_mesa(0u);
+		}
 	}
 	result = FB_GFX3_OK;
 
@@ -908,9 +986,8 @@ static void platform_x11_pump_events(void *state)
 				event.xmotion.x, event.xmotion.y);
 			break;
 		case ButtonPress:
-			fb_gfx3_input_platform_mouse_enter(platform->input);
-			platform_x11_publish_mouse_move(platform,
-				event.xbutton.x, event.xbutton.y);
+			platform_x11_prepare_button_position(platform,
+				event.xbutton.x_root, event.xbutton.y_root);
 			if ((event.xbutton.button >= Button4) &&
 			    (event.xbutton.button <= Button7)) {
 				fb_gfx3_input_platform_mouse_wheel(platform->input,

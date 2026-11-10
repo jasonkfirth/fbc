@@ -654,6 +654,16 @@ static void hInit( void )
 
 	memset(&__fb_con, 0, sizeof(__fb_con));
 
+#ifdef FB_NO_CONSOLE_STARTUP
+	/*
+	   Command-line runtimes which use libc stdio do not need FreeBASIC's
+	   interactive terminal mode. Keep the runtime state initialized above,
+	   but leave terminal probing and mode changes to programs that use the
+	   FreeBASIC console API.
+	*/
+	return;
+#endif
+
 #ifdef DISABLE_NCURSES
 	
 	term = getenv("TERM");
@@ -735,7 +745,8 @@ void fb_hInit( void )
 {
 	hInit( );
 
-#if defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64)
+#if defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64) && \
+	!defined(FB_NO_PORT_IO_STARTUP)
 	/* Permissions for port I/O
 	   (Android has the syscall but no libc wrapper) */
 	__fb_con.has_perm = ioperm(0, 0x400, 1) ? FALSE : TRUE;

@@ -61,6 +61,7 @@ private function hCEmittedFieldAlignment( byval fld as FBSYMBOL ptr ) as integer
 			alignment = 1
 		end if
 	end if
+	if( fld->var_.align > 0 ) then alignment = fld->var_.align
 	return alignment
 end function
 

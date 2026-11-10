@@ -4,9 +4,11 @@
 '' so this provides the extra declarations for use by bindings.
 #include once "crt/stdarg.bi"
 '' C int bindings use Long; Integer can be target-sized and is a distinct type.
+'' Give the byte-backed value the alignment of C long double so containing
+'' unions and records retain the C ABI layout.
 #if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
 	'' Most 64-bit GCC targets use a 16-byte long double.
-	type clongdouble
+	type __clongdouble_storage
 		__(0 to 16-1) as ubyte
 		declare operator cast( ) as byte
 		declare operator cast( ) as ubyte
@@ -21,10 +23,11 @@
 		declare operator cast( ) as single
 		declare operator cast( ) as double
 	end type
+	type clongdouble as __clongdouble_storage Field = 16
 	#assert sizeof( clongdouble ) = 16
 #elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
 	'' ARM32, MIPS o32, and Darwin/Windows ARM64 use 8 bytes.
-	type clongdouble
+	type __clongdouble_storage
 		__(0 to 8-1) as ubyte
 		declare operator cast( ) as byte
 		declare operator cast( ) as ubyte
@@ -39,10 +42,11 @@
 		declare operator cast( ) as single
 		declare operator cast( ) as double
 	end type
+	type clongdouble as __clongdouble_storage Field = 8
 	#assert sizeof( clongdouble ) = 8
 #else
 	'' GCC x86: sizeof(long double) = 12
-	type clongdouble
+	type __clongdouble_storage
 		__(0 to 12-1) as ubyte
 		declare operator cast( ) as byte
 		declare operator cast( ) as ubyte
@@ -57,6 +61,7 @@
 		declare operator cast( ) as single
 		declare operator cast( ) as double
 	end type
+	type clongdouble as __clongdouble_storage Field = 4
 	#assert sizeof( clongdouble ) = 12
 #endif
 

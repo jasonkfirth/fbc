@@ -842,7 +842,9 @@ private function hGetGlobalVarAlign( byval sym as FBSYMBOL ptr ) as integer
 	if( symbIsRef( sym ) ) then
 		function = 4
 	else
-		function = hGetGlobalTypeAlign( symbGetType( sym ) )
+		dim as integer align = hGetGlobalTypeAlign( symbGetType( sym ) )
+		if( sym->var_.align > align ) then align = sym->var_.align
+		function = align
 	end if
 end function
 
@@ -8232,6 +8234,7 @@ private sub _procAllocLocal _
 	'' alignment instead of merely aligning the total stack frame.
 	if( (env.target.options and FB_TARGETOPT_STACKALIGN16) <> 0 ) then
 		var align = typeCalcNaturalAlign( symbGetType( sym ), symbGetSubtype( sym ) )
+		if( sym->var_.align > align ) then align = sym->var_.align
 		if( align > STACK_ALIGNMENT ) then
 			var alignmask = align - 1
 			var frameoffset = STACK_FRAME_POINTER_MODULO_16 and alignmask

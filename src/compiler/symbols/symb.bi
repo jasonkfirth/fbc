@@ -852,6 +852,7 @@ type FBSYMBOL
 
 	lgt         as longint
 	ofs         as longint                      '' for local vars, args, UDT's and fields
+	typealign   as integer                      '' typedef alignment override; 0 = natural
 
 	union
 		var_        as FBS_VAR
@@ -1266,7 +1267,8 @@ declare function symbAddTypedef _
 		byval id as const zstring ptr, _
 		byval dtype as integer, _
 		byval subtype as FBSYMBOL ptr, _
-		byval lgt as longint _
+		byval lgt as longint, _
+		byval typealign as integer = 0 _
 	) as FBSYMBOL ptr
 
 declare function symbAddLabel _
@@ -1395,7 +1397,8 @@ declare function symbAddField _
 		byval subtype as FBSYMBOL ptr, _
 		byval lgt as longint, _
 		byval bits as integer, _
-		byval attrib as FB_SYMBATTRIB _
+		byval attrib as FB_SYMBATTRIB, _
+		byval typealign as integer = 0 _
 	) as FBSYMBOL ptr
 
 declare sub symbInsertInnerUDT _

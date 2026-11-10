@@ -1640,6 +1640,9 @@ fail_surfaces:
 fail:
 	free(mode->point_cache);
 	mode->point_cache = NULL;
+	free(mode->primitive_scratch);
+	mode->primitive_scratch = NULL;
+	mode->primitive_scratch_capacity = 0u;
 	free(mode->paint_queue);
 	mode->paint_queue = NULL;
 	free(mode->paint_visited);
@@ -1696,6 +1699,9 @@ int fb_gfx3_mode_shutdown(FB_GFX3_MODE *mode)
 		free(mode->shadow_pages[i]);
 	for (i = 0; i < mode->page_count; i++)
 		free(mode->shadow_snapshots[i]);
+	free(mode->primitive_scratch);
+	mode->primitive_scratch = NULL;
+	mode->primitive_scratch_capacity = 0u;
 	free(mode->paint_queue);
 	mode->paint_queue = NULL;
 	free(mode->paint_visited);
@@ -2251,6 +2257,184 @@ int fb_gfx3_compat_points_logical(FB_GFX3_DRAW_STATE *state,
 	result = FB_GFX3_OK;
 
 done:
+	fb_MutexUnlock(mode->mutex);
+	return result;
+}
+
+int fb_gfx3_compat_lines_logical(FB_GFX3_DRAW_STATE *state,
+	const FB_GFX3_COMPAT_LINE *lines, uint32_t count)
+{
+	FB_GFX3_MODE *mode = compat_state_lock(state);
+	FB_GFX3_LINE_COMMAND *gpu_lines;
+	size_t allocation_size;
+	uint32_t line_index;
+	int submitted = FALSE;
+	int result;
+
+	if (mode == NULL)
+		return FB_GFX3_INVALID;
+	if ((count > FB_GFX3_CONTEXT_PENDING_LINE_LIMIT) ||
+	    ((count != 0u) && (lines == NULL))) {
+		result = FB_GFX3_INVALID;
+		goto done;
+	}
+	if (count == 0u) {
+		result = FB_GFX3_OK;
+		goto done;
+	}
+	if (fb_gfx3_size_multiply(count, sizeof(*gpu_lines),
+	    &allocation_size) != FB_GFX3_OK) {
+		result = FB_GFX3_INVALID;
+		goto done;
+	}
+	if (allocation_size > mode->primitive_scratch_capacity) {
+		void *scratch = realloc(mode->primitive_scratch, allocation_size);
+		if (scratch == NULL) {
+			result = FB_GFX3_OUT_OF_MEMORY;
+			goto done;
+		}
+		mode->primitive_scratch = scratch;
+		mode->primitive_scratch_capacity = allocation_size;
+	}
+	gpu_lines = (FB_GFX3_LINE_COMMAND *)mode->primitive_scratch;
+	if (gpu_lines == NULL) {
+		result = FB_GFX3_OUT_OF_MEMORY;
+		goto done;
+	}
+	for (line_index = 0u; line_index < count; line_index++) {
+		FB_GFX3_LINE_COMMAND *target = &gpu_lines[line_index];
+		int translated_x1;
+		int translated_y1;
+		int translated_x2;
+		int translated_y2;
+
+		result = compat_translate(state, (float)lines[line_index].x1,
+			(float)lines[line_index].y1, &translated_x1, &translated_y1);
+		if (result != FB_GFX3_OK)
+			goto done;
+		result = compat_translate(state, (float)lines[line_index].x2,
+			(float)lines[line_index].y2, &translated_x2, &translated_y2);
+		if (result != FB_GFX3_OK)
+			goto done;
+		target->clip = state->view;
+		target->x1 = translated_x1;
+		target->y1 = translated_y1;
+		target->x2 = translated_x2;
+		target->y2 = translated_y2;
+		target->color = compat_fix_color(mode->depth,
+			lines[line_index].color);
+		target->style = lines[line_index].style & 0xFFFFu;
+		target->flags = 0u;
+		target->reserved = 0u;
+	}
+	result = compat_commit_locked_shadow(state, mode);
+	if (result != FB_GFX3_OK)
+		goto done;
+	result = fb_gfx3_surface_lines_graphics_locked(
+		compat_work_surface(mode, state), gpu_lines, count);
+	if (result == FB_GFX3_OK) {
+		submitted = TRUE;
+		compat_invalidate_work_point_cache_locked(mode, state,
+			state->view.x1, state->view.y1, state->view.x2,
+			state->view.y2);
+	}
+
+done:
+	if (submitted)
+		compat_invalidate_work_shadow(mode, state, "line batch");
+	fb_MutexUnlock(mode->mutex);
+	return result;
+}
+
+int fb_gfx3_compat_rectangles_logical(FB_GFX3_DRAW_STATE *state,
+	const FB_GFX3_COMPAT_RECTANGLE *rectangles, uint32_t count)
+{
+	FB_GFX3_MODE *mode = compat_state_lock(state);
+	FB_GFX3_RECTANGLE_COMMAND *gpu_rectangles;
+	size_t allocation_size;
+	uint32_t rectangle_index;
+	int submitted = FALSE;
+	int result;
+
+	if (mode == NULL)
+		return FB_GFX3_INVALID;
+	if ((count > FB_GFX3_CONTEXT_PENDING_RECTANGLE_LIMIT) ||
+	    ((count != 0u) && (rectangles == NULL))) {
+		result = FB_GFX3_INVALID;
+		goto done;
+	}
+	if (count == 0u) {
+		result = FB_GFX3_OK;
+		goto done;
+	}
+	if (fb_gfx3_size_multiply(count, sizeof(*gpu_rectangles),
+	    &allocation_size) != FB_GFX3_OK) {
+		result = FB_GFX3_INVALID;
+		goto done;
+	}
+	if (allocation_size > mode->primitive_scratch_capacity) {
+		void *scratch = realloc(mode->primitive_scratch, allocation_size);
+		if (scratch == NULL) {
+			result = FB_GFX3_OUT_OF_MEMORY;
+			goto done;
+		}
+		mode->primitive_scratch = scratch;
+		mode->primitive_scratch_capacity = allocation_size;
+	}
+	gpu_rectangles = (FB_GFX3_RECTANGLE_COMMAND *)mode->primitive_scratch;
+	if (gpu_rectangles == NULL) {
+		result = FB_GFX3_OUT_OF_MEMORY;
+		goto done;
+	}
+	for (rectangle_index = 0u; rectangle_index < count;
+	     rectangle_index++) {
+		FB_GFX3_RECTANGLE_COMMAND *target =
+			&gpu_rectangles[rectangle_index];
+		int translated_x1;
+		int translated_y1;
+		int translated_x2;
+		int translated_y2;
+
+		result = compat_translate(state,
+			(float)rectangles[rectangle_index].x1,
+			(float)rectangles[rectangle_index].y1,
+			&translated_x1, &translated_y1);
+		if (result != FB_GFX3_OK)
+			goto done;
+		result = compat_translate(state,
+			(float)rectangles[rectangle_index].x2,
+			(float)rectangles[rectangle_index].y2,
+			&translated_x2, &translated_y2);
+		if (result != FB_GFX3_OK)
+			goto done;
+		compat_order_int_coordinates(&translated_x1, &translated_y1,
+			&translated_x2, &translated_y2);
+		target->clip = state->view;
+		target->x1 = translated_x1;
+		target->y1 = translated_y1;
+		target->x2 = translated_x2;
+		target->y2 = translated_y2;
+		target->color = compat_fix_color(mode->depth,
+			rectangles[rectangle_index].color);
+		target->style = rectangles[rectangle_index].style & 0xFFFFu;
+		target->filled = (rectangles[rectangle_index].filled != 0u);
+		target->flags = 0u;
+	}
+	result = compat_commit_locked_shadow(state, mode);
+	if (result != FB_GFX3_OK)
+		goto done;
+	result = fb_gfx3_surface_rectangles(compat_work_surface(mode, state),
+		gpu_rectangles, count);
+	if (result == FB_GFX3_OK) {
+		submitted = TRUE;
+		compat_invalidate_work_point_cache_locked(mode, state,
+			state->view.x1, state->view.y1, state->view.x2,
+			state->view.y2);
+	}
+
+done:
+	if (submitted)
+		compat_invalidate_work_shadow(mode, state, "rectangle batch");
 	fb_MutexUnlock(mode->mutex);
 	return result;
 }

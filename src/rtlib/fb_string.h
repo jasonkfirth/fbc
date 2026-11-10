@@ -19,13 +19,12 @@
 
 /** Flag to identify a string size as fixed length without a null terminator
  *
- * This flag is stored in in the ssize_t size parameter passed in to string 
- * handling functions, use FB_STRSETUP_FIX)() and FB_STRSETUP_DYN() to query
- * the string's length.
+ * This flag is stored in the ssize_t size parameter passed to string handling
+ * functions. Use FB_STRSETUP_FIX or FB_STRSETUP_DYN to query the encoded size.
  */
 #ifdef HOST_64BIT
 	#define FB_STRISFIXED ((long long)0x8000000000000000ll)
-	#define FB_STRSIZEMSK ((long long)0x7fffffffffffffffll)  
+	#define FB_STRSIZEMSK ((long long)0x7fffffffffffffffll)
 #else
 	#define FB_STRISFIXED ((int)0x80000000)
 	#define FB_STRSIZEMSK ((int)0x7fffffff)
@@ -169,6 +168,7 @@ FBCALL int          fb_hStrDelTemp_NoLock       ( FBSTRING_ACCESS *str );
 FBCALL void         fb_hStrCopy                 ( char *dst, const char *src, ssize_t bytes );
 FBCALL void         fb_hStrCopyN                ( char *dst, const char *src, ssize_t bytes );
 FBCALL char        *fb_hStrSkipChar             ( char *s, ssize_t len, int c );
+/* Returns NULL when every byte is skipped; callers treat that as length zero. */
 FBCALL char        *fb_hStrSkipCharRev          ( char *s, ssize_t len, int c );
 
 

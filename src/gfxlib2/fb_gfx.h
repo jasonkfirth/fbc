@@ -266,12 +266,16 @@ typedef struct FBGFX
 	GFX_CHAR_CELL **con_pages;              /**< Character information for all pages */
 	EVENT *event_queue;                     /**< The OS events queue array */
 	int event_head, event_tail;             /**< Indices for the head and tail event in the array */
-	FBMUTEX *event_mutex;                   /**< Mutex lock for accessing the events queue */
+	FBMUTEX *event_mutex;                   /**< Mutex for the event and keyboard queues */
 	FB_DROP_STATE drops;                   /**< Payloads protected by event_mutex */
 	volatile int flags;                     /**< Status flags */
 	int lock_count;                         /**<Reference count for SCREENLOCK/UNLOCK */
 	volatile int pending_width;             /**< Coalesced client width requested by the window thread */
 	volatile int pending_height;            /**< Coalesced client height requested by the window thread */
+	/* Optional input snapshot, called without the display lock. Return positive
+	   when it supplies a sample, zero to use the driver callback, or negative
+	   when a previously initialized pointer is outside the graphics window. */
+	int (*get_mouse_fast)(int *x, int *y, int *z, int *buttons, int *clip);
 } FBGFX;
 
 typedef struct GFXDRIVER

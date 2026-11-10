@@ -214,8 +214,7 @@ static int x11_init(void)
 	display_name = XDisplayName(NULL);
 	if (((!display_name[0]) || (display_name[0] == ':') ||
 	    (!strncmp(display_name, "unix:", 5))) &&
-	    (XShmQueryExtension(fb_x11.display)) &&
-	    !(fb_x11.flags & DRIVER_RESIZABLE)) {
+	    (XShmQueryExtension(fb_x11.display))) {
 		if (fb_x11.flags & DRIVER_FULLSCREEN) {
 			if (fb_hX11EnterFullscreen(&h)) {
 				fb_hX11LeaveFullscreen();
@@ -366,7 +365,7 @@ static void x11_update(void)
 {
 	int i, y, h;
 	int any_dirty = FALSE;
-	
+
 	fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
 	/* The window thread still services input on idle frames. Avoid converting
 	 * the whole framebuffer when there are no changed rows to present. */
@@ -425,43 +424,121 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 }
 
 /*
-	Resizable modes deliberately use an ordinary XImage rather than MIT-SHM.
-	That keeps replacement failure atomic and avoids detaching a shared segment
-	while the X server may still be consuming an earlier presentation request.
+	Create the next presentation image before replacing the active image. A
+	shared-memory allocation failure falls back to an ordinary XImage so a
+	resizable window can keep working when the system's SHM limits are low.
 */
-static int driver_resize(int width, int height)
+static XImage *create_replacement_image(int width, int height,
+									   XShmSegmentInfo *replacement_shm,
+									   int *replacement_is_shm)
 {
-	XImage *replacement;
+	XImage *replacement = NULL;
 	size_t data_size;
-	int physical_height;
 
-	if ((width <= 0) || (height <= 0) || is_shm || (image == NULL) ||
-	    ((size_t)height > ((size_t)INT_MAX /
-	     (size_t)__fb_gfx->scanline_size)))
-		return -1;
-	physical_height = height * __fb_gfx->scanline_size;
+	memset(replacement_shm, 0, sizeof(*replacement_shm));
+	replacement_shm->shmid = -1;
+	replacement_shm->shmaddr = (char *)-1;
+	*replacement_is_shm = FALSE;
+
+	if (is_shm) {
+		replacement = XShmCreateImage(fb_x11.display, fb_x11.visual,
+			XDefaultDepth(fb_x11.display, fb_x11.screen), ZPixmap, 0,
+			replacement_shm, width, height);
+		if (replacement && (replacement->bytes_per_line > 0) &&
+		    (replacement->height > 0) &&
+		    ((size_t)replacement->height <= ((size_t)-1 /
+		     (size_t)replacement->bytes_per_line))) {
+			data_size = (size_t)replacement->bytes_per_line *
+				(size_t)replacement->height;
+			replacement_shm->shmid = shmget(IPC_PRIVATE, data_size,
+				IPC_CREAT | 0777);
+			if (replacement_shm->shmid >= 0) {
+				replacement_shm->shmaddr = shmat(replacement_shm->shmid, 0, 0);
+				if (replacement_shm->shmaddr != (char *)-1) {
+					replacement->data = replacement_shm->shmaddr;
+					replacement_shm->readOnly = False;
+					if (XShmAttach(fb_x11.display, replacement_shm)) {
+						*replacement_is_shm = TRUE;
+						return replacement;
+					}
+					shmdt(replacement_shm->shmaddr);
+					replacement_shm->shmaddr = (char *)-1;
+				}
+				shmctl(replacement_shm->shmid, IPC_RMID, 0);
+				replacement_shm->shmid = -1;
+			}
+			/* XShmCreateImage owns the image object, not our shared segment. */
+			replacement->data = NULL;
+			XDestroyImage(replacement);
+			replacement = NULL;
+		} else if (replacement) {
+			replacement->data = NULL;
+			XDestroyImage(replacement);
+			replacement = NULL;
+		}
+	}
+
 	replacement = XCreateImage(fb_x11.display, fb_x11.visual,
 		XDefaultDepth(fb_x11.display, fb_x11.screen), ZPixmap, 0, NULL,
-		width, physical_height, 32, 0);
-	if (replacement == NULL)
-		return -1;
-	if ((replacement->bytes_per_line <= 0) ||
+		width, height, 32, 0);
+	if (!replacement)
+		return NULL;
+	if ((replacement->bytes_per_line <= 0) || (replacement->height <= 0) ||
 	    ((size_t)replacement->height > ((size_t)-1 /
 	     (size_t)replacement->bytes_per_line))) {
 		XDestroyImage(replacement);
-		return -1;
+		return NULL;
 	}
 	data_size = (size_t)replacement->bytes_per_line *
 		(size_t)replacement->height;
 	replacement->data = (char *)malloc(data_size);
-	if (replacement->data == NULL) {
+	if (!replacement->data) {
 		XDestroyImage(replacement);
-		return -1;
+		return NULL;
 	}
 	memset(replacement->data, 0, data_size);
 
+	return replacement;
+}
+
+/*
+	A resize can replace a shared segment only after the X server has finished
+	with every queued XShmPutImage request. Synchronize on this exceptional path,
+	then release the old segment after the detach request has been processed.
+*/
+static int driver_resize(int width, int height)
+{
+	XImage *replacement;
+	XShmSegmentInfo replacement_shm;
+	int replacement_is_shm;
+	int physical_height;
+
+	if ((width <= 0) || (height <= 0) || (image == NULL) ||
+	    ((size_t)height > ((size_t)INT_MAX /
+	     (size_t)__fb_gfx->scanline_size)))
+		return -1;
+	physical_height = height * __fb_gfx->scanline_size;
+	replacement = create_replacement_image(width, physical_height,
+		&replacement_shm, &replacement_is_shm);
+	if (!replacement)
+		return -1;
+	if (is_shm)
+		XShmDetach(fb_x11.display, &shm_info);
+	if (is_shm || replacement_is_shm)
+		XSync(fb_x11.display, False);
+	if (is_shm) {
+		shmdt(shm_info.shmaddr);
+		shmctl(shm_info.shmid, IPC_RMID, 0);
+	}
+
 	XDestroyImage(image);
 	image = replacement;
+	if (replacement_is_shm) {
+		shm_info = replacement_shm;
+		/* XShmPutImage reads this descriptor through XImage->obdata later. */
+		image->obdata = (char *)&shm_info;
+	}
+	is_shm = replacement_is_shm;
 	if (scaled_image != NULL) {
 		XDestroyImage(scaled_image);
 		scaled_image = NULL;

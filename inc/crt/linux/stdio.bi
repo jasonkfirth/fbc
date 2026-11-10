@@ -25,7 +25,26 @@ extern stdin alias "stdin" as FILE ptr
 extern stdout alias "stdout" as FILE ptr
 extern stderr alias "stderr" as FILE ptr
 
+#if defined(__FB_LINUX__)
+'' glibc fpos_t uses a 64-bit file position and multibyte conversion state.
+'' The Linux runtime builds with _FILE_OFFSET_BITS=64, including 32-bit targets.
+private union __fb_fpos_state_value
+	__wch as ulong
+	__wchb(0 to 4-1) as ubyte
+end union
+
+private type __fb_fpos_state
+	__count as long
+	__value as __fb_fpos_state_value
+end type
+
+type fpos_t
+	__pos as longint
+	__state as __fb_fpos_state
+end type
+#else
 type fpos_t as longint
+#endif
 
 extern "c"
 declare function snprintf (byval s as zstring ptr, byval n as size_t, byval format as zstring ptr, ...) as long

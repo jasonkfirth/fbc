@@ -95,6 +95,7 @@ quick-test-body: sanity \
 	debian-include-test \
 	bootstrap-emit-test \
 	compiler-smoke \
+	compiler-clongdouble-abi-smoke \
 	compiler-semantic-model-smoke \
 	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \
@@ -142,6 +143,7 @@ full-test-body: sanity \
 	uninstall-test \
 	matrix-test \
 	compiler-smoke \
+	compiler-clongdouble-abi-smoke \
 	compiler-semantic-model-smoke \
 	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \
@@ -185,6 +187,7 @@ MAKETEST_HOST_FBC_TARGETS := \
 	uninstall-test \
 	matrix-test \
 	compiler-smoke \
+	compiler-clongdouble-abi-smoke \
 	compiler-semantic-model-smoke \
 	compiler-indirect-goto-smoke \
 	compiler-riscv64-smoke \

@@ -3,12 +3,15 @@ Declares an alternative name for a type
 
 {{fbdoc item="syntax"}}##
 	**Type** //typename// [[KeyPgAs|as]] //symbol//
+	**Type** //typename// [[KeyPgAs|as]] //symbol// **Field** = //alignment//
 ##
 {{fbdoc item="param"}}
 	##//typename//## 
 		new alternative name.
 	##//symbol//## 
 		symbol or data type declaration to associate with ##//typename//##. 
+	##//alignment//##
+		optional power-of-two minimum alignment, from 1 through 16 bytes.
 
 {{fbdoc item="desc"}}
 	##//symbol//## may refer to any declared data type including a built-in data type, ##[[KeyPgSub|Sub]]## or ##[[KeyPgFunction|Function]]## pointer, ##[[KeyPgType|Type]]## declaration, ##[[KeyPgUnion|Union]]## declaration, or ##[[KeyPgEnum|Enum]]## declaration.
@@ -19,6 +22,8 @@ Declares an alternative name for a type
 	A type alias must be used to allow declaration of pointer to a function pointer, otherwise ptr applies on return type and not on function.
 	
 	A Type Alias declaration can also be nested inside a UDT structure declaration for a ##[[KeyPgType|Type]] or a ##[[KeyPgUnion|Union]].
+
+`Field = alignment` on a Type Alias sets a minimum alignment for objects and UDT fields that use the alias without changing its `SizeOf`. It can raise natural alignment; a value below the target type's natural alignment does not lower it.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/udt/type-fwd.bas"}}%%(freebasic)
@@ -63,6 +68,18 @@ Print f(123)
 Dim As function_alias Ptr pf                           ''this syntax works
 pf = @f
 Print (*pf)(123)  ''the dereferenced pointer to procedure pointer must be enclosed in parentheses
+%%
+{{fbdoc item="ex"}}%%(freebasic)
+Type AlignedInt As Long Field = 8
+Type RecordWithAlignedInt
+	prefix As Byte
+	value As AlignedInt
+	suffix As Byte
+End Type
+
+Dim record As RecordWithAlignedInt
+Print SizeOf(AlignedInt); " "; _
+	CULngInt(@record.value) - CULngInt(@record)
 %%
 {{fbdoc item="ver"}}
 	- Since fbc 1.10.0: Nesting of a Type Alias declaration inside a structure declaring a UDT (Type or Union) is allowed.
