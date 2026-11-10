@@ -348,6 +348,29 @@ upload() {
 	fi
 }
 
+retry_package_command() {
+	attempt=1
+	max_attempts=5
+	while :; do
+		echo "==> \$* (attempt \${attempt}/\${max_attempts})"
+		if "\$@"; then
+			return 0
+		else
+			status=\$?
+		fi
+
+		if [ "\$attempt" -ge "\$max_attempts" ]; then
+			echo "ERROR: package command failed (\$status) after \$attempt attempts: \$*" >&2
+			return "\$status"
+		fi
+
+		delay=\$((attempt * 10))
+		echo "WARNING: package command failed (\$status); retrying in \${delay}s" >&2
+		sleep "\$delay"
+		attempt=\$((attempt + 1))
+	done
+}
+
 finish() {
 	rc=\$?
 	upload "\$log" "freebasic-netbsd-build.log"
@@ -371,7 +394,7 @@ cd /work/freebasic-source
 sh ./build_scripts/netbsd-build-freebasic.sh --jobs="$JOBS"
 
 if ! command -v curl >/dev/null 2>&1; then
-	pkgin -y install curl
+	retry_package_command pkgin -y install curl
 fi
 
 pkg="\$(find /work/freebasic-source/out -maxdepth 1 -type f -name 'freebasic-*.tgz' | sort | tail -n 1)"
@@ -440,6 +463,28 @@ run() {
 fail() {
 	echo "ERROR: \$*" >&2
 	exit 1
+}
+
+run_retry() {
+	attempt=1
+	max_attempts=5
+	while :; do
+		echo "==> \$* (attempt \${attempt}/\${max_attempts})"
+		if "\$@"; then
+			return 0
+		else
+			status=\$?
+		fi
+
+		if [ "\$attempt" -ge "\$max_attempts" ]; then
+			fail "command failed (\$status) after \$attempt attempts: \$*"
+		fi
+
+		delay=\$((attempt * 10))
+		echo "WARNING: command failed (\$status); retrying in \${delay}s" >&2
+		sleep "\$delay"
+		attempt=\$((attempt + 1))
+	done
 }
 
 fbctests_jobs() {
@@ -583,14 +628,14 @@ hostname fbc-netbsd
 dhcpcd -4 -t 30 wm0 || true
 
 if ! command -v pkgin >/dev/null 2>&1; then
-	pkg_add pkgin
+	run_retry pkg_add pkgin
 fi
 
 mkdir -p /usr/pkg/etc/pkgin
 printf '%s\n' "\$PKG_PATH" > /usr/pkg/etc/pkgin/repositories.conf
 
-pkgin -y update
-pkgin -y install \\
+run_retry pkgin -y update
+run_retry pkgin -y install \\
 	bash \\
 	curl \\
 	gcc12 \\

@@ -14,6 +14,29 @@ run() {
     fi
 }
 
+run_retry() {
+    max_attempts=5
+    attempt=1
+
+    while :; do
+        echo "==> $* (attempt $attempt/$max_attempts)"
+        if "$@"; then
+            return 0
+        else
+            rc=$?
+        fi
+
+        if [ "$attempt" -ge "$max_attempts" ]; then
+            die "command failed ($rc) after $attempt attempts: $*"
+        fi
+
+        delay=$((attempt * 10))
+        echo "WARNING: command failed ($rc); retrying in ${delay}s" >&2
+        sleep "$delay"
+        attempt=$((attempt + 1))
+    done
+}
+
 CLEANUP_SUCCESS=0
 
 cleanup_build_artifacts() {
@@ -135,7 +158,7 @@ if ! command -v pkgin >/dev/null 2>&1; then
         export PKG_PATH
     fi
 
-    run pkg_add pkgin
+    run_retry pkg_add pkgin
 fi
 
 if [ -n "${PKG_PATH:-}" ]; then
@@ -153,8 +176,8 @@ DEPENDS="$(echo "$RUNTIME_PKGS" | tr ' ' '\n' | sort -u | sed 's/$/>=0/' | tr '\
 ##############################################################################
 # Install build dependencies
 ##############################################################################
-run pkgin -y update
-run pkgin -y install $BUILD_PKGS
+run_retry pkgin -y update
+run_retry pkgin -y install $BUILD_PKGS
 echo "==> dependency install complete"
 
 ##############################################################################
