@@ -17,9 +17,12 @@
 SEMANTIC_MODEL_SMOKE_MIN_SCHEMA := 15
 
 LLVM_SMOKE_LLC := $(strip $(or $(LLC),llc))
-LLVM_SMOKE_LLC_AVAILABLE := $(shell command -v "$(LLVM_SMOKE_LLC)" >/dev/null 2>&1 && echo yes)
+LLVM_SMOKE_LLC_COMMAND := $(call tool_cmd,$(LLVM_SMOKE_LLC))
+LLVM_SMOKE_LLC_AVAILABLE := $(shell command -v "$(LLVM_SMOKE_LLC_COMMAND)" >/dev/null 2>&1 && echo yes)
+LLVM_SMOKE_LLC_FBC := $(if $(filter MSYS% MINGW% CYGWIN%,$(shell uname -s 2>/dev/null)),$(call fbc_msys_tool,$(LLVM_SMOKE_LLC)),$(LLVM_SMOKE_LLC))
 # LLVM receives the target in its options, so this uses the host llc directly.
-LLVM_SMOKE_TEST_FBC_CMD = env LLC="$(LLVM_SMOKE_LLC)" "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
+# Native Windows fbc needs the MSYS2 path converted to a Windows executable path.
+LLVM_SMOKE_TEST_FBC_CMD = env LLC="$(LLVM_SMOKE_LLC_FBC)" "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
 
 .PHONY: compiler-smoke compiler-clongdouble-abi-smoke compiler-semantic-model-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
 compiler-smoke: libs
