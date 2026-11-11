@@ -87,8 +87,7 @@ jobs:
       - name: Install package build dependencies
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends \
+          sudo bash build_scripts/github-actions-apt-install.sh \
             ca-certificates curl rsync tar xz-utils gzip dos2unix \
             build-essential pkg-config dpkg-dev debhelper devscripts fakeroot \
             lintian quilt python3 git
@@ -268,8 +267,7 @@ jobs:
       - name: Install Linux matrix host dependencies
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends \
+          sudo bash build_scripts/github-actions-apt-install.sh \
             qemu-user-static binfmt-support \
             ca-certificates curl wget git gnupg \
             build-essential make pkg-config rsync \

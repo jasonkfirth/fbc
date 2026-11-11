@@ -39,7 +39,23 @@ for source_file in "${sources_dir}"/*.list "${sources_dir}"/*.sources; do
     fi
 done
 
-apt-get -o Acquire::Retries=5 update
+for attempt in 1 2 3; do
+    if apt-get \
+        -o Acquire::Retries=2 \
+        -o APT::Update::Error-Mode=any \
+        update; then
+        exit 0
+    fi
+
+    if [ "$attempt" -lt 3 ]; then
+        delay=$((attempt * 5))
+        echo "APT index update failed; retrying in ${delay}s (attempt $((attempt + 1))/3)" >&2
+        sleep "$delay"
+    fi
+done
+
+echo "ERROR: APT index update failed after 3 attempts" >&2
+exit 1
 
 ##############################################################################
 # end of github-actions-apt-update.sh

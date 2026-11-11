@@ -61,8 +61,7 @@ jobs:
       - name: Install Cppcheck
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends cppcheck
+          sudo bash build_scripts/github-actions-apt-install.sh cppcheck
           cppcheck --version
 
       - name: Lint all first-party C and C++ sources
@@ -95,8 +94,7 @@ jobs:
       - name: Install bootstrap dependencies
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends \
+          sudo bash build_scripts/github-actions-apt-install.sh \
             gcc g++ make binutils pkg-config rsync curl \
             tar xz-utils gzip dos2unix \
             libncurses-dev libffi-dev libgpm-dev \
@@ -159,8 +157,7 @@ jobs:
       - name: Install build and test dependencies
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends \
+          sudo bash build_scripts/github-actions-apt-install.sh \
             gcc g++ make binutils pkg-config rsync curl \
             tar xz-utils gzip zip dos2unix python3 \
             libncurses-dev libffi-dev libgpm-dev \
@@ -175,7 +172,7 @@ jobs:
         if: matrix.name == 'x86_64'
         # Backend regressions compile and execute i386 C/GAS programs on the
         # x86_64 host, including the portable 128-bit runtime helpers.
-        run: sudo apt-get install -y --no-install-recommends gcc-multilib g++-multilib
+        run: sudo bash build_scripts/github-actions-apt-install.sh gcc-multilib g++-multilib
 
       - name: Select parallelism
         run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
@@ -393,8 +390,7 @@ jobs:
       - name: Install host and cross-target toolchains
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends \
+          sudo bash build_scripts/github-actions-apt-install.sh \
             gcc g++ make binutils pkg-config rsync curl \
             tar xz-utils gzip dos2unix python3 \
             libncurses-dev libffi-dev libgpm-dev \
@@ -889,8 +885,7 @@ jobs:
       - name: Install MIPS workflow dependencies
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends rsync curl
+          sudo bash build_scripts/github-actions-apt-install.sh rsync curl
           docker version
 
       - name: Seed host bootstrap for the contained build

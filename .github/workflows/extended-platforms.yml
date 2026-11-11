@@ -143,8 +143,7 @@ jobs:
       - name: Install VM host dependencies
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends \
+          sudo bash build_scripts/github-actions-apt-install.sh \
             binutils bzip2 ca-certificates curl g++ gcc libncurses-dev make \
             openssh-client \
             python3 python3-pexpect qemu-system-x86 qemu-utils \
@@ -315,8 +314,7 @@ jobs:
       - name: Install headless display support
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends xauth xvfb
+          sudo bash build_scripts/github-actions-apt-install.sh xauth xvfb
 
       - name: Seed host bootstrap sources
         run: bash build_scripts/ci-seed-source-bootstrap.sh linux-x86_64 linux-x86_64
@@ -412,8 +410,7 @@ jobs:
       - name: Install Windows CE host dependencies
         run: |
           set -euo pipefail
-          sudo bash build_scripts/github-actions-apt-update.sh
-          sudo apt-get install -y --no-install-recommends rsync
+          sudo bash build_scripts/github-actions-apt-install.sh rsync
           docker version
 
       - name: Seed host bootstrap sources

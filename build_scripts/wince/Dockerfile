@@ -29,8 +29,10 @@ COPY --from=cegcc-arm /opt/cegcc-arm /opt/cegcc-arm
 
 ENV PATH="/opt/cegcc-arm/bin:${PATH}"
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
+RUN set -eu; \
+  for attempt in 1 2 3; do \
+    if apt-get -o Acquire::Retries=2 -o APT::Update::Error-Mode=any update \
+      && apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
       bash \
       binutils \
       build-essential \
@@ -50,8 +52,16 @@ RUN apt-get update \
       rsync \
       unzip \
       xz-utils \
-      zip \
- && rm -rf /var/lib/apt/lists/*
+      zip; then \
+      rm -rf /var/lib/apt/lists/*; \
+      exit 0; \
+    fi; \
+    if [ "$attempt" -lt 3 ]; then \
+      sleep "$((attempt * 5))"; \
+    fi; \
+  done; \
+  echo "ERROR: APT setup failed after 3 attempts" >&2; \
+  exit 1
 
 RUN arm-mingw32ce-gcc -dumpmachine | grep -Fx arm-mingw32ce \
  && arm-mingw32ce-gcc -dumpversion | grep -Fx 9.3.0

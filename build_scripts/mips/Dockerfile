@@ -27,8 +27,10 @@ FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN set -eu; \
+    for attempt in 1 2 3; do \
+        if apt-get -o Acquire::Retries=2 -o APT::Update::Error-Mode=any update \
+            && apt-get -o Acquire::Retries=2 install -y --no-install-recommends \
         binutils-mips-linux-gnu \
         binutils-mips64-linux-gnuabi64 \
         binutils-mips64el-linux-gnuabi64 \
@@ -57,8 +59,16 @@ RUN apt-get update \
         qemu-user \
         rsync \
         unzip \
-        zip \
-    && rm -rf /var/lib/apt/lists/*
+        zip; then \
+            rm -rf /var/lib/apt/lists/*; \
+            exit 0; \
+        fi; \
+        if [ "$attempt" -lt 3 ]; then \
+            sleep "$((attempt * 5))"; \
+        fi; \
+    done; \
+    echo "ERROR: APT setup failed after 3 attempts" >&2; \
+    exit 1
 
 ARG LIBFFI_VERSION=3.4.6
 ARG LIBFFI_SHA256=b0dea9df23c863a7a50e825440f3ebffabd65df1497108e5d437747843895a4e
