@@ -5,7 +5,7 @@ Welcome to our world!  This page is an overview of our online warehouse of knowl
 	""FreeBASIC"" is a free, open-source BASIC compiler designed for QuickBASIC source compatibility while extending the language for modern systems programming.  The current tree builds native or cross-target programs for desktop, Unix, DOS, mobile, browser, embedded, and homebrew-console environments across several 32-bit and 64-bit CPU families.  See //[[CompilerAbout|About FreeBASIC]]//, //[[CompilerFeatures|Main Features]]//, and //[[CompilerOpttarget|the current target list]]//.
 
 {{fbdoc item="section" value="Latest Version"}}
-	This manual accompanies the 1.20.4 source tree.  Development is ongoing and package availability differs between the official upstream project and the experimental FBXL target packages.  Read ##[[CompilerRelease1204|What's new in 1.20.4]]##, the ##[[CompilerRelease120History|1.10 to 1.20 development history]]##, and the package repository guide before assuming that every target is available from every host.
+	This manual accompanies the 1.20.5 source tree.  Development is ongoing and package availability differs between the official upstream project and the experimental FBXL target packages.  Read ##[[CompilerRelease1205|What's new in 1.20.5]]##, the ##[[CompilerRelease120History|1.10 to 1.20 development history]]##, and the package repository guide before assuming that every target is available from every host.
 
 {{fbdoc item="section" value="Requirements and Installation"}}
 	Minimum hardware is listed on the //[[CompilerRequirements|Requirements]]// page.  Visit our //[[CompilerInstalling|Installation]]// page for setting up ""FreeBASIC"" on your computer.

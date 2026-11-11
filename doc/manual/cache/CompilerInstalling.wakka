@@ -3,9 +3,9 @@ Installing ""FreeBASIC"", any additionally needed packages, and perhaps a text e
 
 //Note: If the user specifies directory names during the installation of the different components, it is recommended in the chosen names to use only alphanumeric ASCII characters without accent and preferably not any space, otherwise some paths might not work as expected.//
 
-{{fbdoc item="section" value="FBXL 1.20.4 package repository"}}
+{{fbdoc item="section" value="FBXL 1.20.5 package repository"}}
 
-	The unofficial and experimental package repository at [[https://deb.fbxl.net/|deb.fbxl.net]] contains the current 1.20.4 packages, per-directory SHA-256 files, and a release-wide checksum manifest.  The official upstream downloads remain at SourceForge.
+	The unofficial and experimental package repository at [[https://deb.fbxl.net/|deb.fbxl.net]] contains the published 1.20.5-1 packages, per-directory SHA-256 files, and a release-wide checksum manifest.  The official upstream downloads remain at SourceForge. See ##[[CompilerRelease1205|What's new in FreeBASIC 1.20.5]]## for the source-tree changes.
 
 	On a supported Unix-like host, download and run the dispatcher:
 

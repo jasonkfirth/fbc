@@ -100,9 +100,7 @@ End Sub
 	When triggered by the only ##[[KeyPgError|Error]]## statement, //'On [Local] Error Goto label'// remains always working even when none of these compile options are used.
 	//'On Error Goto 0'// deactivates the current error handler. If an error occurs, ""FreeBASIC"" will not jump.
 	
-	The optional ##[[KeyPgLocal|Local]]## keyword (authorized only inside Sub/Function) was intended to be used to define an error handler only in the same procedure the //'On Local Error'// is in (for compatibility with PDS 7.1 and VB Dos 1.0 for example). In this case, ""FreeBASIC"" should have searched for the label in the current procedure only.
-	But presently, the ##[[KeyPgLocal|Local]]## clause is ignored by the compiler, and the error handler can be either in the scope of the same procedure the //'On [Local] Error'// is in, or in the main part of the module (if defined before the procedure).
-	Exception when //[[CompilerOptgen|-gen gcc]]// is used (or for the fbc 64-bit): the ##[[KeyPgLocal|Local]]## clause seems to be rightly taken into account, but except inside a local scope!
+	##[[KeyPgLocal|On Local Error]]## keeps its handler label inside the procedure where it is declared. Each procedure invocation keeps its own saved caller-handler state, so recursive calls do not share that state. The first local-handler change in an invocation saves the caller's active handler; later changes do not overwrite that saved value. The caller's handler is restored when the invocation exits.
 	
 	//'On [Local] Error Goto label'// is not the best way to catch errors from a built-in procedure when a syntax in the form of a function is available. The return error code can be directly tested (using the returned error code from function inhibits the ""QuickBASIC""-like error checking and statement //'On Error Goto'//).
 	

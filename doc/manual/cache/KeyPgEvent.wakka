@@ -23,6 +23,15 @@ Type EVENT Field = 1
 			dx As Long
 			dy As Long
 		End Type
+		Type
+			width As Long
+			height As Long
+		End Type
+		Type
+			drop_id As Long
+			drop_count As Long
+			drop_kind As Long
+		End Type
 		button As Long
 		z As Long
 		w As Long
@@ -49,6 +58,8 @@ End Type
 		- ##EVENT_WINDOW_LOST_FOCUS## (##12##) The program window has lost focus.
 		- ##EVENT_WINDOW_CLOSE## (##13##) The user attempted to close the program window.
 		- ##EVENT_MOUSE_HWHEEL## (##14##) The horizontal mouse wheel was used; the new horizontal wheel position is returned into the ##.w## field.
+		- ##EVENT_WINDOW_RESIZE## (##15##) The window's drawable size changed. The ##.width## and ##.height## fields contain its new dimensions in pixels.
+		- ##EVENT_DROP## (##16##) A supported file or text drop arrived. The ##.drop_id## identifies the retained payload, ##.drop_count## gives its item count, and ##.drop_kind## is ##FB.DROP_FILES## or ##FB.DROP_TEXT##. Include ##fbdrop.bi## and call ##FBC.screenDropGet## promptly to copy each item; see ##[[ProPgGraphicsFileDrop|Graphics file and text drops]]## for limits and lifetime.
 	
 	The ##fbgfx.bi## header file contains a definition of the ##EVENT## user data type, so it is not necessary to declare it manually.
 

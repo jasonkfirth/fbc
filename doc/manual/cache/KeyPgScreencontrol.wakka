@@ -176,6 +176,17 @@ Sets or gets internal graphics library settings
 		**Other operations**
 	- ##POLL_EVENTS## Cause the library to poll all events, ie to check the system event queue, specifically used for retrieving keyboard and mouse events.  This is most useful for ""OpenGL"" code where ##[[KeyPgFlip|Flip]]## is not used, as normally ##[[KeyPgFlip|Flip]]## will cause these events to be polled.
 
+	{{fbdoc item="section" value="Touch, display, and on-screen keyboard operations"}}
+	- ##GET_WINDOW_METRICS## returns the usable drawable width, height, layout DPI and display rotation in degrees through ##//param1//## through ##//param4//##. Browser values use CSS pixels; Android reports native pixels with 160-DPI layout density; Linux reports drawable size, display DPI and rotation.
+	- ##GET_TOUCH_CAPABILITY## returns ##-1## in ##//param1//## when touch is present, ##0## when absent, or ##-2## when the backend cannot determine it.
+	- ##GET_DEVICE_CLASS## returns ##GFX_DEVICE_CLASS_UNKNOWN## (0), ##GFX_DEVICE_CLASS_DESKTOP## (1) or ##GFX_DEVICE_CLASS_HANDHELD## (2) in ##//param1//##. An unknown result is not treated as a desktop result.
+	- ##GET_SOFT_KEYBOARD## returns observed visibility in ##//param1//## (##-1## visible, ##0## hidden, ##-2## unknown) and availability in ##//param2//## (nonzero when available, zero otherwise). When known, ##//param3//## and ##//param4//## return the keyboard's top and height in drawable pixels. Linux visibility is asynchronous; poll again after a request. A zero height means the occluded area is not known or is not visible.
+	- ##SET_SOFT_KEYBOARD## requests show when ##//param1//## is nonzero and hide when it is zero. It is a no-op when the current desktop session has no supported on-screen keyboard. On Wayland, the window must have a focused text-input surface.
+	- ##SET_SOFT_KEYBOARD_REGION## publishes the active text field rectangle through ##//param1//## x, ##//param2//## y, ##//param3//## width and ##//param4//## height. Browser canvases need these regions so a user gesture can focus the correct IME field. Clear old regions before publishing a new layout.
+	- ##CLEAR_SOFT_KEYBOARD_REGIONS## clears the published text-field rectangles. It takes no parameters.
+
+	The soft keyboard may cover part of a drawable without shrinking the window. ##GET_WINDOW_METRICS## therefore reports the drawable size, not the keyboard-free content area. Keyboard visibility, touch capability and device class can be unknown or unsupported on some drivers; check the returned values before using them for layout decisions.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/gfx/screencontrol.bas"}}%%(freebasic)
 '' include fbgfx.bi for some useful definitions

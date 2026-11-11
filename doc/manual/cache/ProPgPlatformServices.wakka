@@ -1,0 +1,47 @@
+{{fbdoc item="title" value="Optional platform runtime services"}}----
+Explicit, bounded runtime interfaces for notifications, idle-loop polling and system-provided random bytes.
+
+{{fbdoc item="desc"}}
+	These opt-in interfaces are declared by ##fbnotify.bi##, ##fbidle.bi## and ##fbrandom.bi##. They require the ##[[CompilerOptlang|-lang fb]]## dialect and return status values instead of raising a BASIC runtime error. Availability depends on the selected runtime and host platform.
+
+	##fbservices.bi## defines shared ##FB.SERVICE_*## results for notification and idle operations: ##FB.SERVICE_OK## (0), ##FB.SERVICE_UNAVAILABLE## (1), ##FB.SERVICE_INVALID## (2), ##FB.SERVICE_FAILED## (3), ##FB.SERVICE_DENIED## (4), and ##FB.SERVICE_WRONG_THREAD## (5). The random-byte interface has its own ##FB.SECURE_RANDOM_*## result constants.
+
+{{fbdoc item="section" value="System-provided random bytes"}}
+	Include ##fbrandom.bi## and call ##FBC.secureRandom## with a writable caller-owned buffer. Each call is limited to ##FB.SECURE_RANDOM_MAX_BYTES## (1 MiB). Concurrent calls are safe when each caller owns a separate buffer, and the function leaves BASIC's ##ERR## state unchanged. The operation uses the host runtime's available random-byte provider; it does not use or seed ##[[KeyPgRnd|Rnd]]##. Check the result against ##FB.SECURE_RANDOM_OK## before using the bytes.
+
+	A provider failure clears the complete valid output span. Invalid arguments leave memory unchanged. A zero-byte request succeeds, including with a null pointer, but does not establish that a provider is available. The other results are ##FB.SECURE_RANDOM_UNAVAILABLE##, ##FB.SECURE_RANDOM_IO_ERROR## and ##FB.SECURE_RANDOM_INVALID_ARGUMENT##.
+
+%%(freebasic)
+#include once "fbrandom.bi"
+
+Dim bytes(0 To 31) As UByte
+Dim As Long status = FBC.secureRandom(@bytes(0), SizeOf(bytes))
+If status <> FB.SECURE_RANDOM_OK Then
+	Print "No random bytes were returned: "; status
+End If
+%%
+
+{{fbdoc item="section" value="Cooperative idle-loop polling"}}
+	Include ##fbidle.bi##. Zero-initialize an ##FB.IDLE_STATE##, then call ##FBC.idleInit## with an interval from 1 millisecond through 24 hours. The first callback is due after that interval; later callbacks are scheduled from the completion of the previous callback. Each ##FBC.idleStep## accepts a maximum wait from 0 through 60 seconds, waits no longer than that value and invokes the callback at most once. Missed intervals coalesce into one callback instead of triggering catch-up calls. Invalid intervals or wait values return ##FB.SERVICE_INVALID##. The callback runs on the calling thread and returns nonzero to keep the loop running or zero to stop it. ##FBC.idleStop## marks the state as stopped without clearing its storage; call ##FBC.idleInit## to reuse the state.
+
+	The interface does not create a worker thread or perform a network request. Keep callbacks short and use an application-owned worker for blocking work. Only the state-owning thread may call the interface.
+
+{{fbdoc item="section" value="Native notifications"}}
+	Include ##fbnotify.bi## to create an explicit notification context. The application owns its lifetime: create, use, poll and destroy it on the same thread. The context is initialized to null; ##FBC.notifyDestroy## clears it after successful destruction, and destroying an already-null context is allowed.
+
+	- ##FBC.notifyCreate## accepts an application name and returns a context.
+	- ##FBC.notifySend## posts or replaces the context's notification using a title and body.
+	- ##FBC.notifyPoll## pumps only that context's native window and does not consume the application's graphics input.
+	- ##FBC.notifyClose## withdraws the current notification while retaining the context.
+	- ##FBC.notifyPermission## queries notification permission. On Android, pass nonzero to request permission; the result remains ##FB.SERVICE_DENIED## until the user grants it.
+	- ##FBC.notifyDestroy## releases the context.
+
+	Application name, title and body are UTF-8 strings limited to ##FB.NOTIFY_APP_MAX## (127), ##FB.NOTIFY_TITLE_MAX## (63) and ##FB.NOTIFY_BODY_MAX## (255) bytes. Embedded null bytes and over-limit inputs are rejected. Notifications can be unavailable or disabled by the platform's notification settings; check each returned status.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgRnd|Rnd]]##
+	- ##[[ProPgGraphicsFileDrop|Graphics file and text drops]]##
+	- ##[[DevSourceRuntime|Core runtime source tree]]##
+
+{{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

@@ -23,7 +23,7 @@ Declares an alternative name for a type
 	
 	A Type Alias declaration can also be nested inside a UDT structure declaration for a ##[[KeyPgType|Type]] or a ##[[KeyPgUnion|Union]].
 
-`Field = alignment` on a Type Alias sets a minimum alignment for objects and UDT fields that use the alias without changing its `SizeOf`. It can raise natural alignment; a value below the target type's natural alignment does not lower it.
+	##Field = alignment## on a Type Alias sets a minimum alignment for objects and UDT fields that use the alias without changing its ##[[KeyPgSizeof|SizeOf]]##. It can raise natural alignment; a value below the target type's natural alignment does not lower it. This differs from ##Field = N## on a ##Type## or ##Union##, which limits field alignment to support packed layouts; see ##[[KeyPgField|FIELD]]##.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/udt/type-fwd.bas"}}%%(freebasic)
@@ -83,6 +83,7 @@ Print SizeOf(AlignedInt); " "; _
 %%
 {{fbdoc item="ver"}}
 	- Since fbc 1.10.0: Nesting of a Type Alias declaration inside a structure declaring a UDT (Type or Union) is allowed.
+	- Since fbc 1.20.5: ##Field = alignment## on a Type Alias specifies a power-of-two minimum alignment from 1 through 16 bytes.
 
 {{fbdoc item="diff"}}
 	- New to ""FreeBASIC""

@@ -7,7 +7,7 @@ Error handling statement to set the current error handler
 {{fbdoc item="desc"}}
 	The ##**Local**## clause in an ##[[KeyPgOnerror|On Error]]## construction allows to define an error handler in the same ##[[KeyPgSub|Sub]]## or ##[[KeyPgFunction|Function]]## the ##**On Local Error**## is in.
 	
-	 **Remark:** Presently, the ##**Local**## clause (authorized only inside Sub/Function) is ignored by the compiler, and the error handler should be in the scope of the same procedure the On [Local] Error is in.
+	The label must belong to the same procedure. The saved caller error-handler state is local to each procedure invocation, including recursive calls, and is restored when that invocation exits. The first ##**On Local Error**## in an invocation saves the caller's handler; later changes in the same invocation do not replace that saved state.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/error/local.bas"}}%%(freebasic)

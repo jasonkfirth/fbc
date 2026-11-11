@@ -7,7 +7,9 @@ Specifies field alignment.
 	End [[KeyPgType|Type]]|[[KeyPgUnion|Union]]
 ##
 {{fbdoc item="desc"}}
-	##**Field**## can be used to pack ##[[KeyPgType|Types]]## or ##[[KeyPgUnion|Unions]]## more tightly than [[DevStructLayout|the default layout]]. The most commonly used value is ##**Field = 1**##, which causes the ##Type## or ##Union## to be packed as tightly as possible, without any padding bytes being added between the fields or at the end of the ##Type##. ##**Field**## can only be used to decrease field alignment, but it cannot be used to increase it. In order to add padding bytes, a ##Union## with appropriate members could be used instead.
+	On a ##[[KeyPgType|Type]]## or ##[[KeyPgUnion|Union]]## declaration, ##**Field = N**## limits natural field alignment so records can match packed binary formats. ##**Field = 1**## is the tightest layout: fields are byte-aligned, with no padding between fields or at the end of the structure. This form can reduce alignment; it does not raise a field above its natural alignment.
+
+	This syntax is separate from ##[[KeyPgTypeAlias|Type Alias]]## alignment. In ##Type name As OtherType Field = N##, the alias requests a minimum alignment for objects and fields that use the alias. It can raise their natural alignment and does not change the aliased type's ##[[KeyPgSizeof|SizeOf]]##. Alias alignment accepts powers of two from 1 through 16 bytes.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/udt/field.bas"}}%%(freebasic)
@@ -55,6 +57,7 @@ sleep
 {{fbdoc item="see"}}
 	- ##[[KeyPgType|Type]]##
 	- ##[[KeyPgUnion|Union]]##
+	- ##[[KeyPgTypeAlias|Type Alias]]##
 	- [[DevStructLayout|Structure packing/field alignment]]
 
 {{fbdoc item="back" value="CatPgUserDefTypes|User Defined Types"}}

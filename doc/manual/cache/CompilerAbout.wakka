@@ -10,6 +10,7 @@ About the ""FreeBASIC"" project.
 	""FreeBASIC"" is a high-level programming language supporting procedural, object-oriented and meta-programming paradigms, with a syntax compatible to [[http://en.wikipedia.org/wiki/QuickBASIC|Microsoft QuickBASIC]]. In fact, the ""FreeBASIC"" project originally began as an attempt to create a code-compatible, free alternative to ""QuickBASIC"", but it has since grown into a powerful development tool. ""FreeBASIC"" can be seen to extend the capabilities of ""QuickBASIC"" in a number of ways, supporting more data types, language constructs, programming styles, and modern platforms and APIs.
 
 {{fbdoc item="see"}}
+	- ##[[CompilerRelease1205|What's new in FreeBASIC 1.20.5]]##
 	- ##[[CompilerRelease120History|FreeBASIC 1.10 to 1.20 development history]]##
 	- ##[[CompilerRequirements|Requirements]]##
 	- ##[[CompilerInstalling|Installing FreeBASIC]]##

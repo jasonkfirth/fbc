@@ -29,12 +29,17 @@ An opt-in render-threaded implementation of the FreeBASIC graphics interface.
 
 	Renderer integrations that need a small screen rectangle can use ##Gfx3ScreenCapture##. It fills an ##FB.IMAGE## from the current work page, using a valid CPU shadow when available or synchronously downloading only the requested rectangle. Ordinary BASIC ##GET## retains its reusable full-page shadow behavior.
 
+	##Gfx3DrawLines## and ##Gfx3DrawRectangles## submit ordered arrays of opaque primitives to the current work page. Both preserve input order and clip to the active ##VIEW##, so overlapping entries keep last-writer behavior without one BASIC drawing call per primitive. The Null backend rasterizes lines, rectangles and glyphs, which lets headless tests exercise ordinary drawing and text.
+
+	##Gfx3SurfaceCopyFromScreen## copies a rectangle from the current work page directly into a GPU surface without creating a CPU readback. Use ##Gfx3ScreenCapture## when CPU-owned ##FB.IMAGE## pixels are needed; that call is synchronous and reads back only the requested rectangle when no current CPU shadow is available.
+
 {{fbdoc item="section" value="Legacy SCREEN modes"}}
 	gfxlib3 adds historical modes that gfxlib2 still leaves undefined: SCREEN 3 Hercules 720 by 348 monochrome, SCREEN 4 Olivetti/AT&T 640 by 400 monochrome, SCREEN 5 PCjr/Tandy 320 by 200 with 16 colours, and SCREEN 6 PCjr/Tandy 640 by 200 with 4 colours.
 
 {{fbdoc item="target"}}
-	- Windowed gfxlib3 adapters are implemented for Windows, Linux/X11, Linux SDL2 KMSDRM, and Android.
+	- Windowed gfxlib3 adapters are implemented for Windows, Linux/X11, Linux/Wayland, Linux SDL2 KMSDRM, and Android.
 	- The SDL2 Linux adapter publishes keyboard, mouse, and SDL gamepad state to gfxlib3 input queries, including GETXPAD.
+	- Linux selects Wayland in a compatible Wayland session by default. ##FBGFX_GFX3_PLATFORM## can select ##wayland##, ##x11##, or ##drm## when the matching adapter is available.
 	- DOS, Haiku, JavaScript, NuttX, Wii, Xbox, and the other ports continue to use gfxlib2.
 	- An explicit Vulkan request fails if Vulkan cannot create the requested mode.  It does not silently fall back to the Null driver.
 

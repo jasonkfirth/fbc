@@ -4,11 +4,13 @@
 GfxLib is not one single display driver.  The common runtime owns the program-visible framebuffer and dispatches presentation, input, mode enumeration, window handling, and OpenGL entry points to a driver selected for the current target.
 
 {{fbdoc item="section" value="gfxlib2 and gfxlib3"}}
-	gfxlib2 is the default runtime and remains the portable choice across the complete target set.  gfxlib3 is an opt-in render-threaded GPU implementation for Windows, Linux/X11, and Android, with a headless Null backend for testing.  Select it with ##[[CompilerOptgfx3|-gfx3]]## or by defining ##[[KeyPgDdfbgfxlib3|__FB_GFXLIB3__]]## before including ##fbgfx.bi##.  See ##[[GfxLib3|gfxlib3 overview]]## for its availability, renderer order, and GPU-surface rules.
+	gfxlib2 is the default runtime and remains the portable choice across the complete target set.  gfxlib3 is an opt-in render-threaded GPU implementation for Windows, Linux/X11, Linux/Wayland, Linux KMSDRM and Android, with a headless Null backend for testing.  Select it with ##[[CompilerOptgfx3|-gfx3]]## or by defining ##[[KeyPgDdfbgfxlib3|__FB_GFXLIB3__]]## before including ##fbgfx.bi##.  See ##[[GfxLib3|gfxlib3 overview]]## for its availability, renderer order, and GPU-surface rules.
 
 ##[[KeyPgScreencontrol|ScreenControl]]## can be used with ##SET_DRIVER_NAME## before the first graphics screen is opened to request a specific driver.  The same choice can be made from the environment by setting ##FBGFX##.  Driver names are matched case-insensitively.  ##ScreenControl## with ##GET_DRIVER_NAME## can be used after a graphics screen has opened to see which driver was selected.
 
 Several modern backends can present a low-resolution GfxLib framebuffer inside a larger display area by using centered integer scaling.  This keeps the program's logical screen size unchanged while avoiding blurry fractional scaling.  Mouse and touch coordinates are mapped back to the logical framebuffer so ##[[KeyPgGetmouse|GetMouse]]## and touch queries still point at the same pixel the program sees.  Builds that define ##GFXLIB_NEVERSCALE## disable this presentation scaling for users who want a ##320x200## screen to remain exactly ##320x200## on the physical display or inside a maximized window.
+
+##[[KeyPgScreencontrol|ScreenControl]]## also reports window metrics, touch capability, device class, and observed on-screen keyboard state on supporting backends.  Keyboard visibility can be unknown while the native session is still reporting changes; check the returned availability and visibility values instead of assuming that a request succeeded.  Browser input regions and Wayland text-input surfaces have their own focus requirements.
 
 The available driver names depend on the target and build configuration:
 
@@ -22,8 +24,9 @@ The available driver names depend on the target and build configuration:
 		- **##OpenGL##** - the Win32 OpenGL driver.
 		- Cygwin builds use the Win32-compatible path but do not necessarily include every native Windows driver.
 
-	- Unix/X11 family:
+	- Linux/Unix graphics drivers:
 		- **##X11##** - the normal X11 driver.
+		- **##Wayland##** - the native Linux compositor driver when Wayland support is built and a compatible session is available.
 		- **##OpenGL##** - OpenGL through X11/GLX when enabled.
 		- **##FBDev##** - Linux framebuffer device support when enabled on Linux.
 
@@ -79,6 +82,7 @@ The available driver names depend on the target and build configuration:
 	- ##[[KeyPgScreenres|ScreenRes]]## A more flexible way to open a graphics screen
 	- ##[[KeyPgScreenlist|ScreenList]]## Check display modes available to GfxLib
 	- ##[[KeyPgScreencontrol|ScreenControl]]## Select drivers and query graphics state
+	- ##[[ProPgGraphicsFileDrop|Graphics file and text drops]]## Receive bounded native drag-and-drop payloads
 	- ##[[KeyPgScreenlock|ScreenLock]]##
 	- ##[[KeyPgScreenunlock|ScreenUnlock]]##
 	- ##[[KeyPgScreenptr|ScreenPtr]]## Direct access to the active framebuffer

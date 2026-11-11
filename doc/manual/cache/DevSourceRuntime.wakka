@@ -52,6 +52,12 @@ The driver map (##src/rtlib/drivers/README.md##) explains the individual platfor
 
 The shared Unix layer is enabled for an explicit set of targets. Cygwin uses the Win32 source layer, while illumos uses Solaris sources. Feature flags can also compile a selected source into an unavailable-service stub, so the mere presence of an API file does not establish platform support.
 
+{{fbdoc item="section" value="Optional Unix startup for libc-stdio clients"}}
+
+When building a Unix runtime for a program that uses libc stdio instead of FreeBASIC's interactive console, define ##FB_NO_CONSOLE_STARTUP## to skip terminal probing and terminal mode changes. Runtime state and synchronization are initialized before this early return, but the program must not depend on startup enabling the FreeBASIC console API.
+
+On Linux x86 and x86-64, ##FB_NO_PORT_IO_STARTUP## skips the startup call that requests permission for direct x86 port I/O. Use it only when the program does not need that hardware access. These are C preprocessor definitions for the runtime build, not FreeBASIC command-line options.
+
 {{fbdoc item="section" value="Startup objects and archive variants"}}
 
 static/fbrt0.c (##src/rtlib/static/fbrt0.c##) and its neighboring startup sources are compiled into separate objects. Native ##drivers/<OS>/static## implementations can replace them. These startup objects and the runtime archive have separate link responsibilities.
@@ -62,6 +68,7 @@ For a runtime change, inspect the compiler declaration, shared headers, portable
 
 
 {{fbdoc item="see"}}
+	- [[ProPgPlatformServices|Optional platform runtime services]]
 	- [[DevSourceCode|Source code guide]]
 	- [[DevToc|Developer pages]]
 	- [[DevArrays|Array implementation notes]]

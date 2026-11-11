@@ -40,6 +40,6 @@ fbc-nuttx-esp32p4 --bas program.bas --serial-port /dev/ttyACM0 --run%%
 {{fbdoc item="see"}}
 	- [[https://deb.fbxl.net/docs/guides/nuttx.md|Complete NuttX guide]]
 	- ##[[CompilerOpttarget|-target compiler option]]##
-	- ##[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]##
+	- ##[[CompilerRelease1205|What's new in FreeBASIC 1.20.5]]##
 
 {{fbdoc item="back" value="DevToc|Developer pages"}}

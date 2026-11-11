@@ -850,6 +850,7 @@
 	[[CatPgMath|Mathematical Functions]]
 	[[CatPgMemory|Memory Functions]]
 	[[ProPgSerialization|Compiler-assisted Serialization]]
+	[[ProPgPlatformServices|Optional platform runtime services]]
 	[[CatPgOpsys|Operating System Functions]]
 	[[CatPgString|String Functions]]
 	[[CatPgThreading|Threading Support Functions]]
@@ -861,6 +862,7 @@
 	[[CatPgGfxScreen|Screen Functions]]
 	[[GfxLib|Supported graphics drivers (backends)]]
 	[[GfxLib3|gfxlib3 opt-in GPU runtime]]
+	[[ProPgGraphicsFileDrop|Graphics file and text drops]]
 	[[GfxScancodes|Keyboard Scan Codes]]
 	[[GfxDefPalettes|Default Palettes]]
 
@@ -1134,7 +1136,7 @@
 
 {{fbdoc item="section" value="Using the FreeBASIC compiler"}}
 	[[CompilerInstalling|Installing FreeBASIC]]
-	[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]
+	[[CompilerRelease1205|What's new in FreeBASIC 1.20.5]]
 	[[CompilerRelease120History|FreeBASIC 1.10 to 1.20 development history]]
 	[[CompilerRequirements|Requirements]]
 	[[CompilerRunning|Running FreeBASIC]]

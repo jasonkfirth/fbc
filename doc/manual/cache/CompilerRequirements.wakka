@@ -39,6 +39,7 @@ FreeBASIC's requirements depend on whether the compiler runs natively on the hos
 	- ##[[CompilerInstalling|Installing FreeBASIC]]##
 	- ##[[CompilerOpttarget|Compiler Option: -target]]##
 	- ##[[DevBuild|Building FreeBASIC from source]]##
+	- ##[[CompilerRelease1205|What's new in FreeBASIC 1.20.5]]##
 	- ##[[CompilerRelease120History|FreeBASIC 1.10 to 1.20 development history]]##
 	- [[https://deb.fbxl.net/docs/guides/packages.md|FBXL package repository guide]]
 

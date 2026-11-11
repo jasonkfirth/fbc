@@ -1,0 +1,44 @@
+{{fbdoc item="title" value="Graphics file and text drops"}}----
+Receive bounded native drag-and-drop payloads through gfxlib2 or gfxlib3.
+
+{{fbdoc item="desc"}}
+	Include ##fbdrop.bi## and call ##FBC.screenDropEnable## after opening a graphics mode. Pass nonzero to enable reception; pass zero to disable it. The function returns ##FB.DROP_OK## when enabled, or ##FB.DROP_UNAVAILABLE## when the current driver has no drop support. Disabling drops or changing graphics modes discards retained payloads.
+
+	The available native adapters accept Windows shell file drops and X11 local-file or UTF-8 text drops. Other drivers report that the service is unavailable. A file drop returns local path text; the runtime does not open paths, fetch remote locations, or execute dropped text.
+
+{{fbdoc item="section" value="ScreenEvent payload"}}
+	When ##[[KeyPgScreenevent|ScreenEvent]]## returns an ##FB.EVENT_DROP## event, its ##.drop_id## is the payload identifier, ##.drop_count## is the number of items, and ##.drop_kind## is ##FB.DROP_FILES## or ##FB.DROP_TEXT##. Copy each item with ##FBC.screenDropGet## before the retained payload expires:
+
+%%(freebasic)
+#include once "fbdrop.bi"
+Using FB
+Using FBC
+
+Dim event As EVENT
+If ScreenEvent(@event) Then
+	If event.type = EVENT_DROP Then
+		Dim item As Long
+		For item = 0 To event.drop_count - 1
+			Dim payload As String
+			If screenDropGet(event.drop_id, item, payload) = DROP_OK Then
+				Print payload
+			End If
+		Next item
+	End If
+End If
+%%
+
+{{fbdoc item="section" value="Limits and lifetime"}}
+	A drop contains at most ##FB.DROP_MAX_ITEMS## (64) items and ##FB.DROP_MAX_BYTES## (65,536) bytes including terminators. The runtime retains at most ##FB.DROP_RETAINED## (8) recent payloads for the current mode. A payload can expire as later drops arrive; copy items promptly into application-owned strings.
+
+	##FBC.screenDropGet## returns an owned UTF-8 ##[[KeyPgString|String]]##. It returns ##FB.DROP_INVALID## for an invalid identifier or item index, ##FB.DROP_FAILED## if copying cannot allocate storage, and ##FB.DROP_EXPIRED## if the payload is no longer retained. The result string is independent of the native event memory and remains owned by the caller.
+
+{{fbdoc item="see"}}
+	- ##[[KeyPgEvent|EVENT]]##
+	- ##[[KeyPgScreenevent|ScreenEvent]]##
+	- ##[[GfxLib|GfxLib overview]]##
+	- ##[[GfxLib3|gfxlib3 overview]]##
+	- ##[[ProPgPlatformServices|Optional platform runtime services]]##
+
+{{fbdoc item="back" value="CatPgProgrammer|Programmer's Guide"}}
+{{fbdoc item="back" value="DocToc|Table of Contents"}}

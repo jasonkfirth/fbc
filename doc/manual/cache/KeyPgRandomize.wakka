@@ -34,6 +34,8 @@ Seeds the random number generator
 				##**Randomize**## is thread-safe (by using an internal mutex), but not thread specific.
 				Unfinished structures for other random number generators are also available in the standard header "fbprng.bi".
 
+	##FB_RND_REAL## is an ##Rnd## algorithm and retains its generator state and fallback behavior. For system-provided random bytes in a caller-owned buffer with explicit result codes, use ##[[ProPgPlatformServices|fbrandom.bi]]##; it does not reseed or change ##Rnd##.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/math/randomize.bas"}}%%(freebasic)
 '' Seed the RNG to the method using C's rand()

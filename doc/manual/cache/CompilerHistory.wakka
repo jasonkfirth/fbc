@@ -2,6 +2,11 @@
 Chronology of the ""FreeBASIC"" project.
 
 {{fbdoc item="section" value="Chronology"}}
+
+	**2026 October 16**
+		- The FBXL repository published the 1.20.5-1 package; the 1.20.5 development line continues in the current source tree
+		- Added 128-bit integers, thread-local storage, Type Alias alignment, compiler-assisted serialization, native platform services, Linux Wayland graphics and mobile input APIs
+		- See ##[[CompilerRelease1205|What's new in FreeBASIC 1.20.5]]## for the grouped summary and the complete changelog for every change
 	
 	**2019 February 18**
 		- ""FreeBASIC"" 1.06.0 release

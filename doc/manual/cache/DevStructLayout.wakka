@@ -27,3 +27,13 @@ tree.
 When a structure is shared with C, prefer a tiny C probe or a FreeBASIC test that
 checks ##sizeof## and important field offsets on the real target. Guessing from
 a similar platform is not enough for release work.
+
+{{fbdoc item="subsect" value="Type alias alignment"}}
+
+##Type name As OtherType Field = N## raises the minimum alignment of objects and
+UDT fields declared through that alias. ##N## must be a power of two from 1
+through 16. The alias keeps the target type's ##SizeOf##; its larger alignment
+affects where an object or field is placed and can therefore change its
+containing record's offsets and size. This differs from ##Field = N## on a
+##Type## or ##Union##, which limits field alignment for packed layouts. See
+##[[KeyPgTypeAlias|Type Alias]]## and ##[[KeyPgField|FIELD]]##.

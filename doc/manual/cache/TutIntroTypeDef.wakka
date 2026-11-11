@@ -228,9 +228,9 @@ The data type of the bit field determines how many bits you can declare in a bit
 
 === The Field Property ===
 
-When you create a variable of a type definition, the type is padded in memory. The padding allows for faster access of the type members since the type fields are aligned on a 4 byte or Word boundary. However, this can cause problems when trying to read a type record from a file that is not padded. You can use the use ##field## property to change the padding of a type definition.
+When you create a variable of a type definition, the type is padded according to the target's natural field alignment. This can cause problems when a record must match a file or foreign ABI layout. The ##field## property on a ##Type## changes that packing; see ##[[KeyPgField|FIELD]]## for the current rules.
 
-The ##field## keyword is used right after the type name and can have the values ##1##, for 1 byte alignment (no padding), ##2## for 2 byte alignment and ##4## for 4 byte alignment. To define a type with no padding you would use the following syntax.
+The ##field## keyword is used right after the type name. Common values are ##1## for byte packing, ##2## for two-byte packing and ##4## for four-byte packing. The requested packing limits natural alignment; the exact layout should be checked against the external format or ABI. To define a tightly packed type you would use the following syntax.
 
 %%(freebasic)
 Type myType field = 1
@@ -239,7 +239,7 @@ Type myType field = 1
 End Type
 %%
 
-For 2 byte alignment you would use ##field = 2##. If no ##field = //property//## is assigned, then the padding will be ##4## bytes. If you are reading a type definition created by ""FreeBASIC"" using the default alignment, then you do not need to use the ##field## property.
+For 2 byte packing you would use ##field = 2##. If no ##field = //property//## is assigned, the target's natural layout is used. If you are reading a type definition created by ""FreeBASIC"" using the same target ABI, then you usually do not need to use the ##field## property.
 
 If you are reading a "Quick Basic" type record, then you will need to use ##field = 1##, as QB used byte alignment by default.
 

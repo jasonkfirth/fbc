@@ -1,8 +1,8 @@
 {{fbdoc item="title" value="FreeBASIC 1.10 to 1.20 development history"}}----
-An overview of the complete development path from the 1.10.0 release through the current 1.20.4 tree.
+An overview of major development changes from the 1.10.0 release through the current 1.20.5 tree.
 
 {{fbdoc item="desc"}}
-	The documentation audit covered all 804 commits after tag ##1.10.0## through commit ##26fe670a9##.  The 1.10 maintenance branch and 1.20 main line developed in parallel, and the FBXL 1.10.4 development branch was imported into 1.20.1 rather than released here as a separate 1.10.4 tag.
+	The historical documentation audit covered all 804 commits after tag ##1.10.0## through commit ##26fe670a9##. This page summarizes the later 1.20.5 development line as well. The 1.10 maintenance branch and 1.20 main line developed in parallel, and the FBXL 1.10.4 development branch was imported into 1.20.1 rather than released here as a separate 1.10.4 tag.
 
 	Version 1.20.2 was a real development identifier used from July 1 through August 11, 2026, but it was not tagged.  Its detailed changes were carried into the next tagged release, 1.20.3.
 
@@ -43,7 +43,10 @@ An overview of the complete development path from the 1.10.0 release through the
 	- Added the native ARM64 Termux plus Ubuntu PRoot Android APK development path.
 
 {{fbdoc item="section" value="1.20.4"}}
-	The current tree adds checked PNG and SIMD media paths, whole-tree C diagnostics, Windows 95 compatibility and native qualification, and further AROS, RISC OS, NetBSD, Haiku, package, and repository fixes.  See ##[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]##.
+	The 1.20.4 tree added checked PNG and SIMD media paths, whole-tree C diagnostics, Windows 95 compatibility and native qualification, and further AROS, RISC OS, NetBSD, Haiku, package, and repository fixes. See ##[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]##.
+
+{{fbdoc item="section" value="1.20.5 development line"}}
+	The 1.20.5 line adds 128-bit integer types, thread-local storage, Type Alias minimum alignment, compiler-assisted serialization, checked platform services, Linux Wayland graphics, mobile input queries, and extensive compiler, runtime and target corrections. See ##[[CompilerRelease1205|What's new in FreeBASIC 1.20.5]]## and the ##changelog.txt## for the full per-change record.
 
 {{fbdoc item="see"}}
 	- [[https://deb.fbxl.net/docs/guides/release-history-1.10-to-1.20.md|Expanded 1.10 to 1.20 history]]

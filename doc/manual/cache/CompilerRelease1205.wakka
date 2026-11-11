@@ -1,0 +1,36 @@
+{{fbdoc item="title" value="What's new in FreeBASIC 1.20.5"}}----
+User-visible compiler, runtime, graphics, target and documentation changes in the 1.20.5 development line.
+
+{{fbdoc item="section" value="Language and compiler"}}
+	- Added signed and unsigned 128-bit integer types, ##Integer<128>## and ##UInteger<128>##, with arithmetic and backend-specific calling conventions. See ##[[KeyPgInteger|Integer]]## and ##[[KeyPgUinteger|UInteger]]##.
+	- Added minimum alignment to Type Alias declarations with ##Field = N##, without changing the alias's ##SizeOf##. On a ##Type## or ##Union##, the existing ##Field = N## syntax caps field alignment to support packed layouts. See ##[[KeyPgTypeAlias|Type Alias]]## and ##[[KeyPgField|FIELD]]##.
+	- Added ##[[KeyPgThreadLocal|THREAD LOCAL]]## variables with per-thread storage and constant initialization.
+	- Corrected procedure-local error handling so ##[[KeyPgLocal|On Local Error]]## labels stay within their procedure and recursive invocations keep separate saved handler state.
+	- Corrected C long-double alias alignment and argument, result, aggregate and variadic handling across compiler backends. See ##[[DevBindingCreation|Writing bindings to C/C++ libraries]]## for target storage and alignment.
+	- Improved C, LLVM and native assembly backends across record layout, C ABI calls, callback values, array indexing, labels, error-handler cleanup and platform-specific object formats. These repairs preserve target ABI details while improving strict compiler compatibility; the complete list and current qualification boundaries are in ##changelog.txt##.
+
+{{fbdoc item="section" value="Runtime and library"}}
+	- Added compiler-assisted ##[[ProPgSerialization|serialization]]## for supported values and whole arrays, with schema checking, bounded decoding and independent ownership.
+	- Added opt-in headers for system notifications, cooperative idle polling and system-provided random bytes. Their statuses, limits and lifetime rules are documented in ##[[ProPgPlatformServices|Optional platform runtime services]]##.
+	- Added bounded graphics file and text drop reception through ##[[ProPgGraphicsFileDrop|fbdrop.bi]]##.
+	- Added Unix runtime build options ##FB_NO_CONSOLE_STARTUP## and ##FB_NO_PORT_IO_STARTUP## for libc-stdio programs that do not need interactive FreeBASIC terminal setup or x86 port-I/O permission probing. See ##[[DevSourceRuntime|Core runtime source tree]]## for their effects.
+	- Hardened Unicode and byte-string length handling, trimming, array/object destruction and error-state restoration. Corrected Linux file-position and target CRT constants, and clarified the ownership lifetime of initialized sfxlib ring buffers.
+
+{{fbdoc item="section" value="Graphics and mobile input"}}
+	- Added a native Linux Wayland driver to gfxlib2 and gfxlib3, with X11 and framebuffer fallback paths where available. gfxlib3 also supports ordered line and rectangle batches, regional CPU screen capture, GPU-to-GPU screen copies, and more complete headless rasterization. See ##[[GfxLib|GfxLib overview]]## and ##[[GfxLib3|gfxlib3 overview]]##.
+	- Added shared queries for window metrics, touch capability, device class and on-screen keyboard state, plus keyboard show/hide and text-region requests on supported mobile and browser backends. See ##[[KeyPgScreencontrol|ScreenControl]]##.
+	- Improved Linux resize, rotation, touch, keyboard and display handling, including mobile compositor sessions and resizable windows.
+
+{{fbdoc item="section" value="Targets, tooling and documentation"}}
+	- Continued target and runtime work for Android, DOS, Amiga and AROS, Windows CE and older Windows CRTs, BSD, Haiku, RISC OS, NuttX, and other supported systems. Package availability and hardware-dependent behavior still vary by target.
+	- Expanded compiler semantic exports and cross-platform regression coverage, and added source-tree guides for the compiler, core runtime, graphics, sound and supporting tools. See ##[[DevToc|Developer information]]##.
+	- Updated the manual examples and external-library pages with current declarations, ABI widths, ownership, bounds and cleanup guidance.
+
+{{fbdoc item="see"}}
+	- ##[[CompilerRelease1204|What's new in FreeBASIC 1.20.4]]##
+	- ##[[CompilerRelease120History|FreeBASIC 1.10 to 1.20 development history]]##
+	- ##[[CompilerInstalling|Installing FreeBASIC]]##
+	- ##[[GfxLib3|gfxlib3 overview]]##
+	- [[https://github.com/jasonkfirth/fbc/blob/master/changelog.txt|Complete per-change changelog]]
+
+{{fbdoc item="back" value="DocToc|Table of Contents"}}
