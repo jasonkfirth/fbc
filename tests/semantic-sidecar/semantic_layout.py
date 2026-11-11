@@ -315,10 +315,9 @@ def validate_layout(model, number, subject_modules):
                         raise ValueError("Field alignment starts at another native offset")
                     wanted_offset = 0 if union else offset + size
                     wanted_length = max(previous[1], size) if union and previous else size if union else wanted_offset
-                    chosen_natural = type_alignment(dtype, nominal)
                     if after[:2] != (wanted_offset, wanted_length):
                         raise ValueError("Allocated field changes another aggregate extent")
-                    if previous and chosen_natural is not None and after[2] != max(previous[2], chosen_natural):
+                    if previous and after[2] != max(previous[2], step[4]):
                         raise ValueError("Field packing overwrites natural aggregate alignment")
                 else:
                     if step[6] != "none" or applied or previous and after != previous:

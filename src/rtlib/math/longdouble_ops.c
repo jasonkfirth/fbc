@@ -35,7 +35,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "extended_math.h"
-#if defined(__HAIKU__) || (defined(__MINGW32__) && !defined(_UCRT) && !defined(_WIN32_WCE))
+#if defined(__AROS__) || defined(__HAIKU__) || \
+	(defined(__MINGW32__) && !defined(_UCRT) && !defined(_WIN32_WCE))
 #define FB_LONGDOUBLE_LOCAL_PARSER
 #include "longdouble_parse.h"
 #endif
@@ -171,7 +172,7 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 
 	if (text == NULL) abort();
 #ifdef FB_LONGDOUBLE_LOCAL_PARSER
-	/* Haiku narrows strtold through double. Legacy MinGW/MSVCRT cannot
+	/* AROS and Haiku narrow strtold through double. Legacy MinGW/MSVCRT cannot
 	 * isolate its numeric locale with UCRT's thread-locale API. The local
 	 * parser keeps native precision without reading or changing locale state. */
 	size_t consumed;
