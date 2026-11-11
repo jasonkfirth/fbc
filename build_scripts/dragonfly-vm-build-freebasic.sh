@@ -482,7 +482,9 @@ cp -a /usr/local/. /work/local/
 mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
 pkg update -f
-pkg install -y curl
+# Refresh curl before the build's package and log uploads.
+pkg install -f -y curl
+curl --version >/dev/null
 
 fetch -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
 tar -xzf /tmp/freebasic-source.tar.gz -C /work/freebasic-source
@@ -725,9 +727,12 @@ cp -a /usr/local/. /work/local/
 mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
 pkg update -f
+# The test VM starts from the same image, so refresh both runtime tools there.
+pkg install -f -y curl rsync
+curl --version >/dev/null
+rsync --version >/dev/null
 pkg install -y \\
 	bash \\
-	curl \\
 	gcc \\
 	gmake \\
 	libffi \\

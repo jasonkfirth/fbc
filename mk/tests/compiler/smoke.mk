@@ -18,6 +18,8 @@ SEMANTIC_MODEL_SMOKE_MIN_SCHEMA := 15
 
 LLVM_SMOKE_LLC := $(strip $(or $(LLC),llc))
 LLVM_SMOKE_LLC_AVAILABLE := $(shell command -v "$(LLVM_SMOKE_LLC)" >/dev/null 2>&1 && echo yes)
+# LLVM receives the target in its options, so this uses the host llc directly.
+LLVM_SMOKE_TEST_FBC_CMD = env LLC="$(LLVM_SMOKE_LLC)" "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
 
 .PHONY: compiler-smoke compiler-clongdouble-abi-smoke compiler-semantic-model-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
 compiler-smoke: libs
@@ -30,7 +32,7 @@ ifneq ($(CAN_RUN),)
 ifeq ($(LLVM_SMOKE_LLC_AVAILABLE),yes)
 	$(call _mt_echo,LLVM duplicate extern global smoke test)
 	$(call _mt_run,$(CC) -c "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.c" -o "$(TEST_TMP)/llvm-duplicate-extern-global.o")
-	$(call _mt_run,$(TEST_FBC_CMD) -i "$(rootdir)/inc" "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.bas" "$(TEST_TMP)/llvm-duplicate-extern-global.o" -x "$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
+	$(call _mt_run,$(LLVM_SMOKE_TEST_FBC_CMD) -i "$(rootdir)/inc" "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.bas" "$(TEST_TMP)/llvm-duplicate-extern-global.o" -x "$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
 	$(call _mt_run,./"$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
 else
 	$(call _mt_echo,LLVM duplicate extern global smoke test skipped; llc is unavailable)
