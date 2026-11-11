@@ -98,11 +98,17 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="fbc-clongdouble-c-abi-") as temporary:
         working = Path(temporary)
-        for backend, options in (
+        backends = [
             ("native", []),
             ("gcc", ["-gen", "gcc"]),
-            ("llvm", ["-gen", "llvm"]),
-        ):
+        ]
+        llc = os.environ.get("LLC", "").strip() or "llc"
+        if shutil.which(llc):
+            backends.append(("llvm", ["-gen", "llvm"]))
+        else:
+            print("CLONGDOUBLE_C_ABI=LLVM: SKIP (llc not found)")
+
+        for backend, options in backends:
             check_backend(fbc, cc, include_directory, working, backend, options)
 
         # Linux i386 returns native long double in x87 ST(0). Compile without

@@ -29,7 +29,8 @@ ifneq ($(CAN_RUN),)
 	@./"$(TEST_TMP)/smoke$(EXEEXT)" >/dev/null 2>&1 && echo "==> RUN OK"
 ifeq ($(LLVM_SMOKE_LLC_AVAILABLE),yes)
 	$(call _mt_echo,LLVM duplicate extern global smoke test)
-	$(call _mt_run,$(TEST_FBC_CMD) -i "$(rootdir)/inc" "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.bas" -x "$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
+	$(call _mt_run,$(CC) -c "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.c" -o "$(TEST_TMP)/llvm-duplicate-extern-global.o")
+	$(call _mt_run,$(TEST_FBC_CMD) -i "$(rootdir)/inc" "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.bas" "$(TEST_TMP)/llvm-duplicate-extern-global.o" -x "$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
 	$(call _mt_run,./"$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
 else
 	$(call _mt_echo,LLVM duplicate extern global smoke test skipped; llc is unavailable)

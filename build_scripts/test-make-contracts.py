@@ -258,9 +258,9 @@ def test_archive_dryrun(root: Path, working: Path) -> None:
 
 
 def test_archive_portable_arguments(root: Path, working: Path) -> None:
-    # Model Apple's rejection of GNU response files and Windows' command
-    # limit while letting the native archiver verify the resulting members.
-    names = ["unit-" + str(index) + "-" + "x" * 60 + ".o" for index in range(600)]
+    # Keep the fixture small for hosted Windows runners while making its
+    # argument list exceed xargs' batch size.
+    names = ["unit-" + str(index) + "-" + "x" * 120 + ".o" for index in range(128)]
     for name in names:
         write(working / name)
     write(working / "ar.sh", "#!/bin/sh\nset -eu\nlength=0\n"
@@ -268,7 +268,11 @@ def test_archive_portable_arguments(root: Path, working: Path) -> None:
           "  case \"$argument\" in @*) exit 1 ;; esac\n"
           "  length=$((length + ${#argument} + 1))\n"
           "done\n[ \"$length\" -lt 32768 ] || exit 1\n"
-          "if [ -f fail-after-first ] && [ -e \"$2\" ]; then exit 1; fi\n"
+          "call_number=0\n"
+          "if [ -f ar.calls ]; then call_number=$(cat ar.calls); fi\n"
+          "call_number=$((call_number + 1))\n"
+          "printf '%s\\n' \"$call_number\" > ar.calls\n"
+          "if [ -f fail-after-first ] && [ \"$call_number\" -gt 1 ]; then exit 1; fi\n"
           "exec ar \"$@\"\n")
     write(working / "GNUmakefile",
           ".DEFAULT_GOAL := runtime/libfb.a\nlibdir := runtime\n"
@@ -277,14 +281,18 @@ def test_archive_portable_arguments(root: Path, working: Path) -> None:
           + include(root, "build/archive-rules.mk") + "\nruntime:\n\t@mkdir -p runtime\n")
     result = make(working)
     require(result.returncode == 0, "archive exceeded portable tool arguments", result)
+    require(int((working / "ar.calls").read_text().strip()) > 1,
+            "archive arguments were not split into bounded batches")
     result = subprocess.run(["ar", "t", "runtime/libfb.a"], cwd=working,
                             capture_output=True, text=True, timeout=10, check=False)
     require(result.returncode == 0 and archive_members(result.stdout) == names,
             "batched archive lost or reordered members", result)
     published = (working / "runtime/libfb.a").read_bytes()
+    write(working / "ar.calls", "0\n")
     write(working / "fail-after-first")
     result = make(working, "-B")
-    require(result.returncode != 0 and (working / "runtime/libfb.a").read_bytes() == published,
+    require(result.returncode != 0 and int((working / "ar.calls").read_text().strip()) > 1
+            and (working / "runtime/libfb.a").read_bytes() == published,
             "a later archiver batch failure published a partial archive", result)
     require(not list((working / "runtime").glob("*.tmp"))
             and not list((working / "runtime").glob("*.rsp")),

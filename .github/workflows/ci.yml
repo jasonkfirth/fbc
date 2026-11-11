@@ -788,6 +788,7 @@ jobs:
         with:
           msystem: CLANGARM64
           release: false
+          cache: false
           update: true
           install: >-
             make
