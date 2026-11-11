@@ -55,6 +55,14 @@ dim shared as integer semantic_macro_invocation_count, semantic_macro_invocation
 const SEMANTIC_MACRO_LOCATION_WORK_LIMIT = 8388608
 dim shared as longint semantic_macro_location_work
 
+'' Invocation indices remain stable while this module's append-only array grows.
+'' Repeated token-origin queries usually revisit a small set of active loaders.
+'' A fixed, power-of-two cache avoids repeating their binary searches. Validate
+'' the stored identity on every hit and still charge the lookup work budget.
+const SEMANTIC_MACRO_LOOKUP_CACHE_SIZE = 256
+dim shared as longint semantic_macro_lookup_ids(0 to SEMANTIC_MACRO_LOOKUP_CACHE_SIZE - 1)
+dim shared as integer semantic_macro_lookup_indices(0 to SEMANTIC_MACRO_LOOKUP_CACHE_SIZE - 1)
+
 '' A canonical symbol can be revisited by several declaration parser routes.
 '' The same expansion-to-symbol observation is one relationship, not one
 '' relationship per visit. Keep a bounded set without changing symbol lookup.
@@ -141,6 +149,8 @@ sub fbSemanticModelResetMacros( )
 	semantic_macro_invocation_count = 0
 	semantic_macro_invocation_capacity = 0
 	semantic_macro_location_work = SEMANTIC_MACRO_LOCATION_WORK_LIMIT
+	erase semantic_macro_lookup_ids
+	erase semantic_macro_lookup_indices
 	for depth as integer = 0 to FB_MAXINCRECLEVEL
 		lex.ctxTB(depth).semantic_last_macro_token = -1
 	next
@@ -278,16 +288,33 @@ end function
 '' -------------------------------------------------------------------------
 
 private function hInvocationIndex( byval identity as longint ) as integer
+	if( identity <= 0 ) then return -1
+	semantic_macro_location_work -= 1
+	if( semantic_macro_location_work < 0 ) then
+		fbSemanticModelFailAt("macro invocation lookup work limit exceeded")
+		return -1
+	end if
+	dim as integer cache_slot = identity and (SEMANTIC_MACRO_LOOKUP_CACHE_SIZE - 1)
+	if( semantic_macro_lookup_ids(cache_slot) = identity ) then
+		dim as integer cached_index = semantic_macro_lookup_indices(cache_slot)
+		if( cached_index >= 0 and cached_index < semantic_macro_invocation_count ) then
+			if( semantic_macro_invocations[cached_index].identity = identity ) then return cached_index
+		end if
+	end if
 	dim as integer first = 0
 	dim as integer last = semantic_macro_invocation_count - 1
 	while( first <= last )
 		semantic_macro_location_work -= 1
 		if( semantic_macro_location_work < 0 ) then
-			fbSemanticModelFailAt("semantic-macros.bas:226")
+			fbSemanticModelFailAt("macro invocation lookup work limit exceeded")
 			return -1
 		end if
 		dim as integer middle = first + (last - first) \ 2
-		if( semantic_macro_invocations[middle].identity = identity ) then return middle
+		if( semantic_macro_invocations[middle].identity = identity ) then
+			semantic_macro_lookup_ids(cache_slot) = identity
+			semantic_macro_lookup_indices(cache_slot) = middle
+			return middle
+		end if
 		if( semantic_macro_invocations[middle].identity < identity ) then
 			first = middle + 1
 		else

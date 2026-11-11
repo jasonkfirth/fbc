@@ -30,7 +30,9 @@ end function
 function fbSemanticModelTypeNumber( byval dtype as longint ) as string
 	return fbSemanticModelNumber(dtype)
 end function
-sub fbSemanticModelAppendProvenance( byref value as const string )
+'' This fixture counts accepted queue entries. Closed-model tests exercise
+'' the exporter's delayed flush and expression refinement together.
+sub fbSemanticModelQueueParserProvenance( byref value as const string )
 	writes += 1
 	if( writes <= 8 ) then captured += value + chr(10)
 end sub

@@ -23,6 +23,7 @@ declare sub fbSemanticModelExportSelectedExpression(byval expr as ASTNODE ptr, b
 declare function fbSemanticModelEscape( byref value as const string ) as string
 declare sub fbSemanticModelAppendDetail( byref value as string )
 declare sub fbSemanticModelAppendProvenance( byref value as const string )
+declare sub fbSemanticModelQueueParserProvenance( byref value as const string )
 declare sub fbSemanticModelFail( )
 declare sub fbSemanticModelFailAt( byref reason as const string )
 declare sub fbSemanticModelMarkSourceRemapped( byval depth as integer )

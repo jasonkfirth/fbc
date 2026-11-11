@@ -22,7 +22,7 @@ sub fbSemanticModelResetIntrinsics( )
 end sub
 
 private sub hIntrinsicProperty( byref key as const string, byref value as const string )
-	fbSemanticModelAppendProvenance("K" + TABCHAR + "module" + TABCHAR + _
+	fbSemanticModelQueueParserProvenance("K" + TABCHAR + "module" + TABCHAR + _
 		fbSemanticModelNumber(fbSemanticModelModuleIdentity( )) + TABCHAR + key + TABCHAR + fbSemanticModelEscape(value))
 end sub
 

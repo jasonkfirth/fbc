@@ -1784,6 +1784,24 @@ print value
                     rows = self.expressions(model, self.span(source, f"{name}({value})"))
                     self.assertTrue(any(row[10:12] == [code, "builtin"] for row in rows), (name, rows))
 
+    def test_intrinsic_dispatch_preserves_final_expression_concepts(self) -> None:
+        operations = {"sgn(value)": "sign", "cint(value)": "convert-to-integer",
+                      "csng(integer_value)": "convert-to-float",
+                      "int(integer_value)": "floor", "frac(integer_value)": "fractional-part"}
+        source = self.source("dim value as double = 0.5\ndim integer_value as long = 2\n" +
+                             "\n".join(f"print {expression}" for expression in operations) + "\n")
+        for backend in self.backends:
+            for mode in ("full", "expressions"):
+                with self.subTest(backend=backend, mode=mode):
+                    model = self.compile(source, mode=mode, backend=backend)
+                    for expression, concept in operations.items():
+                        rows = self.expressions(model, self.span(source, expression))
+                        self.assertTrue(rows, expression)
+                        # Dispatcher metadata must not let a later generic parser
+                        # tier obscure the source operator on a lowered result.
+                        self.assertTrue(all(row[10:12] == [concept, "builtin"] for row in rows),
+                                        (expression, rows))
+
     def test_overloaded_operators_are_not_builtin_or_identifier_bindings(self) -> None:
         source = self.source("type Number\n value as long\nend type\n"
                              "operator +(byref a as Number, byref b as Number) as Number\n"
@@ -3551,6 +3569,30 @@ dim accepted_value as long
                 self.assertTrue(all(model.conditional_decisions[int(row[1])][2:5] ==
                                     ["parent-inactive", "", "0"] for row in nested))
                 self.assertFalse(model.records["PPT"])
+
+    def test_macro_origin_lookup_cache_handles_generated_select(self) -> None:
+        # Repeated expansion-origin queries used to exhaust the lookup work
+        # budget before the much smaller expression model could be written.
+        # Retain the existing budget: cached hits must avoid repeated searches,
+        # not disable capture or admit an incomplete model.
+        original = self.root / "tests/compound/select_const2.bas"
+        text = original.read_text(encoding="utf-8")
+        begin = text.index("\t#macro TEST_RANGES()")
+        end = text.index("\t#endmacro", begin) + len("\t#endmacro")
+        ranges = [line for line in text[begin:end].splitlines()
+                  if line.strip().startswith("TEST_RANGE_EDGES(")][:8]
+        self.assertEqual(len(ranges), 8)
+        # Keep enough repeated origins to exceed the former search budget,
+        # without turning this lookup regression into the independent native
+        # name-history event-capacity stress test. The original stays intact.
+        text = text[:begin] + "\t#macro TEST_RANGES()\n" + "\n".join(ranges) + "\n\t#endmacro" + text[end:]
+        source = self.source(text + "\nPrint 1 + 2.0\n",
+                             "macro-lookup-generated-select.bas")
+        include = str(self.root / "tests/fbcunit/inc")
+        for backend in self.backends:
+            model = self.compile(source, mode="expressions", backend=backend,
+                                 extra=("-i", include))
+            self.assertTrue(model.records["E"], "The successful export must retain typed expressions")
 
     def test_macro_expansions_arguments_substitutions_and_origins(self) -> None:
         text = """#define SEM_VALUE 3

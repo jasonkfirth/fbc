@@ -697,6 +697,21 @@ sub fbSemanticModelAppendDetail(byref value as string)
 	fbSemanticModelAppendProvenance(value)
 end sub
 
+sub fbSemanticModelQueueParserProvenance(byref value as const string)
+	if( (semantic_model_file_open = FALSE) or (semantic_model_module_open = FALSE) or _
+		semantic_model_module_failed ) then exit sub
+	'' Parser callbacks can report metadata while the same completed AST is
+	'' still unwinding through precedence layers. Delay these receipts with
+	'' parser observations, so they cannot erase its refined source operator.
+	'' The next non-expression record flushes the queue through normal checked
+	'' staging. Reserve one byte for the private queue's line delimiter.
+	if( len(value) >= SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES - len(semantic_pending_parser_observations) ) then
+		fbSemanticModelFailAt("parser observation queue limit exceeded")
+		exit sub
+	end if
+	semantic_pending_parser_observations += value + chr(10)
+end sub
+
 sub fbSemanticModelAppendProvenance(byref value as const string)
 	if( (semantic_model_file_open = FALSE) or (semantic_model_module_open = FALSE) or _
 		semantic_model_module_failed ) then exit sub
@@ -4342,14 +4357,10 @@ sub fbSemanticModelExportParserExpression _
 	dim as string receipt = "K" + TABCHAR + "expression" + TABCHAR + _
 		hSemanticModelNumber(semantic_model_last_exported_expression) + TABCHAR + _
 		"parser-observation:" + hSemanticModelNumber(semantic_parser_observation_count) + TABCHAR + _
-		hSemanticModelEscape(payload) + chr(10)
-	if( len(receipt) > SEMANTIC_MODEL_MAX_MODULE_BUFFER_BYTES - len(semantic_pending_parser_observations) ) then
-		fbSemanticModelFailAt("parser observation queue limit exceeded")
-		exit sub
-	end if
+		hSemanticModelEscape(payload)
 	'' Delay receipts until a non-E record so parser unwind deduplication and
 	'' operator refinement can still replace the last staged E record safely.
-	semantic_pending_parser_observations += receipt
+	fbSemanticModelQueueParserProvenance(receipt)
 end sub
 
 sub fbSemanticModelExportSelectedExpression(byval expr as ASTNODE ptr, byref anchor as LEX_LOCATION)
