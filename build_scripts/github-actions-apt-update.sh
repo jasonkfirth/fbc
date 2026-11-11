@@ -25,6 +25,8 @@ set -euo pipefail
 
 readonly sources_dir="/etc/apt/sources.list.d"
 readonly disabled_dir="${sources_dir}/fbc-ci-disabled"
+readonly mirror_list="/etc/apt/apt-mirrors.txt"
+readonly fallback_mirror="https://mirrors.edge.kernel.org/ubuntu/"
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: github-actions-apt-update.sh must run as root" >&2
@@ -38,6 +40,23 @@ for source_file in "${sources_dir}"/*.list "${sources_dir}"/*.sources; do
         mv -- "$source_file" "$disabled_dir/$(basename "$source_file")"
     fi
 done
+
+mirror_dns_failed=0
+for mirror_host in azure.archive.ubuntu.com archive.ubuntu.com security.ubuntu.com; do
+    if ! getent ahosts "$mirror_host" >/dev/null 2>&1; then
+        mirror_dns_failed=1
+        break
+    fi
+done
+
+if [ "$mirror_dns_failed" -ne 0 ] && [ -f "$mirror_list" ]; then
+    if getent ahosts mirrors.edge.kernel.org >/dev/null 2>&1; then
+        printf '%s\n' "$fallback_mirror" > "$mirror_list"
+        echo "Ubuntu archive DNS failed; using the independent fallback mirror" >&2
+    else
+        echo "WARNING: Ubuntu archive DNS and the fallback mirror are unavailable" >&2
+    fi
+fi
 
 for attempt in 1 2 3; do
     if apt-get \
