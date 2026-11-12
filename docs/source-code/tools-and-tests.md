@@ -121,5 +121,10 @@ records linked to each other, with each retaining its own purpose.
 `make source-docs-test` checks source-guide links and native manual navigation.
 `make source-docs-render-test FBDOC=/path/to/fbdoc` also generates fresh HTML,
 fbhelp and text pages in disposable storage and checks their output.
+`python3 -B build_scripts/check-source-docs.py --revision HEAD` checks the
+committed navigation and destinations without trusting local drafts. To check
+staged changes, pass the tree from `git write-tree` instead of `HEAD`.
+The [CI recovery guide](../ci-recovery.md) explains independent validation after
+a successful native build and why every test failure still fails qualification.
 
 <!-- end of source-code/tools-and-tests.md -->

@@ -67,6 +67,22 @@ env:
   BOOTSTRAP_VERSION: "1.10.1"
 
 jobs:
+  source-docs:
+    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
+    name: Source documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check documentation snapshot contracts
+        run: python3 -B build_scripts/test-source-docs.py
+
+      - name: Check committed documentation links
+        run: python3 -B build_scripts/check-source-docs.py --revision HEAD
+
   c-lint:
     if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: C/C++ whole-tree lint
@@ -220,23 +236,28 @@ jobs:
           make -j"$JOBS" compiler </dev/null
 
       - name: Build the XL runtime libraries
+        id: runtime-build
         run: make -j"$JOBS" all </dev/null
 
       - name: Run build-system and compiler smoke tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         # quick-test shares one temporary directory across its prerequisites.
         # Keep the meta-target serial until those tests have isolated state.
-        run: make quick-test </dev/null
+        run: make -k quick-test </dev/null
 
       - name: Run fbctests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         run: make -j"$JOBS" tests-test </dev/null
 
       - name: Run syntax tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         run: |
           set -euo pipefail
           cd tests/syntax
           FBC="$GITHUB_WORKSPACE/bin/fbc -i $GITHUB_WORKSPACE/inc" ./test.sh </dev/null
 
       - name: Run Exampleageddon
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         env:
           FB_GFX_DRIVER: none
           SFXLIB_DRIVER: null
@@ -355,21 +376,25 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build the target compiler and XL runtime libraries
+        id: runtime-build
         run: |
           make clean-compiler clean-libs
           make -j"$JOBS" all BUILD_FBC="$PWD/.ci-host/fbc.exe" </dev/null
 
       - name: Run build-system and compiler smoke tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         # quick-test shares one temporary directory across its prerequisites.
         # Keep the meta-target serial until those tests have isolated state.
         # The x86 target remains runnable on this host, while BUILD_FBC keeps
         # destructive rebuild checks on the preserved 64-bit compiler.
-        run: make quick-test BUILD_FBC="$PWD/.ci-host/fbc.exe" CROSS_BUILD= </dev/null
+        run: make -k quick-test BUILD_FBC="$PWD/.ci-host/fbc.exe" CROSS_BUILD= </dev/null
 
       - name: Run fbctests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         run: make -j"$JOBS" tests-test BUILD_FBC="$PWD/.ci-host/fbc.exe" CROSS_BUILD= </dev/null
 
       - name: Run Exampleageddon
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         env:
           FB_GFX_DRIVER: none
           SFXLIB_DRIVER: null
@@ -646,29 +671,35 @@ jobs:
           gmake -j"$JOBS" compiler </dev/null
 
       - name: Build the XL runtime libraries
+        id: runtime-build
         run: gmake -j"$JOBS" all </dev/null
 
       - name: Run build-system and compiler smoke tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         # quick-test shares one temporary directory across its prerequisites.
         # Keep the meta-target serial until those tests have isolated state.
-        run: gmake quick-test </dev/null
+        run: gmake -k quick-test </dev/null
 
       - name: Run fbctests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         run: gmake -j"$JOBS" tests-test </dev/null
 
       - name: Run Darwin binding and graphics smoke tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         env:
           FBC: ${{ github.workspace }}/bin/fbc
           OUT_DIR: ${{ runner.temp }}/macos-smoke
         run: bash build_scripts/macos-smoke-freebasic.sh
 
       - name: Run syntax tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         run: |
           set -euo pipefail
           cd tests/syntax
           FBC="$GITHUB_WORKSPACE/bin/fbc -i $GITHUB_WORKSPACE/inc" ./test.sh </dev/null
 
       - name: Run Exampleageddon
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         env:
           FB_GFX_DRIVER: none
           SFXLIB_DRIVER: null
@@ -855,23 +886,28 @@ jobs:
           make -j"$JOBS" compiler </dev/null
 
       - name: Build the XL runtime libraries
+        id: runtime-build
         run: make -j"$JOBS" all </dev/null
 
       - name: Run build-system and compiler smoke tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         # quick-test shares one temporary directory across its prerequisites.
         # Keep the meta-target serial until those tests have isolated state.
-        run: make quick-test </dev/null
+        run: make -k quick-test </dev/null
 
       - name: Run fbctests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         run: make -j"$JOBS" tests-test </dev/null
 
       - name: Run syntax tests
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         run: |
           set -euo pipefail
           cd tests/syntax
           FBC="$GITHUB_WORKSPACE/bin/fbc -i $GITHUB_WORKSPACE/inc" ./test.sh </dev/null
 
       - name: Run Exampleageddon
+        if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         env:
           FB_GFX_DRIVER: none
           SFXLIB_DRIVER: null

@@ -14,12 +14,10 @@ language reference.
 - [Tiko C warning qualification](c-emitter-tiko-context.md) records the recovered
   maintained build context, four source guards and unchanged native diagnostics.
 
-- [Runtime library warning audit](library-warning-audit.md) tracks full GCC and
-  Clang warning counts, safe source repairs and remaining platform boundaries.
-
 - [Hosted CI recovery](ci-recovery.md) explains runner allocation failures,
   master run scheduling, selectable macOS ARM64 images and scoped native
-  macOS/Windows ARM64 qualification.
+  macOS/Windows ARM64 qualification, independent test steps and committed
+  documentation checks.
 
 - [Window metrics and software keyboards](../doc/window-keyboard.md) documents
   browser and Android usable geometry, density, rotation, IME requests and

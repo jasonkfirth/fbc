@@ -49,4 +49,36 @@ Manual recovery runs do not trigger package builds, even when they succeed.
 Build and test failures remain failures; runner shortages are not converted
 into passing qualification.
 
+## Independent validation after a successful build
+
+Source documentation has a small independent job, so missing links are reported
+without waiting for a compiler build. Native jobs still check documentation as
+part of `quick-test`. They run that target serially with Make's `-k` option to
+collect failures from independent prerequisites. Make still returns failure
+when any required check fails.
+
+After a successful native compiler/runtime build, fbctests, syntax tests,
+Exampleageddon and the Darwin binding checks run even if an earlier validation
+step fails. A failed or skipped build prevents those tests from running, and a
+cancelled job stops them. Each test retains its own failing status; no test is
+made optional, and package qualification still requires the entire CI run to
+succeed. These conditions apply to Linux, Windows x86/x86_64, macOS and native
+Windows ARM64.
+
+## Checking exactly what will be committed
+
+Local drafts can conceal missing links. The source checker can read an immutable
+Git tree directly, without copying the repository or using untracked files:
+
+```sh
+python3 -B build_scripts/check-source-docs.py --revision HEAD
+```
+
+To check staged documentation before committing, use the tree written by
+`git write-tree` as `--revision`. Stage the intended files first. The checker
+reads both navigation pages and their destinations from that tree, so local
+edits, deletions or untracked drafts cannot change the result. Without
+`--revision`, the existing working-tree and manual-rendering checks remain
+available. Snapshot checks do not render documentation.
+
 <!-- end of ci-recovery.md -->

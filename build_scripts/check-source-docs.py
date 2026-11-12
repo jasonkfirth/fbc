@@ -2,12 +2,14 @@
 """Project: FreeBASIC source documentation
 File: check-source-docs.py
 Purpose: Check source-guide links and the manual converter's real output.
-Responsibilities: Validate maintained navigation and optionally render fresh pages.
+Responsibilities: Validate navigation in working or committed source and
+optionally render fresh pages.
 This file intentionally does NOT package or publish release manuals.
 """
 
 import argparse
 from html.parser import HTMLParser
+import os
 from pathlib import Path
 import re
 import shutil
@@ -27,6 +29,57 @@ GUIDES = {
 PAGES = (*GUIDES, "DevBuildConfig")
 TREES = {"DevSourceCode": "src/", "DevSourceCompiler": "compiler/",
          "DevSourceRuntime": "rtlib/", "DevSourceGraphics": "gfxlib2/", "DevSourceSound": "sfxlib/"}
+
+
+class GitTree:
+    """Read one immutable tree without copying the checkout or trusting local files."""
+
+    def __init__(self, root, revision):
+        self.root = root.resolve()
+        # Resolve once so a branch movement cannot mix two documentation versions.
+        self.tree = self.git("rev-parse", "--verify", "--end-of-options",
+                             revision + "^{tree}").decode().strip()
+        self.paths = {"."}
+        self.files = set()
+        for entry in self.git("ls-tree", "-r", "-t", "-z", self.tree).split(b"\0"):
+            if not entry:
+                continue
+            metadata, name = entry.split(b"\t", 1)
+            name = name.decode("utf-8")
+            self.paths.add(name)
+            if metadata.split()[1] == b"blob":
+                self.files.add(name)
+
+    def git(self, *arguments):
+        result = subprocess.run(["git", "-C", str(self.root), *arguments],
+                                capture_output=True, timeout=30, check=False)
+        require(result.returncode == 0,
+                "cannot read Git documentation snapshot: "
+                + result.stderr.decode("utf-8", errors="replace"))
+        return result.stdout
+
+    def relative(self, path):
+        try:
+            return path.relative_to(self.root).as_posix()
+        except ValueError:
+            return None
+
+    def exists(self, path):
+        return self.relative(path) in self.paths
+
+    def is_file(self, path):
+        return self.relative(path) in self.files
+
+    def read_text(self, path, encoding="utf-8"):
+        name = self.relative(path)
+        require(name in self.files, str(path) + ": absent from Git snapshot")
+        return self.git("show", self.tree + ":" + name).decode(encoding)
+
+
+def read_source(path, snapshot=None, encoding="utf-8"):
+    if snapshot is not None:
+        return snapshot.read_text(path, encoding)
+    return path.read_text(encoding=encoding)
 
 
 class Page(HTMLParser):
@@ -53,9 +106,9 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def check_markdown(path):
+def check_markdown(path, snapshot=None):
     # Code examples may contain illustrative links which are not navigation.
-    text = re.sub(r"(?ms)^```.*?^```[^\n]*", "", path.read_text(encoding="utf-8"))
+    text = re.sub(r"(?ms)^```.*?^```[^\n]*", "", read_source(path, snapshot))
     count = 0
     for target in re.findall(r"!?\[[^]\n]+\]\(([^)]+)\)", text):
         target = target.strip()
@@ -66,15 +119,18 @@ def check_markdown(path):
         parsed = urlsplit(target)
         if parsed.scheme or not parsed.path:
             continue
-        destination = (path.parent / unquote(parsed.path)).resolve()
-        require(destination.exists(), str(path) + ": missing link " + target)
+        # Git paths are lexical. A dirty local symlink must not redirect a
+        # committed link outside the snapshot being checked.
+        destination = Path(os.path.abspath(path.parent / unquote(parsed.path)))
+        exists = snapshot.exists(destination) if snapshot is not None else destination.exists()
+        require(exists, str(path) + ": missing link " + target)
         count += 1
     return count
 
 
-def check_wakka(cache, name):
+def check_wakka(cache, name, snapshot=None):
     path = cache / (name + ".wakka")
-    source = path.read_text(encoding="utf-8-sig")
+    source = read_source(path, snapshot, encoding="utf-8-sig")
     require(source.count("%%") % 2 == 0, name + ": unclosed code block")
     require("```" not in source and "](" not in source, name + ": Markdown in native manual")
     title = re.search(r'^\{\{fbdoc item="title" value="([^"]+)"\}\}', source)
@@ -84,7 +140,9 @@ def check_wakka(cache, name):
     for target in targets:
         if urlsplit(target).scheme:
             continue
-        require((cache / (target.split("#", 1)[0] + ".wakka")).is_file(),
+        destination = cache / (target.split("#", 1)[0] + ".wakka")
+        exists = snapshot.is_file(destination) if snapshot is not None else destination.is_file()
+        require(exists,
                 name + ": missing native link " + target)
     return title.group(1), len(targets)
 
@@ -157,23 +215,33 @@ def render(root, generator):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--revision", help="Check a Git revision or staged tree, ignoring local files")
     formats = parser.add_mutually_exclusive_group()
     formats.add_argument("--fbdoc", type=Path, help="Render fresh pages using this native converter")
     formats.add_argument("--rendered", type=Path, help="Inspect an existing rendered directory")
     options = parser.parse_args()
+    require(not options.revision or not (options.fbdoc or options.rendered),
+            "--revision checks source only; render the checked-out revision separately")
     root = options.root.resolve()
-    markdown = sorted((root / "docs/source-code").glob("*.md"))
+    snapshot = GitTree(root, options.revision) if options.revision else None
+    if snapshot is not None:
+        markdown = sorted(root / name for name in snapshot.paths
+                          if re.fullmatch(r"docs/source-code/[^/]+\.md", name))
+    else:
+        markdown = sorted((root / "docs/source-code").glob("*.md"))
     markdown += [root / name for name in ("docs/README.md", "docs/gfx-maintenance.md", "docs/gfx-locking.md", "mk/README.md",
                                         "src/compiler/README.md", "src/rtlib/README.md",
                                         "src/gfxlib2/README.md", "src/gfxlib3/README.md")]
-    links = sum(check_markdown(path) for path in markdown)
+    links = sum(check_markdown(path, snapshot) for path in markdown)
     cache = root / "doc/manual/cache"
-    native_links = sum(check_wakka(cache, name)[1] for name in PAGES)
+    native_links = sum(check_wakka(cache, name, snapshot)[1] for name in PAGES)
     for navigation in ("DocToc", "DevToc"):
-        source = (cache / (navigation + ".wakka")).read_text(encoding="utf-8")
+        source = read_source(cache / (navigation + ".wakka"), snapshot)
         require(all(name in source for name in GUIDES), navigation + ": guide navigation missing")
     for native, markdown_name in GUIDES.items():
-        require((root / "docs/source-code" / markdown_name).is_file(), native + ": Markdown guide missing")
+        path = root / "docs/source-code" / markdown_name
+        exists = snapshot.is_file(path) if snapshot is not None else path.is_file()
+        require(exists, native + ": Markdown guide missing")
     print(f"SOURCE_DOCS_PASS markdown={len(markdown)} links={links} native_links={native_links}")
     if options.fbdoc:
         render(root, options.fbdoc.resolve())

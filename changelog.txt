@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- CI: remove an index link to an unpublished library-audit draft, validate committed or staged documentation without local-file masking, and run independent native tests after a successful build even when an earlier check fails. Keep every test failure fatal and collect independent quick-test failures serially.
 - CI: let active master qualification finish while retaining only the newest pending revision; keep superseded PR/branch cancellation and add isolated native Windows ARM64 recovery without weakening test failures or package qualification.
 - compiler/C and LLVM: preserve Single precision when rounding read-only scalar views to integers, choose matching LLVM rounding/math intrinsics, and retain Double precision; add cross-backend/Win32 controls and remove 47 Clang promotions from unchanged legacy examples.
 - compiler/C: retain labels through each outlined error callback and the owning GOSUB graph, avoid consumed owner AST during helper emission, and enforce native unused-label checks in GOSUB regressions; remove five GCC and five Clang observations from unchanged legacy examples.
