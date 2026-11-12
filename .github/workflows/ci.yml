@@ -42,6 +42,7 @@ on:
         options:
           - all
           - macos-arm64
+          - windows-arm64
       macos_arm64_runner:
         description: Native ARM64 image, selectable during hosted capacity shortages
         type: choice
@@ -51,8 +52,10 @@ on:
           - macos-15
 
 concurrency:
-  group: fbc-xl-ci-${{ github.workflow }}-${{ github.ref }}${{ inputs.ci_scope == 'macos-arm64' && '-macos-arm64' || '' }}
-  cancel-in-progress: true
+  group: fbc-xl-ci-${{ github.workflow }}-${{ github.ref }}${{ inputs.ci_scope != '' && inputs.ci_scope != 'all' && format('-{0}', inputs.ci_scope) || '' }}
+  # Finish expensive master qualification instead of restarting it on every
+  # push. GitHub keeps only the newest pending revision in this group.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/master') }}
 
 permissions:
   contents: read
@@ -65,7 +68,7 @@ env:
 
 jobs:
   c-lint:
-    if: inputs.ci_scope != 'macos-arm64'
+    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: C/C++ whole-tree lint
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -150,7 +153,7 @@ jobs:
             bootstrap/win32-aarch64/
 
   linux:
-    if: inputs.ci_scope != 'macos-arm64'
+    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: Linux ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: ${{ matrix.runner }}
@@ -260,7 +263,7 @@ jobs:
             tests/log-tests-results-*.log
 
   windows:
-    if: inputs.ci_scope != 'macos-arm64'
+    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: Windows ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: windows-latest
@@ -397,7 +400,7 @@ jobs:
             tests/log-tests-results-*.log
 
   linux-targets:
-    if: inputs.ci_scope != 'macos-arm64'
+    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: Linux target matrix
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -584,6 +587,7 @@ jobs:
             bootstrap/
 
   macos:
+    if: inputs.ci_scope != 'windows-arm64'
     name: macOS ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: ${{ matrix.name == 'arm64' && (inputs.macos_arm64_runner || 'macos-26') || matrix.runner }}
@@ -693,7 +697,7 @@ jobs:
             tests/log-tests-results-*.log
 
   windows-arm64:
-    if: inputs.ci_scope != 'macos-arm64'
+    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: Windows ARM64 cross target
     runs-on: windows-latest
     timeout-minutes: 120
@@ -895,7 +899,7 @@ jobs:
             tests/log-tests-results-*.log
 
   mips:
-    if: inputs.ci_scope != 'macos-arm64'
+    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: Linux MIPS QEMU qualification
     runs-on: ubuntu-24.04
     timeout-minutes: 150

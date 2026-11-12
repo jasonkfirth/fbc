@@ -2,7 +2,7 @@
 Project: FreeBASIC XL CI
 File: ci-recovery.md
 Purpose: Explain hosted-runner recovery without weakening qualification.
-Responsibilities: Identify runner allocation failures and scoped manual reruns.
+Responsibilities: Explain run scheduling, allocation failures and scoped reruns.
 This file does not describe compiler fixes or release publication.
 -->
 
@@ -25,6 +25,24 @@ The scoped run still generates its source bootstrap. It skips unrelated
 platform jobs and uses a separate concurrency group so recovery does not
 cancel a full run on the same branch. Pushes and pull requests always run the
 full matrix. Manual runs default to `all` and can also override the ARM64 image.
+
+For a native Windows ARM64 failure, select `windows-arm64` as `ci_scope`.
+This runs the source bootstrap and the complete Windows ARM64 lane, including
+self-host, runtime libraries, smoke tests, fbctests, syntax tests and
+Exampleageddon. It does not replace native execution with cross-compilation.
+Use **Re-run failed jobs** when retrying the same revision and runner is enough;
+use a scoped manual run to qualify a repaired revision without repeating all
+other platforms. Both ARM64 recovery scopes leave a full run undisturbed.
+
+Master pushes no longer cancel an active main or extended-platform run.
+GitHub retains the newest pending run in each workflow's concurrency group;
+intermediate pending revisions can be replaced before they start. The active
+revision finishes qualification, then the newest pending revision starts.
+Each result belongs to its recorded commit, so a passing older run does not
+qualify a newer commit. Pull requests and pushes to other branches still
+cancel superseded work. To stop an obsolete master run, cancel it explicitly
+in Actions. Workflow scheduling changes take effect in runs using the updated
+workflow; they cannot change the policy of a run already started.
 
 Automatic package builds accept successful CI triggered by a master push.
 Manual recovery runs do not trigger package builds, even when they succeed.

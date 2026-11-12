@@ -12,7 +12,8 @@ language reference.
   Clang warning counts, safe source repairs and remaining platform boundaries.
 
 - [Hosted CI recovery](ci-recovery.md) explains runner allocation failures,
-  selectable macOS ARM64 images and scoped manual qualification.
+  master run scheduling, selectable macOS ARM64 images and scoped native
+  macOS/Windows ARM64 qualification.
 
 - [Window metrics and software keyboards](../doc/window-keyboard.md) documents
   browser and Android usable geometry, density, rotation, IME requests and
