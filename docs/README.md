@@ -8,6 +8,9 @@ language reference.
 
 ## Start here
 
+- [Runtime library warning audit](library-warning-audit.md) tracks full GCC and
+  Clang warning counts, safe source repairs and remaining platform boundaries.
+
 - [Hosted CI recovery](ci-recovery.md) explains runner allocation failures,
   selectable macOS ARM64 images and scoped manual qualification.
 
@@ -53,6 +56,10 @@ language reference.
   selected queue counts, excluded profiles and links to the qualification receipts.
 - [GOSUB and handler label ownership](c-emitter-gosub-labels.md) records callback
   references, AST lifetime boundaries and five fewer warnings per C compiler.
+- [Current JRPG contexts and retained debug bodies](c-emitter-newjrpg-context.md)
+  records two source pointer repairs and the pending 241-program object sweep.
+- [Read-only scalar conversions](c-emitter-qualified-conversions.md) records
+  correct Single helpers, LLVM intrinsic types and the pending complete recount.
 - [Shared C startup registrations](c-emitter-startup-groups.md) records the class-wide
   MinGW repair, callback order, semantic facts and native/object qualification.
 - [Native C pointer values](c-emitter-pointer-values.md) and [named byte-copy slots](c-emitter-member-address.md)

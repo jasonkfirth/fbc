@@ -2850,7 +2850,7 @@ private sub hBuiltInUop _
 
 	ln = hVregToStr( vr ) + " = call "
 
-	if( v1->dtype = FB_DATATYPE_SINGLE ) then
+	if( typeGetDtAndPtrOnly(v1->dtype) = FB_DATATYPE_SINGLE ) then
 		ln += "float @llvm."
 		select case( op )
 		case AST_OP_ABS : builtins(BUILTIN_ABSF).used = TRUE : ln += "fabs"
@@ -3110,11 +3110,14 @@ private sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 		hLoadVreg( v2 )
 
 		var ln = hVregToStr( v0 ) + " = call "
-		if( v2->dtype = FB_DATATYPE_SINGLE ) then
+		'' Memory views can retain const even though LLVM's scalar value
+		'' type has no qualification. The intrinsic must match that value.
+		var input_dtype = typeGetDtAndPtrOnly(v2->dtype)
+		if( input_dtype = FB_DATATYPE_SINGLE ) then
 			builtins(BUILTIN_NEARBYINTF).used = TRUE
 			ln += "float @llvm.nearbyint.f32(float "
 		else
-			assert( v2->dtype = FB_DATATYPE_DOUBLE )
+			assert( input_dtype = FB_DATATYPE_DOUBLE )
 			builtins(BUILTIN_NEARBYINT).used = TRUE
 			ln += "double @llvm.nearbyint.f64(double "
 		end if

@@ -170,6 +170,8 @@ def main() -> int:
         ("storage-alignment-owner", "tests/compiler-support/c-storage-alignment-owner.bas", ""),
         ("qualified-float-literals", "tests/compiler-support/c-qualified-float-literals.bas",
          "C_QUALIFIED_FLOAT_LITERALS_PASS"),
+        ("qualified-float-conversions", "tests/compiler-support/c-qualified-float-conversions.bas",
+         "C_QUALIFIED_FLOAT_CONVERSIONS_PASS"),
         ("indirect-integer-ranges", "tests/compiler-support/c-indirect-integer-ranges.bas",
          "C_INDIRECT_INTEGER_RANGES_PASS"),
         ("indirect-ranges-managed-iif", "tests/compiler-support/c-indirect-ranges-managed-iif.bas",

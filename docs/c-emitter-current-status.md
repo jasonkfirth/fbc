@@ -15,6 +15,20 @@ The development prefix retains `fbc-before-gosub-labels-20261112.exe`, hash
 as its immediate rollback. Installed release binaries and normal archives are unchanged.
 Ten selected-prefix value runs pass across GCC and Clang.
 
+The totals below remain the last completed selected-executable census. A separate
+[JRPG and fb-ext-lib context expansion](c-emitter-newjrpg-context.md) is in
+progress, including two repaired JRPG cancel callbacks. Its partial counts must
+not be added to this completed table. The context status packet records newly
+verified owner paths and explicit PNG exclusions as the sweep advances.
+
+The [qualified conversion candidate](c-emitter-qualified-conversions.md),
+`56cc73187b5208e476725afd1e7df9cd5f90944c7ae86c02aefb8747dbc2179a`, now passes
+all four existing queues: 6,418 profiles, 6,312 accepted C units, GCC 198 /
+Clang 15,969. Its 47 fewer Clang warnings all come from corrected Single rounding
+helpers in the 208 unchanged legacy examples. The selected executable remains
+pinned for the active JRPG audit; the new compiler is built and fully qualified
+for the existing cohort. The queued fb-ext-lib expansion uses its immutable path.
+
 | Group | Profiles | GCC warnings | Clang warnings |
 | --- | ---: | ---: | ---: |
 | Compiler | 224 | 0 | 1,339 |

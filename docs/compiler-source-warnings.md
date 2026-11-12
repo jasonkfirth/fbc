@@ -90,10 +90,17 @@ warning 55 under `-w all`. These include a deliberately retained static and a
 macro-local named `TMP`. Earlier summaries incorrectly called four compiler
 temporaries; matching source diagnostics confirm their source identities. At the
 219-observation baseline, all 24 unused-variable observations concern compiler
-storage. Four unused-function observations
-concern retained library definitions, including two implicit assignment operators.
-These must be handled by backend retention policy rather than misleading source
-warnings. The two checked formatter paths and the previously qualified Stunts
+storage. The four historical unused-function observations concern retained library
+definitions. A current non-image review corrects the earlier claim that two were
+implicit assignment operators: the JSON library explicitly defines an array
+assignment operator and a macro-generated sort comparator. The third reviewed
+body is omaGUI's explicit alpha helper. All three remain for debugger visibility;
+both corresponding normal-mode profiles have zero GCC warnings under the same
+aggressive native flags. The fourth observation belongs to excluded image work
+and is not re-investigated. No warning annotation, dummy read or source-warning
+replacement was added. The correction and current JRPG coverage are recorded in
+[the current-project audit](c-emitter-newjrpg-context.md).
+The two checked formatter paths and the previously qualified Stunts
 containing-record copy false positive establish no additional source fault.
 
 The BMP range guard and deliberate exception-demo accesses now have FBC feedback.

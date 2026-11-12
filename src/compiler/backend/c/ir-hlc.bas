@@ -6134,37 +6134,40 @@ private sub _emitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 		''   (need to avoid truncation to int64)
 
 		dim s as string, tempdtype as integer
+		'' Read-only views retain const on the expression type. Select the
+		'' rounding helper from its scalar precision without changing the view.
+		var input_is_single = (typeGetDtAndPtrOnly(r->dtype) = FB_DATATYPE_SINGLE)
 		select case( typeGetSizeType( v1->dtype ) )
 		case is <= FB_SIZETYPE_INT32
-			if( r->dtype = FB_DATATYPE_SINGLE ) then
+			if( input_is_single ) then
 				s = "fb_F2I" : ctx.usedbuiltins or= BUILTIN_F2I
 			else
 				s = "fb_D2I" : ctx.usedbuiltins or= BUILTIN_D2I
 			end if
 			tempdtype = FB_DATATYPE_LONG
 		case is <= FB_SIZETYPE_INT64
-			if( r->dtype = FB_DATATYPE_SINGLE ) then
+			if( input_is_single ) then
 				s = "fb_F2L" : ctx.usedbuiltins or= BUILTIN_F2L
 			else
 				s = "fb_D2L" : ctx.usedbuiltins or= BUILTIN_D2L
 			end if
 			tempdtype = FB_DATATYPE_LONGINT
 		case FB_SIZETYPE_INT128
-			if( r->dtype = FB_DATATYPE_SINGLE ) then
+			if( input_is_single ) then
 				s = "fb_F2I128" : ctx.usedbuiltins or= BUILTIN_F2I128
 			else
 				s = "fb_D2I128" : ctx.usedbuiltins or= BUILTIN_D2I128
 			end if
 			tempdtype = FB_DATATYPE_INTEGER128
 		case FB_SIZETYPE_UINT128
-			if( r->dtype = FB_DATATYPE_SINGLE ) then
+			if( input_is_single ) then
 				s = "fb_F2U128" : ctx.usedbuiltins or= BUILTIN_F2U128
 			else
 				s = "fb_D2U128" : ctx.usedbuiltins or= BUILTIN_D2U128
 			end if
 			tempdtype = FB_DATATYPE_UINTEGER128
 		case else
-			if( r->dtype = FB_DATATYPE_SINGLE ) then
+			if( input_is_single ) then
 				s = "fb_F2UL" : ctx.usedbuiltins or= BUILTIN_F2UL
 			else
 				s = "fb_D2UL" : ctx.usedbuiltins or= BUILTIN_D2UL
