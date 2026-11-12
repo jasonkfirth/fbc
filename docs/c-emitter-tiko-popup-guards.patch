@@ -1,0 +1,43 @@
+--- a/src/tiko_native_completion.bi
++++ b/src/tiko_native_completion.bi
+@@ -3843,6 +3843,8 @@
+     ByRef candidates As TikoCompletionList _
+ )
+
++    If tiko_Editor = 0 OrElse tiko_CompletionPopup = 0 Then Exit Sub
++
+     Dim As Integer screenHeight, screenWidth
+     Dim As Integer cursorLine = tiko_LineNumberAt( _
+         textData.text, textData.cursor_pos _
+@@ -4078,6 +4080,9 @@
+
+ Sub tiko_UpdateAutocomplete()
+
++    If tiko_CompletionPopup = 0 OrElse _
++       tiko_CompletionPopup->data = 0 Then Exit Sub
++
+     Dim As TextBoxData Ptr textData
+     Dim As String sourceText
+     Dim As String receiver
+--- a/src/tiko_native_calltips.bi
++++ b/src/tiko_native_calltips.bi
+@@ -776,6 +776,9 @@
+
+ Private Sub tiko_CallTipPosition(ByRef textData As TextBoxData)
+
++    If tiko_Editor = 0 OrElse tiko_CallTipPopup = 0 OrElse _
++       tiko_CallTipPopup->data = 0 Then Exit Sub
++
+     Dim As Integer screenHeight
+     Dim As Integer screenWidth
+     Dim As Integer cursorLine = tiko_LineNumberAt( _
+@@ -826,6 +829,9 @@
+ ' -------------------------------------------------------------------------
+
+ Sub tiko_UpdateCallTip()
++
++    If tiko_CallTipPopup = 0 OrElse _
++       tiko_CallTipPopup->data = 0 Then Exit Sub
+
+     Dim As TextBoxData Ptr textData
+     Dim As String shortName

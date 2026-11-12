@@ -29,6 +29,14 @@ helpers in the 208 unchanged legacy examples. The selected executable remains
 pinned for the active JRPG audit; the new compiler is built and fully qualified
 for the existing cohort. The queued fb-ext-lib expansion uses its immutable path.
 
+The [maintained Tiko entry](c-emitter-tiko-context.md) now adds one completed
+profile and fifty previously pending non-image BASIC owner paths. Four source
+guards remove ten genuine GCC null-access warnings. Its fresh repaired entry
+has GCC 0 / Clang 42, making the expanded completed candidate cohort 6,419
+profiles / 6,313 accepted C units, GCC 198 / Clang 16,011. The additional Clang
+observations reflect coverage growth. The table below remains the earlier
+selected-executable census; partial JRPG counts are still excluded.
+
 | Group | Profiles | GCC warnings | Clang warnings |
 | --- | ---: | ---: | ---: |
 | Compiler | 224 | 0 | 1,339 |

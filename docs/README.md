@@ -8,6 +8,9 @@ language reference.
 
 ## Start here
 
+- [Tiko C warning qualification](c-emitter-tiko-context.md) records the recovered
+  maintained build context, four source guards and unchanged native diagnostics.
+
 - [Runtime library warning audit](library-warning-audit.md) tracks full GCC and
   Clang warning counts, safe source repairs and remaining platform boundaries.
 

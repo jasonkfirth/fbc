@@ -48,6 +48,12 @@ native project queue active at a time. The not-yet-started fb-ext-lib queue now
 uses the qualified conversion candidate by its immutable executable path. These
 planned profiles have no warning totals yet.
 
+A separate [Tiko maintained-entry check](c-emitter-tiko-context.md) is now
+complete with GCC 0 / Clang 42 after four genuine source null-access repairs.
+It adds fifty non-image BASIC owner paths and remains separate from this
+unfinished JRPG sweep. The combined project coverage snapshot is retained as
+`current-tiko-context-reconciliation-20261112.json.zlib`.
+
 ## Retained non-image debug functions
 
 The selected compiler's two-profile review verifies three `-Wunused-function`
