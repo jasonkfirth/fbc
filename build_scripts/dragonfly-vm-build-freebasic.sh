@@ -481,12 +481,12 @@ chmod 1777 /work/tmp
 cp -a /usr/local/. /work/local/
 mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
-pkg update -f
-# Current curl requires the OpenSSL 3.5 shared libraries. The live image can
-# retain OpenSSL's package record while those files are missing.
-# Refresh curl's installed dependency closure too. The live image's libssh2
-# can still require the old OpenSSL soname after openssl and curl are upgraded.
-pkg install -f -R -y openssl curl
+pkg-static update -f
+# The live image and repository can use different OpenSSL sonames. Upgrade
+# libssh2 explicitly with curl: pkg's self-upgrade can restart the transaction
+# without refreshing that already-installed dependency. Use the static client
+# while replacing libraries that the ordinary package client may also load.
+pkg-static install -f -y openssl libssh2 curl
 curl --version >/dev/null
 
 fetch -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
@@ -729,9 +729,10 @@ chmod 1777 /work/tmp
 cp -a /usr/local/. /work/local/
 mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
-pkg update -f
-# The test VM starts from the same image, so refresh both runtime tools there.
-pkg install -f -y openssl curl rsync
+pkg-static update -f
+# The test VM starts from the same image. Keep its runtime-tool transaction
+# consistent with the build VM, including curl's libssh2 dependency.
+pkg-static install -f -y openssl libssh2 curl rsync
 curl --version >/dev/null
 rsync --version >/dev/null
 pkg install -y \\

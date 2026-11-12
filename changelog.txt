@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- CI: apply C-only floating-promotion diagnostics only to GCC/Clang while retaining LLVM value checks; refresh DragonFly libssh2 explicitly with the static package client in both guest phases, with stale-library and setup-failure controls.
 - compiler/C: choose floating literal suffixes and special-value builtins from the scalar type after preserving constant qualifiers; prevent spurious Single-to-Double promotions, add a precision regression, and qualify the current 224-unit self-host and complete unsuppressed GCC/Clang queues.
 - CI: fetch pinned MIPS dependency sources through bounded, checksum-verified fallback mirrors; refresh DragonFly runtime-tool consumers after shared-library upgrades; preserve numbered runtime test failures instead of replacing their exit status with 1.
 - compiler/type layout: add FIELD = alignment to type aliases, with documented 1-16 byte minimum-alignment semantics that leave SizeOf unchanged; carry alias and field alignment through symbol handling, explicit C record layout, and C, x86, GAS64, and LLVM emission.

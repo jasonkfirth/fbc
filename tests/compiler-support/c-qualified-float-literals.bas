@@ -6,7 +6,10 @@ Responsibilities: Check Single and Double results and reject implicit C promotio
 This file intentionally does NOT depend on graphics or audio libraries.
 '/
 #lang "fb"
-#cmdline "-Wc -Werror=double-promotion"
+' Only C compilers accept this diagnostic; LLVM still runs the value checks.
+#if (__FB_BACKEND__ = "gcc") or (__FB_BACKEND__ = "clang")
+	#cmdline "-Wc -Werror=double-promotion"
+#endif
 
 type SingleRectangle
 	y as single
