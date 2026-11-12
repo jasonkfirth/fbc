@@ -1280,6 +1280,17 @@ private sub hCErrEmitHelpers( )
 	errorhelper = TRUE
 	for i as integer = 0 to errorplan->handlercount - 1
 		var h = @errorplan->handlers[i]
+		'' Source access flags belong to the entire owner, including its other
+		'' callbacks. Retain labels through this callback's own typed edges.
+		dim as THASH label_uses
+		'' Fixed buckets; chains admit any number of referenced labels.
+		hashInit(@label_uses, 32, TRUE)
+		hCErrLabelReference(h->label, NULL, @label_uses)
+		var statement = h->clones
+		while( statement <> NULL )
+			if( hCErrResume(statement) = 0 ) then hCErrLabelTree(statement, NULL, @label_uses)
+			statement = statement->next
+		wend
 		'' A callback is a private graph node, not an output-wide root.
 		'' Keep its body and callees only through a live owning procedure.
 		hCLeafBegin(h->callback)
@@ -1328,14 +1339,17 @@ private sub hCErrEmitHelpers( )
 			elseif( action ) then
 				hWriteLine( "return " + str(action) + ";" )
 				astDelTree( n )
-			elseif( n->class = AST_NODECLASS_LABEL andalso symbGetIsAccessed(n->sym) = FALSE ) then
-				'' Apply the ordinary C flusher's unused-label rule to clones too.
+			elseif( n->class = AST_NODECLASS_LABEL ) then
+				var key = str(culngint(cuint(n->sym)))
+				var needed = (hashLookup(@label_uses, strptr(key)) <> NULL)
+				if( needed ) then astLoad(n)
 				astDelNode(n)
 			else
 				astLoad( n )
 				astDelNode( n )
 			end if
 		wend
+		hashEnd(@label_uses)
 		'' A discarded function result can leave an expression cached. Each
 		'' helper starts its own vreg numbering, so no cache may cross it.
 		do

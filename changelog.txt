@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- compiler/C: retain labels through each outlined error callback and the owning GOSUB graph, avoid consumed owner AST during helper emission, and enforce native unused-label checks in GOSUB regressions; remove five GCC and five Clang observations from unchanged legacy examples.
 - CI: move native macOS ARM64 qualification to macOS 26, allow manual image selection and ARM64-only recovery without cancelling full runs, and restrict automatic package promotion to successful master-push CI.
 - compiler/C: retain the GOSUB context declaration and zero initialization when generated calls are its only uses, and retain cleanup runtime declarations through the native dependency graph; add returning and non-returning legacy GOSUB controls.
 - CI: apply C-only floating-promotion diagnostics only to GCC/Clang while retaining LLVM value checks; refresh DragonFly libssh2 explicitly with the static package client in both guest phases, with stale-library and setup-failure controls.

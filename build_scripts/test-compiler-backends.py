@@ -178,6 +178,8 @@ def main() -> int:
          "GOSUB_STORAGE_DEPENDENCY_PASS"),
         ("gosub-cleanup-dependency", "tests/compiler-support/c-gosub-cleanup-dependency.bas",
          "GOSUB_ERROR_CLEANUP_DEPENDENCY_PASS"),
+        ("gosub-handler-labels", "tests/compiler-support/c-gosub-handler-labels.bas",
+         "GOSUB_HANDLER_LABELS_PASS"),
         ("reserved-names", "tests/compiler-support/c-reserved-names.bas",
          "C_RESERVED_NAMES_PASS\nC_RESERVED_DESTRUCTOR_PASS"),
         ("terminating-context", "tests/compiler-support/c-terminating-context.bas",

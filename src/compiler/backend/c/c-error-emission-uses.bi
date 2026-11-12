@@ -4,13 +4,24 @@
 '' Responsibilities: Distinguish owner references from callback references and inspect bounded C buffers.
 '' This file intentionally does NOT alter source control flow or runtime ownership.
 
-private sub hCErrOriginalLabelReference(byval label as FBSYMBOL ptr)
-	if( label = NULL ) then exit sub
+private sub hCErrLabelReference(byval label as FBSYMBOL ptr, byval uses as ubyte ptr, byval symbols as THASH ptr = NULL)
+	if( label = NULL orelse symbIsLabel(label) = FALSE ) then exit sub
+	if( symbols <> NULL ) then
+		'' Callback emission outlives the owner's AST nodes. Label symbols
+		'' remain owned by the procedure's symbol table through helper emission.
+		var key = str(culngint(cuint(label)))
+		if( hashLookup(symbols, strptr(key)) = NULL ) then
+			hashAdd(symbols, ZstrDup(strptr(key)), label, hashHash(strptr(key)))
+		end if
+		exit sub
+	end if
+	'' Statement positions are used only while the original AST is live.
+	assert(uses <> NULL)
 	var index = hCErrLabelIndex(label)
-	if( index >= 0 ) then errorplan->original_labels[index] = 1
+	if( index >= 0 ) then uses[index] = 1
 end sub
 
-private sub hCErrOriginalLabelTree(byval n as ASTNODE ptr)
+private sub hCErrLabelTree(byval n as ASTNODE ptr, byval uses as ubyte ptr, byval symbols as THASH ptr = NULL)
 	if( n = NULL ) then exit sub
 	'' A selected handler is emitted as a callback address, not this source
 	'' label address. Its label still belongs to the callback's own graph.
@@ -18,34 +29,42 @@ private sub hCErrOriginalLabelTree(byval n as ASTNODE ptr)
 		if( hCErrName(n) = "fb_ErrorSetHandler" ) then exit sub
 	end if
 	select case n->class
-	case AST_NODECLASS_VAR
-		if( n->sym <> NULL andalso symbIsLabel(n->sym) ) then hCErrOriginalLabelReference(n->sym)
+	case AST_NODECLASS_VAR, AST_NODECLASS_OFFSET
+		hCErrLabelReference(n->sym, uses, symbols)
 	case AST_NODECLASS_BRANCH, AST_NODECLASS_BOP, AST_NODECLASS_UOP
-		hCErrOriginalLabelReference(n->op.ex)
+		hCErrLabelReference(n->op.ex, uses, symbols)
 	case AST_NODECLASS_JMPTB
 		for i as integer = 0 to n->jmptb.labelcount - 1
-			hCErrOriginalLabelReference(n->jmptb.labels[i])
+			hCErrLabelReference(n->jmptb.labels[i], uses, symbols)
 		next
-		hCErrOriginalLabelReference(n->jmptb.deflabel)
+		hCErrLabelReference(n->jmptb.deflabel, uses, symbols)
+	case AST_NODECLASS_CALL
+		'' These loader-owned trees can also carry label addresses.
+		hCErrLabelTree(n->call.profbegin, uses, symbols)
+		hCErrLabelTree(n->call.profend, uses, symbols)
+		var item = n->call.strtail
+		while( item <> NULL )
+			hCErrLabelTree(item->srctree, uses, symbols)
+			item = item->prev
+		wend
 	end select
-	hCErrOriginalLabelTree(n->l)
-	hCErrOriginalLabelTree(n->r)
+	hCErrLabelTree(n->l, uses, symbols)
+	hCErrLabelTree(n->r, uses, symbols)
 end sub
 
 private sub hCErrMarkOriginalLabels()
-	'' Unknown original transfers and implicit GOSUB return entries retain
-	'' the conservative spelling. This pass only refines a proved owner graph.
+	'' Only refine a proved owner graph. Direct GOSUB targets are ordinary
+	'' typed branch edges; its generated return-site labels are not AST labels.
 	if( errorplan->original_live = NULL or errorplan->handlercount = 0 ) then exit sub
-	if( symbGetProcStatGosub(errorplan->owner) ) then exit sub
 	errorplan->original_labels = callocate(errorplan->count)
 	if( errorplan->original_labels = NULL ) then exit sub
-	hCErrOriginalLabelReference(astGetProc()->block.initlabel)
-	if( errorplan->can_transfer ) then hCErrOriginalLabelReference(errorplan->cleanup_label)
+	hCErrLabelReference(astGetProc()->block.initlabel, errorplan->original_labels)
+	if( errorplan->can_transfer ) then hCErrLabelReference(errorplan->cleanup_label, errorplan->original_labels)
 	for i as integer = 0 to errorplan->count - 1
 		if( errorplan->recovery_ids <> NULL andalso errorplan->recovery_ids[i] <> 0 ) then
 			errorplan->original_labels[i] = 1
 		end if
-		if( errorplan->original_live[i] <> 0 ) then hCErrOriginalLabelTree(errorplan->statements[i])
+		if( errorplan->original_live[i] <> 0 ) then hCErrLabelTree(errorplan->statements[i], errorplan->original_labels)
 	next
 end sub
 

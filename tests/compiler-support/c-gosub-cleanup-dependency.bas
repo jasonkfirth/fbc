@@ -6,10 +6,10 @@
     This file contains no graphics, external assets or failing runtime operations.
 '/
 #lang "fblite"
-option gosub
 #if (__FB_BACKEND__ = "gcc") or (__FB_BACKEND__ = "clang")
     #cmdline "-Wc -Werror=implicit-function-declaration"
 #endif
+option gosub
 
 dim as integer visits
 on error goto failed

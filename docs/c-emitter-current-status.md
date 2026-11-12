@@ -6,14 +6,14 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: indirect ranges and GOSUB dependencies, November 12
+# Current selected compiler: GOSUB handler labels, November 12
 
 `build/main-gcc/bin/fbc.exe` is
-`da4f90d862bb0649c1ecae0009eef5dce5d85870026274662bf293b9be3ebfa6`.
-The development prefix retains `fbc-before-indirect-ranges-20261112.exe`, hash
-`18fbb506f581d640a1e8f3c28850bc422652d42f67bdf04ff3e53db4a8d47406`,
+`55aa25168871aefc36edaae881c1c47a5537f35417690f419061f93d258743c1`.
+The development prefix retains `fbc-before-gosub-labels-20261112.exe`, hash
+`da4f90d862bb0649c1ecae0009eef5dce5d85870026274662bf293b9be3ebfa6`,
 as its immediate rollback. Installed release binaries and normal archives are unchanged.
-Eight selected-prefix value runs pass across GCC and Clang.
+Ten selected-prefix value runs pass across GCC and Clang.
 
 | Group | Profiles | GCC warnings | Clang warnings |
 | --- | ---: | ---: | ---: |
@@ -25,15 +25,34 @@ Eight selected-prefix value runs pass across GCC and Clang.
 | Exampleageddon default | 1,775 | 3 | 2,606 |
 | TurboTrek build lists | 251 | 0 | 1,949 |
 | TurboTrek additional tests/tools | 114 | 1 | 3,967 |
-| Extracted legacy examples | 208 | 8 | 75 |
-| Total | 6,418 | 203 | 16,021 |
+| Extracted legacy examples | 208 | 3 | 70 |
+| Total | 6,418 | 198 | 16,016 |
 
 The retained 5,845-profile queue has GCC 194 / Clang 10,030, compared with
-195 / 10,030 in the preceding selected floating-literal compiler. The additional
+194 / 10,030 in the preceding selected indirect-range compiler. The additional
 573 profiles remain separate above so expanded coverage does not look like a
 compiler regression. All 6,312 applicable C units are accepted by both native
 tools under their original unsuppressed flags. No corpus applications were run.
-The retained queue peaks at 21,622,853 owned bytes; scratch paths are reused.
+The core controller checks a 32 MiB owned working-set limit; scratch paths are reused.
+
+The callback-label repair removes five GCC and five Clang unused-label warnings
+from the extracted examples. Each callback retains only its own typed label
+references, while shared GOSUB targets remain in the original owner. Its label
+set borrows procedure symbols rather than consumed owner AST nodes. Both full
+backend suites pass in 188.843 seconds, with 462 source-warning checks. Strict
+lint is clean for the five owned BASIC files. The rejected intermediate candidate
+was never selected. See [label ownership](c-emitter-gosub-labels.md).
+
+The core worker reached all 5,845 terminal profiles, then rejected concurrent
+DOS-only input drift at its final guard. The raw database remains unchanged.
+An explicit reconciliation proves the inactive header/test branches, checks
+five exact old/new Win64/Win32 emitted-output pairs and freshly compiles the one
+changed fbctest profile with both native tools. No DOS behavior is claimed.
+The current packets use `gosub-label-*-v3-` and `current-*-labels-v3-`; the
+`gosub-label-v3-terminal-reconciliation-20261112.json.zlib` packet resolves the
+raw worker's final input rejection. Installed artifacts stay pinned.
+
+The preceding indirect-range qualification remains described below.
 
 The C rewrite retains original operand evaluation when folding fixed indirect
 integer comparisons. A C-only evaluation macro is inserted after source

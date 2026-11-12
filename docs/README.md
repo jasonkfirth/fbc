@@ -51,6 +51,8 @@ language reference.
   retained during C cleanup, warning levels, exclusions and regression commands.
 - [Current C warning status](c-emitter-current-status.md) gives the latest
   selected queue counts, excluded profiles and links to the qualification receipts.
+- [GOSUB and handler label ownership](c-emitter-gosub-labels.md) records callback
+  references, AST lifetime boundaries and five fewer warnings per C compiler.
 - [Shared C startup registrations](c-emitter-startup-groups.md) records the class-wide
   MinGW repair, callback order, semantic facts and native/object qualification.
 - [Native C pointer values](c-emitter-pointer-values.md) and [named byte-copy slots](c-emitter-member-address.md)
