@@ -62,6 +62,33 @@ The other Tiko tests, archived UI baselines and standalone units remain pending.
 This single completed profile remains separate from the unfinished 241-program
 JRPG sweep and the queued 194-profile fb-ext-lib sweep.
 
+## Remaining entry contexts
+
+The retained `src/tiko_windows_legacy.bas` reaches an external SDK input defect
+before emitting C. The bundled AfxNova `AfxGdiplus.inc` and `AfxCom.inc` files
+are case-only compatibility stubs that resolve back to themselves on this Windows
+volume. Their real providers are not loaded. The installed compiler and the
+qualified candidate produce the same eleven frontend diagnostics with the same
+176 opened source inputs. The legacy entry and its included `logging.bas`
+remain open; neither receives C-census credit. No provider implementation is
+reviewed or changed by this check.
+
+A further 125 active entry profiles are prepared from the maintained README
+recipes: twelve editor tests with `-g -exx`, 110 toolkit tests, and three toolkit
+demos/tools using their ordinary context. The image-specific raster smoke entry
+is excluded. Five real navigation entries provide the optional define needed
+for the four navigation/layout implementation fragments. These are planned
+contexts, not passing results or foreign-platform qualification.
+
+The supervisor waits on the preceding project's actual process handles, then
+refreshes the unstarted plan before launching one checkpointed worker. The
+worker independently rejects competing project workers, uses the immutable
+conversion compiler, reuses C/object/log slots and has a 64 MiB owned disk cap.
+It emits C and compiles objects without running these applications. Normal GUI
+includes remain pinned, including incidental image dependencies; image-specific
+entries and implementation review stay outside this queue. The twelve archived
+UI-baseline source paths remain pending provenance/context review.
+
 The previous four completed queues remain 6,418 profiles / 6,312 accepted C
 units, GCC 198 / Clang 15,969. Adding this current Tiko entry gives 6,419 profiles /
 6,313 accepted C units, GCC 198 / Clang 16,011. The forty-two added Clang
@@ -81,6 +108,14 @@ Evidence in `build/c-emitter-forward-views-20261105/`:
 - `current-tiko-main-fixed-context-20261112.json.zlib`: repaired full entry.
 - `current-tiko-context-reconciliation-20261112.json.zlib`: source/tool/flag
   reconciliation and the separate partial project coverage snapshot.
+- `current-tiko-legacy-context-20261112.json.zlib` and
+  `current-tiko-legacy-disposition-20261112.json.zlib`: original SDK rejection,
+  installed-compiler comparison and self-resolving alias evidence.
+- `current-tiko-extra-plan-20261112.json.zlib`: 125 planned active entry contexts;
+  no warning totals are available until their native checks run.
+- `current-tiko-extra-queue-20261112.ps1` and
+  `current-tiko-extra-context-20261112.py`: sequential admission and checkpointed
+  object-only qualification.
 
 The broader compiler/corpus warning goal remains active.
 

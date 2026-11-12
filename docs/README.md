@@ -8,6 +8,9 @@ language reference.
 
 ## Start here
 
+- [Guarded label payload qualification](c-emitter-label-guard.md) binds the
+  unchanged real fixture's GCC bounds warning to both native runtime passes.
+
 - [Tiko C warning qualification](c-emitter-tiko-context.md) records the recovered
   maintained build context, four source guards and unchanged native diagnostics.
 

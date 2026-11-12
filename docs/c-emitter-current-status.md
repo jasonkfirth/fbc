@@ -37,6 +37,17 @@ profiles / 6,313 accepted C units, GCC 198 / Clang 16,011. The additional Clang
 observations reflect coverage growth. The table below remains the earlier
 selected-executable census; partial JRPG counts are still excluded.
 
+The lone additional TurboTrek GCC bounds observation now has
+[unchanged full-fixture runtime evidence](c-emitter-label-guard.md). Both native
+tools pass the real null-framebuffer test while GCC retains the same guarded
+small-payload warning. This resolves that check without changing its source or
+removing the observation from the totals.
+
+Another 125 active Tiko/toolkit entry contexts are queued after the existing
+project workers. Its retained legacy Windows entry remains an open third-party
+SDK input defect, reproduced with both compiler generations before C emission.
+These planned or rejected contexts contribute no completed warning totals.
+
 | Group | Profiles | GCC warnings | Clang warnings |
 | --- | ---: | ---: | ---: |
 | Compiler | 224 | 0 | 1,339 |
