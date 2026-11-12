@@ -65,6 +65,22 @@ made optional, and package qualification still requires the entire CI run to
 succeed. These conditions apply to Linux, Windows x86/x86_64, macOS and native
 Windows ARM64.
 
+Haiku package testing also runs smoke tests, fbctests and Exampleageddon in
+separate shells after package installation and compiler verification succeed.
+A failed phase remains fatal, but the remaining phases run and report their
+own results. If guest Python is unavailable, host-driven Exampleageddon still
+runs after a smoke or fbctests failure. Package setup failures remain immediate
+failures because the independent suites need the installed compiler.
+
+The Haiku TCP smoke has a 600-second outer limit, followed by a five-second
+forced-termination allowance. Its source already allows three minutes for the
+stream exchange and two minutes for the byte-at-a-time burst; the old 60-second
+wrapper could terminate it before its own diagnostics. Set the positive integer
+environment variable `HAIKU_TCP_SMOKE_TIMEOUT` when a different VM needs a
+different bound. The log records the exit status and configured limit on
+failure, including status 124 for a timeout. A longer allowance does not turn
+timeouts or failed assertions into passes.
+
 ## Checking exactly what will be committed
 
 Local drafts can conceal missing links. The source checker can read an immutable

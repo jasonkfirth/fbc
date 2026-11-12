@@ -4,7 +4,8 @@ File: test-ci-platform-contracts.py
 Purpose: Check analyzer models and small native platform contracts.
 Responsibilities: Retain data-flow diagnostics, reject CE precision loss,
 exercise the JavaScript path provider, verify dependency mirror fallback,
-and check guest package setup against stale shared-library dependencies.
+check guest package setup against stale shared-library dependencies, and
+retain independent Haiku test phases and bounded timeout diagnostics.
 This file intentionally does NOT install tools or emulate a target system.
 """
 import argparse
@@ -133,6 +134,128 @@ def check_dragonfly_tools(root, work):
     print('CI_DRAGONFLY_TOOLS_PASS build,test,stale-library,update-failure,install-failure')
 
 
+def check_haiku_phases(root, work):
+    """Execute the guest's phase dispatch and collector without a VM.
+
+    A separate shell is essential here: an if-tested shell function loses
+    errexit inside its body. Each mock deliberately has work after a failing
+    command so the check detects that failure being swallowed.
+    """
+    source = (root / 'build_scripts/haiku-vm-build-freebasic.sh').read_text()
+    guest = source.split("cat > \"$path\" <<'EOF'\n", 1)[1].split('\nEOF\n', 1)[0]
+    dispatch = guest.split('case "${1:-}" in\n', 1)[1]
+    dispatch = 'case "${1:-}" in\n' + dispatch.split('\nesac\n', 1)[0] + '\nesac\n'
+    collector = guest.split('\ntest_status=0\n', 1)[1]
+    collector = 'test_status=0\n' + collector
+    script = work / 'haiku-phases.sh'
+    script.write_text(
+        '#!/bin/sh\nset -e\n'
+        'fail() { echo "ERROR: $*" >&2; exit 1; }\n'
+        'run() { "$@"; }\n'
+        'touch() { echo fallback >> "$MOCK_LOG"; }\n'
+        'ensure_python3() { return "$MOCK_PYTHON_STATUS"; }\n'
+        'phase_body() { echo "$1" >> "$MOCK_LOG"; return "$2"; }\n'
+        'run_package_smokes() { phase_body smoke "$MOCK_SMOKE_STATUS"; '
+        'echo smoke-finished >> "$MOCK_LOG"; }\n'
+        'run_fbctests() { phase_body fbctests "$MOCK_FBCTESTS_STATUS"; '
+        'echo fbctests-finished >> "$MOCK_LOG"; }\n'
+        'run_exampleageddon() { phase_body exampleageddon "$MOCK_EXAMPLES_STATUS"; '
+        'echo exampleageddon-finished >> "$MOCK_LOG"; }\n' + dispatch + collector)
+    for mask in range(8):
+        log = work / 'haiku-phases.log'
+        log.unlink(missing_ok=True)
+        phases = ('smoke', 'fbctests', 'exampleageddon')
+        statuses = [17 if mask & (1 << index) else 0 for index in range(3)]
+        environment = os.environ.copy()
+        environment.update(MOCK_LOG=str(log), MOCK_PYTHON_STATUS='0',
+                           MOCK_SMOKE_STATUS=str(statuses[0]),
+                           MOCK_FBCTESTS_STATUS=str(statuses[1]),
+                           MOCK_EXAMPLES_STATUS=str(statuses[2]))
+        result = subprocess.run(['sh', str(script)], env=environment,
+                                text=True, capture_output=True, timeout=15)
+        expected = []
+        for phase, status in zip(phases, statuses):
+            expected.append(phase)
+            if not status:
+                expected.append(phase + '-finished')
+            elif f'{phase} failed with status 17' not in result.stderr:
+                raise RuntimeError('Haiku collector lost a phase exit status')
+        if log.read_text().splitlines() != expected or result.returncode != bool(mask):
+            raise RuntimeError(f'Haiku phases stopped early or hid failure: {mask}\n'
+                               f'{result.stdout}{result.stderr}')
+        if ('TEST PASSED' in result.stdout) != (mask == 0):
+            raise RuntimeError('Haiku collector reported false success')
+    # Python fallback must remain available after a failed smoke test.
+    log.unlink()
+    environment.update(MOCK_SMOKE_STATUS='17', MOCK_FBCTESTS_STATUS='0',
+                       MOCK_EXAMPLES_STATUS='0', MOCK_PYTHON_STATUS='1')
+    result = subprocess.run(['sh', str(script)], env=environment,
+                            text=True, capture_output=True, timeout=15)
+    if result.returncode != 1 or log.read_text().splitlines() != [
+            'smoke', 'fbctests', 'fbctests-finished', 'fallback']:
+        raise RuntimeError('Haiku smoke failure suppressed Python fallback')
+
+    tcp = guest.split('echo "==> running TCP loopback smoke"\n', 1)[1]
+    tcp = tcp.split('echo "==> compiling thread-local initialization smoke"', 1)[0]
+    script.write_text('#!/bin/sh\nset -e\n'
+                      'fail() { echo "ERROR: $*" >&2; exit 1; }\n'
+                      'run_limited() { echo "limit=$1 command=$2"; '
+                      'return "$MOCK_TCP_STATUS"; }\n' + tcp)
+    cases = ((None, 0, 600), ('900', 0, 900), ('600', 124, 600),
+             ('600', 23, 600), ('0', 0, None), ('invalid', 0, None))
+    for value, status, expected_limit in cases:
+        environment = os.environ.copy()
+        environment.pop('HAIKU_TCP_SMOKE_TIMEOUT', None)
+        environment['MOCK_TCP_STATUS'] = str(status)
+        if value is not None:
+            environment['HAIKU_TCP_SMOKE_TIMEOUT'] = value
+        result = subprocess.run(['sh', str(script)], env=environment,
+                                text=True, capture_output=True, timeout=15)
+        if (result.returncode == 0) != (expected_limit is not None and status == 0):
+            raise RuntimeError('Haiku TCP timeout hid a failure or accepted an invalid limit')
+        if expected_limit is not None:
+            if f'limit={expected_limit} command=/Work/smoke/tcp' not in result.stdout:
+                raise RuntimeError('Haiku TCP timeout did not use the configured bound')
+            if status and f'status {status} (limit {expected_limit}s)' not in result.stderr:
+                raise RuntimeError('Haiku TCP failure lost its status or timeout bound')
+        elif 'limit=' in result.stdout:
+            raise RuntimeError('Haiku TCP command ran with an invalid limit')
+    # Exercise the real host failure handler too. A failed guest phase must
+    # still run requested host-driven examples, without changing the failure
+    # into success even if that independent example run passes.
+    host = source.split('test_package_in_vm() {\n', 1)[1]
+    host = 'test_package_in_vm() {\n' + host.split('\nverify_audio_capture() {', 1)[0]
+    script.write_text(
+        '#!/bin/bash\nset -e\n'
+        'msg() { :; }\nwarn() { echo "$*" >&2; }\n'
+        'die() { echo "$*" >&2; exit 1; }\n'
+        'format_and_mount_work() { :; }\n'
+        'install_test_staging_dependencies() { :; }\n'
+        'scp_to_guest() { :; }\nscp_from_guest() { :; }\n'
+        'send_tests_tree() { :; }\nsend_exampleageddon_tree() { :; }\n'
+        'write_test_runner() { :; }\n'
+        'ssh_guest() { case "$3" in\n'
+        ' FBCTESTS_JOBS=*) cat >/dev/null; return 17 ;;\n'
+        ' "test -f /Work/exampleageddon-needs-host") return "$MOCK_FALLBACK" ;;\n'
+        ' *) return 0 ;; esac; }\n'
+        'run_host_exampleageddon() { echo host-examples >> "$MOCK_LOG"; '
+        'return "$MOCK_HOST_STATUS"; }\n'
+        'LOG_DIR="$MOCK_WORK"\n' + host +
+        '\ntest_package_in_vm "$MOCK_WORK" 10022 fixture.hpkg\n')
+    for fallback, status in ((0, 0), (0, 19), (1, 0)):
+        log.unlink(missing_ok=True)
+        environment = os.environ.copy()
+        environment.update(MOCK_WORK=str(work), MOCK_LOG=str(log),
+                           MOCK_FALLBACK=str(fallback), MOCK_HOST_STATUS=str(status))
+        result = subprocess.run(['bash', str(script)], env=environment,
+                                text=True, capture_output=True, timeout=15)
+        if result.returncode != 1 or log.exists() != (fallback == 0):
+            raise RuntimeError('Haiku failure handler suppressed fallback or hid failure')
+        if log.exists() and log.read_text().splitlines() != ['host-examples']:
+            raise RuntimeError('Haiku failure handler repeated host-driven examples')
+    print('CI_HAIKU_PHASES_PASS combinations=8 python-fallback timeout-cases=6 host-cases=3')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--gcc', default=os.environ.get('GCC') or 'gcc')
@@ -144,6 +267,7 @@ def main():
         work = Path(directory)
         check_source_fetch(root, work)
         check_dragonfly_tools(root, work)
+        check_haiku_phases(root, work)
         source = work / 'model.c'
         command = [options.cppcheck, '--quiet', '--platform=unix64',
                    '--enable=warning,performance,portability', '--error-exitcode=1',

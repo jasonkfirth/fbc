@@ -59,6 +59,7 @@ EXAMPLEAGEDDON_JOBS="$JOBS"
 EXAMPLEAGEDDON_COMPILE_TIMEOUT="120"
 EXAMPLEAGEDDON_RUN_TIMEOUT="10"
 PYTHON_INSTALL_TIMEOUT="1800"
+HAIKU_TCP_SMOKE_TIMEOUT="${HAIKU_TCP_SMOKE_TIMEOUT:-600}"
 BOOT_SCRIPT_BYTES=884
 
 NIGHTLY_INDEX_URL="https://download.haiku-os.org/nightly-images/x86_64/"
@@ -101,6 +102,7 @@ Options:
   -h, --help               Show this help.
 
 The script builds x86_64 and x86 (i386) Haiku VMs. A fresh Haiku VM is used for package testing.
+HAIKU_TCP_SMOKE_TIMEOUT sets the TCP smoke limit in seconds (default: 600).
 EOF
 }
 
@@ -194,6 +196,7 @@ case "$EXAMPLEAGEDDON_JOBS" in ''|*[!0-9]*|0) die "--exampleageddon-jobs must be
 case "$EXAMPLEAGEDDON_COMPILE_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-compile-timeout must be a positive integer" ;; esac
 case "$EXAMPLEAGEDDON_RUN_TIMEOUT" in ''|*[!0-9]*|0) die "--exampleageddon-run-timeout must be a positive integer" ;; esac
 case "$PYTHON_INSTALL_TIMEOUT" in ''|*[!0-9]*|0) die "--python-install-timeout must be a positive integer" ;; esac
+case "$HAIKU_TCP_SMOKE_TIMEOUT" in ''|*[!0-9]*|0) die "HAIKU_TCP_SMOKE_TIMEOUT must be a positive integer" ;; esac
 
 if [ "$TEST_ONLY" -eq 1 ] && [ -z "$PACKAGE_FILE" ]; then
 	die "--test-only requires --package"
@@ -1605,51 +1608,9 @@ run_exampleageddon() {
 	echo "==> exampleageddon passed"
 }
 
-export PATH=/Work/tools:/boot/system/bin:/bin:$PATH
-export FBGFX="${FBGFX:-}"
-export FB_GFX_DRIVER="${FB_GFX_DRIVER:-}"
-export SFXLIB_DRIVER="${SFXLIB_DRIVER:-default}"
-
-echo "==> installing package test dependencies"
-install_image_packages \
-	haiku_devel \
-	make \
-	binutils \
-	mpc \
-	mpfr \
-	gcc \
-	pkgconfig \
-	zstd_devel
-
-if using_secondary_x86; then
-	install_image_packages \
-		haiku_x86_devel \
-		binutils_x86 \
-		mpc_x86 \
-		mpfr_x86 \
-		gcc_x86 \
-		gcc_x86_syslibs \
-		zstd_x86_devel
-fi
-
-cleanup_package_states
-
-if using_secondary_x86; then
-	run install_required_packages libffi_x86_devel ncurses6_x86_devel
-else
-	run install_required_packages libffi_devel ncurses6_devel
-fi
-cleanup_package_states
-find /boot/_packages_ -maxdepth 1 -type f -name '*.hpkg' -exec rm -f {} + 2>/dev/null || true
-
-echo "==> installing FreeBASIC package"
-pkgman uninstall -y freebasic freebasic_x86 >/dev/null 2>&1 || true
-run pkgman_install /Work/package/freebasic*.hpkg
-
-echo "==> verifying fbc"
-fbc_command -version
-print_secondary_x86_tools
-
+# Each phase runs in a fresh shell with errexit enabled. Calling a shell
+# function as an if-condition would disable errexit inside that function.
+run_package_smokes() {
 mkdir -p /Work/smoke
 
 cat > /Work/smoke/console.bas <<'FBEOF'
@@ -1854,7 +1815,17 @@ echo "==> compiling TCP loopback smoke"
 run fbc_command -mt /Work/fbctests-source/tests/file/tcp.bas -x /Work/smoke/tcp
 
 echo "==> running TCP loopback smoke"
-timeout 60 /Work/smoke/tcp
+# tcp.bas has separate three-minute stream and two-minute burst waits. A
+# one-minute outer limit kills a valid slow guest before those diagnostics.
+# Keep a host-adjustable deadlock bound and report its actual exit status.
+tcp_smoke_timeout="${HAIKU_TCP_SMOKE_TIMEOUT:-600}"
+case "$tcp_smoke_timeout" in ''|*[!0-9]*|0) fail "HAIKU_TCP_SMOKE_TIMEOUT must be a positive integer" ;; esac
+if run_limited "$tcp_smoke_timeout" /Work/smoke/tcp; then
+	echo "==> TCP loopback smoke passed"
+else
+	tcp_smoke_status=$?
+	fail "TCP loopback smoke failed with status $tcp_smoke_status (limit ${tcp_smoke_timeout}s)"
+fi
 
 echo "==> compiling thread-local initialization smoke"
 run fbc_command -mt /Work/fbctests-source/tests/compiler-support/thread-local.bas -x /Work/smoke/thread-local
@@ -1937,14 +1908,83 @@ cat /Work/smoke/sfx.out || true
 
 echo "==> sfxlib smoke passed"
 
-run_fbctests
-if run ensure_python3; then
-	run_exampleageddon
-else
-	echo "==> guest Python unavailable; host will run exampleageddon"
-	touch /Work/exampleageddon-needs-host
+}
+
+export PATH=/Work/tools:/boot/system/bin:/bin:$PATH
+export FBGFX="${FBGFX:-}"
+export FB_GFX_DRIVER="${FB_GFX_DRIVER:-}"
+export SFXLIB_DRIVER="${SFXLIB_DRIVER:-default}"
+
+# Package installation and the compiler check below are prerequisites. Once
+# they succeed, preserve failures while still collecting independent suites.
+case "${1:-}" in
+	--smoke) run_package_smokes; exit ;;
+	--fbctests) run_fbctests; exit ;;
+	--exampleageddon)
+		if run ensure_python3; then
+			run_exampleageddon
+		else
+			echo "==> guest Python unavailable; host will run exampleageddon"
+			touch /Work/exampleageddon-needs-host
+		fi
+		exit
+		;;
+	'') ;;
+	*) fail "unknown test phase: $1" ;;
+esac
+
+echo "==> installing package test dependencies"
+install_image_packages \
+	haiku_devel \
+	make \
+	binutils \
+	mpc \
+	mpfr \
+	gcc \
+	pkgconfig \
+	zstd_devel
+
+if using_secondary_x86; then
+	install_image_packages \
+		haiku_x86_devel \
+		binutils_x86 \
+		mpc_x86 \
+		mpfr_x86 \
+		gcc_x86 \
+		gcc_x86_syslibs \
+		zstd_x86_devel
 fi
 
+cleanup_package_states
+
+if using_secondary_x86; then
+	run install_required_packages libffi_x86_devel ncurses6_x86_devel
+else
+	run install_required_packages libffi_devel ncurses6_devel
+fi
+cleanup_package_states
+find /boot/_packages_ -maxdepth 1 -type f -name '*.hpkg' -exec rm -f {} + 2>/dev/null || true
+
+echo "==> installing FreeBASIC package"
+pkgman uninstall -y freebasic freebasic_x86 >/dev/null 2>&1 || true
+run pkgman_install /Work/package/freebasic*.hpkg
+
+echo "==> verifying fbc"
+fbc_command -version
+print_secondary_x86_tools
+
+test_status=0
+for phase in smoke fbctests exampleageddon; do
+	echo "==> starting Haiku test phase: $phase"
+	if /bin/sh "$0" "--$phase"; then
+		echo "==> Haiku test phase passed: $phase"
+	else
+		phase_status=$?
+		echo "ERROR: Haiku test phase $phase failed with status $phase_status" >&2
+		test_status=1
+	fi
+done
+[ "$test_status" -eq 0 ] || fail "one or more Haiku test phases failed"
 echo "==> TEST PASSED"
 EOF
 
@@ -2008,7 +2048,7 @@ test_package_in_vm() {
 
 	msg "Running Haiku package smoke tests, fbctests, and exampleageddon"
 	if ! ssh_guest "$key" "$port" \
-			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' EXAMPLEAGEDDON_JOBS='$EXAMPLEAGEDDON_JOBS' EXAMPLEAGEDDON_COMPILE_TIMEOUT='$EXAMPLEAGEDDON_COMPILE_TIMEOUT' EXAMPLEAGEDDON_RUN_TIMEOUT='$EXAMPLEAGEDDON_RUN_TIMEOUT' PYTHON_INSTALL_TIMEOUT='$PYTHON_INSTALL_TIMEOUT' /bin/sh -s" <<'EOF'
+			"FBCTESTS_JOBS='$FBCTESTS_JOBS' FBCTESTS_UNIT_ARGS='$FBCTESTS_UNIT_ARGS' EXAMPLEAGEDDON_JOBS='$EXAMPLEAGEDDON_JOBS' EXAMPLEAGEDDON_COMPILE_TIMEOUT='$EXAMPLEAGEDDON_COMPILE_TIMEOUT' EXAMPLEAGEDDON_RUN_TIMEOUT='$EXAMPLEAGEDDON_RUN_TIMEOUT' PYTHON_INSTALL_TIMEOUT='$PYTHON_INSTALL_TIMEOUT' HAIKU_TCP_SMOKE_TIMEOUT='$HAIKU_TCP_SMOKE_TIMEOUT' /bin/sh -s" <<'EOF'
 set -e
 
 log=/Work/freebasic-haiku-test.log
@@ -2032,6 +2072,11 @@ EOF
 		scp_from_guest "$key" "$port" "/Work/freebasic-haiku-test.log" "$LOG_DIR/" || true
 		scp_from_guest "$key" "$port" "/Work/exampleageddon/report.md" "$vm_dir/exampleageddon-report.md" || true
 		scp_from_guest "$key" "$port" "/Work/exampleageddon/results.csv" "$vm_dir/exampleageddon-results.csv" || true
+		# Python fallback is independent of smoke/fbctests status as well.
+		if ssh_guest "$key" "$port" "test -f /Work/exampleageddon-needs-host"; then
+			run_host_exampleageddon "$vm_dir" "$key" "$port" ||
+				warn "host-driven exampleageddon also failed"
+		fi
 		tail -n 160 "$LOG_DIR/freebasic-haiku-test.log" >&2 || true
 		die "Haiku package smoke tests, fbctests, or exampleageddon failed"
 	fi

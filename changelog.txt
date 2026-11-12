@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- CI: give Haiku TCP smoke a configurable bounded allowance that outlasts its internal waits, report its failure status, and collect independent smoke, fbctests and Exampleageddon phase results without hiding failures; retain host-driven examples after earlier guest failures.
 - compiler/C: adapt eligible static typed ThreadCreate workers to the runtime callback ABI without extra contexts, preserving explicit address conversions and the ordinary semantic call-ABI schema. Fix GAS64 byte-address narrowing and Boolean register lifetime; add native, Win32/ELF, semantic-transport and unchanged-example controls.
 - CI: remove an index link to an unpublished library-audit draft, validate committed or staged documentation without local-file masking, and run independent native tests after a successful build even when an earlier check fails. Keep every test failure fatal and collect independent quick-test failures serially.
 - CI: let active master qualification finish while retaining only the newest pending revision; keep superseded PR/branch cancellation and add isolated native Windows ARM64 recovery without weakening test failures or package qualification.
