@@ -1491,10 +1491,11 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 	const FB_GFX3_LINE_COMMAND *packed_lines, FB_GFX3_HANDLE target,
 	uint64_t sequence, uint32_t count)
 {
-	FB_GFX3_OPENGL_LINE_BATCH_ITEM *items = NULL;
+	FB_GFX3_OPENGL_LINE_BATCH_ITEM *items;
 	const FB_GFX3_LINE_COMMAND *first;
 	FB_GFX3_OPENGL_SURFACE *destination = NULL;
 	FB_GFX3_RECT clip;
+	size_t allocation_size;
 	uint32_t maximum_count = 0;
 	uint32_t index;
 	uint32_t generation;
@@ -1526,16 +1527,26 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 		return FB_GFX3_OK;
 	}
 	/*
-		Keep the largest supported batch off the thread stack. The 32,767-entry
-		buffer is about one MiB, which is too close to the default Windows stack
-		limit for a renderer call chain.
+		The OpenGL state belongs to the renderer thread. Reuse its bounded line
+		conversion buffer so a full scene redraw does not allocate once per frame.
 	*/
-	items = (FB_GFX3_OPENGL_LINE_BATCH_ITEM *)malloc(
-		(size_t)count * sizeof(*items));
-	if (items == NULL) {
-		fb_gfx3_resource_release(state->resources, target);
-		return FB_GFX3_OUT_OF_MEMORY;
+	if (fb_gfx3_size_multiply((size_t)count, sizeof(*items),
+	    &allocation_size) != FB_GFX3_OK) {
+		result = FB_GFX3_INVALID;
+		goto done;
 	}
+	if (count > state->line_batch_items_capacity) {
+		FB_GFX3_OPENGL_LINE_BATCH_ITEM *replacement =
+			(FB_GFX3_OPENGL_LINE_BATCH_ITEM *)realloc(
+				state->line_batch_items, allocation_size);
+		if (replacement == NULL) {
+			result = FB_GFX3_OUT_OF_MEMORY;
+			goto done;
+		}
+		state->line_batch_items = replacement;
+		state->line_batch_items_capacity = count;
+	}
+	items = state->line_batch_items;
 	for (index = 0; index < count; index++) {
 		const FB_GFX3_LINE_COMMAND *payload;
 		int64_t difference_x;
@@ -1674,7 +1685,6 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 
 done:
 	fb_gfx3_resource_release(state->resources, target);
-	free(items);
 	return result;
 }
 

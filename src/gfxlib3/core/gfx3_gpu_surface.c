@@ -1005,41 +1005,66 @@ FBCALL int fb_Gfx3DrawPoints(void *destination_pointer,
 {
 	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_SURFACE *surface = NULL;
+	FB_GFX3_MODE *mode = NULL;
 	FB_GFX3_POINT *points = NULL;
 	FB_GFX3_RECT clip;
 	size_t allocation_size;
 	uint32_t bytes_per_pixel;
 	int index;
+	int allocated_points = FALSE;
 	int result = FB_GFX3_INVALID;
+	/* Retain one usual packet; larger one-off submissions do not grow mode scratch. */
+	const size_t retained_point_limit = 16384u;
 
 	if ((count < 0) || ((count != 0) && (public_points == NULL)) ||
 	    (fb_gfx3_size_multiply((size_t)count, sizeof(*points),
 	     &allocation_size) != FB_GFX3_OK))
 		goto done;
-	if (count != 0) {
-		points = (FB_GFX3_POINT *)malloc(allocation_size);
-		if (points == NULL) {
-			result = FB_GFX3_OUT_OF_MEMORY;
-			goto done;
-		}
-	}
 	FB_GRAPHICS_LOCK();
 	state = fb_gfx3_api_get_draw_state_locked();
-	if (state == NULL)
+	if ((state == NULL) || (state->mode == NULL))
 		goto unlock;
+	mode = state->mode;
 	if (destination_pointer == NULL) {
-		if (state->work_page >= state->mode->page_count)
+		if (state->work_page >= mode->page_count)
 			goto unlock;
-		surface = &state->mode->pages[state->work_page];
+		surface = &mode->pages[state->work_page];
 		clip = state->view;
 	} else {
 		if (fb_gfx3_gpu_surface_lookup_locked(destination_pointer,
-		    state->mode, &surface) != FB_GFX3_OK)
+		    mode, &surface) != FB_GFX3_OK)
 			goto unlock;
 		clip.x1 = 0;
 		clip.y1 = 0;
 		clip.x2 = (int32_t)surface->width - 1;
 		clip.y2 = (int32_t)surface->height - 1;
+	}
+	if (count != 0) {
+		/*
+			The mode scratch is shared with line conversion. The global graphics
+			lock serializes both users, and the converted points are consumed
+			before this public call releases that lock.
+		*/
+		if ((mode->primitive_scratch != NULL) &&
+		    (allocation_size <= mode->primitive_scratch_capacity)) {
+			points = (FB_GFX3_POINT *)mode->primitive_scratch;
+		} else if (allocation_size <= retained_point_limit * sizeof(*points)) {
+			void *scratch = realloc(mode->primitive_scratch, allocation_size);
+			if (scratch == NULL) {
+				result = FB_GFX3_OUT_OF_MEMORY;
+				goto unlock;
+			}
+			mode->primitive_scratch = scratch;
+			mode->primitive_scratch_capacity = allocation_size;
+			points = (FB_GFX3_POINT *)scratch;
+		} else {
+			points = (FB_GFX3_POINT *)malloc(allocation_size);
+			if (points == NULL) {
+				result = FB_GFX3_OUT_OF_MEMORY;
+				goto unlock;
+			}
+			allocated_points = TRUE;
+		}
 	}
 	bytes_per_pixel = gpu_surface_bytes_per_pixel(surface->depth);
 	for (index = 0; index < count; index++) {
@@ -1075,7 +1100,8 @@ FBCALL int fb_Gfx3DrawPoints(void *destination_pointer,
 unlock:
 	FB_GRAPHICS_UNLOCK();
 done:
-	free(points);
+	if (allocated_points)
+		free(points);
 	return fb_ErrorSetNum(fb_gfx3_api_runtime_error(result));
 }
 
