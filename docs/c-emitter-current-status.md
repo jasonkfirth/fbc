@@ -15,6 +15,14 @@ The development prefix retains `fbc-before-gosub-labels-20261112.exe`, hash
 as its immediate rollback. Installed release binaries and normal archives are unchanged.
 Ten selected-prefix value runs pass across GCC and Clang.
 
+A [static thread callback candidate](c-emitter-thread-callbacks.md) now passes
+the 224-unit GCC-clean self-host, both complete C-backend suites, 20 native value
+runs, four Win32 objects and two Linux ELF assembly checks. It also repairs
+GAS64 byte-address narrowing. Four unchanged example profiles lose their Clang
+strict callback-cast warning without changing other classes. Its complete
+retained-cohort refresh is running; the candidate is unselected and the totals
+below still belong to their recorded earlier compiler cuts.
+
 The totals below remain the last completed selected-executable census. A separate
 [JRPG and fb-ext-lib context expansion](c-emitter-newjrpg-context.md) is in
 progress, including two repaired JRPG cancel callbacks. Its partial counts must

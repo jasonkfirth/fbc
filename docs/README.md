@@ -8,6 +8,9 @@ language reference.
 
 ## Start here
 
+- [Static typed thread callbacks](c-emitter-thread-callbacks.md) records native
+  adapters, preserved address casts, GAS64 narrowing and the pending full recount.
+
 - [Guarded label payload qualification](c-emitter-label-guard.md) binds the
   unchanged real fixture's GCC bounds warning to both native runtime passes.
 

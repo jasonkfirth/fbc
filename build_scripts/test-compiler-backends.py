@@ -172,6 +172,8 @@ def main() -> int:
          "C_QUALIFIED_FLOAT_LITERALS_PASS"),
         ("qualified-float-conversions", "tests/compiler-support/c-qualified-float-conversions.bas",
          "C_QUALIFIED_FLOAT_CONVERSIONS_PASS"),
+        ("thread-callback-types", "tests/compiler-support/c-thread-callback-types.bas",
+         "C_THREAD_CALLBACK_TYPES_PASS"),
         ("indirect-integer-ranges", "tests/compiler-support/c-indirect-integer-ranges.bas",
          "C_INDIRECT_INTEGER_RANGES_PASS"),
         ("indirect-ranges-managed-iif", "tests/compiler-support/c-indirect-ranges-managed-iif.bas",
@@ -805,6 +807,51 @@ def main() -> int:
                     command += ["-asm", "intel"]
                 if name == "custom-entry":
                     command += ["-entry", "custom_entry"]
+                if name == "thread-callback-types":
+                    command += ["-mt"]
+                    if backend in ("gcc", "clang"):
+                        command += ["-Wc", "-Werror=cast-function-type"]
+                    if backend == "clang":
+                        command += ["-Wc", "-Werror=cast-function-type-strict"]
+                    if backend in ("gcc", "clang"):
+                        generated = working / (backend + "-thread-callback-types.c")
+                        semantic = working / (backend + "-thread-callback-types.tsv")
+                        emitted = subprocess.run(
+                            [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                             "-semantic-model-text", "-semantic-model", str(semantic),
+                             "-mt", "-m", input_source.stem, "-r", str(input_source), "-o", str(generated)],
+                            cwd=working, text=True, capture_output=True, timeout=120,
+                            check=False)
+                        if emitted.returncode:
+                            print(f"{backend}/{name}: callback C/model emission failed\n"
+                                  f"{emitted.stdout}{emitted.stderr}")
+                            return 1
+                        code = generated.read_text() if generated.is_file() else ""
+                        narrowed = re.search(
+                            r"^[^\n;]*\bUNINVOKEDNARROWFACTORY\([^\n;]*\)\n\{(.*?)^\}",
+                            code, re.MULTILINE | re.DOTALL)
+                        if (narrowed is None or
+                                "uint8" not in narrowed[1] or
+                                "fb_c_thread_callback_" in narrowed[1]):
+                            print(f"{backend}/{name}: source callback cast was discarded\n"
+                                  f"{emitted.stdout}{emitted.stderr}")
+                            return 1
+                        # The adapter changes a native expression, while the
+                        # selected argument still has the runtime's normal ABI.
+                        reader = str(root / "tests/semantic-sidecar")
+                        if reader not in sys.path:
+                            sys.path.insert(0, reader)
+                        from sidecar import Model
+                        try:
+                            model = Model.read(semantic)
+                            adapters = [row for module in model.selected_call_abi.values()
+                                        for row in module["argument"].values()
+                                        if re.fullmatch(r"fb_c_thread_callback_\d+", row[-1])]
+                            if len(adapters) != 3 or any(row[5] != "value" for row in adapters):
+                                raise ValueError("typed thread arguments lost their ordinary ABI")
+                        except (OSError, ValueError) as error:
+                            print(f"{backend}/{name}: callback semantic model failed: {error}")
+                            return 1
                 if name == "label-flag-layout":
                     command += ["-i", str(root / "src/compiler")]
                 if name == "asm-att-llvm":

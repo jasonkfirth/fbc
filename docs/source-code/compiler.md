@@ -93,6 +93,13 @@ and interoperability tests before changing parameter layout, aggregate
 passing, inline assembly or debug emission. A fix in one emitter does not
 automatically cover the others.
 
+The C emitter uses stateless adapters for eligible static `ThreadCreate`
+workers with typed pointer parameters. It preserves the user pointer and other
+uses of the source function address, and retains explicit integer narrowing.
+The regression in
+[c-thread-callback-types.bas](../../tests/compiler-support/c-thread-callback-types.bas)
+also checks GAS64 address narrowing and the existing semantic call-ABI contract.
+
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage
 is released. It must not reparse text to invent a competing interpretation.

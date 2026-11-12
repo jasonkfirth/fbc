@@ -6069,12 +6069,14 @@ end function
 private function hConvertLoadSource _
 	( _
 		byval v2 as IRVREG ptr, _
+		byval v1dtype as FB_DATATYPE, _
 		byref v2dtype as FB_DATATYPE, _
 		byref prefix1 as string, _
 		byref prefix2 as string, _
 		byref op1 as string, _
 		byref op2 as string, _
-		byref srcreg as integer _
+		byref srcreg as integer, _
+		byval regresult as integer _
 	) as integer
 
 	select case v2->typ
@@ -6107,6 +6109,12 @@ private function hConvertLoadSource _
 	case IR_VREGTYPE_OFS
 		op2 = *symbGetMangledName( v2->sym ) + _
 		      "[rip+" + str( v2->ofs ) + "]"
+		dim as string address_register = op1
+		if( typeGetSize( v1dtype ) = GAS64_BYTE_BYTES ) then
+			'' LEA has no byte-register form. Materialize the address in the
+			'' same physical GPR; subsequent byte uses retain the low bits.
+			address_register = *regstrq( regresult )
+		end if
 		if( (typeGetDtOnly( v2->dtype ) = FB_DATATYPE_FUNCTION) andalso _
 		    ctx.systemv andalso _
 		    (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB) ) then
@@ -6116,9 +6124,15 @@ private function hConvertLoadSource _
 			end if
 			asm_code( "mov rax, QWORD PTR " + _
 			          left( op2, bracket - 1 ) + "@GOTPCREL[rip]" )
-			asm_code( "mov " + op1 + ", rax", KNOOPTIM )
+			asm_code( "mov " + address_register + ", rax", KNOOPTIM )
 		else
-			asm_code( "lea " + op1 + ", " + op2, KNOOPTIM )
+			asm_code( "lea " + address_register + ", " + op2, KNOOPTIM )
+		end if
+		if( v1dtype = FB_DATATYPE_BOOLEAN ) then
+			'' Boolean conversion tests the complete address, not its low byte.
+			'' Keep the result register live across this instruction pair.
+			asm_code( "test " + address_register + ", " + address_register, KNOFREE )
+			asm_code( "setne " + op1, KNOFREE )
 		end if
 		return TRUE
 
@@ -6167,8 +6181,8 @@ private function hConvertLoadOperands _
 	end if
 
 	prefix2 = hConvertSourcePrefix( v2dtype )
-	function = hConvertLoadSource( v2, v2dtype, prefix1, prefix2, _
-	                               op1, op2, srcreg )
+	function = hConvertLoadSource( v2, v1dtype, v2dtype, prefix1, prefix2, _
+	                               op1, op2, srcreg, regresult )
 end function
 
 private sub hConvertToFloat _

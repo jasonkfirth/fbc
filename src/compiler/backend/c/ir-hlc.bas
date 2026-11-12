@@ -251,6 +251,12 @@ type CARRAYCALLBACK
 	identifier  as uinteger
 end type
 
+type CTHREADCALLBACK
+	target_name as DZSTRING
+	target_type as DZSTRING
+	identifier  as uinteger
+end type
+
 '' Initializer nodes borrow their symbols. Only the stack allocation belongs
 '' to the emitter; closing a child aggregate counts as one parent element.
 type CVARINISCOPE
@@ -312,6 +318,8 @@ type IRHLCCTX
 	alignmentviews          as TLIST   '' CALIGNVIEW, owned until backend shutdown.
 	arraycallbacks          as TLIST   '' CARRAYCALLBACK, owns C names for one emission unit.
 	arraycallbackid         as uinteger
+	threadcallbacks         as TLIST   '' CTHREADCALLBACK, owns static thread entry adapters.
+	threadcallbackid        as uinteger
 	gfxblenders             as TLIST   '' CGFXBLENDER, owns adapter type spellings per C output.
 	gfxblenderid            as uinteger
 	gfxcontextid            as uinteger
@@ -363,6 +371,8 @@ declare sub exprFreeNode( byval n as EXPRNODE ptr )
 declare function hIsArrayCallbackParam( byval proc as FBSYMBOL ptr, byval param_index as integer ) as integer
 declare sub hEmitArrayCallbackDefinitions( )
 declare sub hClearArrayCallbacks( )
+declare sub hEmitThreadCallbackDefinitions( )
+declare sub hClearThreadCallbacks( )
 declare function hGfxBlenderType( byval proc as FBSYMBOL ptr, byval param_index as integer ) as FBSYMBOL ptr
 declare sub hEmitGfxBlenderDefinitions( )
 declare sub hClearGfxBlenders( )
@@ -475,6 +485,7 @@ private sub _init( )
 	listInit( @ctx.exprcache, 8, sizeof( EXPRCACHENODE ), LIST_FLAGS_NOCLEAR )
 	listInit( @ctx.alignmentviews, 8, sizeof(CALIGNVIEW), LIST_FLAGS_CLEAR )
 	listInit( @ctx.arraycallbacks, 8, sizeof(CARRAYCALLBACK), LIST_FLAGS_CLEAR )
+	listInit( @ctx.threadcallbacks, 8, sizeof(CTHREADCALLBACK), LIST_FLAGS_CLEAR )
 	listInit( @ctx.gfxblenders, 8, sizeof(CGFXBLENDER), LIST_FLAGS_CLEAR )
 	irSetOption( IR_OPT_FPUIMMEDIATES or IR_OPT_MISSINGOPS )
 
@@ -523,6 +534,8 @@ private sub _end( )
 
 	hClearArrayCallbacks( )
 	listEnd( @ctx.arraycallbacks )
+	hClearThreadCallbacks( )
+	listEnd( @ctx.threadcallbacks )
 	hClearGfxBlenders( )
 	listEnd( @ctx.gfxblenders )
 	listEnd( @ctx.alignmentviews )
@@ -3002,6 +3015,8 @@ private function _emitBegin( ) as integer
 	loop
 	hClearArrayCallbacks( )
 	ctx.arraycallbackid = 0
+	hClearThreadCallbacks( )
+	ctx.threadcallbackid = 0
 	hClearGfxBlenders( )
 	ctx.gfxblenderid = 0
 	ctx.gfxcontextid = 0
@@ -3126,6 +3141,7 @@ private sub _emitEnd( )
 	symbForEachGlobal( FB_SYMBCLASS_PROC, @hMaybeEmitProcProto )
 	'' Callback bodies follow the original typed procedure prototypes.
 	hEmitArrayCallbackDefinitions( )
+	hEmitThreadCallbackDefinitions( )
 	hEmitGfxBlenderDefinitions( )
 
 	''
@@ -6271,6 +6287,7 @@ private sub _emitAddr _
 end sub
 
 #include once "backend/c/c-array-callbacks.bi"
+#include once "backend/c/c-thread-callbacks.bi"
 #include once "backend/c/c-gfx-callbacks.bi"
 
 private function hCAllocationArgument( byval value as EXPRNODE ptr ) as EXPRNODE ptr
@@ -6416,6 +6433,9 @@ private sub hDoCall _
 			elseif( hIsArrayCallbackParam( param_proc, param_index ) ) then
 				expr = hArrayCallbackArgument( expr )
 				semantic_kind = "array-callback"
+			elseif( hIsThreadCallbackParam( param_proc, param_index ) ) then
+				expr = hThreadCallbackArgument(expr, dtype, subtype)
+				'' The adapter retains the ordinary typed procedure-pointer ABI.
 			else
 				dim as integer semantic_original_dtype = dtype
 				dim as FBSYMBOL ptr semantic_original_subtype = subtype
