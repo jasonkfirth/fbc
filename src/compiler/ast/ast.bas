@@ -216,7 +216,10 @@ dim shared ast_opTB( 0 to AST_OPCODES-1 ) as AST_OPINFO => _
 	(AST_NODECLASS_DBG   , AST_OPFLAGS_NONE, @"sini"    ), _ '' AST_OP_DBG_SCOPEINI
 	(AST_NODECLASS_DBG   , AST_OPFLAGS_NONE, @"send"    ), _ '' AST_OP_DBG_SCOPEEND
 	(AST_NODECLASS_LIT   , AST_OPFLAGS_NONE, @"rem"     ), _ '' AST_OP_LIT_COMMENT
-	(AST_NODECLASS_LIT   , AST_OPFLAGS_NONE, @"asm"     )  _ '' AST_OP_ASM
+	(AST_NODECLASS_LIT   , AST_OPFLAGS_NONE, @"asm"     ), _ '' AST_OP_ASM
+	(0                  , AST_OPFLAGS_NONE, NULL       ), _ '' AST_OP_TOSIGNED (parser-only)
+	(0                  , AST_OPFLAGS_NONE, NULL       ), _ '' AST_OP_TOUNSIGNED (parser-only)
+	(AST_NODECLASS_MACRO , AST_OPFLAGS_NONE, @"c_eval"  )  _ '' AST_OP_C_EVAL
 }
 
 sub astInit( )

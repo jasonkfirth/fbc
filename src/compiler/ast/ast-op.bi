@@ -168,6 +168,9 @@ enum AST_OP
 	AST_OP_TOSIGNED
 	AST_OP_TOUNSIGNED
 
+	'' C-only IR macro, inserted after parsing and semantic observation.
+	AST_OP_C_EVAL
+
 	AST_OPCODES                                 '' total
 end enum
 

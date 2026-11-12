@@ -1441,7 +1441,10 @@ private sub hCErrEmitHelpers( )
 			end if
 		next
 		if( symbGetProcStatGosub( errorplan->owner ) ) then
-			hWriteLine( "fb_GosubExit(&" + hCErrSymbolText(symbGetProcGosubSym(errorplan->owner)) + ");" )
+			'' This generated cleanup call needs the same declaration and native
+			'' dependency edge as ordinary GOSUB calls, including its ABI name.
+			var exit_name = hCGosubAPI(@FB_RTL_GOSUBEXIT, FB_RTL_IDX_GOSUBEXIT)
+			hWriteLine( exit_name + "(&" + hCErrSymbolText(symbGetProcGosubSym(errorplan->owner)) + ");" )
 		end if
 	end if
 	'' The unsupported-resource path ends the program. A free after that

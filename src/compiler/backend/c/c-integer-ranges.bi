@@ -86,40 +86,59 @@ end function
 '' Operand ranges and native C promotions
 '' -------------------------------------------------------------------------
 
-private function hCRangeValue(byval n as ASTNODE ptr, byref interval as CINTEGERRANGE) as integer
+private function hCRangeConstant(byval dtype as integer, byval value as longint, byref interval as CINTEGERRANGE) as integer
+	interval.lower.negative = FALSE
+	interval.lower.magnitude = culngint(value)
+	if( typeIsSigned(dtype) ) then
+		if( value < 0 ) then
+			interval.lower.negative = TRUE
+			interval.lower.magnitude = 0ull - culngint(value)
+		end if
+		dim as CINTEGERRANGE declared_range
+		hCRangeFull(dtype, declared_range)
+		if( hCRangeCompare(interval.lower, declared_range.lower) < 0 orelse _
+		    hCRangeCompare(interval.lower, declared_range.upper) > 0 ) then return FALSE
+	else
+		interval.lower.magnitude and= hCRangeMask(typeGetBits(dtype))
+	end if
+	interval.upper = interval.lower
+	return TRUE
+end function
+
+private function hCRangeValue(byval n as ASTNODE ptr, byref interval as CINTEGERRANGE, byval retain_operands as integer = FALSE) as integer
 	if( n = NULL orelse n->vector <> 0 ) then return FALSE
 	if( hCRangeType(n->dtype) = FALSE ) then return FALSE
 	select case as const n->class
 	case AST_NODECLASS_CONST
-		interval.lower.negative = FALSE
-		interval.lower.magnitude = culngint(n->val.i)
-		if( typeIsSigned(n->dtype) ) then
-			if( n->val.i < 0 ) then
-				interval.lower.negative = TRUE
-				interval.lower.magnitude = 0ull - culngint(n->val.i)
-			end if
-			dim as CINTEGERRANGE declared_range
-			hCRangeFull(n->dtype, declared_range)
-			if( hCRangeCompare(interval.lower, declared_range.lower) < 0 orelse _
-			    hCRangeCompare(interval.lower, declared_range.upper) > 0 ) then return FALSE
-		else
-			interval.lower.magnitude and= hCRangeMask(typeGetBits(n->dtype))
-		end if
-		interval.upper = interval.lower
-		return TRUE
+		return hCRangeConstant(n->dtype, n->val.i, interval)
 	case AST_NODECLASS_VAR
 		var sym = n->sym
 		if( sym = NULL orelse symbIsVar(sym) = FALSE ) then return FALSE
+		if( retain_operands ) then
+			hCRangeFull(n->dtype, interval)
+			return TRUE
+		end if
 		if( symbIsRef(sym) or symbIsParamVarBydescOrByref(sym) ) then return FALSE
 		if( symbIsThreadLocal(sym) or symbIsThreadLocalC(sym) ) then return FALSE
 		if( symbGetArrayDimensions(sym) <> 0 orelse n->var_.ofs <> 0 ) then return FALSE
 		if( typeGetDtAndPtrOnly(symbGetFullType(sym)) <> typeGetDtAndPtrOnly(n->dtype) ) then return FALSE
 		hCRangeFull(n->dtype, interval)
 		return TRUE
+	case AST_NODECLASS_FIELD, AST_NODECLASS_DEREF, AST_NODECLASS_IDX
+		'' Range-only callers must retain the complete load and its address.
+		if( retain_operands = FALSE ) then return FALSE
+		hCRangeFull(n->dtype, interval)
+		return TRUE
 	case AST_NODECLASS_CONV
 		if( n->r <> NULL ) then return FALSE
-		if( hCRangeValue(n->l, interval) = FALSE ) then return FALSE
+		if( hCRangeValue(n->l, interval, retain_operands) = FALSE ) then return FALSE
 		return hCRangeConvert(interval, n->dtype)
+	case AST_NODECLASS_LINK
+		'' A nested folded comparison retains reads on the left and yields
+		'' its fixed value on the right. Preserve that whole sequence again
+		'' if an enclosing comparison can also be resolved.
+		if( retain_operands = FALSE or n->link.ret <> AST_LINK_RETURN_RIGHT ) then return FALSE
+		return hCRangeValue(n->r, interval, TRUE)
 	end select
 	'' Calls, opaque text, dereferences, and other address computations retain
 	'' their evaluation even if their apparent result type has a limited range.
@@ -155,16 +174,16 @@ private function hCRangeCommonType(byval ldtype as integer, byval rdtype as inte
 	return iif(is_signed, FB_DATATYPE_LONG, FB_DATATYPE_ULONG)
 end function
 
-private function hCRangeTruth(byval n as ASTNODE ptr, byref truth as integer) as integer
-	dim as CINTEGERRANGE left_range, right_range
-	if( hCRangeValue(n->l, left_range) = FALSE ) then return FALSE
-	if( hCRangeValue(n->r, right_range) = FALSE ) then return FALSE
-	var dtype = hCRangeCommonType(n->l->dtype, n->r->dtype)
+private function hCRangeIntervalsTruth _
+	( byval op as integer, byval ldtype as integer, byval rdtype as integer, _
+	  byref left_range as CINTEGERRANGE, byref right_range as CINTEGERRANGE, _
+	  byref truth as integer ) as integer
+	var dtype = hCRangeCommonType(ldtype, rdtype)
 	if( hCRangeConvert(left_range, dtype) = FALSE ) then return FALSE
 	if( hCRangeConvert(right_range, dtype) = FALSE ) then return FALSE
 	var lower_upper = hCRangeCompare(left_range.lower, right_range.upper)
 	var upper_lower = hCRangeCompare(left_range.upper, right_range.lower)
-	select case as const n->op.op
+	select case as const op
 	case AST_OP_EQ, AST_OP_NE
 		if( lower_upper > 0 or upper_lower < 0 ) then
 			truth = FALSE
@@ -173,7 +192,7 @@ private function hCRangeTruth(byval n as ASTNODE ptr, byref truth as integer) as
 		else
 			return FALSE
 		end if
-		if( n->op.op = AST_OP_NE ) then truth = not truth
+		if( op = AST_OP_NE ) then truth = not truth
 	case AST_OP_LT
 		if( upper_lower < 0 ) then
 			truth = TRUE
@@ -209,6 +228,14 @@ private function hCRangeTruth(byval n as ASTNODE ptr, byref truth as integer) as
 	case else
 		return FALSE
 	end select
+	return TRUE
+end function
+
+private function hCRangeTruth(byval n as ASTNODE ptr, byref truth as integer, byval retain_operands as integer = FALSE) as integer
+	dim as CINTEGERRANGE left_range, right_range
+	if( hCRangeValue(n->l, left_range, retain_operands) = FALSE ) then return FALSE
+	if( hCRangeValue(n->r, right_range, retain_operands) = FALSE ) then return FALSE
+	if( hCRangeIntervalsTruth(n->op.op, n->l->dtype, n->r->dtype, left_range, right_range, truth) = FALSE ) then return FALSE
 	if( n->op.options and AST_OPOPT_DOINVERSE ) then truth = not truth
 	return TRUE
 end function

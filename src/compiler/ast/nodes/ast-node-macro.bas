@@ -5,7 +5,7 @@
 ''
 '' Purpose:
 ''
-''     Build and lower AST va_list nodes.
+''     Build and lower AST macro nodes for varargs and retained evaluation.
 ''
 '' Responsibilities:
 ''
@@ -17,7 +17,7 @@
 ''     - token scanning or physical register allocation
 ''
 
-'' AST va_list nodes
+'' AST compiler macro nodes
 '' l = arg1 expression; r = arg2 expression
 ''
 '' chng: oct/2018 written [jeffm]
@@ -46,8 +46,8 @@ function astNewMACRO _
 	'' l   r
 	''
 	'' n = MACRO node, dtype/subtype to return (if any)
-	'' l = first argument (the cva_list object)
-	'' r = second argument (only used in cva_copy)
+	'' l = first argument (a cva_list object or retained C operand)
+	'' r = optional second argument
 	''
 	'' To make this node class more generic, need to add
 	'' sub-nodes to build a list of argument expressions
@@ -59,6 +59,7 @@ function astNewMACRO _
 	'' AST_OP_VA_END    va_end( arg1 )
 	'' AST_OP_VA_ARG    expr = va_arg(arg1,typeof(arg2))
 	'' AST_OP_VA_COPY   va_copy( arg1, arg2 )
+	'' AST_OP_C_EVAL    evaluate both operands without keeping their values
 
 	n->op.op = op
 	n->l = arg1
@@ -123,6 +124,13 @@ function astLoadMACRO _
 	case AST_OP_VA_COPY
 		v1 = astLoad( n->l )
 		v2 = astLoad( n->r )
+		vr = NULL
+
+	case AST_OP_C_EVAL
+		'' The C-only comparison pass retains reads after proving their result.
+		'' Parsing and source diagnostics have already observed the original tree.
+		v1 = astLoad(n->l)
+		v2 = astLoad(n->r)
 		vr = NULL
 
 	case else

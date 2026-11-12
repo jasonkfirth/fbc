@@ -142,6 +142,10 @@ type layout_sample
 	second_value as integer
 end type
 print offsetof(layout_sample, second_value)
+#elseif SOURCE_WARNING_CASE = 23
+dim value as ubyte = 1
+dim p as ubyte ptr = @value
+print *p >= 0
 #endif
 
 '' end of source-warnings.bas

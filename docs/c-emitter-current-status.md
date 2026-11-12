@@ -6,67 +6,98 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: qualified floating literals, November 12
+# Current selected compiler: indirect ranges and GOSUB dependencies, November 12
 
 `build/main-gcc/bin/fbc.exe` is
-`18fbb506f581d640a1e8f3c28850bc422652d42f67bdf04ff3e53db4a8d47406`.
-The development prefix retains `fbc-before-qualified-float-20261112.exe`, hash
-`3b736d245e30fc79e34e386aca28eea7617ecb7cc3d1dc5e92771cb2133cd2b1`,
-as its immediate rollback. Installed release files and normal archives are unchanged.
-
-Qualified constants now select C floating suffixes and special-value builtins
-from their scalar width. The current parser preserves full type metadata when
-loading constants; that exposed two Single-to-Double promotion observations in
-the unchanged SDL3 planar-audio example. The scalar normalization removes both.
-The new `c-qualified-float-literals.bas` regression checks Single values and a
-Double precision boundary with GCC promotion warnings treated as errors.
+`da4f90d862bb0649c1ecae0009eef5dce5d85870026274662bf293b9be3ebfa6`.
+The development prefix retains `fbc-before-indirect-ranges-20261112.exe`, hash
+`18fbb506f581d640a1e8f3c28850bc422652d42f67bdf04ff3e53db4a8d47406`,
+as its immediate rollback. Installed release binaries and normal archives are unchanged.
+Eight selected-prefix value runs pass across GCC and Clang.
 
 | Group | Profiles | GCC warnings | Clang warnings |
 | --- | ---: | ---: | ---: |
 | Compiler | 224 | 0 | 1,339 |
 | fbctests | 703 | 0 | 779 |
 | Broad production | 1,129 | 65 | 945 |
-| Broad additional | 239 | 124 | 1,634 |
+| Broad additional | 239 | 123 | 1,634 |
 | Exampleageddon checked | 1,775 | 3 | 2,727 |
 | Exampleageddon default | 1,775 | 3 | 2,606 |
-| Total | 5,845 | 195 | 10,030 |
+| TurboTrek build lists | 251 | 0 | 1,949 |
+| TurboTrek additional tests/tools | 114 | 1 | 3,967 |
+| Extracted legacy examples | 208 | 8 | 75 |
+| Total | 6,418 | 203 | 16,021 |
 
-The current-source pre-repair replay had 197 GCC and 10,032 Clang observations.
-All 5,845 repaired profiles are terminal, with 5,739 accepted C definitions and
-no unexpected failures. The existing 32 Optical and 46 PNG exclusions, six
-included fragments, twenty known frontend failures and two closed assembler
-profiles retain their dispositions. The 224 canonical Make-selected compiler
-units reproduce their C exactly and self-build with zero GCC warnings. Both
-backend suites pass in 147.44 seconds, including 420 source-warning controls.
-Selected-prefix regression executions pass with both C generators. The replay
-uses one worker and peaks at 21,598,277 owned bytes, without running corpus apps.
+The retained 5,845-profile queue has GCC 194 / Clang 10,030, compared with
+195 / 10,030 in the preceding selected floating-literal compiler. The additional
+573 profiles remain separate above so expanded coverage does not look like a
+compiler regression. All 6,312 applicable C units are accepted by both native
+tools under their original unsuppressed flags. No corpus applications were run.
+The retained queue peaks at 21,622,853 owned bytes; scratch paths are reused.
 
-All 176 retained GCC unused-parameter observations belong to debug profiles.
-Debug names remain available. The three additional Clang padding observations
-relative to the older selected-source census come from current semantic-range
-and bitfield-test layouts. This recount uses the current compiler source graph;
-the historical seven-root compiler-overlay mismatch is retained separately in
-the pre-repair database and explicitly superseded by its canonical graph amendment.
+The C rewrite retains original operand evaluation when folding fixed indirect
+integer comparisons. A C-only evaluation macro is inserted after source
+diagnostics, and existing AST operator numbers stay unchanged. Supported scalar
+IIF selections discard the unused arm and private branch scaffolding; managed
+results and destructor wrappers retain their conditions. Bitwise propagation is
+limited to facts newly exposed by this pass and preserves both operand reads.
+This avoids the late Stunts constant-OR warnings and the ten unused labels found
+in an intermediate recount. Neither intermediate compiler was selected.
 
-The wider inventory still needs coverage beyond these queues. Current TurboTrek
-build lists supply 251 additional profiles, all accepted by GCC and Clang. Their
-actual include graphs qualify 222 discovered BASIC paths; 120 TurboTrek paths
-remain outside those graphs. Fourteen GCC observations are fixed-range integer
-comparisons in two production modules, each already reported by FreeBASIC
-warning 56. Their C lowering remains open. The corrected replay preserves project
-include precedence; its initial wrong-header failure remains in the prior receipt.
-It reuses 250 exact C/tool/flag checks per native compiler and checks one corrected
-profile afresh. These profile totals are separate from the 5,845-profile census.
+All fourteen TurboTrek fixed-range observations disappear, with its other native
+warning classes unchanged. FreeBASIC warning 56 remains enabled and now also
+covers typed pointer dereferences. The regression checks all 256 byte values,
+address/index/arm counts, conversions, nested selections and skipped arms.
+Both full backend suites pass in 156.256 seconds, including 462 source-warning
+controls. All twelve Win32 emitted-C checks and four LLVM value runs pass.
+The deliberately unreachable fallback in the new non-returning GOSUB control
+retains its Clang diagnostic in the raw width-check receipt.
 
-Across the two external roots, 2,957 discovered paths still need an owning build
-context. Another 939 paths remain at the existing moving-Optical boundary.
-Separate compiler forks and Tiko's bundled compiler distribution have explicit
-repository/package evidence. These dispositions do not claim full-corpus success.
+The extracted-example extension found two generated-C faults across four
+unchanged programs. GOSUB without a returning path could lose its context
+storage and zero initialization because its uses are emitted outside the AST.
+An outlined cleanup callback could also lose the `fb_GosubExit` declaration.
+Both hidden dependencies now use the ordinary storage/runtime retention graph,
+including the runtime's actual ABI name. All 208 profiles pass; 199 exact-C native
+checks are reused per tool and nine are fresh. Its remaining unused source value
+also receives warning 55 under `-w all` in the unchanged Santa example.
 
-Receipts are in `build/c-emitter-forward-views-20261105/`: `qualified-float-` selfhost,
-focus, gates, queue-plan, queue-refresh, queue-status and publish packets;
-`current-turbotrek-context-20261112.sqlite3`; and
-`current-source-coverage-reconciliation-20261112.json.zlib`. The broader goal stays active.
+The 224 canonical compiler units reach an exact emitted-C fixed point with zero
+GCC warnings. Strict lint has no findings in all 19 owned BASIC files. Compiler
+structure checks cover 408 documented files and 21 host source graphs. No warning
+flags, attributes or functional examples were weakened.
+
+The twenty retained frontend outcomes are explicitly resolved, with raw failures
+preserved: four intentional negative-example profiles, ten legacy stack-varargs
+profiles rejected by the C backend's parser, four foreign-target profiles, and
+two VB6 counterpart profiles. They are not unexpected compiler failures. The
+existing 32 Optical and 46 PNG profile exclusions, six included fragments and
+two closed assembler profiles retain their dispositions.
+
+Wider source coverage remains incomplete. The current TurboTrek include graphs
+cover 340 of 342 BASIC paths; its two image tests retain the existing exclusion.
+Across the outside-pin inventory, 548 paths now have owning C-profile evidence,
+2,629 still need an owning build context, and 939 remain at the existing moving
+Optical boundary. Separate compiler forks and the Tiko bundled compiler retain
+their repository/package dispositions. These counts do not claim full-goal success.
+
+Receipts are in `build/c-emitter-forward-views-20261105/`: `indirect-range-`
+selfhost/value/production/gate `v7-` packets; `indirect-range-v7-queue-` and
+`indirect-range-v7-publish-` packets; `current-turbotrek-*-v7-` databases;
+`current-extracted-examples-v7-20261112.sqlite3`;
+`current-frontend-dispositions-20261112.json.zlib`; and
+`current-source-coverage-selected-reconciliation-20261112.json.zlib`.
+The broader goal remains active.
+
+## Previous selected floating-literal compiler
+
+The preceding selected hash was
+`18fbb506f581d640a1e8f3c28850bc422652d42f67bdf04ff3e53db4a8d47406`.
+It normalized qualified scalar widths when choosing C floating suffixes and
+special-value builtins, removing two false Single-to-Double promotions. Its
+complete 5,845-profile queue had 195 GCC / 10,030 Clang warnings and no unexpected
+failures. Both backend suites passed in 147.44 seconds with 420 source-warning
+controls. The `qualified-float-` receipts and its prior rollback remain retained.
 
 # Historical selected compiler: compiler-owned debug bindings
 

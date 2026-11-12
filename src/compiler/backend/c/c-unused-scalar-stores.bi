@@ -677,6 +677,9 @@ private function hCScalarStoresBegin(byval proc as FBSYMBOL ptr, byval first as 
 	'' Initializers can retain private static addresses without an executable
 	'' VAR read. Root those dependencies before considering any write dead.
 	hCStaticArrayInitializers(proc)
+	'' The direct GOSUB emitter passes this binding by address outside the AST.
+	'' Its zero initialization must survive even in an owner without RETURN.
+	if( symbGetProcStatGosub(proc) ) then hCScalarStoreRemember(symbGetProcGosubSym(proc))
 	'' Discarded RTL call results also occur without any scalar binding.
 	dim as integer fallthrough = TRUE
 	n = first

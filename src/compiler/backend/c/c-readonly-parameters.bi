@@ -108,7 +108,10 @@ private function hCReadOnlyCheck(byval n as ASTNODE ptr, byval storage as FBSYMB
 	byref seen as integer, byval pointer_read as integer = FALSE) as integer
 	if( n = NULL ) then return TRUE
 	select case as const n->class
-	case AST_NODECLASS_ASM, AST_NODECLASS_MACRO
+	case AST_NODECLASS_MACRO
+		if( n->op.op <> AST_OP_C_EVAL ) then return FALSE
+		return hCReadOnlyCheck(n->l, storage, seen, TRUE) andalso hCReadOnlyCheck(n->r, storage, seen, TRUE)
+	case AST_NODECLASS_ASM
 		'' Opaque text and intrinsic macros can observe frames or hidden storage.
 		return FALSE
 	case AST_NODECLASS_VAR
