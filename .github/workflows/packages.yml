@@ -32,6 +32,8 @@ on:
   # A normal master push first runs the compiler qualification workflow.
   # Package creation follows only after that tested source revision has passed
   # fbctests and Exampleageddon, instead of racing the qualification run.
+  # Successful manual CI may cover only a recovery lane. Require a push event
+  # in the package job guards before treating CI as full qualification.
   workflow_run:
     workflows:
       - FreeBASIC XL CI
@@ -121,7 +123,7 @@ jobs:
 
   linux-package-plan:
     name: Linux package-factory plan
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master') }}
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.event == 'push') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -250,7 +252,7 @@ jobs:
   linux-release-matrix:
     name: Linux ${{ matrix.name }} package
     needs: linux-package-plan
-    if: ${{ needs.linux-package-plan.outputs.run_linux_matrix == 'true' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) }}
+    if: ${{ needs.linux-package-plan.outputs.run_linux_matrix == 'true' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_linux_matrix) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.event == 'push')) }}
     strategy:
       fail-fast: false
       max-parallel: ${{ github.event_name == 'workflow_dispatch' && fromJSON(inputs.linux_matrix_parallelism || '6') || 6 }}
@@ -422,7 +424,7 @@ jobs:
 
   windows:
     name: Windows package matrix
-    if: ${{ (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
+    if: ${{ (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.event == 'push')) && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
     runs-on: windows-latest
     timeout-minutes: 240
 
@@ -490,7 +492,7 @@ jobs:
 
   macos:
     name: macOS package matrix
-    if: ${{ (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master')) && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
+    if: ${{ (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'master' && github.event.workflow_run.event == 'push')) && (github.event_name != 'workflow_dispatch' || inputs.linux_matrix_target == '' || inputs.linux_matrix_target == 'all') }}
     runs-on: macos-15
     timeout-minutes: 180
 
