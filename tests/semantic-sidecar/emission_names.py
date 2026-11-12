@@ -147,7 +147,15 @@ def check_transport_and_objects(test):
     baseline = executable_object.read_bytes()
     _, artifact = test.invoke([source], mode="full", emit=False, extra=("-c", "-R", "-o", str(executable_object)))
     model = Model.read(artifact)
-    test.assertEqual(executable_object.read_bytes(), baseline)
+
+    def without_coff_timestamp(data):
+        # COFF records the compile time in FILE_HEADER.TimeDateStamp.
+        if len(data) >= 20 and int.from_bytes(data[:2], "little") in {0x014C, 0x8664, 0xAA64}:
+            return data[:4] + bytes(4) + data[8:]
+        return data
+
+    test.assertEqual(without_coff_timestamp(executable_object.read_bytes()),
+                     without_coff_timestamp(baseline))
     result = subprocess.run(["nm", "-g", str(executable_object)], capture_output=True, text=True, timeout=30)
     test.assertEqual(result.returncode, 0, result.stdout + result.stderr)
     object_symbols = {line.split()[-1] for line in result.stdout.splitlines() if line.split()}

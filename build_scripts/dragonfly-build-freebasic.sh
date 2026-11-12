@@ -117,8 +117,8 @@ echo "==> package: ${PKGNAME}-${PKGVERSION}"
 if [ "$NO_BUILD" -eq 0 ]; then
     run pkg update -f
 
-    # The live image can have rsync registered without its shared libraries.
-    run pkg install -f -y rsync
+    # The live image can retain package records while shared libraries are missing.
+    run pkg install -f -y openssl rsync
     rsync --version >/dev/null
 
     run pkg install -y \

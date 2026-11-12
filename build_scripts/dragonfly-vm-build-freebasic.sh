@@ -482,8 +482,9 @@ cp -a /usr/local/. /work/local/
 mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
 pkg update -f
-# Refresh curl before the build's package and log uploads.
-pkg install -f -y curl
+# Current curl requires the OpenSSL 3.5 shared libraries. The live image can
+# retain OpenSSL's package record while those files are missing.
+pkg install -f -y openssl curl
 curl --version >/dev/null
 
 fetch -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
@@ -728,7 +729,7 @@ mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
 pkg update -f
 # The test VM starts from the same image, so refresh both runtime tools there.
-pkg install -f -y curl rsync
+pkg install -f -y openssl curl rsync
 curl --version >/dev/null
 rsync --version >/dev/null
 pkg install -y \\
