@@ -356,6 +356,9 @@ typedef struct FB_GFX3_OPENGL_STATE {
 	uint32_t blit_batch_winner_width;
 	uint32_t blit_batch_winner_height;
 	uint32_t blit_batch_generation;
+	/* Renderer-thread-owned conversion storage for ordered line batches. */
+	FB_GFX3_OPENGL_LINE_BATCH_ITEM *line_batch_items;
+	uint32_t line_batch_items_capacity;
 	/* Reused by exact GPU PAINT scanline queues. */
 	GLuint paint_scratch_buffer;
 	size_t paint_scratch_bytes;

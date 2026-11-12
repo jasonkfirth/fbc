@@ -494,6 +494,9 @@ static void opengl_shutdown(FB_GFX3_BACKEND *backend)
 	if ((state->clear_program != 0) && (state->gl.delete_program != NULL))
 		state->gl.delete_program(state->clear_program);
 
+	free(state->line_batch_items);
+	state->line_batch_items = NULL;
+	state->line_batch_items_capacity = 0u;
 	if ((state->platform_vtable != NULL) &&
 	    (state->platform_vtable->destroy != NULL))
 		state->platform_vtable->destroy(state->platform);
