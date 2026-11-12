@@ -484,7 +484,9 @@ mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 pkg update -f
 # Current curl requires the OpenSSL 3.5 shared libraries. The live image can
 # retain OpenSSL's package record while those files are missing.
-pkg install -f -y openssl curl
+# Refresh curl's installed dependency closure too. The live image's libssh2
+# can still require the old OpenSSL soname after openssl and curl are upgraded.
+pkg install -f -R -y openssl curl
 curl --version >/dev/null
 
 fetch -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
