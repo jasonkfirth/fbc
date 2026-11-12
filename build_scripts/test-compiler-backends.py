@@ -168,6 +168,8 @@ def main() -> int:
         ("startup-declarations", "tests/compiler-support/c-startup-declarations.bas",
          "C_STARTUP_DECLARATIONS_PASS\nC_STARTUP_DECLARATIONS_CLEANUP_PASS"),
         ("storage-alignment-owner", "tests/compiler-support/c-storage-alignment-owner.bas", ""),
+        ("qualified-float-literals", "tests/compiler-support/c-qualified-float-literals.bas",
+         "C_QUALIFIED_FLOAT_LITERALS_PASS"),
         ("reserved-names", "tests/compiler-support/c-reserved-names.bas",
          "C_RESERVED_NAMES_PASS\nC_RESERVED_DESTRUCTOR_PASS"),
         ("terminating-context", "tests/compiler-support/c-terminating-context.bas",

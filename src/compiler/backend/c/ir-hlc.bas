@@ -4162,6 +4162,10 @@ private function hEmitFloat _
 		byval value as double _
 	) as string
 
+	'' Immediate values retain storage qualifiers and C alias flags in the IR.
+	'' Select the literal suffix and special-value builtin from the scalar width.
+	dtype = typeGetDtAndPtrOnly( dtype )
+
 	dim as string s
 	dim as ulong expval = any
 

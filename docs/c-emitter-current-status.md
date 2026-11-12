@@ -6,7 +6,69 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: compiler-owned debug bindings
+# Current selected compiler: qualified floating literals, November 12
+
+`build/main-gcc/bin/fbc.exe` is
+`18fbb506f581d640a1e8f3c28850bc422652d42f67bdf04ff3e53db4a8d47406`.
+The development prefix retains `fbc-before-qualified-float-20261112.exe`, hash
+`3b736d245e30fc79e34e386aca28eea7617ecb7cc3d1dc5e92771cb2133cd2b1`,
+as its immediate rollback. Installed release files and normal archives are unchanged.
+
+Qualified constants now select C floating suffixes and special-value builtins
+from their scalar width. The current parser preserves full type metadata when
+loading constants; that exposed two Single-to-Double promotion observations in
+the unchanged SDL3 planar-audio example. The scalar normalization removes both.
+The new `c-qualified-float-literals.bas` regression checks Single values and a
+Double precision boundary with GCC promotion warnings treated as errors.
+
+| Group | Profiles | GCC warnings | Clang warnings |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,339 |
+| fbctests | 703 | 0 | 779 |
+| Broad production | 1,129 | 65 | 945 |
+| Broad additional | 239 | 124 | 1,634 |
+| Exampleageddon checked | 1,775 | 3 | 2,727 |
+| Exampleageddon default | 1,775 | 3 | 2,606 |
+| Total | 5,845 | 195 | 10,030 |
+
+The current-source pre-repair replay had 197 GCC and 10,032 Clang observations.
+All 5,845 repaired profiles are terminal, with 5,739 accepted C definitions and
+no unexpected failures. The existing 32 Optical and 46 PNG exclusions, six
+included fragments, twenty known frontend failures and two closed assembler
+profiles retain their dispositions. The 224 canonical Make-selected compiler
+units reproduce their C exactly and self-build with zero GCC warnings. Both
+backend suites pass in 147.44 seconds, including 420 source-warning controls.
+Selected-prefix regression executions pass with both C generators. The replay
+uses one worker and peaks at 21,598,277 owned bytes, without running corpus apps.
+
+All 176 retained GCC unused-parameter observations belong to debug profiles.
+Debug names remain available. The three additional Clang padding observations
+relative to the older selected-source census come from current semantic-range
+and bitfield-test layouts. This recount uses the current compiler source graph;
+the historical seven-root compiler-overlay mismatch is retained separately in
+the pre-repair database and explicitly superseded by its canonical graph amendment.
+
+The wider inventory still needs coverage beyond these queues. Current TurboTrek
+build lists supply 251 additional profiles, all accepted by GCC and Clang. Their
+actual include graphs qualify 222 discovered BASIC paths; 120 TurboTrek paths
+remain outside those graphs. Fourteen GCC observations are fixed-range integer
+comparisons in two production modules, each already reported by FreeBASIC
+warning 56. Their C lowering remains open. The corrected replay preserves project
+include precedence; its initial wrong-header failure remains in the prior receipt.
+It reuses 250 exact C/tool/flag checks per native compiler and checks one corrected
+profile afresh. These profile totals are separate from the 5,845-profile census.
+
+Across the two external roots, 2,957 discovered paths still need an owning build
+context. Another 939 paths remain at the existing moving-Optical boundary.
+Separate compiler forks and Tiko's bundled compiler distribution have explicit
+repository/package evidence. These dispositions do not claim full-corpus success.
+
+Receipts are in `build/c-emitter-forward-views-20261105/`: `qualified-float-` selfhost,
+focus, gates, queue-plan, queue-refresh, queue-status and publish packets;
+`current-turbotrek-context-20261112.sqlite3`; and
+`current-source-coverage-reconciliation-20261112.json.zlib`. The broader goal stays active.
+
+# Historical selected compiler: compiler-owned debug bindings
 
 `build/main-gcc/bin/fbc.exe` is `3b736d245e30fc79e34e386aca28eea7617ecb7cc3d1dc5e92771cb2133cd2b1`.
 838B6658 is the immediate rollback. Installed release artifacts and normal ST/MT

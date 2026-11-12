@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- compiler/C: choose floating literal suffixes and special-value builtins from the scalar type after preserving constant qualifiers; prevent spurious Single-to-Double promotions, add a precision regression, and qualify the current 224-unit self-host and complete unsuppressed GCC/Clang queues.
 - CI: fetch pinned MIPS dependency sources through bounded, checksum-verified fallback mirrors; refresh DragonFly runtime-tool consumers after shared-library upgrades; preserve numbered runtime test failures instead of replacing their exit status with 1.
 - compiler/type layout: add FIELD = alignment to type aliases, with documented 1-16 byte minimum-alignment semantics that leave SizeOf unchanged; carry alias and field alignment through symbol handling, explicit C record layout, and C, x86, GAS64, and LLVM emission.
 - compiler/C ABI: align byte-backed CLongDouble aliases for target ABIs and preserve C typedef identity and aggregate sizes through constant/conversion lowering and variadic calls, including GAS32 and LLVM long-double arguments and results.
