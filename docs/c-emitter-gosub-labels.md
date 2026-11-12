@@ -60,6 +60,13 @@ old/new output pairs across GCC, Clang and LLVM. The one changed fbctest profile
 is freshly compiled with both native tools and retains its warning maps. This
 resolves the input boundary for this batch and makes no DOS qualification claim.
 
+The subsequent sync merges an independent gfxlib3 update, including a native C
+file retained in the broad source census. That file is not a compiler/backend
+gate input or a retained profile source. Compiler inputs and installed archives
+remain unchanged; `gosub-label-post-merge-boundary-20261112.json.zlib` records the
+new census pin separately. Native qualification of those graphics changes
+remains outside this emitted-C batch.
+
 Receipts remain in the existing `build/c-emitter-forward-views-20261105/`
 directory: `gosub-label-selfhost-v3-`, `gosub-label-gates-v3-`,
 `gosub-label-values-v3-context-`, `gosub-label-errno-reconciliation-`,
