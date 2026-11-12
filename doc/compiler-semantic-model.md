@@ -1855,6 +1855,11 @@ encoding, subtype, attached symbol, vector width and left/right child presence.
 | `assembly` | entry token count, unknown-memory/register/control contract |
 | `text`, `debug` | literal text; debug has opcode, scalar extra and filename |
 
+The `text` payload has one free-form field after its kind. Tabs in literal or
+debug-source text remain part of that field; the reader splits only the first
+separator. Structured union payloads retain their exact field counts and kind
+checks. This does not change the outer record escaping or transport schema.
+
 `native-load-argument:<load>:<zero-based ordinal>` retains parameter, passing
 mode, byte count, raw datatype, subtype, operand snapshot origin and omission
 flag. `native-load-jump:<load>:<ordinal>` retains unsigned value/target pairs.

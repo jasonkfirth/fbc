@@ -20,6 +20,7 @@ type CABIPROC
 	parameters as CABIPARAM ptr
 	next_definition as CABIPROC ptr
 	header_at as uinteger
+	body_at as uinteger
 	emit_header as integer
 	semantic_signature as longint
 end type
@@ -34,6 +35,9 @@ dim shared as TLIST c_abi_procs, c_abi_params
 dim shared as THASH c_abi_names
 dim shared as CABIPROC ptr c_abi_definitions, c_abi_definition_tail
 dim shared as integer c_abi_ready
+'' Debug storage remains named, but its body can still be inspected unless
+'' naked/general assembly hides uses. This proof does not enable dead stores.
+dim shared as integer c_abi_body_complete
 
 private sub hCAbiFinish( )
 	if( c_abi_ready = FALSE ) then exit sub
@@ -82,7 +86,7 @@ private sub hCAbiParameter _
 	( byref first as CABIPARAM ptr, byref last as CABIPARAM ptr, _
 	  byval param as FBSYMBOL ptr, byval insert_at as uinteger )
 
-	if( c_abi_ready = FALSE orelse c_local_refs_complete = FALSE ) then exit sub
+	if( c_abi_ready = FALSE orelse c_abi_body_complete = FALSE ) then exit sub
 	var storage = symbGetParamVar(param)
 	if( storage = NULL ) then exit sub
 	if( symbIsParamVar(storage) = FALSE ) then exit sub
@@ -211,6 +215,15 @@ private sub hCAbiPrepare( byval buffer as const ubyte ptr, byval size as uintege
 				select case buffer[body_first]
 				case asc(!"\t"), asc(!"\n"), asc(!"\r"), asc(" ")
 					body_first += 1
+				case asc("#")
+					'' Debug emission can reset the source line between a named
+					'' header and its brace. Skip only the directive we emit.
+					if( size - body_first < 6 ) then exit while
+					if( memcmp(buffer + body_first, strptr("#line "), 6) <> 0 ) then exit while
+					while( body_first < size )
+						if( buffer[body_first] = asc(!"\n") ) then exit while
+						body_first += 1
+					wend
 				case else
 					exit while
 				end select
@@ -225,6 +238,7 @@ private sub hCAbiPrepare( byval buffer as const ubyte ptr, byval size as uintege
 				              2, body_last) andalso (body_last + 2 < size) ) then
 					if( buffer[body_last + 2] = asc(!"\n") orelse buffer[body_last + 2] = asc(!"\r") ) then
 						entry->header_at = position
+						entry->body_at = body_first + 1
 						var param = entry->parameters
 						while( param <> NULL )
 							var name_length = cuint(len(*param->name))
@@ -275,7 +289,7 @@ private sub hCAbiSemanticHeaders( )
 	while( entry <> NULL )
 		if( entry->semantic_signature <> 0 ) then
 			dim as string header
-			if( entry->emit_header ) then
+			if( entry->emit_header and (env.clopt.debuginfo = FALSE) ) then
 				header = hCAbiUnnamedHeader(entry)
 			else
 				header = *entry->header.data
@@ -303,16 +317,40 @@ private function hCAbiWriteOutput _
 	end if
 	'' Candidate parameters already passed the procedure-local assembly
 	'' check. An opaque body elsewhere cannot refer to their local names.
-	if( env.clopt.debuginfo = FALSE ) then hCAbiPrepare(buffer, size)
+	hCAbiPrepare(buffer, size)
 	hCAbiSemanticHeaders( )
 	'' GNU11 requires parameter names in definitions. C23 permits an unnamed
 	'' parameter, so emit both headers and let the C compiler select its path.
 	'' The body and the ABI are identical in both paths. No warning attribute is
 	'' needed, and the legacy path still exposes its unused-parameter warnings.
 	dim as uinteger cursor = 0
+	dim as uinteger ignored_index = 0
 	var entry = c_abi_definitions
 	while( entry <> NULL )
 		if( entry->emit_header ) then
+			if( env.clopt.debuginfo ) then
+				'' Keep named formal storage and all existing debug line numbers.
+				'' The address is inside sizeof, so no value is read or escapes.
+				'' BASIC's unread-parameter warning was already reported from AST.
+				var position = entry->body_at
+				assert(position >= cursor andalso position <= size)
+				if( hCAbiWriteChunk(buffer + cursor, position - cursor) = FALSE ) then return FALSE
+				var param = entry->parameters
+				while( param <> NULL )
+					if( param->emit_unused ) then
+						'' A declaration keeps following local declarations before
+						'' statements, including Clang's C89 compatibility check.
+						ignored_index += 1
+						var text = " enum { fb_c_abi_ignored_" + str(ignored_index) + _
+							" = sizeof(&" + *param->name + ") };"
+						if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(text)), len(text)) = FALSE ) then return FALSE
+					end if
+					param = param->next_param
+				wend
+				cursor = position
+				entry = entry->next_definition
+				continue while
+			end if
 			var position = entry->header_at
 			var header_length = cuint(len(*entry->header.data))
 			assert(position >= cursor andalso position <= size)

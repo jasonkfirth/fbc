@@ -50,6 +50,39 @@ def check_payloads(test):
             test.assertFalse(model.named("load_assembly_label"))
 
 
+def check_tabbed_debug_text(test):
+    """Keep literal tabs without accepting extra structured union fields."""
+    source = test.source("sub DebugText(byval value as long)\n"
+                         "\tdim result as long = value + 1\n"
+                         "\tprint result\nend sub\nDebugText(3)\n", "debug-text.bas")
+    for backend in test.backends:
+        with test.subTest(backend=backend):
+            test.invoke([source], mode="off", backend=backend, extra=("-g",))
+            baseline = test.emission_path(source.stem, backend).read_bytes()
+            model = test.compile(source, backend=backend, extra=("-g",))
+            state = model.native_load_payloads[1]
+            text = [payload[1] for payload in state["payloads"].values()
+                    if payload[0] == "text"]
+            test.assertTrue(any("\t" in value for value in text))
+            for row in model.rows:
+                if row[0] == "K" and row[3].startswith("native-load-payload:"):
+                    identity = int(row[3].split(":")[1])
+                    if state["payloads"][identity][0] == "text":
+                        test.assertEqual(state["payloads"][identity][1], row[4].split("\t", 1)[1])
+            test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), baseline)
+            for kind, mutation in (("text", "discriminator"), ("call", "extra-field")):
+                rows = [row.copy() for row in model.rows]
+                row = next(row for row in rows if row[0] == "K" and
+                           row[3].startswith("native-load-payload:") and
+                           row[4].startswith(kind + "\t"))
+                if mutation == "discriminator":
+                    row[4] = "offset\t" + row[4].split("\t", 1)[1]
+                else:
+                    row[4] += "\textra"
+                with test.assertRaises(ValueError):
+                    Model(text_rows(rows))
+
+
 def check_type_abis(test):
     source = test.fixture("call-abi.bas")
     native = test.compile(source, extra=("-semantic-type-abi", "native"))

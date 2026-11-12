@@ -20,8 +20,32 @@ the 224-unit GCC-clean self-host, both complete C-backend suites, 20 native valu
 runs, four Win32 objects and two Linux ELF assembly checks. It also repairs
 GAS64 byte-address narrowing. Four unchanged example profiles lose their Clang
 strict callback-cast warning without changing other classes. Its complete
-retained-cohort refresh is running; the candidate is unselected and the totals
-below still belong to their recorded earlier compiler cuts.
+retained-cohort refresh now has 6,419 profiles, 6,313 accepted C units, GCC 198 /
+Clang 16,007. The core contributes 194 / 10,026; the extracted examples 3 / 23;
+TurboTrek build lists 0 / 1,949; additional TurboTrek contexts 1 / 3,967; and the
+maintained Tiko entry 0 / 42. Its final native-source drift guard is resolved by
+actual emitted-C dependency checks, with the raw database retained. The candidate
+is unselected while JRPG uses the pinned executable; the tables below retain
+their recorded earlier compiler cuts.
+
+A subsequent [ignored debug-parameter candidate](c-emitter-debug-parameters.md)
+preserves named formal storage and warning 54 while acknowledging unused ABI
+storage through unevaluated declarations. It passes the GCC-clean 224-unit
+self-host, both complete C-backend suites, 16 native value runs, four GDB runs,
+eight semantic models and four Win32 C objects. Its completed original-flags
+recheck of 43 debug profiles removes 176 warnings from each native tool, retains
+all other warning classes and preserves all 165 source warning 54 observations.
+These targeted results are separate from the complete totals above; they do
+not substitute for a full retained-cohort recount with the new executable.
+
+Fourteen newly recovered fbrtLib test contexts separately compile with both
+native tools: GCC 1 / Clang 6, without linking or executing those tests. The GCC
+observation is the format-extremes snprintf precision case. Actual Make dry-run
+source selection also recovers the owners of 85 foreign-platform files across
+eight target/CPU contexts. Those dry runs do not qualify foreign C compilation
+or native runtime providers. The `current-fbrt-owner-contexts-20261112` packet
+and `current-fbrt-tests-context-20261112.sqlite3` retain these distinct results;
+they are not added to the equal-coverage retained cohort.
 
 The totals below remain the last completed selected-executable census. A separate
 [JRPG and fb-ext-lib context expansion](c-emitter-newjrpg-context.md) is in

@@ -6070,6 +6070,10 @@ Next
         from load_payloads import check_payloads
         check_payloads(self)
 
+    def test_native_ast_load_payloads_preserve_tabbed_debug_text(self) -> None:
+        from load_payloads import check_tabbed_debug_text
+        check_tabbed_debug_text(self)
+
     def test_native_ast_load_payloads_preserve_both_raw_type_encodings(self) -> None:
         from load_payloads import check_type_abis
         check_type_abis(self)

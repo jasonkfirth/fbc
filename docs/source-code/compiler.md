@@ -100,6 +100,12 @@ The regression in
 [c-thread-callback-types.bas](../../tests/compiler-support/c-thread-callback-types.bas)
 also checks GAS64 address narrowing and the existing semantic call-ABI contract.
 
+Debug C keeps formal argument names even when a calling contract requires an
+ignored value. The late body inspection records an unevaluated address size in
+a local enum declaration, without changing source warning 54, runtime storage
+or debug line mappings. See [ignored debug parameters](../c-emitter-debug-parameters.md)
+and [the regression](../../tests/compiler-support/c-debug-unused-parameters.bas).
+
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage
 is released. It must not reparse text to invent a competing interpretation.

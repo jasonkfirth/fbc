@@ -240,6 +240,20 @@ def main() -> int:
                   f"{source_warnings.stdout}{source_warnings.stderr}")
             return 1
         print(source_warnings.stdout.strip())
+        debug_parameters_command = [
+            sys.executable, '-B',
+            str(root / 'tests/compiler-support/c-debug-unused-parameters.py'),
+            '--fbc', str(options.fbc.resolve()), '--prefix', str(toolchain_prefix),
+            '--gcc', os.environ.get('GCC') or 'gcc', '--work-dir', str(working)]
+        if clang:
+            debug_parameters_command += ['--clang', clang]
+        debug_parameters = subprocess.run(debug_parameters_command, cwd=root,
+                                          text=True, capture_output=True, check=False)
+        if debug_parameters.returncode:
+            print('debug parameter regression failed\n' +
+                  debug_parameters.stdout + debug_parameters.stderr)
+            return 1
+        print(debug_parameters.stdout.strip())
         # Test the C parser directly so stale installed runtime archives cannot
         # conceal a missing CRT API or a loss of native long-double precision.
         locale_test = working / ("longdouble-locale.exe" if os.name == "nt"

@@ -73,8 +73,19 @@ Both permanent C-backend regression lanes also validate the callback model.
 
 The four unchanged critical-section and timer-library profiles lose four Clang
 strict callback-cast observations, with every other warning class unchanged.
-The full retained corpus refresh is running. Its partial results do not replace
-the completed totals in [current status](c-emitter-current-status.md).
+The full retained corpus refresh is complete: 6,419 profiles, 6,313 accepted C
+units, GCC 198 / Clang 16,007. The four removed callback observations are the
+only changes against the preceding equal-coverage candidate. All other warning
+classes retain their counts; no project applications were executed.
+
+The core worker finished all 5,845 profiles, then rejected four concurrently
+edited native library files at its final input guard. Its raw database remains
+unchanged. A separate dependency reconciliation re-emits 412 fresh profiles,
+checks their exact C hashes and runs both native preprocessors' dependency
+queries. None reads the changed native files or any additional header. This
+resolves the generated-C census guard without qualifying those library edits.
+The retained label-alignment runtime proof still applies by exact C, tool,
+source and runtime-artifact identity.
 
 An intermediate adapter incorrectly discarded an integer cast and was rejected.
 The first GAS64 fix then failed the Boolean register-lifetime control and was
@@ -94,9 +105,12 @@ Receipts use the existing `build/c-emitter-forward-views-20261105/` directory:
 `thread-callback-qualification-v5-20261112`,
 `thread-callback-semantic-v5-20261112`,
 `thread-callback-gates-v5-20261112`, and
-`thread-callback-original-examples-v5-20261112` compressed packets. The running
-core database is `thread-callback-v5-queue-refresh-20261112.sqlite3`; the serial
-tail covers the retained extracted examples, TurboTrek contexts and Tiko entry.
+`thread-callback-original-examples-v5-20261112` compressed packets. The retained
+core database is `thread-callback-v5-queue-refresh-20261112.sqlite3`; the completed
+serial tail covers the retained extracted examples, TurboTrek contexts and Tiko
+entry. `thread-callback-v5-terminal-reconciliation-20261112.json.zlib` resolves
+the raw final guard, and `thread-callback-v5-cohort-close-20261112.json.zlib`
+binds all completed queues and their warning classes.
 No corpus applications are executed. PNG, moving Optical inputs and existing
 closed assembler/provider boundaries remain excluded.
 

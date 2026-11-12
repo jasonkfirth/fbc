@@ -8,8 +8,11 @@ language reference.
 
 ## Start here
 
+- [Ignored debug parameters](c-emitter-debug-parameters.md) records named formal
+  storage, preserved source warnings and the class-wide native recheck.
+
 - [Static typed thread callbacks](c-emitter-thread-callbacks.md) records native
-  adapters, preserved address casts, GAS64 narrowing and the pending full recount.
+  adapters, preserved address casts, GAS64 narrowing and the completed retained census.
 
 - [Guarded label payload qualification](c-emitter-label-guard.md) binds the
   unchanged real fixture's GCC bounds warning to both native runtime passes.

@@ -92,6 +92,10 @@ def validate_load_payloads(model, number, subject_modules, node_kinds):
         if identity not in model.native_loads.get(module, {}).get("enters", {}):
             raise ValueError("Load payload has no native load interval")
         actual_kind = node_kinds[int(model.native_loads[module]["enters"][identity][4])]
+        if family == "native-load-payload" and actual_kind == "literal-text":
+            # Source/debug text is the final free-form field. Tabs inside it
+            # are content, while every structured class retains exact arity.
+            fields = tuple(row[4].split("\t", 1))
         if family in ("native-load-shape", "native-load-payload"):
             if len(pieces) != 2:
                 raise ValueError("Scalar load payload has an unexpected ordinal")

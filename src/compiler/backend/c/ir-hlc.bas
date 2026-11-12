@@ -2113,6 +2113,7 @@ private sub hMarkReferencedLocalInTree( byval n as ASTNODE ptr )
 		wend
 		if( hCScalarAsmReferencesComplete(n->asm.tokhead) = FALSE ) then
 			c_local_refs_complete = FALSE
+			c_abi_body_complete = FALSE
 		end if
 		ctx.computedgotoopaque = TRUE
 	elseif( n->class <> AST_NODECLASS_DECL ) then
@@ -7994,6 +7995,7 @@ private sub _emitProcBegin _
 	hashInit(@c_local_refs, 256, TRUE) '' Fixed buckets; chains admit larger local sets.
 	if( env.clopt.debuginfo ) then hashInit(@c_debug_decls, 256, TRUE)
 	c_local_refs_complete = ((symbIsNaked(proc) = FALSE) and (env.clopt.debuginfo = FALSE))
+	c_abi_body_complete = (symbIsNaked(proc) = FALSE)
 	hMarkReferencedLocals( astGetProc()->l )
 	if( hCComparisonsBegin(astGetProc()->l) ) then
 		'' Recompute storage uses after comparisons lose their value operands.

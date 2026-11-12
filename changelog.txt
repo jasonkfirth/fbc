@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- compiler/C: preserve debugger-visible ignored parameters through unevaluated declarations, removing 176 GCC and 176 Clang warnings across 43 original-flags profiles while retaining source warning 54 and opaque-assembly diagnostics. Fix tabbed literal debug text in the semantic reader, add native/debugger/Win32/transport controls, and close the 6,419-profile callback census.
 - CI: give Haiku TCP smoke a configurable bounded allowance that outlasts its internal waits, report its failure status, and collect independent smoke, fbctests and Exampleageddon phase results without hiding failures; retain host-driven examples after earlier guest failures.
 - compiler/C: adapt eligible static typed ThreadCreate workers to the runtime callback ABI without extra contexts, preserving explicit address conversions and the ordinary semantic call-ABI schema. Fix GAS64 byte-address narrowing and Boolean register lifetime; add native, Win32/ELF, semantic-transport and unchanged-example controls.
 - CI: remove an index link to an unpublished library-audit draft, validate committed or staged documentation without local-file masking, and run independent native tests after a successful build even when an earlier check fails. Keep every test failure fatal and collect independent quick-test failures serially.
