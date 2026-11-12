@@ -26,7 +26,7 @@ private function hSourceComparisonFixed(byval op as integer, byval l as ASTNODE 
 	end if
 	if( r->class <> AST_NODECLASS_CONST ) then return FALSE
 	select case as const l->class
-	case AST_NODECLASS_VAR, AST_NODECLASS_FIELD, AST_NODECLASS_IDX
+	case AST_NODECLASS_VAR, AST_NODECLASS_FIELD, AST_NODECLASS_IDX, AST_NODECLASS_DEREF
 	case else
 		return FALSE
 	end select

@@ -86,7 +86,10 @@ private function hCStaticCodeCheck(byval n as ASTNODE ptr, byval sym as FBSYMBOL
 	byref seen as integer, byval value_read as integer = FALSE) as integer
 	if( n = NULL ) then return TRUE
 	select case as const n->class
-	case AST_NODECLASS_ASM, AST_NODECLASS_MACRO
+	case AST_NODECLASS_MACRO
+		if( n->op.op <> AST_OP_C_EVAL ) then return FALSE
+		return hCStaticCodeCheck(n->l, sym, seen, TRUE) andalso hCStaticCodeCheck(n->r, sym, seen, TRUE)
+	case AST_NODECLASS_ASM
 		return FALSE
 	case AST_NODECLASS_VAR
 		if( n->sym = sym ) then

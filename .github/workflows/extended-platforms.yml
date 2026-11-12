@@ -219,6 +219,8 @@ jobs:
           printf 'Verified installable package: %s\n' "${package_files[@]}"
 
       - name: Upload installable guest package
+        # Artifact storage is an output channel, not part of package qualification.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-platform-package-${{ matrix.id }}
@@ -231,6 +233,8 @@ jobs:
 
       - name: Upload guest qualification evidence
         if: always()
+        # Keep completed guest checks green when Actions artifact storage is unavailable.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-${{ matrix.id }}-evidence
@@ -290,6 +294,8 @@ jobs:
 
       - name: Upload AROS qualification evidence
         if: always()
+        # Evidence uploads must not override the emulator test result.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-aros-x86_64-evidence
@@ -384,6 +390,8 @@ jobs:
 
       - name: Upload RISC OS qualification evidence
         if: always()
+        # Evidence uploads must not override the emulator test result.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-riscos-arm-evidence
@@ -447,6 +455,8 @@ jobs:
 
       - name: Upload Windows CE compile evidence
         if: always()
+        # Evidence uploads must not override the compile qualification result.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: fbc-xl-wince-arm-compile-evidence

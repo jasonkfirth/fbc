@@ -102,7 +102,10 @@ private function hCReadOnlyLocalCheck(byval n as ASTNODE ptr, byval sym as FBSYM
 	byval value_read as integer = FALSE) as integer
 	if( n = NULL ) then return TRUE
 	select case as const n->class
-	case AST_NODECLASS_ASM, AST_NODECLASS_MACRO
+	case AST_NODECLASS_MACRO
+		if( n->op.op <> AST_OP_C_EVAL ) then return FALSE
+		return hCReadOnlyLocalCheck(n->l, sym, TRUE) andalso hCReadOnlyLocalCheck(n->r, sym, TRUE)
+	case AST_NODECLASS_ASM
 		return FALSE
 	case AST_NODECLASS_VAR
 		if( n->sym = sym ) then return value_read

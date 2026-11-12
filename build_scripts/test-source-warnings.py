@@ -54,6 +54,8 @@ def expected(case: int, bits: int, level: str) -> Counter:
         result[57] = 1
     elif case == 9:
         result[56] = 4 if bits == 64 else 3
+    elif case == 23:
+        result[56] = 1
     return result
 
 
@@ -120,16 +122,17 @@ def main() -> int:
 
         for generator, bits in (("gcc", 64), ("clang", 64), ("gas64", 64),
                                 ("gcc", 32), ("clang", 32), ("gas", 32)):
-            for case in range(1, 23):
+            for case in range(1, 24):
                 for level in ("default", "all"):
                     check(generator, bits, case, level)
             for flags in (("-O", "0"), ("-O", "2", "-g"), ("-O", "2", "-exx")):
-                for case in (1, 2, 3, 4, 5, 9):
+                for case in (1, 2, 3, 4, 5, 9, 23):
                     check(generator, bits, case, "all", flags)
-            for case in (1, 2, 3, 9, 10, 11):
+            for case in (1, 2, 3, 9, 10, 11, 23):
                 check(generator, bits, case, "none")
             check(generator, bits, 10, "all", promote=True)
             check(generator, bits, 3, "default", promote=True)
+            check(generator, bits, 23, "default", promote=True)
             print(f"SOURCE_WARNINGS_BACKEND_PASS {generator} {bits}", flush=True)
     state["checks_complete"] = True
     if args.report:

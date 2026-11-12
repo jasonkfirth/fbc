@@ -8,9 +8,9 @@ This file intentionally does NOT classify every native warning as a BASIC error.
 
 # Source warnings behind the GCC cleanup
 
-These diagnostics remain enabled in the [current selected compiler](c-emitter-debug-bindings.md).
-Its complete census has 195 GCC and 10,027 Clang observations across
-5,845 profiles. Both native compilers accept all 5,739 open C definitions.
+These diagnostics remain enabled in the [current selected compiler](c-emitter-current-status.md).
+The earlier debug-binding census recorded 195 GCC and 10,027 Clang observations
+across 5,845 profiles. Both native compilers accepted all 5,739 open C definitions.
 Historical diagnostic-only qualification used 5C78E4AD.
 
 The compiler reports these diagnostics before emitting C or assembly. Removing
@@ -37,13 +37,26 @@ warning can name an included file without moving or rescanning the lexer.
 Metadata is released at procedure completion, with a separate parser-recovery
 cleanup. The pass does not modify AST nodes or procedure signatures.
 
-Range checking currently covers direct integer variable, field and indexed
+Range checking covers direct integer variable, field and indexed
 operands up to 32 bits, compared with nonnegative integer constants. It uses the
 declared range before promotion. It conservatively excludes ambiguous unsigned
 conversions, negative constants, wider operands and inferred value ranges. For
 example, `Dim height As Long: If height = &h80000000 Then ...` cannot match on
 Win64 because the literal is positive 2147483648. The corresponding Win32
 comparison has different signedness rules and is not warned about.
+
+The current selected compiler also diagnoses typed pointer
+dereferences under warning 56. That check observes the declared type without
+evaluating the expression. All six backend/width combinations pass the new
+default/all/none, optimization/debug/runtime-check and warning-as-error controls.
+The expanded source-warning suite contains 462 checks. Selection and the complete native recount are recorded in the current status.
+
+The C rewrite retains both original integer operands as evaluated expressions,
+then produces the proven value or branch. Scalar IIF arms can be selected only
+when the condition has become a known branch and both arms assign the same
+scalar temporary. Managed results and branch-local destructor wrappers retain
+their original conditions. This preserves source feedback and lazy evaluation. Fixed zero-AND and all-ones-OR
+results also retain both operands because ordinary bitwise operators evaluate both.
 
 Null-access checking recognizes constant zero and a recent straight-line zero
 assignment to an automatic pointer. Calls, aliases, control-flow joins and
@@ -102,17 +115,26 @@ observations; these current results remain separate from this historical census.
 From the repository root, with a compiler built from these sources:
 
 ```powershell
-python -B build_scripts/test-source-warnings.py --fbc build/main-gcc/bin/fbc.exe --prefix build/main-gcc
+python -B build_scripts/test-source-warnings.py --fbc bin/fbc.exe --prefix .
 ```
 
-The regression performs 420 checks across Win32/Win64, both C generators and
+The command above assumes a normal checkout build. This campaign uses
+`build/main-gcc/bin/fbc.exe` with `--prefix build/main-gcc` to preserve the
+installed release compiler. The source changes are in the normal compiler tree;
+no private binary is required to build or run the regression elsewhere.
+
+The current regression performs 462 checks across Win32/Win64, both C generators and
 the native assembly generators, warning levels, O0/O2, debug and runtime checks.
-With `--reference <previous-fbc.exe>`, it additionally verifies 408 byte-identical
-emitted outputs. The fault examples are compiled only. The complete GCC backend
+`--reference <previous-fbc.exe>` additionally requires byte-identical emitted
+outputs for non-promoted cases. Use a reference with matching code generation;
+the indirect-range rewrite intentionally changes some outputs. The earlier
+420-check matrix qualified 408 such identities. The fault examples are compiled only. The complete GCC backend
 suite invokes this regression and passes without a whole-suite deadline.
 
-The compiler reaches an emitted-C fixed point across 224 units with zero GCC
-warnings. Strict lint covers all eleven changed or added BASIC files. Compiler
+## Earlier diagnostic-only qualification
+
+The earlier compiler reached an emitted-C fixed point across 224 units with zero
+GCC warnings. Strict lint covered its eleven changed or added BASIC files. Compiler
 structural checks pass; unchanged runtime structural results remain qualified.
 Both C generators pass Clang's original full compiler diagnostics: 1,338
 observations each, comprising 1,325 padding and 13 global-constructor observations.

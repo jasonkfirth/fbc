@@ -392,6 +392,12 @@ function astHasSideFx( byval n as ASTNODE ptr ) as integer
 		exit function
 	end if
 
+	'' C range folding retains mandatory reads through this macro. Later
+	'' simplification must neither discard nor duplicate those evaluations.
+	if( n->class = AST_NODECLASS_MACRO andalso n->op.op = AST_OP_C_EVAL ) then
+		return TRUE
+	end if
+
 	'' Most CALLs are treated as having side-effects, i.e. mustn't be
 	'' duplicated. But for some RTL procedures we know that it's safe to
 	'' duplicate calls to them, so they can be excluded here (but the CALL's

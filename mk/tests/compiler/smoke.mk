@@ -20,9 +20,19 @@ LLVM_SMOKE_LLC := $(strip $(or $(LLC),llc))
 LLVM_SMOKE_LLC_COMMAND := $(call tool_cmd,$(LLVM_SMOKE_LLC))
 LLVM_SMOKE_LLC_AVAILABLE := $(shell command -v "$(LLVM_SMOKE_LLC_COMMAND)" >/dev/null 2>&1 && echo yes)
 LLVM_SMOKE_LLC_FBC := $(if $(filter MSYS% MINGW% CYGWIN%,$(shell uname -s 2>/dev/null)),$(call fbc_msys_tool,$(LLVM_SMOKE_LLC)),$(LLVM_SMOKE_LLC))
+# Windows LLVM output needs a host Clang assembler. The 32-bit MinGW CI job
+# supplies x86_64 Clang, which can assemble the requested i686 target.
+LLVM_SMOKE_CLANG := $(strip $(or $(CLANG),clang))
+LLVM_SMOKE_CLANG_COMMAND := $(call tool_cmd,$(LLVM_SMOKE_CLANG))
+LLVM_SMOKE_CLANG_AVAILABLE := $(shell command -v "$(LLVM_SMOKE_CLANG_COMMAND)" >/dev/null 2>&1 && echo yes)
+LLVM_SMOKE_CLANG_FBC := $(if $(filter MSYS% MINGW% CYGWIN%,$(shell uname -s 2>/dev/null)),$(call fbc_msys_tool,$(LLVM_SMOKE_CLANG)),$(LLVM_SMOKE_CLANG))
+LLVM_SMOKE_AVAILABLE := $(LLVM_SMOKE_LLC_AVAILABLE)
+ifeq ($(TARGET_OS),win32)
+LLVM_SMOKE_AVAILABLE := $(if $(and $(filter yes,$(LLVM_SMOKE_LLC_AVAILABLE)),$(filter yes,$(LLVM_SMOKE_CLANG_AVAILABLE))),yes,no)
+endif
 # LLVM receives the target in its options, so this uses the host llc directly.
 # Native Windows fbc needs the MSYS2 path converted to a Windows executable path.
-LLVM_SMOKE_TEST_FBC_CMD = env LLC="$(LLVM_SMOKE_LLC_FBC)" "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
+LLVM_SMOKE_TEST_FBC_CMD = env LLC="$(LLVM_SMOKE_LLC_FBC)" CLANG="$(LLVM_SMOKE_CLANG_FBC)" "$(TEST_FBC)" $(TEST_FBC_TARGET_ARGS) $(TEST_FBC_BUILDPREFIX_ARGS)
 
 .PHONY: compiler-smoke compiler-clongdouble-abi-smoke compiler-semantic-model-smoke compiler-indirect-goto-smoke compiler-riscv32-smoke compiler-riscv64-smoke compiler-s390x-smoke compiler-loongarch64-smoke compiler-mips-smoke compiler-ppc-smoke compiler-ppc64-smoke compiler-ppc64le-smoke compiler-riscos-smoke
 compiler-smoke: libs
@@ -32,13 +42,13 @@ compiler-smoke: libs
 	$(call _mt_run,$(TEST_FBC_CMD) "$(TEST_TMP)/smoke.bas" -x "$(TEST_TMP)/smoke$(EXEEXT)")
 ifneq ($(CAN_RUN),)
 	@./"$(TEST_TMP)/smoke$(EXEEXT)" >/dev/null 2>&1 && echo "==> RUN OK"
-ifeq ($(LLVM_SMOKE_LLC_AVAILABLE),yes)
+ifeq ($(LLVM_SMOKE_AVAILABLE),yes)
 	$(call _mt_echo,LLVM duplicate extern global smoke test)
 	$(call _mt_run,$(CC) -c "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.c" -o "$(TEST_TMP)/llvm-duplicate-extern-global.o")
 	$(call _mt_run,$(LLVM_SMOKE_TEST_FBC_CMD) -i "$(rootdir)/inc" "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.bas" "$(TEST_TMP)/llvm-duplicate-extern-global.o" -x "$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
 	$(call _mt_run,./"$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
 else
-	$(call _mt_echo,LLVM duplicate extern global smoke test skipped; llc is unavailable)
+	$(call _mt_echo,LLVM duplicate extern global smoke test skipped; required LLVM tools are unavailable)
 endif
 endif
 	$(call _mt_cleanup_success)

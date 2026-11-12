@@ -2145,6 +2145,11 @@ private sub hMarkReferencedCStatement( byval n as ASTNODE ptr, byref fallthrough
 end sub
 
 private sub hMarkReferencedLocals( byval n as ASTNODE ptr )
+	'' Direct C GOSUB calls address this context through emitted runtime calls,
+	'' even when no RETURN or reachable procedure exit supplies an AST read.
+	if( symbGetProcStatGosub(ctx.currproc) ) then
+		hRememberCLocalReference(symbGetProcGosubSym(ctx.currproc))
+	end if
 	dim as integer fallthrough = TRUE
 	while( n <> NULL )
 		hMarkReferencedCStatement(n, fallthrough)
@@ -4161,6 +4166,10 @@ private function hEmitFloat _
 		byval dtype as integer, _
 		byval value as double _
 	) as string
+
+	'' Immediate values retain storage qualifiers and C alias flags in the IR.
+	'' Select the literal suffix and special-value builtin from the scalar width.
+	dtype = typeGetDtAndPtrOnly( dtype )
 
 	dim as string s
 	dim as ulong expval = any
@@ -6773,6 +6782,12 @@ private sub _emitMacro _
 	dim as CVAPOINTERCURSOR left_cursor, right_cursor
 
 	select case op
+	case AST_OP_C_EVAL
+		'' Retain each original operand read before a proven branch or value.
+		hWriteLine("(void)(" + exprFlush(exprNewVREG(v1)) + ");")
+		hWriteLine("(void)(" + exprFlush(exprNewVREG(v2)) + ");")
+		exit sub
+
 	case AST_OP_VA_START
 		l = hCVaPointerOperand(v1, left_cursor, (op <> AST_OP_VA_START), TRUE)
 		r = hCVaStartParameter(v2)

@@ -1,4 +1,9 @@
 #!/bin/sh
+# Project: FreeBASIC DragonFly packaging
+# File: build_scripts/dragonfly-build-freebasic.sh
+# Purpose: Build and stage the native compiler and runtime package.
+# Responsibilities: Prepare dependencies, compile, stage and package the tree.
+# This file contains no VM lifecycle or guest test orchestration.
 
 set -eu
 
@@ -117,8 +122,9 @@ echo "==> package: ${PKGNAME}-${PKGVERSION}"
 if [ "$NO_BUILD" -eq 0 ]; then
     run pkg update -f
 
-    # The live image can have rsync registered without its shared libraries.
-    run pkg install -f -y rsync
+    # The live image can retain package records while shared libraries are missing.
+    # Refresh installed consumers too when OpenSSL changes its shared-library ABI.
+    run pkg install -f -R -y openssl rsync
     rsync --version >/dev/null
 
     run pkg install -y \
@@ -297,3 +303,5 @@ run ${PREFIX}/bin/fbc /tmp/fb.bas -x /tmp/fb
 CLEANUP_SUCCESS=1
 
 echo "==> SUCCESS"
+
+# end of build_scripts/dragonfly-build-freebasic.sh

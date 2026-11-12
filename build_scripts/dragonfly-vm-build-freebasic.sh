@@ -481,9 +481,12 @@ chmod 1777 /work/tmp
 cp -a /usr/local/. /work/local/
 mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
-pkg update -f
-# Refresh curl before the build's package and log uploads.
-pkg install -f -y curl
+pkg-static update -f
+# The live image and repository can use different OpenSSL sonames. Upgrade
+# libssh2 explicitly with curl: pkg's self-upgrade can restart the transaction
+# without refreshing that already-installed dependency. Use the static client
+# while replacing libraries that the ordinary package client may also load.
+pkg-static install -f -y openssl libssh2 curl
 curl --version >/dev/null
 
 fetch -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
@@ -726,9 +729,10 @@ chmod 1777 /work/tmp
 cp -a /usr/local/. /work/local/
 mount_null /work/local /usr/local || mount_nullfs /work/local /usr/local
 
-pkg update -f
-# The test VM starts from the same image, so refresh both runtime tools there.
-pkg install -f -y curl rsync
+pkg-static update -f
+# The test VM starts from the same image. Keep its runtime-tool transaction
+# consistent with the build VM, including curl's libssh2 dependency.
+pkg-static install -f -y openssl libssh2 curl rsync
 curl --version >/dev/null
 rsync --version >/dev/null
 pkg install -y \\

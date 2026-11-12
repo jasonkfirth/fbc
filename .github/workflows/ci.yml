@@ -34,9 +34,24 @@ on:
     branches:
       - master
   workflow_dispatch:
+    inputs:
+      ci_scope:
+        description: Qualification scope (normal commits always run all jobs)
+        type: choice
+        default: all
+        options:
+          - all
+          - macos-arm64
+      macos_arm64_runner:
+        description: Native ARM64 image, selectable during hosted capacity shortages
+        type: choice
+        default: macos-26
+        options:
+          - macos-26
+          - macos-15
 
 concurrency:
-  group: fbc-xl-ci-${{ github.workflow }}-${{ github.ref }}
+  group: fbc-xl-ci-${{ github.workflow }}-${{ github.ref }}${{ inputs.ci_scope == 'macos-arm64' && '-macos-arm64' || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -50,6 +65,7 @@ env:
 
 jobs:
   c-lint:
+    if: inputs.ci_scope != 'macos-arm64'
     name: C/C++ whole-tree lint
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -134,6 +150,7 @@ jobs:
             bootstrap/win32-aarch64/
 
   linux:
+    if: inputs.ci_scope != 'macos-arm64'
     name: Linux ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: ${{ matrix.runner }}
@@ -243,6 +260,7 @@ jobs:
             tests/log-tests-results-*.log
 
   windows:
+    if: inputs.ci_scope != 'macos-arm64'
     name: Windows ${{ matrix.name }}
     needs: bootstrap-sources
     runs-on: windows-latest
@@ -379,6 +397,7 @@ jobs:
             tests/log-tests-results-*.log
 
   linux-targets:
+    if: inputs.ci_scope != 'macos-arm64'
     name: Linux target matrix
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -567,19 +586,19 @@ jobs:
   macos:
     name: macOS ${{ matrix.name }}
     needs: bootstrap-sources
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.name == 'arm64' && (inputs.macos_arm64_runner || 'macos-26') || matrix.runner }}
     # Keep the complete serial qualification within one bounded native job.
     timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: arm64
-            runner: macos-15
-            bootstrap_target: darwin-aarch64
-          - name: x86_64
-            runner: macos-15-intel
-            bootstrap_target: darwin-x86_64
+        # Keep the source bootstrap prerequisite, but avoid rerunning unrelated
+        # native suites when only the hosted ARM64 runner failed to start.
+        include: >-
+          ${{ fromJSON(inputs.ci_scope == 'macos-arm64' &&
+          '[{"name":"arm64","runner":"macos-26","bootstrap_target":"darwin-aarch64"}]' ||
+          '[{"name":"arm64","runner":"macos-26","bootstrap_target":"darwin-aarch64"},
+          {"name":"x86_64","runner":"macos-15-intel","bootstrap_target":"darwin-x86_64"}]') }}
 
     env:
       # Homebrew GCC does not support the Intel assembly spelling used by
@@ -674,6 +693,7 @@ jobs:
             tests/log-tests-results-*.log
 
   windows-arm64:
+    if: inputs.ci_scope != 'macos-arm64'
     name: Windows ARM64 cross target
     runs-on: windows-latest
     timeout-minutes: 120
@@ -764,6 +784,7 @@ jobs:
             tests/log-tests-results-*.log
 
   windows-arm64-native:
+    if: inputs.ci_scope != 'macos-arm64'
     name: Windows ARM64 native
     needs: bootstrap-sources
     runs-on: windows-11-arm
@@ -874,6 +895,7 @@ jobs:
             tests/log-tests-results-*.log
 
   mips:
+    if: inputs.ci_scope != 'macos-arm64'
     name: Linux MIPS QEMU qualification
     runs-on: ubuntu-24.04
     timeout-minutes: 150

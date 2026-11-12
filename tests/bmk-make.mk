@@ -1,5 +1,8 @@
 # bmk-make.mk
 # This file is part of the FreeBASIC test suite
+# Purpose: Build single/multi-module tests and check their runtime status.
+# Responsibilities: Select tools, compile, link and retain failing exit codes.
+# This file contains no test discovery or saved-log summary policy.
 #
 # make file for building mutiple-module tests
 # and testing run-time assertions
@@ -185,7 +188,8 @@ $(APP) : $(OBJS) $(EXTRA_OBJSX)
 endif
 
 run_test_ok : $(APP)
-	@if $(RUN_APP) ; then true ; else false ; fi
+	@if $(RUN_APP) ; then true ; else \
+		status=$$?; echo "Test $(APP) exited with status $$status" >&2; exit $$status; fi
 
 run_test_fail : $(APP)
 	@if $(RUN_APP) ; then false ; else true ; fi
@@ -194,3 +198,5 @@ run_test_fail : $(APP)
 clean:
 	@$(ECHO) Cleaning $(SRCDIR)$(MAIN_MODULE) files ...
 	@$(RM) $(OBJS) $(EXTRA_OBJSX) $(APP)
+
+# end of bmk-make.mk

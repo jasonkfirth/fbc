@@ -8,6 +8,9 @@ language reference.
 
 ## Start here
 
+- [Hosted CI recovery](ci-recovery.md) explains runner allocation failures,
+  selectable macOS ARM64 images and scoped manual qualification.
+
 - [Window metrics and software keyboards](../doc/window-keyboard.md) documents
   browser and Android usable geometry, density, rotation, IME requests and
   observation, including the shared gfxlib2/gfxlib3 `ScreenControl` contract.
