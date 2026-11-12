@@ -72,7 +72,28 @@ env:
   JOBS: 4
 
 jobs:
+  changes:
+    name: Select CI scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_builds: ${{ steps.scope.outputs.run_builds }}
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Check CI scope contracts
+        run: python3 -B build_scripts/test-ci-change-scope.py
+      - name: Select qualification scope
+        id: scope
+        env:
+          CI_SOURCE_REF: ${{ inputs.source_ref }}
+        run: python3 -B build_scripts/ci-change-scope.py
+
   qemu-guests:
+    needs: changes
+    if: needs.changes.outputs.run_builds == 'true'
     name: ${{ matrix.name }} native package (fbctests + Exampleageddon)
     runs-on: ubuntu-24.04
     timeout-minutes: 360
@@ -247,8 +268,9 @@ jobs:
             ${{ matrix.log_path }}/
 
   aros:
+    needs: changes
     name: AROS x86_64 (fbctests + Exampleageddon)
-    if: ${{ !inputs.package_guests_only }}
+    if: needs.changes.outputs.run_builds == 'true' && !inputs.package_guests_only
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
@@ -308,8 +330,9 @@ jobs:
             out/aros/exampleageddon/
 
   riscos:
+    needs: changes
     name: RISC OS ARM (fbctests + Exampleageddon)
-    if: ${{ !inputs.package_guests_only }}
+    if: needs.changes.outputs.run_builds == 'true' && !inputs.package_guests_only
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
@@ -406,8 +429,9 @@ jobs:
             out/riscos/gccsdk/gcc4/build-*-output.txt
 
   wince:
+    needs: changes
     name: Windows CE ARM ROM-free compile qualification
-    if: ${{ !inputs.package_guests_only }}
+    if: needs.changes.outputs.run_builds == 'true' && !inputs.package_guests_only
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 

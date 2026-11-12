@@ -23,7 +23,7 @@ language reference.
 - [Hosted CI recovery](ci-recovery.md) explains runner allocation failures,
   master run scheduling, selectable macOS ARM64 images and scoped native
   macOS/Windows ARM64 qualification, independent test steps and committed
-  documentation checks.
+  documentation checks, including conservative documentation-only scheduling.
 
 - [Window metrics and software keyboards](../doc/window-keyboard.md) documents
   browser and Android usable geometry, density, rotation, IME requests and

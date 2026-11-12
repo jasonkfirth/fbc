@@ -36,7 +36,7 @@ on:
   workflow_dispatch:
     inputs:
       ci_scope:
-        description: Qualification scope (normal commits always run all jobs)
+        description: Qualification scope (source changes always run all jobs)
         type: choice
         default: all
         options:
@@ -67,6 +67,23 @@ env:
   BOOTSTRAP_VERSION: "1.10.1"
 
 jobs:
+  changes:
+    name: Select CI scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_builds: ${{ steps.scope.outputs.run_builds }}
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Check CI scope contracts
+        run: python3 -B build_scripts/test-ci-change-scope.py
+      - name: Select qualification scope
+        id: scope
+        run: python3 -B build_scripts/ci-change-scope.py
+
   source-docs:
     if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
     name: Source documentation
@@ -84,7 +101,8 @@ jobs:
         run: python3 -B build_scripts/check-source-docs.py --revision HEAD
 
   c-lint:
-    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope == '' || inputs.ci_scope == 'all')
+    needs: changes
     name: C/C++ whole-tree lint
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -118,6 +136,8 @@ jobs:
           path: ${{ runner.temp }}/fbc-cppcheck.log
 
   bootstrap-sources:
+    if: needs.changes.outputs.run_builds == 'true'
+    needs: changes
     name: Generate native bootstrap sources
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -169,9 +189,9 @@ jobs:
             bootstrap/win32-aarch64/
 
   linux:
-    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope == '' || inputs.ci_scope == 'all')
     name: Linux ${{ matrix.name }}
-    needs: bootstrap-sources
+    needs: [changes, bootstrap-sources]
     runs-on: ${{ matrix.runner }}
     # Serial semantic contracts and both corpora exceeded the old job budget.
     timeout-minutes: 240
@@ -284,9 +304,9 @@ jobs:
             tests/log-tests-results-*.log
 
   windows:
-    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope == '' || inputs.ci_scope == 'all')
     name: Windows ${{ matrix.name }}
-    needs: bootstrap-sources
+    needs: [changes, bootstrap-sources]
     runs-on: windows-latest
     # The x86 smoke suite can take 90 minutes on hosted Windows runners.
     # Leave time for bootstrap, fbctests, syntax checks, and examples.
@@ -425,7 +445,8 @@ jobs:
             tests/log-tests-results-*.log
 
   linux-targets:
-    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope == '' || inputs.ci_scope == 'all')
+    needs: changes
     name: Linux target matrix
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -612,9 +633,9 @@ jobs:
             bootstrap/
 
   macos:
-    if: inputs.ci_scope != 'windows-arm64'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope != 'windows-arm64')
     name: macOS ${{ matrix.name }}
-    needs: bootstrap-sources
+    needs: [changes, bootstrap-sources]
     runs-on: ${{ matrix.name == 'arm64' && (inputs.macos_arm64_runner || 'macos-26') || matrix.runner }}
     # Keep the complete serial qualification within one bounded native job.
     timeout-minutes: 240
@@ -728,7 +749,8 @@ jobs:
             tests/log-tests-results-*.log
 
   windows-arm64:
-    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope == '' || inputs.ci_scope == 'all')
+    needs: changes
     name: Windows ARM64 cross target
     runs-on: windows-latest
     timeout-minutes: 120
@@ -819,9 +841,9 @@ jobs:
             tests/log-tests-results-*.log
 
   windows-arm64-native:
-    if: inputs.ci_scope != 'macos-arm64'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope != 'macos-arm64')
     name: Windows ARM64 native
-    needs: bootstrap-sources
+    needs: [changes, bootstrap-sources]
     runs-on: windows-11-arm
     # Native ARM64 runs the same hundreds-case quick-test suite more slowly.
     # Keep the full hosted-runner window for the remaining qualification steps.
@@ -935,7 +957,8 @@ jobs:
             tests/log-tests-results-*.log
 
   mips:
-    if: inputs.ci_scope == '' || inputs.ci_scope == 'all'
+    if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope == '' || inputs.ci_scope == 'all')
+    needs: changes
     name: Linux MIPS QEMU qualification
     runs-on: ubuntu-24.04
     timeout-minutes: 150

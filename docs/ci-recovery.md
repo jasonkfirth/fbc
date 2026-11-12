@@ -23,8 +23,9 @@ image worked.
 
 The scoped run still generates its source bootstrap. It skips unrelated
 platform jobs and uses a separate concurrency group so recovery does not
-cancel a full run on the same branch. Pushes and pull requests always run the
-full matrix. Manual runs default to `all` and can also override the ARM64 image.
+cancel a full run on the same branch. Source changes in pushes and pull requests
+run the full matrix. Manual runs default to `all` and can also override the
+ARM64 image.
 
 For a native Windows ARM64 failure, select `windows-arm64` as `ci_scope`.
 This runs the source bootstrap and the complete Windows ARM64 lane, including
@@ -48,6 +49,31 @@ Automatic package builds accept successful CI triggered by a master push.
 Manual recovery runs do not trigger package builds, even when they succeed.
 Build and test failures remain failures; runner shortages are not converted
 into passing qualification.
+
+## Documentation-only commits
+
+The main and extended workflows first compare the tested checkout against the
+push's `before` commit or the pull request's base commit. Changes confined to
+`readme.txt`, `changelog.txt`, Markdown under `docs/`, or Markdown/Wakka pages
+under `doc/manual/cache/` run scope regression tests and the independent source
+documentation checks. They skip compiler, analyzer and guest builds. Programs
+and build inputs inside those directories still require full qualification.
+
+The comparison covers the entire push, including source changes before a final
+documentation commit. Renames include both the old and new paths, so moving
+source into a documentation directory cannot hide its deletion. Unknown paths,
+an empty comparison, an initial push or unavailable shallow history select the
+full matrix. The checkout retains only two commits; scope detection does not
+download a full history to optimize a documentation change. Manual, scheduled,
+tag and explicit source-ref qualification also retain their existing builds.
+
+Automatic packages inspect the completed main run's jobs using read-only Actions
+access. A successful scope planner and documentation check together with an
+intentionally skipped bootstrap identify a documentation-only run. That run
+does not trigger packages and does not claim native compiler qualification.
+Older workflow layouts retain package builds; an API error fails the package
+scope job visibly. Direct manual, scheduled and tagged package requests retain
+their existing behavior. Scope changes do not affect workflows already running.
 
 ## Independent validation after a successful build
 
