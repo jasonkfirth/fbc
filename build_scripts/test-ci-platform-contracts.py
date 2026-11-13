@@ -5,7 +5,7 @@ Purpose: Check analyzer models and small native platform contracts.
 Responsibilities: Retain data-flow diagnostics, reject CE precision loss,
 exercise the JavaScript path provider, verify dependency mirror fallback,
 check guest package setup against stale shared-library dependencies, and
-retain independent Haiku test phases and bounded timeout diagnostics.
+retain independent Haiku/FreeBSD test phases and bounded timeout diagnostics.
 This file intentionally does NOT install tools or emulate a target system.
 """
 import argparse
@@ -256,6 +256,84 @@ def check_haiku_phases(root, work):
     print('CI_HAIKU_PHASES_PASS combinations=8 python-fallback timeout-cases=6 host-cases=3')
 
 
+def check_freebsd_phases(root, work):
+    """Keep each real guest phase fatal while collecting independent suites."""
+    source = (root / 'build_scripts/freebsd-vm-build-freebasic.sh').read_text()
+    guest = source.split("cat > \"$path\" <<'EOF'\n", 1)[1].split('\nEOF\n', 1)[0]
+    dispatch = 'case "${1:-}" in\n' + guest.split('case "${1:-}" in\n', 1)[1].split('\nesac\n', 1)[0] + '\nesac\n'
+    setup = guest.split('# Package setup and compiler verification', 1)[1]
+    setup = '# Package setup and compiler verification' + setup.split('\ntest_status=0\n', 1)[0]
+    collector = 'test_status=0\n' + guest.split('\ntest_status=0\n', 1)[1]
+    script = work / 'freebsd-phases.sh'
+    script.write_text(
+        '#!/usr/bin/env bash\nset -euo pipefail\n'
+        'fail() { echo "ERROR: $*" >&2; exit 1; }\n'
+        'run() { "$@"; }\nstart_xvfb() { :; }\nstop_xvfb() { :; }\n'
+        'su() { return "$MOCK_SETUP_STATUS"; }\nfbc() { :; }\n'
+        'phase_body() { echo "$1" >> "$MOCK_LOG"; return "$2"; }\n'
+        'run_package_smokes() { phase_body smoke "$MOCK_SMOKE_STATUS"; '
+        'echo smoke-finished >> "$MOCK_LOG"; }\n'
+        'run_fbctests() { phase_body fbctests "$MOCK_FBCTESTS_STATUS"; '
+        'echo fbctests-finished >> "$MOCK_LOG"; }\n'
+        'run_exampleageddon() { phase_body exampleageddon "$MOCK_EXAMPLES_STATUS"; '
+        'echo exampleageddon-finished >> "$MOCK_LOG"; }\n' + dispatch + setup + collector)
+    phases = ('smoke', 'fbctests', 'exampleageddon')
+    log = work / 'freebsd-phases.log'
+    for mask in range(8):
+        log.unlink(missing_ok=True)
+        statuses = [17 if mask & (1 << index) else 0 for index in range(3)]
+        environment = os.environ.copy()
+        environment.update(MOCK_LOG=str(log), MOCK_SETUP_STATUS='0', CXX='mock-cxx',
+                           MOCK_SMOKE_STATUS=str(statuses[0]),
+                           MOCK_FBCTESTS_STATUS=str(statuses[1]),
+                           MOCK_EXAMPLES_STATUS=str(statuses[2]))
+        result = subprocess.run(['bash', str(script)], env=environment,
+                                text=True, capture_output=True, timeout=15)
+        expected = []
+        for phase, status in zip(phases, statuses):
+            expected.append(phase)
+            if not status:
+                expected.append(phase + '-finished')
+            elif f'{phase} failed with status 17' not in result.stderr:
+                raise RuntimeError('FreeBSD collector lost a phase exit status')
+        if log.read_text().splitlines() != expected or result.returncode != bool(mask):
+            raise RuntimeError(f'FreeBSD phases stopped early or hid failure: {mask}\n'
+                               f'{result.stdout}{result.stderr}')
+        if ('TEST PASSED' in result.stdout) != (mask == 0):
+            raise RuntimeError('FreeBSD collector reported false success')
+    log.unlink()
+    environment['MOCK_SETUP_STATUS'] = '19'
+    result = subprocess.run(['bash', str(script)], env=environment,
+                            text=True, capture_output=True, timeout=15)
+    if result.returncode != 19 or log.exists():
+        raise RuntimeError('FreeBSD package setup failure did not stop qualification')
+
+    tcp = guest.split('echo "==> running TCP loopback smoke"\n', 1)[1].split('\nstart_xvfb\n', 1)[0]
+    script.write_text('#!/usr/bin/env bash\nset -euo pipefail\n'
+                      'fail() { echo "ERROR: $*" >&2; exit 1; }\n'
+                      'timeout() { echo "timeout=$*"; return "$MOCK_TCP_STATUS"; }\n' + tcp)
+    cases = ((None, 0, 600), ('900', 0, 900), ('600', 124, 600),
+             ('600', 23, 600), ('0', 0, None), ('invalid', 0, None))
+    for value, status, expected_limit in cases:
+        environment = os.environ.copy()
+        environment.pop('FREEBSD_TCP_SMOKE_TIMEOUT', None)
+        environment['MOCK_TCP_STATUS'] = str(status)
+        if value is not None:
+            environment['FREEBSD_TCP_SMOKE_TIMEOUT'] = value
+        result = subprocess.run(['bash', str(script)], env=environment,
+                                text=True, capture_output=True, timeout=15)
+        if (result.returncode == 0) != (expected_limit is not None and status == 0):
+            raise RuntimeError('FreeBSD TCP timeout hid a failure or accepted an invalid limit')
+        if expected_limit is not None:
+            if f'timeout=-k 5 {expected_limit} /work/smoke/tcp' not in result.stdout:
+                raise RuntimeError('FreeBSD TCP timeout lost its termination bound')
+            if status and f'status {status} (limit {expected_limit}s)' not in result.stderr:
+                raise RuntimeError('FreeBSD TCP failure lost its status or limit')
+        elif 'timeout=' in result.stdout:
+            raise RuntimeError('FreeBSD TCP command ran with an invalid limit')
+    print('CI_FREEBSD_PHASES_PASS combinations=8 setup-failure timeout-cases=6')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--gcc', default=os.environ.get('GCC') or 'gcc')
@@ -268,6 +346,7 @@ def main():
         check_source_fetch(root, work)
         check_dragonfly_tools(root, work)
         check_haiku_phases(root, work)
+        check_freebsd_phases(root, work)
         source = work / 'model.c'
         command = [options.cppcheck, '--quiet', '--platform=unix64',
                    '--enable=warning,performance,portability', '--error-exitcode=1',

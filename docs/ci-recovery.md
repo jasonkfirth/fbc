@@ -120,6 +120,32 @@ different bound. The log records the exit status and configured limit on
 failure, including status 124 for a timeout. A longer allowance does not turn
 timeouts or failed assertions into passes.
 
+FreeBSD also runs package smoke tests, fbctests and Exampleageddon in separate
+Bash processes after package setup and compiler verification succeed. Each
+phase owns its virtual display and cleanup. Failed phases remain fatal, later
+phases still run, and available Exampleageddon reports are collected with the
+failure logs. Its TCP smoke defaults to 600 seconds plus a five-second forced
+termination allowance; `FREEBSD_TCP_SMOKE_TIMEOUT` selects another positive
+integer limit. The former 60-second wrapper could expire before the test's
+own stream and burst bounds.
+
+The FreeBSD failure in run `43345415529` reached the TCP test's peer-closure
+assertion while data remained readable. The loopback test had assumed that a
+four-byte array `GET` always returned the entire payload. TCP can split that
+payload between reads. The test now checks `bytesread` and receives the rest
+before acknowledging completion. A deterministic regression withholds the
+tail until the first array read returns, and also checks complete, truncated
+and empty streams. It runs during FreeBSD package smoke qualification:
+
+```sh
+python3 -B tests/compiler-support/tcp-short-read.py --fbc ./bin/fbc
+```
+
+Use `--clang` to repeat the checks through the Clang backend. This corrects a
+test assumption; it does not change the runtime's short-read behavior or retry
+a failing suite until it passes. Local GCC/Clang loopback checks and phase
+contracts do not replace execution of the updated FreeBSD guest job.
+
 ## Checking exactly what will be committed
 
 Local drafts can conceal missing links. The source checker can read an immutable

@@ -4,6 +4,8 @@
 # FreeBASIC FreeBSD VM package builder
 ##############################################################################
 #
+# File: build_scripts/freebsd-vm-build-freebasic.sh
+#
 # Purpose:
 #
 #   Build and test the FreeBSD x86_64 FreeBASIC package from a Debian/Ubuntu
@@ -767,8 +769,6 @@ run_exampleageddon() {
 	echo "==> exampleageddon passed"
 }
 
-trap stop_xvfb EXIT
-
 export PATH=/usr/local/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin:$PATH
 export CXX="${CXX:-$(resolve_gnu_cxx)}"
 
@@ -780,44 +780,9 @@ prepare_audio_device() {
 	ls -l /dev/dsp* || true
 }
 
-echo "==> installing package test dependencies"
-export ASSUME_ALWAYS_YES=yes
-su -m root -c 'env ASSUME_ALWAYS_YES=yes IGNORE_OSVERSION=yes pkg install -y \
-	bash \
-	binutils \
-	gcc \
-	gmake \
-	libffi \
-	libglvnd \
-	libX11 \
-	libXau \
-	libXcursor \
-	libXdmcp \
-	libXext \
-	libXi \
-	libXinerama \
-	libXpm \
-	libXrandr \
-	libXrender \
-	libXxf86vm \
-	libxcb \
-	mesa-libs \
-	ncurses \
-	pkgconf \
-	rsync \
-	terminfo-db \
-	xauth \
-	xorg-vfbserver'
-
-echo "==> reinstalling FreeBASIC package"
-su -m root -c 'pkg delete -y freebasic >/dev/null 2>&1 || true'
-run su -m root -c 'env ASSUME_ALWAYS_YES=yes pkg install -y /work/package/freebasic-*.pkg'
-
-echo "==> verifying fbc"
-command -v fbc
-fbc -version
-echo "CXX=$CXX"
-
+# Keep errexit active inside each independent suite. Testing a shell function
+# directly in an if-condition would also disable errexit inside that function.
+run_package_smokes() {
 mkdir -p /work/smoke
 
 cat > /work/smoke/console.bas <<'FBEOF'
@@ -1013,11 +978,23 @@ run fbc /work/fbctests-source/tests/crt/curses.bas -x /work/smoke/curses-bi
 echo "==> running curses.bi API smoke"
 run /work/smoke/curses-bi
 
+echo "==> checking fragmented TCP payload reads"
+run /usr/local/bin/python3.12 /work/freebasic-source/tests/compiler-support/tcp-short-read.py
+
 echo "==> compiling TCP loopback smoke"
 run fbc -mt /work/fbctests-source/tests/file/tcp.bas -x /work/smoke/tcp
 
 echo "==> running TCP loopback smoke"
-timeout 60 /work/smoke/tcp
+tcp_timeout="${FREEBSD_TCP_SMOKE_TIMEOUT:-600}"
+case "$tcp_timeout" in
+	''|*[!0-9]*|0) fail "FREEBSD_TCP_SMOKE_TIMEOUT must be a positive integer" ;;
+esac
+if timeout -k 5 "$tcp_timeout" /work/smoke/tcp; then
+	:
+else
+	tcp_status=$?
+	fail "TCP loopback smoke exited with status $tcp_status (limit ${tcp_timeout}s)"
+fi
 
 start_xvfb
 
@@ -1065,8 +1042,67 @@ grep -qi '^sfx-driver=freebsd oss' /work/smoke/sfx.out || fail "sfx smoke did no
 	fail "sfx smoke wrote stderr"
 }
 
-run_fbctests
-run_exampleageddon
+}
+
+case "${1:-}" in
+	--smoke) trap stop_xvfb EXIT; run_package_smokes; exit ;;
+	--fbctests) trap stop_xvfb EXIT; start_xvfb; run_fbctests; exit ;;
+	--exampleageddon) trap stop_xvfb EXIT; start_xvfb; run_exampleageddon; exit ;;
+	'') ;;
+	*) fail "unknown test phase: $1" ;;
+esac
+
+# Package setup and compiler verification must succeed before running suites.
+echo "==> installing package test dependencies"
+export ASSUME_ALWAYS_YES=yes
+su -m root -c 'env ASSUME_ALWAYS_YES=yes IGNORE_OSVERSION=yes pkg install -y \
+	bash \
+	binutils \
+	gcc \
+	gmake \
+	libffi \
+	libglvnd \
+	libX11 \
+	libXau \
+	libXcursor \
+	libXdmcp \
+	libXext \
+	libXi \
+	libXinerama \
+	libXpm \
+	libXrandr \
+	libXrender \
+	libXxf86vm \
+	libxcb \
+	mesa-libs \
+	ncurses \
+	pkgconf \
+	rsync \
+	terminfo-db \
+	xauth \
+	xorg-vfbserver'
+
+echo "==> reinstalling FreeBASIC package"
+su -m root -c 'pkg delete -y freebasic >/dev/null 2>&1 || true'
+run su -m root -c 'env ASSUME_ALWAYS_YES=yes pkg install -y /work/package/freebasic-*.pkg'
+
+echo "==> verifying fbc"
+command -v fbc
+fbc -version
+echo "CXX=$CXX"
+
+test_status=0
+for phase in smoke fbctests exampleageddon; do
+	echo "==> starting FreeBSD test phase: $phase"
+	if "$BASH" "$0" "--$phase"; then
+		echo "==> FreeBSD test phase passed: $phase"
+	else
+		phase_status=$?
+		echo "ERROR: FreeBSD test phase $phase failed with status $phase_status" >&2
+		test_status=1
+	fi
+done
+[ "$test_status" -eq 0 ] || fail "one or more FreeBSD test phases failed"
 
 echo "==> TEST PASSED"
 EOF
@@ -1115,6 +1151,8 @@ EOF
 	then
 		rm -f "$LOG_DIR/freebasic-freebsd-test.log"
 		scp_from_guest "$key" "$port" "/work/freebasic-freebsd-test.log" "$LOG_DIR/" || true
+		scp_from_guest "$key" "$port" "/work/exampleageddon/report.md" "$LOG_DIR/exampleageddon-report.md" || true
+		scp_from_guest "$key" "$port" "/work/exampleageddon/results.csv" "$LOG_DIR/exampleageddon-results.csv" || true
 		tail -n 200 "$LOG_DIR/freebasic-freebsd-test.log" >&2 || true
 		die "FreeBSD package smoke tests or fbctests failed"
 	fi

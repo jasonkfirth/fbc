@@ -29,6 +29,8 @@ Opens a TCP client connection and binds it to a file number.
 
 	For sockets, ##[[KeyPgEof|Eof]]## means that no byte is currently available to read.  Use ##[[KeyPgEoc|Eoc]]## to test whether the peer has closed the connection.
 
+	TCP preserves byte order but does not preserve individual write boundaries. A ##[[KeyPgGetfileio|Get #]]## can return fewer bytes than requested when only part of a payload is available. Check its ##bytesread## result and receive the remaining bytes before treating a fixed-size payload as complete. Polling ##Eof## confirms that some data is ready, not that the whole payload has arrived.
+
 {{fbdoc item="ex"}}
 	See ##examples/network/opentcp/http-get.bas##.
 

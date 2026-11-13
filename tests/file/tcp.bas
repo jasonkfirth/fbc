@@ -118,6 +118,39 @@ function wait_for_tcp_data( byval handle as integer ) as integer
 	return TRUE
 end function
 
+function read_tcp_payload( byval handle as integer, payload() as ubyte ) as integer
+	dim as integer bytesread
+	dim as integer count = ubound( payload ) - lbound( payload ) + 1
+	dim as integer i
+
+	if( wait_for_tcp_data( handle ) = FALSE ) then
+		return FALSE
+	end if
+	if( get( #handle, , payload(), , bytesread ) <> 0 ) then
+		return FALSE
+	end if
+	if( bytesread < 0 or bytesread > count ) then
+		return FALSE
+	end if
+
+	' TCP preserves byte order, not PUT boundaries. GET can return a short
+	' array when only the first packet has arrived. Read the remaining bytes
+	' before acknowledging the payload or waiting for the peer to close.
+	for i = lbound( payload ) + bytesread to ubound( payload )
+		if( wait_for_tcp_data( handle ) = FALSE ) then
+			return FALSE
+		end if
+		if( get( #handle, , payload(i), , bytesread ) <> 0 ) then
+			return FALSE
+		end if
+		if( bytesread <> 1 ) then
+			return FALSE
+		end if
+	next
+
+	return TRUE
+end function
+
 sub server_thread( byval userdata as any ptr )
 	dim as integer server
 	dim as integer client
@@ -185,13 +218,12 @@ sub server_thread( byval userdata as any ptr )
 	server_write_text = s
 
 	server_step = 6
-	if( wait_for_tcp_data( client ) = FALSE ) then
+	if( read_tcp_payload( client, client_put_recv() ) = FALSE ) then
 		server_error = 5
 		close #client
 		close #server
 		exit sub
 	end if
-	get #client, , client_put_recv()
 
 	server_step = 7
 	server_reply_ready = TRUE
@@ -313,12 +345,11 @@ sub client_thread( byval userdata as any ptr )
 	client_write_text = s
 
 	client_step = 7
-	if( wait_for_tcp_data( client ) = FALSE ) then
+	if( read_tcp_payload( client, server_put_recv() ) = FALSE ) then
 		client_error = 7
 		close #client
 		exit sub
 	end if
-	get #client, , server_put_recv()
 	client_received_reply = TRUE
 
 	client_step = 8
