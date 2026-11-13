@@ -559,9 +559,19 @@ static int context_stage_glyphs(FB_GFX3_SURFACE *surface,
 		return FB_GFX3_UNSUPPORTED;
 	if (count == 0u)
 		return FB_GFX3_OK;
+	if ((surface->context == NULL) ||
+	    ((surface->context->renderer.backend.caps.features &
+	      FB_GFX3_FEATURE_PACKED_GLYPHS) == 0u))
+		return FB_GFX3_UNSUPPORTED;
 	for (index = 0u; index < count; ++index) {
+		int64_t last_x = (int64_t)glyphs[index].x +
+			(int64_t)glyphs[index].width - 1;
+		int64_t last_y = (int64_t)glyphs[index].y +
+			(int64_t)glyphs[index].height - 1;
+
 		if ((glyphs[index].width == 0u) || (glyphs[index].width > 8u) ||
 		    (glyphs[index].height == 0u) || (glyphs[index].height > 16u) ||
+		    (last_x > INT32_MAX) || (last_y > INT32_MAX) ||
 		    ((glyphs[index].flags &
 		      ~(uint32_t)FB_GFX3_GLYPH_BACKGROUND) != 0u))
 			return FB_GFX3_INVALID;

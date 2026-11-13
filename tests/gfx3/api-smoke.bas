@@ -23,6 +23,7 @@
 
 #define __FB_GFXLIB3__
 #include once "fbgfx.bi"
+#include once "fbgfx3.bi"
 
 if screenres(16, 16, 32, 3, FB.GFX_NULL) <> 0 then end 1
 
@@ -55,6 +56,23 @@ pset (6, 9), &hDEADBEEFu
 screencopy 1, 0
 screenset 0, 0
 if cuint(point(6, 9)) <> &hDEADBEEFu then end 13
+
+'' The null backend expands compact opaque glyphs through the point fallback.
+dim as fb.Gfx3Glyph glyph(0 to 0)
+line (0, 0)-(15, 15), &h11223344u, bf
+glyph(0).x = 2
+glyph(0).y = 3
+glyph(0).foreground = &hA1B2C3D4u
+glyph(0).background = &h55667788u
+glyph(0).width = 3
+glyph(0).height = 2
+glyph(0).row(0) = &h05u
+glyph(0).row(1) = &h02u
+if fb.Gfx3DrawGlyphs(@glyph(0), 1) <> 0 then end 14
+if cuint(point(2, 3)) <> &hA1B2C3D4u then end 15
+if cuint(point(3, 3)) <> &h11223344u then end 16
+if cuint(point(4, 3)) <> &hA1B2C3D4u then end 17
+if cuint(point(3, 4)) <> &hA1B2C3D4u then end 18
 
 screen 0
 
