@@ -12,6 +12,8 @@ import re
 import subprocess
 import tempfile
 
+from native_c_support import native_command, native_machine_flags
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -23,6 +25,7 @@ def main():
     parser.add_argument('--gdb', help='also inspect formal values in a native debugger')
     parser.add_argument('--work-dir', type=Path, required=True)
     args = parser.parse_args()
+    machine_flags = native_machine_flags(args.fbc)
     root = Path(__file__).resolve().parents[2]
     source = root / 'tests/compiler-support/c-debug-unused-parameters.bas'
     environment = os.environ.copy()
@@ -35,7 +38,7 @@ def main():
     values = comparisons = controls = debugger_checks = 0
 
     def run(command, success=True):
-        result = subprocess.run(list(map(str, command)), cwd=root, env=environment,
+        result = subprocess.run(native_command(command), cwd=root, env=environment,
                                 capture_output=True, text=True, timeout=180)
         if (result.returncode == 0) != success:
             raise RuntimeError(f'{command}\n{result.stdout}{result.stderr}')
@@ -72,7 +75,7 @@ def main():
             for standard in ('gnu11', 'gnu23'):
                 for native, compiler in tools:
                     for optimization in ('0', '2'):
-                        flags = ['-std=' + standard, '-nostdinc', '-fno-strict-aliasing',
+                        flags = [*machine_flags, '-std=' + standard, '-nostdinc', '-fno-strict-aliasing',
                                  '-fwrapv', '-g', '-O' + optimization, '-Wall', '-Wextra',
                                  '-Wpedantic', '-Wconversion', '-Werror=unused-parameter']
                         if native == 'clang':
@@ -107,7 +110,7 @@ def main():
             if any('OPAQUEVALUE' in name for name in marker.findall(opaque)):
                 raise RuntimeError('General assembly lost its conservative boundary')
             for _, compiler in tools:
-                diagnostic = run([compiler, '-std=gnu23', '-nostdinc', '-g', '-Wall',
+                diagnostic = run([compiler, *machine_flags, '-std=gnu23', '-nostdinc', '-g', '-Wall',
                                   '-Wextra', '-Werror=unused-parameter', '-c', cpp, '-o', obj],
                                  success=False)
                 if 'OPAQUEVALUE' not in diagnostic or 'unused-parameter' not in diagnostic:

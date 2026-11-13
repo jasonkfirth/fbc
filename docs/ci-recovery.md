@@ -77,6 +77,19 @@ their existing behavior. Scope changes do not affect workflows already running.
 
 ## Independent validation after a successful build
 
+Native C regression drivers use the shared compiler capability probes. GCC
+versions that call C23 `gnu2x` run that mode instead of failing on the newer
+`gnu23` spelling. The probe requires a C23 language-version macro; it does not
+fall back to C11 or remove diagnostic flags. Native x86 object builds also
+match the BASIC compiler's pointer width, including 32-bit Windows runners
+that expose a 64-bit Clang.
+
+Archive membership regressions compile a small native object and copy it for
+their input lists. Text files named `.o` are not portable archive inputs:
+Apple's archive tools can leave only the symbol index. The tests still require
+the exact object member order, removal of stale members, bounded argument
+batches, and preservation of a published archive after a tool failure.
+
 Source documentation has a small independent job, so missing links are reported
 without waiting for a compiler build. Native jobs still check documentation as
 part of `quick-test`. They run that target serially with Make's `-k` option to

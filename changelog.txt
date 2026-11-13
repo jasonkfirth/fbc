@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- CI: probe native C23 dialect spelling and BASIC pointer width in debug-parameter regressions without removing warnings; compile real native objects for archive membership and bounded-batch tests so Apple indexing does not discard text placeholders.
 - CI: select documentation-only checks from the complete push or PR comparison, retain full source/manual/scheduled/tag qualification and conservative shallow-history fallback, and prevent documentation-only green runs from triggering automatic packages; cover renames, earlier source commits, package API decisions and workflow dependencies.
 - compiler/C: preserve debugger-visible ignored parameters through unevaluated declarations, removing 176 GCC and 176 Clang warnings across 43 original-flags profiles while retaining source warning 54 and opaque-assembly diagnostics. Fix tabbed literal debug text in the semantic reader, add native/debugger/Win32/transport controls, and close the 6,419-profile callback census.
 - CI: give Haiku TCP smoke a configurable bounded allowance that outlasts its internal waits, report its failure status, and collect independent smoke, fbctests and Exampleageddon phase results without hiding failures; retain host-driven examples after earlier guest failures.

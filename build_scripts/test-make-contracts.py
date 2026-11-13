@@ -72,6 +72,18 @@ def archive_members(listing: str) -> list[str]:
     return [name for name in listing.splitlines() if name not in indexes]
 
 
+def archive_objects(working: Path, names: list[str]) -> None:
+    # Apple's archive indexing can discard non-object inputs. Compile one
+    # native object, then copy it to keep batching fixtures small and fast.
+    result = subprocess.run([FIXTURE_CC, "-x", "c", "-c", "-o", names[0], "-"],
+                            input="int archive_fixture(void) { return 0; }\n",
+                            cwd=working, capture_output=True, text=True,
+                            timeout=30, check=False)
+    require(result.returncode == 0, "could not compile archive fixture", result)
+    for name in names[1:]:
+        shutil.copyfile(working / names[0], working / name)
+
+
 # -------------------------------------------------------------------------
 # Compiler links, distribution staging, and installation ownership
 # -------------------------------------------------------------------------
@@ -261,8 +273,7 @@ def test_archive_portable_arguments(root: Path, working: Path) -> None:
     # Keep the fixture small for hosted Windows runners while making its
     # argument list exceed xargs' batch size.
     names = ["unit-" + str(index) + "-" + "x" * 120 + ".o" for index in range(128)]
-    for name in names:
-        write(working / name)
+    archive_objects(working, names)
     write(working / "ar.sh", "#!/bin/sh\nset -eu\nlength=0\n"
           "for argument in \"$@\"; do\n"
           "  case \"$argument\" in @*) exit 1 ;; esac\n"
@@ -562,8 +573,7 @@ def test_prerequisite_order(root: Path, working: Path) -> None:
 
 
 def test_archive_membership(root: Path, working: Path) -> None:
-    write(working / "first.o")
-    write(working / "second.o")
+    archive_objects(working, ["first.o", "second.o"])
     write(working / "GNUmakefile",
           ".DEFAULT_GOAL := runtime/libfb.a\nlibdir := runtime\n"
           "RTLIB_OBJ := first.o second.o\nAR := ar\nARFLAGS := rcs\nRANLIB := ranlib\n"

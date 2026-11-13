@@ -1,20 +1,22 @@
 """Project: FreeBASIC native C regression tests
 File: test_native_c_support.py
 Purpose: Protect the tool capability boundaries used by hosted CI.
-Responsibilities: Exercise older C23 spellings and Clang's GNU command alias.
+Responsibilities: Exercise C23 spellings, BASIC pointer widths and Clang aliases.
 This file intentionally does NOT compile fixtures or change diagnostic policy.
 """
 import subprocess
 import sys
 import unittest
 from unittest.mock import patch
-from native_c_support import c23_standard, is_gnu_compiler, native_command, resolve_executable
+from native_c_support import (c23_standard, is_gnu_compiler, native_command,
+                              native_machine_flags, resolve_executable)
 
 
 class NativeCompilerContracts(unittest.TestCase):
     def setUp(self):
         c23_standard.cache_clear()
         is_gnu_compiler.cache_clear()
+        native_machine_flags.cache_clear()
 
     def test_draft_c23_spelling_keeps_the_requested_mode(self):
         def compiler(command, **unused):
@@ -36,6 +38,22 @@ class NativeCompilerContracts(unittest.TestCase):
                 # MSYS can omit .exe in sys.executable while executable discovery
                 # supplies it. Compare the file, not those equivalent spellings.
                 self.assertTrue(resolve_executable(command).samefile(executable))
+
+    def test_c23_command_preserves_diagnostics_and_machine_mode(self):
+        command = ['gcc-13', '-m32', '-std=gnu23', '-Wall', '-Wextra',
+                   '-Werror=unused-parameter', '-c', 'unit.c', '-o', 'unit.o']
+        with patch('native_c_support.c23_standard', return_value='gnu2x'):
+            expected = ['-std=gnu2x' if flag == '-std=gnu23' else flag for flag in command]
+            self.assertEqual(native_command(command), expected)
+        self.assertEqual(command[2], '-std=gnu23')
+
+    def test_native_machine_mode_matches_basic_target(self):
+        for target, expected in (('win32', ('-m32',)), ('linux-x86', ('-m32',)),
+                                 ('win64', ('-m64',)), ('linux-x86_64', ('-m64',)),
+                                 ('darwin-aarch64', ()), ('win32-aarch64', ())):
+            with self.subTest(target=target), patch('native_c_support.subprocess.run',
+                    return_value=subprocess.CompletedProcess([], 0, target + '\n', '')):
+                self.assertEqual(native_machine_flags('fbc-' + target), expected)
 
     def test_missing_c23_mode_fails_instead_of_downgrading(self):
         with patch('native_c_support.subprocess.run', return_value=
