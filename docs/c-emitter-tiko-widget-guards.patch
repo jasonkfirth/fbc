@@ -1,0 +1,92 @@
+--- a/src/tiko.bas
++++ b/src/tiko.bas
+@@ -2042,2 +2042,4 @@
+     Static As ULong cachedSerial(0 To 1)
++    ' An absent editor handle must not match an absent widget argument.
++    If w = 0 Then Return 0
+     Dim As Integer editorIndex
+@@ -2251,2 +2253,3 @@
+     If pageIndex < 0 OrElse pageIndex > TIKO_OUTPUT_PAGE_NOTES Then Return
++    If tiko_Output = 0 Then Return
+     tiko_CaptureOutputNotes
+--- a/src/tiko_native_ui.bi
++++ b/src/tiko_native_ui.bi
+@@ -247,2 +247,3 @@
+     tiko_ShowMenu(menuIndex, tiko_MenuLeft(menuIndex))
++    If tiko_PopupMenu = 0 Then Exit Sub
+     menu_ShowAt(tiko_PopupMenu, tiko_PopupMenu->ax, tiko_PopupMenu->ay, -1)
+--- /dev/null
++++ b/tests/tiko_widget_lifecycle_smoke.bas
+@@ -0,0 +1,72 @@
++/'
++    Project: Tiko tests. File: tiko_widget_lifecycle_smoke.bas.
++    Purpose: Check widget callbacks before construction and after teardown.
++    Responsibilities: Cover absent editors, output widgets and popup menus.
++    This file does not open a window, render images or access user documents.
++    Widget pointers and fixtures belong to this single GUI-thread test.
++'/
++#lang "fb"
++#define TIKO_NO_MAIN
++#define TIKO_TEST_SETTINGS
++#include once "../src/tiko.bas"
++
++Private Dim Shared As Integer checks
++
++Private Sub require(ByVal condition As Integer, ByVal lineValue As Integer)
++    checks += 1
++    If condition = 0 Then
++        Print "WIDGET_LIFECYCLE_FAIL "; lineValue
++        End 1
++    End If
++End Sub
++
++Dim As Widget editorWidget
++Dim As TextBoxData editorData
++Dim As Integer colorState = 37, styleState = 41
++
++tiko_EditorPrimary = 0
++tiko_EditorSecondary = 0
++require tiko_PrepareTextRenderState(0, 0, colorState, styleState) = 0, __LINE__
++require colorState = 37 AndAlso styleState = 41, __LINE__
++
++tiko_EditorPrimary = @editorWidget
++require tiko_PrepareTextRenderState(0, 0, colorState, styleState) = 0, __LINE__
++tiko_EditorPrimary = 0
++tiko_EditorSecondary = @editorWidget
++require tiko_PrepareTextRenderState(0, 0, colorState, styleState) = 0, __LINE__
++require tiko_PrepareTextRenderState(@editorWidget, 0, colorState, styleState) = 0, __LINE__
++
++editorWidget.data = @editorData
++editorData.text = "alpha"
++tiko_SyntaxHighlightingEnabled = 0
++require tiko_PrepareTextRenderState(@editorWidget, 0, colorState, styleState) <> 0, __LINE__
++require colorState = 0 AndAlso styleState = 0, __LINE__
++
++tiko_Output = 0
++tiko_OutputPage = 2
++tiko_ShowOutputPage(1)
++require tiko_OutputPage = 2, __LINE__
++
++' A live but data-less widget retains the previous page-selection behavior.
++Dim As Widget outputWidget
++tiko_Output = @outputWidget
++tiko_CompilerLogOutput = "existing log"
++tiko_ShowOutputPage(1)
++require tiko_OutputPage = 1, __LINE__
++
++tiko_PopupMenu = 0
++tiko_ActiveMenuIndex = 0
++tiko_MenuBarSwitch(0, 1)
++require tiko_ActiveMenuIndex = 0, __LINE__
++tiko_MenuBarSwitch(0, -1)
++require tiko_ActiveMenuIndex = 0, __LINE__
++tiko_ActiveMenuIndex = -1
++tiko_MenuBarSwitch(0, 1)
++require tiko_ActiveMenuIndex = -1, __LINE__
++
++tiko_Output = 0
++tiko_EditorPrimary = 0
++tiko_EditorSecondary = 0
++Print "TIKO_WIDGET_LIFECYCLE_PASS checks="; checks
++
++/' end of tiko_widget_lifecycle_smoke.bas '/

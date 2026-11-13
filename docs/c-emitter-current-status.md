@@ -38,11 +38,11 @@ retain their previous disposition; two assembly controls remain separate.
 | Maintained Tiko entry | 1 | 0 | 42 |
 | Total retained | 6,419 | 14 | 15,823 |
 
-All applicable C was freshly emitted. Native results were reused only for
+During the unread-local repair, all applicable C was freshly emitted. Native results were reused only for
 byte-identical header-free, macro-safe C with pinned tools, flags and inputs.
 The three changed non-compiler debug profiles retain exact program text after
 removing only their four constant debug declarations and line directives.
-All 224 compiler C units match the GCC-clean fixed point. The peak is
+All 224 compiler C units match the GCC-clean fixed point. That recount peaked at
 29,183,759 owned bytes under a 64 MiB cap. The separately committed TCP CI test
 change updates one domain pin; it is not an emitted source in this queue.
 
@@ -51,6 +51,13 @@ array bounds, format truncation, unused static locals and GNU label extensions.
 Both remaining unread static locals have source warning 55 under `-w all`.
 The WSR selection also consumes the compatibility RNG stream; a compiler
 follow-up must preserve those effects rather than changing the example.
+
+The six null observations are deliberate fault inputs in the try/catch signal
+demonstration, three in each context. All six retain FBC warning 57. The two
+format-truncation observations belong to a helper with checked failure returns;
+its existing value and direct-call controls remain documented in the
+[class review](c-emitter-class-priorities.md). These observations remain counted
+under unsuppressed diagnostics.
 
 Fourteen recovered fbrtLib contexts retain byte-identical C and GCC 1 / Clang 6.
 Together these give **6,433 profiles, 6,327 accepted C units, GCC 15 / Clang
@@ -66,14 +73,19 @@ apart from debug declarations and proven unused temporaries; the other 166
 are byte-identical. Accepted units retain 658 FBC parameter and 250 variable
 warnings, and refused contexts retain two further parameter warnings.
 
-The separate Tiko/toolkit recount accepts all **125 contexts**, including the
-recovered public-accessor localization test. GCC falls **40 to 29** and Clang
-**4,593 to 4,582**. All 11 duplicate unread-local observations disappear per
-tool. Every other native warning line is preserved, including 28 GCC null
-observations and one array-bounds observation. All 2,078 FBC parameter and 801
-variable warnings remain. Eleven changed debug profiles have identical program
-text after removing their constant declarations; the other 114 C files are
-byte-identical. The worker uses a 96 MiB scratch cap. Applications were not run.
+The [Tiko widget lifecycle guards](c-emitter-tiko-widget-guards.md) remove all
+28 null-dereference observations from the original 125 contexts: **GCC 29 to 1,
+Clang unchanged at 4,582**. Their 2,078 parameter, 801 variable and 122 fixed-range
+source warnings are unchanged. The new headless lifecycle fixture passes twelve
+assertions with both native backends and adds GCC 0 / Clang 46. The completed
+expanded cut is **126 accepted contexts, GCC 1 / Clang 4,628**. Its remaining
+bounds observation and the Clang padding/startup classes remain visible.
+
+The retained census was freshly emitted after those source changes and still
+has GCC 14 / Clang 15,823. Only its maintained Tiko entry changes C; all native
+classes and source warning lines are preserved. The current retained and Tiko
+scratch peaks are 32,472,035 / 68,219,694 bytes under their 64/96 MiB caps.
+Full editor execution and rendering remain outside these checks.
 The JRPG cut
 remains 241 accepted profiles, GCC 0 / Clang 10,018, on `55aa2516`.
 Overlapping contexts and different compiler cuts remain separate.
@@ -85,9 +97,12 @@ Receipts reuse `build/c-emitter-forward-views-20261105/`:
 `current-fbext-debug-local-v1-20261112.sqlite3`, and
 `debug-local-class-close-v1-20261112.json.zlib`, and
 `debug-local-selected-publish-v1-20261112.json.zlib`.
-The completed separate Tiko cut is
-`current-tiko-extra-debug-local-v1-20261112.sqlite3` and
-`current-tiko-debug-local-cohort-close-v1-20261112.json.zlib`.
+The current corpus source cut is
+`tiko-widget-retained-refresh-20261113.sqlite3`,
+`current-tiko-widget-guards-20261113.sqlite3`, and
+`tiko-widget-guards-close-20261113.json.zlib`.
+The publication seal `tiko-widget-current-seal-20261113.json.zlib` reconciles
+the later independent CI domain changes against these unchanged profile inputs.
 These checks do not qualify applications, foreign providers, PNG work or the
 unrelated dirty native-library changes.
 

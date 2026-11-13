@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- C-emitter corpus: guard absent Tiko editor/output/popup widgets and add a headless lifecycle regression. Remove 28 GCC null observations from 125 contexts; qualify all 126 expanded contexts and preserve every other native/source diagnostic. Publish only the scoped patch, retain the full census and reconcile independent CI inputs without changing installed binaries.
 - CI: give the generated semantic macro stress test its own configurable 600-second emission bound while retaining ordinary limits and fatal failures; release each large decoded model before the next backend. Add native C varargs controls, flushed ABI-stage diagnostics and ARM64 executable/object evidence for the unresolved status-139 crash.
 - compiler/C: preserve unread named debug locals with unevaluated declaration acknowledgements and omit unused compiler-owned TYPEOF record scratch while retaining source warnings, stores and lifetime effects. Remove 62 GCC/Clang observations per tool in the expanded fb-ext-lib queue, 11 per tool in Tiko and four per tool in the retained census; qualify the GCC-clean fixed point, native/debugger values, semantic exports and complete retained recount, then select the development compiler with its existing rollback.
 - CI: receive complete TCP test payloads across short array GETs, with deterministic fragmented/closed-stream regressions; keep FreeBSD smoke, fbctests and Exampleageddon failures independent and fatal, retain failure reports, and let the configurable TCP smoke limit outlast its internal waits.

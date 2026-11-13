@@ -8,6 +8,9 @@ language reference.
 
 ## Start here
 
+- [Tiko widget lifecycle guards](c-emitter-tiko-widget-guards.md) records three
+  source checks, the headless regression and the complete 126-context recount.
+
 - [Unread debug storage](c-emitter-debug-locals.md) explains preserved source
   locals, discarded TYPEOF scratch and unchanged source/data-flow diagnostics.
 

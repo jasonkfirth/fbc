@@ -8,6 +8,11 @@ This file does not qualify editor rendering or optional feature initialization.
 
 # Tiko maintained entry, November 12
 
+The [November 13 widget lifecycle qualification](c-emitter-tiko-widget-guards.md)
+adds three source guards and a headless regression, then checks all 126 current
+contexts with the selected compiler. The sections below retain the earlier
+source and compiler cuts.
+
 `C:/fb_corpus/tiko-editor/_compile.bat` and `_compile.sh` build `src/tiko.bas`
 with `-O 2` and `-i src/omaGUI-main`. The audit retains that native Win64,
 gfxlib2 context, adds `-w all`, and emits C with the immutable qualified
