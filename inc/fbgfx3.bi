@@ -113,6 +113,21 @@ namespace fb
 		color as ulong
 		style as ulong
 	end type
+	'' One opaque bitmap glyph up to 8 pixels wide and 16 pixels high.
+	'' Row bit zero is the leftmost pixel; background is transparent by default.
+	const GFX3_GLYPH_BACKGROUND = &h00000001u
+	const GFX3_GLYPH_MAXIMUM = 8191
+	type Gfx3Glyph
+		x as long
+		y as long
+		foreground as ulong
+		background as ulong
+		width as ulong
+		height as ulong
+		flags as ulong
+		reserved as ulong
+		row(0 to 15) as ulong
+	end type
 
 	'' One opaque screen rectangle for Gfx3DrawRectangles. Coordinates follow
 	'' the active VIEW and WINDOW mapping; style uses the low 16-bit pattern.
@@ -249,6 +264,10 @@ namespace fb
 	'' The active VIEW clips each segment, and input order is preserved.
 	declare function Gfx3DrawLines GFX3CALL alias "fb_Gfx3DrawLines" _
 		( byval lines as const Gfx3Line ptr, byval count as long ) as long
+	'' Submit compact opaque bitmap glyphs. Unsupported renderers expand them
+	'' to ordered points, retaining the same screen-page drawing contract.
+	declare function Gfx3DrawGlyphs GFX3CALL alias "fb_Gfx3DrawGlyphs" _
+		( byval glyphs as const Gfx3Glyph ptr, byval count as long ) as long
 	'' Submit opaque rectangles for the current work page as one bounded batch.
 	'' The active VIEW clips every rectangle, and input order is preserved.
 	declare function Gfx3DrawRectangles GFX3CALL _

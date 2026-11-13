@@ -72,6 +72,9 @@ typedef struct FB_GFX3_VULKAN_SURFACE {
 	uint32_t width;
 	uint32_t height;
 	uint32_t depth;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VULKAN_SURFACE;
 
 /*
@@ -143,6 +146,9 @@ typedef struct FB_GFX3_VULKAN_POINTS {
 	FB_GFX3_RECT clip;
 	const FB_GFX3_POINT *points;
 	uint32_t point_count;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VULKAN_POINTS;
 
 enum FB_GFX3_VULKAN_PRIMITIVE_TYPE {

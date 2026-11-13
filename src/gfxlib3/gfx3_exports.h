@@ -255,6 +255,7 @@ FBCALL int fb_Gfx3SurfacePresent(void *surface_pointer, int wait);
 FBCALL int fb_Gfx3DrawPoints(void *destination_pointer,
 	const struct FB_GFX3_PUBLIC_POINT *public_points, int count);
 FBCALL int fb_Gfx3DrawLines(const FB_GFX3_COMPAT_LINE *lines, int count);
+FBCALL int fb_Gfx3DrawGlyphs(const FB_GFX3_GLYPH *glyphs, int count);
 FBCALL int fb_Gfx3DrawRectangles(
 	const FB_GFX3_COMPAT_RECTANGLE *rectangles, int count);
 

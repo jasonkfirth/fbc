@@ -2188,7 +2188,8 @@ static int vulkan_backend_probe(FB_GFX3_BACKEND_CAPS *caps)
 		FB_GFX3_FEATURE_HETEROGENEOUS_BLITS |
 		FB_GFX3_FEATURE_PACKED_RECTANGLES |
 		FB_GFX3_FEATURE_PACKED_STYLED_RECTANGLES |
-		FB_GFX3_FEATURE_PACKED_LINES;
+		FB_GFX3_FEATURE_PACKED_LINES |
+		FB_GFX3_FEATURE_PACKED_GLYPHS;
 	/*
 		Surfaces use linear storage buffers. Advertise the same practical
 		per-axis compatibility bound as the desktop OpenGL backend; allocation

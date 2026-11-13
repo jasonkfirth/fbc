@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -44,6 +45,37 @@ def source_hashes(source_root=None):
                 if source.suffix in ('.c', '.h', '.cpp', '.inc', '.s', '.S'):
                     sources['src/' + source.relative_to(source_root).as_posix()] = hashlib.sha256(source.read_bytes()).hexdigest()
     return sources
+
+
+def normalized_path(path, base=ROOT):
+    path = path.replace('\\', '/')
+    if os.name == 'nt':
+        match = re.match(r'^/([A-Za-z])/(.*)$', path)
+        if match:
+            path = match.group(1) + ':/' + match.group(2)
+    resolved = Path(path)
+    if not resolved.is_absolute():
+        resolved = base / resolved
+    return os.path.normcase(os.path.normpath(str(resolved.resolve()))).replace('\\', '/')
+
+
+def selected_source_changes(changed, source_root, output):
+    dependency_text = '\n'.join(
+        path.read_text(encoding='utf-8', errors='replace')
+        for path in (output / 'src').rglob('*.d'))
+    dependency_text = re.sub(r'\\\r?\n', ' ', dependency_text)
+    dependencies = set()
+    for token in shlex.split(dependency_text):
+        token = token.rstrip(':')
+        if token:
+            dependencies.add(normalized_path(token))
+    selected = []
+    for path in changed:
+        relative_path = path[4:] if path.startswith('src/') else path
+        source_path = normalized_path(relative_path, source_root)
+        if source_path in dependencies:
+            selected.append(path)
+    return selected
 
 
 def write_counts(output):
@@ -193,12 +225,9 @@ def main():
     selected_changes = []
     if changed:
         # Other targets can be maintained concurrently. Only changes present
-        # in this build's source commands or dependency closure invalidate it.
-        dependencies = diagnostics + '\n' + '\n'.join(
-            path.read_text(encoding='utf-8', errors='replace')
-            for path in (output / 'src').rglob('*.d'))
-        dependencies = dependencies.replace('\\', '/')
-        selected_changes = [path for path in changed if path in dependencies]
+        # in this build's dependency closure invalidate it. Normalize both
+        # relative source names and compiler paths, which may contain '..'.
+        selected_changes = selected_source_changes(changed, source_root, output)
     archives = {}
     for archive in (output / 'lib').rglob('*.a'):
         if not any(part.startswith('.') for part in archive.relative_to(output).parts):

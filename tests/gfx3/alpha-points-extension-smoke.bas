@@ -141,6 +141,33 @@ if fb.Gfx3DrawPoints( surface, @points(0), 1 ) <> 0 then end 9
 if culng( point( 2, 3, surface ) ) <> expected_color then end 10
 if fb.Gfx3SurfaceDestroy( surface ) <> 0 then end 11
 
+'' Compact glyph commands preserve transparent pixels and background fills.
+dim as fb.Gfx3Glyph glyphs(0 to 1)
+line (20, 20)-(27, 27), destination_color, bf
+glyphs(0).x = 20
+glyphs(0).y = 20
+glyphs(0).foreground = &h00CC2211u
+glyphs(0).width = 4
+glyphs(0).height = 2
+glyphs(0).row(0) = &h09u
+glyphs(0).row(1) = &h06u
+glyphs(1).x = 26
+glyphs(1).y = 20
+glyphs(1).foreground = &h00114477u
+glyphs(1).background = &h00AABBCCu
+glyphs(1).width = 2
+glyphs(1).height = 2
+glyphs(1).flags = fb.GFX3_GLYPH_BACKGROUND
+glyphs(1).row(0) = &h02u
+glyphs(1).row(1) = 0
+if fb.Gfx3DrawGlyphs(@glyphs(0), 2) <> 0 then end 12
+if culng(point(20, 20)) <> &h00CC2211u then end 13
+if culng(point(21, 20)) <> destination_color then end 14
+if culng(point(23, 20)) <> &h00CC2211u then end 15
+if culng(point(26, 20)) <> &h00AABBCCu then end 16
+if culng(point(27, 20)) <> &h00114477u then end 17
+if culng(point(26, 21)) <> &h00AABBCCu then end 18
+
 screen 0
 end 0
 

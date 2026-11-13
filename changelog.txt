@@ -1,6 +1,7 @@
 Version 1.20.5
 
 [changed]
+- gfxlib3: expose ordered packed glyph batches with foreground/background colours and clipped headless fallback; enable the packed-glyph capability in OpenGL and Vulkan, bound glyph coordinates before queuing, and retain the canonical C export declaration.
 - runtime libraries: audit all Make-selected Win64 runtime, graphics and sound objects with unsuppressed GCC/Clang diagnostics; repair declarations, unused parameters, fallthroughs, reserved identifiers, ABI-preserving padding and conversion spelling. Fix printer-name ownership, bounded profiler names and time parsing, Windows file-mode limits, reverse-search bounds, TLS cleanup and unsigned pixel shifts; add native regressions, per-object diagnostic captures and reproducible audit documentation.
 - compiler/C: preserve real Intel assembly storage addresses with distinct static-address and automatic-memory operands, avoiding GCC's Win32 RotoZoomASM operand-limit failure without rewriting the library routine. Keep one scalar parameter home throughout each call, preserve floating argument representations without x87 evaluation, and cover live aliases, unreachable assembly and native Win32/Win64 bit patterns.
 - DOS math: select IEEE libm pole/domain behavior at startup and preserve the caller's FPU control word around DJGPP Double tangent evaluation. Check tangent accuracy and all precision/rounding combinations. Correct byte-wide WSTRING fixtures without removing USTRING Unicode coverage; add explicit lossy-conversion and Unicode-path checks.

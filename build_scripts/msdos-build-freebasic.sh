@@ -1132,6 +1132,8 @@ if [ "$DO_STAGE_INSTALL" = "1" ]; then
 	cat > "$DISTROOT/fbdos.bat" <<'EOF'
 @echo off
 set DJGPP=C:\DJGPP\DJGPP.ENV
+rem GCC must run from its DJGPP tree so its private programs remain reachable.
+set GCC=C:\DJGPP\BIN\GCC.EXE
 set PATH=C:\FB;C:\DJGPP\BIN;%PATH%
 echo FreeBASIC DOS environment ready.
 EOF
@@ -1227,6 +1229,7 @@ run_dosbox_test() {
 	fi
 	prepare_dos_runtime_layout "$test_root/fb" "$test_root/djgpp"
 	[ -f "$test_root/fb/bin/dos/as.exe" ] || die "DOS smoke-test assembler is missing"
+	cp -f "$ROOT/tests/dos/emulator-x87.bas" "$test_root/X87TEST.BAS"
 
 	# On MSYS2, DOSBox-X's imgmake drive path is not a host path.  It can report
 	# successful image creation without leaving a file where sfdisk can read it.
@@ -1248,9 +1251,8 @@ EOF
 		cat > "$autoexec_bat" <<'EOF'
 @echo off
 echo begin>D:\TRACE.LOG
-set DJGPP=C:\DJGPP\DJGPP.ENV
+call C:\FBDOS.BAT
 echo djgpp=%DJGPP%>>D:\TRACE.LOG
-set PATH=C:\FB;C:\DJGPP\BIN;%PATH%
 echo path=%PATH%>>D:\TRACE.LOG
 if not exist C:\FB\FBC.EXE echo missing-fbc>>D:\TRACE.LOG
 if not exist C:\DJGPP\BIN\GCC.EXE echo missing-gcc>>D:\TRACE.LOG
@@ -1268,6 +1270,9 @@ echo hello-exe-present>>D:\TRACE.LOG
 C:\DJGPP\BIN\REDIR.EXE -eo -o D:\RUN.LOG D:\HELLO.EXE
 echo hello-errorlevel=%ERRORLEVEL%>>D:\TRACE.LOG
 :afterhello
+C:\FB\FBC.EXE -gen gcc D:\X87TEST.BAS -x D:\X87TEST.EXE > D:\GCC.LOG
+if exist D:\X87TEST.EXE D:\X87TEST.EXE >> D:\GCC.LOG
+C:\DJGPP\BIN\CWSDPMI.EXE -u >>D:\TRACE.LOG
 dir D:\RESULT.TXT >>D:\TRACE.LOG
 EOF
 
@@ -1333,9 +1338,8 @@ EOF
 		cat > "$autoexec_bat" <<'EOF'
 @echo off
 echo begin>trace.log
-set DJGPP=C:\DJGPP\DJGPP.ENV
+call C:\FBDOS.BAT
 echo djgpp=%DJGPP%>>trace.log
-set PATH=C:\FB;C:\DJGPP\BIN;%PATH%
 echo path=%PATH%>>trace.log
 if not exist C:\FB\FBC.EXE echo missing-fbc>>trace.log
 if not exist C:\DJGPP\BIN\GCC.EXE echo missing-gcc>>trace.log
@@ -1353,6 +1357,9 @@ echo hello-exe-present>>trace.log
 hello.exe >>trace.log
 echo hello-errorlevel=%ERRORLEVEL%>>trace.log
 :afterhello
+C:\FB\FBC.EXE -gen gcc X87TEST.BAS -x X87TEST.EXE > GCC.LOG
+if exist X87TEST.EXE X87TEST.EXE >> GCC.LOG
+C:\DJGPP\BIN\CWSDPMI.EXE -u >>trace.log
 dir >>trace.log
 EOF
 
@@ -1415,6 +1422,14 @@ EOF
 	fi
 
 	grep -q "FreeBASIC DOS OK" "$result_txt" || die "DOSBox smoke test produced unexpected output"
+	local gcc_log="$test_root/GCC.LOG"
+	if [ ! -f "$gcc_log" ] && [ -f "$test_root/gcc.log" ]; then
+		gcc_log="$test_root/gcc.log"
+	fi
+	if [ ! -f "$gcc_log" ] || ! grep -q 'DOS_X87=PASS' "$gcc_log"; then
+		[ ! -f "$gcc_log" ] || sed -n '1,40p' "$gcc_log" >&2
+		die "DOSBox C-backend smoke test failed through fbdos.bat"
+	fi
 
 	if find "$test_root" -maxdepth 1 -type f \
 		\( -iname '*.asm' -o -iname '*.o' -o -iname '*.tmp' \) \

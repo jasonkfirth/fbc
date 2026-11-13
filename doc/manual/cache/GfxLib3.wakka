@@ -31,6 +31,8 @@ An opt-in render-threaded implementation of the FreeBASIC graphics interface.
 
 	##Gfx3DrawLines## and ##Gfx3DrawRectangles## submit ordered arrays of opaque primitives to the current work page. Both preserve input order and clip to the active ##VIEW##, so overlapping entries keep last-writer behavior without one BASIC drawing call per primitive. The Null backend rasterizes lines, rectangles and glyphs, which lets headless tests exercise ordinary drawing and text.
 
+	##Gfx3DrawGlyphs## submits an ordered array of ##FB.Gfx3Glyph## entries to the current work page. Each entry describes an 8-bit-wide bitmap with width 1 to 8, height 1 to 16, and one row value per scanline; bit 0 is the leftmost pixel. Foreground pixels are opaque. The background is transparent unless ##FB.GFX3_GLYPH_BACKGROUND## is set. Counts above ##FB.GFX3_GLYPH_MAXIMUM## (8191) are rejected. Entries are clipped to ##VIEW## and overlapping glyphs preserve array order.
+
 	##Gfx3SurfaceCopyFromScreen## copies a rectangle from the current work page directly into a GPU surface without creating a CPU readback. Use ##Gfx3ScreenCapture## when CPU-owned ##FB.IMAGE## pixels are needed; that call is synchronous and reads back only the requested rectangle when no current CPU shadow is available.
 
 {{fbdoc item="section" value="Legacy SCREEN modes"}}

@@ -62,7 +62,9 @@ enum FB_GFX3_BACKEND_FEATURE {
 		operations. This avoids one allocation and queue record per scanline in
 		software-style polygon fillers while retaining GPU rasterization.
 	*/
-	FB_GFX3_FEATURE_PACKED_LINES = 0x00000800u
+	FB_GFX3_FEATURE_PACKED_LINES = 0x00000800u,
+	/* The backend accepts compact ordered bitmap glyph records. */
+	FB_GFX3_FEATURE_PACKED_GLYPHS = 0x00001000u
 };
 
 typedef struct FB_GFX3_BACKEND_CAPS {
