@@ -1720,7 +1720,7 @@ static void test_renderer_lifecycle(void)
 	int result;
 
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_null;
+	config.backend = &fb_gfx3_backend_null;
 	config.backend_config.width = 64;
 	config.backend_config.height = 64;
 	config.backend_config.depth = 32;
@@ -2100,7 +2100,7 @@ static void test_opengl_partial_context_failure_cleanup(void)
 	int result;
 
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_opengl;
+	config.backend = &fb_gfx3_backend_opengl;
 	config.backend_config.width = 32;
 	config.backend_config.height = 32;
 	config.backend_config.depth = 32;
@@ -2132,12 +2132,12 @@ static void test_vulkan_native_window_failure_cleanup(void)
 	int result;
 
 	memset(&caps, 0, sizeof(caps));
-	if (__fb_gfx3_backend_vulkan.probe(&caps) != FB_GFX3_OK) {
+	if (fb_gfx3_backend_vulkan.probe(&caps) != FB_GFX3_OK) {
 		printf("gfxlib3 Vulkan native window cleanup skipped\n");
 		return;
 	}
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_vulkan;
+	config.backend = &fb_gfx3_backend_vulkan;
 	config.backend_config.width = 32;
 	config.backend_config.height = 32;
 	config.backend_config.depth = 32;
@@ -2178,7 +2178,7 @@ static void test_typed_context_api(void)
 	uint32_t color = 0;
 
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_null;
+	config.backend = &fb_gfx3_backend_null;
 	config.width = 8;
 	config.height = 8;
 	config.depth = 32;
@@ -2257,7 +2257,7 @@ static void test_alpha_primitive_null_backend(void)
 	uint32_t color = 0;
 
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_null;
+	config.backend = &fb_gfx3_backend_null;
 	config.width = 8;
 	config.height = 8;
 	config.depth = 32;
@@ -2332,7 +2332,7 @@ static void test_compatibility_state(void)
 	int previous_pages = -1;
 
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_null;
+	config.backend = &fb_gfx3_backend_null;
 	config.width = 8;
 	config.height = 8;
 	config.depth = 32;
@@ -2443,7 +2443,7 @@ static void test_shadow_damage_rectangles(void)
 	int previous_pages = 0;
 
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_null;
+	config.backend = &fb_gfx3_backend_null;
 	config.width = 8;
 	config.height = 8;
 	config.depth = 32;
@@ -2543,7 +2543,7 @@ static void test_vulkan_surface_backend(void)
 	int result;
 
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_vulkan;
+	config.backend = &fb_gfx3_backend_vulkan;
 	config.backend_config.width = 32;
 	config.backend_config.height = 32;
 	config.backend_config.depth = 32;
@@ -2558,7 +2558,7 @@ static void test_vulkan_surface_backend(void)
 	if (result != FB_GFX3_OK)
 		return;
 	reference_config = config;
-	reference_config.backend = &__fb_gfx3_backend_null;
+	reference_config.backend = &fb_gfx3_backend_null;
 	result = fb_gfx3_renderer_init(&reference_renderer, &reference_config);
 	CHECK(result == FB_GFX3_OK);
 	if (result == FB_GFX3_OK)
@@ -2854,7 +2854,7 @@ static void test_opengl_compute_backend(void)
 	CHECK(fb_gfx3_log_set(&logger, FB_GFX3_LOG_INFO,
 		capture_log_message, NULL) == FB_GFX3_OK);
 	memset(&config, 0, sizeof(config));
-	config.backend = &__fb_gfx3_backend_opengl;
+	config.backend = &fb_gfx3_backend_opengl;
 	config.backend_config.logger = &logger;
 	config.backend_config.width = 32;
 	config.backend_config.height = 32;
@@ -2963,7 +2963,7 @@ static void test_opengl_compute_backend(void)
 				0x55667788u);
 
 		memset(&reference_config, 0, sizeof(reference_config));
-		reference_config.backend = &__fb_gfx3_backend_null;
+		reference_config.backend = &fb_gfx3_backend_null;
 		reference_config.backend_config.width = 32;
 		reference_config.backend_config.height = 32;
 		reference_config.backend_config.depth = 32;
@@ -3089,11 +3089,11 @@ static void test_backend_selection(void)
 	char long_name[256];
 
 #ifdef HOST_ANDROID
-	preferred = &__fb_gfx3_backend_vulkan;
-	fallback = &__fb_gfx3_backend_gles;
+	preferred = &fb_gfx3_backend_vulkan;
+	fallback = &fb_gfx3_backend_gles;
 #else
-	preferred = &__fb_gfx3_backend_opengl;
-	fallback = &__fb_gfx3_backend_vulkan;
+	preferred = &fb_gfx3_backend_opengl;
+	fallback = &fb_gfx3_backend_vulkan;
 #endif
 
 	count = fb_gfx3_backend_plan(0, NULL, plan,
@@ -3163,12 +3163,12 @@ static void test_backend_selection(void)
 	count = fb_gfx3_backend_plan(0x00000200, NULL, plan,
 		FB_GFX3_BACKEND_PLAN_CAPACITY);
 	CHECK(count == 1);
-	CHECK(plan[0] == &__fb_gfx3_backend_vulkan);
+	CHECK(plan[0] == &fb_gfx3_backend_vulkan);
 	count = fb_gfx3_backend_attempt_plan(0x00000200, NULL, plan,
 		attempt_flags, FB_GFX3_BACKEND_PLAN_CAPACITY);
 	CHECK(count == 2);
-	CHECK(plan[0] == &__fb_gfx3_backend_vulkan);
-	CHECK(plan[1] == &__fb_gfx3_backend_vulkan);
+	CHECK(plan[0] == &fb_gfx3_backend_vulkan);
+	CHECK(plan[1] == &fb_gfx3_backend_vulkan);
 	CHECK(attempt_flags[0] == 0x00000200);
 	CHECK(attempt_flags[1] == 0x00000201);
 
@@ -3176,25 +3176,25 @@ static void test_backend_selection(void)
 		FB_GFX3_BACKEND_PLAN_CAPACITY);
 	CHECK(count == 1);
 #ifdef HOST_ANDROID
-	CHECK(plan[0] == &__fb_gfx3_backend_gles);
+	CHECK(plan[0] == &fb_gfx3_backend_gles);
 #else
-	CHECK(plan[0] == &__fb_gfx3_backend_opengl);
+	CHECK(plan[0] == &fb_gfx3_backend_opengl);
 #endif
 
 	count = fb_gfx3_backend_plan(-1, NULL, plan,
 		FB_GFX3_BACKEND_PLAN_CAPACITY);
 	CHECK(count == 1);
-	CHECK(plan[0] == &__fb_gfx3_backend_null);
+	CHECK(plan[0] == &fb_gfx3_backend_null);
 	count = fb_gfx3_backend_attempt_plan(-1, NULL, plan, attempt_flags,
 		FB_GFX3_BACKEND_PLAN_CAPACITY);
 	CHECK(count == 1);
-	CHECK(plan[0] == &__fb_gfx3_backend_null);
+	CHECK(plan[0] == &fb_gfx3_backend_null);
 	CHECK(attempt_flags[0] == -1);
 
 	count = fb_gfx3_backend_plan(0, "null", plan,
 		FB_GFX3_BACKEND_PLAN_CAPACITY);
 	CHECK(count == 1);
-	CHECK(plan[0] == &__fb_gfx3_backend_null);
+	CHECK(plan[0] == &fb_gfx3_backend_null);
 
 	memset(long_name, 'x', sizeof(long_name));
 	CHECK(fb_gfx3_backend_set_requested_name(long_name,

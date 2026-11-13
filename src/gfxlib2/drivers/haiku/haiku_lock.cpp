@@ -61,9 +61,9 @@ void fb_hHaikuLock(void)
         here so the generic resize layer observes it under the driver lock.
     */
     fb_hHaikuLockState();
-    if (__fb_gfx)
+    if (fb_gfx)
     {
-        fb_hMemCpy(__fb_gfx->key, fb_haiku.key_state, sizeof(fb_haiku.key_state));
+        fb_hMemCpy(fb_gfx->key, fb_haiku.key_state, sizeof(fb_haiku.key_state));
         while (fb_haiku.key_head != fb_haiku.key_tail)
         {
             fb_hPostKey(fb_haiku.pending_keys[fb_haiku.key_head]);
@@ -72,10 +72,10 @@ void fb_hHaikuLock(void)
     }
     if (fb_haiku.pending_width > 0 && fb_haiku.pending_height > 0)
     {
-        if (__fb_gfx && __fb_gfx->scanline_size > 0)
+        if (fb_gfx && fb_gfx->scanline_size > 0)
         {
             int height = (fb_haiku.pending_height - 1) /
-                __fb_gfx->scanline_size + 1;
+                fb_gfx->scanline_size + 1;
             fb_hRequestResize(fb_haiku.pending_width, height);
         }
         fb_haiku.pending_width = 0;

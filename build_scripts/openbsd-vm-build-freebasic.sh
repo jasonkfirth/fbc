@@ -622,6 +622,9 @@ send_tests_tree() {
 		--exclude='*.a' \
 		-e "$(rsync_ssh "$key" "$port")" \
 		"$ROOT/src/sfxlib/" "$GUEST_USER@127.0.0.1:/home/fbc/work/fbctests-source/src/sfxlib/"
+
+	# The sound header shares linker-label declarations with the runtime.
+	ssh_guest "$key" "$port" "mkdir -p /home/fbc/work/fbctests-source/src/rtlib && cat > /home/fbc/work/fbctests-source/src/rtlib/fb_abi.h" < "$ROOT/src/rtlib/fb_abi.h"
 }
 
 send_exampleageddon_tree() {

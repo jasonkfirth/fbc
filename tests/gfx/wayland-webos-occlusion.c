@@ -9,14 +9,14 @@
 #include <assert.h>
 #include "../../src/gfxlib2/drivers/linux/gfx_driver_wayland.c"
 
-FBGFX *__fb_gfx;
+FBGFX *fb_gfx;
 
 int main(void)
 {
 	FBGFX gfx = { 0 };
 	FB_WAYLAND_WEBOS *webos = &fb_wayland_window.webos;
 	int top = 0, height = 0;
-	__fb_gfx = &gfx;
+	fb_gfx = &gfx;
 	gfx.h = 1050;
 	fb_wayland_window.active = 1;
 	webos->visible = -1;

@@ -15,6 +15,11 @@ bash build_scripts/msdos-exampleageddon.sh
 ```
 
 The build script stages `out/msdos/FreeBASIC-*-dos` and creates its ZIP.
+It also bundles the existing PDMLWP thread provider, its source notices and
+rebuild helper. Programs still select that provider explicitly with
+`-dos-threads pdmlwp`; ordinary programs use the non-threaded runtime.
+`DOS_THREAD_PROVIDER=` disables these optional archives for a smaller build,
+which cannot qualify the required threaded examples.
 The unit script uses that build's private DOS source/object directory, compiles
 the emulator, FPU control and assembly-address preflights and the complete
 Make-selected DOS unit manifest, and runs the executables in DOSBox-X.
@@ -38,6 +43,8 @@ still owns inventory classification, multi-file sources and runtime resources.
 Every source receives a result row; unsupported platform or library outcomes
 remain visible. The gate requires a complete inventory, successful compilation
 and execution of every self-contained example, and no attempted runtime failure.
+The shared argument selector adds `-dos-threads pdmlwp` to DOS examples using
+thread primitives. These examples retain their original classifications.
 `--max-batches` is a development bound and cannot turn a partial run into a pass.
 `--resume` requires identical source, package, emulator and runner fingerprints.
 `--start-batch N` changes only the processing order: the runner wraps through
@@ -130,7 +137,7 @@ Double result, then restores the caller's control word. BASIC startup selects
 IEEE libm behavior so `0 ^ negative` has the same positive-infinity result as
 constant folding and the other target runtimes.
 
-## Current-source unit receipt
+## Qualified-source unit receipt
 
 The November 13 source build and refreshed distribution pass the complete DOS
 unit manifest: 685 suites, 2,462 tests and 1,620,924 assertions, with no errors
@@ -145,6 +152,13 @@ Local evidence is under `out/codex-dos-emitter-20261112/package/qualification`.
 Concurrent padding declarations confined to 64-bit targets produce identical
 DOS-preprocessed internal headers; their equivalence receipt avoids an
 unnecessary rebuild of the unchanged 32-bit code.
+The provider package refresh passed the complete unit suite again with the
+same unit executable hash. `qualification-inputs-provider.json` records that
+source snapshot, including the provider sources and reviewed DOS-excluded
+gfxlib3 updates. `qualification-source-cut.json` binds the emitter to committed
+revision `e4341432091a3506ddb2386069c2478b3120651d`. Later independent,
+uncommitted callback-cast edits are outside this qualification; these receipts
+must not be presented as validation of those newer edits.
 
 The earlier native compiler reproduced the new floating-argument representation
 regression with exit status 9 at its signaling-NaN check. The current DOS compiler
@@ -154,9 +168,41 @@ checks. Its SHA-256 is
 The C observer uses Intel assembly and DJGPP's underscore-prefixed symbol names.
 
 The earlier partial sweep is retained under `package/exampleageddon` and marked
-superseded. The complete fresh 1,775-entry sweep runs under
-`out/codex-dos-emitter-20261112/float-bits-qualification/exampleageddon`, beginning
-at batch 8 and wrapping through the earlier batches. No earlier result is reused
-for the rebuilt compiler, and partial receipts are not final acceptance.
+superseded. A second sweep under `float-bits-qualification/exampleageddon`
+found that the package omitted the existing optional thread provider; its
+required thread-pool example failed compilation rather than being excluded.
+All five required threaded examples passed a focused native DOS replay with
+the provider. The refreshed package and a complete fresh sweep under
+`out/codex-dos-emitter-20261112/provider-qualification/exampleageddon` are now
+being qualified. Earlier result rows are not reused for the refreshed package,
+and partial receipts are not final acceptance.
+
+The packaged `fbdos.bat` also sets GCC to the DJGPP installation, where its
+private programs are available. The distribution smoke test calls this launcher
+and compiles and runs both the default emitter and a C-backend x87 check.
+
+## Runtime TLS qualification
+
+The provider sweep found a further required compile failure in
+`examples/manual/variable/thread-local.bas`: DJGPP COFF does not implement
+native C `__thread` storage. DOS C accesses now use the existing runtime TLS
+allocator, with ordinary static objects supplying their initial bytes.
+Public BASIC externs use a common mangled-name key across modules. Private
+objects use their static template address as an opaque key, because different
+modules can have private variables with the same spelling. The runtime borrows
+that key for the program lifetime and releases only its per-thread allocations.
+
+The shared array-index repair retains byte bias, normal bounds checks and a
+single evaluation of each index when TLS supplies a computed address. Native
+C TLS externs and managed TLS initialization still receive explicit compiler
+diagnostics. They are not replaced with shared storage.
+
+The DOS unit workflow checks ordinary TLS, worker isolation, initialized BASIC
+externs and private module identity through C and GAS, fixed-array indexing,
+the storage API independently of compiler lowering, and unsupported-form
+diagnostics before running the complete unit manifest. The earlier provider
+sweeps are diagnostic receipts and are marked superseded. A fresh complete
+1,775-entry run is required for the rebuilt compiler and archives; its output
+will be `runtime-tls-qualification/exampleageddon`.
 
 <!-- end of dos-qualification.md -->

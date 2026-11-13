@@ -4,6 +4,20 @@
 '' Responsibilities: Keep erased callback values distinct from typed call adapters.
 '' This file intentionally does NOT change call signatures or calling conventions.
 
+private function hCNoReturnCallbackIdentity(byval n as EXPRNODE ptr) as integer
+	if( typeGetDtAndPtrOnly(n->dtype) <> typeAddrOf(FB_DATATYPE_FUNCTION) ) then return FALSE
+	var value = n->l
+	if( value->class <> EXPRCLASS_SYM ) then return FALSE
+	if( typeGetDtAndPtrOnly(value->dtype) <> typeAddrOf(FB_DATATYPE_FUNCTION) ) then return FALSE
+	if( value->sym = NULL orelse symbIsProc(value->sym) = FALSE ) then return FALSE
+	if( hProcDoesNotReturn(value->sym) = FALSE ) then return FALSE
+	'' The interned procedure-pointer signature excludes the body's noreturn
+	'' property. A matching callback accepts the function address directly;
+	'' an explicit cast instead makes Clang diagnose the lost attribute.
+	'' Exact identity retains parameter types, result mode and convention.
+	return n->subtype = symbAddProcPtrFromFunction(value->sym)
+end function
+
 private function hCErasedCallbackType(byval dtype as integer, byval subtype as FBSYMBOL ptr) as integer
 	if( typeGetDtAndPtrOnly(dtype) <> typeAddrOf(FB_DATATYPE_FUNCTION) ) then return FALSE
 	if( subtype = NULL orelse symbIsProc(subtype) = FALSE ) then return FALSE

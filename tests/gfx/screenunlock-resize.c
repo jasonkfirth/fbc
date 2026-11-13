@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-FBGFX *__fb_gfx;
+FBGFX *fb_gfx;
 void *(*fb_hMemSet)(void *, int, size_t) = memset;
 
 static FB_GFXCTX test_context;
@@ -50,7 +50,7 @@ int main(void)
 	FBGFX gfx = { 0 };
 	char dirty[4] = { 0 };
 
-	__fb_gfx = &gfx;
+	fb_gfx = &gfx;
 	gfx.driver = &driver;
 	gfx.dirty = dirty;
 	gfx.h = 4;

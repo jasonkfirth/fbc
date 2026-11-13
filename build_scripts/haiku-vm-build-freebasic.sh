@@ -1173,6 +1173,9 @@ send_tests_tree() {
 		--exclude='./*.o' \
 		--exclude='./*.a'
 
+	# Include the sound header's shared ABI dependency in the private test tree.
+	ssh_guest "$key" "$port" "mkdir -p /Work/fbctests-source/src/rtlib && cat > /Work/fbctests-source/src/rtlib/fb_abi.h" < "$ROOT/src/rtlib/fb_abi.h"
+
 	mapfile -t unit_dirs < <(
 		make -s -C "$ROOT/tests" -f dirlist.mk \
 			--eval='print:;@printf "%s\n" $(DIRLIST_FB)' print

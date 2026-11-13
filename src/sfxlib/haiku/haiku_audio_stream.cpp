@@ -122,7 +122,7 @@ static void audio_callback(
     int frames;
     int samples;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
     {
         memset(buffer, 0, size);
         return;

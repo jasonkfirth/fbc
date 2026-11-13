@@ -86,6 +86,8 @@ jobs:
           fetch-depth: 2
       - name: Check CI scope contracts
         run: python3 -B build_scripts/test-ci-change-scope.py
+      - name: Check shared C ABI consumers
+        run: python3 -B build_scripts/test-rtlib-abi-names.py
       - name: Select qualification scope
         id: scope
         env:
@@ -106,6 +108,7 @@ jobs:
       DOS_UNIT_TIMEOUT: 600
       DOSBOX_X_VERSION: '2026.10.01'
       DOS_TEST_CORE: dynamic_x86
+      DOS_THREAD_PROVIDER: pdmlwp
     steps:
       - name: Checkout tested revision
         uses: actions/checkout@v7

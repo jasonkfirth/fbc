@@ -105,7 +105,7 @@ stage_source_tree()
 	if command -v git >/dev/null 2>&1 &&
 		git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 		git -C "$ROOT" ls-files -co --exclude-standard -z -- \
-			tests inc src/sfxlib examples build_scripts/exampleageddon-freebasic.py |
+			tests inc src/sfxlib src/rtlib/fb_abi.h examples build_scripts/exampleageddon-freebasic.py |
 			while IFS= read -r -d '' source_path; do
 				[ -e "$ROOT/$source_path" ] || continue
 				printf '%s\0' "$source_path"
@@ -126,6 +126,8 @@ stage_source_tree()
 			--exclude='*.a' \
 			--exclude='*.o' \
 			"$ROOT/src/sfxlib/" "$source_root/src/sfxlib/"
+		mkdir -p "$source_root/src/rtlib"
+		cp "$ROOT/src/rtlib/fb_abi.h" "$source_root/src/rtlib/"
 		rsync -a --delete "$ROOT/examples/" "$source_root/examples/"
 		mkdir -p "$source_root/build_scripts"
 		cp "$ROOT/build_scripts/exampleageddon-freebasic.py" "$source_root/build_scripts/"

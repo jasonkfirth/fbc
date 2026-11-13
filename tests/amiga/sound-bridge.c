@@ -14,9 +14,9 @@ int amiga_test_sound_driver(void)
 {
     int result = 0;
     fb_sfxRuntimeLock();
-    if (__fb_sfx != NULL && __fb_sfx->initialized && __fb_sfx->driver != NULL) {
-        if (strcmp(__fb_sfx->driver->name, "Amiga Paula") == 0) result = 1;
-        else if (strcmp(__fb_sfx->driver->name, "AMIGA AHI") == 0) result = 2;
+    if (fb_sfx_context != NULL && fb_sfx_context->initialized && fb_sfx_context->driver != NULL) {
+        if (strcmp(fb_sfx_context->driver->name, "Amiga Paula") == 0) result = 1;
+        else if (strcmp(fb_sfx_context->driver->name, "AMIGA AHI") == 0) result = 2;
     }
     fb_sfxRuntimeUnlock();
     return result;

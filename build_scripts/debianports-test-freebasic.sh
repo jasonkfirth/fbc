@@ -507,6 +507,7 @@ stage_sources_for_fbctests() {
     root_cmd rsync -a --delete "$ROOT/inc/" "$ROOTFS/source-inc/"
     root_cmd rsync -a --delete --exclude='obj' \
         "$ROOT/src/sfxlib/" "$ROOTFS/source-sfxlib/"
+    root_cmd cp "$ROOT/src/rtlib/fb_abi.h" "$ROOTFS/source-fb-abi.h"
 }
 
 stage_sources_for_exampleageddon() {
@@ -644,6 +645,9 @@ run_fbctests() {
         cd /tmp/fbctests-source/src/sfxlib
         tar xf -
     )
+
+    mkdir -p /tmp/fbctests-source/src/rtlib
+    cp /source-fb-abi.h /tmp/fbctests-source/src/rtlib/fb_abi.h
 
     cd /tmp/fbctests-source/tests
 

@@ -92,8 +92,8 @@ int main(int argc, char **argv)
          * owner prevents scheduler initialization altogether.
          */
         rtc_write(0x0B, saved_b | (slow ? 0x08 : 0x40));
-        if (!require(fb_sfxInit() == 0 && __fb_sfx &&
-                     strcmp(__fb_sfx->driver->name, "PCSpeaker") == 0 &&
+        if (!require(fb_sfxInit() == 0 && fb_sfx_context &&
+                     strcmp(fb_sfx_context->driver->name, "PCSpeaker") == 0 &&
                      !fb_sfxMsdosPcSpeakerIrqActive() &&
                      !!fb_sfxMsdosWorkerActive() == slow, "speaker fallback selection"))
             return 1;
@@ -121,10 +121,10 @@ int main(int argc, char **argv)
         float block[1024];
         int i;
         phase(cycle, "initializing");
-        if (!require(fb_sfxInit() == 0 && __fb_sfx &&
-                     strcmp(__fb_sfx->driver->name, "PCSpeaker") == 0 &&
+        if (!require(fb_sfxInit() == 0 && fb_sfx_context &&
+                     strcmp(fb_sfx_context->driver->name, "PCSpeaker") == 0 &&
                      fb_sfxMsdosWorkerActive() && fb_sfxMsdosPcSpeakerIrqActive() &&
-                     __fb_sfx->samplerate == 8192, "clocked speaker worker initialization"))
+                     fb_sfx_context->samplerate == 8192, "clocked speaker worker initialization"))
             return 1;
         if (!require(fb_sfxOutputCaptureStart() == 0, "capture start"))
             return 1;

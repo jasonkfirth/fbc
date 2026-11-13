@@ -1,10 +1,30 @@
-/* GDI gfx driver */
+/*
+    Project: FreeBASIC Graphics Library
+    ------------------------------------
+
+    File: drivers/win32/gfx_driver_gdi.c
+
+    Purpose:
+
+        Present the gfxlib2 framebuffer through Windows GDI.
+
+    Responsibilities:
+
+        - create and configure the GDI backbuffer
+        - enumerate display modes and copy changed scanlines
+
+    This file intentionally does NOT contain:
+
+        - portable drawing operations
+        - shared window or input event handling
+*/
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_win32.h"
 #include <limits.h>
 
-#define SCREENLIST(w, h) ((h) | (w) << 16)
+/* Screen mode entries pack the width and height into one 32-bit value. */
+#define SCREENLIST(w, h) ((int)((DWORD)(h) | ((DWORD)(w) << 16)))
 #ifndef LWA_COLORKEY
 #define LWA_COLORKEY	0x00000001
 #endif
@@ -78,7 +98,8 @@ static void gdi_paint(void)
 	hdc = GetDC(fb_win32.wnd);
 	SelectPalette(hdc, palette, FALSE);
 	RealizePalette(hdc);
-	SetDIBitsToDevice(hdc, 0, 0, fb_win32.w, fb_win32.h, 0, 0, 0, fb_win32.h, source, bitmap_info, DIB_RGB_COLORS);
+	SetDIBitsToDevice(hdc, 0, 0, (DWORD)fb_win32.w, (DWORD)fb_win32.h,
+			  0, 0, 0, (UINT)fb_win32.h, source, bitmap_info, DIB_RGB_COLORS);
 	InvalidateRect(fb_win32.wnd, NULL, FALSE);
 	ReleaseDC(fb_win32.wnd, hdc);
 }
@@ -90,6 +111,7 @@ static int gdi_init(void)
 	HDC hdc;
 	RECT rect;
 	LOGPALETTE *lp;
+	size_t aligned_width, buffer_size;
 	int x, y;
 	MONITORINFOEX monitor_info;
 	const char *devname = NULL;
@@ -108,12 +130,12 @@ static int gdi_init(void)
 	if (fb_win32.flags & DRIVER_FULLSCREEN) {
 		fb_hMemSet(&mode, 0, sizeof(mode));
 		mode.dmSize = sizeof(mode);
-		mode.dmPelsWidth = fb_win32.w;
-		mode.dmPelsHeight = fb_win32.h;
-		mode.dmBitsPerPel = fb_win32.depth;
+		mode.dmPelsWidth = (DWORD)fb_win32.w;
+		mode.dmPelsHeight = (DWORD)fb_win32.h;
+		mode.dmBitsPerPel = (DWORD)fb_win32.depth;
 		mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
 		if (fb_win32.version >= 0x500) {
-			mode.dmDisplayFrequency = fb_win32.refresh_rate;
+			mode.dmDisplayFrequency = (DWORD)fb_win32.refresh_rate;
 			mode.dmFields |= DM_DISPLAYFREQUENCY;
 		}
 		
@@ -128,9 +150,9 @@ static int gdi_init(void)
 	} else {
 		style = WS_OVERLAPPEDWINDOW;
 		if (!(fb_win32.flags & DRIVER_RESIZABLE))
-			style &= ~WS_THICKFRAME;
+			style &= ~(DWORD)WS_THICKFRAME;
 		if (fb_win32.flags & DRIVER_NO_SWITCH)
-			style &= ~WS_MAXIMIZEBOX;
+			style &= ~(DWORD)WS_MAXIMIZEBOX;
 		if (fb_win32.flags & DRIVER_NO_FRAME)
 			style = WS_POPUP;
 		if (fb_win32.flags & DRIVER_SHAPED_WINDOW) {
@@ -195,7 +217,18 @@ static int gdi_init(void)
 				return -1;
 		}
 		if(fb_win32.blitter) {
-			buffer = malloc(((fb_win32.w + 3) & ~3) * fb_win32.h * fb_gfx->bpp);
+			if ((fb_win32.w <= 0) || (fb_win32.h <= 0) || (fb_gfx->bpp <= 0))
+				return -1;
+			if ((size_t)fb_win32.w > ((size_t)-1 - 3u))
+				return -1;
+			aligned_width = ((size_t)fb_win32.w + 3u) & ~(size_t)3u;
+			if ((size_t)fb_win32.h > ((size_t)-1 / aligned_width))
+				return -1;
+			buffer_size = aligned_width * (size_t)fb_win32.h;
+			if ((size_t)fb_gfx->bpp > ((size_t)-1 / buffer_size))
+				return -1;
+			buffer_size *= (size_t)fb_gfx->bpp;
+			buffer = malloc(buffer_size);
 			if (!buffer)
 				return -1;
 		}
@@ -297,7 +330,8 @@ static DWORD WINAPI gdi_thread( LPVOID param )
 				}
 				h = (y2 - y1 + 1);
 
-				SetDIBitsToDevice(hdc, 0, y1, fb_win32.w, h, 0, 0, 0, h, source, bitmap_info, DIB_RGB_COLORS);
+				SetDIBitsToDevice(hdc, 0, y1, (DWORD)fb_win32.w, (DWORD)h,
+						  0, 0, 0, (UINT)h, source, bitmap_info, DIB_RGB_COLORS);
 				
 				if (fb_win32.version < 0x500) {
 					rect.top = y1;
@@ -310,7 +344,7 @@ static DWORD WINAPI gdi_thread( LPVOID param )
 		}
 		ReleaseDC(fb_win32.wnd, hdc);
 
-		fb_hMemSet(fb_gfx->dirty, FALSE, fb_win32.h);
+		fb_hMemSet(fb_gfx->dirty, FALSE, (size_t)fb_win32.h);
 
         if( fb_win32.is_active ) {
             GetKeyboardState(keystate);
@@ -404,7 +438,7 @@ static int driver_resize(int width, int height)
 static int *driver_fetch_modes(int depth, int *size)
 {
 	int *data = NULL, *newdata;
-	int mode = 0;
+	DWORD mode = 0;
 	int count = 0;
 	DEVMODE dm;
 
@@ -414,8 +448,14 @@ static int *driver_fetch_modes(int depth, int *size)
 		    (dm.dmBitsPerPel == 16 && depth == 15) ||
 		    (dm.dmBitsPerPel == 24 && depth == 32) ||
 		    (dm.dmBitsPerPel == 32 && depth == 24)) {
+			if (count == INT_MAX)
+				break;
 			++count;
-			newdata = realloc(data, count * sizeof(int));
+			if ((size_t)count > ((size_t)-1 / sizeof(*newdata))) {
+				--count;
+				break;
+			}
+			newdata = realloc(data, (size_t)count * sizeof(*newdata));
 			if (!newdata) {
 				*size = count - 1;
 				return data;
@@ -429,3 +469,5 @@ static int *driver_fetch_modes(int depth, int *size)
 	*size = count;
 	return data;
 }
+
+/* end of gfx_driver_gdi.c */

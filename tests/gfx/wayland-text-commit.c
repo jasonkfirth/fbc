@@ -17,7 +17,7 @@ static int keys[320];
 static EVENT events[640];
 static size_t key_count;
 static size_t event_count;
-FBGFX *__fb_gfx;
+FBGFX *fb_gfx;
 
 int fb_hScancodeToExtendedKey(int scancode)
 {
@@ -167,7 +167,7 @@ int main(void)
 	memset(key_state, 0, sizeof(key_state));
 	memset(&fb_wayland_window, 0, sizeof(fb_wayland_window));
 	gfx.key = key_state;
-	__fb_gfx = &gfx;
+	fb_gfx = &gfx;
 	fb_wayland_window.keyboard_focused = 1;
 	fb_wayland_window.xkb_state = (struct xkb_state *)(uintptr_t)1;
 	fb_wayland_window.xkb.state_update_key = mock_xkb_update;

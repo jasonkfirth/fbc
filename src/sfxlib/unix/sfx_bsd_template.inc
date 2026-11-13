@@ -1,6 +1,11 @@
 /*
     Shared BSD backend scaffold.
 
+    File: sfx_bsd_template.inc
+    Purpose: Share BSD sound initialization and worker state.
+    Responsibilities: Driver registration, playback state and background feeding.
+    This file intentionally does NOT contain: platform device APIs or synthesis.
+
     This file is included by per-target BSD backend shims. It provides
     Linux-style runtime state and background feed plumbing so future
     OSS/sndio/native BSD drivers can opt into unattended playback
@@ -64,7 +69,7 @@
 #endif
 
 extern const FB_SFX_DRIVER FB_SFX_BSD_DRIVER_NAME;
-extern const FB_SFX_DRIVER __fb_sfxDriverNull;
+extern const FB_SFX_DRIVER fb_sfxDriverNull_internal;
 
 #if defined(__GNUC__) || defined(__clang__)
 #define FB_SFX_BSD_WEAK __attribute__((weak))
@@ -274,12 +279,14 @@ int FB_SFX_BSD_WEAK fb_sfxPlatformCaptureRead(float *buffer, int frames)
     return 0;
 }
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
     &FB_SFX_BSD_DRIVER_NAME,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 
 #undef BSD_DBG
 #undef FB_SFX_BSD_WEAK
+
+/* end of sfx_bsd_template.inc */

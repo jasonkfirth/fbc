@@ -9,7 +9,7 @@
 #include <stdarg.h>
 
 static FBGFX context;
-FBGFX *__fb_gfx = &context;
+FBGFX *fb_gfx = &context;
 static unsigned checks, requests, acknowledgements;
 static int requested_width, requested_height;
 static uint32_t acknowledged_serial;

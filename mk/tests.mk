@@ -111,6 +111,7 @@ exampleageddon-contract-test:
 # Source ownership and platform replacements are checked without a cross SDK.
 .PHONY: rtlib-structure-test
 rtlib-structure-test:
+	$(PYTHON) "$(rootdir)/build_scripts/test-rtlib-abi-names.py"
 	$(PYTHON) "$(rootdir)/build_scripts/check-rtlib-structure.py" --root "$(rootdir)" --make "$(MAKE)"
 
 .PHONY: gfx-locking-test

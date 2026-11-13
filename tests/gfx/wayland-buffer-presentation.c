@@ -15,7 +15,7 @@
 
 #include <stdarg.h>
 
-FBGFX *__fb_gfx;
+FBGFX *fb_gfx;
 
 /* Both buffers are preallocated here; the allocation path must not be needed. */
 int fb_hWaylandLoadSymbols(const char *const *names, void **addresses, size_t count)
@@ -81,10 +81,10 @@ static int record_flush(struct wl_display *display)
 static void copy_dirty_rows(unsigned char *destination, int pitch)
 {
 	int y;
-	for (y = 0; y < __fb_gfx->h; y++) {
-		if (__fb_gfx->dirty[y])
+	for (y = 0; y < fb_gfx->h; y++) {
+		if (fb_gfx->dirty[y])
 			memcpy(destination + (size_t)y * (size_t)pitch,
-				__fb_gfx->framebuffer + (size_t)y * sizeof(uint32_t),
+				fb_gfx->framebuffer + (size_t)y * sizeof(uint32_t),
 				sizeof(uint32_t));
 	}
 }
@@ -116,7 +116,7 @@ int main(void)
 	struct wl_buffer *second = (struct wl_buffer *)(uintptr_t)2;
 	int i;
 
-	__fb_gfx = &gfx;
+	fb_gfx = &gfx;
 	gfx.framebuffer = (unsigned char *)source;
 	gfx.dirty = pending;
 	gfx.h = 3;

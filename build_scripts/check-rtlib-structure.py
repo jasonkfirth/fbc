@@ -41,6 +41,15 @@ SDK_MACROS = {
 
 ABI_C_NAME = re.compile(r'\b(?:__fb_[A-Za-z0-9_]+|_ZN[A-Za-z0-9_$]+)\b')
 COMMENTS = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|/\*.*?\*/|//[^\n]*', re.S)
+DATA_ABI_LABEL = re.compile(
+    r'\b([A-Za-z_][A-Za-z_0-9]*)\s*(?:\[[^;]*?\])?\s+'
+    r'FB_(?:C|RTLIB)_SYMBOL\("([A-Za-z_][A-Za-z_0-9]*)"\)')
+# These files deliberately supply legacy ABI declarations without the shared
+# declaration: a minimal standalone runtime and an old-header link control.
+LEGACY_ABI_CONSUMERS = {
+    'src/rtlib/drivers/nuttx/fb_nuttx_object.c',
+    'tests/rtlib/runtime-symbol-legacy.c',
+}
 
 # These quoted names are supplied by platform SDKs, not this repository.
 # Keep exceptions attached to their consumers so a misspelled private include
@@ -77,6 +86,35 @@ def reserved_runtime_tags(relative: str, text: str) -> list[str]:
 def reserved_runtime_abi_names(text: str) -> list[str]:
     """Keep legacy ABI names in quoted labels, rather than C declarations."""
     return sorted(set(ABI_C_NAME.findall(COMMENTS.sub('', text))))
+
+
+def stale_abi_references(root: Path) -> list[str]:
+    """Catch old data identifiers in every platform, including C++ and templates.
+
+    Assembly and quoted labels still use the original linker names. Only
+    native source tokens must follow the ordinary names in shared headers.
+    Private platform identifiers without a shared alias are outside this check.
+    """
+    aliases = {}
+    for subsystem in ('rtlib', 'gfxlib2', 'gfxlib3', 'sfxlib'):
+        for path in (root / 'src' / subsystem).glob('*.h'):
+            text = without_comments(path.read_bytes().decode('latin-1'))
+            aliases.update({old: new for new, old in DATA_ABI_LABEL.findall(text)
+                            if old != new})
+    failures = []
+    for directory in ('src', 'tests'):
+        for path in (root / directory).rglob('*'):
+            relative = path.relative_to(root)
+            if (path.suffix.lower() not in {'.c', '.h', '.cpp', '.inc'} or
+                    {'obj', 'third_party'}.intersection(relative.parts) or
+                    relative.as_posix() in LEGACY_ABI_CONSUMERS):
+                continue
+            code = COMMENTS.sub('', path.read_bytes().decode('latin-1'))
+            names = set(re.findall(r'\b[A-Za-z_][A-Za-z_0-9]*\b', code))
+            for name in sorted(names.intersection(aliases)):
+                failures.append(f'{relative.as_posix()}: use {aliases[name]} '
+                                f'as the C identifier for ABI label {name}')
+    return failures
 
 
 def reserved_runtime_macros(relative: str, text: str) -> list[str]:
@@ -180,7 +218,7 @@ def check_collision_guards(root: Path, make: str, work: Path) -> int:
 
 def validate(root: Path, make: str) -> None:
     rtl = root / "src/rtlib"
-    failures: list[str] = []
+    failures: list[str] = stale_abi_references(root)
     files = sorted(path for path in rtl.rglob("*") if path.is_file()
                    and "obj" not in path.relative_to(rtl).parts and path.suffix in SOURCE_SUFFIXES)
     if not files:
@@ -272,9 +310,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--make", default="make")
+    parser.add_argument("--abi-names-only", action="store_true",
+                        help="Check shared C names without querying Make graphs")
     options = parser.parse_args()
     try:
-        validate(options.root.resolve(strict=True), options.make)
+        root = options.root.resolve(strict=True)
+        if options.abi_names_only:
+            failures = stale_abi_references(root)
+            if failures:
+                raise ValueError('\n'.join(failures))
+            print('RTLIB_ABI_NAMES=PASS')
+        else:
+            validate(root, options.make)
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         print(error)
         return 1

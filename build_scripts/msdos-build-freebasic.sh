@@ -90,6 +90,7 @@ Environment:
   CURL_BIN               curl executable for host downloads (MSYS2 default: /usr/bin/curl)
   TARGET_TRIPLET         DJGPP target triplet (default: i586-pc-msdosdjgpp)
   DOS_TCP_PROVIDER        Set to watt32 to enable the optional Watt-32 TCP path
+  DOS_THREAD_PROVIDER     Bundled thread provider (default: pdmlwp; empty disables)
   DOS_WATT32_CFLAGS       Include path for the Watt-32 headers
   DOS_WATT32_LIBS         Link flags for the Watt-32 archive (default: DJGPP payload lib)
   DOS_DPMI_YIELD          Set to YesPlease for a tested DPMI host time-slice path
@@ -157,6 +158,9 @@ esac
 
 TARGET_TRIPLET="${TARGET_TRIPLET:-i586-pc-msdosdjgpp}"
 PREFIX="${PREFIX:-/fb}"
+# Bundle the existing opt-in scheduler and its source notices. Ordinary
+# programs still link the non-threaded runtime unless they select it.
+export DOS_THREAD_PROVIDER="${DOS_THREAD_PROVIDER-pdmlwp}"
 
 BUILDROOT="${BUILDROOT:-$ROOT/.build-msdos/$HOST_KIND}"
 HOST_WORKTREE="${HOST_WORKTREE:-$BUILDROOT/host-worktree}"

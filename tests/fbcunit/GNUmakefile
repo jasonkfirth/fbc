@@ -1,4 +1,10 @@
+# Project: FreeBASIC fbcunit
+# File: GNUmakefile
+# Purpose: Build the test framework and its examples.
+# Responsibilities: Framework compilation, archiving and local test programs.
+# This file does not own the parent compiler test inventory.
 FBC ?= fbc
+AR ?= ar
 
 ECHO := echo
 RM ?= rm -f
@@ -126,12 +132,13 @@ tests: $(TEST_EXE)
 examples: $(EXAMPLES)
 
 $(LIBRARY): $(SRCS) $(HDRS)
+	mkdir -p $(@D)
 ifeq ($(TARGET),dos)
 	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit.bas -o src/fbcunit.o
 	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit_qb.bas -o src/fbcunit_qb.o
 	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit_console.bas -o src/fbcunit_console.o
 	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -c src/fbcunit_report.bas -o src/fbcunit_report.o
-	ar rcs $@ $(LIBRARY_OBJS)
+	$(AR) rcs $@ $(LIBRARY_OBJS)
 else
 	$(FBC) $(FBCFLAGS) -d FBCU_NO_INCLIB -lib $(SRCS) -x $@
 endif
@@ -151,3 +158,5 @@ clean:
 	-$(RM) $(LIBRARY_OBJS)
 	-$(RM) $(TEST_OBJS) $(TEST_EXE)
 	-$(RM) $(EXAMPLES)
+
+# end of GNUmakefile

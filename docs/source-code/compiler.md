@@ -57,6 +57,11 @@ grammar in comments, but its branches, dialect checks and recovery behavior
 determine what is accepted. An accepted parse is only part of compilation:
 symbol and AST checks still enforce types, argument modes and lifetime rules.
 
+Runtime-backed fixed-array variables supply a computed storage address. The
+variable parser lowers indexing through that address with the existing byte
+bias, retaining bounds checks and single evaluation. See
+[TLS arrays and terminating C epilogues](../c-emitter-runtime-tls-arrays.md).
+
 ## Trace PRINT from syntax to runtime
 
 For a string-valued `PRINT` argument, the useful path is:
@@ -148,6 +153,12 @@ source addresses stable for the entire call. Intel static address operands
 and automatic memory operands have distinct constraints. See
 [assembly storage addresses](../c-emitter-asm-addresses.md) and
 [the live-address regression](../../tests/compiler-support/c-asm-real-addresses.bas).
+
+`backend/c/c-callback-representation.bi` distinguishes erased code addresses
+from typed calls. It also recognizes exact signature identity when a terminating
+procedure address is assigned to an ordinary callback. See
+[terminating callbacks](../c-emitter-noreturn-callbacks.md) for native identity
+checks and the preserved signature-mismatch control.
 
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage

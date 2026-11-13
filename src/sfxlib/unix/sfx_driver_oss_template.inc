@@ -348,17 +348,17 @@ int fb_sfxPlatformCaptureStart(void)
 
     requested_channels = FB_SFX_DEFAULT_CHANNELS;
     requested_rate = FB_SFX_DEFAULT_RATE;
-    if (__fb_sfx)
+    if (fb_sfx_context)
     {
-        if (__fb_sfx->capture.channels > 0)
-            requested_channels = __fb_sfx->capture.channels;
-        else if (__fb_sfx->output_channels > 0)
-            requested_channels = __fb_sfx->output_channels;
+        if (fb_sfx_context->capture.channels > 0)
+            requested_channels = fb_sfx_context->capture.channels;
+        else if (fb_sfx_context->output_channels > 0)
+            requested_channels = fb_sfx_context->output_channels;
 
-        if (__fb_sfx->capture.rate > 0)
-            requested_rate = __fb_sfx->capture.rate;
-        else if (__fb_sfx->samplerate > 0)
-            requested_rate = __fb_sfx->samplerate;
+        if (fb_sfx_context->capture.rate > 0)
+            requested_rate = fb_sfx_context->capture.rate;
+        else if (fb_sfx_context->samplerate > 0)
+            requested_rate = fb_sfx_context->samplerate;
     }
 
     device_path = bsd_oss_capture_device_path();
@@ -388,10 +388,10 @@ int fb_sfxPlatformCaptureStart(void)
     bsd_oss_capture_fd = fd;
     bsd_oss_capture_channels = actual_channels;
 
-    if (__fb_sfx)
+    if (fb_sfx_context)
     {
-        __fb_sfx->capture.rate = actual_rate;
-        __fb_sfx->capture.channels = actual_channels;
+        fb_sfx_context->capture.rate = actual_rate;
+        fb_sfx_context->capture.channels = actual_channels;
         fb_sfxCaptureBufferClear();
     }
 
@@ -487,3 +487,5 @@ const FB_SFX_DRIVER FB_SFX_BSD_DRIVER_NAME =
 };
 
 #undef BSD_OSS_DBG
+
+/* end of sfx_driver_oss_template.inc */

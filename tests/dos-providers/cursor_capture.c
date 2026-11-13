@@ -24,16 +24,16 @@ static void capture_update(void)
 	int first = capture.height, last = -1, row;
 	if (capture.banked) {
 		for (row = 0; row < capture.height; row++) {
-			if (__fb_gfx->dirty[row]) {
+			if (fb_gfx->dirty[row]) {
 				if (first == capture.height) first = row;
 				last = row;
 			}
 		}
 	}
 	for (row = 0; row < capture.height; row++) {
-		if (__fb_gfx->dirty[row] || (row >= first && row <= last))
+		if (fb_gfx->dirty[row] || (row >= first && row <= last))
 			memcpy(capture.pixels + row * capture.pitch,
-				__fb_gfx->framebuffer + row * capture.pitch, capture.pitch);
+				fb_gfx->framebuffer + row * capture.pitch, capture.pitch);
 	}
 	capture.updates++;
 }
@@ -43,11 +43,11 @@ int cursor_test_install(void)
 {
 	size_t size;
 	int length = (int)((uintptr_t)capture_update_end - (uintptr_t)capture_update);
-	if (!__fb_gfx || capture.pixels || __fb_gfx->w != 640 || __fb_gfx->h != 480 ||
-		__fb_gfx->pitch < 1 || __fb_gfx->pitch > 8192 ||
-		__fb_gfx->bpp < 1 || __fb_gfx->bpp > 4 || length < 1 || length > 65536)
+	if (!fb_gfx || capture.pixels || fb_gfx->w != 640 || fb_gfx->h != 480 ||
+		fb_gfx->pitch < 1 || fb_gfx->pitch > 8192 ||
+		fb_gfx->bpp < 1 || fb_gfx->bpp > 4 || length < 1 || length > 65536)
 		return 0;
-	size = (size_t)__fb_gfx->h * __fb_gfx->pitch;
+	size = (size_t)fb_gfx->h * fb_gfx->pitch;
 	/* The test uses 640x480; reject an unexpected mode before allocating. */
 	if (size > 8u * 1024u * 1024u) return 0;
 	capture.pixels = calloc(1, size);
@@ -55,10 +55,10 @@ int cursor_test_install(void)
 	if (fb_dos_lock_data(&capture, sizeof(capture)) != 0) goto fail;
 	if (fb_dos_lock_data(capture.pixels, size) != 0) goto unlock_state;
 	if (fb_dos_lock_code(capture_update, length) != 0) goto unlock_pixels;
-	capture.width = __fb_gfx->w;
-	capture.height = __fb_gfx->h;
-	capture.pitch = __fb_gfx->pitch;
-	capture.bpp = __fb_gfx->bpp;
+	capture.width = fb_gfx->w;
+	capture.height = fb_gfx->h;
+	capture.pitch = fb_gfx->pitch;
+	capture.bpp = fb_gfx->bpp;
 	capture.banked = 0;
 	capture.updates = 0;
 	capture.update = fb_dos.update;
@@ -95,7 +95,7 @@ void cursor_test_banked(int enabled) { capture.banked = enabled; }
 unsigned int cursor_test_pixel(int x, int y, int presented)
 {
 	unsigned int value = 0;
-	unsigned char *pixels = presented ? capture.pixels : __fb_gfx->framebuffer;
+	unsigned char *pixels = presented ? capture.pixels : fb_gfx->framebuffer;
 	if (!pixels || x < 0 || y < 0 || x >= capture.width || y >= capture.height)
 		return 0;
 	memcpy(&value, pixels + y * capture.pitch + x * capture.bpp, capture.bpp);

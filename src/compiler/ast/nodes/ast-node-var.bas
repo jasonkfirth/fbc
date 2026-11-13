@@ -62,14 +62,30 @@ function astNewVAR _
 
 	if( sym andalso symbIsThreadLocal( sym ) andalso (no_thread_local = FALSE) andalso _
 	    ((env.clopt.backend = FB_BACKEND_GAS) or _
-	     (env.clopt.backend = FB_BACKEND_GAS64)) andalso _
+	     (env.clopt.backend = FB_BACKEND_GAS64) or _
+	     ((env.clopt.backend = FB_BACKEND_GCC) and _
+	      (env.clopt.target = FB_COMPTARGET_DOS))) andalso _
 	    (symbIsThreadLocalC( sym ) = FALSE orElse _
 	     env.clopt.target <> FB_COMPTARGET_LINUX orElse _
 	     fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB)) then
-		dim as ASTNODE ptr call_node = astNewCALL( rtlProcLookup( @FB_RTL_TLSGETVAR, FB_RTL_IDX_TLSGETVAR ) )
+		'' Match the private static storage rule. Names identify
+		'' public externs across modules, but cannot identify private objects
+		'' with identical spellings in separately compiled modules.
+		dim as integer private_tls_key = (env.clopt.target = FB_COMPTARGET_DOS) and _
+			symbIsStatic( sym ) and _
+			((symbGetAttrib( sym ) and (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) = 0)
+		dim as ASTNODE ptr call_node
+		dim as ASTNODE ptr key_expr
+		if( private_tls_key ) then
+			call_node = astNewCALL( rtlProcLookup( @FB_RTL_TLSGETVARKEY, FB_RTL_IDX_TLSGETVARKEY ) )
+			key_expr = astNewADDROF( astNewVAR( sym, 0, FB_DATATYPE_INVALID, NULL, TRUE ) )
+		else
+			call_node = astNewCALL( rtlProcLookup( @FB_RTL_TLSGETVAR, FB_RTL_IDX_TLSGETVAR ) )
+			key_expr = astNewCONSTstr( symbGetMangledName( sym ) )
+		end if
 		dim as integer pointer_integer_type = _
 			iif( env.pointersize = 8, FB_DATATYPE_ULONGINT, FB_DATATYPE_ULONG )
-		if( astNewARG( call_node, astNewCONSTstr( symbGetMangledName( sym ) ) ) = NULL ) then
+		if( astNewARG( call_node, key_expr ) = NULL ) then
 			astDelTREE( call_node )
 			return NULL
 		end if
@@ -84,7 +100,12 @@ function astNewVAR _
 			astDelTREE( call_node )
 			return NULL
 		end if
-		if( symbGetTypeIniTree( sym ) andalso (symbIsExtern( sym ) = FALSE) ) then
+		'' DJGPP COFF has no native C TLS. Its C backend uses the same
+		'' runtime keys as assembly, with an ordinary object as the initial
+		'' value template. BASIC externs can address the provider's template.
+		if( private_tls_key orElse _
+		    (symbGetTypeIniTree( sym ) andalso (symbIsExtern( sym ) = FALSE)) orElse _
+		    ((env.clopt.target = FB_COMPTARGET_DOS) andalso symbIsExtern( sym )) ) then
 			dim as ASTNODE ptr initial_address = astNewADDROF( _
 				astNewVAR( sym, 0, FB_DATATYPE_INVALID, NULL, TRUE ) )
 			initial_address = astNewCONV( pointer_integer_type, NULL, initial_address )

@@ -173,8 +173,8 @@ bool FBHaikuWindow::QuitRequested()
         fb_haiku.quitting = 1;
         fb_hHaikuPostQuitEvent();
 
-        if (__fb_gfx)
-            __fb_gfx->key[KEY_QUIT] = TRUE;
+        if (fb_gfx)
+            fb_gfx->key[KEY_QUIT] = TRUE;
 
         killer = spawn_thread(
             fb_hHaikuForceExit,
@@ -482,12 +482,12 @@ int fb_hHaikuResize(int width, int height)
     int physical_height;
 
     /* The generic resize layer holds the driver mutex and owns software pages. */
-    if (!__fb_gfx || !g_win || !g_view || !g_bmp ||
-        width <= 0 || height <= 0 || __fb_gfx->scanline_size <= 0 ||
-        width > INT_MAX / 4 || height > INT_MAX / __fb_gfx->scanline_size)
+    if (!fb_gfx || !g_win || !g_view || !g_bmp ||
+        width <= 0 || height <= 0 || fb_gfx->scanline_size <= 0 ||
+        width > INT_MAX / 4 || height > INT_MAX / fb_gfx->scanline_size)
         return -1;
 
-    physical_height = height * __fb_gfx->scanline_size;
+    physical_height = height * fb_gfx->scanline_size;
     replacement = fb_hHaikuCreateBitmap(width, physical_height);
     if (!replacement)
         return -1;

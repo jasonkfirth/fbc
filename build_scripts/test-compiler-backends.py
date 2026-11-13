@@ -826,6 +826,10 @@ def main() -> int:
                      "128-bit integer arithmetic passed"),
                     ("thread-local", "tests/compiler-support/thread-local.bas",
                      "thread-local storage passed"),
+                    ("thread-local-arrays", "tests/compiler-support/thread-local-arrays.bas",
+                     "THREAD_LOCAL_ARRAYS_PASS"),
+                    ("thread-local-arrays-extern", "tests/compiler-support/thread-local-array-consumer.bas",
+                     "THREAD_LOCAL_ARRAY_MODULES_PASS"),
                     ("thread-local-contextual-procedure", "tests/compiler-support/thread-contextual-procedure.bas",
                      "CONTEXTUAL_THREAD_PROCEDURE_PASS"),
                     ("thread-local-contextual-namespace", "tests/compiler-support/thread-contextual-namespace.bas",
@@ -833,11 +837,58 @@ def main() -> int:
                     ("thread-local-contextual-import", "tests/compiler-support/thread-contextual-import.bas",
                      "CONTEXTUAL_THREAD_IMPORT_PASS"),
                 ))
+            if any(backend in ("gcc", "clang") for backend in backends):
+                noreturn_object = working / "noreturn-callback.o"
+                machine = (["-m64"] if architecture == "x86_64" else
+                           ["-m32"] if architecture in ("x86", "686") or
+                           (system == "win32" and architecture == "") else [])
+                c_build = subprocess.run(
+                    [os.environ.get("GCC") or "gcc", *machine, "-std=c11",
+                     "-Wall", "-Wextra", "-Werror", "-c",
+                     str(root / "tests/compiler-support/c-noreturn-callback.c"),
+                     "-o", str(noreturn_object)], cwd=working, text=True,
+                    capture_output=True, timeout=60, check=False)
+                if c_build.returncode:
+                    print("Terminating callback observer compilation failed\n" +
+                          c_build.stdout + c_build.stderr)
+                    return 1
+                fixtures.append(("noreturn-callback",
+                                 "tests/compiler-support/c-noreturn-callback.bas", ""))
+                dos_main = working / "dos-noreturn-main.c"
+                emitted = subprocess.run(
+                    [*compiler_args, "-i", str(root / "inc"), "-target", "dos",
+                     "-gen", "gcc", "-exx", "-m", "c-noreturn-main", "-r",
+                     str(root / "tests/compiler-support/c-noreturn-main.bas"),
+                     "-o", str(dos_main)], cwd=working, text=True,
+                    capture_output=True, timeout=120, check=False)
+                code = dos_main.read_text() if dos_main.is_file() else ""
+                terminating_main = any("noreturn" in line and "main(" in line
+                                       for line in code.splitlines())
+                finish = re.search(r"(?m)^[^\n]*\bfb_noreturn_finish\([^;\n]*\)\s*\{", code)
+                finish_body = ""
+                if finish:
+                    depth = 1
+                    for character in code[finish.end():]:
+                        depth += (character == "{") - (character == "}")
+                        if depth == 0:
+                            break
+                        finish_body += character
+                if (emitted.returncode or not code or "fb_End" not in code or
+                        not finish or "noreturn" not in finish.group(0) or
+                        re.search(r"\breturn(?:\s|;)", finish_body) or
+                        (terminating_main and re.search(r"\breturn(?:\s|;)", code))):
+                    print("DOS terminating-main contract failed\n" +
+                          emitted.stdout + emitted.stderr)
+                    return 1
         except (OSError, subprocess.TimeoutExpired) as error:
             print(f"C ABI fixture: {error}")
             return 1
         for backend in backends:
             for fixture_index, (name, source, expected) in enumerate(fixtures):
+                if name == "noreturn-callback" and backend not in ("gcc", "clang"):
+                    continue
+                if name == "thread-local-arrays-extern" and backend not in ("gcc", "clang"):
+                    continue
                 if name.startswith("asm-real-addresses"):
                     if backend not in ("gcc", "clang"):
                         continue
@@ -946,7 +997,7 @@ def main() -> int:
                 if name in ("dispatch-values", "gosub-values", "error-capture-layout"):
                     # RESUME needs the failing statement's continuation labels.
                     command += ["-ex"]
-                if name == "terminating-context":
+                if name in ("terminating-context", "thread-local-arrays"):
                     command += ["-exx"]
                 if name == "virtual-receiver-checked":
                     command += ["-exx"]
@@ -1042,6 +1093,23 @@ def main() -> int:
                                 "-Wc", "-fsanitize-trap=pointer-overflow"]
                 if name == "procedure-address-identity":
                     command += [str(address_object)]
+                if name == "noreturn-callback":
+                    command += [str(noreturn_object)]
+                    if backend == "clang":
+                        command += ["-Wc", "-Werror=cast-function-type-strict"]
+                if name == "thread-local-arrays-extern":
+                    module_object = working / (backend + "-tls-array-provider.o")
+                    module_build = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         "-mt", "-m", input_source.stem, "-c",
+                         str(root / "tests/compiler-support/thread-local-array-provider.bas"),
+                         "-o", str(module_object)], cwd=working, text=True,
+                        capture_output=True, timeout=120, check=False)
+                    if module_build.returncode:
+                        print(f"{backend}/{name}: provider failed\n"
+                              f"{module_build.stdout}{module_build.stderr}")
+                        return 1
+                    command += ["-m", input_source.stem, str(module_object), "-exx"]
                 if name == "stdio-contract":
                     command += [str(stdio_object)]
                 if name == "crt-native-values":
@@ -1094,6 +1162,21 @@ def main() -> int:
                         print(f"{backend}/{name}: compilation failed: {command!r}\n"
                               f"{built.stdout}{built.stderr}")
                         return 1
+                    if name == "noreturn-callback" and backend == "clang":
+                        # Establish the matching callback first, then require a
+                        # real signature mismatch to keep its native diagnostic.
+                        negative_command = command.copy()
+                        negative_command[negative_command.index("-x") + 1] = str(
+                            working / "noreturn-mismatch")
+                        negative_command += ["-d", "NORETURN_CALLBACK_MISMATCH"]
+                        negative = subprocess.run(
+                            negative_command, cwd=working, text=True,
+                            capture_output=True, timeout=120, check=False)
+                        if (negative.returncode == 0 or "cast-function-type-strict" not in
+                                negative.stdout + negative.stderr):
+                            print(f"{backend}/{name}: incompatible callback was accepted\n"
+                                  f"{negative.stdout}{negative.stderr}")
+                            return 1
                     if backend == "llvm" and name.startswith("c-abi"):
                         # byval's alignment applies to the source pointer too.
                         # x86 tolerates many unaligned reads, so execution alone

@@ -127,7 +127,7 @@ def prepare_batch(batch: Path, entries: list[dict], args) -> None:
                 '-p', 'C:/FB/lib/dos', '-i', dos(compile_cwd), '-p', dos(compile_cwd)]
         if args.sdk:
             base += ['-i', 'G:/include', '-p', 'G:/lib']
-        flags = list(shared.EXAMPLE_FBC_ARGUMENTS.get(rel, ()))
+        flags = shared.example_fbc_arguments(source, args.root, 'dos')
         if rel == 'examples/graphics/SDL3/ttf/showfont.bas':
             flags += ['-m', 'showfont']
         module = shared.LIBRARY_MODULES.get(rel)

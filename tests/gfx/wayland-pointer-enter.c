@@ -13,7 +13,7 @@
  */
 #include "../../src/gfxlib2/drivers/linux/gfx_driver_wayland.c"
 
-FBGFX *__fb_gfx;
+FBGFX *fb_gfx;
 
 static EVENT events[8];
 static size_t event_count;
@@ -67,7 +67,7 @@ int main(void)
 	/* Both entry and subsequent motion use BASIC's logical scanline height. */
 	event_count = 0;
 	gfx.scanline_size = 2;
-	__fb_gfx = &gfx;
+	fb_gfx = &gfx;
 	fb_wayland_pointer_enter(&window, NULL, 0, surface, 30 * 256, 80 * 256);
 	require(event_count == 2 && events[1].type == EVENT_MOUSE_MOVE &&
 		events[1].x == 30 && events[1].y == 40 && events[1].dy == 0,

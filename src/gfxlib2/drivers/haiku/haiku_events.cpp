@@ -124,7 +124,7 @@ static void haiku_key(const char *bytes, int32_t keycode, int down)
        presentation takes the driver mutex before locking that BWindow.
        ScreenEvent has its own queue lock. Window shutdown joins native hooks
        before freeing the graphics context used by this event queue. */
-    if (__fb_gfx)
+    if (fb_gfx)
         fb_hPostEvent(&event);
 }
 
@@ -161,7 +161,7 @@ void fb_hHaikuHandleMouseMoved(void *, int x, int y)
     fb_haiku.mouse_x = x;
     fb_haiku.mouse_y = y;
     fb_hHaikuUnlockState();
-    if (__fb_gfx && (event.dx || event.dy))
+    if (fb_gfx && (event.dx || event.dy))
         fb_hPostEvent(&event);
 }
 
@@ -188,7 +188,7 @@ static void haiku_buttons(void *view, int x, int y, int buttons)
         event.type = buttons & button ? EVENT_MOUSE_BUTTON_PRESS :
             EVENT_MOUSE_BUTTON_RELEASE;
         event.button = button;
-        if (__fb_gfx)
+        if (fb_gfx)
             fb_hPostEvent(&event);
     }
 }
@@ -227,7 +227,7 @@ static void haiku_wheel(float delta, int horizontal)
     event.type = horizontal ? EVENT_MOUSE_HWHEEL : EVENT_MOUSE_WHEEL;
     event.z = *position; /* z and w occupy the same EVENT union member. */
     fb_hHaikuUnlockState();
-    if (__fb_gfx && steps)
+    if (fb_gfx && steps)
         fb_hPostEvent(&event);
 }
 
@@ -259,7 +259,7 @@ void fb_hHaikuHandleFocus(int active)
             event.ascii = fb_haiku.key_ascii[scancode];
             fb_haiku.key_state[scancode] = FALSE;
             fb_haiku.key_ascii[scancode] = 0;
-            if (__fb_gfx)
+            if (fb_gfx)
                 fb_hPostEvent(&event);
         }
         x = fb_haiku.mouse_x;
@@ -268,7 +268,7 @@ void fb_hHaikuHandleFocus(int active)
         haiku_buttons(NULL, x, y, 0);
     }
     event.type = active ? EVENT_WINDOW_GOT_FOCUS : EVENT_WINDOW_LOST_FOCUS;
-    if (__fb_gfx)
+    if (fb_gfx)
         fb_hPostEvent(&event);
 }
 
@@ -280,7 +280,7 @@ void fb_hHaikuPostQuitEvent(void)
     haiku_queue_key(KEY_QUIT);
     fb_hHaikuUnlockState();
     event.type = EVENT_WINDOW_CLOSE;
-    if (__fb_gfx)
+    if (fb_gfx)
         fb_hPostEvent(&event);
 }
 

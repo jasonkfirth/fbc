@@ -80,6 +80,8 @@ jobs:
           fetch-depth: 2
       - name: Check CI scope contracts
         run: python3 -B build_scripts/test-ci-change-scope.py
+      - name: Check shared C ABI consumers
+        run: python3 -B build_scripts/test-rtlib-abi-names.py
       - name: Select qualification scope
         id: scope
         run: python3 -B build_scripts/ci-change-scope.py

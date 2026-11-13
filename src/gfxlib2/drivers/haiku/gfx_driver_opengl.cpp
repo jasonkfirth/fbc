@@ -47,21 +47,21 @@ static int driver_init(char *title, int w, int h, int depth,
         return -1;
 
     fb_hGL_NormalizeParameters(flags);
-    __fb_gl_params.mode_2d = __fb_gl_params.init_mode_2d;
-    __fb_gl_params.scale = __fb_gl_params.init_scale >= 1 ?
-                           __fb_gl_params.init_scale : 1;
+    fb_gl_params.mode_2d = fb_gl_params.init_mode_2d;
+    fb_gl_params.scale = fb_gl_params.init_scale >= 1 ?
+                           fb_gl_params.init_scale : 1;
 
-    if ((__fb_gl_params.scale > 1) &&
-        ((w > INT_MAX / __fb_gl_params.scale) ||
-         (h > INT_MAX / __fb_gl_params.scale)))
+    if ((fb_gl_params.scale > 1) &&
+        ((w > INT_MAX / fb_gl_params.scale) ||
+         (h > INT_MAX / fb_gl_params.scale)))
         return -1;
 
     /* BGLView does not expose a multisample pixel-format selector. */
-    __fb_gl_params.num_samples = 0;
+    fb_gl_params.num_samples = 0;
 
     result = fb_hHaikuInit(title,
-                           w * __fb_gl_params.scale,
-                           h * __fb_gl_params.scale,
+                           w * fb_gl_params.scale,
+                           h * fb_gl_params.scale,
                            depth, refresh_rate, flags);
     if (result != 0)
         return result;
@@ -76,7 +76,7 @@ static int driver_init(char *title, int w, int h, int depth,
         return -1;
     }
 
-    if (__fb_gl_params.mode_2d != DRIVER_OGL_2D_NONE)
+    if (fb_gl_params.mode_2d != DRIVER_OGL_2D_NONE)
         fb_hGL_ScreenCreate();
 
     return 0;
@@ -98,7 +98,7 @@ static void driver_lock(void)
 
 static void driver_unlock(void)
 {
-    if (__fb_gl_params.mode_2d == DRIVER_OGL_2D_AUTO_SYNC)
+    if (fb_gl_params.mode_2d == DRIVER_OGL_2D_AUTO_SYNC)
     {
         fb_hGL_SetupProjection();
         fb_hHaikuOpenGLFlip();
@@ -117,7 +117,7 @@ static void driver_flip(void)
 {
     fb_hHaikuLock();
 
-    if (__fb_gl_params.mode_2d == DRIVER_OGL_2D_MANUAL_SYNC)
+    if (fb_gl_params.mode_2d == DRIVER_OGL_2D_MANUAL_SYNC)
         fb_hGL_SetupProjection();
 
     fb_hHaikuOpenGLFlip();

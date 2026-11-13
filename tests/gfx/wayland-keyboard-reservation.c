@@ -9,7 +9,7 @@
 #include "../../src/gfxlib2/drivers/linux/gfx_driver_wayland.c"
 
 static FBGFX context;
-FBGFX *__fb_gfx = &context;
+FBGFX *fb_gfx = &context;
 static unsigned checks;
 
 int fb_hWaylandWebosKeyboard(FB_WAYLAND_WEBOS *webos, int visible)

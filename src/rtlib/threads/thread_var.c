@@ -15,6 +15,7 @@
 typedef struct FB_TLS_USER_VAR {
 	struct FB_TLS_USER_VAR *next;
 	char *name;
+	const void *key;
 	void *allocation;
 	void *value;
 	size_t size;
@@ -49,25 +50,27 @@ static void hFreeTlsUserVars( void *data )
 	}
 }
 
-FBCALL void *fb_TlsGetVar( const char *name, unsigned int len,
+static void *hTlsGetVar( const char *name, const void *key, unsigned int len,
 	unsigned int align, uintptr_t initial_address )
 {
 	FB_TLS_USER_VAR_CTX *ctx;
 	FB_TLS_USER_VAR *var;
-	size_t name_len;
+	size_t name_len = 0;
 	size_t allocation_len;
 	void *allocation;
 	uintptr_t aligned_address;
 	const void *initial = (const void *)initial_address;
 
-	if( (name == NULL) || (len == 0) || (align == 0) ||
+	if( ((name == NULL) && (key == NULL)) || (len == 0) || (align == 0) ||
 	    (((uintptr_t)align & ((uintptr_t)align - 1)) != 0) ) {
 		return hTlsUserVarAllocationFailure( );
 	}
 
-	name_len = strlen( name );
-	if( (name_len == 0) || (name_len == (size_t)-1) ) {
-		return hTlsUserVarAllocationFailure( );
+	if( name != NULL ) {
+		name_len = strlen( name );
+		if( (name_len == 0) || (name_len == (size_t)-1) ) {
+			return hTlsUserVarAllocationFailure( );
+		}
 	}
 
 	ctx = (FB_TLS_USER_VAR_CTX *)fb_TlsGetCtx(
@@ -77,7 +80,8 @@ FBCALL void *fb_TlsGetVar( const char *name, unsigned int len,
 	}
 
 	for( var = ctx->vars; var != NULL; var = var->next ) {
-		if( strcmp( var->name, name ) == 0 ) {
+		if( (key != NULL) ? (var->key == key) :
+		    ((var->key == NULL) && (strcmp( var->name, name ) == 0)) ) {
 			if( (var->size != (size_t)len) || (var->align != (size_t)align) ) {
 				return hTlsUserVarAllocationFailure( );
 			}
@@ -101,13 +105,16 @@ FBCALL void *fb_TlsGetVar( const char *name, unsigned int len,
 		free( allocation );
 		return hTlsUserVarAllocationFailure( );
 	}
-	var->name = (char *)malloc( name_len + 1 );
-	if( var->name == NULL ) {
-		free( var );
-		free( allocation );
-		return hTlsUserVarAllocationFailure( );
+	if( name != NULL ) {
+		var->name = (char *)malloc( name_len + 1 );
+		if( var->name == NULL ) {
+			free( var );
+			free( allocation );
+			return hTlsUserVarAllocationFailure( );
+		}
+		memcpy( var->name, name, name_len + 1 );
 	}
-	memcpy( var->name, name, name_len + 1 );
+	var->key = key;
 	var->allocation = allocation;
 	var->value = (void *)aligned_address;
 	var->size = len;
@@ -121,6 +128,24 @@ FBCALL void *fb_TlsGetVar( const char *name, unsigned int len,
 	ctx->vars = var;
 
 	return var->value;
+}
+
+FBCALL void *fb_TlsGetVar( const char *name, unsigned int len,
+	unsigned int align, uintptr_t initial_address )
+{
+	return hTlsGetVar( name, NULL, len, align, initial_address );
+}
+
+/*
+    Private objects can have the same name in different translation units.
+    Their compiler-owned static template addresses provide unique identities.
+    The borrowed key must outlive every thread; it is compared, never freed.
+    Public BASIC externs retain the name-based entry point above.
+*/
+FBCALL void *fb_TlsGetVarKey( const void *key, unsigned int len,
+	unsigned int align, uintptr_t initial_address )
+{
+	return hTlsGetVar( NULL, key, len, align, initial_address );
 }
 
 /* end of threads/thread_var.c */

@@ -1449,6 +1449,12 @@ function cVariableEx overload _
 		'' byref or imports are already pointers
 		if( is_byref ) then
 			varexpr = astNewBOP( AST_OP_ADD, varexpr, idxexpr )
+		elseif( astIsVAR( varexpr ) = FALSE ) then
+			'' Runtime TLS supplies a computed address, not the plain VAR
+			'' required by IDX. Apply the fixed array's byte bias to that
+			'' storage once, retaining the normal index and bounds checks.
+			idxexpr = astNewBOP( AST_OP_ADD, idxexpr, astNewCONSTi( symbGetArrayDiff( sym ) ) )
+			varexpr = astBuildDerefAddrOf( varexpr, idxexpr, sym->typ, sym->subtype )
 		else
 			varexpr = astNewIDX( varexpr, idxexpr )
 		end if

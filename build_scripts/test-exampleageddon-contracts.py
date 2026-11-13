@@ -90,6 +90,14 @@ class ResultContracts(unittest.TestCase):
                     self.assertEqual(result.group, "system-changing")
                     self.assertFalse(result.runnable)
 
+    def test_dos_threads_select_the_native_provider_without_changing_scope(self):
+        path = ROOT / "examples/manual/proguide/multithreading/emulatetp1.bas"
+        self.assertEqual(runner.classify(path, ROOT, "dos", False).group, "self-contained")
+        self.assertEqual(runner.example_fbc_arguments(path, ROOT, "dos"), ["-dos-threads", "pdmlwp"])
+        for target in ("windows", "linux", "freebsd"):
+            self.assertEqual(runner.example_fbc_arguments(path, ROOT, target), [])
+        self.assertEqual(runner.example_fbc_arguments(self.source, self.root, "dos"), [])
+
     def test_run_all_cannot_execute_clock_examples(self):
         # The fake compiler creates an invalid executable. Attempting to run
         # it would fail, so this exercises the real compile/run decision with

@@ -86,7 +86,7 @@ static void poll_events(void)
 static void driver_exit(void)
 {
 	check(runtime_depth && graphics_depth, "driver exit lost its mode locks");
-	check(__fb_gfx && __fb_gfx->page && __fb_gfx->event_mutex,
+	check(fb_gfx && fb_gfx->page && fb_gfx->event_mutex,
 	      "mode storage was freed before driver exit");
 	atomic_fetch_add(&exits, 1);
 }
@@ -123,10 +123,10 @@ int main(void)
 
 	fb_hRtInit();
 	check(fb_GfxScreenRes(64, 64, 32, 1, DRIVER_NULL, 0) == FB_RTERROR_OK, "initial mode failed");
-	driver = *__fb_gfx->driver;
+	driver = *fb_gfx->driver;
 	driver.poll_events = poll_events;
 	driver.exit = driver_exit;
-	__fb_gfx->driver = &driver;
+	fb_gfx->driver = &driver;
 	check(pthread_create(&thread, NULL, reader, NULL) == 0, "reader launch failed");
 	pthread_mutex_lock(&gate);
 	while (!reader_ready)
@@ -150,14 +150,14 @@ int main(void)
 	atomic_store(&fail_allocation, 1);
 	check(fb_GfxScreenRes(64, 64, 32, 1, DRIVER_NULL, 0) == FB_RTERROR_OUTOFMEM,
 	      "allocation failure was not exercised");
-	check(!__fb_gfx && !fb_ctx.hooks.inkeyproc, "failed allocation left mode/hooks installed");
+	check(!fb_gfx && !fb_ctx.hooks.inkeyproc, "failed allocation left mode/hooks installed");
 	check(fb_GfxScreenQB(-1, -1, -1) == FB_RTERROR_ILLEGALFUNCTIONCALL, "invalid QB mode accepted");
 	check(!runtime_depth && !graphics_depth, "failure path leaked a lock");
 	check(fb_GfxScreenRes(64, 64, 32, 1, DRIVER_NULL, 0) == FB_RTERROR_OK, "mode recovery failed");
-	__fb_gfx->driver = &driver;
+	fb_gfx->driver = &driver;
 	fb_ctx.exit_gfxlib2();
 	fb_ctx.exit_gfxlib2();
-	check(!__fb_gfx && !fb_ctx.hooks.inkeyproc && atomic_load(&exits) == 2,
+	check(!fb_gfx && !fb_ctx.hooks.inkeyproc && atomic_load(&exits) == 2,
 	      "shutdown was incomplete or not idempotent");
 	check(!runtime_depth && !graphics_depth, "shutdown leaked a lock");
 	fb_hRtExit();

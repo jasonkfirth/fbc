@@ -11,7 +11,7 @@
 #include <limits.h>
 
 static FBGFX context;
-FBGFX *__fb_gfx = &context;
+FBGFX *fb_gfx = &context;
 static unsigned checks;
 static int maliit_available;
 static unsigned maliit_queries;

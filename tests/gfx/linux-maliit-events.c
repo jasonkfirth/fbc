@@ -16,7 +16,7 @@
 #define DISABLE_X11
 #include "../../src/gfxlib2/drivers/linux/gfx_mobile.c"
 
-FBGFX *__fb_gfx;
+FBGFX *fb_gfx;
 static int keys[8];
 static EVENT events[16];
 static int key_count, event_count, lock_count, unlocked_posts;
@@ -64,7 +64,7 @@ int main(void)
 	driver.lock = driver_lock;
 	driver.unlock = driver_unlock;
 	gfx.driver = &driver;
-	__fb_gfx = &gfx;
+	fb_gfx = &gfx;
 	linux_maliit_post_key(NULL, 'a', FB_LINUX_MALIIT_TEXT);
 	linux_maliit_post_key(NULL, 0x4bffu, FB_LINUX_MALIIT_TEXT);
 	linux_maliit_post_key(NULL, 0x4bffu, FB_LINUX_MALIIT_KEY);

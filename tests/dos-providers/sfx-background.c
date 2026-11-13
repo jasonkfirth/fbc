@@ -53,7 +53,7 @@ int main( int argc, char **argv )
 		outportb( 0x70, 0x0B );
 		outportb( 0x71, rtc_b | 0x40 );
 		if( fb_sfxInit() != 0 || fb_sfxMsdosWorkerActive() ||
-		    strcmp( __fb_sfx->driver->name, "SoundBlaster" ) != 0 )
+		    strcmp( fb_sfx_context->driver->name, "SoundBlaster" ) != 0 )
 			return 1;
 		fb_sfxSoundChannel( 0, 440, 0.3f, 0.5f );
 		fb_Delay( 250 );
@@ -67,8 +67,8 @@ int main( int argc, char **argv )
 		return 0;
 	}
 	for( cycle = 0; cycle < 3; cycle++ ) {
-		if( fb_sfxInit() != 0 || !__fb_sfx || !__fb_sfx->driver ||
-		    strcmp( __fb_sfx->driver->name, "SoundBlaster" ) != 0 ||
+		if( fb_sfxInit() != 0 || !fb_sfx_context || !fb_sfx_context->driver ||
+		    strcmp( fb_sfx_context->driver->name, "SoundBlaster" ) != 0 ||
 		    !fb_sfxMsdosWorkerActive() ) {
 			puts( "FAIL Sound Blaster worker initialization" );
 			return 1;
@@ -85,7 +85,7 @@ int main( int argc, char **argv )
 		phase( "after spin" );
 		fb_sfxOutputCaptureStop();
 		if( fb_sfxOutputCaptureSave( cycle == 0 ? "AUDIO.WAV" : "REPEAT.WAV" ) != 0 ||
-		    strcmp( __fb_sfx->driver->name, "SoundBlaster" ) != 0 ) {
+		    strcmp( fb_sfx_context->driver->name, "SoundBlaster" ) != 0 ) {
 			puts( "FAIL background PCM or driver fallback" );
 			return 1;
 		}

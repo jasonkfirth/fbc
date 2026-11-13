@@ -163,7 +163,8 @@ function cVariableDecl( byval attrib as FB_SYMBATTRIB ) as integer
 		if( ((attrib and FB_SYMBATTRIB_THREADLOCAL) <> 0) andalso _
 		    (parser.mangling = FB_MANGLING_CDECL) andalso _
 		    ((env.clopt.backend = FB_BACKEND_GAS) or _
-		     (env.clopt.backend = FB_BACKEND_GAS64)) andalso _
+		     (env.clopt.backend = FB_BACKEND_GAS64) or _
+		     (env.clopt.target = FB_COMPTARGET_DOS)) andalso _
 		    ((env.clopt.target <> FB_COMPTARGET_LINUX) or _
 		     (fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB)) ) then
 			errReport( FB_ERRMSG_THREADLOCALUNSUPPORTED )

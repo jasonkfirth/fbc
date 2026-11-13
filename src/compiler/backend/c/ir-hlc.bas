@@ -1532,7 +1532,10 @@ private function hEmitProcHeader _
 		semantic_signature = fbSemanticModelBackendAbiBegin(proc, "c", semantic_role, semantic_result, semantic_convention)
 
 	if( (options and EMITPROC_ISPROCPTR) = 0 ) then
-		if( hProcDoesNotReturn( proc ) ) then ln += " __attribute__((noreturn))"
+		'' C gives main an implicit return 0. Older GCC versions diagnose that
+		'' synthetic return even when the body ends in a terminating call.
+		if( hProcDoesNotReturn( proc ) andalso hGetCId( proc ) <> "main" ) then _
+			ln += " __attribute__((noreturn))"
 		if( symbGetIsRTL(proc) andalso *symbGetMangledName(proc) = "_setjmp" ) then ln += " __attribute__((returns_twice))"
 	end if
 	if( options = 0 andalso readonly_variant = NULL andalso builtin_address_id = NULL andalso _
@@ -1967,7 +1970,8 @@ private sub hEmitVarDecl _
 		ln += "static "
 		static_storage = TRUE
 	end if
-	if( symbIsThreadLocal( sym ) ) then ln += "__thread "
+	'' DOS uses this object as the runtime TLS initializer, not native TLS.
+	if( symbIsThreadLocal( sym ) and (env.clopt.target <> FB_COMPTARGET_DOS) ) then ln += "__thread "
 
 	dim dtype as integer
 	dim subtype as FBSYMBOL ptr
@@ -4818,6 +4822,10 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 
 	case EXPRCLASS_CAST
 		hCLiteralMutableCast(n->dtype, n->l)
+		if( hCNoReturnCallbackIdentity(n) ) then
+			hExprFlush(n->l, TRUE)
+			exit sub
+		end if
 		if( typeGetPtrCnt(n->dtype) = 1 andalso typeGetPtrCnt(n->l->dtype) = 1 andalso _
 		    (typeIsConstAt(n->dtype, 1) = FALSE) andalso typeIsConstAt(n->l->dtype, 1) andalso _
 		    typeGetDtOnly(n->dtype) <> FB_DATATYPE_FUNCTION andalso _
@@ -6260,6 +6268,9 @@ private sub _emitLoad( byval v1 as IRVREG ptr )
 end sub
 
 private sub _emitLoadRes( byval v1 as IRVREG ptr, byval vr as IRVREG ptr )
+	'' The frontend can append a synthetic result load after a terminating
+	'' body. It is not a return edge in the procedure's settled C contract.
+	if( hProcDoesNotReturn( ctx.currproc ) ) then exit sub
 	_emitStore( vr, v1 )
 	if( hUsesCLongDoubleCABI( ctx.currproc ) andalso _
 	    hIsCLongDoubleType( vr->dtype, vr->subtype ) ) then

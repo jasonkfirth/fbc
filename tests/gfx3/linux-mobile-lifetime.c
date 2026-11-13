@@ -57,7 +57,7 @@ static TEST_STATE test_state = {
 static pthread_mutex_t graphics_mutex = PTHREAD_MUTEX_INITIALIZER;
 static FB_GFX3_MODE old_mode, new_mode;
 static const FB_GFX3_BACKEND_VTABLE display_backend = { 0 };
-const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_null = { 0 };
+const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_null = { 0 };
 
 static void require(int condition, const char *message)
 {
@@ -171,7 +171,7 @@ int main(void)
 	require(test_state.calls == 2 && test_state.last_input == &new_mode.input,
 		"the reopened mode did not receive its own request");
 	fb_gfx3_linux_mode_transition_begin();
-	new_mode.context.renderer.backend_vtable = &__fb_gfx3_backend_null;
+	new_mode.context.renderer.backend_vtable = &fb_gfx3_backend_null;
 	fb_gfx3_linux_mode_transition_end(&new_mode);
 	p1 = p2 = p3 = p4 = -2;
 	fb_gfx3_linux_control_mode(GET_SOFT_KEYBOARD, &p1, &p2, &p3, &p4);

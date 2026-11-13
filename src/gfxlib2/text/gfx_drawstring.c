@@ -43,12 +43,12 @@ static int parse_font(void *image, int target_bpp, FB_GFX_FONT *font,
 	uint32_t first_word, width, height, bpp, row_pitch;
 	size_t header_size;
 
-	if (!image)
+	if (!image || (target_bpp < 0))
 		return 0;
 	memcpy(&first_word, image, sizeof(first_word));
 	if (first_word == PUT_HEADER_NEW) {
 		memcpy(&header, image, sizeof(header));
-		bpp = header.bpp;
+		bpp = (uint32_t)header.bpp;
 		width = header.width;
 		height = header.height;
 		row_pitch = header.pitch;
@@ -59,11 +59,11 @@ static int parse_font(void *image, int target_bpp, FB_GFX_FONT *font,
 		/* The legacy header contains two native 16-bit words. Treating
 		   them as one integer reverses their roles on big-endian targets. */
 		memcpy(words, image, sizeof(words));
-		bpp = words[0] & 7;
+		bpp = (uint32_t)(words[0] & 7u);
 		if (!bpp)
-			bpp = target_bpp;
-		width = words[0] >> 3;
-		height = words[1];
+			bpp = (uint32_t)target_bpp;
+		width = (uint32_t)(words[0] >> 3);
+		height = (uint32_t)words[1];
 		row_pitch = width * bpp;
 		header_size = 4;
 	}
@@ -74,7 +74,7 @@ static int parse_font(void *image, int target_bpp, FB_GFX_FONT *font,
 	    (height && row_pitch > (SIZE_MAX - header_size) / height))
 		return 0;
 	*pixels = (unsigned char *)image + header_size;
-	*pitch = row_pitch;
+	*pitch = (int)row_pitch;
 	return fb_hGfxParseFont(*pixels, width, height, row_pitch, font);
 }
 
@@ -83,6 +83,7 @@ FBCALL int fb_GfxDrawStringSize(FBSTRING_ACCESS *string, int *width, int *height
 {
 	FB_GFX_FONT font;
 	unsigned char *pixels;
+	ssize_t string_size;
 	int pitch, measured_width, measured_height;
 	int result = FB_RTERROR_ILLEGALFUNCTIONCALL;
 
@@ -92,6 +93,9 @@ FBCALL int fb_GfxDrawStringSize(FBSTRING_ACCESS *string, int *width, int *height
 	if (!width || !height || width == height || !string ||
 	    (!string->data && FB_STRSIZE(string)))
 		goto done;
+	string_size = FB_STRSIZE(string);
+	if (string_size < 0)
+		goto done;
 	/* Explicit fonts do not require an active display or matching screen depth. */
 	if (font_image) {
 		if (!parse_font(font_image, 0, &font, &pixels, &pitch))
@@ -99,7 +103,7 @@ FBCALL int fb_GfxDrawStringSize(FBSTRING_ACCESS *string, int *width, int *height
 	} else if (!fb_gfx) {
 		goto done;
 	}
-	if (fb_hGfxMeasureFont((unsigned char *)string->data, FB_STRSIZE(string),
+	if (fb_hGfxMeasureFont((unsigned char *)string->data, (size_t)string_size,
 	    font_image ? &font : NULL, fb_gfx ? fb_gfx->font->w : 0,
 	    fb_gfx ? fb_gfx->font->h : 0, &measured_width, &measured_height)) {
 		*width = measured_width;
@@ -130,9 +134,14 @@ FBCALL int fb_GfxDrawString
 	FB_GFXCTX *context;
 	FB_GFX_FONT custom_font;
 	int font_height, full_font_height, x, y, px, py, i, w, h, pitch, bpp, first, last;
-	int offset, bytes_count, res = fb_ErrorSetNum( FB_RTERROR_OK );
+	int bytes_count, res = fb_ErrorSetNum( FB_RTERROR_OK );
+	size_t offset;
 	unsigned char *data, *glyph_pixels;
+	const unsigned char *font_data;
 	unsigned int code, advance;
+	ssize_t string_size;
+	int string_length;
+	int64_t clipped_amount, text_right, view_right, view_bottom;
 
 	FB_GRAPHICS_LOCK( );
 
@@ -143,11 +152,18 @@ FBCALL int fb_GfxDrawString
 			res = FB_RTERROR_ILLEGALFUNCTIONCALL;
 		goto exit_error_unlocked;
 	}
+	string_size = FB_STRSIZE(string);
+	if ((string_size < 0) || (string_size > INT_MAX)) {
+		res = FB_RTERROR_ILLEGALFUNCTIONCALL;
+		goto exit_error_unlocked;
+	}
+	/* Drawing indices and pixel coordinates use int throughout this path. */
+	string_length = (int)string_size;
 
 	fb_hPrepareTarget(context, target);
 
 	if (mode != PUT_MODE_ALPHA) {
-		if (flags & DEFAULT_COLOR_1)
+		if ((unsigned int)flags & DEFAULT_COLOR_1)
 			color = context->fg_color;
 		else
 			color = fb_hFixColor(context->target_bpp, color);
@@ -160,32 +176,49 @@ FBCALL int fb_GfxDrawString
 	fb_hTranslateCoord(context, fx, fy, &x, &y);
 
 	DRIVER_LOCK();
+	view_right = (int64_t)context->view_x + context->view_w;
+	view_bottom = (int64_t)context->view_y + context->view_h;
+	if ((context->view_w <= 0) || (context->view_h <= 0) ||
+	    (view_right > INT_MAX) || (view_bottom > INT_MAX))
+		goto exit_error;
 
 	if (font) {
 		/* user passed a custom font */
 
 		bpp = context->target_bpp;
+		if (bpp <= 0) {
+			res = FB_RTERROR_ILLEGALFUNCTIONCALL;
+			goto exit_error;
+		}
 		if (!parse_font(font, bpp, &custom_font, &data, &pitch)) {
 			res = FB_RTERROR_ILLEGALFUNCTIONCALL;
 			goto exit_error;
 		}
-		font_height = full_font_height = custom_font.font_height;
+		font_height = full_font_height = (int)custom_font.font_height;
 		if (((int64_t)y + font_height <= context->view_y) ||
-		    (y >= context->view_y + context->view_h))
+		    ((int64_t)y >= view_bottom))
 			goto exit_error;
 		data += pitch;
 		if (y < context->view_y) {
-			data += (size_t)pitch * (context->view_y - y);
-			font_height -= (context->view_y - y);
+			clipped_amount = (int64_t)context->view_y - y;
+			if ((clipped_amount <= 0) || (clipped_amount >= font_height) ||
+			    ((size_t)clipped_amount > SIZE_MAX / (size_t)pitch))
+				goto exit_error;
+			data += (size_t)pitch * (size_t)clipped_amount;
+			font_height -= (int)clipped_amount;
 			y = context->view_y;
 		}
-		if ((int64_t)y + font_height > context->view_y + context->view_h)
-			font_height = context->view_y + context->view_h - y;
+		if ((int64_t)y + font_height > view_bottom) {
+			clipped_amount = view_bottom - y;
+			if (clipped_amount <= 0)
+				goto exit_error;
+			font_height = (int)clipped_amount;
+		}
 		glyph_pixels = data;
 
-		for (i = 0; i < (int)FB_STRSIZE(string); i++) {
+		for (i = 0; i < string_length; i++) {
 
-			if (x >= context->view_x + context->view_w)
+			if ((int64_t)x >= view_right)
 				break;
 
 			code = (unsigned char)string->data[i];
@@ -197,78 +230,110 @@ FBCALL int fb_GfxDrawString
 				continue;
 			}
 			advance = custom_font.glyph_widths[code];
-			data = glyph_pixels + (size_t)custom_font.glyph_offsets[code] * bpp;
-			w = advance;
+			if (advance > (uint32_t)INT_MAX)
+				goto exit_error;
+			data = glyph_pixels + (size_t)custom_font.glyph_offsets[code] * (size_t)bpp;
+			w = (int)advance;
 			h = font_height;
 			px = x;
 
 			if (w && (int64_t)x + w > context->view_x) {
 
 				if (x < context->view_x) {
-					data += ((context->view_x - x) * bpp);
-					w -= (context->view_x - x);
+					clipped_amount = (int64_t)context->view_x - x;
+					if ((clipped_amount <= 0) || (clipped_amount >= w) ||
+					    ((size_t)clipped_amount > SIZE_MAX / (size_t)bpp))
+						goto exit_error;
+					data += (size_t)clipped_amount * (size_t)bpp;
+					w -= (int)clipped_amount;
 					px = context->view_x;
 				}
-				if ((int64_t)px + w > context->view_x + context->view_w)
-					w = context->view_x + context->view_w - px;
-				putter(data, context->line[y] + (px * bpp), w, h, pitch, context->target_pitch, color, blender, param);
+				if ((int64_t)px + w > view_right) {
+					clipped_amount = view_right - px;
+					if (clipped_amount <= 0)
+						goto exit_error;
+					w = (int)clipped_amount;
+				}
+				putter(data, context->line[y] + (px * bpp), w, h, pitch, context->target_pitch, (int)color, blender, param);
 
 			}
 			if (x > INT_MAX - (int)advance)
 				break;
-			x += advance;
+			x += (int)advance;
 		}
 	} else {
 		/* use default font */
 
+		if (!fb_gfx->font || !fb_gfx->font->data)
+			goto exit_error;
 		font_height = fb_gfx->font->h;
 		w = fb_gfx->font->w;
-		bytes_count = BYTES_PER_PIXEL(w);
+		if ((font_height <= 0) || (w <= 0))
+			goto exit_error;
+		bytes_count = (w / 8) + ((w % 8) != 0);
 		offset = 0;
 
-		if ((x + (w * (int)FB_STRSIZE(string)) <= context->view_x) || (x >= context->view_x + context->view_w) ||
-		    (y + font_height <= context->view_y) || (y >= context->view_y + context->view_h)) {
+		if (((int64_t)x + ((int64_t)w * string_length) <= context->view_x) ||
+		    ((int64_t)x >= view_right) ||
+		    ((int64_t)y + font_height <= context->view_y) ||
+		    ((int64_t)y >= view_bottom)) {
 			goto exit_error;
 		}
 
 		if (y < context->view_y) {
-			offset = (bytes_count * (context->view_y - y));
-			font_height -= (context->view_y - y);
+			clipped_amount = (int64_t)context->view_y - y;
+			if ((clipped_amount <= 0) || (clipped_amount >= font_height) ||
+			    ((size_t)clipped_amount > SIZE_MAX / (size_t)bytes_count))
+				goto exit_error;
+			offset = (size_t)bytes_count * (size_t)clipped_amount;
+			font_height -= (int)clipped_amount;
 			y = context->view_y;
 		}
-		if (y + font_height > context->view_y + context->view_h)
-			font_height -= ((y + font_height) - (context->view_y + context->view_h));
+		if ((int64_t)y + font_height > view_bottom) {
+			clipped_amount = view_bottom - y;
+			if (clipped_amount <= 0)
+				goto exit_error;
+			font_height = (int)clipped_amount;
+		}
 
 		first = 0;
 		if (x < context->view_x) {
-			first = (context->view_x - x) / w;
-			x += (first * w);
+			clipped_amount = ((int64_t)context->view_x - x) / w;
+			first = clipped_amount > string_length ? string_length : (int)clipped_amount;
+			if (first < string_length)
+				x = (int)((int64_t)x + ((int64_t)first * w));
 		}
-		last = FB_STRSIZE(string);
-		if (x + ((last - first) * w) > context->view_x + context->view_w)
-			last -= ((x + ((last - first) * w) - (context->view_x + context->view_w)) / w);
+		last = string_length;
+		text_right = (int64_t)x + ((int64_t)(last - first) * w);
+		if (text_right > view_right) {
+			clipped_amount = (text_right - view_right) / w;
+			if (clipped_amount > (int64_t)(last - first))
+				clipped_amount = last - first;
+			last -= (int)clipped_amount;
+		}
 
 		for (i = first; i < last; i++, x += w) {
 
-			if (x + w <= context->view_x)
+			if ((int64_t)x + w <= context->view_x)
 				continue;
 
-			if (x >= context->view_x + context->view_w)
+			if ((int64_t)x >= view_right)
 				break;
 
-			data = (unsigned char *)fb_gfx->font->data + ((unsigned char)string->data[i] * bytes_count * fb_gfx->font->h) + offset;
+			font_data = fb_gfx->font->data + ((size_t)(unsigned char)string->data[i] * (size_t)bytes_count * (size_t)fb_gfx->font->h) + offset;
 			for (py = 0; py < font_height; py++) {
 				for (px = 0; px < w; px++) {
-					if ((*data & (1 << (px & 0x7))) && (x + px >= context->view_x) && (x + px < context->view_x + context->view_w))
+					if ((*font_data & (1 << (px & 0x7))) && ((int64_t)x + px >= context->view_x) && ((int64_t)x + px < view_right))
 						context->put_pixel(context, x + px, y + py, color);
 					if ((px & 0x7) == 0x7)
-						data++;
+						font_data++;
 				}
 			}
 		}
 	}
 
-	SET_DIRTY(context, y, font_height);
+	if (font_height > 0)
+		SET_DIRTY(context, y, (size_t)font_height);
 
 exit_error:
 	DRIVER_UNLOCK();

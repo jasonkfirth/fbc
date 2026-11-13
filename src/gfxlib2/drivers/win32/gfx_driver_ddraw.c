@@ -10,6 +10,7 @@
 
 #ifndef HOST_CYGWIN
 
+#include <limits.h>
 #include <objbase.h>
 #include <ddraw.h>
 #include <dinput.h>
@@ -261,7 +262,8 @@ static int directx_init(void)
 		{
 			flags = ((fb_win32.w == 320) && (height == 200) && (fb_win32.depth == 8)) ? DDSDM_STANDARDVGAMODE : 0;
 
-			if (IDirectDraw2_SetDisplayMode(lpDD, fb_win32.w, height, fb_win32.depth, refresh_rate, flags) == DD_OK)
+			if (IDirectDraw2_SetDisplayMode(lpDD, (DWORD)fb_win32.w, (DWORD)height,
+							(DWORD)fb_win32.depth, (DWORD)refresh_rate, (DWORD)flags) == DD_OK)
 				break;
 
 			depth = fb_win32.depth;
@@ -273,7 +275,9 @@ static int directx_init(void)
 				case 32: depth = 24; break;
 			}
 
-			if ((depth == fb_win32.depth) || (IDirectDraw2_SetDisplayMode(lpDD, fb_win32.w, height, depth, refresh_rate, flags) != DD_OK))
+			if ((depth == fb_win32.depth) ||
+			    (IDirectDraw2_SetDisplayMode(lpDD, (DWORD)fb_win32.w, (DWORD)height,
+							 (DWORD)depth, (DWORD)refresh_rate, (DWORD)flags) != DD_OK))
 			{
 				height = calc_comp_height( height );
 				if( height == 0 )
@@ -289,7 +293,7 @@ static int directx_init(void)
 		} else {
 			style = (WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME);
 			if (fb_win32.flags & DRIVER_NO_SWITCH)
-				style &= ~WS_MAXIMIZEBOX;
+				style &= ~(DWORD)WS_MAXIMIZEBOX;
 		}
 		AdjustWindowRect(&rect, style, 0);
 		rect.right -= rect.left;
@@ -318,8 +322,8 @@ static int directx_init(void)
 		fb_hMemSet(&desc, 0, sizeof(DDSURFACEDESC));
 		desc.dwSize = sizeof(desc);
 		desc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
-		desc.dwWidth = fb_win32.w;
-		desc.dwHeight = fb_win32.h;
+		desc.dwWidth = (DWORD)fb_win32.w;
+		desc.dwHeight = (DWORD)fb_win32.h;
 		desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN | DDSCAPS_VIDEOMEMORY;
 		if (IDirectDraw2_CreateSurface(lpDD, &desc, &lpDDS_back, 0) != DD_OK)
 			return -1;
@@ -341,7 +345,9 @@ static int directx_init(void)
 		fb_win32.is_palette_changed = FALSE;
 	}
 
-	depth = format.dwRGBBitCount;
+	if (format.dwRGBBitCount > (DWORD)INT_MAX)
+		return -1;
+	depth = (int)format.dwRGBBitCount;
 	if ((format.dwRGBBitCount == 16) && (format.dwGBitMask == 0x03E0))
 		depth = 15;
 	if ((format.dwRGBBitCount >= 24) && (format.dwRBitMask == 0xFF))
@@ -358,8 +364,8 @@ static int directx_init(void)
 
 	for (i = 0; i < 256; i++) {
 		fb_dinput_keyboard_object_format[i].pguid = &fb_GUID_Key;
-		fb_dinput_keyboard_object_format[i].dwOfs = i;
-		fb_dinput_keyboard_object_format[i].dwType = 0x8000000C | (i << 8);
+		fb_dinput_keyboard_object_format[i].dwOfs = (DWORD)i;
+		fb_dinput_keyboard_object_format[i].dwType = 0x8000000Cu | ((DWORD)i << 8);
 		fb_dinput_keyboard_object_format[i].dwFlags = 0;
 	}
 	if (IDirectInput_CreateDevice(lpDI, &fb_GUID_SysKeyboard, &lpDID, NULL) != DI_OK)
@@ -480,7 +486,7 @@ static DWORD WINAPI directx_thread( LPVOID param )
 			if (result == DD_OK) {
 				fb_win32.blitter((unsigned char *)desc.lpSurface + display_offset * desc.lPitch, desc.lPitch);
 				IDirectDrawSurface_Unlock(lpDDS_back, desc.lpSurface);
-				fb_hMemSet(fb_gfx->dirty, FALSE, fb_win32.h);
+				fb_hMemSet(fb_gfx->dirty, FALSE, (size_t)fb_win32.h);
 			}
 
 			directx_paint();
@@ -536,21 +542,37 @@ static void driver_wait_vsync(void)
 static HRESULT CALLBACK fetch_modes_callback(LPDDSURFACEDESC desc, LPVOID data)
 {
 	MODESLIST *modes = (MODESLIST *)data;
-	int depth = desc->ddpfPixelFormat.dwRGBBitCount;
+	DWORD pixel_depth = desc->ddpfPixelFormat.dwRGBBitCount;
+	DWORD packed_dimensions;
+	int depth;
+
+	if (pixel_depth > (DWORD)INT_MAX)
+		return DDENUMRET_OK;
+	depth = (int)pixel_depth;
 
 	if ((depth == 16) && (desc->ddpfPixelFormat.dwGBitMask == 0x03E0))
 		depth = 15;
 	if (depth == modes->depth) {
 		int *newdata;
+		if (modes->size == INT_MAX) {
+			modes->failed = TRUE;
+			return DDENUMRET_CANCEL;
+		}
 		modes->size++;
-		newdata = (int *)realloc(modes->data, modes->size * sizeof(int));
+		if ((size_t)modes->size > ((size_t)-1 / sizeof(*newdata))) {
+			modes->size--;
+			modes->failed = TRUE;
+			return DDENUMRET_CANCEL;
+		}
+		newdata = (int *)realloc(modes->data, (size_t)modes->size * sizeof(*newdata));
 		if (newdata == NULL) {
 			modes->size--;
 			modes->failed = TRUE;
 			return DDENUMRET_CANCEL;
 		}
 		modes->data = newdata;
-		modes->data[modes->size - 1] = (desc->dwWidth << 16) | desc->dwHeight;
+		packed_dimensions = (desc->dwWidth << 16) | desc->dwHeight;
+		modes->data[modes->size - 1] = (int)packed_dimensions;
 	}
 
 	return DDENUMRET_OK;

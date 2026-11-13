@@ -684,7 +684,7 @@ static void audio_callback(void *cookie, void *buffer, size_t size, const media_
     (void)cookie;
     (void)fmt;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
     {
         memset(buffer, 0, size);
         return;

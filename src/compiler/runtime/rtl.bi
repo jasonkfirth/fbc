@@ -569,6 +569,7 @@
 
 #define FB_RTL_THREADCALL               "fb_ThreadCall"
 #define FB_RTL_TLSGETVAR                "fb_TlsGetVar"
+#define FB_RTL_TLSGETVARKEY             "fb_TlsGetVarKey"
 #define FB_RTL_INT128BOP                "fb_Int128Bop"
 #define FB_RTL_INT128UOP                "fb_Int128Uop"
 #define FB_RTL_INT128COPY               "fb_Int128Copy"
@@ -1183,6 +1184,7 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_ERRORCRESUMECHECKPOINT
 	FB_RTL_IDX_ERRORNATIVEHANDLERFRAME
 	FB_RTL_IDX_ERRORNATIVEDISPATCH
+	FB_RTL_IDX_TLSGETVARKEY
 	FB_RTL_INDEXES
 end enum
 

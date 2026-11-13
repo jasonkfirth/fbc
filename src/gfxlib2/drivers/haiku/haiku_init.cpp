@@ -42,13 +42,13 @@ static uint32 fb_hHaikuOpenGLViewOptions(void)
 {
     uint32 options = BGL_RGB | BGL_DOUBLE;
 
-    if (__fb_gl_params.color_alpha_bits > 0)
+    if (fb_gl_params.color_alpha_bits > 0)
         options |= BGL_ALPHA;
-    if (__fb_gl_params.depth_bits > 0)
+    if (fb_gl_params.depth_bits > 0)
         options |= BGL_DEPTH;
-    if (__fb_gl_params.stencil_bits > 0)
+    if (fb_gl_params.stencil_bits > 0)
         options |= BGL_STENCIL;
-    if (__fb_gl_params.accum_bits > 0)
+    if (fb_gl_params.accum_bits > 0)
         options |= BGL_ACCUM;
 
     return options;
@@ -254,10 +254,10 @@ int fb_hHaikuInit(char *title, int w, int h, int depth, int refresh, int flags)
     fb_haiku.depth    = depth;
     fb_haiku.refresh  = refresh;
     fb_haiku.flags    = flags;
-    fb_haiku.scanline_size = __fb_gfx ? __fb_gfx->scanline_size : 1;
+    fb_haiku.scanline_size = fb_gfx ? fb_gfx->scanline_size : 1;
 
-    if (__fb_gfx)
-        fb_hMemSet(__fb_gfx->key, FALSE, 128);
+    if (fb_gfx)
+        fb_hMemSet(fb_gfx->key, FALSE, 128);
 
     tid = spawn_thread(
         fb_haiku_event_thread_func,

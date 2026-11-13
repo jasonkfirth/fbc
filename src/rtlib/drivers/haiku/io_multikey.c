@@ -12,16 +12,16 @@
 
 int fb_ConsoleMultikey( int scancode )
 {
-    if( __fb_gfx == NULL )
+    if( fb_gfx == NULL )
         return 0;
 
-    if( __fb_gfx->key == NULL )
+    if( fb_gfx->key == NULL )
         return 0;
 
     if( scancode < 0 || scancode >= 128 )
         return 0;
 
-    return __fb_gfx->key[scancode] ? 1 : 0;
+    return fb_gfx->key[scancode] ? 1 : 0;
 }
 
 #endif

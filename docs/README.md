@@ -8,6 +8,12 @@ language reference.
 
 ## Start here
 
+- [Runtime-backed TLS arrays](c-emitter-runtime-tls-arrays.md) records computed
+  storage, bounds checks, module initialization and terminating C epilogues.
+
+- [Terminating callbacks](c-emitter-noreturn-callbacks.md) records the exact
+  signature conversion, native address checks and preserved mismatch diagnostics.
+
 - [Intel assembly storage addresses](c-emitter-asm-addresses.md) records the
   selected Win32 operand-limit repair, live parameter aliases, floating bit
   preservation, complete recount and remaining qualification boundaries.
@@ -321,8 +327,9 @@ regressions and separate Win32 object qualification.
 
 - [Main GCC promotion](c-emitter-main-gcc-promotion.md): current sources, complete GCC counts, matching runtime and preservation limits.
 
-<!-- end of README.md -->
 
 [Windows CRT layout and ordinary C names](c-emitter-crt-contracts.md) records
 native SDK contracts, current paired warning counts, preserved experimental
 policies and the missing clean external-rebuild proof.
+
+<!-- end of README.md -->

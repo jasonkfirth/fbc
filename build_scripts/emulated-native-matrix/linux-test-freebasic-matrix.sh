@@ -482,6 +482,9 @@ run_fbctests() {
         tar xf -
     )
 
+    mkdir -p /tmp/fbctests-source/src/rtlib
+    cp /source-fb-abi.h /tmp/fbctests-source/src/rtlib/fb_abi.h
+
     cd /tmp/fbctests-source/tests
 
     echo "==> cleaning fbctests tree"
@@ -945,6 +948,7 @@ EOF
                 -v "$ROOT/tests:/source-tests:ro" \
                 -v "$ROOT/inc:/source-inc:ro" \
                 -v "$ROOT/src/sfxlib:/source-sfxlib:ro" \
+            -v "$ROOT/src/rtlib/fb_abi.h:/source-fb-abi.h:ro" \
                 -v "$ROOT/examples:/source-root/examples:ro" \
                 -v "$ROOT/build_scripts/exampleageddon-freebasic.py:/exampleageddon-freebasic.py:ro" \
                 -v "$ROOT/build_scripts/linux-package-test-runner.sh:/linux-package-test-runner.sh:ro" \
@@ -1022,6 +1026,7 @@ EOF
             -v "$ROOT/tests:/source-tests:ro" \
             -v "$ROOT/inc:/source-inc:ro" \
             -v "$ROOT/src/sfxlib:/source-sfxlib:ro" \
+            -v "$ROOT/src/rtlib/fb_abi.h:/source-fb-abi.h:ro" \
             -v "$ROOT/build_scripts/exampleageddon-freebasic.py:/exampleageddon-freebasic.py:ro" \
             -v "$TEST_RUNNER:/test-freebasic-packages.sh:ro" \
             "$image" \

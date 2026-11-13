@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-FBGFX *__fb_gfx;
+FBGFX *fb_gfx;
 X11DRIVER fb_x11;
 void *(*fb_hMemCpy)(void *, const void *, size_t) = memcpy;
 void *(*fb_hMemSet)(void *, int, size_t) = memset;
@@ -77,7 +77,7 @@ int main(void)
 	unsigned char storage[24] = { 0 };
 	memset(&graphics, 0, sizeof(graphics));
 	memset(&pixels, 0, sizeof(pixels));
-	__fb_gfx = &graphics;
+	fb_gfx = &graphics;
 	graphics.dirty = dirty;
 	graphics.pitch = 8;
 	fb_x11.w = 2;

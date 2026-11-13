@@ -181,7 +181,7 @@ int amiga_test_present_cache(int x, int y)
     damaged = original ^ 1;
     SetAPen(fb_amiga_gfx.window->RPort, (ULONG)damaged);
     WritePixel(fb_amiga_gfx.window->RPort, window_x, window_y);
-    __fb_gfx->dirty[y] = TRUE;
+    fb_gfx->dirty[y] = TRUE;
     fb_amigaGfxPresent();
     /* A software row which has not changed must use the cache. A real
        refresh event, rather than that identical row, repairs window damage. */
@@ -201,7 +201,7 @@ int amiga_test_present_cache(int x, int y)
     fb_amiga_gfx.present_cache_valid = NULL;
     SetAPen(fb_amiga_gfx.window->RPort, (ULONG)damaged);
     WritePixel(fb_amiga_gfx.window->RPort, window_x, window_y);
-    __fb_gfx->dirty[y] = TRUE;
+    fb_gfx->dirty[y] = TRUE;
     fb_amigaGfxPresent();
     if ((LONG)ReadPixel(fb_amiga_gfx.window->RPort, window_x, window_y) == original) result = 0;
     fb_amiga_gfx.present_cache = cache;
@@ -209,8 +209,8 @@ int amiga_test_present_cache(int x, int y)
 
 done:
     fb_amigaGfxInvalidate();
-    if (__fb_gfx != NULL && __fb_gfx->dirty != NULL)
-        memset(__fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
+    if (fb_gfx != NULL && fb_gfx->dirty != NULL)
+        memset(fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
     fb_GfxUnlock(0, 0);
     DeleteMsgPort(reply);
     return result;

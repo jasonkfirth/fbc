@@ -103,6 +103,15 @@ class DosReceipts(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.redirected('X' * 130, 'D:/LOG/0123C.LOG')
 
+    def test_threaded_sources_use_the_provider_in_native_response_files(self):
+        directory = self.root / 'examples'
+        directory.mkdir()
+        (directory / 'one.bas').write_text('Dim worker As Any Ptr = ThreadCreate(@job)\n')
+        runner.prepare_batch(self.batch, self.entries, self.args)
+        response = (self.batch / 'TMP/00000.RSP').read_text()
+        self.assertIn('-dos-threads\npdmlwp\n', response)
+        self.assertEqual(self.entries[0]['group'], 'self-contained')
+
     def test_unrecorded_cases_cannot_reuse_an_old_artifact(self):
         directory = self.root / 'examples'
         directory.mkdir()

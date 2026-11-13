@@ -10,7 +10,56 @@ For the current selected compiler and queue counts, see
 [current status](c-emitter-current-status.md). Compiler identities and count
 tables below preserve earlier qualification cuts.
 
-# Current selected compiler: alternate-entry cleanup
+# Last completed retained census: November 13
+
+The selected Intel assembly-storage compiler is `c3f2b1e6`. The completed
+6,419-profile retained cut reports GCC 14 / Clang 15,824. Expansions and the
+Make-selected native runtime-library audit have separate totals and overlap
+this body; they must not be added to it.
+
+| Remaining GCC class | Occurrences | Disposition |
+| --- | ---: | --- |
+| Null dereference | 6 | Deliberate signal-handler inputs; FBC warning 57 remains |
+| Bounds | 2 | [Containing-copy optimizer reproduction](c-emitter-bulk-copy-diagnostic.md) and [guarded wrong-widget test](c-emitter-label-guard.md) |
+| Format truncation | 2 | Checked helper returns; standalone native C controls reproduce the warning |
+| Unread static | 2 | Named persistent source storage; FBC warning 55 remains; preserve the RNG side effect |
+| GNU label addresses | 2 | Legacy Minesweeper computed dispatch; retain label interoperability |
+
+Compiler and fbctests generated C have zero GCC warnings. The separate Win32
+RotoZoom qualification retains 65 opaque-assembly unused-code observations per
+native compiler; these are not in the retained Win64 counts.
+
+| Remaining Clang class | Occurrences |
+| --- | ---: |
+| Record padding | 14,571 |
+| Global constructors | 1,190 |
+| All other classes | 63 |
+
+Padding and startup registration account for 99.6% of the retained Clang
+observations. Natural C padding is intentional where it already places fields
+correctly: adding named padding can change compatible aggregate declarations
+under LTO. The explicit-record writer therefore adds bytes only when C's
+natural layout cannot supply the required offset. Size and named-field offset
+assertions remain enabled. Any class-wide layout change needs native aggregate
+ABI, initializer, anonymous-member and debugger qualification.
+
+The [terminating-callback repair](c-emitter-noreturn-callbacks.md) addresses a
+concrete strict-cast defect without changing examples or record layouts. Its
+candidate qualification remains separate from the completed counts above.
+
+Startup registrations preserve priority, module ordering and finalizer behavior.
+The current MinGW grouping already combines compatible callbacks; singletons
+and non-returning callbacks retain their original registration attributes.
+These two classes remain counted under unsuppressed diagnostics. They are not
+14,571 independent layout faults or 1,190 missing BASIC initializers.
+
+The class receipt is `asm-address-class-review-v1-20261113.json.zlib` in the
+existing `build/c-emitter-forward-views-20261105` work area. It binds the whole
+retained database and all fourteen GCC occurrences. The older JRPG cut still
+needs a refresh with the selected compiler; partial new results do not replace
+its completed GCC 0 / Clang 10,018 census.
+
+# Historical selected compiler: alternate-entry cleanup
 
 `build/main-gcc/bin/fbc.exe` is BF344DD7, with B2827405 retained for rollback.
 Complete GCC results remain compiler 0, fbctests 0, Exampleageddon 6 deliberate

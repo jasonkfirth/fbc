@@ -1,8 +1,29 @@
-/* OpenGL gfx driver */
+/*
+    Project: FreeBASIC Graphics Library
+    ------------------------------------
+
+    File: drivers/win32/gfx_driver_opengl.c
+
+    Purpose:
+
+        Present gfxlib2 output through the Windows WGL backend.
+
+    Responsibilities:
+
+        - create and manage the OpenGL context
+        - configure display modes and scaled rendering
+        - poll keyboard state for the graphics window
+
+    This file intentionally does NOT contain:
+
+        - portable drawing operations
+        - shared Win32 window lifecycle and event translation
+*/
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_win32.h"
 #include "../../fb_gfx_gl.h"
+#include <limits.h>
 #include <process.h>
 
 #ifndef DISABLE_OPENGL
@@ -296,15 +317,15 @@ static int opengl_init(void)
 		devname = monitor_info.szDevice;
 	}
 	
-	style = GetWindowLong(fb_win32.wnd, GWL_STYLE);
+	style = (DWORD)GetWindowLong(fb_win32.wnd, GWL_STYLE);
 	flags = SWP_FRAMECHANGED;
 	if (fb_win32.flags & DRIVER_FULLSCREEN) {
 		fb_hMemSet(&mode, 0, sizeof(mode));
 		mode.dmSize = sizeof(mode);
-		mode.dmPelsWidth = fb_win32.w;
-		mode.dmPelsHeight = fb_win32.h;
-		mode.dmBitsPerPel = fb_win32.depth;
-		mode.dmDisplayFrequency = fb_win32.refresh_rate;
+		mode.dmPelsWidth = (DWORD)fb_win32.w;
+		mode.dmPelsHeight = (DWORD)fb_win32.h;
+		mode.dmBitsPerPel = (DWORD)fb_win32.depth;
+		mode.dmDisplayFrequency = (DWORD)fb_win32.refresh_rate;
 		mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
 		if (fb_win32.ChangeDisplaySettingsEx) {
 			if (fb_win32.ChangeDisplaySettingsEx(devname, &mode, NULL, CDS_FULLSCREEN, NULL) != DISP_CHANGE_SUCCESSFUL){
@@ -313,23 +334,23 @@ static int opengl_init(void)
 		} else if (ChangeDisplaySettings(&mode, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL) {
 			return -1;
 		}
-		style &= ~WS_OVERLAPPEDWINDOW;
+		style &= ~(DWORD)WS_OVERLAPPEDWINDOW;
 		style |= WS_POPUP;
 	}
 	else {
 		if (fb_win32.flags & DRIVER_NO_FRAME) {
-			style &= ~WS_OVERLAPPEDWINDOW;
+			style &= ~(DWORD)WS_OVERLAPPEDWINDOW;
 			style |= WS_POPUP;
 		}
 		else {
 			style |= WS_OVERLAPPEDWINDOW;
 			style &= ~(WS_POPUP | WS_THICKFRAME);
 			if ((fb_win32.flags & DRIVER_NO_SWITCH) && !fb_hWin32IsWindowScalingEnabled())
-				style &= ~WS_MAXIMIZEBOX;
+				style &= ~(DWORD)WS_MAXIMIZEBOX;
 		}
 		flags |= SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING | SWP_NOZORDER;
 	}
-	SetWindowLong(fb_win32.wnd, GWL_STYLE, style);
+	SetWindowLong(fb_win32.wnd, GWL_STYLE, (LONG)style);
 	rect.left = rect.top = x = y = 0;
 	rect.right = fb_win32.w;
 	rect.bottom = fb_win32.h;
@@ -402,6 +423,8 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 {
 	const char *const wgl_funcs[] = { "wglCreateContext", "wglMakeCurrent", "wglDeleteContext", NULL };
 	int depth = MAX(8, depth_arg);
+	size_t dirty_size;
+	char *new_dirty;
 
 	fb_hMemSet(&fb_win32, 0, sizeof(fb_win32));
 
@@ -427,8 +450,23 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 		fb_gl_params.scale = fb_gl_params.init_scale;
 	}
 	if (fb_gl_params.scale>1){
+		if ((w <= 0) || (h <= 0) || (fb_gfx->h <= 0) ||
+		    (fb_gfx->scanline_size <= 0) ||
+		    (fb_gl_params.scale > (INT_MAX / w)) ||
+		    (fb_gl_params.scale > (INT_MAX / h)))
+			return -1;
+		dirty_size = (size_t)fb_gfx->h;
+		if ((size_t)fb_gfx->scanline_size > ((size_t)-1 / dirty_size))
+			return -1;
+		dirty_size *= (size_t)fb_gfx->scanline_size;
+		if ((size_t)fb_gl_params.scale > ((size_t)-1 / dirty_size))
+			return -1;
+		dirty_size *= (size_t)fb_gl_params.scale;
+		new_dirty = (char *)calloc(1, dirty_size);
+		if (!new_dirty)
+			return -1;
 		free(fb_gfx->dirty);
-		fb_gfx->dirty = (char *)calloc(1, fb_gfx->h * fb_gfx->scanline_size * fb_gl_params.scale);
+		fb_gfx->dirty = new_dirty;
 		w *= fb_gl_params.scale;
 		h *= fb_gl_params.scale;
 	}
@@ -526,7 +564,8 @@ static void driver_poll_events(void)
 static int *driver_fetch_modes(int depth, int *size)
 {
 	DEVMODE devmode;
-	int *modes = NULL, index = 0;
+	int *modes = NULL;
+	DWORD index = 0;
 
 	*size = 0;
 
@@ -536,15 +575,27 @@ static int *driver_fetch_modes(int depth, int *size)
 		index++;
 		if (devmode.dmBitsPerPel == (unsigned int)depth) {
 			int *newModes;
+			DWORD packed_dimensions;
+			if (*size == INT_MAX) {
+				free(modes);
+				*size = 0;
+				return NULL;
+			}
 			(*size)++;
-			newModes = (int *)realloc(modes, *size * sizeof(int));
+			if ((size_t)*size > ((size_t)-1 / sizeof(*newModes))) {
+				free(modes);
+				*size = 0;
+				return NULL;
+			}
+			newModes = (int *)realloc(modes, (size_t)*size * sizeof(*newModes));
 			if (newModes == NULL) {
 				free(modes);
 				*size = 0;
 				return NULL;
 			}
 			modes = newModes;
-			modes[(*size) - 1] = (devmode.dmPelsWidth << 16) | devmode.dmPelsHeight;
+			packed_dimensions = (devmode.dmPelsWidth << 16) | devmode.dmPelsHeight;
+			modes[(*size) - 1] = (int)packed_dimensions;
 		}
 	}
 
@@ -552,3 +603,5 @@ static int *driver_fetch_modes(int depth, int *size)
 }
 
 #endif /* DISABLE_OPENGL */
+
+/* end of gfx_driver_opengl.c */

@@ -150,12 +150,12 @@ static int runtime_playback(int worker, const char *expected)
     {
         uclock_t start;
         volatile unsigned long iterations = 0;
-        if (fb_sfxInit() != 0 || !__fb_sfx || !__fb_sfx->driver ||
-            strcmp(__fb_sfx->driver->name, expected) != 0)
+        if (fb_sfxInit() != 0 || !fb_sfx_context || !fb_sfx_context->driver ||
+            strcmp(fb_sfx_context->driver->name, expected) != 0)
             return 1;
-        if (strcmp(expected, "AC97") == 0 && __fb_sfx->samplerate != 48000)
+        if (strcmp(expected, "AC97") == 0 && fb_sfx_context->samplerate != 48000)
             return 1;
-        printf("Selected %s, rate %d\n", __fb_sfx->driver->name, __fb_sfx->samplerate);
+        printf("Selected %s, rate %d\n", fb_sfx_context->driver->name, fb_sfx_context->samplerate);
 #if FB_SFX_DOS_THREADS
         if (worker && !fb_sfxMsdosWorkerActive())
             return 1;
@@ -178,7 +178,7 @@ static int runtime_playback(int worker, const char *expected)
             fb_Delay(750);
         fb_sfxOutputCaptureStop();
         if (fb_sfxOutputCaptureSave(cycle == 0 ? "AUDIO.WAV" : "REPEAT.WAV") != 0 ||
-            strcmp(__fb_sfx->driver->name, expected) != 0)
+            strcmp(fb_sfx_context->driver->name, expected) != 0)
             return 1;
         fb_sfxSoundLegacy2(880, 2);
         fb_sfxExit();
@@ -208,7 +208,7 @@ int main(int argc, char **argv)
         }
         /* The environment request must not bypass actual device discovery. */
         setenv("SFXLIB_DRIVER", "AC97", 1);
-        if (fb_sfxInit() != 0 || strcmp(__fb_sfx->driver->name, "PCSpeaker") != 0)
+        if (fb_sfxInit() != 0 || strcmp(fb_sfx_context->driver->name, "PCSpeaker") != 0)
             result = 1;
         fb_sfxExit();
         if (!result)

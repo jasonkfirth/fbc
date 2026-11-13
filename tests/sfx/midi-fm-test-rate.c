@@ -47,9 +47,9 @@ int fb_sfxTestSetSampleRate(int sample_rate)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx && __fb_sfx->initialized)
+    if (fb_sfx_context && fb_sfx_context->initialized)
     {
-        __fb_sfx->samplerate = sample_rate;
+        fb_sfx_context->samplerate = sample_rate;
         result = 0;
     }
 

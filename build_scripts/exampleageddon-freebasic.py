@@ -383,6 +383,7 @@ INTERACTIVE_RE = re.compile(
 
 NETWORK_RE = re.compile(r"\b(open\s+tcp|http-get|http_get|ftp|gethostbyname)\b", re.IGNORECASE)
 THREADCALL_RE = re.compile(r"\bthreadcall\b", re.IGNORECASE)
+DOS_THREAD_RE = re.compile(r"\b(threadcreate|threadwait|threaddetach|threadself|mutexcreate|condcreate)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -555,6 +556,16 @@ def command_environment(args: argparse.Namespace, env: dict[str, str] | None = N
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore")
+
+
+def example_fbc_arguments(path: Path, root: Path, target_os: str) -> list[str]:
+    arguments = list(EXAMPLE_FBC_ARGUMENTS.get(relpath(path, root), ()))
+    if target_os == "dos" and DOS_THREAD_RE.search(read_text(path)):
+        # DOS keeps ordinary programs independent of its optional scheduler.
+        # Thread primitives require the provider option, not -mt alone; the
+        # distribution must supply its matching MT and scheduler archives.
+        arguments.extend(["-dos-threads", "pdmlwp"])
+    return arguments
 
 
 def classify(path: Path, root: Path, target_os: str, supports_gas64: bool) -> Classification:
@@ -1117,7 +1128,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
     if rel in LIBRARY_MODULES:
         mode, flags = LIBRARY_MODULES[rel]
         cmd.extend([mode, *flags])
-    cmd.extend(EXAMPLE_FBC_ARGUMENTS.get(rel, ()))
+    cmd.extend(example_fbc_arguments(path, root, args.target_os))
     if rel == "examples/graphics/SDL3/ttf/showfont.bas":
         cmd.extend(["-m", "showfont"])
     if rel in GAS64_VARIADIC_SOURCES and compiler_supports_gas64(args):

@@ -36,6 +36,8 @@
 #include <d3d10_1.h>
 #include <d2d1.h>
 #include <dxgi.h>
+#include <limits.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 /* Defining DEBUG or D2D_DEBUG will turn on debugging for Direct2D & Direct3D
@@ -315,7 +317,7 @@ static LRESULT CALLBACK D2DWndProcSubclass(HWND hwnd, UINT msg, WPARAM wParam, L
 					fb_gfx->key[fbScan] = (value << 7) | ((GetKeyState(alternateKey) & 0x8000) ? TRUE : FALSE);
 				}
 				else {
-					fb_gfx->key[fbScan] = value;
+					fb_gfx->key[fbScan] = (char)value;
 				}
 				DBG_TEXT(
 					"%s - Got key%s for vKey %#x, fbScan=%#x, winScan=%#x, gfxKeyState=%#x",
@@ -328,7 +330,7 @@ static LRESULT CALLBACK D2DWndProcSubclass(HWND hwnd, UINT msg, WPARAM wParam, L
 			}
 			else {
 				/* Shift needs to update both the LSHIFT and RSHIFT scancodes */
-				fb_gfx->key[SC_RSHIFT] = fb_gfx->key[SC_LSHIFT] = value;
+				fb_gfx->key[SC_RSHIFT] = fb_gfx->key[SC_LSHIFT] = (char)value;
 			}
 			fb_gfxDriverD2D.unlock();
 		}
@@ -361,16 +363,16 @@ static HWND CreateTheWindow(WNDPROC* pOriginalProc)
 		windowStyle |= WS_POPUP;
 	}
 	if((fbFlags & DRIVER_NO_SWITCH) && !fb_hWin32IsWindowScalingEnabled()) {
-		windowStyle &= ~WS_MAXIMIZEBOX;
+		windowStyle &= ~(DWORD)WS_MAXIMIZEBOX;
 	}
 	winSize.right = fb_win32.w;
 	winSize.bottom = fb_win32.h;
 	winSize.left = winSize.top = 0;
 	if(isFullScreen) {		
-		mode.dmPelsWidth = fb_win32.w;
-		mode.dmPelsHeight = fb_win32.h;
-		mode.dmBitsPerPel = fb_win32.depth;
-		mode.dmDisplayFrequency = fb_win32.refresh_rate;
+		mode.dmPelsWidth = (DWORD)fb_win32.w;
+		mode.dmPelsHeight = (DWORD)fb_win32.h;
+		mode.dmBitsPerPel = (DWORD)fb_win32.depth;
+		mode.dmDisplayFrequency = (DWORD)fb_win32.refresh_rate;
 		mode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
 		if(fb_win32.ChangeDisplaySettingsEx(mInf.szDevice, &mode, NULL, CDS_FULLSCREEN, NULL) != DISP_CHANGE_SUCCESSFUL) {
 			mode.dmDisplayFrequency = 0;
@@ -391,7 +393,8 @@ static HWND CreateTheWindow(WNDPROC* pOriginalProc)
 	}
 	if(EnumDisplaySettings(mInf.szDevice, ENUM_CURRENT_SETTINGS, &mode)) {
 		DBG_TEXT("%s - current refresh rate is %d", mode.dmDisplayFrequency);
-		fb_gfx->refresh_rate = mode.dmDisplayFrequency;
+		if (mode.dmDisplayFrequency <= (DWORD)INT_MAX)
+			fb_gfx->refresh_rate = (int)mode.dmDisplayFrequency;
 	}
 	hwnd = fb_win32.wnd;
 	*pOriginalProc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&D2DWndProcSubclass);
@@ -474,8 +477,8 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 		texDesc.CPUAccessFlags = 0;
 		texDesc.MiscFlags = D3D10_RESOURCE_MISC_GDI_COMPATIBLE;
 		texDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-		bitmapSize.width = texDesc.Width = fb_win32.w;
-		bitmapSize.height = texDesc.Height = fb_win32.h;
+		bitmapSize.width = texDesc.Width = (UINT)fb_win32.w;
+		bitmapSize.height = texDesc.Height = (UINT)fb_win32.h;
 		stride = bitmapSize.width * 4;
 		if(NOTIFY_FAILED_HR(ID3D10Device1_CreateTexture2D(pD3DDevice, &texDesc, NULL, &pD3DTexture))) {
 			goto errorReturn;
@@ -564,8 +567,8 @@ static int D2DDirectSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 	
 	hwndRenderProps.hwnd = hwnd;
 	hwndRenderProps.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY;
-	hwndRenderProps.pixelSize.height = fb_win32.h;
-	hwndRenderProps.pixelSize.width = fb_win32.w;
+	hwndRenderProps.pixelSize.height = (UINT32)fb_win32.h;
+	hwndRenderProps.pixelSize.width = (UINT32)fb_win32.w;
 	stride = hwndRenderProps.pixelSize.width * 4;
 	renderProps.type = D2D1_RENDER_TARGET_TYPE_DEFAULT;
 	renderProps.usage = D2D1_RENDER_TARGET_USAGE_NONE;
@@ -641,18 +644,26 @@ static void D2DCommonPaintInternal(D2DGlobalState* pGlobalState)
 	char* pDirtyStart, *pDirtyEnd;
 	const char* pFirstDirtyRow = NULL, *pLastDirtyRow = NULL;
 	unsigned char* pBitmapDataSrc = NULL;
-	const UINT stride = winWidth * 4;
+	UINT stride;
 	const ULONG ptrSize = sizeof(ULONG_PTR);
 	ULONG_PTR dirtyRows;
 	ULONG bitPos;
+	ptrdiff_t first_dirty_index, last_dirty_index;
+	size_t first_dirty_row, dirty_row_count, source_offset;
 	int scanlineSize;
 
 	fb_gfxDriverD2D.lock();
 
 	scanlineSize = fb_gfx->scanline_size;
+	if ((winWidth <= 0) || (winWidth > INT_MAX / 4) || (winHeight <= 0) ||
+	    (fb_gfx->h <= 0) || (scanlineSize <= 0) || !fb_gfx->dirty) {
+		fb_gfxDriverD2D.unlock();
+		return;
+	}
+	stride = (UINT)(winWidth * 4);
 	pDirtyStart = fb_gfx->dirty;
-	pDirtyEnd = pDirtyStart + fb_gfx->h;
-	pFirstDirtyRow = FB_MEMCHR(pDirtyStart, TRUE, fb_gfx->h);
+	pDirtyEnd = pDirtyStart + (size_t)fb_gfx->h;
+	pFirstDirtyRow = FB_MEMCHR(pDirtyStart, TRUE, (size_t)fb_gfx->h);
 	/* nothing's dirty, don't do anything */
 	if(!pFirstDirtyRow) {
 		fb_gfxDriverD2D.unlock();
@@ -678,9 +689,22 @@ static void D2DCommonPaintInternal(D2DGlobalState* pGlobalState)
 	pLastDirtyRow = pDirtyEnd + ((bitPos >> 3) & (ptrSize - 1));
 fillInDirtyRect:
 	dirtyRect.left = 0;
-	dirtyRect.right = winWidth;
-	dirtyRect.top = (pFirstDirtyRow - pDirtyStart) * scanlineSize;
-	dirtyRect.bottom = ((pLastDirtyRow - pDirtyStart) + 1) * scanlineSize;
+	dirtyRect.right = (UINT32)winWidth;
+	first_dirty_index = pFirstDirtyRow - pDirtyStart;
+	last_dirty_index = pLastDirtyRow - pDirtyStart;
+	if ((first_dirty_index < 0) || (last_dirty_index < first_dirty_index) ||
+	    (last_dirty_index >= fb_gfx->h)) {
+		fb_gfxDriverD2D.unlock();
+		return;
+	}
+	first_dirty_row = (size_t)first_dirty_index;
+	dirty_row_count = (size_t)last_dirty_index + 1u;
+	if (dirty_row_count > ((size_t)UINT_MAX / (size_t)scanlineSize)) {
+		fb_gfxDriverD2D.unlock();
+		return;
+	}
+	dirtyRect.top = (UINT32)(first_dirty_row * (size_t)scanlineSize);
+	dirtyRect.bottom = (UINT32)(dirty_row_count * (size_t)scanlineSize);
 	drawRect.left = dirtyRect.left;
 	drawRect.right = dirtyRect.right;
 	drawRect.top = dirtyRect.top;
@@ -692,12 +716,17 @@ fillInDirtyRect:
 	// otherwise we can just direcly use the framebuffer 
 	*/
 	if(pGlobalState->pBlitter) {
-		pGlobalState->pBlitter(pBitmapDataSrc = pGlobalState->pTempBuffer, stride);
+		pGlobalState->pBlitter(pBitmapDataSrc = pGlobalState->pTempBuffer, (int)stride);
 	}
 	else {
 		pBitmapDataSrc = fb_gfx->framebuffer;
 	}
-	pBitmapDataSrc += (stride * dirtyRect.top);
+	if ((size_t)dirtyRect.top > ((size_t)-1 / (size_t)stride)) {
+		fb_gfxDriverD2D.unlock();
+		return;
+	}
+	source_offset = (size_t)stride * (size_t)dirtyRect.top;
+	pBitmapDataSrc += source_offset;
 
 	ID2D1Bitmap_CopyFromMemory(pBackBuffer, &dirtyRect, pBitmapDataSrc, stride);
 
@@ -728,7 +757,7 @@ fillInDirtyRect:
 	hr = ID2D1RenderTarget_EndDraw(pRT, NULL, NULL);
 	/* If we have to reset the drawing surfaces, we mark it all dirty
 	// otherwise we mark it all clean */
-	fb_hMemSet(pDirtyStart, SUCCEEDED(hr) ? FALSE : TRUE, winHeight);
+	fb_hMemSet(pDirtyStart, SUCCEEDED(hr) ? FALSE : TRUE, (size_t)winHeight);
 
 	fb_gfxDriverD2D.unlock();
 
@@ -881,10 +910,19 @@ typedef struct MiniVector
 
 static void D2DPushToVector(MiniVector* pVector, int elemToAdd)
 {
+	if ((pVector->elems < 0) || (pVector->capacity < 0) ||
+	    (pVector->elems > pVector->capacity))
+		return;
 	if(pVector->elems == pVector->capacity)
 	{
-		int newCapacity = pVector->capacity + 20;
-		int* pNewData = realloc(pVector->pData, newCapacity * sizeof(*pNewData));
+		int newCapacity;
+		int* pNewData;
+		if (pVector->capacity > INT_MAX - 20)
+			return;
+		newCapacity = pVector->capacity + 20;
+		if ((size_t)newCapacity > ((size_t)-1 / sizeof(*pNewData)))
+			return;
+		pNewData = realloc(pVector->pData, (size_t)newCapacity * sizeof(*pNewData));
 		if(!pNewData)
 		{
 			return;
@@ -906,8 +944,11 @@ static void D2DEnumOutputModes(IDXGIOutput* pOutput, MiniVector* pDepthModes)
 			DXGI_MODE_DESC* pModeList = calloc(numOutputModes, sizeof(*pModeList));
 			if(pModeList && (!NOTIFY_FAILED_HR(IDXGIOutput_GetDisplayModeList(pOutput, *pFormats, DXGI_ENUM_MODES_INTERLACED, &numOutputModes, pModeList)))) {
 				UINT i;
+				UINT32 packed_mode;
+				int mode;
 				for(i = 0; i < numOutputModes; ++i) {
-					int mode = ((pModeList[i].Width << 16) | pModeList[i].Height);
+					packed_mode = (pModeList[i].Width << 16) | pModeList[i].Height;
+					mode = (int)packed_mode;
 					DBG_TEXT("%s found mode %dx%d - %fHz", pModeList[i].Width, pModeList[i].Height, ((float)pModeList[i].RefreshRate.Numerator / pModeList[i].RefreshRate.Denominator));
 					D2DPushToVector(pDepthModes, mode);
 				}

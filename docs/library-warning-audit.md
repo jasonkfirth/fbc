@@ -6,19 +6,35 @@ It uses GCC 16.2.0 and Clang 22.1.7 from the local UCRT64 toolchain.
 
 ## Latest completed capture
 
-The `rtlib-context-padding-1.json` receipts capture all 1,463 objects per
-compiler with stable selected inputs: **GCC 4,460 / Clang 31,764**, or 36,224
-occurrences. This is 24,373 fewer than the accepted 60,597-warning baseline, a
-40.2% reduction. Per-library totals are rtlib 1,248 / 17,472, gfxlib2 1,612 /
-6,610, gfxlib3 818 / 6,736 and sfxlib 782 / 946. Both builds had zero errors,
-missing diagnostic captures or selected-input changes. All sixteen archive
-hashes match the preceding accepted build.
+The latest accepted receipts capture all 1,463 objects per compiler with stable
+selected inputs: **GCC 4,118 / Clang 31,578**, or 35,696 occurrences. This is
+24,901 fewer than the accepted 60,597-warning baseline, a 41.1% reduction.
+Per-library totals are rtlib 1,248 / 17,472, gfxlib2 1,400 / 6,428, gfxlib3
+688 / 6,732 and sfxlib 782 / 946. Both builds had zero errors, missing or
+unexpected diagnostic captures, or selected-input changes, and their source
+snapshots match. The GCC `-Wsign-conversion` count is 968 and Clang's is 944,
+down 210 and 180 from the pre-Win32-cleanup checkpoint (1,178 and 1,124).
 
-The Win64 padding and packed-record probes preserve sizes and existing member
-offsets under GCC and Clang. The event and PUT header probes also confirm the
-byte-packed representations; the PUT header byte comparison passes at runtime
-on Win64. The earlier runtime/compiler and structure checks recorded below were
-not rerun for these layout-only changes.
+The latest cleanup typed native boundaries in the DirectDraw, GDI, Direct2D,
+shared Win32 window and OpenGL driver code. It added checks for pixel-depth
+narrowing, allocation arithmetic, dirty-row bounds, code-page conversion
+buffers, OpenGL scale dimensions and mode-list growth. It also tightened
+font-pitch and string-length validation, used wide intermediates for viewport
+clipping, and kept the built-in font source const. These five Win32 C files,
+the font helper and the string renderer now have no sign-conversion warnings
+under either compiler. The changes touch an internal helper header but do not
+change public API signatures or exports. The current source snapshot also
+includes the separate TLS-key runtime change described below.
+
+Win64 layout probes confirm the Vulkan surface and point records remain 24 and
+32 bytes, with every existing member offset unchanged under GCC and Clang. The
+event and PUT header probes also confirm the byte-packed representations; the
+PUT header byte comparison passes at runtime on Win64. The four current gfxlib3
+archives each contain the additive `fb_Gfx3DrawGlyphs` symbol. The four rtlib
+archives contain the additive `fb_TlsGetVarKey` symbol from the separate TLS
+change. No original defined symbol was removed; the other eight archive
+inventories match exactly. The earlier runtime/compiler and structure checks
+recorded below were not rerun for these layout changes or the new exports.
 
 ## Starting baseline and earlier CINT cut
 
@@ -83,7 +99,16 @@ Receipts and logs live under `build/c-warning-audit/{gcc,clang}/`.
   counts and diagnostic hashes, complete command, compiler identity and source
   hashes.
 - `current-captured.json` retains an earlier accepted checkpoint.
-- `rtlib-context-padding-1.json` records the latest complete build for both compilers.
+- `gfx-drawstring-sign-1.json` records the latest accepted GCC and Clang builds.
+- `win32-opengl-sign-3.json` and `win32-opengl-sign-2.json` record the preceding
+  accepted GCC and Clang builds.
+- `win32-core-sign-1.json` and `win32-sign-boundaries-1.json` record preceding
+  accepted builds.
+- `gfx3-vulkan-tail-padding-1.json` and `gfx3-vulkan-tail-padding-2.json`
+  retain the preceding GCC and accepted Clang graphics-layout builds.
+- `vulkan-private-padding-2.json` and `vulkan-private-padding-1.json` retain
+  the preceding accepted GCC and Clang builds, respectively.
+- `rtlib-context-padding-1.json` retains the preceding common checkpoint.
 - `file-size-padding-1.json` retains the preceding accepted checkpoint.
 - `packed-pragma-1.json` retains the packed-record cleanup checkpoint.
 - `gfx3-tail-padding-2.json` retains the preceding graphics padding checkpoint.
@@ -100,12 +125,26 @@ The GCC `gfx3-tail-padding-1` row is retained with `accepted=False`. That
 attempt selected MSYS GCC 15.3 with a Cygwin target and failed during archive
 creation. Its warning count is excluded from the accepted totals.
 
+The GCC `vulkan-private-padding-1` attempt is also retained with
+`accepted=False`: its PowerShell environment did not put the MSYS utilities on
+`PATH`, so Make could not find `grep` or `tr` and compiled zero objects. The
+Clang `gfx3-vulkan-tail-padding-1` capture is retained as unaccepted because
+`gfx3_exports.h` changed while its objects were compiling. The audit runner now
+normalizes dependency paths before checking for changed selected inputs; the
+stable full rerun is `gfx3-vulkan-tail-padding-2.json`.
+
+The first OpenGL GCC attempt is retained as `win32-opengl-sign-1.json` with
+`accepted=False`: the `make` shim did not provide the required MSYS tools, and
+zero library objects compiled. The first OpenGL Clang pass is also unaccepted
+because `fb_thread.h` and `thread_var.c` changed during compilation. The
+current accepted GCC and Clang receipts use the stable source snapshot.
+
 The original source is reconstructed once in a bounded 10.6 MB snapshot at
 `build/c-warning-audit/original-src`. `original-source-reconstruction.json`
 records the restored files, and `baseline-validation.json` binds the initial
 source hashes and original archive symbol inventories to the captured baseline.
 
-The current checkpoint occupies about 870.5 MiB, including both reusable object
+The current checkpoint occupies about 1,005.1 MiB, including both reusable object
 trees, diagnostic history, regression products and the single original-source
 snapshot. Layout-probe sources, compiler-generated assembly/value snapshots and
 the small native probe executables and objects remain under
@@ -306,17 +345,19 @@ checks covering zero initialization, reuse, destructor calls and empty slots.
 The 36 runtime/compiler-variant checks and 31 graphics structure graphs recorded
 above were run before this identifier-only cleanup. They were not rerun in this
 warning-count pass. The current source state was verified by both full compiler
-captures and the 16-archive symbol comparison.
+captures. The latest archive comparison retains every original defined symbol
+and adds `fb_Gfx3DrawGlyphs` to the four gfxlib3 archives.
 
 The native test links include `fbrt0.o`, which initializes the MT critical
 sections and TLS before main. An initial MT probe supplied `fb_Init` alone,
 omitted that startup object and failed. The corrected native link passes with
 both compilers.
 
-The exported defined-symbol inventories of all 16 archives match the original
-archives. `archive-symbol-check-current.json` records that comparison with each
-archive's SHA-256. Interactive fullscreen presentation and physical audio-device
-qualification remain pending.
+Twelve of the sixteen current archive symbol inventories match the original
+exactly. The four gfxlib3 archives each add `fb_Gfx3DrawGlyphs`; none removes an
+original symbol. `archive-symbol-check-current.json` records the current
+archive hashes and symbol differences. Interactive fullscreen presentation
+and physical audio-device qualification remain pending.
 
 The graphics structure checker passed all 31 graphs. The runtime structure
 checker reported one header-format issue in the pre-existing untracked
@@ -409,14 +450,33 @@ This removes 366 Clang `-Wpadded` occurrences and lowers the combined total
 from 36,590 to 36,224. GCC's warning count is unchanged. Both latest complete
 captures compile all 1,463 objects with no errors or missing diagnostics.
 
+## Vulkan tail padding and export follow-up
+
+Name the existing 64-bit tail bytes in eight Vulkan ABI records in
+`gfx3_vulkan_private.h`, then in `FB_GFX3_VULKAN_SURFACE` and
+`FB_GFX3_VULKAN_POINTS` in `gfx3_vulkan.h`. These fields occupy compiler-created
+tail padding; the Win64 surface and point records remain 24 and 32 bytes, and
+all existing member offsets match the staged pre-change header in GCC and Clang
+compile probes. GCC `-Wpadded` occurrences fell from 282 to 158; Clang's fell
+from 1,512 to 1,464.
+
+The stable Clang capture includes a concurrent `gfx3_exports.h` declaration
+for `fb_Gfx3DrawGlyphs`. The four current gfxlib3 archives each add that symbol
+to the original defined-symbol inventory, with no removals. The declaration
+also coincided with 50 more Clang `-Wunsafe-buffer-usage` occurrences across
+`gfx3_gpu_surface.c` and `gfx3_context.c`, so the total Clang count is two
+higher than the preceding accepted checkpoint despite the padding cleanup.
+`archive-symbol-check-current.json` records the current archive hashes and
+symbol differences.
+
 ## Remaining diagnostic boundaries
 
-The latest accepted captures report **4,460 GCC warnings** and **31,764 Clang
-warnings**, or **36,224 total**. GCC's largest remaining categories are
+The latest accepted captures report **4,338 GCC warnings** and **31,766 Clang
+warnings**, or **36,104 total**. GCC's largest remaining categories are
 `-Wsign-conversion` (1,178), `-Wcast-align` (770), `-Wstrict-overflow` (594),
-`-Wconversion` (450), and `-Wpadded` (282). Clang's largest remaining
-categories are `-Wunsafe-buffer-usage` (26,338), `-Wpadded` (1,512),
-`-Wsign-conversion` (1,124), `-Wcast-align` (734), and
+`-Wconversion` (450), and `-Wdouble-promotion` (234). `-Wpadded` is down to
+158. Clang's largest remaining categories are `-Wunsafe-buffer-usage` (26,388),
+`-Wpadded` (1,464), `-Wsign-conversion` (1,124), `-Wcast-align` (734), and
 `-Wpre-c11-compat` (304).
 
 Layout warnings require ABI review before changing structures. Buffer-usage

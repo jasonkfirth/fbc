@@ -65,28 +65,32 @@ static int fb_hGfxMeasureFont(const unsigned char *text, size_t length,
 	int *width, int *height)
 {
 	size_t i;
+	size_t builtin_width_size;
 	uint32_t code, advance, total = 0;
 
 	if ((!text && length) || !width || !height)
 		return 0;
 	if (!font) {
 		if (builtin_width <= 0 || builtin_height <= 0 ||
-		    length > (size_t)INT_MAX / (unsigned int)builtin_width)
+		    length > (size_t)INT_MAX / (size_t)builtin_width)
 			return 0;
-		total = (uint32_t)length * builtin_width;
+		builtin_width_size = (size_t)builtin_width;
+		total = (uint32_t)length * (uint32_t)builtin_width_size;
 		*height = builtin_height;
 	} else {
+		if ((font->font_height == 0) || (font->font_height > (uint32_t)INT_MAX))
+			return 0;
 		for (i = 0; i < length; i++) {
 			code = text[i];
 			advance = (code >= font->first && code <= font->last) ?
 				font->glyph_widths[code] : font->font_height;
-			if (advance > INT_MAX - total)
+			if (advance > (uint32_t)INT_MAX - total)
 				return 0;
 			total += advance;
 		}
-		*height = font->font_height;
+		*height = (int)font->font_height;
 	}
-	*width = total;
+	*width = (int)total;
 	return 1;
 }
 

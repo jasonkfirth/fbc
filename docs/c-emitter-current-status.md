@@ -6,15 +6,32 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: Intel assembly storage, November 13
+# Current selected compiler: terminating callbacks and TLS arrays, November 13
 
 `build/main-gcc/bin/fbc.exe` now selects
-`c3f2b1e625e7fde905a22808944ca5c6a23f73bb4a096d8ee17ddfdd79fba846`.
-The existing pointer-slot image,
-`1b874138079b497b1cef2ca13aba6dbf07a6ff6b7117d0f42f556004b57850eb`,
-is its immediate rollback. Fourteen previous selected-path value checks and
-four new Win32/Win64 assembly executions pass through the selected prefix.
+`9e800d585c799c061f42beafa0fc35f2134762c15c5c15f39cf24cceeda610b7`.
+The preceding assembly-address compiler,
+`c3f2b1e625e7fde905a22808944ca5c6a23f73bb4a096d8ee17ddfdd79fba846`,
+is its immediate rollback. Seven native value runs pass through the selected
+prefix, including both C emitters, module TLS initialization and GAS64 arrays.
 Installed release executables and runtime archives remain unchanged.
+
+The [callback conversion](c-emitter-noreturn-callbacks.md) and
+[runtime-backed array repair](c-emitter-runtime-tls-arrays.md) retain real
+signature diagnostics, index evaluation and bounds checks. The combined
+compiler reaches a 224-unit GCC-clean fixed point, passes the complete
+GCC/Clang backend suite, 32 callback value executions and 22 array executions,
+including actual DOS programs. All 703 retained fbctests profiles are re-emitted;
+702 retain exact C identities and one receives fresh native compilation.
+GCC remains at zero and original BASIC warning lines remain unchanged.
+
+Selection is recorded in
+`noreturn-selected-publish-v3-20261113.json.zlib`, with the full gate in
+`noreturn-callback-gates-v3-20261113.json.zlib` and the test replay in
+`noreturn-fbctests-v2-20261113.sqlite3`. A complete new-compiler corpus census
+is still pending. The following complete queue totals belong to the preceding
+assembly-address compiler, whose independent JRPG refresh stays pinned to its
+immutable executable.
 
 The [assembly-address repair](c-emitter-asm-addresses.md) reduces the original
 Win32 RotoZoomASM operand count from 48 to 27 and keeps one source parameter
@@ -26,7 +43,7 @@ module comparisons. The isolated observer-helper DJGPP amendment retains
 four exact Win32/Win64 preprocessor identities and receives separate object
 qualification before selection.
 
-| Complete current queue | Profiles | Accepted C | GCC | Clang |
+| Last complete preceding-compiler queue | Profiles | Accepted C | GCC | Clang |
 | --- | ---: | ---: | ---: | ---: |
 | Retained census | 6,419 | 6,313 | 14 | 15,824 |
 | Retained plus recovered fbrtLib | 6,433 | 6,327 | 15 | 15,830 |
