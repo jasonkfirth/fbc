@@ -8,6 +8,10 @@ language reference.
 
 ## Start here
 
+- [Pointer fields carried as integer words](c-emitter-pointer-field-words.md)
+  records eight removed GCC observations, original array-test execution and
+  complete current-compiler queue qualification.
+
 - [Tiko widget lifecycle guards](c-emitter-tiko-widget-guards.md) records three
   source checks, the headless regression and the complete 126-context recount.
 

@@ -64,6 +64,8 @@ Debug C retains formal argument names when a calling contract requires an ignore
 
 ##backend/c/c-debug-locals.bi## indexes reads in reachable optimized AST statements, including hidden call storage and address escapes. Unread named debug locals retain declarations, stores and lifetime effects, with an unevaluated address-size enum on the same line. Compiler-owned scratch from a discarded ##TypeOf## can be omitted only when no statement or lifetime code uses it. The per-procedure hash owns its keys and borrows symbols until cleanup. Source warnings and opaque-assembly behavior remain unchanged. The regression in ##tests/compiler-support/c-debug-local-storage.bas## checks named debugger values, object lifetimes, discarded queries and ordinary C identity.
 
+##backend/c/c-member-access.bi## retains declared pointer-field addresses for scalar byte copies when optimized IR carries the bytes in an integer of exactly the target pointer size. The copy keeps its original width and value type; it does not become a typed integer access to pointer storage. Other widths and unknown origins keep their existing lowering. The regression in ##tests/compiler-support/c-pointer-field-words.bas## checks packed slots, short object views, callable slots and single evaluation.
+
 ##tooling## records facts selected by the compiler. Its observers must obtain identities, types and source ranges before the corresponding compiler storage is released. It must not reparse text to invent a competing interpretation. The semantic model contract (##doc/compiler-semantic-model.md##) describes the exported format separately from these implementation boundaries.
 
 {{fbdoc item="section" value="Adding or moving a compiler module"}}

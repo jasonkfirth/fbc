@@ -213,6 +213,7 @@ def main() -> int:
         ("label-flag-layout", "tests/compiler-support/c-label-flag-layout.bas", "C_LABEL_FLAG_LAYOUT_PASS"),
         ("label-flag-gosub", "tests/compiler-support/label-flag-gosub.bas", "LABEL_FLAG_GOSUB_PASS"),
         ("member-pointer-slots", "tests/compiler-support/c-member-pointer-slots.bas", "MEMBER_POINTER_SLOTS_PASS"),
+        ("pointer-field-words", "tests/compiler-support/c-pointer-field-words.bas", "POINTER_FIELD_WORDS_PASS  59"),
         ("record-layout", "tests/compiler-support/c-record-layout.bas", "RECORD_LAYOUT_PASS 6"),
         ("packed-descriptors", "tests/compiler-support/c-packed-descriptors.bas", "PACKED_DESCRIPTORS_PASS"),
         ("packed-descriptor-tail", "tests/compiler-support/c-packed-descriptor-tail.bas", "PACKED_DESCRIPTOR_TAIL_PASS"),

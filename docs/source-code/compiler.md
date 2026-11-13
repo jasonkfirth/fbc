@@ -123,6 +123,15 @@ procedure symbols until cleanup. Source warnings and opaque-assembly behavior
 remain unchanged. See [unread debug storage](../c-emitter-debug-locals.md) and
 [the regression](../../tests/compiler-support/c-debug-local-storage.bas).
 
+`backend/c/c-member-access.bi` retains a declared pointer field as the source
+of a scalar byte copy when optimized IR carries its bytes in an integer word
+of exactly the target pointer size. Only the copy address is recovered; the
+loaded value type and copied width remain unchanged. This avoids losing the
+field's storage identity through integer address arithmetic. Other widths and
+unknown origins keep their existing lowering. See
+[pointer-field words](../c-emitter-pointer-field-words.md) and
+[the regression](../../tests/compiler-support/c-pointer-field-words.bas).
+
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage
 is released. It must not reparse text to invent a competing interpretation.

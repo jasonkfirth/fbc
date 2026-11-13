@@ -6,6 +6,10 @@ Responsibilities: Separate accepted totals, class-wide candidates and required c
 This file intentionally does NOT equate warning counts with independent source defects.
 -->
 
+For the current selected compiler and queue counts, see
+[current status](c-emitter-current-status.md). Compiler identities and count
+tables below preserve earlier qualification cuts.
+
 # Current selected compiler: alternate-entry cleanup
 
 `build/main-gcc/bin/fbc.exe` is BF344DD7, with B2827405 retained for rollback.

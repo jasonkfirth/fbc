@@ -6,9 +6,69 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: unread debug storage, November 13
+# Current selected compiler: pointer-field word copies, November 13
 
-`build/main-gcc/bin/fbc.exe` now selects
+`build/main-gcc/bin/fbc.exe` selects
+`d37a9052009511c8132faeafcf471847c909b0925745228c98dfe46160d00f28`.
+The existing immutable unread-local compiler,
+`fc092d79d744a7491bf980fade21705900fbd39dd430dcde0898327f089f85f9`,
+is its immediate rollback. Ten selected-path GCC/Clang value runs pass under
+the original aggressive native flags. Installed release executables and runtime
+archives remain unchanged. The [pointer-field repair](c-emitter-pointer-field-words.md)
+retains declared member addresses during native-word byte copies, preserving
+copy widths, unaligned access and original value types.
+
+| Current complete queue | Profiles | Accepted C | GCC | Clang |
+| --- | ---: | ---: | ---: | ---: |
+| Retained census | 6,419 | 6,313 | 14 | 15,823 |
+| Retained plus recovered fbrtLib | 6,433 | 6,327 | 15 | 15,829 |
+| Separate fb-ext-lib expansion | 194 | 186 | 7 | 165 |
+| Separate Tiko expansion | 126 | 126 | 1 | 4,628 |
+
+The expansions overlap retained coverage and must not be summed. Compiler
+and fbctests GCC counts remain zero. Retained group counts are unchanged
+from the unread-local cut below. The fb-ext-lib expansion removes eight GCC
+array observations across five unchanged original tests, reducing its previous
+GCC total from 15 to 7. All other per-profile native classes remain unchanged.
+The six qualifier casts and one legitimate uninitialized-field observation
+remain visible. Its eight runner-context refusals are unchanged.
+
+The compiler reaches a GCC-clean exact 224-unit emitted-C fixed point.
+The full GCC/Clang backend gate passes after the latest CI control fixes.
+The strengthened regression passes 59 checks through both C backends and GAS64,
+including sixteen byte origins, short object views, callable slots and checked
+unaligned copies. Eight semantic models preserve eight C identities; four
+Win32 objects compile with the normal FBC native aliasing contract. The five
+original array tests pass ten tests and 48 assertions per backend. Tiko's
+headless lifecycle regression retains twelve passing assertions per backend.
+
+Independent closure preserves every source-warning line in all four queues,
+including the deliberate fault inputs' six FBC warning-57 observations.
+Both unread static locals still produce warning 55 under separate `-w all`
+controls. Retained, Tiko and recovered fbrtLib native classes are identical
+to their respective parent cuts. Changed C is freshly compiled; reuse requires
+byte-identical, header-free, macro-safe C with pinned tools and original flags.
+The retained/Tiko scratch peaks are 32,108,408 / 68,115,731 bytes under their
+64/96 MiB caps. The old selected image is reused as rollback without another
+backup tree.
+
+Current receipts reuse `build/c-emitter-forward-views-20261105/`:
+`pointer-word-selfhost-v1-20261113.json.zlib`,
+`pointer-word-gates-v3-20261113.json.zlib`,
+`pointer-word-semantic-v3-20261113.json.zlib`,
+`pointer-word-cohort-close-v1-20261113.json.zlib`, and
+`pointer-word-selected-publish-v1-20261113.json.zlib`.
+The current databases are `pointer-word-retained-v1-20261113.sqlite3`,
+`pointer-word-fbrt-v1-20261113.sqlite3`,
+`current-fbext-pointer-word-v1-20261113.sqlite3` and
+`current-tiko-pointer-word-v1-20261113.sqlite3`.
+These checks do not close the overall warning audit, JRPG refresh, foreign
+providers, interactive rendering, Clang cleanup or unrelated native-library
+changes. PNG work remains excluded.
+
+# Historical selected compiler: unread debug storage, November 13
+
+At this earlier cut, `build/main-gcc/bin/fbc.exe` selected
 `fc092d79d744a7491bf980fade21705900fbd39dd430dcde0898327f089f85f9`.
 The existing immutable private-body compiler,
 `3da82d365092848e6dddf621e0b38bc5a0af97440d08b2fc5a1267d45f9f5877`,

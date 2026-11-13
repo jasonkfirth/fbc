@@ -15,6 +15,13 @@ private function hCMemberTypeMatches _
 	if( (typeGetDtAndPtrOnly(dtype) = typeGetDtAndPtrOnly(wanted)) andalso _
 	    (subtype = wantedsubtype) ) then return TRUE
 	if( typeIsPtr(dtype) or typeIsPtr(wanted) ) then
+		'' Optimization can carry pointer-field bytes in a native integer word.
+		'' Only the byte-copy path may recover that field's address: this does
+		'' not load a pointer through integer storage or convert its value.
+		if( address_only andalso typeIsPtr(dtype) andalso typeIsPtr(wanted) = FALSE ) then
+			if( typeGetClass(wanted) = FB_DATACLASS_INTEGER andalso _
+			    typeGetSize(wanted) = env.pointersize ) then return TRUE
+		end if
 		'' A byte copy transfers the stored pointer word without a typed load
 		'' or conversion. Its address can therefore retain the declared field
 		'' even when the copy temporary uses another object-pointer type.
