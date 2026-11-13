@@ -8,8 +8,9 @@ language reference.
 
 ## Start here
 
-- [Ignored debug parameters](c-emitter-debug-parameters.md) records named formal
-  storage, preserved source warnings and the class-wide native recheck.
+- [Debug parameters and private bodies](c-emitter-debug-parameters.md) records
+  named formal storage, executable private debug entries, preserved source
+  warnings and the original-flags native rechecks.
 
 - [Static typed thread callbacks](c-emitter-thread-callbacks.md) records native
   adapters, preserved address casts, GAS64 narrowing and the completed retained census.

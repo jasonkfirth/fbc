@@ -14,6 +14,11 @@ type CPROCLEAF
 	name as zstring ptr
 	referenced as integer
 	abi_referenced as integer
+	'' Native roots exclude bodies retained only for source debugging.
+	native_referenced as integer
+	native_abi_referenced as integer
+	debug_attribute_first as uinteger
+	debug_attribute_last as uinteger
 	separate_abi as integer
 	must_keep as integer
 	body_span as CPROCLEAFSPAN ptr
@@ -98,6 +103,8 @@ private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
 		symbGetIsModLevelProc(proc) or symbIsExport(proc) or symbIsVirtual(proc)
 	entry->must_keep or= required_entry
 	entry->abi_referenced or= required_entry
+	entry->native_referenced or= required_entry
+	entry->native_abi_referenced or= required_entry
 	'' Debuggers may inspect source-defined private bodies even without a
 	'' C call. Generated default members have no independent source body;
 	'' retain those only through real calls, addresses and required roots.
@@ -130,6 +137,8 @@ private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF 
 		'' Public bodies and global initializers are roots outside private spans.
 		target->referenced = TRUE
 		target->abi_referenced or= needs_abi
+		target->native_referenced = TRUE
+		target->native_abi_referenced or= needs_abi
 		exit sub
 	end if
 	'' A redirected recursive call needs only the implementation. An address
@@ -156,13 +165,15 @@ end sub
 
 '' The output owns every node and edge until pruning finishes. Edges borrow
 '' pooled nodes, never FBSYMBOL pointers that may expire during IR flushing.
-private sub hCLeafReachable( )
+private sub hCLeafReachable( byval native_only as integer = FALSE )
 	dim as CPROCLEAF ptr first = NULL, last = NULL
 	var entry = cptr(CPROCLEAF ptr, listGetHead(@c_leaf_nodes))
 	while( entry <> NULL )
 		entry->work_next = NULL
-		if( entry->referenced or entry->must_keep ) then
-			entry->referenced = TRUE
+		var referenced = iif(native_only, @entry->native_referenced, @entry->referenced)
+		var required = iif(native_only, FALSE, entry->must_keep)
+		if( *referenced or required ) then
+			*referenced = TRUE
 			if( last <> NULL ) then
 				last->work_next = entry
 			else
@@ -183,9 +194,11 @@ private sub hCLeafReachable( )
 			var target = edge->target
 			'' Address and adapter edges require the original C entry even if a
 			'' direct-call edge has already made its implementation reachable.
-			target->abi_referenced or= edge->needs_abi
-			if( target->referenced = FALSE ) then
-				target->referenced = TRUE
+			var abi_referenced = iif(native_only, @target->native_abi_referenced, @target->abi_referenced)
+			var referenced = iif(native_only, @target->native_referenced, @target->referenced)
+			*abi_referenced or= edge->needs_abi
+			if( *referenced = FALSE ) then
+				*referenced = TRUE
 				target->work_next = NULL
 				if( last <> NULL ) then
 					last->work_next = target
@@ -197,6 +210,28 @@ private sub hCLeafReachable( )
 			edge = edge->next_edge
 		wend
 	wend
+end sub
+
+private function hCLeafNativeEntryNeeded(byval proc as FBSYMBOL ptr) as integer
+	var entry = hCLeafGet(proc)
+	if( entry = NULL ) then return TRUE
+	return entry->native_abi_referenced
+end function
+
+private sub hCLeafRememberDebugAttribute(byref header as string)
+	if( c_leaf_current = NULL ) then exit sub
+	var marker = " __attribute__((used))"
+	var position = instr(header, marker)
+	if( position = 0 ) then exit sub
+	'' This is the header just written by hWriteLine, not a parsed C body.
+	'' Record its owned attribute span before subsequent body emission. The
+	'' closing graph pass removes it from ordinary native-callable entries.
+	assert(ctx.section = 2)
+	var bytes = len(header) + len(NEWLINE)
+	assert(cuint(bytes) <= ctx.sections(2).bufferlen)
+	var first = ctx.sections(2).bufferlen - bytes + position - 1
+	c_leaf_current->debug_attribute_first = first
+	c_leaf_current->debug_attribute_last = first + len(marker)
 end sub
 
 private function hCLeafNeeded(byval proc as FBSYMBOL ptr) as integer
@@ -299,7 +334,17 @@ private sub hCLeafBegin( byval proc as FBSYMBOL ptr )
 end sub
 
 private sub hCLeafEnd( )
-	if( c_leaf_current <> NULL ) then c_leaf_current->body_span->last = ctx.sections(1).bufferlen
+	if( c_leaf_current <> NULL ) then
+		'' Section 2 owns the procedure until sectionEnd appends it to the
+		'' module's body section. Relocate the header span only after that append.
+		if( c_leaf_current->debug_attribute_last > c_leaf_current->debug_attribute_first ) then
+			assert(ctx.sections(2).bufferlen <= ctx.sections(1).bufferlen)
+			var first = ctx.sections(1).bufferlen - ctx.sections(2).bufferlen
+			c_leaf_current->debug_attribute_first += first
+			c_leaf_current->debug_attribute_last += first
+		end if
+		c_leaf_current->body_span->last = ctx.sections(1).bufferlen
+	end if
 	c_leaf_current = NULL
 end sub
 
@@ -330,6 +375,12 @@ private function hCLeafRangesValid( byval is_header as integer, byref section_en
 		var last = span->last
 		if( (first < previous_last) or (last < first) or _
 			(last > section_entry.bufferlen) ) then return FALSE
+		var entry = span->owner
+		if( (is_header = FALSE) andalso (span = entry->body_span) andalso _
+		    (entry->debug_attribute_last > entry->debug_attribute_first) ) then
+			if( (entry->debug_attribute_first < first) or _
+			    (entry->debug_attribute_last > last) ) then return FALSE
+		end if
 		previous_last = last
 		span = span->next_span
 	wend
@@ -341,10 +392,15 @@ private sub hCLeafCompact( byval is_header as integer, byref section_entry as SE
 	dim as uinteger read_position = 0, write_position = 0
 	while( span <> NULL )
 		var entry = span->owner
-		if( ((entry->referenced = FALSE) and (entry->must_keep = FALSE)) or _
-		    (span->needs_abi andalso entry->separate_abi andalso (entry->abi_referenced = FALSE)) ) then
-			var first = span->first
-			var last = span->last
+		var omit_span = ((entry->referenced = FALSE) and (entry->must_keep = FALSE)) or _
+		    (span->needs_abi andalso entry->separate_abi andalso (entry->abi_referenced = FALSE))
+		var omit_attribute = ((is_header = FALSE) andalso (span = entry->body_span) andalso _
+		    entry->native_referenced andalso _
+		    (entry->debug_attribute_last > entry->debug_attribute_first))
+		if( omit_span or omit_attribute ) then
+			if( omit_attribute andalso (omit_span = FALSE) ) then hCAbiRemoveDebugRetention(entry->name)
+			var first = iif(omit_span, span->first, entry->debug_attribute_first)
+			var last = iif(omit_span, span->last, entry->debug_attribute_last)
 			var bytes = first - read_position
 			if( bytes > 0 ) then memmove(section_entry.buffer + write_position, section_entry.buffer + read_position, bytes)
 			write_position += bytes

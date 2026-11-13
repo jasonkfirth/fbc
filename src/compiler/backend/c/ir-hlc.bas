@@ -415,6 +415,7 @@ dim shared as TLIST c_pointer_views
 dim shared as integer c_pointer_view_id, c_pointer_raw_types, c_pointer_prototypes
 #include once "backend/c/asm-names.bi"
 #include once "backend/c/c-identifiers.bi"
+declare sub hCAbiRemoveDebugRetention(byval identifier as const zstring ptr)
 #include once "backend/c/c-generated-leaves.bi"
 #include once "backend/c/c-procedure-prototypes.bi"
 #include once "backend/c/c-abi-parameters.bi"
@@ -1528,6 +1529,17 @@ private function hEmitProcHeader _
 		if( hProcDoesNotReturn( proc ) ) then ln += " __attribute__((noreturn))"
 		if( symbGetIsRTL(proc) andalso *symbGetMangledName(proc) = "_setjmp" ) then ln += " __attribute__((returns_twice))"
 	end if
+	if( options = 0 andalso readonly_variant = NULL andalso builtin_address_id = NULL andalso _
+		env.clopt.debuginfo andalso symbIsPrivate(proc) andalso _
+		((proc->attrib and FB_SYMBATTRIB_INTERNAL) = 0) andalso (symbGetIsRTL(proc) = FALSE) ) then
+		'' hCLeafGet retains source bodies for debugger entry even without a C
+		'' caller. Retain native code for those debugger-only entries too. The
+		'' closing graph pass removes this attribute from ordinary C callees,
+		'' preserving their existing native data-flow analysis and optimization.
+		'' Generated members and read-only ABI variants have no separate source
+		'' entry and remain subject to ordinary native reachability.
+		ln += " __attribute__((used))"
+	end if
 	ln += " "
 
 	mangled = *symbGetMangledName( proc )
@@ -1677,7 +1689,11 @@ private function hEmitProcHeader _
 		hAppendCtorAttrib( ln, proc, FALSE, ((options and EMITPROC_ISCALLVIEW) = 0) )
 	end if
 
-	if( abi_first <> NULL ) then
+	if( (abi_first <> NULL) orElse _
+	    ((options = 0) andalso (semantic_signature <> 0) andalso _
+	     (instr(ln, " __attribute__((used))") > 0)) ) then
+		'' A debug-only attribute can be removed after the graph closes. Defer
+		'' that header observation even when there are no formals to inspect.
 		hCAbiDefinition(proc, ln, abi_prefix, abi_first, semantic_signature)
 	else
 		fbSemanticModelBackendAbiEnd(semantic_signature, ln)
@@ -3202,6 +3218,7 @@ private sub _emitEnd( )
 
 	'' Global initializer addresses are roots too. Close the private graph
 	'' before deciding which deferred ABI entry points need definitions.
+	if( env.clopt.debuginfo ) then hCLeafReachable(TRUE)
 	hCLeafReachable()
 	hCReadOnlyWritePrivateWrappers()
 	hCLeafPrune( )
@@ -8091,6 +8108,7 @@ private sub _emitProcBegin _
 	hCGosubBegin(proc)
 	if( readonly_variant = NULL ) then
 		hWriteLine(original_header)
+		hCLeafRememberDebugAttribute(original_header)
 	else
 		hWriteLine(hEmitProcHeader(proc, 0, readonly_variant))
 	end if

@@ -105,6 +105,14 @@ ignored value. The late body inspection records an unevaluated address size in
 a local enum declaration, without changing source warning 54, runtime storage
 or debug line mappings. See [ignored debug parameters](../c-emitter-debug-parameters.md)
 and [the regression](../../tests/compiler-support/c-debug-unused-parameters.bas).
+Private entries retained solely for debugging also carry native code retention,
+matching retained debug globals. A separate graph walk closes native-call roots
+before adding debug roots. Called source bodies and read-only implementations
+retain their existing optimization. When late compaction removes an unneeded
+retention attribute, it updates the owned ABI header and argument offsets too.
+Semantic definition headers wait for that decision even when the procedure has
+no arguments, so exported headers match the actual C definition.
+Optimized debug objects can grow because debugger-only entries now have code.
 
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage

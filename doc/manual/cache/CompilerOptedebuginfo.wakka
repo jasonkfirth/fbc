@@ -6,10 +6,12 @@ Add debug information
 ##
 {{fbdoc item="desc"}}
 	The ##**-edebuginfo**## compiler inserts debugging symbols into output files, to use with GDB-compatible debuggers.
+
+	With the C backends, private source entries retained solely for debugging also retain native code in optimized objects. Unused compiler-generated default members and internal read-only implementations still follow ordinary reachability. See ##[[CompilerOptg|-g]]##.
 	
 	##**-edebuginfo**## is automatically implied by the ##[[CompilerOptg|-g]]## option.
 	
-	##[[KeyPgDdfberr|__FB_ERR__]]## can be used to determine in user source code if the ##**-edebugingo**## option was specified or implied on the command line.
+	##[[KeyPgDdfberr|__FB_ERR__]]## can be used to determine in user source code if the ##**-edebuginfo**## option was specified or implied on the command line.
 
 {{fbdoc item="ver"}}
 	- Since fbc 1.07.0

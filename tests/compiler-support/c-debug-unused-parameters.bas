@@ -2,7 +2,7 @@
 '' File: c-debug-unused-parameters.bas
 '' Purpose: Keep debugger-visible formal storage for ignored ABI arguments.
 '' Responsibilities: Check caller evaluation, pointer/reference/descriptor
-''                  parameters and the conservative opaque-assembly boundary.
+''                  parameters, native private debug entries and opaque assembly.
 '' This file intentionally does NOT access ignored pointer values.
 
 #lang "fb"
@@ -29,6 +29,13 @@ private function observedDebug(byval value as long, byval unusedValue as long) a
 	return value + evaluations
 end function
 
+'' A debugger needs an executable location after a caller is eliminated.
+'' The native regression checks an actual optimized assembly entry for this
+'' source body, independently of whether a debug symbol was emitted for it.
+private function dormantDebugBody(byval value as long) as long
+	return value + 101
+end function
+
 #ifdef DEBUG_OPAQUE_CONTROL
 private sub opaqueDebug(byval opaqueValue as long)
 	'' General assembly may name formal storage outside typed IR references.
@@ -42,6 +49,9 @@ opaqueDebug(1)
 dim as long referenceValue = 19
 dim as long arrayValue(0 to 1) = {3, 5}
 dim as DebugRecord recordValue = (23)
+'' Parsing marks the source body referenced; folding removes its only call.
+'' This exercises private bodies already admitted by the shared AST layer.
+if 0 then evaluations = dormantDebugBody(41)
 ignoredDebug(nextArgument(), 0, referenceValue, arrayValue(), 0, recordValue)
 if evaluations <> 2 then end 1
 if observedDebug(40, nextArgument()) <> 43 then end 2

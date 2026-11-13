@@ -110,7 +110,7 @@ private sub hCAbiDefinition _
 	  byval prefix_length as uinteger, byval first as CABIPARAM ptr, _
 	  byval semantic_signature as longint )
 
-	if( first = NULL ) then exit sub
+	if( first = NULL andalso semantic_signature = 0 ) then exit sub
 	var entry = hCAbiGet(sym)
 	if( entry = NULL ) then exit sub
 	'' Different BASIC signatures can have the same C name. Keep the first
@@ -190,6 +190,26 @@ private function hCAbiHasReference _
 	wend
 	return FALSE
 end function
+
+private sub hCAbiRemoveDebugRetention(byval identifier as const zstring ptr)
+	if( c_abi_ready = FALSE ) then exit sub
+	var entry = cptr(CABIPROC ptr, hashLookup(@c_abi_names, identifier))
+	if( entry = NULL orelse entry->header.data = NULL ) then exit sub
+	var header = *entry->header.data
+	var marker = " __attribute__((used))"
+	var position = instr(header, marker)
+	if( position = 0 ) then exit sub
+	'' Keep the late formal-name inspection bound to the actual definition.
+	'' Its argument offsets followed this owned attribute in the saved header.
+	var param = entry->parameters
+	while( param <> NULL )
+		assert(param->insert_at >= cuint(position - 1 + len(marker)))
+		param->insert_at -= len(marker)
+		param = param->next_param
+	wend
+	header = left(header, position - 1) + mid(header, position + len(marker))
+	DZstrAssign(entry->header, strptr(header))
+end sub
 
 private sub hCAbiPrepare( byval buffer as const ubyte ptr, byval size as uinteger )
 	dim as uinteger search_at = 0

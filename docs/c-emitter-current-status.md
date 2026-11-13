@@ -6,7 +6,193 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: GOSUB handler labels, November 12
+# Current selected compiler: executable private debug entries, November 12
+
+`build/main-gcc/bin/fbc.exe` now selects
+`3da82d365092848e6dddf621e0b38bc5a0af97440d08b2fc5a1267d45f9f5877`.
+The existing immutable named-parameter compiler, hash
+`9d60dd5092770ecf583c586237b0ccf4c604f3dcfe58a327e6a6950fbc182b98`,
+is its rollback. Ten selected-prefix GCC/Clang value runs pass. Installed release
+executables and runtime archives remain unchanged. The source and ABI metadata
+repair is described in [debug parameters and bodies](c-emitter-debug-parameters.md).
+
+The complete native Win64 retained census has **6,419 profiles, 6,313 accepted C units,
+18 GCC warnings and 15,827 Clang warnings**. Compiler and fbctests GCC counts
+are zero. Four duplicate unused-function observations disappear from this
+retained coverage; all other native classes and the twenty frontend-refusal
+signatures remain unchanged. PNG, Optical and owning-fragment exclusions remain
+explicit, and two assembly controls retain their separate disposition.
+
+| Group | Profiles | GCC warnings | Clang warnings |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,339 |
+| fbctests | 703 | 0 | 779 |
+| Broad production | 1,129 | 6 | 886 |
+| Broad additional | 239 | 2 | 1,513 |
+| Exampleageddon checked | 1,775 | 3 | 2,725 |
+| Exampleageddon default | 1,775 | 3 | 2,604 |
+| Extracted legacy examples | 208 | 3 | 23 |
+| TurboTrek build lists | 251 | 0 | 1,949 |
+| TurboTrek additional tests/tools | 114 | 1 | 3,967 |
+| Maintained Tiko entry | 1 | 0 | 42 |
+| Total retained | 6,419 | 18 | 15,827 |
+
+Every applicable profile was freshly emitted by the corrected compiler. Native
+results are reused only for byte-identical header-free C with pinned tools,
+flags and source inputs. Changed compiler units receive fresh native checks.
+All 224 compiler C units match the current fixed point. The owned scratch peak
+is 29,167,375 bytes under a 64 MiB cap. An audit-controller
+cleanup correction preserves 3,217 checkpoints and removes partial C from
+expected failing examples; it changes no profile or native diagnostic policy.
+
+Fourteen additional fbrtLib contexts retain exact C and GCC 1 / Clang 6. With
+these, the completed cut is **6,433 profiles, 6,327 accepted C units, GCC 19 /
+Clang 15,833**. The other 85 fbrtLib paths have verified Make owners across eight
+foreign contexts; foreign native compilation and runtime providers remain open.
+
+## Separate project context expansions
+
+The same corrected compiler completes the 194-profile fb-ext-lib expansion:
+186 accepted C units, eight exact harness-context refusals, **GCC 77 / Clang
+227**. This is down from 666 / 816 on `9d60dd50`. All 589 duplicate unused-function
+observations disappear per native tool, and every other warning class is
+identical in every profile. Accepted units retain 658 FBC unread-parameter and
+250 unread-variable warnings; the refused contexts retain two further parameter
+warnings. Nine pre-existing GCC data-flow observations remain visible. The
+refusals need their maintained test runners, not changes to protected APIs.
+
+Of the 77 remaining GCC observations in this expansion, 62 concern unread local
+storage, six concern const casts, and nine concern data flow. The unread-local
+class includes a compiler-generated allocator temporary declared without any C
+use, alongside source locals already diagnosed by FBC warning 55. This is the
+next compiler class to resolve while preserving source diagnostics and debug
+storage; the smaller retained total does not replace this expanded queue.
+
+The terminal Tiko/toolkit baseline on `9d60dd50` has 125 profiles, 124 accepted C
+units, **GCC 99 / Clang 4,614**, and one stale localization test. Its peak is
+68,087,210 bytes under a finite 96 MiB cap. The test used removed private dialog
+fields; using the existing public action accessor recovers it on this compiler
+with GCC 1 / Clang 47 and unchanged assertions. Its native objects are accepted;
+the GUI test was not executed. The completed recount with this compiler accepts
+all 125 profiles: **GCC 40 / Clang 4,593**. It removes 68 unused-function
+observations per tool and preserves every earlier non-function diagnostic line.
+Eight additional null-dereference observations in four debug contexts remain
+visible for source repair. All 2,078 FBC parameter and 801 variable warnings
+remain. The owned peak is 67,508,187 bytes under the 96 MiB cap.
+See [Tiko contexts](c-emitter-tiko-context.md).
+
+The completed JRPG cut remains 241 accepted C profiles, GCC 0 / Clang 10,018,
+on the older `55aa2516` compiler. Its 676 opened inputs and 290 recovered BASIC
+owner paths are reconciled. Different compiler cuts and overlapping contexts
+keep these expansions separate from the retained table. No combined total is
+presented as the whole corpus. No project applications or unrelated native
+library edits receive new qualification credit.
+
+Current evidence reuses `build/c-emitter-forward-views-20261105/`:
+`debug-body-cohort-refresh-v5-20261112.sqlite3`,
+`debug-body-cohort-close-v5-20261112.json.zlib`,
+`current-fbrt-tests-debug-body-v5-20261112.sqlite3`,
+`current-fbext-debug-body-v5r3-20261112.sqlite3`,
+`debug-body-class-close-v5-20261112.json.zlib`, and
+`debug-body-selected-publish-v5-20261112.json.zlib`.
+The separate completed Tiko cut is retained in
+`current-tiko-extra-debug-body-v5-20261112.sqlite3` and
+`current-tiko-debug-body-cohort-close-v5-20261112.json.zlib`.
+
+## Historical selected compiler: named debug parameters, November 12
+
+The following counts and worker descriptions record the preceding compiler cut.
+
+`build/main-gcc/bin/fbc.exe` now selects
+`9d60dd5092770ecf583c586237b0ccf4c604f3dcfe58a327e6a6950fbc182b98`.
+The existing immutable GOSUB-label compiler, hash
+`55aa25168871aefc36edaae881c1c47a5537f35417690f419061f93d258743c1`,
+is its rollback. Ten selected-prefix GCC/Clang value runs pass. Installed
+release executables and runtime archives are unchanged. The source changes and
+native/debugger controls are described in [debug parameters](c-emitter-debug-parameters.md).
+
+The complete retained census has 6,419 profiles and 6,313 accepted C units,
+with **22 GCC and 15,831 Clang warnings** under the original unsuppressed flags.
+All 176 duplicate unused-parameter observations disappear from each native tool;
+every other class matches the preceding callback compiler. The 20 recorded
+frontend refusals retain their exact diagnostic signatures. Optical, PNG,
+included-fragment and closed-assembler dispositions remain explicit.
+
+| Group | Profiles | GCC warnings | Clang warnings |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,339 |
+| fbctests | 703 | 0 | 779 |
+| Broad production | 1,129 | 9 | 889 |
+| Broad additional | 239 | 3 | 1,514 |
+| Exampleageddon checked | 1,775 | 3 | 2,725 |
+| Exampleageddon default | 1,775 | 3 | 2,604 |
+| Extracted legacy examples | 208 | 3 | 23 |
+| TurboTrek build lists | 251 | 0 | 1,949 |
+| TurboTrek additional tests/tools | 114 | 1 | 3,967 |
+| Maintained Tiko entry | 1 | 0 | 42 |
+| Total retained | 6,419 | 22 | 15,831 |
+
+Every applicable profile was freshly emitted by this compiler. Exact C, pinned
+tools and unchanged flags justify 6,309 native-result reuses per tool; changed
+units receive fresh native checks. The owned scratch peak was 29,052,687 bytes,
+below its 64 MiB cap. No corpus applications were run, and unrelated native
+library edits receive no qualification credit.
+
+Fourteen additional fbrtLib test contexts have also been rebound to this same
+compiler: all fourteen emitted C files exactly match the prior qualified files,
+with GCC 1 / Clang 6. Including these gives **6,433 profiles, 6,327 accepted C
+units, GCC 23 / Clang 15,837**. The other 85 fbrtLib paths now have verified
+foreign-platform Make owners across eight contexts; their foreign native
+compilation and runtime providers remain pending.
+
+## Additional project contexts
+
+The completed JRPG audit has 241 accepted C profiles, GCC 0 / Clang 10,018,
+using the previous `55aa2516` compiler. Its 676 opened inputs reconcile without
+drift, and 290 previously pending BASIC owner paths now have qualified owners.
+That process is terminal and no longer pins the development executable.
+
+The completed fb-ext-lib expansion uses immutable `9d60dd50`: 194 profiles,
+186 accepted C units, GCC 666 / Clang 816, and eight specialized harness-context
+refusals. Its 432 opened inputs reconcile without drift, with a 3,028,074-byte
+scratch peak. Of the GCC observations, 589 are unused source-defined private
+functions in debug contexts. Their native retention is the next compiler class
+under qualification. The remaining classes and original refusals remain counted.
+No valid examples or library interfaces were changed for this sweep.
+
+The subsequent private-body candidate, `b668f901`, now completes the same 194
+profiles with GCC 77 / Clang 227. All 589 unused-function observations disappear
+from each tool, while every other warning class is identical in every profile.
+All 186 accepted C units match the baseline after removing only the new retention
+attributes. All 658 source parameter warnings and 250 source variable warnings
+remain, as do the eight exact harness-refusal signatures. The owned peak is
+3,032,346 bytes. Its full retained recount is in progress; these project results
+are not substituted for the selected compiler's completed table.
+
+The 125-profile Tiko/toolkit expansion uses the same immutable compiler and
+original flags. Its first attempt stopped before saving a profile when a checked
+editor's C/object/log set reached 67,396,330 bytes against a 64 MiB cap. The empty
+checkpoint is preserved. A replacement serial worker uses a finite 96 MiB cap
+and records component sizes; it has begun accepting profiles. Its partial counts
+are not a completed census. See [project contexts](c-emitter-newjrpg-context.md)
+and [Tiko contexts](c-emitter-tiko-context.md).
+
+These project expansions remain separate from the retained table: coverage and
+compiler generations differ. Their diagnostics must not be hidden behind the
+smaller retained GCC total. Source ownership, foreign native providers and the
+remaining diagnostic classes keep the overall cleanup open.
+
+The current receipts reuse `build/c-emitter-forward-views-20261105/`:
+`debug-abi-cohort-refresh-v3-20261112.sqlite3`,
+`debug-abi-cohort-close-v3-20261112.json.zlib`,
+`current-fbrt-tests-debug-abi-v3-20261112.sqlite3`,
+`current-fbrt-coverage-reconciliation-20261112.json.zlib`, and
+`debug-abi-selected-publish-v3-20261112.json.zlib`.
+
+## Historical selected compiler: GOSUB handler labels, November 12
+
+The following section and subsequent dated entries retain earlier compiler cuts.
+Their selected/candidate descriptions and warning totals are historical.
 
 `build/main-gcc/bin/fbc.exe` is
 `55aa25168871aefc36edaae881c1c47a5537f35417690f419061f93d258743c1`.

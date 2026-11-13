@@ -1,0 +1,21 @@
+diff --git a/tests/tiko_localization_smoke.bas b/tests/tiko_localization_smoke.bas
+--- a/tests/tiko_localization_smoke.bas
++++ b/tests/tiko_localization_smoke.bas
+@@ -139,14 +139,13 @@
+ localeSmoke_Click(d->deleteButton)
+ AssertTrue(d->deleteDialog <> 0, "deleting a saved catalog requires its nested confirmation")
+ If d->deleteDialog <> 0 Then
+-    Dim As ConfirmDialogData Ptr confirmData = d->deleteDialog->data
+-    localeSmoke_Click(confirmData->cancelButton)
++    ' The two-choice factory exposes confirmation first and cancellation second.
++    localeSmoke_Click(confirmdialog_GetActionButton(d->deleteDialog, 1))
+ End If
+ AssertTrue(d->deleteDialog = 0 AndAlso tiko_NativeFileExists(tiko_LocaleUserPath(savedName)) <> 0, "cancelled confirmation returns to its owner without deleting")
+ localeSmoke_Click(d->deleteButton)
+ If d->deleteDialog <> 0 Then
+-    Dim As ConfirmDialogData Ptr confirmData = d->deleteDialog->data
+-    localeSmoke_Click(confirmData->confirmButton)
++    localeSmoke_Click(confirmdialog_GetActionButton(d->deleteDialog, 0))
+ End If
+ AssertTrue(d->deleteDialog = 0 AndAlso d->filename = "english.lang" AndAlso _
+     tiko_NativeFileExists(tiko_LocaleUserPath(savedName)) = 0, "confirmed deletion removes only the user catalog and selects English")

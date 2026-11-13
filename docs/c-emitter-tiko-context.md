@@ -78,27 +78,36 @@ recipes: twelve editor tests with `-g -exx`, 110 toolkit tests, and three toolki
 demos/tools using their ordinary context. The image-specific raster smoke entry
 is excluded. Five real navigation entries provide the optional define needed
 for the four navigation/layout implementation fragments. These are planned
-contexts, not passing results or foreign-platform qualification.
+contexts; the completed baseline below does not qualify foreign platforms.
 
-The supervisor waits on the preceding project's actual process handles, then
-refreshes the unstarted plan before launching one checkpointed worker. The
-worker independently rejects competing project workers, uses the immutable
-conversion compiler, reuses C/object/log slots and has a 64 MiB owned disk cap.
-It emits C and compiles objects without running these applications. Normal GUI
+The supervisor waited on the preceding project's actual process handles, then
+refreshed the unstarted plan before launching one checkpointed worker. The
+worker independently rejected competing project workers and pinned the fully
+recounted immutable `9d60dd50` compiler at startup. It reused C/object/log slots.
+The first attempt stopped before saving a profile: the checked editor produced
+63,192,259 bytes of C, and its combined C/object/log set reached 67,396,330 bytes
+against the original 64 MiB cap. That empty checkpoint is preserved. A serial
+replacement used a finite 96 MiB cap and recorded component sizes. All 125
+profiles and input pins now reconcile: 124 accepted C units, one stale
+localization test, GCC 99 / Clang 4,614, and a 68,087,210-byte peak on
+`9d60dd50`. The original raw refused context remains preserved.
+It emitted C and compiled objects without running these applications. Normal GUI
 includes remain pinned, including incidental image dependencies; image-specific
 entries and implementation review stay outside this queue. The twelve archived
 UI-baseline source paths remain pending provenance/context review.
 
-The previous four completed queues remain 6,418 profiles / 6,312 accepted C
-units, GCC 198 / Clang 15,969. Adding this current Tiko entry gives 6,419 profiles /
+At that original compiler cut, the four completed queues had 6,418 profiles /
+6,312 accepted C units, GCC 198 / Clang 15,969. Adding the Tiko entry gave 6,419 profiles /
 6,313 accepted C units, GCC 198 / Clang 16,011. The forty-two added Clang
-observations come from expanded coverage, not a compiler regression. Partial
-JRPG warnings are not included in either completed total.
+observations came from expanded coverage, not a compiler regression. JRPG had
+not finished and was excluded from those dated totals.
 
 The entry's maximum owned disk footprint is 18,617,340 bytes under a 64 MiB
 limit. C, object and log files are removed after each completed run; existing
-audit storage is reused. No installed binary or library is replaced. The selected
-development executable stays pinned for the live JRPG worker.
+audit storage is reused. No installed release binary or library is replaced.
+JRPG has now finished and released the development executable; the selected
+development compiler is now `3da82d36`. A subsequent private-debug-body recount uses immutable `3da82d36`,
+independently of development-prefix promotion.
 
 Evidence in `build/c-emitter-forward-views-20261105/`:
 
@@ -112,11 +121,52 @@ Evidence in `build/c-emitter-forward-views-20261105/`:
   `current-tiko-legacy-disposition-20261112.json.zlib`: original SDK rejection,
   installed-compiler comparison and self-resolving alias evidence.
 - `current-tiko-extra-plan-20261112.json.zlib`: 125 planned active entry contexts;
-  no warning totals are available until their native checks run.
+  the original completed sweep is retained in the v2 context database.
 - `current-tiko-extra-queue-20261112.ps1` and
   `current-tiko-extra-context-20261112.py`: sequential admission and checkpointed
   object-only qualification.
 
 The broader compiler/corpus warning goal remains active.
+
+## Localization test recovery and current-compiler recount
+
+The one refusal used the removed private `ConfirmDialogData.confirmButton` and
+`cancelButton` fields. The existing public two-choice factory exposes Confirm
+at index zero and Cancel at index one. Replace those two private-field calls
+with `confirmdialog_GetActionButton(d->deleteDialog, 0)` and
+`confirmdialog_GetActionButton(d->deleteDialog, 1)` respectively, retaining the
+existing `localeSmoke_Click` wrapper and all assertions. The repaired test is
+strict-lint clean and emits 63,281,386 bytes of C with `3da82d36`. Both native
+tools accept its object: GCC 1 / Clang 47, peak 67,529,786 bytes. The GCC warning
+is an unread `fontPointSize` source variable. No GUI execution is claimed.
+The source was already untracked; only the small accessor repair is owned here.
+The [accessor patch](c-emitter-tiko-localization-accessor.patch) contains only
+these hunks, preserving the surrounding project work.
+
+The completed 125-profile current-compiler recount preserves the old raw database and pins
+the repaired source explicitly. It reuses native diagnostics only for exact C,
+tools and flags; changed debug bodies receive fresh checks. Added diagnostics
+remain counted, and losing a pre-existing non-function warning still stops the
+controller. In the first checked editor, all four existing null warnings remain
+and two more appear in `tiko_PrepareTextRenderState`: a null widget can match a
+null editor global before `w->data` is accessed. That source guard remains open.
+All 125 contexts now accept C, with GCC 40 / Clang 4,593. The 68 unused-function
+observations disappear from each tool. Every pre-existing non-function
+diagnostic line is preserved, and eight additional GCC null observations arise
+from the same source issue across four debug contexts. The remaining GCC
+classes are 28 null-dereference, eleven unread-variable and one array-bounds
+observation. All 2,078 source parameter warnings and 801 variable warnings
+remain. Exact native-result reuses cover 120 profiles per tool; five profiles
+receive fresh checks. The owned peak is 67,508,187 bytes under a 96 MiB cap.
+This completed cut stays separate from overlapping retained/project contexts.
+
+Evidence uses `current-tiko-extra-terminal-reconciliation-20261112.json.zlib`,
+`current-tiko-localization-accessor-preimage-20261112.json.zlib`,
+`current-tiko-localization-accessor-20261112.json.zlib`,
+`current-tiko-extra-debug-body-v5-20261112.sqlite3`,
+`current-tiko-debug-body-cohort-close-v5-20261112.json.zlib`, and
+`current-tiko-debug-body-new-null-review-20261112.json.zlib` in the existing audit
+directory. The source preimage and public accessor calls make this test repair
+reviewable without publishing unrelated untracked project work.
 
 <!-- end of c-emitter-tiko-context.md -->

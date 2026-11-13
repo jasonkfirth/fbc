@@ -5822,6 +5822,10 @@ Next
         from backend_abi import check_choices
         check_choices(self)
 
+    def test_selected_backend_abi_private_debug_headers_match_emission(self) -> None:
+        from backend_abi import check_private_debug_headers
+        check_private_debug_headers(self)
+
     def test_selected_backend_abi_omissions_are_explicit(self) -> None:
         from backend_abi import check_omissions
         check_omissions(self)

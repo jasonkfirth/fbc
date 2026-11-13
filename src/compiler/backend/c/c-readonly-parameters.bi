@@ -262,6 +262,17 @@ end function
 
 private sub hCReadOnlyWriteWrapper(byval entry as CREADONLYPROC ptr)
 	var header = *entry->header.data
+	if( entry->private_proc andalso hCLeafNativeEntryNeeded(entry->proc) ) then
+		'' The graph is closed before private wrappers are written. Keep the
+		'' debug-only retention attribute off an ordinary called ABI entry.
+		var marker = " __attribute__((used))"
+		var position = instr(header, marker)
+		if( position > 0 ) then
+			header = left(header, position - 1) + mid(header, position + len(marker))
+			var identifier = hGetCId(entry->proc)
+			hCAbiRemoveDebugRetention(strptr(identifier))
+		end if
+	end if
 	if( entry->private_proc andalso c_leaf_opaque ) then
 		'' Raw assembly may require the original entry without a C reference.
 		'' Keep an out-of-line definition for that assembler-visible symbol.

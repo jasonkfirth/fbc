@@ -73,6 +73,32 @@ def check_choices(test):
                 test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
 
 
+def check_private_debug_headers(test):
+    source = test.source(
+        (test.root / 'tests/compiler-support/c-debug-unused-parameters.bas').read_text(encoding='utf-8'),
+        'private-debug-headers.bas')
+    for backend in test.backends:
+        if backend not in ('gcc', 'clang'):
+            continue
+        for target in ('linux-x86', 'linux-x86_64', 'win32-x86', 'win32-x86_64'):
+            with test.subTest(backend=backend, target=target):
+                extra = ('-g', '-exx', '-target', target)
+                test.invoke([source], mode='off', backend=backend, extra=extra)
+                emission = test.emission_path(source.stem, backend).read_bytes()
+                model = test.compile(source, backend=backend, extra=extra)
+                facts = model.selected_backend_abi[1]
+                for name, retained in (('nextArgument', False), ('dormantDebugBody', True)):
+                    procedure = test.one(model, name, 'procedure')
+                    headers = [facts['end'][frame][1]
+                               for frame, signature in frames(model, procedure).items()
+                               if signature[2] == 'definition']
+                    test.assertTrue(headers)
+                    for header in headers:
+                        test.assertEqual('__attribute__((used))' in header, retained)
+                        test.assertIn(header, emission.decode('ascii'))
+                test.assertEqual(test.emission_path(source.stem, backend).read_bytes(), emission)
+
+
 def check_omissions(test):
     source = test.fixture("backend-abi.bas")
     for backend in test.backends:

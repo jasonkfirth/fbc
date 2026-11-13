@@ -25,13 +25,15 @@ values retain their existing storage. Naked procedures and bodies containing
 general opaque assembly retain their conservative behavior and C diagnostics.
 The non-debug C23 unnamed-parameter path and GNU11 fallback are unchanged.
 
-## Qualification
+## Named-parameter qualification at the preceding compiler cut
 
-The candidate is `9d60dd5092770ecf583c586237b0ccf4c604f3dcfe58a327e6a6950fbc182b98`.
+The preceding selected development compiler is
+`9d60dd5092770ecf583c586237b0ccf4c604f3dcfe58a327e6a6950fbc182b98`.
 It reproduces 224 compiler C units at a fixed point with zero GCC warnings,
 reusing 223 unchanged objects and then all 224 in the fixed-point round.
-Installed release binaries, runtime archives and the executable pinned by the
-running JRPG audit are unchanged.
+After the JRPG audit finished all 241 profiles, ten selected-prefix value runs
+passed across GCC and Clang. The previous immutable compiler remains available
+as rollback. Installed release binaries and runtime archives are unchanged.
 
 The regression passes 16 native value runs across both C producers, GCC and
 Clang, GNU11/GNU23 and O0/O2. Four GDB runs inspect all six ignored formal
@@ -72,8 +74,77 @@ separate from accepted qualification.
 Receipts reuse `build/c-emitter-forward-views-20261105/` with the
 `debug-abi-selfhost-v3-`, `debug-abi-values-v3-`, `debug-abi-semantic-v3-`,
 `debug-abi-gates-v3-` and `debug-abi-parameter-profiles-v3-` prefixes.
-The completed 43-profile original-flags recheck remains separate from the completed
-[retained census](c-emitter-current-status.md); it does not claim that every
-remaining warning class is resolved.
+The complete retained refresh now covers 6,419 profiles and 6,313 accepted C
+units, GCC 22 / Clang 15,831. Every other warning class is unchanged from the
+callback compiler. Fourteen further fbrtLib test contexts retain exact prior C
+and add GCC 1 / Clang 6 on this same compiler. The expanded completed cut is
+6,433 profiles, 6,327 accepted C units, GCC 23 / Clang 15,837.
+
+The full refresh reused 6,309 exact native results per tool and peaked at
+29,052,687 owned bytes under a 64 MiB cap. Its twenty frontend refusals preserve
+their exact diagnostic signatures. The guarded-label runtime proof remains
+bound by exact C and artifact identities. No applications or unrelated native
+library edits receive new qualification credit. The `debug-abi-cohort-close-v3-`
+and `debug-abi-selected-publish-v3-` receipts record these checks and promotion.
+See the [current census](c-emitter-current-status.md) for separate new-project
+counts and remaining warning classes.
+
+## Executable private debug bodies
+
+The additional fb-ext-lib sweep exposed 589 unused-function observations in
+debug output. These functions have source bodies, often from library template
+macros. The C reachability pass already retains them as debugger entries after
+their callers disappear, but the native optimizer could discard the actual code.
+
+The selected follow-up compiler separates actual native-call roots from roots kept only
+for debugging. It applies `__attribute__((used))` only to debugger-only source
+entries, as the backend already does for retained debug globals. Ordinary called
+bodies, generated default members and read-only implementations retain their
+native optimization. A separate original-ABI wrapper is retained only when that
+source entry is needed. Prototypes and function-pointer types stay unchanged.
+Optimized debug objects can grow because the source bodies now have executable
+entries. No native warning flag or diagnostic attribute is used to hide them.
+
+The regression gives one source body a caller that folding eliminates. The old
+compiler fails the native unused-function error gate. The corrected compiler passes 16
+native value runs, eight optimized assembly-entry checks, four debugger runs,
+two exact normalized debug-C comparisons, four opaque-assembly controls, eight
+independently read semantic models and four Win32 objects. The 224-unit fixed
+point is GCC-clean. Both complete C-backend suites pass in 237.692 seconds,
+including 462 source-warning controls. Strict lint is clean for the five
+changed BASIC files. The original source
+parameter warnings remain. Six real profiles also preserve all nine pre-existing
+GCC data-flow observations. A broader intermediate attribute policy removed those
+observations along with the unused-function warnings and was rejected. The
+complete real-project recheck now covers all 194 profiles: GCC 666 to 77 and
+Clang 816 to 227. All 589 unused-function observations disappear per tool, with
+every other warning class identical in each profile. All 186 accepted C files
+match after removing only the new attributes; all 658 source parameter warnings,
+250 source variable warnings and eight harness-refusal signatures remain. The
+original native-check peak is 3,032,346 bytes. The complete retained recount now
+accepts 6,313 C units across 6,419 profiles, GCC 18 / Clang 15,827. Including the
+fourteen rebound fbrtLib contexts gives GCC 19 / Clang 15,833. Ten selected-view
+value runs pass; the existing named-parameter compiler is the rollback.
+
+The final compiler also corrects semantic definition headers for no-argument
+procedures. A late graph decision can remove a provisional retention attribute
+from an ordinary called body. Its exported definition header now waits for that
+decision through the owned ABI cache, even when there are no formals. The
+regression reproduces eight failures on the preceding candidate and passes all
+eight producer/target cases after the fix, with exact C identity when export is
+enabled. No wire schema or native calling convention changes.
+
+The shared native helper probes C23 spelling and pointer width, retaining
+GNU2x on older tools and the same diagnostic gates. A later CI-only edit added
+native capability unit controls; those six tests pass independently, and the
+backend gate's source-pin reconciliation records that sole input delta.
+
+Current receipts use the `debug-body-selfhost-v5-`, `debug-body-values-v5-`,
+`debug-body-semantic-v5-`, `debug-body-gates-v5-`, `debug-noarg-header-v5-`,
+`debug-body-class-close-v5-`, `debug-body-cohort-close-v5-`, and
+`debug-body-selected-publish-v5-` prefixes. The `current-fbext-debug-body-v5r3-`
+database freshly re-emits all 194 contexts with exact prior C. Its comparison
+normalizes CRLF/LF line endings only. Earlier rejected attribute policies and
+the accepted V4 native-class census retain separate receipts.
 
 <!-- end of c-emitter-debug-parameters.md -->
