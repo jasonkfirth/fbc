@@ -9,12 +9,13 @@
 PYTHON ?= python3
 COMPILER_SEMANTIC_SELF_FLAGS ?=
 COMPILER_SEMANTIC_PROJECTS_FLAGS ?=
+COMPILER_SEMANTIC_MODEL_FLAGS ?=
 
 .PHONY: compiler-semantic-model-test compiler-semantic-corpus-test compiler-semantic-self-test compiler-semantic-projects-test
 compiler-semantic-model-test: compiler | maybe-build-fbc $(RTL_LIBS)
 	$(if $(CAN_RUN),,$(call _mt_echo,Skipping semantic sidecar execution for a cross build))
 ifneq ($(CAN_RUN),)
-	$(FBC_TOOL_ENV) $(PYTHON) "$(rootdir)/build_scripts/test-compiler-semantic-model.py" --root "$(rootdir)" --fbc "$(abspath $(FBC_EXE))"
+	$(FBC_TOOL_ENV) $(PYTHON) "$(rootdir)/build_scripts/test-compiler-semantic-model.py" --root "$(rootdir)" --fbc "$(abspath $(FBC_EXE))" $(COMPILER_SEMANTIC_MODEL_FLAGS)
 endif
 
 compiler-semantic-corpus-test: compiler | maybe-build-fbc $(RTL_LIBS)

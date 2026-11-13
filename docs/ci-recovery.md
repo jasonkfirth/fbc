@@ -146,6 +146,34 @@ test assumption; it does not change the runtime's short-read behavior or retry
 a failing suite until it passes. Local GCC/Clang loopback checks and phase
 contracts do not replace execution of the updated FreeBSD guest job.
 
+## Generated semantic stress and native ABI failures
+
+Run `43316388206` finished after newer commits had already been pushed. Its
+macOS Intel semantic suite reported one timeout across 556 tests, with 16
+skipped. The LLVM emission of the generated macro-origin lookup input exceeded
+the common 120-second subprocess limit. This is a stress input, not an ordinary small
+fixture. It now has a separate 600-second allowance per backend. Other semantic
+compiler invocations retain their 120-second limit. A compiler error, incomplete
+model, assertion failure or expired allowance still fails the suite. To select
+a different positive bound without editing the tests:
+
+```sh
+make compiler-semantic-model-test COMPILER_SEMANTIC_MODEL_FLAGS='--stress-timeout 900'
+```
+
+The same old run's native Windows ARM64 aggregate-varargs test exited with
+status 139. Its log does not identify the failing operation. This crash remains
+unresolved until native execution identifies its location; successful host
+execution and ARM64 object compilation do not establish an ARM64 runtime fix.
+The test now writes flushed `CVA_STAGE` checkpoints through one C diagnostic
+helper before C/BASIC register and overflow paths, long-double varargs,
+literals, conversions and formatting. An independent C decoder checks a
+`va_copy` of the original C argument list before handing the untouched cursor
+to BASIC. A failed C control exits with status 16; it cannot turn into a pass.
+The ARM64 failure artifact also retains this test's executable and both native
+objects for debugging. No test is skipped, retried until successful or made
+optional.
+
 ## Checking exactly what will be committed
 
 Local drafts can conceal missing links. The source checker can read an immutable

@@ -716,7 +716,7 @@ class SidecarTests(unittest.TestCase):
 
     def invoke(self, sources: list[Path], *, mode: str = "full", backend: str = "gcc",
                success: bool = True, extra: tuple[str, ...] = (), emit: bool = True,
-               environment: dict[str, str] | None = None
+               environment: dict[str, str] | None = None, timeout: int = 120
                ) -> tuple[subprocess.CompletedProcess[str], Path]:
         self.sequence += 1
         model = self.working / f"model-{self.sequence}.tsv"
@@ -739,7 +739,7 @@ class SidecarTests(unittest.TestCase):
             command += [option, str(model)]
         command += [*extra, *(str(path) for path in sources)]
         result = subprocess.run(command, cwd=self.working, text=True, capture_output=True,
-                                timeout=120, check=False,
+                                timeout=timeout, check=False,
                                 env=None if environment is None else {**os.environ, **environment})
         if success:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -750,8 +750,9 @@ class SidecarTests(unittest.TestCase):
         return result, model
 
     def compile(self, source: Path, *, mode: str = "full", backend: str = "gcc",
-                extra: tuple[str, ...] = ()) -> Model:
-        _, path = self.invoke([source], mode=mode, backend=backend, extra=extra)
+                extra: tuple[str, ...] = (), timeout: int = 120) -> Model:
+        _, path = self.invoke([source], mode=mode, backend=backend, extra=extra,
+                              timeout=timeout)
         model = Model.read(path, expressions_only=mode == "expressions",
                            bindings_only=mode == "bindings")
         # Model.read owns all decoded rows. Callers needing the original file
@@ -3591,8 +3592,30 @@ dim accepted_value as long
         include = str(self.root / "tests/fbcunit/inc")
         for backend in self.backends:
             model = self.compile(source, mode="expressions", backend=backend,
-                                 extra=("-i", include))
+                                 extra=("-i", include), timeout=self.stress_timeout)
             self.assertTrue(model.records["E"], "The successful export must retain typed expressions")
+            # Release the large decoded model before parsing the next backend's
+            # output. The loop only needs this assertion, not both models.
+            del model
+
+    def test_compiler_timeout_and_failure_contract(self) -> None:
+        # A larger allowance belongs to the generated stress input alone.
+        # Neither an ordinary nonzero exit nor an expired allowance is a pass.
+        source = self.source("Print 1\n")
+        for timeout in (120, self.stress_timeout):
+            with self.subTest(timeout=timeout):
+                result = subprocess.CompletedProcess([], 0, "", "")
+                with mock.patch.object(subprocess, "run", return_value=result) as run:
+                    self.invoke([source], mode="off", timeout=timeout)
+                    self.assertEqual(run.call_args.kwargs["timeout"], timeout)
+                result = subprocess.CompletedProcess([], 1, "", "fixture failure")
+                with mock.patch.object(subprocess, "run", return_value=result):
+                    with self.assertRaisesRegex(AssertionError, "fixture failure"):
+                        self.invoke([source], mode="off", timeout=timeout)
+                with mock.patch.object(subprocess, "run", side_effect=
+                        subprocess.TimeoutExpired("fixture", timeout)):
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        self.invoke([source], mode="off", timeout=timeout)
 
     def test_macro_expansions_arguments_substitutions_and_origins(self) -> None:
         text = """#define SEM_VALUE 3

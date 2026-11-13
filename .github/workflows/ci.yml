@@ -955,6 +955,9 @@ jobs:
             maketests-log/
             tests/**/*.log
             tests/log-tests-results-*.log
+            tests/functions/va_cva_aggregate.exe
+            tests/functions/va_cva_aggregate.o
+            tests/bindings/va_cva_aggregate.o
 
   mips:
     if: needs.changes.outputs.run_builds == 'true' && (inputs.ci_scope == '' || inputs.ci_scope == 'all')

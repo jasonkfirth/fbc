@@ -108,6 +108,8 @@ End Function
 
 Declare Function cva_aggregate_registers CDecl _
     Alias "cva_aggregate_registers" () As LongInt
+Declare Sub cva_test_checkpoint CDecl Alias "cva_test_checkpoint" _
+    (ByVal stage As Const ZString Ptr)
 Declare Function cva_aggregate_overflow CDecl _
     Alias "cva_aggregate_overflow" () As LongInt
 Declare Function cva_longdouble_register CDecl _
@@ -141,8 +143,11 @@ Dim As AggregateXR xr = Type<AggregateXR>(12.0, 34)
 Dim As AggregateXX xx = Type<AggregateXX>(56.0, 78.0)
 Dim As AggregateMemory memory_value = Type<AggregateMemory>(9, 8, 7)
 
+cva_test_checkpoint("C-registers")
 If cva_aggregate_registers() <> 15533436603905 Then End 1
+cva_test_checkpoint("C-overflow")
 If cva_aggregate_overflow() <> 1235534567911 Then End 2
+cva_test_checkpoint("BASIC-registers")
 If ReadOwnCvaAggregates(0, rr, small_value, x_value, rx, xr, xx, memory_value) <> _
     15533436603905 Then End 3
 
@@ -153,10 +158,13 @@ rx = Type<AggregateRX>(3, 4.0)
 xr = Type<AggregateXR>(5.0, 6)
 xx = Type<AggregateXX>(7.0, 8.0)
 memory_value = Type<AggregateMemory>(9, 10, 11)
+cva_test_checkpoint("BASIC-overflow")
 If ReadOwnCvaAggregatesOverflow(1, 2, 3, 4, 5, 6, rr, small_value, x_value, _
                                 rx, xr, xx, memory_value) <> 1235534567911 Then End 4
+cva_test_checkpoint("long-double-vararg")
 If cva_longdouble_register() <> 1 Then End 5
 
+cva_test_checkpoint("long-double-literals")
 Dim As CLongDouble literal_value = CLongDoubleFromStringValue( _
     StrPtr(!"1.0000000000000001"))
 Dim As CLongDouble c_literal_value
@@ -166,6 +174,7 @@ If (literal_value = c_literal_value) <> -1 Then End 10
 '' native C result, including its rounding, rather than requiring x87 precision.
 If (literal_value > CLongDoubleFromStringValue(StrPtr(!"1.0"))) <> _
     -cva_longdouble_has_extra_precision() Then End 11
+cva_test_checkpoint("long-double-conversions")
 Dim As CLongDouble fractional_value = _
     CLongDoubleFromStringValue(StrPtr(!"1.75"))
 If Cast(Long, fractional_value) <> 1 Then End 12
@@ -181,6 +190,7 @@ If Cast(Double, cva_longdouble_add( _
 If Cast(Double, cva_call_fbc_longdouble_export(fixed_input)) <> 2.25# Then End 8
 #endif
 
+cva_test_checkpoint("long-double-format")
 Dim As ZString * 32 formatted_value
 Dim As CLongDouble formatting_value = CLongDoubleFromDoubleValue(1.75#)
 Dim As Integer format_length = FormatLongDouble( _

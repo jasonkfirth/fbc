@@ -14,6 +14,13 @@ import sys
 import unittest
 
 
+def positive_timeout(value: str) -> int:
+    seconds = int(value)
+    if seconds <= 0:
+        raise argparse.ArgumentTypeError("timeout must be a positive number of seconds")
+    return seconds
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -22,6 +29,8 @@ def main() -> int:
                         help="Use an existing native SDK without copying it into the source tree")
     parser.add_argument("--backend", choices=("gcc", "clang", "llvm", "gas64", "gas"), action="append")
     parser.add_argument("--test", action="append", help="Run only the named test method")
+    parser.add_argument("--stress-timeout", type=positive_timeout, default=600,
+                        help="Seconds allowed per generated macro stress emission (default: 600)")
     options = parser.parse_args()
     root = options.root.resolve()
     if not options.fbc.is_file():
@@ -33,6 +42,7 @@ def main() -> int:
     SidecarTests.compiler = options.fbc.resolve()
     SidecarTests.toolchain_prefix = (options.toolchain_prefix or root).resolve()
     SidecarTests.backends = options.backend or ["gcc", "clang", "llvm"]
+    SidecarTests.stress_timeout = options.stress_timeout
     if options.test:
         suite = unittest.TestSuite(SidecarTests(name) for name in options.test)
     else:
