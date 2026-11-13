@@ -21,8 +21,8 @@
         - storage owned by a platform adapter
 */
 
-#ifndef __FB_GFX3_SCREENLIST_INTERNAL_H__
-#define __FB_GFX3_SCREENLIST_INTERNAL_H__
+#ifndef FB_GFX3_SCREENLIST_INTERNAL_H
+#define FB_GFX3_SCREENLIST_INTERNAL_H
 
 #include "gfx3_screenlist.h"
 

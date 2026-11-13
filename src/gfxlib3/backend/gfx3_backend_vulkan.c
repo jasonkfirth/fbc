@@ -3129,7 +3129,7 @@ static int vulkan_backend_wait_idle(FB_GFX3_BACKEND *backend)
 	return result;
 }
 
-const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_vulkan = {
+const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_vulkan = {
 	FB_GFX3_BACKEND_ABI_VERSION,
 	"Vulkan compute",
 	vulkan_backend_probe,

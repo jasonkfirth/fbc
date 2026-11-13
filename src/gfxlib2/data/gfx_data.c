@@ -14,7 +14,7 @@
 static unsigned char internal_data[DATA_SIZE];
 
 /* must match the FB_FONT_* enum */
-const FONT __fb_font[FB_FONT_COUNT] =
+const FONT fb_font[FB_FONT_COUNT] =
 {
 	{ 8,  8, &internal_data[DATA_FONT_8 ] },
 	{ 8, 14, &internal_data[DATA_FONT_14] },
@@ -22,7 +22,7 @@ const FONT __fb_font[FB_FONT_COUNT] =
 };
 
 /* must match the FB_PALETTE_* enum */
-const PALETTE __fb_palette[FB_PALETTE_COUNT] =
+const PALETTE fb_palette[FB_PALETTE_COUNT] =
 {
 	{   2, &internal_data[DATA_PAL_2  ] },
 	{  16, &internal_data[DATA_PAL_16 ] },

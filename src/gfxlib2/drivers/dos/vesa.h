@@ -1,7 +1,14 @@
+/*
+ * Project: FreeBASIC runtime libraries
+ * File: vesa.h
+ * Purpose: Declare VESA VBE firmware data layouts.
+ * Responsibilities: Packed controller/mode records and their capability constants.
+ * This file intentionally does NOT contain: BIOS calls or framebuffer drawing.
+ */
 /* VESA VBE structures and constants */
 
-#ifndef __FB_DOS_VESA_H__
-#define __FB_DOS_VESA_H__
+#ifndef FB_DOS_VESA_H
+#define FB_DOS_VESA_H
 
 /* Info block for the VESA controller */
 typedef struct VbeInfoBlock
@@ -180,3 +187,5 @@ enum
 };
 
 #endif
+
+/* end of vesa.h */

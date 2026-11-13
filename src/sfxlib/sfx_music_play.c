@@ -38,12 +38,12 @@ static FB_SFXVOICE *fb_sfxCurrentMusicVoiceLocked(void)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return NULL;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (voice->active && voice->type == FB_SFX_VOICE_MUSIC)
             return voice;
@@ -56,15 +56,15 @@ static float fb_sfxMusicSampleStepLocked(void)
 {
     FB_SFX_ASSET *asset;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 1.0f;
 
-    asset = &__fb_sfx->music;
+    asset = &fb_sfx_context->music;
 
-    if (asset->sample_rate <= 0 || __fb_sfx->samplerate <= 0)
+    if (asset->sample_rate <= 0 || fb_sfx_context->samplerate <= 0)
         return 1.0f;
 
-    return (float)asset->sample_rate / (float)__fb_sfx->samplerate;
+    return (float)asset->sample_rate / (float)fb_sfx_context->samplerate;
 }
 
 static int fb_sfxStartMusicVoice(int loop)
@@ -76,9 +76,9 @@ static int fb_sfxStartMusicVoice(int loop)
 
     fb_sfxRuntimeLock();
 
-    if (!__fb_sfx->music.loaded ||
-        !__fb_sfx->music.data ||
-        __fb_sfx->music.frames <= 0)
+    if (!fb_sfx_context->music.loaded ||
+        !fb_sfx_context->music.data ||
+        fb_sfx_context->music.frames <= 0)
     {
         fb_sfxRuntimeUnlock();
         return -1;
@@ -97,8 +97,8 @@ static int fb_sfxStartMusicVoice(int loop)
     voice->sfx_id = 0;
     voice->channel = 0;
     voice->volume = 1.0f;
-    voice->data = __fb_sfx->music.data;
-    voice->length = __fb_sfx->music.size / (int)sizeof(float);
+    voice->data = fb_sfx_context->music.data;
+    voice->length = fb_sfx_context->music.size / (int)sizeof(float);
     voice->position = 0;
     voice->pos = 0;
     voice->sample_pos = 0.0f;
@@ -107,10 +107,10 @@ static int fb_sfxStartMusicVoice(int loop)
     voice->env_level = 1.0f;
     voice->env_state = FB_SFX_ENV_SUSTAIN;
 
-    __fb_sfx->music_playing = 0;
-    __fb_sfx->music_paused = 0;
-    __fb_sfx->music_loop = loop ? 1 : 0;
-    __fb_sfx->music_pos = 0;
+    fb_sfx_context->music_playing = 0;
+    fb_sfx_context->music_paused = 0;
+    fb_sfx_context->music_loop = loop ? 1 : 0;
+    fb_sfx_context->music_pos = 0;
 
     fb_sfxVoiceActivateLocked(voice);
     fb_sfxRuntimeUnlock();
@@ -178,14 +178,14 @@ void fb_sfxMusicRestart(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx->music_playing < 0)
+    if (fb_sfx_context->music_playing < 0)
     {
         fb_sfxRuntimeUnlock();
         return;
     }
 
     voice = fb_sfxCurrentMusicVoiceLocked();
-    __fb_sfx->music_pos = 0;
+    fb_sfx_context->music_pos = 0;
 
     if (voice)
     {

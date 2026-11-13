@@ -22,8 +22,8 @@
         - platform window-system declarations
 */
 
-#ifndef __FB_GFX3_H__
-#define __FB_GFX3_H__
+#ifndef FB_GFX3_H
+#define FB_GFX3_H
 
 /*
 	The established runtime headers intentionally preserve ABI-era enum and

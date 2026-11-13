@@ -1252,7 +1252,7 @@ static int platform_win32_set_window_title(void *state, const char *title)
 		FB_GFX3_FAILED;
 }
 
-static const FB_GFX3_PLATFORM_VTABLE __fb_gfx3_platform_win32 = {
+static const FB_GFX3_PLATFORM_VTABLE fb_gfx3_platform_win32 = {
 	"Win32",
 	platform_win32_probe_opengl,
 	platform_win32_create_window,
@@ -1270,7 +1270,7 @@ static const FB_GFX3_PLATFORM_VTABLE __fb_gfx3_platform_win32 = {
 
 #else
 
-static const FB_GFX3_PLATFORM_VTABLE __fb_gfx3_platform_win32 = {
+static const FB_GFX3_PLATFORM_VTABLE fb_gfx3_platform_win32 = {
 	"Win32 unavailable",
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
@@ -1288,7 +1288,7 @@ int fb_gfx3_platform_keyboard_overlay(void *platform,
 
 const FB_GFX3_PLATFORM_VTABLE *fb_gfx3_platform_default(void)
 {
-	return &__fb_gfx3_platform_win32;
+	return &fb_gfx3_platform_win32;
 }
 
 /* end of win32/gfx3_platform.c */

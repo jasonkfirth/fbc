@@ -10,22 +10,22 @@
 
 int fb_ConsoleWidth( int cols, int rows )
 {
-	if( !__fb_con.inited )
+	if( !fb_console_context.inited )
 		return (80 | (25 << 16));
 
 	BG_LOCK( );
 	fb_hRecheckConsoleSize( TRUE );
 	BG_UNLOCK( );
 
-	int cur = __fb_con.w | (__fb_con.h << 16);
+	int cur = fb_console_context.w | (fb_console_context.h << 16);
 
 	if ((cols > 0) || (rows > 0)) {
 		BG_LOCK();
 
 		if (cols <= 0)
-			cols = __fb_con.w;
+			cols = fb_console_context.w;
 		if (rows <= 0)
-			rows = __fb_con.h;
+			rows = fb_console_context.h;
 		fb_hTermOut(SEQ_WINDOW_SIZE, rows, cols);
 
 		BG_UNLOCK();

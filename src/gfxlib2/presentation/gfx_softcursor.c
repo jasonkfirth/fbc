@@ -15,6 +15,8 @@
 #define BIT_ENCODE(p0,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12) \
 	((p0)|(p1<<2)|(p2<<4)|(p3<<6)|(p4<<8)|(p5<<10)|(p6<<12)|(p7<<14)|(p8<<16)|(p9<<18)|(p10<<20)|(p11<<22)|(p12<<24))
 
+/* The DOS driver uses these boundary symbols to lock cursor data in memory. */
+extern char fb_hSoftCursor_data_start;
 char fb_hSoftCursor_data_start;
 
 static const unsigned int cursor_data[] = {
@@ -45,6 +47,7 @@ static const unsigned int cursor_data[] = {
 static unsigned char *cursor_area;
 static unsigned int white, black;
 
+extern char fb_hSoftCursor_data_end;
 char fb_hSoftCursor_data_end;
 
 void fb_hSoftCursor_code_start(void) { }
@@ -54,18 +57,18 @@ static void copy_cursor_area(int x, int y, int from_area)
 	unsigned char *s, *d;
 	int w, h, s_pitch, d_pitch;
 
-	w = (MIN(CURSOR_W, __fb_gfx->w - x) * __fb_gfx->bpp);
-	h = MIN(CURSOR_H, __fb_gfx->h - y);
+	w = (MIN(CURSOR_W, fb_gfx->w - x) * fb_gfx->bpp);
+	h = MIN(CURSOR_H, fb_gfx->h - y);
 
 	if (from_area) {
 		s = cursor_area;
-		d = __fb_gfx->framebuffer + (y * __fb_gfx->pitch) + (x * __fb_gfx->bpp);
+		d = fb_gfx->framebuffer + (y * fb_gfx->pitch) + (x * fb_gfx->bpp);
 		s_pitch = w;
-		d_pitch = __fb_gfx->pitch;
+		d_pitch = fb_gfx->pitch;
 	} else {
-		s = __fb_gfx->framebuffer + (y * __fb_gfx->pitch) + (x * __fb_gfx->bpp);
+		s = fb_gfx->framebuffer + (y * fb_gfx->pitch) + (x * fb_gfx->bpp);
 		d = cursor_area;
-		s_pitch = __fb_gfx->pitch;
+		s_pitch = fb_gfx->pitch;
 		d_pitch = w;
 	}
 
@@ -78,30 +81,30 @@ static void copy_cursor_area(int x, int y, int from_area)
 
 int fb_hColorDistance(int index, int r, int g, int b)
 {
-	return (((__fb_gfx->device_palette[index] & 0xFF) - r) * ((__fb_gfx->device_palette[index] & 0xFF) - r)) +
-	       ((((__fb_gfx->device_palette[index] >> 8) & 0xFF) - g) * (((__fb_gfx->device_palette[index] >> 8) & 0xFF) - g)) +
-	       ((((__fb_gfx->device_palette[index] >> 16) & 0xFF) - b) * (((__fb_gfx->device_palette[index] >> 16) & 0xFF) - b));
+	return (((fb_gfx->device_palette[index] & 0xFF) - r) * ((fb_gfx->device_palette[index] & 0xFF) - r)) +
+	       ((((fb_gfx->device_palette[index] >> 8) & 0xFF) - g) * (((fb_gfx->device_palette[index] >> 8) & 0xFF) - g)) +
+	       ((((fb_gfx->device_palette[index] >> 16) & 0xFF) - b) * (((fb_gfx->device_palette[index] >> 16) & 0xFF) - b));
 }
 
 int fb_hSoftCursorInit(void)
 {
 	size_t cursor_size;
 
-	if ((!__fb_gfx) || (__fb_gfx->bpp < 1) || (__fb_gfx->bpp > (int)sizeof(unsigned int)))
+	if ((!fb_gfx) || (fb_gfx->bpp < 1) || (fb_gfx->bpp > (int)sizeof(unsigned int)))
 		return -1;
 
-	cursor_size = (size_t)CURSOR_W * CURSOR_H * (size_t)__fb_gfx->bpp;
+	cursor_size = (size_t)CURSOR_W * CURSOR_H * (size_t)fb_gfx->bpp;
 	cursor_area = calloc(1, cursor_size);
 	if (!cursor_area)
 		return -1;
 
-	if (__fb_gfx->bpp == 1) {
+	if (fb_gfx->bpp == 1) {
 		white = 15;
 		black = 0;
 	}
 	else {
-		white = fb_hFixColor(__fb_gfx->bpp, 0xFFFFFF);
-		black = fb_hFixColor(__fb_gfx->bpp, 0x000000);
+		white = fb_hFixColor(fb_gfx->bpp, 0xFFFFFF);
+		black = fb_hFixColor(fb_gfx->bpp, 0x000000);
 	}
 
 	return 0;
@@ -125,9 +128,9 @@ void fb_hSoftCursorPut(int x, int y)
 
 	copy_cursor_area(x, y, FALSE);
 
-	w = MIN(CURSOR_W, __fb_gfx->w - x);
-	h = MIN(CURSOR_H, __fb_gfx->h - y);
-	dest = __fb_gfx->framebuffer + (y * __fb_gfx->pitch) + (x * __fb_gfx->bpp);
+	w = MIN(CURSOR_W, fb_gfx->w - x);
+	h = MIN(CURSOR_H, fb_gfx->h - y);
+	dest = fb_gfx->framebuffer + (y * fb_gfx->pitch) + (x * fb_gfx->bpp);
 	cursor = cursor_data;
 	for (py = 0; py < h; py++) {
 		d = dest;
@@ -137,31 +140,31 @@ void fb_hSoftCursorPut(int x, int y)
 			for (count = 0; (px < w) && ((int)(data & 0x3) == pixel); px++, data >>= 2)
 				count++;
 			if (pixel == 0x3) {
-				if (__fb_gfx->bpp == 4)
+				if (fb_gfx->bpp == 4)
 					fb_hPixelSetAlpha4(d, 0x40000000, count);
 			}
 			else {
 				if (pixel)
 					fb_hPixelSet(d, (pixel & 0x1) ? white : black, count);
 			}
-			d += (count * __fb_gfx->bpp);
+			d += (count * fb_gfx->bpp);
 		}
-		__fb_gfx->dirty[y + py] = TRUE;
-		dest += __fb_gfx->pitch;
+		fb_gfx->dirty[y + py] = TRUE;
+		dest += fb_gfx->pitch;
 	}
 }
 
 void fb_hSoftCursorUnput(int x, int y)
 {
 	copy_cursor_area(x, y, TRUE);
-	fb_hMemSet(__fb_gfx->dirty + y, TRUE, MIN(CURSOR_H, __fb_gfx->h - y));
+	fb_hMemSet(fb_gfx->dirty + y, TRUE, MIN(CURSOR_H, fb_gfx->h - y));
 }
 
 void fb_hSoftCursorPaletteChanged(void)
 {
 	int i, dist, min_wdist = 1000000, min_bdist = 1000000;
 
-	if (__fb_gfx->bpp > 1)
+	if (fb_gfx->bpp > 1)
 		return;
 	for (i = 0; i < 256; i++) {
 		dist = fb_hColorDistance(i, 255, 255, 255);

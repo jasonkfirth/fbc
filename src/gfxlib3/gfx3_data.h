@@ -20,8 +20,8 @@
         - file-format codecs
 */
 
-#ifndef __FB_GFX3_DATA_H__
-#define __FB_GFX3_DATA_H__
+#ifndef FB_GFX3_DATA_H
+#define FB_GFX3_DATA_H
 
 #include "fb_gfx3.h"
 

@@ -44,8 +44,8 @@
         platform audio driver
 */
 
-#ifndef __FB_SFX_MIXER_H__
-#define __FB_SFX_MIXER_H__
+#ifndef FB_SFX_MIXER_H
+#define FB_SFX_MIXER_H
 
 #include "fb_sfx.h"
 

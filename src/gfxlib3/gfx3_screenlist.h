@@ -21,8 +21,8 @@
         - fullscreen or display-mode changes
 */
 
-#ifndef __FB_GFX3_SCREENLIST_H__
-#define __FB_GFX3_SCREENLIST_H__
+#ifndef FB_GFX3_SCREENLIST_H
+#define FB_GFX3_SCREENLIST_H
 
 #include "fb_gfx3.h"
 

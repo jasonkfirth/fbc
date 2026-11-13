@@ -194,7 +194,7 @@ static void keyboard_console_handler(void)
 						if( pressed && (ioctl(key_fd, VT_GETSTATE, &vt_state) >= 0) ) {
 							orig_vt = vt_state.v_active;
 							if (vt != orig_vt) {
-								if (__fb_con.gfx_exit) {
+								if (fb_console_context.gfx_exit) {
 									gfx_save();
 									ioctl(key_fd, KDSETMODE, KD_TEXT);
 								}
@@ -202,7 +202,7 @@ static void keyboard_console_handler(void)
 								ioctl(key_fd, VT_WAITACTIVE, vt);
 								while (ioctl(key_fd, VT_WAITACTIVE, orig_vt) < 0)
 								    usleep(50000);
-								if (__fb_con.gfx_exit) {
+								if (fb_console_context.gfx_exit) {
 									ioctl(key_fd, KDSETMODE, KD_GRAPHICS);
 									gfx_restore();
 								}
@@ -263,10 +263,10 @@ static int keyboard_init(void)
 	memset( &term, 0, sizeof( term ) );
 
 	main_pid = getpid();
-	old_getch = __fb_con.keyboard_getch;
+	old_getch = fb_console_context.keyboard_getch;
 
-	if(__fb_con.inited == INIT_CONSOLE) {
-		key_fd = dup(__fb_con.h_in);
+	if(fb_console_context.inited == INIT_CONSOLE) {
+		key_fd = dup(fb_console_context.h_in);
 
 		term.c_iflag = 0;
 		term.c_cflag = CS8;
@@ -281,8 +281,8 @@ static int keyboard_init(void)
 			key_fd = -1;
 			return -1;
 		}
-		__fb_con.keyboard_handler = keyboard_console_handler;
-		__fb_con.keyboard_getch = keyboard_console_getch;
+		fb_console_context.keyboard_handler = keyboard_console_handler;
+		fb_console_context.keyboard_getch = keyboard_console_getch;
 		key_head = key_tail = 0;
 		ioctl(key_fd, KDGETLED, &key_leds);
 	}
@@ -306,19 +306,19 @@ static int keyboard_init(void)
 		fb_hInitX11KeycodeToScancodeTb( display, X.DisplayKeycodes, X.GetKeyboardMapping, X.Free );
 
 		fb_hXTermInitFocus();
-		__fb_con.keyboard_handler = keyboard_x11_handler;
+		fb_console_context.keyboard_handler = keyboard_x11_handler;
 	}
 #endif
 
-	__fb_con.keyboard_init = keyboard_init;
-	__fb_con.keyboard_exit = keyboard_exit;
+	fb_console_context.keyboard_init = keyboard_init;
+	fb_console_context.keyboard_exit = keyboard_exit;
 
 	return 0;
 }
 
 static void keyboard_exit(void)
 {
-	if (__fb_con.inited == INIT_CONSOLE) {
+	if (fb_console_context.inited == INIT_CONSOLE) {
 		if (key_fd >= 0) {
 			ioctl(key_fd, KDSKBMODE, key_old_mode);
 			close(key_fd);
@@ -326,7 +326,7 @@ static void keyboard_exit(void)
 		}
 	}
 #ifndef DISABLE_X11
-	else if (__fb_con.inited == INIT_X11) {
+	else if (fb_console_context.inited == INIT_X11) {
 		if (display) {
 			X.CloseDisplay(display);
 			display = NULL;
@@ -336,23 +336,23 @@ static void keyboard_exit(void)
 			fb_hDynUnload(&xlib);
 	}
 #endif
-	__fb_con.keyboard_getch = old_getch;
-	__fb_con.keyboard_handler = NULL;
-	__fb_con.keyboard_exit = NULL;
+	fb_console_context.keyboard_getch = old_getch;
+	fb_console_context.keyboard_handler = NULL;
+	fb_console_context.keyboard_exit = NULL;
 }
 
 int fb_ConsoleMultikey(int scancode)
 {
 	int res;
 
-	if (!__fb_con.inited)
+	if (!fb_console_context.inited)
 		return FB_FALSE;
 
 	BG_LOCK();
 
 	fb_hStartBgThread( );
 
-	if ((!__fb_con.keyboard_handler) && (!keyboard_init())) {
+	if ((!fb_console_context.keyboard_handler) && (!keyboard_init())) {
 		/* Let the handler execute at least once to fill in states */
 		BG_UNLOCK();
 		usleep(50000);
@@ -378,7 +378,7 @@ int fb_hConsoleGfxMode
 
 	fb_hStartBgThread( );
 
-	__fb_con.gfx_exit = gfx_exit;
+	fb_console_context.gfx_exit = gfx_exit;
 	if (gfx_exit) {
 		gfx_save = save;
 		gfx_restore = restore;
@@ -387,7 +387,7 @@ int fb_hConsoleGfxMode
 			gfx_save = NULL;
 			gfx_restore = NULL;
 			gfx_key_handler = NULL;
-			__fb_con.gfx_exit = NULL;
+			fb_console_context.gfx_exit = NULL;
 			BG_UNLOCK();
 			return -1;
 		}
@@ -397,7 +397,7 @@ int fb_hConsoleGfxMode
 			gfx_save = NULL;
 			gfx_restore = NULL;
 			gfx_key_handler = NULL;
-			__fb_con.gfx_exit = NULL;
+			fb_console_context.gfx_exit = NULL;
 			BG_UNLOCK();
 			return -1;
 		}
@@ -410,7 +410,7 @@ int fb_hConsoleGfxMode
 		fb_ctx.hooks.sleepproc = NULL;
 		FB_UNLOCK( );
 	} else {
-		if (__fb_con.keyboard_exit) {
+		if (fb_console_context.keyboard_exit) {
 			if (key_fd >= 0) {
 				ioctl(key_fd, KDSETMODE, KD_TEXT);
 				keyboard_exit();
@@ -419,7 +419,7 @@ int fb_hConsoleGfxMode
 				keyboard_exit();
 			}
 		}
-		__fb_con.gfx_exit = NULL;
+		fb_console_context.gfx_exit = NULL;
 		gfx_save = NULL;
 		gfx_restore = NULL;
 		gfx_key_handler = NULL;

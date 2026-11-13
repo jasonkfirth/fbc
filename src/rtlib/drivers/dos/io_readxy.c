@@ -17,7 +17,7 @@ unsigned int fb_ConsoleReadXY_BIOS( int col, int row, int colorflag )
 
     __dpmi_regs regs;
     regs.x.ax = 0x0800;
-    regs.x.bx = __fb_con.active;
+    regs.x.bx = fb_console_context.active;
     __dpmi_int(0x10, &regs);
 
     fb_hSetCursorPos( usPosOld, -1 );

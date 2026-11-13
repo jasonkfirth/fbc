@@ -76,12 +76,12 @@ static void amiga_source_rgb(const unsigned char *source, int x,
 {
     unsigned int pixel;
 
-    if (__fb_gfx->depth <= 8) {
-        pixel = __fb_gfx->device_palette[source[x]];
+    if (fb_gfx->depth <= 8) {
+        pixel = fb_gfx->device_palette[source[x]];
         *red = (unsigned char)(pixel & 255U);
         *green = (unsigned char)((pixel >> 8) & 255U);
         *blue = (unsigned char)((pixel >> 16) & 255U);
-    } else if (__fb_gfx->depth == 16) {
+    } else if (fb_gfx->depth == 16) {
         pixel = ((const unsigned short *)source)[x];
         *red = (unsigned char)(((pixel >> 11) & 31U) * 255U / 31U);
         *green = (unsigned char)(((pixel >> 5) & 63U) * 255U / 63U);
@@ -97,7 +97,7 @@ static void amiga_source_rgb(const unsigned char *source, int x,
 void fb_amigaGfxSetPalette(int index, int red, int green, int blue)
 {
     if (!fb_amiga_gfx.private_screen || fb_amiga_gfx.screen == NULL ||
-        __fb_gfx == NULL || __fb_gfx->depth > 8 ||
+        fb_gfx == NULL || fb_gfx->depth > 8 ||
         index < 0 || index >= (1 << fb_amiga_gfx.screen_depth))
         return;
 
@@ -226,10 +226,10 @@ static void amiga_reset_colour_table(void)
 static int amiga_colour_row_changed(int row)
 {
     const unsigned char *source;
-    if (__fb_gfx->dirty != NULL && !__fb_gfx->dirty[row]) return FALSE;
+    if (fb_gfx->dirty != NULL && !fb_gfx->dirty[row]) return FALSE;
     if (fb_amiga_gfx.present_cache == NULL ||
         !fb_amiga_gfx.present_cache_valid[row]) return TRUE;
-    source = __fb_gfx->framebuffer + (size_t)row * (size_t)__fb_gfx->pitch;
+    source = fb_gfx->framebuffer + (size_t)row * (size_t)fb_gfx->pitch;
     return memcmp(source, fb_amiga_gfx.present_cache +
         (size_t)row * fb_amiga_gfx.present_cache_row_bytes,
         fb_amiga_gfx.present_cache_row_bytes) != 0;
@@ -237,8 +237,8 @@ static int amiga_colour_row_changed(int row)
 
 static int amiga_collect_colour_row(int row)
 {
-    const unsigned char *source = __fb_gfx->framebuffer +
-        (size_t)row * (size_t)__fb_gfx->pitch;
+    const unsigned char *source = fb_gfx->framebuffer +
+        (size_t)row * (size_t)fb_gfx->pitch;
     unsigned char *pixels = amiga_colour_pixels +
         (size_t)row * (size_t)fb_amiga_gfx.width;
     int x;
@@ -357,8 +357,8 @@ static int amiga_prepare_dominant_colours(void)
     /* The framebuffer allocation already bounds width*height to size_t.
        Each pixel belongs to one bucket, so bucket counts cannot overflow. */
     for (row = 0; row < fb_amiga_gfx.height; ++row) {
-        const unsigned char *source = __fb_gfx->framebuffer +
-            (size_t)row * (size_t)__fb_gfx->pitch;
+        const unsigned char *source = fb_gfx->framebuffer +
+            (size_t)row * (size_t)fb_gfx->pitch;
         for (x = 0; x < fb_amiga_gfx.width; ++x) {
             unsigned char red, green, blue;
             unsigned int colour;
@@ -419,8 +419,8 @@ static int amiga_prepare_dominant_colours(void)
         }
     }
     for (row = 0; row < fb_amiga_gfx.height; ++row) {
-        const unsigned char *source = __fb_gfx->framebuffer +
-            (size_t)row * (size_t)__fb_gfx->pitch;
+        const unsigned char *source = fb_gfx->framebuffer +
+            (size_t)row * (size_t)fb_gfx->pitch;
         unsigned char *pixels = amiga_colour_pixels +
             (size_t)row * (size_t)fb_amiga_gfx.width;
         for (x = 0; x < fb_amiga_gfx.width; ++x) {
@@ -569,14 +569,14 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
     ULONG mode_id = (ULONG)INVALID_ID, screen_error = 0;
 
     (void)refresh_rate;
-    fb_amigaGfxDebug("opening %dx%d depth=%d", width, height, __fb_gfx != NULL ? __fb_gfx->depth : 0);
+    fb_amigaGfxDebug("opening %dx%d depth=%d", width, height, fb_gfx != NULL ? fb_gfx->depth : 0);
     memset(&fb_amiga_gfx, 0, sizeof(fb_amiga_gfx));
 
     /* Both pixel-transfer APIs use unsigned 16-bit dimensions and pitch.
        Conversion needs one scratch row. The optional planar cache below
        retains source bytes only to avoid uploading unchanged rows. */
     if (width <= 0 || height <= 0 || width > 16383 || height > 32767 ||
-        __fb_gfx == NULL || !amiga_open_libraries())
+        fb_gfx == NULL || !amiga_open_libraries())
         goto fail;
 
     desktop = LockPubScreen(NULL);
@@ -592,9 +592,9 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
            the depth accepted by graphics.library's display database. */
         maximum_depth = (GfxBase->ChipRevBits0 & GFXF_AA_LISA) ? 8 : 5;
         fb_amigaGfxDebug("chip revision=%u maximum depth=%d", GfxBase->ChipRevBits0, maximum_depth);
-        fb_amiga_gfx.screen_depth = __fb_gfx->depth <= 8
-            ? MIN(__fb_gfx->depth, maximum_depth) : maximum_depth;
-        if (__fb_gfx->depth <= 8 && __fb_gfx->depth > maximum_depth)
+        fb_amiga_gfx.screen_depth = fb_gfx->depth <= 8
+            ? MIN(fb_gfx->depth, maximum_depth) : maximum_depth;
+        if (fb_gfx->depth <= 8 && fb_gfx->depth > maximum_depth)
             goto fail;
         mode_id = amiga_select_mode(width, height, fb_amiga_gfx.screen_depth);
         fb_amigaGfxDebug("selected mode=%lx", mode_id);
@@ -672,20 +672,20 @@ int fb_amigaGfxDisplayInit(const char *title, int width, int height,
         if (fb_amiga_gfx.line_bitmap == NULL) goto fail;
         InitRastPort(&fb_amiga_gfx.line_rastport);
         fb_amiga_gfx.line_rastport.BitMap = fb_amiga_gfx.line_bitmap;
-        if (__fb_gfx->depth > 8) amiga_set_truecolour_palette();
+        if (fb_gfx->depth > 8) amiga_set_truecolour_palette();
     }
     fb_amiga_gfx.present_buffer = malloc(fb_amiga_gfx.present_buffer_size);
     if (fb_amiga_gfx.present_buffer == NULL) goto fail;
     memset(fb_amiga_gfx.present_buffer, 0, fb_amiga_gfx.present_buffer_size);
     fb_amiga_gfx.width = width;
     fb_amiga_gfx.height = height;
-    if (!fb_amiga_gfx.rtg && __fb_gfx->depth > 8) {
+    if (!fb_amiga_gfx.rtg && fb_gfx->depth > 8) {
         /* This optional byte-per-pixel cache avoids a second RGB conversion.
            Allocation failure keeps the existing fixed-palette renderer. */
         amiga_colour_pixels = malloc((size_t)width * (size_t)height);
     }
     if (!fb_amiga_gfx.rtg) {
-        size_t row_bytes = (size_t)width * (size_t)__fb_gfx->bpp;
+        size_t row_bytes = (size_t)width * (size_t)fb_gfx->bpp;
 
         /* PALETTE marks every software row dirty even when SetRGB32 has
            already changed the displayed colours. Compare actual source
@@ -745,12 +745,12 @@ void fb_amigaGfxPresent(void)
 {
     int row, force_all = FALSE;
 
-    if (!fb_amiga_gfx.active || __fb_gfx == NULL ||
-        __fb_gfx->framebuffer == NULL || fb_amiga_gfx.present_buffer == NULL)
+    if (!fb_amiga_gfx.active || fb_gfx == NULL ||
+        fb_gfx->framebuffer == NULL || fb_amiga_gfx.present_buffer == NULL)
         return;
 
     fb_amigaGfxDebug("present begin");
-    if (!fb_amiga_gfx.rtg && __fb_gfx->depth > 8 && amiga_colour_pixels != NULL)
+    if (!fb_amiga_gfx.rtg && fb_gfx->depth > 8 && amiga_colour_pixels != NULL)
         force_all = amiga_prepare_colour_frame();
 
     for (row = 0; row < fb_amiga_gfx.height; ++row) {
@@ -759,14 +759,14 @@ void fb_amigaGfxPresent(void)
         unsigned char *destination = fb_amiga_gfx.present_buffer;
         int x;
 
-        if (!force_all && __fb_gfx->dirty != NULL && !__fb_gfx->dirty[row]) continue;
-        source = __fb_gfx->framebuffer + (size_t)row * (size_t)__fb_gfx->pitch;
+        if (!force_all && fb_gfx->dirty != NULL && !fb_gfx->dirty[row]) continue;
+        source = fb_gfx->framebuffer + (size_t)row * (size_t)fb_gfx->pitch;
         if (fb_amiga_gfx.present_cache != NULL) {
             cached = fb_amiga_gfx.present_cache +
                 (size_t)row * fb_amiga_gfx.present_cache_row_bytes;
             if (!force_all && fb_amiga_gfx.present_cache_valid[row] &&
                 memcmp(cached, source, fb_amiga_gfx.present_cache_row_bytes) == 0) {
-                if (__fb_gfx->dirty != NULL) __fb_gfx->dirty[row] = FALSE;
+                if (fb_gfx->dirty != NULL) fb_gfx->dirty[row] = FALSE;
                 continue;
             }
         }
@@ -778,7 +778,7 @@ void fb_amigaGfxPresent(void)
             for (x = 0; x < fb_amiga_gfx.width; ++x) {
                 unsigned char red, green, blue;
 
-                if (!fb_amiga_gfx.rtg && __fb_gfx->depth <= 8) {
+                if (!fb_amiga_gfx.rtg && fb_gfx->depth <= 8) {
                     destination[x] = source[x];
                     continue;
                 }
@@ -808,7 +808,7 @@ void fb_amigaGfxPresent(void)
             /* An incomplete native transfer must remain dirty for retry. */
             if (written != fb_amiga_gfx.width) {
                 /* A palette remap may also upload rows that were not dirty. */
-                if (__fb_gfx->dirty != NULL) __fb_gfx->dirty[row] = TRUE;
+                if (fb_gfx->dirty != NULL) fb_gfx->dirty[row] = TRUE;
                 if (fb_amiga_gfx.present_cache_valid != NULL)
                     fb_amiga_gfx.present_cache_valid[row] = FALSE;
                 continue;
@@ -818,7 +818,7 @@ void fb_amigaGfxPresent(void)
             memcpy(cached, source, fb_amiga_gfx.present_cache_row_bytes);
             fb_amiga_gfx.present_cache_valid[row] = TRUE;
         }
-        if (__fb_gfx->dirty != NULL) __fb_gfx->dirty[row] = FALSE;
+        if (fb_gfx->dirty != NULL) fb_gfx->dirty[row] = FALSE;
     }
     fb_amigaGfxDebug("present end");
 }
@@ -838,8 +838,8 @@ void fb_amigaGfxSetWindowTitle(char *title)
            RTG public-screen windows retain their ordinary native decorations. */
         if (fb_amiga_gfx.private_screen) {
             fb_amigaGfxInvalidate();
-            if (__fb_gfx != NULL && __fb_gfx->dirty != NULL)
-                memset(__fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
+            if (fb_gfx != NULL && fb_gfx->dirty != NULL)
+                memset(fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
             fb_amigaGfxPresent();
         }
     }

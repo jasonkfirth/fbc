@@ -82,7 +82,7 @@ static void *gles_get_opengl_proc(FB_GFX3_BACKEND *backend,
 	return NULL;
 }
 
-const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_gles = {
+const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_gles = {
 	FB_GFX3_BACKEND_ABI_VERSION,
 	"OpenGL ES 3.0",
 	gles_probe,

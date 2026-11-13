@@ -11,6 +11,8 @@ void fb_hArrayDtorStr( FBARRAY_ACCESS *array, FB_DEFCTOR dtor, size_t keep_idx )
 {
 	size_t elements;
 	FBSTRING_ACCESS *this_;
+	/* String elements use fb_StrDelete instead of the generic destructor. */
+	(void)dtor;
 
 	if( array->ptr == NULL )
 		return;

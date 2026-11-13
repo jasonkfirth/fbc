@@ -105,10 +105,10 @@ float fb_sfxOscillatorPhaseStep(FB_SFXVOICE *voice)
     if (!voice)
         return 0.0f;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0.0f;
 
-    if (__fb_sfx->samplerate <= 0)
+    if (fb_sfx_context->samplerate <= 0)
         return 0.0f;
 
     if (voice->frequency <= 0)
@@ -119,11 +119,11 @@ float fb_sfxOscillatorPhaseStep(FB_SFXVOICE *voice)
     }
 
     if (voice->phase_step <= 0.0f ||
-        voice->phase_rate != __fb_sfx->samplerate)
+        voice->phase_rate != fb_sfx_context->samplerate)
     {
         voice->phase_step =
-            (float)voice->frequency / (float)__fb_sfx->samplerate;
-        voice->phase_rate = __fb_sfx->samplerate;
+            (float)voice->frequency / (float)fb_sfx_context->samplerate;
+        voice->phase_rate = fb_sfx_context->samplerate;
     }
 
     return voice->phase_step;
@@ -251,7 +251,7 @@ static float fb_sfxOscillatorNoise(FB_SFXVOICE *voice)
     if (voice->frequency <= 0)
         return fb_sfxOscillatorRandomNoise();
 
-    if (!__fb_sfx || __fb_sfx->samplerate <= 0)
+    if (!fb_sfx_context || fb_sfx_context->samplerate <= 0)
         return fb_sfxOscillatorRandomNoise();
 
     if (!voice->noise_ready)
@@ -384,10 +384,10 @@ void fb_sfxVoiceSetFrequency(FB_SFXVOICE *voice, int freq)
     voice->phase_step = 0.0f;
     voice->phase_rate = 0;
 
-    if (__fb_sfx && __fb_sfx->samplerate > 0 && freq > 0)
+    if (fb_sfx_context && fb_sfx_context->samplerate > 0 && freq > 0)
     {
-        voice->phase_step = (float)freq / (float)__fb_sfx->samplerate;
-        voice->phase_rate = __fb_sfx->samplerate;
+        voice->phase_step = (float)freq / (float)fb_sfx_context->samplerate;
+        voice->phase_rate = fb_sfx_context->samplerate;
     }
 
     SFX_DEBUG("sfx_oscillator: frequency set to %d", freq);

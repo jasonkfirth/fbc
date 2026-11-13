@@ -30,8 +30,10 @@
     Those components are implemented in separate modules.
 */
 
-#ifndef __FB_SFX_H__
-#define __FB_SFX_H__
+#ifndef FB_SFX_H
+#define FB_SFX_H
+
+#include "../rtlib/fb_abi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -186,6 +188,10 @@ typedef struct FB_SFX_ASSET
     int sample_rate;
     int loaded;
     char name[260];
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Name the existing 64-bit tail padding without changing this layout. */
+    unsigned char tail_padding[4];
+#endif
 } FB_SFX_ASSET;
 
 
@@ -360,7 +366,7 @@ typedef struct FB_SFXCTX
 /* Global runtime pointer                                                    */
 /* ------------------------------------------------------------------------- */
 
-extern FB_SFXCTX *__fb_sfx;
+extern FB_SFXCTX *fb_sfx_context FB_C_SYMBOL("__fb_sfx");
 
 
 /* ------------------------------------------------------------------------- */

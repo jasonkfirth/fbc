@@ -22,12 +22,26 @@ end function
 
 SUITE( fbc_tests.string_.text_types )
 
+	'' Keep every mixed overload round trip within the target WSTRING range.
+	'' Full Unicode USTRING behavior is checked separately, including lossy
+	'' conversions to the DOS byte-wide compatibility type.
+	#if sizeof(wstring) = 1
+		const MIXED_REPLACEMENT = &hF1
+		const MIXED_TAIL = &hF8
+	#else
+		const MIXED_REPLACEMENT = &h4E2D
+		const MIXED_TAIL = &h1F600
+	#endif
+
 	TEST( truncate_in_place )
 		dim as string bytes = "abc"
 		dim as wstring * 32 wide
 		dim as wstring * 32 widePrefix
 		'' WSTRING is UTF-16 on 2-byte targets, so use the explicit pair there.
-		#if sizeof(wstring) = 2
+		#if sizeof(wstring) = 1
+			wide = wchr(&hE9, 63, 65)
+			widePrefix = wchr(&hE9, 63)
+		#elseif sizeof(wstring) = 2
 			wide = wchr(&hE9, &hD83D, &hDE00, 65)
 			widePrefix = wchr(&hE9, &hD83D, &hDE00)
 		#else
@@ -36,7 +50,11 @@ SUITE( fbc_tests.string_.text_types )
 		#endif
 		dim as ustring utf8 = uchr(&hE9, &h1F600, 65)
 		dim as any ptr buffer = strptr(utf8)
-		CU_ASSERT( ustring(wide) = utf8 )
+		#if sizeof(wstring) = 1
+			CU_ASSERT( ustring(wide) = uchr(&hE9, 63, 65) )
+		#else
+			CU_ASSERT( ustring(wide) = utf8 )
+		#endif
 		FBC.LeftSelf(bytes, 2)
 		FBC.LeftSelf(wide, 2)
 		FBC.LeftSelf(utf8, 2)
@@ -79,7 +97,11 @@ SUITE( fbc_tests.string_.text_types )
 		CU_ASSERT( FbNetGetStringLE(h, received, 7) )
 		CU_ASSERT( received = utf8 )
 		CU_ASSERT( FbNetGetStringLE(h, byteResult, 7) )
-		CU_ASSERT( byteResult = bytes )
+		#if sizeof(wstring) = 1
+			CU_ASSERT( byteResult = cast(string, uchr(&hE9, 63, 65)) )
+		#else
+			CU_ASSERT( byteResult = bytes )
+		#endif
 		CU_ASSERT( FbNetGetStringLE(h, received, 7) )
 		CU_ASSERT( received = uchr(&hE9) )
 		CU_ASSERT( FbNetGetStringLE(h, wideResult, 7, 32) )
@@ -116,20 +138,24 @@ SUITE( fbc_tests.string_.text_types )
 		CU_ASSERT( string(2, wide) = wchr(&hE9, &hE9) )
 		swap wide, utf8
 		CU_ASSERT( wide = wstr(uchr(&hE9, &h4E2D, &h1F600)) )
-		CU_ASSERT( utf8 = uchr(&hE9, &h4E2D) )
+		#if sizeof(wstring) = 1
+			CU_ASSERT( utf8 = uchr(&hE9, &h2D) )
+		#else
+			CU_ASSERT( utf8 = uchr(&hE9, &h4E2D) )
+		#endif
 	END_TEST
 
 	TEST( every_mixed_optional_overload )
-		dim as ustring sourceU = uchr(65, &hE9, &h1F600)
+		dim as ustring sourceU = uchr(65, &hE9, MIXED_TAIL)
 		dim as ustring patternU = uchr(&hE9)
-		dim as ustring replacementU = uchr(&h4E2D)
+		dim as ustring replacementU = uchr(MIXED_REPLACEMENT)
 		dim as wstring * 32 sourceW = wstr(sourceU)
 		dim as wstring * 32 patternW = wstr(patternU)
 		dim as wstring * 32 replacementW = wstr(replacementU)
 		dim as string sourceS = cast(string, sourceU)
 		dim as string patternS = cast(string, patternU)
 		dim as string replacementS = cast(string, replacementU)
-		dim as ustring expected = uchr(65, &h4E2D, &h1F600)
+		dim as ustring expected = uchr(65, MIXED_REPLACEMENT, MIXED_TAIL)
 
 		#macro check_replacements(source, pattern)
 			CU_ASSERT( ustring(Replace(source, pattern, replacementS)) = expected )
@@ -165,7 +191,13 @@ SUITE( fbc_tests.string_.text_types )
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL750 REASON: Haiku and Windows runtimes implement these environment APIs.
 		CU_ASSERT_EQUAL( setenviron(wide), 0 )
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL750 REASON: Haiku and Windows runtimes implement these environment APIs.
-		CU_ASSERT( ustring(environ(wstr("FBC_TEXT_TYPES_TEST"))) = uchr(&hE9, &h4E2D) )
+		#if sizeof(wstring) = 1
+			'' The shared environment overload encodes the representable wide
+			'' characters as UTF-8; WCHR has already truncated the second scalar.
+			CU_ASSERT( ustring(environ(wstr("FBC_TEXT_TYPES_TEST"))) = uchr(&hE9, &h2D) )
+		#else
+			CU_ASSERT( ustring(environ(wstr("FBC_TEXT_TYPES_TEST"))) = uchr(&hE9, &h4E2D) )
+		#endif
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL750 REASON: Haiku and Windows runtimes implement these environment APIs.
 		CU_ASSERT_EQUAL( setenviron(utf8), 0 )
 		'' FB-LINTER: DISABLE-NEXT-LINE FBL750 REASON: Haiku and Windows runtimes implement these environment APIs.
@@ -188,8 +220,15 @@ SUITE( fbc_tests.string_.text_types )
 	TEST( paths_and_file_helpers )
 		dim as string filenameStem = "text-types-" + str(getpid())
 		dim as string tempExtension = textTypesTempFileExtension()
-		dim as wstring * 128 wide = wstr(filenameStem + "-") + wchr(&hE9, &h4E2D) + wstr(tempExtension)
-		dim as ustring utf8 = filenameStem + "-" + uchr(&hE9, &h4E2D) + tempExtension
+		#if sizeof(wstring) = 1
+			'' A byte-wide DOS path and a UTF-8 path share the same spelling only
+			'' in the ASCII range. Unicode USTRING paths have their own test below.
+			dim as wstring * 128 wide = wstr(filenameStem + "-wide" + tempExtension)
+			dim as ustring utf8 = filenameStem + "-wide" + tempExtension
+		#else
+			dim as wstring * 128 wide = wstr(filenameStem + "-") + wchr(&hE9, &h4E2D) + wstr(tempExtension)
+			dim as ustring utf8 = filenameStem + "-" + uchr(&hE9, &h4E2D) + tempExtension
+		#endif
 		dim as integer handle = freefile()
 		CU_ASSERT_EQUAL( open(wide for output as #handle), 0 )
 		print #handle, "abc"
@@ -256,9 +295,34 @@ SUITE( fbc_tests.string_.text_types )
 		line input #handle, lineText
 		CU_ASSERT( lineText = utf8 + uchr(&hE9) )
 		line input #handle, lineText
-		CU_ASSERT( lineText = utf8 + uchr(&hE9) )
+		#if sizeof(wstring) = 1
+			CU_ASSERT( lineText = uchr(&hE9, 63, 63, &hE9) )
+		#else
+			CU_ASSERT( lineText = utf8 + uchr(&hE9) )
+		#endif
 		close #handle
 		if FileExists(filename) then CU_ASSERT_EQUAL( kill(filename), 0 )
+	END_TEST
+
+	TEST( unicode_paths )
+		'' Exercise Unicode paths independently of the range of WSTRING.
+		dim as ustring original = "text-types-unicode-" + str(getpid()) + uchr(&h4E2D, &h1F600)
+		original += textTypesTempFileExtension()
+		dim as ustring copied = "copy-" + original
+		dim as ustring renamed = "renamed-" + original
+		dim as integer handle = freefile()
+		CU_ASSERT_EQUAL( open(original for output as #handle), 0 )
+		print #handle, "abc"
+		close #handle
+		CU_ASSERT( FileExists(original) )
+		CU_ASSERT_EQUAL( FileCopy(original, copied), 0 )
+		CU_ASSERT_EQUAL( FileLen(original), FileLen(copied) )
+		CU_ASSERT( len(dir(original)) > 0 )
+		if FileExists(copied) then name copied as renamed
+		CU_ASSERT( FileExists(renamed) )
+		if FileExists(original) then CU_ASSERT_EQUAL( kill(original), 0 )
+		if FileExists(copied) then CU_ASSERT_EQUAL( kill(copied), 0 )
+		if FileExists(renamed) then CU_ASSERT_EQUAL( kill(renamed), 0 )
 	END_TEST
 
 	TEST( long_unicode_formats )

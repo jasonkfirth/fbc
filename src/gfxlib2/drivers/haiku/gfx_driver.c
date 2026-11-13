@@ -71,13 +71,13 @@ extern const GFXDRIVER fb_gfxDriverHaikuOpenGL;
     Order therefore determines driver priority.
 */
 
-const GFXDRIVER *__fb_gfx_drivers_list[] =
+const GFXDRIVER *fb_gfx_drivers_list[] =
 {
 #ifndef DISABLE_OPENGL
     &fb_gfxDriverHaikuOpenGL,
 #endif
     &fb_gfxDriverHaiku,   /* Primary Haiku graphics backend */
-    &__fb_gfxDriverNull,  /* Fallback driver */
+    &fb_gfxDriverNull,  /* Fallback driver */
     NULL
 };
 

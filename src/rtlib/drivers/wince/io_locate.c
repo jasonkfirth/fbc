@@ -36,14 +36,14 @@ int fb_ConsoleLocate( int row, int column, int cursor )
 	int result;
 
 	if( column < 1 )
-		column = __fb_con.cursor_x + 1;
+		column = fb_console_context.cursor_x + 1;
 	if( row < 1 )
-		row = __fb_con.cursor_y + 1;
+		row = fb_console_context.cursor_y + 1;
 
-	column = hClamp( column, 1, __fb_con.columns );
-	row = hClamp( row, 1, __fb_con.rows );
+	column = hClamp( column, 1, fb_console_context.columns );
+	row = hClamp( row, 1, fb_console_context.rows );
 	result = (column & 0xFF) | ((row & 0xFF) << 8) |
-	         (__fb_con.cursor_visible ? 0x10000 : 0);
+	         (fb_console_context.cursor_visible ? 0x10000 : 0);
 
 	fb_ConsoleLocateRawEx( NULL, row - 1, column - 1, cursor );
 	return result;
@@ -53,11 +53,11 @@ void fb_ConsoleLocateRawEx( HANDLE console, int row, int column, int cursor )
 {
 	(void)console;
 	if( column >= 0 )
-		__fb_con.cursor_x = hClamp( column, 0, __fb_con.columns - 1 );
+		fb_console_context.cursor_x = hClamp( column, 0, fb_console_context.columns - 1 );
 	if( row >= 0 )
-		__fb_con.cursor_y = hClamp( row, 0, __fb_con.rows - 1 );
+		fb_console_context.cursor_y = hClamp( row, 0, fb_console_context.rows - 1 );
 	if( cursor >= 0 )
-		__fb_con.cursor_visible = (cursor != 0);
+		fb_console_context.cursor_visible = (cursor != 0);
 }
 
 FBCALL void fb_ConsoleLocateRaw( int row, int column, int cursor )

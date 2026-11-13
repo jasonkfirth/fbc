@@ -6,7 +6,72 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: qualified pointer slots, November 13
+# Current selected compiler: Intel assembly storage, November 13
+
+`build/main-gcc/bin/fbc.exe` now selects
+`c3f2b1e625e7fde905a22808944ca5c6a23f73bb4a096d8ee17ddfdd79fba846`.
+The existing pointer-slot image,
+`1b874138079b497b1cef2ca13aba6dbf07a6ff6b7117d0f42f556004b57850eb`,
+is its immediate rollback. Fourteen previous selected-path value checks and
+four new Win32/Win64 assembly executions pass through the selected prefix.
+Installed release executables and runtime archives remain unchanged.
+
+The [assembly-address repair](c-emitter-asm-addresses.md) reduces the original
+Win32 RotoZoomASM operand count from 48 to 27 and keeps one source parameter
+home throughout each call, including escaped addresses and floating bits.
+Its 224-unit GCC-clean fixed point, complete GCC/Clang backend suite,
+32 native value cases, 16 original-module objects and eight semantic-model
+checks pass. Win64 exports and instructions remain identical in all eight
+module comparisons. The isolated observer-helper DJGPP amendment retains
+four exact Win32/Win64 preprocessor identities and receives separate object
+qualification before selection.
+
+| Complete current queue | Profiles | Accepted C | GCC | Clang |
+| --- | ---: | ---: | ---: | ---: |
+| Retained census | 6,419 | 6,313 | 14 | 15,824 |
+| Retained plus recovered fbrtLib | 6,433 | 6,327 | 15 | 15,830 |
+| Separate fb-ext-lib expansion | 194 | 186 | 0 | 159 |
+| Separate Tiko expansion | 126 | 126 | 1 | 4,628 |
+
+The expansions overlap retained coverage and must not be summed. Compiler
+and fbctests generated C still have zero GCC warnings. All 7,319 original
+source-warning lines, twenty retained refusal signatures and eight fb-ext-lib
+refusals are preserved. Seven retained C profiles change; all three expansions
+retain their prior C identities. The only native class increase is one Clang
+pre-C99 declaration-placement advisory in fbsound's mixed floating/integer
+assembly parameter prologue. That code is valid C99 and later; the advisory
+remains counted without suppression. It is not a BASIC source fault.
+
+Retained/Tiko scratch peaks are 29,122,488 / 63,839,013 bytes under their
+64/96 MiB caps. fb-ext-lib and recovered fbrtLib peak at 3,036,689 / 227,400
+bytes. The source cut records the exact uncommitted compiler inputs before
+the full-tree commit, including the concurrent DOS context.
+
+Current receipts reuse `build/c-emitter-forward-views-20261105/`:
+`asm-address-selfhost-v5-20261113.json.zlib`,
+`asm-address-gates-v6-20261113.json.zlib`,
+`asm-address-values-v7-20261113.json.zlib`,
+`asm-address-semantic-v1-20261113.json.zlib`,
+`asm-address-modules-v5-20261113.json.zlib`,
+`asm-address-cohort-close-v1-20261113.json.zlib`, and
+`asm-address-selected-publish-v2-20261113.json.zlib`.
+The databases are `asm-address-retained-v1-20261113.sqlite3`,
+`current-fbext-asm-address-v1-20261113.sqlite3`,
+`current-tiko-asm-address-v1-20261113.sqlite3` and
+`asm-address-fbrt-v1-20261113.sqlite3`.
+
+The separate Win32 RotoZoom module still retains 65 unused-code observations
+per native compiler, and unoptimized i386 PIC retains its verified baseline
+register limit. Broader Clang cleanup, foreign providers and JRPG refresh
+remain open. These warning totals do not include the separate native C
+[runtime library audit](library-warning-audit.md). Its current cross-header
+runtime checks pass all 36 compiler/threading cases with immutable library
+copies, preserving installed products. PNG work remains excluded.
+
+# Historical selected compiler: qualified pointer slots, November 13
+
+At this earlier cut, the queue totals below describe the selected pointer-slot
+compiler before the Intel assembly repair.
 
 `build/main-gcc/bin/fbc.exe` selects
 `1b874138079b497b1cef2ca13aba6dbf07a6ff6b7117d0f42f556004b57850eb`.

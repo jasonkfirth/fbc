@@ -124,9 +124,9 @@ int fb_sfxMusicLoad(const char *filename)
 
     fb_sfxRuntimeLock();
 
-    old_data = __fb_sfx->music.data;
+    old_data = fb_sfx_context->music.data;
     fb_sfxMusicStopLocked();
-    __fb_sfx->music = next_asset;
+    fb_sfx_context->music = next_asset;
 
     fb_sfxRuntimeUnlock();
 
@@ -156,15 +156,15 @@ void fb_sfxMusicUnload(void)
 
     fb_sfxRuntimeLock();
 
-    old_data = __fb_sfx->music.data;
+    old_data = fb_sfx_context->music.data;
     fb_sfxMusicStopLocked();
 
-    __fb_sfx->music.data = NULL;
-    __fb_sfx->music.size = 0;
-    __fb_sfx->music.frames = 0;
-    __fb_sfx->music.sample_rate = 0;
-    __fb_sfx->music.loaded = 0;
-    __fb_sfx->music.name[0] = '\0';
+    fb_sfx_context->music.data = NULL;
+    fb_sfx_context->music.size = 0;
+    fb_sfx_context->music.frames = 0;
+    fb_sfx_context->music.sample_rate = 0;
+    fb_sfx_context->music.loaded = 0;
+    fb_sfx_context->music.name[0] = '\0';
 
     fb_sfxRuntimeUnlock();
 

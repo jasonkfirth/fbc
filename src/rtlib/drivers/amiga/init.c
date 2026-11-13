@@ -33,7 +33,7 @@
 #include <proto/exec.h>
 
 FB_RTLIB_CTX fb_ctx;
-static int __fb_is_inicnt = 0;
+static int fb_runtime_init_count = 0;
 static APTR previous_requester_window;
 void fb_hAmigaInitAllocator(void);
 void fb_hAmigaInitFileDescriptors(void);
@@ -50,8 +50,8 @@ void fb_hRtInit(void)
     fb_hAmigaInitAllocator();
     fb_hAmigaInitFileDescriptors();
     fb_hAmigaDebug("rtinit");
-    ++__fb_is_inicnt;
-    if (__fb_is_inicnt != 1)
+    ++fb_runtime_init_count;
+    if (fb_runtime_init_count != 1)
         return;
 
     /* BASIC reports filesystem failures through its return values and ERR.
@@ -75,8 +75,8 @@ void fb_hRtInit(void)
 
 void fb_hRtExit(void)
 {
-    --__fb_is_inicnt;
-    if (__fb_is_inicnt != 0)
+    --fb_runtime_init_count;
+    if (fb_runtime_init_count != 0)
         return;
 
     /* A BASIC destructor may use sound or graphics after fb_End() closed

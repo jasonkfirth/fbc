@@ -41,15 +41,15 @@ size_t fb_gfx3_target_backend_default_list(
 
 	if ((backends == NULL) || (capacity == 0u))
 		return 0u;
-	backends[count++] = &__fb_gfx3_backend_vulkan;
+	backends[count++] = &fb_gfx3_backend_vulkan;
 	if (count < capacity)
-		backends[count++] = &__fb_gfx3_backend_gles;
+		backends[count++] = &fb_gfx3_backend_gles;
 	return count;
 }
 
 const FB_GFX3_BACKEND_VTABLE *fb_gfx3_target_opengl_backend(void)
 {
-	return &__fb_gfx3_backend_gles;
+	return &fb_gfx3_backend_gles;
 }
 
 size_t fb_gfx3_target_image_cache_snapshot_budget(void)

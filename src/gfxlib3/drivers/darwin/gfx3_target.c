@@ -36,7 +36,7 @@ size_t fb_gfx3_target_backend_default_list(
 {
 	if ((backends == NULL) || (capacity == 0u))
 		return 0u;
-	backends[0] = &__fb_gfx3_backend_vulkan;
+	backends[0] = &fb_gfx3_backend_vulkan;
 	return 1u;
 }
 

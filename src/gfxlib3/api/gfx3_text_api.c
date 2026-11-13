@@ -24,6 +24,7 @@
         - platform text APIs
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../gfx3_backend_opengl.h"
 #include "../gfx3_backend_vulkan.h"
@@ -34,10 +35,6 @@
 
 #include <math.h>
 
-FBCALL int fb_GfxPut(void *target, float x, float y,
-	unsigned char *source, int x1, int y1, int x2, int y2, int flags,
-	int mode, PUTTER *putter, int alpha, BLENDER *blender,
-	void *parameter);
 
 /* ------------------------------------------------------------------------- */
 /* Common coordinate and color helpers                                      */
@@ -211,9 +208,9 @@ static int text_draw_builtin_gpu(FB_GFX3_SURFACE *target,
 		color);
 	if ((primitive_flags == 0u) && (target->context != NULL) &&
 	    ((target->context->renderer.backend_vtable ==
-	      &__fb_gfx3_backend_opengl) ||
+	      &fb_gfx3_backend_opengl) ||
 	     (target->context->renderer.backend_vtable ==
-	      &__fb_gfx3_backend_vulkan))) {
+	      &fb_gfx3_backend_vulkan))) {
 		FB_GFX3_GLYPH *glyphs = NULL;
 		FB_GFX3_GLYPH local_glyphs[32];
 		uint32_t glyph_count = 0u;
@@ -305,9 +302,9 @@ static int text_draw_builtin_screen(FB_GFX3_DRAW_STATE *state,
 		state->mode->depth, color);
 	if ((primitive_flags == 0u) &&
 	    ((state->mode->context.renderer.backend_vtable ==
-	      &__fb_gfx3_backend_opengl) ||
+	      &fb_gfx3_backend_opengl) ||
 	     (state->mode->context.renderer.backend_vtable ==
-	      &__fb_gfx3_backend_vulkan))) {
+	      &fb_gfx3_backend_vulkan))) {
 		FB_GFX3_GLYPH *glyphs = NULL;
 		FB_GFX3_GLYPH local_glyphs[32];
 		uint32_t glyph_count = 0u;

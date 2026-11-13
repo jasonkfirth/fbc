@@ -107,7 +107,7 @@ void fb_sfxEnvelopeCmd(
     if (sustain > FB_SFX_ENV_SUSTAIN_MAX)
         sustain = FB_SFX_ENV_SUSTAIN_MAX;
 
-    env = &__fb_sfx->envelopes[id];
+    env = &fb_sfx_context->envelopes[id];
 
     env->attack  = attack;
     env->decay   = decay;
@@ -129,13 +129,13 @@ void fb_sfxEnvelopeCmd(
 
 int fb_sfxEnvelopeDefined(int id)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     if (id < 0 || id >= FB_SFX_MAX_ENVELOPES)
         return 0;
 
-    return __fb_sfx->envelopes[id].defined;
+    return fb_sfx_context->envelopes[id].defined;
 }
 
 
@@ -151,7 +151,7 @@ void fb_sfxEnvelopeCmdReset(void)
         return;
 
     for (i = 0; i < FB_SFX_MAX_ENVELOPES; i++)
-        __fb_sfx->envelopes[i].defined = 0;
+        fb_sfx_context->envelopes[i].defined = 0;
 
     SFX_DEBUG("sfx_envelope_cmd: all envelopes reset");
 }

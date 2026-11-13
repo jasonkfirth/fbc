@@ -44,7 +44,7 @@ static __stdcall LONG exception_filter( LPEXCEPTION_POINTERS info )
 }
 #endif
 
-typedef struct _FB_SIGHANDLER {
+typedef struct FB_SIGHANDLER {
 	int		errnum;
 	void 	(*oldhnd)(int);
 } FB_SIGHANDLER;

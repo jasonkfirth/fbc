@@ -24,8 +24,8 @@
         - input-event translation
 */
 
-#ifndef __FB_GFX3_PLATFORM_H__
-#define __FB_GFX3_PLATFORM_H__
+#ifndef FB_GFX3_PLATFORM_H
+#define FB_GFX3_PLATFORM_H
 
 #include "fb_gfx3.h"
 #include "gfx3_presentation.h"

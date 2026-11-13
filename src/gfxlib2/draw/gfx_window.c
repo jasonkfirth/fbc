@@ -16,7 +16,7 @@ FBCALL void fb_GfxWindow(float x1, float y1, float x2, float y2, int screen)
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}

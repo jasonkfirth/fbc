@@ -164,7 +164,7 @@ static DWORD WINAPI wasapi_audio_worker(LPVOID unused)
 
     while (InterlockedCompareExchange(&g_worker_stop, 0, 0) == 0)
     {
-        if (__fb_sfx && __fb_sfx->shutting_down)
+        if (fb_sfx_context && fb_sfx_context->shutting_down)
         {
             Sleep(5);
             continue;
@@ -379,8 +379,8 @@ static int wasapi_init(int rate, int channels, int buffer_size, int flags)
         so leaving it at the default while WASAPI picked a different mix rate
         makes audible timing and pitch feel wrong.
     */
-    if (__fb_sfx && g_mix_format->nSamplesPerSec > 0)
-        __fb_sfx->samplerate = (int)g_mix_format->nSamplesPerSec;
+    if (fb_sfx_context && g_mix_format->nSamplesPerSec > 0)
+        fb_sfx_context->samplerate = (int)g_mix_format->nSamplesPerSec;
 
     buffer_duration = (REFERENCE_TIME)((10000000.0 * (double)buffer_size) /
                                        (double)g_mix_format->nSamplesPerSec);
@@ -497,8 +497,8 @@ static int wasapi_write(const float *buffer, int frames)
     if (!g_audio || !g_render || !g_mix_format || !buffer || frames <= 0)
         return -1;
 
-    src_channels = (__fb_sfx && __fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    src_channels = (fb_sfx_context && fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
     fb_sfxDriverDiagnostics("WASAPI", buffer, frames, src_channels);
@@ -596,11 +596,11 @@ static const FB_SFX_DRIVER fb_sfxDriverWASAPI =
 /* Driver registry                                                           */
 /* ------------------------------------------------------------------------- */
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
     &fb_sfxDriverWASAPI,
     &fb_sfxDriverWinMM,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

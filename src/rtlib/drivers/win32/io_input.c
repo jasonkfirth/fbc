@@ -17,14 +17,14 @@ static unsigned key_scratch_pad = 0;
 static int key_buffer_changed = FALSE;
 static int console_has_focus = TRUE;
 
-typedef struct _FB_KEY_CODES {
+typedef struct FB_KEY_CODES {
     unsigned short value_normal;
     unsigned short value_shift;
     unsigned short value_ctrl;
     unsigned short value_alt;
 } FB_KEY_CODES;
 
-typedef struct _FB_KEY_LIST_ENTRY {
+typedef struct FB_KEY_LIST_ENTRY {
     unsigned short            scan_code;
     const FB_KEY_CODES        codes;
 } FB_KEY_LIST_ENTRY;
@@ -424,8 +424,8 @@ int fb_ConsoleProcessEvents( void )
                 break;
 
             case MOUSE_EVENT:
-                if( __fb_con.mouseEventHook != (fb_FnProcessMouseEvent) NULL ) {
-                    __fb_con.mouseEventHook( &ir.Event.MouseEvent );
+                if( fb_console_context.mouseEventHook != (fb_FnProcessMouseEvent) NULL ) {
+                    fb_console_context.mouseEventHook( &ir.Event.MouseEvent );
                     got_event = TRUE;
                 }
                 break;

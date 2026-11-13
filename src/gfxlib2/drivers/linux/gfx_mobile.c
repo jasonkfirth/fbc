@@ -45,9 +45,9 @@ static void linux_maliit_post_key(void *user_data, uint32_t key,
 	 * the driver lock here: shutdown may already hold the optional runtime
 	 * graphics lock while it waits for the callback to finish.
 	 */
-	if (__fb_gfx && __fb_gfx->driver && __fb_gfx->driver->lock &&
-	    __fb_gfx->driver->unlock) {
-		driver = __fb_gfx->driver;
+	if (fb_gfx && fb_gfx->driver && fb_gfx->driver->lock &&
+	    fb_gfx->driver->unlock) {
+		driver = fb_gfx->driver;
 		driver->lock();
 		/* Unicode text is an event, not a legacy extended INKEY code. */
 		if (kind == FB_LINUX_MALIIT_KEY || key <= 0xffu)
@@ -252,7 +252,7 @@ void fb_hMobileControl(int what, ssize_t *p1, ssize_t *p2,
 		 * leave an application permanently panned after the IME closes. */
 		if (visible == -2 && *p2 != 0 && fb_hLinuxOskIsHildon()) {
 			FB_GRAPHICS_LOCK();
-			if (__fb_gfx && fb_x11.display && fb_hX11WindowHasFocus())
+			if (fb_gfx && fb_x11.display && fb_hX11WindowHasFocus())
 				visible = 0;
 			FB_GRAPHICS_UNLOCK();
 		}
@@ -298,9 +298,9 @@ void fb_hMobileControl(int what, ssize_t *p1, ssize_t *p2,
 
 	FB_GRAPHICS_LOCK();
 	fb_hApplyPendingResize();
-	if (__fb_gfx) {
-		*p1 = __fb_gfx->w;
-		*p2 = __fb_gfx->h;
+	if (fb_gfx) {
+		*p1 = fb_gfx->w;
+		*p2 = fb_gfx->h;
 	} else {
 		const char *mir_socket = getenv("MIR_SOCKET");
 		const char *display = getenv("DISPLAY");
@@ -328,7 +328,7 @@ void fb_hMobileControl(int what, ssize_t *p1, ssize_t *p2,
 		FB_WAYLAND_DISPLAY_INFO info;
 		if (fb_hWaylandDisplayInfo(&info) == 0) {
 			/* Before mode setup, the active Wayland output supplies screen size. */
-			if (!__fb_gfx && info.width > 0 && info.height > 0) {
+			if (!fb_gfx && info.width > 0 && info.height > 0) {
 				*p1 = info.width;
 				*p2 = info.height;
 			}

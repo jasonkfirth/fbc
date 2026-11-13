@@ -93,6 +93,9 @@ FB_CRT_IOB_PROC fb_CrtImpAcrtIobFunc
 #undef FB_CRT_CDECL
 #undef FB_CRT_WEAK
 
+#else
+/* Keep the Win64 translation unit valid without defining 32-bit symbols. */
+typedef int fb_crt_iob_compat_empty_translation_unit;
 #endif
 
 /* end of drivers/win32/crt_iob_compat.c */

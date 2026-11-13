@@ -86,6 +86,10 @@ Intel documents CPUID, carry handling and bounded retries in the
 The implementation uses these platform facilities directly, without defining
 a new cryptographic generator.
 
+The Windows-hosted DOSBox-X device patch and its build recipe are retained in
+`contrib/dosbox-x/`. The handoff pins the upstream release and keeps the host
+component reproducible independently of private qualification directories.
+
 ## DOS control protocol
 
 `INT 21h`, `AX=4402h`, reads the device control channel into `DS:DX`. The caller

@@ -16,7 +16,7 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t chars, int mask
 	size_t avail, avail_len;
 	char *temp;
 
-	if( !__fb_con.inited )
+	if( !fb_console_context.inited )
 	{
 		ssize_t bytes;
 		temp = alloca( chars * 4 + 1 );
@@ -34,7 +34,7 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t chars, int mask
 	BG_UNLOCK( );
 
 	/* ToDo: handle scrolling for internal characters/attributes buffer? */
-	avail = (__fb_con.w * __fb_con.h) - (((__fb_con.cur_y - 1) * __fb_con.w) + __fb_con.cur_x - 1);
+	avail = (fb_console_context.w * fb_console_context.h) - (((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1);
 	avail_len = chars;
 	if (avail < avail_len)
 		avail_len = avail;
@@ -45,12 +45,12 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t chars, int mask
 	*/
 	fb_wstr_ConvToA( temp, avail_len, buffer );
 
-	memcpy( __fb_con.char_buffer + ((__fb_con.cur_y - 1) * __fb_con.w) + __fb_con.cur_x - 1,
+	memcpy( fb_console_context.char_buffer + ((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1,
 	        temp,
 	        avail_len );
 
-	memset( __fb_con.attr_buffer + ((__fb_con.cur_y - 1) * __fb_con.w) + __fb_con.cur_x - 1,
-	        __fb_con.fg_color | (__fb_con.bg_color << 4),
+	memset( fb_console_context.attr_buffer + ((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1,
+	        fb_console_context.fg_color | (fb_console_context.bg_color << 4),
 	        avail_len );
 
 	/* convert wchar_t to UTF-8 */
@@ -69,13 +69,13 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t chars, int mask
 	/* update x and y coordinates.. */
 	for( ; chars; chars--, buffer++ )
 	{
-		++__fb_con.cur_x;
-		if( (*buffer == FB_WCHAR_LITERAL('\n')) || (__fb_con.cur_x >= __fb_con.w) )
+		++fb_console_context.cur_x;
+		if( (*buffer == FB_WCHAR_LITERAL('\n')) || (fb_console_context.cur_x >= fb_console_context.w) )
 		{
-			__fb_con.cur_x = 1;
-			++__fb_con.cur_y;
-			if( __fb_con.cur_y > __fb_con.h )
-				__fb_con.cur_y = __fb_con.h;
+			fb_console_context.cur_x = 1;
+			++fb_console_context.cur_y;
+			if( fb_console_context.cur_y > fb_console_context.h )
+				fb_console_context.cur_y = fb_console_context.h;
 		}
 	}
 

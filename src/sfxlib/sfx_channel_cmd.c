@@ -67,8 +67,8 @@ void fb_sfxChannelCmd(int channel)
     if (channel >= FB_SFX_MAX_CHANNELS)
         channel = FB_SFX_MAX_CHANNELS - 1;
 
-    __fb_sfx->current_channel = channel;
-    __fb_sfx->channel_context_active = 1;
+    fb_sfx_context->current_channel = channel;
+    fb_sfx_context->channel_context_active = 1;
 
     SFX_DEBUG(
         "sfx_channel_cmd: current channel set to %d",
@@ -83,10 +83,10 @@ void fb_sfxChannelCmd(int channel)
 
 int fb_sfxChannelCmdGet(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
-    return __fb_sfx->current_channel;
+    return fb_sfx_context->current_channel;
 }
 
 
@@ -99,8 +99,8 @@ void fb_sfxChannelCmdReset(void)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    __fb_sfx->current_channel = 0;
-    __fb_sfx->channel_context_active = 0;
+    fb_sfx_context->current_channel = 0;
+    fb_sfx_context->channel_context_active = 0;
 
     SFX_DEBUG(
         "sfx_channel_cmd: current channel reset to 0"
@@ -123,11 +123,11 @@ void fb_sfxChannelCmdReset(void)
 
 int fb_sfxResolveChannel(int channel)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     if (channel < 0)
-        return __fb_sfx->current_channel;
+        return fb_sfx_context->current_channel;
 
     if (channel >= FB_SFX_MAX_CHANNELS)
         return FB_SFX_MAX_CHANNELS - 1;

@@ -23,6 +23,7 @@
         - file input for handles other than standard input
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_console.h"
 #include "../gfx3_line_input.h"
 

@@ -10,7 +10,7 @@
 
 #include <limits.h>
 
-typedef struct _fb_PrintInfo {
+typedef struct FB_PRINT_INFO {
     fb_Rect         rWindow;
     fb_Coord        BufferSize;
     WORD            wAttributes;
@@ -249,8 +249,8 @@ void fb_ConsolePrintBufferEx( const void *buffer, size_t len, int mask )
             info.wAttributes = screen_info.wAttributes;
         }
 
-        if( __fb_con.scrollWasOff ) {
-            __fb_con.scrollWasOff = FALSE;
+        if( fb_console_context.scrollWasOff ) {
+            fb_console_context.scrollWasOff = FALSE;
             ++hooks.Coord.Y;
             hooks.Coord.X = hooks.Border.Left;
             fb_hConCheckScroll( &hooks );
@@ -268,7 +268,7 @@ void fb_ConsolePrintBufferEx( const void *buffer, size_t len, int mask )
         }
         else
         {
-            __fb_con.scrollWasOff = TRUE;
+            fb_console_context.scrollWasOff = TRUE;
             hooks.Coord.X = hooks.Border.Right;
             hooks.Coord.Y = hooks.Border.Bottom;
         }

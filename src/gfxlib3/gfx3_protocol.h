@@ -22,8 +22,8 @@
         - FreeBASIC parser state
 */
 
-#ifndef __FB_GFX3_PROTOCOL_H__
-#define __FB_GFX3_PROTOCOL_H__
+#ifndef FB_GFX3_PROTOCOL_H
+#define FB_GFX3_PROTOCOL_H
 
 #include "gfx3_command.h"
 

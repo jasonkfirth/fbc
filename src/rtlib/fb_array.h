@@ -11,12 +11,12 @@ typedef struct FBARRAYDIM_ {
 	ssize_t ubound;
 } FBARRAYDIM;
 
-typedef enum FBARRAY_FLAGS_ {
-	FBARRAY_FLAGS_DIMENSIONS = 0x0000000f,
-	FBARRAY_FLAGS_FIXED_DIM  = 0x00000010,
-	FBARRAY_FLAGS_FIXED_LEN  = 0x00000020,
-	FBARRAY_FLAGS_RESERVED   = 0xffffffc0
-} FBARRAY_FLAGS;
+/* Keep the reserved mask out of the enum because it does not fit in int. */
+typedef uint32_t FBARRAY_FLAGS;
+#define FBARRAY_FLAGS_DIMENSIONS ((FBARRAY_FLAGS)0x0000000fu)
+#define FBARRAY_FLAGS_FIXED_DIM  ((FBARRAY_FLAGS)0x00000010u)
+#define FBARRAY_FLAGS_FIXED_LEN  ((FBARRAY_FLAGS)0x00000020u)
+#define FBARRAY_FLAGS_RESERVED   ((FBARRAY_FLAGS)0xffffffc0u)
 
 /* DATA stores the native address bits for the virtual zero-index origin.
    It can lie outside the allocation, so form and adjust it through

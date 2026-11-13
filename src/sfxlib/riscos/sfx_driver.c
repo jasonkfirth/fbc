@@ -34,9 +34,9 @@
 
 extern const FB_SFX_DRIVER fb_sfxDriverRiscosDsp;
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] = {
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] = {
     &fb_sfxDriverRiscosDsp,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

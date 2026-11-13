@@ -7,15 +7,15 @@
  */
 #include "fb.h"
 
-#define FB_PRINT_BUFFER_SIZE 2048
-
 static void fb_hPrintPadEx ( FB_FILE *handle, int mask, int current_x, int new_x )
 {
 #ifdef FB_NATIVE_TAB
+	(void)mask;
     FB_PRINT_EX(handle, "\t", 1, mask);
 
 #else
     char tab_char_buffer[FB_TAB_WIDTH+1];
+	(void)mask;
     if (new_x <= current_x) {
         FB_PRINT_EX(handle, FB_NEWLINE, sizeof(FB_NEWLINE)-1, mask);
     } else {

@@ -75,10 +75,10 @@ static float fb_sfxSfxPitchStep(const FB_SFX_ASSET *asset, float pitch)
 
     if (asset &&
         asset->sample_rate > 0 &&
-        __fb_sfx &&
-        __fb_sfx->samplerate > 0)
+        fb_sfx_context &&
+        fb_sfx_context->samplerate > 0)
     {
-        step *= (float)asset->sample_rate / (float)__fb_sfx->samplerate;
+        step *= (float)asset->sample_rate / (float)fb_sfx_context->samplerate;
     }
 
     if (step <= 0.0f)
@@ -101,7 +101,7 @@ static void fb_sfxSfxStart(int channel, int id, float pitch, int loop)
 
     fb_sfxRuntimeLock();
 
-    asset = &__fb_sfx->sfx[id];
+    asset = &fb_sfx_context->sfx[id];
 
     if (!asset->loaded)
     {
@@ -119,7 +119,7 @@ static void fb_sfxSfxStart(int channel, int id, float pitch, int loop)
         return;
     }
 
-    voice_index = (int)(voice - __fb_sfx->voices);
+    voice_index = (int)(voice - fb_sfx_context->voices);
 
     voice->type = FB_SFX_VOICE_SFX;
     voice->sfx_id = id;
@@ -168,7 +168,7 @@ void fb_sfxSfxPlay(int id)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    channel = __fb_sfx->current_channel;
+    channel = fb_sfx_context->current_channel;
 
     fb_sfxSfxPlayChannel(channel, id);
 }
@@ -180,7 +180,7 @@ void fb_sfxSfxPlayPitch(int id, float pitch)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    channel = __fb_sfx->current_channel;
+    channel = fb_sfx_context->current_channel;
 
     fb_sfxSfxPlayChannelPitch(channel, id, pitch);
 }
@@ -229,7 +229,7 @@ void fb_sfxSfxLoop(int id)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    channel = __fb_sfx->current_channel;
+    channel = fb_sfx_context->current_channel;
 
     fb_sfxSfxLoopChannel(channel, id);
 }
@@ -241,7 +241,7 @@ void fb_sfxSfxLoopPitch(int id, float pitch)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    channel = __fb_sfx->current_channel;
+    channel = fb_sfx_context->current_channel;
 
     fb_sfxSfxLoopChannelPitch(channel, id, pitch);
 }

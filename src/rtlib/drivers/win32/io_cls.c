@@ -42,10 +42,10 @@ void fb_ConsoleClear( int mode )
     if( FB_CONSOLE_WINDOW_EMPTY() || mode==1 )
         return;
 
-    win_top = __fb_con.window.Top;
-    win_left = __fb_con.window.Left;
-    win_right = __fb_con.window.Right;
-    win_bottom = __fb_con.window.Bottom;
+    win_top = fb_console_context.window.Top;
+    win_left = fb_console_context.window.Left;
+    win_right = fb_console_context.window.Right;
+    win_bottom = fb_console_context.window.Bottom;
 
 	if( (mode == 2) || (mode == (int)0xFFFF0000) )	/* same as gfxlib's DEFAULT_COLOR */
     {

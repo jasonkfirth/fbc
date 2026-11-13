@@ -23,8 +23,8 @@
         - graphical console drawing
 */
 
-#ifndef __FB_GFX3_INPUT_H__
-#define __FB_GFX3_INPUT_H__
+#ifndef FB_GFX3_INPUT_H
+#define FB_GFX3_INPUT_H
 
 #include "fb_gfx3.h"
 #include "../rtlib/fb_drop.h"
@@ -143,6 +143,10 @@ typedef struct FB_GFX3_INPUT_STATE {
 	int text_region_width;
 	int text_region_height;
 	int initialized;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing 8-byte-aligned size. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_INPUT_STATE;
 
 int fb_gfx3_input_init(FB_GFX3_INPUT_STATE *input, uint32_t width,

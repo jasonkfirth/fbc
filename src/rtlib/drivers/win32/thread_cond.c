@@ -35,7 +35,7 @@ struct FBCOND_ {
 	};
 };
 
-typedef struct _FBCONDOPS
+typedef struct FB_CONDOPS
 {
 	FBCALL void (*create)    ( FBCOND *cond );
 	FBCALL void (*destroy)   ( FBCOND *cond );
@@ -61,8 +61,8 @@ static FBCALL void fb_CondWait_9x      ( FBCOND *cond, FBMUTEX *mutex );
 typedef DWORD (WINAPI * SIGNALOBJECTANDWAIT) (HANDLE, HANDLE, DWORD, BOOL );
 
 static SIGNALOBJECTANDWAIT pSignalObjectAndWait = NULL;
-static LONG __inited = FALSE;
-static FBCONDOPS __condops;
+static LONG fb_cond_inited = FALSE;
+static FBCONDOPS fb_cond_ops;
 
 static inline void fb_CondInit( void )
 {
@@ -73,7 +73,7 @@ static inline void fb_CondInit( void )
 	   them does the initialization while the other one waits. */
 	FB_MTLOCK();
 
-	if( __inited ) {
+	if( fb_cond_inited ) {
 		FB_MTUNLOCK();
 		return;
 	}
@@ -92,20 +92,20 @@ static inline void fb_CondInit( void )
 		        sizeof( pSignalObjectAndWait ) );
 	if( (pSignalObjectAndWait != NULL)
 	    && (pSignalObjectAndWait(NULL, NULL, 0, 0) == WAIT_FAILED) ) {
-		__condops.create    = fb_CondCreate_nt;
-		__condops.destroy   = fb_CondDestroy_nt;
-		__condops.signal    = fb_CondSignal_nt;
-		__condops.broadcast = fb_CondBroadcast_nt;
-		__condops.wait      = fb_CondWait_nt;
+		fb_cond_ops.create    = fb_CondCreate_nt;
+		fb_cond_ops.destroy   = fb_CondDestroy_nt;
+		fb_cond_ops.signal    = fb_CondSignal_nt;
+		fb_cond_ops.broadcast = fb_CondBroadcast_nt;
+		fb_cond_ops.wait      = fb_CondWait_nt;
 	} else {
-		__condops.create    = fb_CondCreate_9x;
-		__condops.destroy   = fb_CondDestroy_9x;
-		__condops.signal    = fb_CondSignal_9x;
-		__condops.broadcast = fb_CondBroadcast_9x;
-		__condops.wait      = fb_CondWait_9x;
+		fb_cond_ops.create    = fb_CondCreate_9x;
+		fb_cond_ops.destroy   = fb_CondDestroy_9x;
+		fb_cond_ops.signal    = fb_CondSignal_9x;
+		fb_cond_ops.broadcast = fb_CondBroadcast_9x;
+		fb_cond_ops.wait      = fb_CondWait_9x;
 	}
 
-	__inited = TRUE;
+	fb_cond_inited = TRUE;
 
 	FB_MTUNLOCK();
 }
@@ -122,7 +122,7 @@ FBCALL FBCOND *fb_CondCreate( void )
 
 	cond->waiters_count = 0;
 	InitializeCriticalSection( &cond->waiters_count_lock );
-	__condops.create( cond );
+	fb_cond_ops.create( cond );
 
 	return cond;
 }
@@ -132,7 +132,7 @@ FBCALL void fb_CondDestroy( FBCOND *cond )
 	if( !cond )
 		return;
 	DeleteCriticalSection( &cond->waiters_count_lock );
-	__condops.destroy( cond );
+	fb_cond_ops.destroy( cond );
 	free( cond );
 }
 
@@ -148,21 +148,21 @@ FBCALL void fb_CondSignal( FBCOND *cond )
 	LeaveCriticalSection( &cond->waiters_count_lock );
 
 	if( has_waiters ) {
-		__condops.signal( cond );
+		fb_cond_ops.signal( cond );
 	}
 }
 
 FBCALL void fb_CondBroadcast( FBCOND *cond )
 {
 	if( cond ) {
-		__condops.broadcast( cond );
+		fb_cond_ops.broadcast( cond );
 	}
 }
 
 FBCALL void fb_CondWait( FBCOND *cond, FBMUTEX *mutex )
 {
 	if( cond && mutex ) {
-		__condops.wait( cond, mutex );
+		fb_cond_ops.wait( cond, mutex );
 	}
 }
 

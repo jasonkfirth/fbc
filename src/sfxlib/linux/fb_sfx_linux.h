@@ -26,8 +26,8 @@
         • driver implementations
 */
 
-#ifndef __FB_SFX_LINUX_H__
-#define __FB_SFX_LINUX_H__
+#ifndef FB_SFX_LINUX_H
+#define FB_SFX_LINUX_H
 
 #ifndef DISABLE_LINUX
 

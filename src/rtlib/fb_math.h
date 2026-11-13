@@ -19,6 +19,10 @@ FBCALL void         fb_Randomize        ( double seed, int algorithm );
 FBCALL double       fb_Rnd              ( float n );
 FBCALL uint32_t     fb_Rnd32            ( void );
 
+#ifdef HOST_DOS
+FBCALL double       fb_DosTan           ( double value );
+#endif
+
 #define FB_RND_MAX_STATE 624
 
 typedef struct FB_RNDSTATE_ {

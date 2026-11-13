@@ -25,7 +25,7 @@
 
 extern const GFXDRIVER fb_gfxDriverAmiga;
 
-const GFXDRIVER *__fb_gfx_drivers_list[] =
+const GFXDRIVER *fb_gfx_drivers_list[] =
 {
     &fb_gfxDriverAmiga,
     NULL

@@ -1826,7 +1826,7 @@ static int null_wait_idle(FB_GFX3_BACKEND *backend)
 	return FB_GFX3_OK;
 }
 
-const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_null = {
+const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_null = {
 	FB_GFX3_BACKEND_ABI_VERSION,
 	"Null",
 	null_probe,

@@ -44,23 +44,23 @@ static int switched_to_fullscreen;
 static void alpha_remover_blitter(unsigned char *dest, int pitch)
 {
 	unsigned int *d, *s;
-	unsigned char *src = __fb_gfx->framebuffer;
+	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c;
-	char *dirty = __fb_gfx->dirty;
+	char *dirty = fb_gfx->dirty;
 	int x, y;
 
-	DBG_ASSERT((fb_win32.depth == 32) && (__fb_gfx->scanline_size == 1));
+	DBG_ASSERT((fb_win32.depth == 32) && (fb_gfx->scanline_size == 1));
 
-	for (y = __fb_gfx->h; y; y--) {
+	for (y = fb_gfx->h; y; y--) {
 		if (*dirty) {
 			s = (unsigned int *)src;
 			d = (unsigned int *)dest;
-			for (x = __fb_gfx->w; x; x--) {
+			for (x = fb_gfx->w; x; x--) {
 				c = *s++;
 				*d++ = c & ~MASK_A_32;
 			}
 		}
-		src += __fb_gfx->pitch;
+		src += fb_gfx->pitch;
 		dest += pitch;
 	}
 }
@@ -73,7 +73,7 @@ static void gdi_paint(void)
 	if (fb_win32.blitter)
 		source = buffer;
 	else
-		source = __fb_gfx->framebuffer;
+		source = fb_gfx->framebuffer;
 
 	hdc = GetDC(fb_win32.wnd);
 	SelectPalette(hdc, palette, FALSE);
@@ -180,7 +180,7 @@ static int gdi_init(void)
 	bitmap_info->bmiHeader.biClrUsed = 256;
 	bitmap_info->bmiHeader.biCompression = BI_RGB;
 
-	if ((fb_win32.depth >= 16) || (fb_win32.w & 0x3) || (__fb_gfx->scanline_size > 1)) {
+	if ((fb_win32.depth >= 16) || (fb_win32.w & 0x3) || (fb_gfx->scanline_size > 1)) {
 		if ((fb_win32.flags & DRIVER_SHAPED_WINDOW) && (fb_win32.depth == 32)) {
 			fb_win32.blitter = alpha_remover_blitter;
 		}
@@ -189,20 +189,20 @@ static int gdi_init(void)
 			if (!fb_win32.blitter)
 				return -1;
 		}
-		else if ((fb_win32.w & 0x3) || (__fb_gfx->scanline_size > 1)) {
+		else if ((fb_win32.w & 0x3) || (fb_gfx->scanline_size > 1)) {
 			fb_win32.blitter = fb_hGetBlitter(fb_win32.depth, FALSE);
 			if (!fb_win32.blitter)
 				return -1;
 		}
 		if(fb_win32.blitter) {
-			buffer = malloc(((fb_win32.w + 3) & ~3) * fb_win32.h * __fb_gfx->bpp);
+			buffer = malloc(((fb_win32.w + 3) & ~3) * fb_win32.h * fb_gfx->bpp);
 			if (!buffer)
 				return -1;
 		}
 	}
 
 	hdc = GetDC(fb_win32.wnd);
-	__fb_gfx->refresh_rate = GetDeviceCaps(hdc, VREFRESH);
+	fb_gfx->refresh_rate = GetDeviceCaps(hdc, VREFRESH);
 
 	lp = (LOGPALETTE *)malloc(sizeof(LOGPALETTE) + (sizeof(PALETTEENTRY) * 256));
 	if (!lp) {
@@ -262,7 +262,7 @@ static DWORD WINAPI gdi_thread( LPVOID param )
 	while (fb_win32.is_running)
 	{
 		fb_hWin32Lock();
-		scanline_size = __fb_gfx->scanline_size;
+		scanline_size = fb_gfx->scanline_size;
 		rect.right = fb_win32.w;
 
 		hdc = GetDC(fb_win32.wnd);
@@ -280,20 +280,20 @@ static DWORD WINAPI gdi_thread( LPVOID param )
 			fb_win32.is_palette_changed = FALSE;
 		}
 		/* Only do a single SetDIBitsToDevice call per frame */
-		for (y1 = 0; y1 < __fb_gfx->h; y1++) {
-			if (__fb_gfx->dirty[y1]) {
-				for (y2 = __fb_gfx->h - 1; !__fb_gfx->dirty[y2]; y2--)
+		for (y1 = 0; y1 < fb_gfx->h; y1++) {
+			if (fb_gfx->dirty[y1]) {
+				for (y2 = fb_gfx->h - 1; !fb_gfx->dirty[y2]; y2--)
 					;
 
 				if (fb_win32.blitter) {
 					y1 *= scanline_size;
 					y2 *= scanline_size;
-					fb_win32.blitter(buffer, (__fb_gfx->pitch + 3) & ~0x3);
-					source = buffer + (y1 * ((__fb_gfx->pitch + 3) & ~0x3));
+					fb_win32.blitter(buffer, (fb_gfx->pitch + 3) & ~0x3);
+					source = buffer + (y1 * ((fb_gfx->pitch + 3) & ~0x3));
 				}
 				else
 				{
-					source = __fb_gfx->framebuffer + (y1 * __fb_gfx->pitch);
+					source = fb_gfx->framebuffer + (y1 * fb_gfx->pitch);
 				}
 				h = (y2 - y1 + 1);
 
@@ -310,16 +310,16 @@ static DWORD WINAPI gdi_thread( LPVOID param )
 		}
 		ReleaseDC(fb_win32.wnd, hdc);
 
-		fb_hMemSet(__fb_gfx->dirty, FALSE, fb_win32.h);
+		fb_hMemSet(fb_gfx->dirty, FALSE, fb_win32.h);
 
         if( fb_win32.is_active ) {
             GetKeyboardState(keystate);
-            for (i = 0; __fb_keytable[i][0]; i++) {
-                if (__fb_keytable[i][2])
-                    __fb_gfx->key[__fb_keytable[i][0]] = ((keystate[__fb_keytable[i][1]] & 0x80) |
-                                                       (keystate[__fb_keytable[i][2]] & 0x80)) ? TRUE : FALSE;
+            for (i = 0; fb_keytable[i][0]; i++) {
+                if (fb_keytable[i][2])
+                    fb_gfx->key[fb_keytable[i][0]] = ((keystate[fb_keytable[i][1]] & 0x80) |
+                                                       (keystate[fb_keytable[i][2]] & 0x80)) ? TRUE : FALSE;
                 else
-                    __fb_gfx->key[__fb_keytable[i][0]] = (keystate[__fb_keytable[i][1]] & 0x80) ? TRUE : FALSE;
+                    fb_gfx->key[fb_keytable[i][0]] = (keystate[fb_keytable[i][1]] & 0x80) ? TRUE : FALSE;
             }
         }
 
@@ -362,12 +362,12 @@ static int driver_resize(int width, int height)
 	if ((width <= 0) || (height <= 0) || !bitmap_info)
 		return -1;
 	if ((size_t)height > ((size_t)INT_MAX /
-	    (size_t)__fb_gfx->scanline_size))
+	    (size_t)fb_gfx->scanline_size))
 		return -1;
-	physical_height = (size_t)height * (size_t)__fb_gfx->scanline_size;
-	if ((size_t)width > ((size_t)-1 / (size_t)__fb_gfx->bpp))
+	physical_height = (size_t)height * (size_t)fb_gfx->scanline_size;
+	if ((size_t)width > ((size_t)-1 / (size_t)fb_gfx->bpp))
 		return -1;
-	row_bytes = (size_t)width * (size_t)__fb_gfx->bpp;
+	row_bytes = (size_t)width * (size_t)fb_gfx->bpp;
 
 	/* Indexed DIB rows require four-byte alignment. */
 	if (!new_blitter && ((row_bytes & 3u) != 0u)) {

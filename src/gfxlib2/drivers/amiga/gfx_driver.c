@@ -45,7 +45,7 @@ static int amiga_driver_init(char *title, int width, int height, int depth,
         return -1;
 
     fb_amigaGfxInputInit();
-    __fb_gfx->refresh_rate = fb_amiga_gfx.refresh_rate;
+    fb_gfx->refresh_rate = fb_amiga_gfx.refresh_rate;
     return 0;
 }
 

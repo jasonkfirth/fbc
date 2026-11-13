@@ -30,8 +30,8 @@
             fb_sfx.h
 */
 
-#ifndef __FB_SFX_INTERNAL_H__
-#define __FB_SFX_INTERNAL_H__
+#ifndef FB_SFX_INTERNAL_H
+#define FB_SFX_INTERNAL_H
 
 #include "fb_sfx.h"
 #include "fb_sfx_driver.h"
@@ -247,6 +247,15 @@ void fb_sfxPan(int channel, float position);
 float fb_sfxPanGet(int channel);
 void fb_sfxPanReset(void);
 
+/* Compatibility helpers remain exported for existing C clients. Keep their
+   declarations here so definitions and internal callers share one contract. */
+void fb_sfxSetMasterVolume(float volume);
+float fb_sfxGetMasterVolume(void);
+void fb_sfxSetChannelVolume(int channel, float volume);
+void fb_sfxSetChannelPan(int channel, float pan);
+int fb_sfxStatus(void);
+const char *fb_sfxDriverName(void);
+
 
 
 /* ------------------------------------------------------------------------- */
@@ -288,6 +297,14 @@ float fb_sfxBufferRead(int index);
 
 int fb_sfxDriverInit(void);
 void fb_sfxDriverShutdown(void);
+int fb_sfxControlDeviceList(void);
+int fb_sfxControlDeviceSelect(int device);
+const char *fb_sfxDeviceInfoName(int id);
+int fb_sfxDeviceValid(int id);
+int fb_sfxDeviceFind(const char *name);
+void fb_sfxDeviceListInfo(int id);
+const FB_SFX_DRIVER *fb_sfxDeviceDriver(void);
+void fb_sfxDeviceShutdown(void);
 
 
 
@@ -346,6 +363,11 @@ float fb_sfxWaveformSample(FB_SFXVOICE *voice);
 int fb_sfxMixerSimdEnabled(void);
 
 void fb_sfxVoiceInit(FB_SFXVOICE *voice);
+void fb_sfxVoiceStartTone(FB_SFXVOICE *voice, int freq, float volume);
+void fb_sfxVoiceStartSample(FB_SFXVOICE *voice, const float *data, int length, float volume);
+void fb_sfxVoiceStop(FB_SFXVOICE *voice);
+void fb_sfxVoiceAdvance(FB_SFXVOICE *voice);
+void fb_sfxOscillatorReset(FB_SFXVOICE *voice);
 void fb_sfxVoiceSetWaveform(FB_SFXVOICE *voice, int waveform);
 void fb_sfxVoiceSetFrequency(FB_SFXVOICE *voice, int freq);
 void fb_sfxVoiceSetEnvelope(FB_SFXVOICE *voice, int id);
@@ -388,6 +410,17 @@ int fb_sfxAllocContext(void);
 void fb_sfxFreeContext(void);
 int fb_sfxInitCore(void);
 void fb_sfxExitCore(void);
+FB_SFXCTX *fb_sfxGetContext(void);
+void fb_sfxPoll(void);
+void fb_sfxAbort(void);
+void fb_sfxDefaultConfig(FB_SFXCTX *ctx);
+void fb_sfxPlayString(int channel, const char *str);
+void fb_sfxMusicRestart(void);
+void fb_sfxOctaveReset(void);
+void fb_sfxOctaveUp(void);
+void fb_sfxOctaveDown(void);
+void fb_sfxTempoReset(void);
+float fb_sfxTempoBeatDuration(void);
 void fb_sfxPlatformExit(void);
 void fb_sfxUpdate(int frames);
 void fb_sfxBeep(void);
@@ -523,7 +556,17 @@ extern int g_midi_playing;
 int fb_sfxMidiSend(unsigned char status,
                    unsigned char data1,
                    unsigned char data2);
+int fb_sfxMidiClosed(void);
+int fb_sfxMidiDevice(void);
+int fb_sfxMidiResumed(void);
+int fb_sfxMidiStopped(void);
+int fb_sfxMidiNoteOn(unsigned char channel, unsigned char note, unsigned char velocity);
+int fb_sfxMidiNoteOff(unsigned char channel, unsigned char note, unsigned char velocity);
+int fb_sfxMidiProgramChange(unsigned char channel, unsigned char program);
 int fb_sfxCaptureReadSamples(float *buffer, int frames);
+int fb_sfxCaptureProbe(void);
+int fb_sfxCaptureRunning(void);
+int fb_sfxCaptureActive(void);
 int fb_sfxCaptureSaveCmd(const char *filename);
 int fb_sfxDeviceCount(void);
 const char *fb_sfxDeviceName(int id);

@@ -13,6 +13,13 @@ data "A", ustringWideData, !"A\000B", 123
 
 SUITE( fbc_tests.string_.ustring_ )
 
+	#if sizeof(wstring) = 1
+		'' WCHR retains the low byte on DOS's compatibility WSTRING ABI.
+		const WIDE_SECOND_SCALAR = &h2D
+	#else
+		const WIDE_SECOND_SCALAR = &h4E2D
+	#endif
+
 	type Message
 		text as ustring
 	end type
@@ -227,13 +234,13 @@ SUITE( fbc_tests.string_.ustring_ )
 		text = chr(&hF4, &h90, &h80, &h80)
 		CU_ASSERT_EQUAL( len(text), 4 )
 		text = wchr(&hE9, &h4E2D)
-		CU_ASSERT( text = uchr(&hE9, &h4E2D) )
+		CU_ASSERT( text = uchr(&hE9, WIDE_SECOND_SCALAR) )
 		dim as wstring * 16 wide = wstr(text)
 		CU_ASSERT_EQUAL( asc(wide, 1), &hE9 )
-		CU_ASSERT_EQUAL( asc(wide, 2), &h4E2D )
+		CU_ASSERT_EQUAL( asc(wide, 2), WIDE_SECOND_SCALAR )
 		wide = text
 		CU_ASSERT_EQUAL( asc(wide, 1), &hE9 )
-		CU_ASSERT_EQUAL( asc(wide, 2), &h4E2D )
+		CU_ASSERT_EQUAL( asc(wide, 2), WIDE_SECOND_SCALAR )
 		CU_ASSERT( text = wide )
 		CU_ASSERT_EQUAL( len(text + wide), 4 )
 		CU_ASSERT( uchr(&hFFFD) = chr(&hFF) )
@@ -243,6 +250,26 @@ SUITE( fbc_tests.string_.ustring_ )
 		CU_ASSERT_EQUAL( vallng(text), 123 )
 		CU_ASSERT_EQUAL( valuint(text), 123 )
 		CU_ASSERT_EQUAL( valulng(text), 123 )
+	END_TEST
+
+	TEST( wide_conversion_limits )
+		dim as ustring text = uchr(&hE9, &h4E2D, &h1F600)
+		dim as wstring * 16 wide = wstr(text)
+		#if sizeof(wstring) = 1
+			'' Unrepresentable scalars are replaced, rather than truncating
+			'' their UTF-8 bytes or modifying the source descriptor.
+			CU_ASSERT( wide = wchr(&hE9, 63, 63) )
+			CU_ASSERT( ustring(wide) = uchr(&hE9, 63, 63) )
+		#else
+			CU_ASSERT( ustring(wide) = text )
+		#endif
+		wide = text
+		#if sizeof(wstring) = 1
+			CU_ASSERT( wide = wchr(&hE9, 63, 63) )
+		#else
+			CU_ASSERT( ustring(wide) = text )
+		#endif
+		CU_ASSERT( text = uchr(&hE9, &h4E2D, &h1F600) )
 	END_TEST
 
 	TEST( ownership_arrays_and_fields )
@@ -350,7 +377,7 @@ SUITE( fbc_tests.string_.ustring_ )
 		read text
 		CU_ASSERT( text = "A" )
 		read text
-		CU_ASSERT( text = uchr(&hE9, &h4E2D) )
+		CU_ASSERT( text = uchr(&hE9, WIDE_SECOND_SCALAR) )
 		read text
 		CU_ASSERT( text = uchr(65, 0, 66) )
 		read text

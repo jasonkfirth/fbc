@@ -29,7 +29,6 @@ int fb_FileFlushEx( FB_FILE *handle, int systembuffers )
     default:
         FB_UNLOCK();
         return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
-        break;
     }
 
     if( handle->hooks && handle->hooks->pfnFlush )

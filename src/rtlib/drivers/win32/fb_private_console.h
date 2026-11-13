@@ -6,10 +6,11 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include <windows.h>
+#include "../../fb_abi.h"
 
 typedef void (*fb_FnProcessMouseEvent)(const MOUSE_EVENT_RECORD *pEvent);
 
-typedef struct _FB_CONSOLE_CTX
+typedef struct FB_CONSOLE_CTX
 {
 	HANDLE 			inHandle, outHandle;
 	HANDLE 			pgHandleTb[FB_CONSOLE_MAXPAGES];
@@ -20,7 +21,7 @@ typedef struct _FB_CONSOLE_CTX
 	fb_FnProcessMouseEvent mouseEventHook;
 } FB_CONSOLE_CTX;
 
-extern FB_CONSOLE_CTX __fb_con;
+extern FB_CONSOLE_CTX fb_console_context FB_C_SYMBOL("__fb_con");
 
 int fb_hConsoleTranslateKey( char AsciiChar, WORD wVsCode, WORD wVkCode, DWORD dwControlKeyState, int bEnhancedKeysOnly );
 int fb_hVirtualToScancode( int vkey );
@@ -56,12 +57,12 @@ int fb_ConsoleHasFocus( void );
 
 #define FB_CON_CORRECT_POSITION()                                    \
 	do {                                                         \
-		if( __fb_con.scrollWasOff )                          \
+		if( fb_console_context.scrollWasOff )                          \
 			fb_ConsolePrintBufferEx( NULL, 0, FB_PRINT_FORCE_ADJUST ); \
 	} while (0)
 
 #define FB_CONSOLE_WINDOW_EMPTY() \
-	((__fb_con.window.Left==__fb_con.window.Right) \
-	|| (__fb_con.window.Top==__fb_con.window.Bottom))
+	((fb_console_context.window.Left==fb_console_context.window.Right) \
+	|| (fb_console_context.window.Top==fb_console_context.window.Bottom))
 
 /* end of drivers/win32/fb_private_console.h */

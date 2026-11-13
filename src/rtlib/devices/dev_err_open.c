@@ -27,6 +27,8 @@ static FB_FILE_HOOKS hooks_dev_err = {
 int fb_DevErrOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {
     int res = fb_ErrorSetNum( FB_RTERROR_OK );
+	(void)filename;
+	(void)filename_len;
 
     FB_LOCK();
 

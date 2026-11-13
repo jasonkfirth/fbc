@@ -22,8 +22,8 @@
         - FreeBASIC command implementations
 */
 
-#ifndef __FB_SFX_SOLARIS_H__
-#define __FB_SFX_SOLARIS_H__
+#ifndef FB_SFX_SOLARIS_H
+#define FB_SFX_SOLARIS_H
 
 #include "../unix/fb_sfx_bsd.h"
 

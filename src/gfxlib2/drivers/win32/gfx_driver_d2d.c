@@ -1,11 +1,35 @@
+/*
+    Project: FreeBASIC Graphics Library
+    ------------------------------------
+
+    File: drivers/win32/gfx_driver_d2d.c
+
+    Purpose:
+
+        Provide the Win32 Direct2D and DXGI graphics backend.
+
+    Responsibilities:
+
+        • create and manage Direct2D render targets
+        • enumerate display modes through DXGI
+        • present FreeBASIC framebuffers through the Windows API
+
+    This file intentionally does NOT contain:
+
+        • common graphics API dispatch
+        • keyboard or mouse input handling
+        • other graphics backends
+*/
+
 #define CINTERFACE
-#define COBJMACROS
 #define D2D_USE_C_DEFINITIONS
 /* This file requires a Windows SDK capable of targeting Windows 7 */
 #define _WIN32_WINNT 0x0601
 
 #ifndef DISABLE_D3D10
 #ifndef HOST_CYGWIN
+
+#define COBJMACROS
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_win32.h"
@@ -99,11 +123,11 @@ const GFXDRIVER fb_gfxDriverD2D = {
 /* IIDs of various interfaces so we don't need to link uuid.lib
 // which is bad because of bloat
 */
-DX_GUID(__fb_IID_IDXGIFactory, 0x7b7166ec, 0x21c7, 0x44ae, 0xb2, 0x1a, 0xc9, 0xae, 0x32, 0x1a, 0xe3, 0x69);
-DX_GUID(__fb_IID_ID2D1Factory, 0x06152247, 0x6f50, 0x465a, 0x92, 0x45, 0x11, 0x8b, 0xfd, 0x3b, 0x60, 0x07);
-DX_GUID(__fb_IID_IDXGISurface, 0xcafcb56c, 0x6ac3, 0x4889, 0xbf, 0x47, 0x9e, 0x23, 0xbb, 0xd2, 0x60, 0xec);
-DX_GUID(__fb_IID_ID2D1GdiInteropRenderTarget, 0xe0db51c3, 0x6f77, 0x4bae, 0xb3, 0xd5, 0xe4, 0x75, 0x09, 0xb3, 0x58, 0x38);
-DX_GUID(__fb_IID_ID2D1RenderTarget, 0x2cd90694, 0x12e2, 0x11dc, 0x9f, 0xed, 0x00, 0x11, 0x43, 0xa0, 0x55, 0xf9);
+DX_GUID(fb_IID_IDXGIFactory, 0x7b7166ec, 0x21c7, 0x44ae, 0xb2, 0x1a, 0xc9, 0xae, 0x32, 0x1a, 0xe3, 0x69);
+DX_GUID(fb_IID_ID2D1Factory, 0x06152247, 0x6f50, 0x465a, 0x92, 0x45, 0x11, 0x8b, 0xfd, 0x3b, 0x60, 0x07);
+DX_GUID(fb_IID_IDXGISurface, 0xcafcb56c, 0x6ac3, 0x4889, 0xbf, 0x47, 0x9e, 0x23, 0xbb, 0xd2, 0x60, 0xec);
+DX_GUID(fb_IID_ID2D1GdiInteropRenderTarget, 0xe0db51c3, 0x6f77, 0x4bae, 0xb3, 0xd5, 0xe4, 0x75, 0x09, 0xb3, 0x58, 0x38);
+DX_GUID(fb_IID_ID2D1RenderTarget, 0x2cd90694, 0x12e2, 0x11dc, 0x9f, 0xed, 0x00, 0x11, 0x43, 0xa0, 0x55, 0xf9);
 
 /* Direct2D HwndRenderTargets only support 32-bpp formats 
 // https://docs.microsoft.com/en-gb/windows/win32/direct2d/supported-pixel-formats-and-alpha-modes#supported-formats-for-id2d1hwndrendertarget
@@ -232,10 +256,10 @@ static D2DGlobalState* CreateGlobalState(HWND hwnd, HMODULE hD2D, ID2D1Factory* 
 		pState->hD2D = hD2D;
 		pState->wndProcCookie = wndprocCookie;
 		pState->pD2DFactory = pFactory;
-		while(__fb_keytable[i][0]) {
-			pState->vkToFBKeyTranslation[__fb_keytable[i][1]] = i;
-			if(__fb_keytable[i][2]) {
-				pState->vkToFBKeyTranslation[__fb_keytable[i][2]] = i;
+		while(fb_keytable[i][0]) {
+			pState->vkToFBKeyTranslation[fb_keytable[i][1]] = i;
+			if(fb_keytable[i][2]) {
+				pState->vkToFBKeyTranslation[fb_keytable[i][2]] = i;
 			}
 			++i;
 		}
@@ -284,14 +308,14 @@ static LRESULT CALLBACK D2DWndProcSubclass(HWND hwnd, UINT msg, WPARAM wParam, L
 			fb_gfxDriverD2D.lock();
 			if(wParam != VK_SHIFT) {
 				BYTE fbKeyIndex = pTranslationTable[wParam];
-				const BYTE* pKeyTableKey = __fb_keytable[fbKeyIndex];
+				const BYTE* pKeyTableKey = fb_keytable[fbKeyIndex];
 				BYTE fbScan = pKeyTableKey[0];
 				BYTE alternateKey = (pKeyTableKey[1] == wParam) ? pKeyTableKey[2] : pKeyTableKey[1];
 				if(alternateKey) {
-					__fb_gfx->key[fbScan] = (value << 7) | ((GetKeyState(alternateKey) & 0x8000) ? TRUE : FALSE);
+					fb_gfx->key[fbScan] = (value << 7) | ((GetKeyState(alternateKey) & 0x8000) ? TRUE : FALSE);
 				}
 				else {
-					__fb_gfx->key[fbScan] = value;
+					fb_gfx->key[fbScan] = value;
 				}
 				DBG_TEXT(
 					"%s - Got key%s for vKey %#x, fbScan=%#x, winScan=%#x, gfxKeyState=%#x",
@@ -299,12 +323,12 @@ static LRESULT CALLBACK D2DWndProcSubclass(HWND hwnd, UINT msg, WPARAM wParam, L
 					wParam,
 					fbScan,
 					LOBYTE(lParam >> 16),
-					 __fb_gfx->key[fbScan]
+					 fb_gfx->key[fbScan]
 				);
 			}
 			else {
 				/* Shift needs to update both the LSHIFT and RSHIFT scancodes */
-				__fb_gfx->key[SC_RSHIFT] = __fb_gfx->key[SC_LSHIFT] = value;
+				fb_gfx->key[SC_RSHIFT] = fb_gfx->key[SC_LSHIFT] = value;
 			}
 			fb_gfxDriverD2D.unlock();
 		}
@@ -320,7 +344,7 @@ static HWND CreateTheWindow(WNDPROC* pOriginalProc)
 	RECT monitorSize = {0};
 	DWORD windowStyle = 0;
 	DWORD exStyle = 0;
-	DEVMODE mode = {};
+	DEVMODE mode = {0};
 	int fbFlags = fb_win32.flags;
 	HMONITOR hCurMonitor = fb_win32.monitor;
 	MONITORINFOEX mInf;
@@ -367,7 +391,7 @@ static HWND CreateTheWindow(WNDPROC* pOriginalProc)
 	}
 	if(EnumDisplaySettings(mInf.szDevice, ENUM_CURRENT_SETTINGS, &mode)) {
 		DBG_TEXT("%s - current refresh rate is %d", mode.dmDisplayFrequency);
-		__fb_gfx->refresh_rate = mode.dmDisplayFrequency;
+		fb_gfx->refresh_rate = mode.dmDisplayFrequency;
 	}
 	hwnd = fb_win32.wnd;
 	*pOriginalProc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&D2DWndProcSubclass);
@@ -383,9 +407,10 @@ static void GdiInteropPaint(D2DGlobalState* pGlobalState, const D2D1_RECT_U* pDi
 	// write to the DC, passing NULL instead of this
 	// indicates a full redraw, which we definitely don't want
 	*/
-	RECT empty = {};
+	RECT empty = {0};
 	SIZE winSize = {fb_win32.w, fb_win32.h};
-	POINT origin = {};
+	POINT origin = {0};
+	(void)pDirtyRect;
 
 	ID2D1GdiInteropRenderTarget_GetDC(pLp->pGDITarget, D2D1_DC_INITIALIZE_MODE_COPY, &hdc);
 	pLp->updateLayeredWindow(fb_win32.wnd, NULL, NULL, &winSize, hdc, &origin, MASK_COLOR_32, NULL, ULW_COLORKEY);
@@ -412,13 +437,14 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 	ID2D1GdiInteropRenderTarget* pGdiTarget = NULL;
 	ID2D1Bitmap* pBitmap = NULL;
 	HMODULE hD3D = LoadLibrary("d3d10_1.dll");
+	(void)hwnd;
 
 	if(hD3D != NULL) {
-		D2D1_RENDER_TARGET_PROPERTIES renderProps = {};
-		D2D1_BITMAP_PROPERTIES bitmapProps = {};
-		D2D1_SIZE_U bitmapSize = {};
+		D2D1_RENDER_TARGET_PROPERTIES renderProps;
+		D2D1_BITMAP_PROPERTIES bitmapProps;
+		D2D1_SIZE_U bitmapSize;
 		UINT stride;
-		D3D10_TEXTURE2D_DESC texDesc = {};
+		D3D10_TEXTURE2D_DESC texDesc;
 		HMODULE hUser32 = GetModuleHandle("user32.dll");
 		struct LayeredWindowRenderParams* pLayeredParams = &pGlobalState->RenderParams.Layered;
 
@@ -441,7 +467,11 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 			goto errorReturn;
 		}
 		texDesc.ArraySize = texDesc.MipLevels = texDesc.SampleDesc.Count = 1;
+		/* Use default sample quality and keep the texture GPU-only. */
+		texDesc.SampleDesc.Quality = 0;
+		texDesc.Usage = D3D10_USAGE_DEFAULT;
 		texDesc.BindFlags = D3D10_BIND_RENDER_TARGET;
+		texDesc.CPUAccessFlags = 0;
 		texDesc.MiscFlags = D3D10_RESOURCE_MISC_GDI_COMPATIBLE;
 		texDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 		bitmapSize.width = texDesc.Width = fb_win32.w;
@@ -450,15 +480,18 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 		if(NOTIFY_FAILED_HR(ID3D10Device1_CreateTexture2D(pD3DDevice, &texDesc, NULL, &pD3DTexture))) {
 			goto errorReturn;
 		}
-		if(NOTIFY_FAILED_HR(ID3D10Texture2D_QueryInterface(pD3DTexture, &__fb_IID_IDXGISurface, (void**)&pDXGISurface))) {
+		if(NOTIFY_FAILED_HR(ID3D10Texture2D_QueryInterface(pD3DTexture, &fb_IID_IDXGISurface, (void**)&pDXGISurface))) {
 			goto errorReturn;
 		}
 		/* We don't need this interface, just the DXGI one */
 		ID3D10Texture2D_Release(pD3DTexture);
 		pD3DTexture = NULL;
+		renderProps.type = D2D1_RENDER_TARGET_TYPE_DEFAULT;
+		renderProps.pixelFormat.format = DXGI_FORMAT_UNKNOWN;
 		renderProps.pixelFormat.alphaMode = D2D1_ALPHA_MODE_IGNORE;
 		renderProps.usage = D2D1_RENDER_TARGET_USAGE_GDI_COMPATIBLE;
 		renderProps.dpiX = renderProps.dpiY = 96.f;
+		renderProps.minLevel = D2D1_FEATURE_LEVEL_DEFAULT;
 		if(NOTIFY_FAILED_HR(ID2D1Factory_CreateDxgiSurfaceRenderTarget(pGlobalState->pD2DFactory, pDXGISurface, &renderProps, &pRenderTarget))) {
 			goto errorReturn;
 		}
@@ -468,11 +501,11 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 		if(NOTIFY_FAILED_HR(ID2D1RenderTarget_CreateBitmap(pRenderTarget, bitmapSize, NULL, stride, &bitmapProps, &pBitmap))) {
 			goto errorReturn;
 		}
-		if(NOTIFY_FAILED_HR(ID2D1RenderTarget_QueryInterface(pRenderTarget, &__fb_IID_ID2D1GdiInteropRenderTarget, (void**)&pGdiTarget))) {
+		if(NOTIFY_FAILED_HR(ID2D1RenderTarget_QueryInterface(pRenderTarget, &fb_IID_ID2D1GdiInteropRenderTarget, (void**)&pGdiTarget))) {
 			goto errorReturn;
 		}
 		/* if depth conversion is necessary, we need a blitter and a temp buffer */
-		if(__fb_gfx->depth < 24) {
+		if(fb_gfx->depth < 24) {
 			pGlobalState->pBlitter = fb_hGetBlitter(32, FALSE);
 			if(!(pGlobalState->pTempBuffer = calloc(1, bitmapSize.height * stride))) {
 				goto errorReturn;
@@ -524,9 +557,9 @@ static int D2DDirectSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 	ID2D1RenderTarget* pRenderTarget = NULL;
 	ID2D1Bitmap* pBackBufferBitmap = NULL;
 	const DXGI_FORMAT* pFormats = THIRTY_TWO_BPP_FORMATS;
-	D2D1_RENDER_TARGET_PROPERTIES renderProps = {0};   
+	D2D1_RENDER_TARGET_PROPERTIES renderProps;
 	D2D1_HWND_RENDER_TARGET_PROPERTIES hwndRenderProps = {0};
-	D2D1_BITMAP_PROPERTIES bitmapProps = {};
+	D2D1_BITMAP_PROPERTIES bitmapProps;
 	UINT stride = 0;
 	
 	hwndRenderProps.hwnd = hwnd;
@@ -538,6 +571,7 @@ static int D2DDirectSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 	renderProps.usage = D2D1_RENDER_TARGET_USAGE_NONE;
 	renderProps.pixelFormat.alphaMode = D2D1_ALPHA_MODE_IGNORE;
 	renderProps.dpiX = renderProps.dpiY = 96.f;
+	renderProps.minLevel = D2D1_FEATURE_LEVEL_DEFAULT;
 	while(*pFormats != DXGI_FORMAT_UNKNOWN) {
 		renderProps.pixelFormat.format = *(pFormats++);
 		if(!NOTIFY_FAILED_HR(ID2D1Factory_CreateHwndRenderTarget(
@@ -570,13 +604,13 @@ static int D2DDirectSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 	//
 	// Otherwise we need a blitter and a temp buffer, since you can't map or lock D2D bitmaps
 	*/
-	if((renderProps.pixelFormat.format < DXGI_FORMAT_B8G8R8A8_UNORM) || (__fb_gfx->depth < 24)) {
+	if((renderProps.pixelFormat.format < DXGI_FORMAT_B8G8R8A8_UNORM) || (fb_gfx->depth < 24)) {
 		pGlobalState->pBlitter = fb_hGetBlitter(32, renderProps.pixelFormat.format < DXGI_FORMAT_B8G8R8A8_UNORM);
 		if(!(pGlobalState->pTempBuffer = calloc(1, hwndRenderProps.pixelSize.height * stride))) {
 			goto errorReturn;
 		}
 	}
-	if(NOTIFY_FAILED_HR(ID2D1HwndRenderTarget_QueryInterface(pHwndRenderTarget, &__fb_IID_ID2D1RenderTarget, (void**)&pRenderTarget))) {
+	if(NOTIFY_FAILED_HR(ID2D1HwndRenderTarget_QueryInterface(pHwndRenderTarget, &fb_IID_ID2D1RenderTarget, (void**)&pRenderTarget))) {
 		goto errorReturn;
 	}
 	pNlp->pHwndTarget = pHwndRenderTarget;
@@ -615,10 +649,10 @@ static void D2DCommonPaintInternal(D2DGlobalState* pGlobalState)
 
 	fb_gfxDriverD2D.lock();
 
-	scanlineSize = __fb_gfx->scanline_size;
-	pDirtyStart = __fb_gfx->dirty;
-	pDirtyEnd = pDirtyStart + __fb_gfx->h;
-	pFirstDirtyRow = FB_MEMCHR(pDirtyStart, TRUE, __fb_gfx->h);
+	scanlineSize = fb_gfx->scanline_size;
+	pDirtyStart = fb_gfx->dirty;
+	pDirtyEnd = pDirtyStart + fb_gfx->h;
+	pFirstDirtyRow = FB_MEMCHR(pDirtyStart, TRUE, fb_gfx->h);
 	/* nothing's dirty, don't do anything */
 	if(!pFirstDirtyRow) {
 		fb_gfxDriverD2D.unlock();
@@ -661,7 +695,7 @@ fillInDirtyRect:
 		pGlobalState->pBlitter(pBitmapDataSrc = pGlobalState->pTempBuffer, stride);
 	}
 	else {
-		pBitmapDataSrc = __fb_gfx->framebuffer;
+		pBitmapDataSrc = fb_gfx->framebuffer;
 	}
 	pBitmapDataSrc += (stride * dirtyRect.top);
 
@@ -728,7 +762,7 @@ static int D2DCommonInit(void)
 		if((D2DCreateFactory == NULL) || 
 		   (NOTIFY_FAILED_HR(D2DCreateFactory(
 			D2D1_FACTORY_TYPE_SINGLE_THREADED,
-			&__fb_IID_ID2D1Factory,
+			&fb_IID_ID2D1Factory,
 			&opts,
 			(void**)&pFactory))
 		)) {
@@ -895,6 +929,7 @@ static int* D2DFetchModes(int depth, int *size)
 	IDXGIAdapter* pAdapter = NULL;
 	MiniVector hardwareModes = {NULL, 0, 0};
 	MiniVector softwareModes = {NULL, 0, 0};
+	(void)depth;
 	DBG_TEXT("%s called with depth=%d", depth);
 
 	/* What happens here is that we enumerate everything
@@ -907,10 +942,11 @@ static int* D2DFetchModes(int depth, int *size)
 		fb_hWin32LoadProcedure(hDxgi, "CreateDXGIFactory",
 		                       (void *)&CreateDXGIFactory,
 		                       sizeof(CreateDXGIFactory));
-		if ((CreateDXGIFactory) && (!NOTIFY_FAILED_HR(CreateDXGIFactory(&__fb_IID_IDXGIFactory, (void**)&pFactory)))) {
+		if ((CreateDXGIFactory) && (!NOTIFY_FAILED_HR(CreateDXGIFactory(&fb_IID_IDXGIFactory, (void**)&pFactory)))) {
 			while((hardwareModes.elems == 0) && SUCCEEDED(IDXGIFactory_EnumAdapters(pFactory, adapterIter++, &pAdapter))) {
 				IDXGIOutput* pOutput = NULL;
-				DXGI_ADAPTER_DESC adapterDesc = {};
+				DXGI_ADAPTER_DESC adapterDesc;
+				/* GetDesc fills the structure before any field is read. */
 				if(SUCCEEDED(IDXGIAdapter_GetDesc(pAdapter, &adapterDesc))) {
 					/* The 'random' ids are defined here for the software/warp adapter 
 					// https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
@@ -942,3 +978,5 @@ static int* D2DFetchModes(int depth, int *size)
 
 #endif /* HOST_CYGWIN */
 #endif /* DISABLE_D3D10 */
+
+/* end of drivers/win32/gfx_driver_d2d.c */

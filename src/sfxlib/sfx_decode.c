@@ -26,12 +26,12 @@
 #define DR_MP3_IMPLEMENTATION
 
 /*
-    stb_vorbis uses alloca() internally but not every GCC target SDK exposes
-    the non-standard declaration through a public header.  Use the compiler's
-    architecture-neutral intrinsic at this third-party boundary.  This keeps
-    the decoder portable without placing an AROS conditional in shared code.
+    stb_vorbis includes alloca declarations for MinGW and several Unix SDKs.
+    Other GCC targets may still need the compiler intrinsic at this boundary.
 */
-#if defined(__GNUC__) && !defined(alloca)
+#if defined(__GNUC__) && !defined(alloca) && !defined(__MINGW32__) \
+    && !defined(__linux__) && !defined(__linux) && !defined(__sun__) \
+    && !defined(__EMSCRIPTEN__) && !defined(__NEWLIB__)
 #define alloca __builtin_alloca
 #endif
 

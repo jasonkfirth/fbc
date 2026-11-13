@@ -20,8 +20,8 @@
         - public graphics API declarations
 */
 
-#ifndef __FB_GFX3_PLATFORM_DRM_INPUT_H__
-#define __FB_GFX3_PLATFORM_DRM_INPUT_H__
+#ifndef FB_GFX3_PLATFORM_DRM_INPUT_H
+#define FB_GFX3_PLATFORM_DRM_INPUT_H
 
 #include "../../gfx3_input.h"
 
@@ -37,3 +37,5 @@ void fb_gfx3_platform_drm_input_destroy(
 #endif
 
 /* end of linux/gfx3_platform_drm_input.h */
+
+/* end of gfx3_platform_drm_input.h */

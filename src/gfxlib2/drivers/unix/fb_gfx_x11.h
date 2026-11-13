@@ -3,13 +3,13 @@
 	File: fb_gfx_x11.h
 	Purpose: Share X11 window and input contracts between the X11 drivers.
 	Responsibilities: Declare common driver state and X11 helper functions.
-	This file does not own event-loop state or graphics primitives.
+	This file intentionally does NOT contain: event-loop state or graphics primitives.
 */
 
 #ifndef DISABLE_X11
 
-#ifndef __FB_GFX_X11_H__
-#define __FB_GFX_X11_H__
+#ifndef FB_GFX_X11_H
+#define FB_GFX_X11_H
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>

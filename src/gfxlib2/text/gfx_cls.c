@@ -31,7 +31,7 @@ void fb_GfxClear(int mode)
         else {
             int con_y_start = fb_ConsoleGetTopRow();
             int con_y_end = fb_ConsoleGetBotRow();
-            if( con_y_start==0 && (con_y_end==__fb_gfx->text_h-1) )
+            if( con_y_start==0 && (con_y_end==fb_gfx->text_h-1) )
                 /* No VIEW PRINT range set */
                 mode = 0;
             else
@@ -45,14 +45,14 @@ void fb_GfxClear(int mode)
             {
                 int cursor_y = fb_ConsoleGetTopRow();
 
-                context->pixel_set(context->line[0], context->bg_color, __fb_gfx->w * __fb_gfx->h);
+                context->pixel_set(context->line[0], context->bg_color, fb_gfx->w * fb_gfx->h);
                 dirty = 0;
-                dirty_len = __fb_gfx->h;
+                dirty_len = fb_gfx->h;
 
                 new_x = 0;
                 new_y = cursor_y;
 
-                reset_console_end = __fb_gfx->text_h;
+                reset_console_end = fb_gfx->text_h;
 
                 reset_gfx_pos = TRUE;
             }
@@ -63,11 +63,11 @@ void fb_GfxClear(int mode)
             {
                 int con_y_start = fb_ConsoleGetTopRow();
                 int con_y_end = fb_ConsoleGetBotRow();
-                int y_start = con_y_start * __fb_gfx->font->h;
-                int y_end = (con_y_end + 1) * __fb_gfx->font->h;
+                int y_start = con_y_start * fb_gfx->font->h;
+                int y_end = (con_y_end + 1) * fb_gfx->font->h;
                 int view_height = y_end - y_start;
 
-                context->pixel_set(context->line[y_start], context->bg_color, __fb_gfx->w * view_height);
+                context->pixel_set(context->line[y_start], context->bg_color, fb_gfx->w * view_height);
                 dirty = y_start;
                 dirty_len = view_height;
 
@@ -85,10 +85,10 @@ void fb_GfxClear(int mode)
 		default:
             /* Clear graphics viewport if set */
             {
-                unsigned char *dest = context->line[context->view_y] + (context->view_x * __fb_gfx->bpp);
+                unsigned char *dest = context->line[context->view_y] + (context->view_x * fb_gfx->bpp);
                 for (i = 0; i < context->view_h; i++) {
                     context->pixel_set(dest, context->bg_color, context->view_w);
-                    dest += __fb_gfx->pitch;
+                    dest += fb_gfx->pitch;
                 }
                 dirty = context->view_y;
                 dirty_len = context->view_h;
@@ -105,7 +105,7 @@ void fb_GfxClear(int mode)
     }
 
     fb_hClearCharCells( 0, reset_console_start,
-                        __fb_gfx->text_w, reset_console_end,
+                        fb_gfx->text_w, reset_console_end,
                         context->work_page,
                         32,
                         context->fg_color, context->bg_color );

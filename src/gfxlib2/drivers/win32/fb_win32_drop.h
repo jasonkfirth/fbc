@@ -19,9 +19,9 @@ static int fb_hWin32DropReceive(HDROP drop, FB_WIN32_DROP_SUBMIT submit, void *u
 	FINISH_DROP finish = NULL;
 	HMODULE library = NULL;
 	FARPROC address;
-	wchar_t *wide = NULL;
+	FB_WCHAR *wide = NULL;
 	char *data = NULL;
-	wchar_t path[MAX_PATH];
+	FB_WCHAR path[MAX_PATH];
 	UINT index, count, length;
 	size_t used = 0;
 	int result = FB_DROP_INVALID;

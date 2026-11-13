@@ -23,6 +23,7 @@
         - ordinary gfxlib2 compatibility entry points
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 
 /* ------------------------------------------------------------------------- */

@@ -22,17 +22,17 @@
 int fb_ConsoleGetRawXEx( HANDLE console )
 {
 	(void)console;
-	return __fb_con.cursor_x;
+	return fb_console_context.cursor_x;
 }
 
 int fb_ConsoleGetRawX( void )
 {
-	return __fb_con.cursor_x;
+	return fb_console_context.cursor_x;
 }
 
 int fb_ConsoleGetX( void )
 {
-	return __fb_con.cursor_x + 1;
+	return fb_console_context.cursor_x + 1;
 }
 
 /* end of drivers/wince/io_getx.c */

@@ -21,8 +21,8 @@
         - renderer or image algorithms
 */
 
-#ifndef __FB_GFX3_API_INTERNAL_H__
-#define __FB_GFX3_API_INTERNAL_H__
+#ifndef FB_GFX3_API_INTERNAL_H
+#define FB_GFX3_API_INTERNAL_H
 
 #include "gfx3_compat.h"
 

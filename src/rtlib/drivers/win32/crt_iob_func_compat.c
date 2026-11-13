@@ -48,6 +48,9 @@ void *FB_CRT_CDECL __iob_func( void )
 
 #undef FB_CRT_CDECL
 
+#else
+/* Keep the Win64 translation unit valid without defining a legacy symbol. */
+typedef int fb_crt_iob_func_compat_empty_translation_unit;
 #endif
 
 /* end of drivers/win32/crt_iob_func_compat.c */

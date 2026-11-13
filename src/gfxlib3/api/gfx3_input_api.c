@@ -24,6 +24,7 @@
         - graphical console drawing or line editing
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../gfx3_console.h"
 #include "../gfx3_input.h"

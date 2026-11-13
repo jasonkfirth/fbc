@@ -19,12 +19,12 @@
         - renderer lifecycle code
 */
 
-#ifndef __FB_GFX3_BACKEND_NULL_H__
-#define __FB_GFX3_BACKEND_NULL_H__
+#ifndef FB_GFX3_BACKEND_NULL_H
+#define FB_GFX3_BACKEND_NULL_H
 
 #include "gfx3_backend.h"
 
-extern const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_null;
+extern const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_null FB_C_SYMBOL("__fb_gfx3_backend_null");
 
 #endif
 

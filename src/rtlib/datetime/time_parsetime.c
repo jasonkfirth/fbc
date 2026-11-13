@@ -8,16 +8,48 @@
 #include "fb.h"
 #include <ctype.h>
 
+/* strtol has no input-span limit. Parse the small decimal time fields here
+   so neither a missing terminator nor an oversized value can escape the
+   caller's byte span or overflow before its range is checked. */
+static int fb_hTimeNumber( const char **text, const char *text_end,
+                          unsigned int maximum, int *number )
+{
+    const char *p = *text, *digits;
+    unsigned int value = 0;
+    int negative = FALSE;
+
+    while( p < text_end && isspace( FB_CHAR_TO_INT( *p ) ) )
+        ++p;
+    if( p < text_end && (*p == '-' || *p == '+') ) {
+        negative = (*p == '-');
+        ++p;
+    }
+    digits = p;
+    while( p < text_end && *p >= '0' && *p <= '9' ) {
+        value = value * 10 + (unsigned int)(*p - '0');
+        if( value > maximum )
+            return FALSE;
+        ++p;
+    }
+    if( p == digits || (negative && value != 0) )
+        return FALSE;
+    *number = (int)value;
+    *text = p;
+    return TRUE;
+}
+
 /*:::::*/
-static int fb_hCheckAMPM( const char *text, size_t *pLength )
+static int fb_hCheckAMPM( const char *text, const char *text_end, size_t *pLength )
 {
     const char *text_start = text;
     int result = 0;
 
     /* skip WS */
-    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+    while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
         ++text;
 
+    if( text == text_end )
+        return 0;
     switch( *text ) {
     case 'a':
     case 'A':
@@ -31,7 +63,7 @@ static int fb_hCheckAMPM( const char *text, size_t *pLength )
         break;
     }
     if( result!=0 ) {
-        char ch = *text;
+        char ch = (text < text_end) ? *text : 0;
         if( ch==0 ) {
             // ignore
         } else if( ch=='m' || ch=='M' ) {
@@ -42,12 +74,12 @@ static int fb_hCheckAMPM( const char *text, size_t *pLength )
         }
     }
     if( result!=0 ) {
-        if( isalpha( FB_CHAR_TO_INT( *text ) ) )
+        if( text < text_end && isalpha( FB_CHAR_TO_INT( *text ) ) )
             result = 0;
     }
     if( result!=0 ) {
         /* skip WS */
-        while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+        while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
             ++text;
         if( pLength )
             *pLength = text - text_start;
@@ -63,46 +95,39 @@ int fb_hTimeParse( const char *text, size_t text_len, int *pHour, int *pMinute, 
     int am_pm = 0;
     int result = FALSE;
     int hour = 0, minute = 0, second = 0;
-    char *endptr;
+    const char *text_end;
 
-    hour = strtol( text, &endptr, 10 );
-    if( hour >= 0 && hour < 24 && endptr!=text) {
+    if( text == NULL || text_len == 0 || text_len > (size_t)PTRDIFF_MAX )
+        return FALSE;
+    text_end = text + text_len;
+
+    if( fb_hTimeNumber( &text, text_end, 23, &hour ) ) {
         int is_ampm_hour = ( hour >= 1 && hour <= 12 );
         /* skip white spaces */
-        text = endptr;
-        while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+        while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
             ++text;
-        if( *text==':' ) {
+        if( text < text_end && *text==':' ) {
             ++text;
-            minute = strtol( text, &endptr, 10 );
-            if( minute >= 0 && minute < 60 && endptr!=text ) {
-                text = endptr;
-                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+            if( fb_hTimeNumber( &text, text_end, 59, &minute ) ) {
+                while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
 
                 result = TRUE;
-                if( *text==':' ) {
+                if( text < text_end && *text==':' ) {
                     ++text;
-                    second = strtol( text, &endptr, 10 );
-                    if( endptr!=text ) {
-                        if( second < 0 || second > 59 ) {
-                            result = FALSE;
-                        } else {
-                            text = endptr;
-                        }
-                    } else {
+                    if( !fb_hTimeNumber( &text, text_end, 59, &second ) ) {
                         result = FALSE;
                     }
                 }
                 if( result && is_ampm_hour ) {
-                    am_pm = fb_hCheckAMPM( text, &length );
+                    am_pm = fb_hCheckAMPM( text, text_end, &length );
                     if( am_pm ) {
                         text += length;
                     }
                 }
             }
         } else if( is_ampm_hour ) {
-            am_pm = fb_hCheckAMPM( text, &length );
+            am_pm = fb_hCheckAMPM( text, text_end, &length );
             if( am_pm ) {
                 text += length;
                 result = TRUE;

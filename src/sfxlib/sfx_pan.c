@@ -93,7 +93,7 @@ void fb_sfxPan(int channel, float position)
 
 float fb_sfxPanGet(int channel)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_PAN_CENTER;
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)

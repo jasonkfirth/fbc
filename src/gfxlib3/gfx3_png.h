@@ -20,8 +20,8 @@
         - PNG codec implementation
 */
 
-#ifndef __FB_GFX3_PNG_H__
-#define __FB_GFX3_PNG_H__
+#ifndef FB_GFX3_PNG_H
+#define FB_GFX3_PNG_H
 
 #include "gfx3_file_api.h"
 

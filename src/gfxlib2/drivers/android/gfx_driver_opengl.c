@@ -179,14 +179,14 @@ static int android_egl_choose_config(void)
 	EGLint count;
 	EGLint samples;
 
-	attributes[5] = __fb_gl_params.color_red_bits;
-	attributes[7] = __fb_gl_params.color_green_bits;
-	attributes[9] = __fb_gl_params.color_blue_bits;
-	attributes[11] = __fb_gl_params.color_alpha_bits;
-	attributes[13] = __fb_gl_params.depth_bits;
-	attributes[15] = __fb_gl_params.stencil_bits;
+	attributes[5] = fb_gl_params.color_red_bits;
+	attributes[7] = fb_gl_params.color_green_bits;
+	attributes[9] = fb_gl_params.color_blue_bits;
+	attributes[11] = fb_gl_params.color_alpha_bits;
+	attributes[13] = fb_gl_params.depth_bits;
+	attributes[15] = fb_gl_params.stencil_bits;
 
-	samples = __fb_gl_params.num_samples;
+	samples = fb_gl_params.num_samples;
 	if (samples < 0)
 		samples = 0;
 
@@ -199,7 +199,7 @@ static int android_egl_choose_config(void)
 		if (eglChooseConfig(fb_android_egl.display, attributes,
 		                    &fb_android_egl.config, 1, &count) && (count > 0))
 		{
-			__fb_gl_params.num_samples = samples;
+			fb_gl_params.num_samples = samples;
 			return 0;
 		}
 
@@ -232,8 +232,8 @@ int fb_hAndroidOpenGLInit(char *title, int w, int h, int depth, int refresh_rate
 	fb_hGL_NormalizeParameters(flags);
 
 	/* gfxlib2's framebuffer-to-texture bridge requires desktop OpenGL. */
-	if ((__fb_gl_params.init_mode_2d != DRIVER_OGL_2D_NONE) ||
-	    (__fb_gl_params.accum_bits > 0))
+	if ((fb_gl_params.init_mode_2d != DRIVER_OGL_2D_NONE) ||
+	    (fb_gl_params.accum_bits > 0))
 		return -1;
 
 	result = fb_hAndroidInit(title, w, h, depth, refresh_rate, flags, require_api26);
@@ -278,15 +278,15 @@ int fb_hAndroidOpenGLInit(char *title, int w, int h, int depth, int refresh_rate
 		const GLubyte *extensions = glGetString(GL_EXTENSIONS);
 
 		if (extensions) {
-			strncpy(__fb_gl_extensions, (const char *)extensions,
+			strncpy(fb_gl_extensions, (const char *)extensions,
 			        FBGL_EXTENSIONS_STRING_SIZE - 1);
-			__fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE - 1] = '\0';
+			fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE - 1] = '\0';
 		} else {
-			__fb_gl_extensions[0] = '\0';
+			fb_gl_extensions[0] = '\0';
 		}
 	}
-	__fb_gl_params.mode_2d = DRIVER_OGL_2D_NONE;
-	__fb_gl_params.scale = 1;
+	fb_gl_params.mode_2d = DRIVER_OGL_2D_NONE;
+	fb_gl_params.scale = 1;
 	return 0;
 
 fail:
@@ -313,7 +313,7 @@ void fb_hAndroidOpenGLExit(void)
 	if (fb_android_egl.gles_library)
 		dlclose(fb_android_egl.gles_library);
 	fb_android_egl.gles_library = NULL;
-	__fb_gl_extensions[0] = '\0';
+	fb_gl_extensions[0] = '\0';
 
 	fb_hAndroidExit();
 }

@@ -483,14 +483,10 @@ FBCALL int fb_ProfileGetFileName( char *filename, int length )
 				fname = fb_hGetExeName( buffer, PROFILER_MAX_PATH-1 );
 				if( fname ) {
 					size_t exe_len = strlen( buffer );
-					if( exe_len < PROFILER_MAX_PATH ) {
-						int written = snprintf( buffer + exe_len,
-							PROFILER_MAX_PATH - exe_len,
-							"%s", DEFAULT_PROFILE_EXT );
-						if( (written >= 0) && ((size_t)written < (PROFILER_MAX_PATH - exe_len)) )
-							fname = buffer;
-						else
-							fname = DEFAULT_PROFILE_FILE;
+					/* Include the extension's terminator in the capacity check. */
+					if( exe_len <= sizeof( buffer ) - sizeof( DEFAULT_PROFILE_EXT ) ) {
+						memcpy( buffer + exe_len, DEFAULT_PROFILE_EXT, sizeof( DEFAULT_PROFILE_EXT ) );
+						fname = buffer;
 					} else {
 						fname = DEFAULT_PROFILE_FILE;
 					}

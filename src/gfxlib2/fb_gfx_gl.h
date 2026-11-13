@@ -1,7 +1,13 @@
-/* internal OpenGL gfx definitions */
+/*
+ * FreeBASIC gfxlib2: fb_gfx_gl.h
+ * Purpose: Declare the legacy OpenGL presentation interface.
+ * Responsibilities: GL function types, context state and image helpers.
+ * This file does not implement drawing or native window management.
+ */
 
 #ifndef DISABLE_OPENGL
 
+#include "../rtlib/fb_abi.h"
 #include "../rtlib/fb_private_hdynload.h"
 
 #ifdef __cplusplus
@@ -31,8 +37,8 @@ typedef struct FB_GL_PARAMS {
 	void (*callback)(void);
 } FB_GL_PARAMS;
 
-extern FB_GL_PARAMS __fb_gl_params;
-extern char __fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE];
+extern FB_GL_PARAMS fb_gl_params FB_C_SYMBOL("__fb_gl_params");
+extern char fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE] FB_C_SYMBOL("__fb_gl_extensions");
 extern void fb_hGL_NormalizeParameters(int gl_options);
 extern void *fb_hGL_GetProcAddress(const char *proc);
 
@@ -125,13 +131,16 @@ typedef struct FB_GL {
 	int							state;
 } FB_GL;
 
-extern FB_GL __fb_gl;
+extern FB_GL fb_gl FB_C_SYMBOL("__fb_gl");
 extern void fb_hGL_SetPalette(int index, int r, int g, int b);
 
 extern int fb_hGL_Init(FB_DYLIB lib, char *os_extensions);
 extern int fb_hGL_ExtensionSupported(const char *extension);
 extern void fb_hGL_SetupProjection(void);
 extern void fb_hGL_ScreenCreate(void);
+extern void fb_hGL_SetState(int state);
+extern GLuint fb_hGL_ImageCreate(PUT_HEADER *image, unsigned int color);
+extern void fb_hGL_ImageDestroy(GLuint id);
 
 #endif /* not OPENGL_CONTEXT_ONLY */
 
@@ -140,3 +149,5 @@ extern void fb_hGL_ScreenCreate(void);
 #endif
 
 #endif /* not DISABLE_OPENGL */
+
+/* end of fb_gfx_gl.h */

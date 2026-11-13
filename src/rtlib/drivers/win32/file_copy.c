@@ -24,7 +24,7 @@ FBCALL int fb_FileCopy( const char *source, const char *destination )
 {
 	BOOL res;
 	char *source_ansi = NULL, *destination_ansi = NULL;
-	wchar_t *source_wide, *destination_wide;
+	FB_WCHAR *source_wide, *destination_wide;
 
 	if (!source || !*source || !destination || !*destination)
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);

@@ -83,8 +83,8 @@ int fb_ConsoleWidth( int cols, int rows )
         int i;
         for( i = 0; i < FB_CONSOLE_MAXPAGES; i++ )
         {
-            if( __fb_con.pgHandleTb[i] != NULL )
-                SetConsoleWindowInfo( __fb_con.pgHandleTb[i], TRUE, &rectRes );
+            if( fb_console_context.pgHandleTb[i] != NULL )
+                SetConsoleWindowInfo( fb_console_context.pgHandleTb[i], TRUE, &rectRes );
         }
     }
 
@@ -93,17 +93,17 @@ int fb_ConsoleWidth( int cols, int rows )
     int i;
     for( i = 0; i < FB_CONSOLE_MAXPAGES; i++ )
     {
-       	if( __fb_con.pgHandleTb[i] != NULL )
+	if( fb_console_context.pgHandleTb[i] != NULL )
        	{
-       		SetConsoleScreenBufferSize( __fb_con.pgHandleTb[i], size );
-       		SetConsoleWindowInfo( __fb_con.pgHandleTb[i], TRUE, &rect );
+		SetConsoleScreenBufferSize( fb_console_context.pgHandleTb[i], size );
+		SetConsoleWindowInfo( fb_console_context.pgHandleTb[i], TRUE, &rect );
        	}
     }
 
     /* Re-enable updating */
-    __fb_con.setByUser = FALSE;
+    fb_console_context.setByUser = FALSE;
     fb_hUpdateConsoleWindow( );
-    __fb_con.setByUser = TRUE;
+    fb_console_context.setByUser = TRUE;
 
     return cur;
 }

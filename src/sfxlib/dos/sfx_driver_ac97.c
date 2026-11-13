@@ -421,8 +421,8 @@ static int msdos_ac97_init(int rate, int channels, int buffer, int flags)
         !ac97_pci_read(ac97.pci, 4, &command) || !(command & AC97_PCI_MASTER))
         goto failed;
     ac97.active = 1;
-    if (__fb_sfx)
-        __fb_sfx->samplerate = AC97_RATE;
+    if (fb_sfx_context)
+        fb_sfx_context->samplerate = AC97_RATE;
     SFX_DEBUG("msdos_ac97: PCI %04X codec %04X:%04X, 48000 Hz stereo",
               ac97.pci, vendor1, vendor2);
     return 0;

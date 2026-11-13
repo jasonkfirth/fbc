@@ -227,13 +227,19 @@ static void *hAssign( void *dst, void *src, ssize_t size, int is_init )
 	return dst;
 }
 
+/* USTRING always stores a growable FBSTRING descriptor. The shared
+   assignment ABI also carries fixed-buffer size and fill arguments. */
 FBCALL void *fb_UStrAssign( void *dst, ssize_t dst_size, void *src, ssize_t src_size, int fill_rem )
 {
+	(void)dst_size;
+	(void)fill_rem;
 	return hAssign( dst, src, src_size, FB_FALSE );
 }
 
 FBCALL void *fb_UStrInit( void *dst, ssize_t dst_size, void *src, ssize_t src_size, int fill_rem )
 {
+	(void)dst_size;
+	(void)fill_rem;
 	return hAssign( dst, src, src_size, FB_TRUE );
 }
 
@@ -309,6 +315,7 @@ static FBSTRING_ACCESS *hConcat( void *first, ssize_t first_size, void *second, 
 FBCALL FBSTRING_ACCESS *fb_UStrConcat( FBSTRING_ACCESS *dst, void *first, ssize_t first_size, void *second, ssize_t second_size )
 {
 	FBSTRING_ACCESS *result = hConcat( first, first_size, second, second_size );
+	(void)dst;
 	return result ? result : &fb_ctx.null_desc;
 }
 
@@ -316,6 +323,8 @@ FBCALL void *fb_UStrConcatAssign( void *dst, ssize_t dst_size, void *src, ssize_
 {
 	FBSTRING view = { NULL, 0, 0 };
 	FBSTRING_ACCESS *result;
+	(void)dst_size;
+	(void)fill_rem;
 	if( dst == NULL ) {
 		if( src_size == FB_STRSIZEVARLEN ) fb_hStrDelTemp( src );
 		return NULL;

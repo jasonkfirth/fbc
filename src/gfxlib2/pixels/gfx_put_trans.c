@@ -22,7 +22,10 @@ void fb_hPutTrans1C(unsigned char *src, unsigned char *dest, int w, int h, int s
 	unsigned char *s = (unsigned char *)src;
 	unsigned char *d;
 	int x;
-	
+	(void)alpha;
+	(void)blender;
+	(void)param;
+
 	src_pitch -= w;
 	for (; h; h--) {
 		d = (unsigned char *)dest;
@@ -42,7 +45,10 @@ static void fb_hPutTrans2C(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned short *s = (unsigned short *)src;
 	unsigned short *d;
 	int x;
-	
+	(void)alpha;
+	(void)blender;
+	(void)param;
+
 	src_pitch = (src_pitch >> 1) - w;
 	for (; h; h--) {
 		d = (unsigned short *)dest;
@@ -62,7 +68,10 @@ static void fb_hPutTrans4C(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned int *s = (unsigned int *)src;
 	unsigned int *d, c;
 	int x;
-	
+	(void)alpha;
+	(void)blender;
+	(void)param;
+
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
 		d = (unsigned int *)dest;
@@ -105,7 +114,7 @@ void fb_hPutTrans(unsigned char *src, unsigned char *dest, int w, int h, int src
 		else
 #endif
 #ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
+		if (fb_gfx->flags & X86_MMX_ENABLED)
 			context->putter[PUT_MODE_TRANS] = mmx_putters;
 		else
 #endif

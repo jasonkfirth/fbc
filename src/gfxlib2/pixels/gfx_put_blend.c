@@ -10,7 +10,6 @@
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
 
-extern void fb_hPutTrans1C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
 
 #ifdef HOST_X86
 #include "../drivers/x86/fb_gfx_mmx.h"
@@ -24,7 +23,9 @@ static void fb_hPutBlend2C(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned short *s = (unsigned short *)src, *d;
 	unsigned int sc, dc, drb, dg, srb, sg, dt, st;
 	int x;
-	
+	(void)blender;
+	(void)param;
+
 	alpha = (alpha + 7) >> 3;
 	src_pitch = (src_pitch >> 1) - w;
 	for (; h; h--) {
@@ -56,10 +57,11 @@ static void fb_hPutBlend2C(unsigned char *src, unsigned char *dest, int w, int h
 					sc |= (dc & 0xFFFF0000);
 				}
 				st = sc & (MASK_RB_16 | (MASK_G_16 << 16));
-				sc &= (MASK_G_16 | (MASK_RB_16 << 16));
+				/* Widen the pixel mask as unsigned before setting its high bit. */
+				sc &= (MASK_G_16 | ((unsigned int)MASK_RB_16 << 16));
 				dt = dc & (MASK_RB_16 | (MASK_G_16 << 16));
-				dc &= (MASK_G_16 | (MASK_RB_16 << 16));
-				dc = ((((sc >> 5) - (dc >> 5)) * alpha) + dc) & (MASK_G_16 | (MASK_RB_16 << 16));
+				dc &= (MASK_G_16 | ((unsigned int)MASK_RB_16 << 16));
+				dc = ((((sc >> 5) - (dc >> 5)) * alpha) + dc) & (MASK_G_16 | ((unsigned int)MASK_RB_16 << 16));
 				sc = ((((st - dt) * alpha) >> 5) + dt) & (MASK_RB_16 | (MASK_G_16 << 16));
 				*(unsigned int *)d = dc | sc;
 			}
@@ -76,7 +78,9 @@ static void fb_hPutBlend4C(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned int *s = (unsigned int *)src;
 	unsigned int *d, sc, dc, drb, dga, srb, sga;
 	int x;
-	
+	(void)blender;
+	(void)param;
+
 	alpha++;
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
@@ -133,7 +137,7 @@ void fb_hPutBlend(unsigned char *src, unsigned char *dest, int w, int h, int src
 		else
 #endif
 #ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
+		if (fb_gfx->flags & X86_MMX_ENABLED)
 			context->putter[PUT_MODE_BLEND] = mmx_putters;
 		else
 #endif

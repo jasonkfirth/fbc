@@ -52,38 +52,38 @@ enum PROCINFO_FLAGS
 };
 
 /* procedure call information, and hash table for child procedures */
-typedef struct _FB_PROCINFO
+typedef struct FB_PROCINFO
 {
 	const char *name;
-	struct _FB_PROCINFO *parent;
+	struct FB_PROCINFO *parent;
 	double start_time;
 	double local_time;
 	long long int local_count;
 	unsigned int hashkey;
 	int proc_id;
-	struct _FB_PROCINFO *child[PROC_MAX_CHILDREN];
-	struct _FB_PROCINFO *next;
+	struct FB_PROCINFO *child[PROC_MAX_CHILDREN];
+	struct FB_PROCINFO *next;
 	int flags;
 } FB_PROCINFO;
 
 /* block of memory to store procedure call information records */
-typedef struct _FB_PROCINFO_TB
+typedef struct FB_PROCINFO_TB
 {
 	FB_PROCINFO procinfo[PROC_INFO_TB_SIZE];
-	struct _FB_PROCINFO_TB *next;
+	struct FB_PROCINFO_TB *next;
 	int next_free;
 	int proc_tb_id;
 } FB_PROCINFO_TB;
 
 /* hash table block for procedures */
-typedef struct _PROC_HASH_TB
+typedef struct FB_PROC_HASH_TB
 {
 	FB_PROCINFO *proc[PROC_HASH_TB_SIZE];
-	struct _PROC_HASH_TB *next;
+	struct FB_PROC_HASH_TB *next;
 } PROC_HASH_TB;
 
 /* array of procinfo entries and associated hash tables */
-typedef struct _FB_PROCARRAY
+typedef struct FB_PROCARRAY
 {
 	FB_PROCINFO **array;
 	STRING_HASH hash;
@@ -96,18 +96,18 @@ typedef struct _FB_PROCARRAY
 
 /* context for thread local storage */
 
-typedef struct _FB_PROFILER_THREAD
+typedef struct FB_PROFILER_THREAD
 {
 	FB_PROCINFO *thread_entry;
 	FB_PROCINFO *thread_proc;
 	STRING_TABLE strings;
 	STRING_HASH_TABLE strings_hash;
 	FB_PROCINFO_TB *proc_tb;
-	struct _FB_PROFILER_THREAD *next;
+	struct FB_PROFILER_THREAD *next;
 	int last_proc_id;
 } FB_PROFILER_THREAD;
 
-typedef struct _FB_PROFILECTX
+typedef struct FB_PROFILECTX
 {
 	FB_PROFILER_THREAD *ctx;
 } FB_PROFILECTX;
@@ -737,11 +737,11 @@ static void hPopLeader( FB_PROFILER_CALLS *prof )
 }
 
 static void hProfilerReportCallTreeProc (
-	FB_PROFILER_CALLS *prof, FB_PROFILER_THREAD *ctx, FILE *f,
-	FB_PROCINFO *proc, int isfirst, int islast )
+	FB_PROFILER_CALLS *prof, FILE *f, FB_PROCINFO *proc, int islast )
 {
 	static char asc_chars[4] = { '|', '-', '|', '\\' };
-	static char gfx_chars[4] = { 179, 196, 195, 192  };
+	/* CP437 vertical, horizontal, branch and final-branch glyph bytes. */
+	static char gfx_chars[] = "\263\304\303\300";
 	char * ch = asc_chars;
 
 	FB_PROCINFO *p;
@@ -794,7 +794,7 @@ static void hProfilerReportCallTreeProc (
 	PROCARRAY_sort_by_name( &lst );
 
 	for( i = 0; i < lst.length; i++ ) {
-		hProfilerReportCallTreeProc( prof, ctx, f, lst.array[i], (i == 0), (i == lst.length - 1) );
+		hProfilerReportCallTreeProc( prof, f, lst.array[i], (i == lst.length - 1) );
 	}
 
 	PROCARRAY_destructor( &lst );
@@ -813,7 +813,7 @@ static void hProfilerReportCallTree (
 		fprintf( f, "Call Tree:\n\n" );
 	}
 
-	hProfilerReportCallTreeProc( prof, ctx, f, ctx->thread_entry, TRUE, TRUE );
+	hProfilerReportCallTreeProc( prof, f, ctx->thread_entry, TRUE );
 }
 
 /* PROFILE_OPTION_REPORT_RAWLIST */
@@ -1008,7 +1008,7 @@ static void hProfilerReportRawStrings (
 
 /* PROFILE_OPTION_SHOW_DEBUGGING */
 static void hProfilerReportDebug (
-	FB_PROFILER_CALLS *prof, FB_PROFILER_THREAD *ctx, FILE *f )
+	FB_PROFILER_CALLS *prof, FILE *f )
 {
 	FB_PROFILER_METRICS metrics_data;
 	FB_PROFILER_METRICS *metrics = &metrics_data;
@@ -1074,7 +1074,7 @@ static void hProfilerReportThread (
 	}
 
 	if( (prof->global->options & PROFILE_OPTION_SHOW_DEBUGGING) != 0 ) {
-		hProfilerReportDebug( prof, ctx, f );
+		hProfilerReportDebug( prof, f );
 	}
 }
 

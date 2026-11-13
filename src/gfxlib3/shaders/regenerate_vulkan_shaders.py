@@ -149,8 +149,8 @@ def build_header(compiled: list[tuple[str, bytes]]) -> str:
         "        1.0 with glslangValidator and optimized with spirv-opt.",
         "*/",
         "",
-        "#ifndef __FB_GFX3_VULKAN_SHADER_H__",
-        "#define __FB_GFX3_VULKAN_SHADER_H__",
+        "#ifndef FB_GFX3_VULKAN_SHADER_H",
+        "#define FB_GFX3_VULKAN_SHADER_H",
         "",
     ]
     for name, data in compiled:

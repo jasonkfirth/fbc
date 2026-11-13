@@ -192,7 +192,7 @@ void fb_hAndroidSfxExit(void)
 #endif
 }
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
 	/*
 		OpenSL ES is the older Android API, but its SimpleBufferQueue path
@@ -201,7 +201,7 @@ const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
 	*/
 	&fb_sfxDriverOpenSLES,
 	&fb_sfxDriverAAudio,
-	&__fb_sfxDriverNull,
+	&fb_sfxDriverNull_internal,
 	NULL
 };
 

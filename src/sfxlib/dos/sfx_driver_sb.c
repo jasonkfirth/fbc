@@ -384,8 +384,8 @@ static void fb_sfxMsdosConvertToUnsignedMono8(const float *samples, int frames, 
     int channels;
     int i;
 
-    channels = (__fb_sfx && __fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    channels = (fb_sfx_context && fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : 2;
 
     for (i = 0; i < frames; ++i)
@@ -487,8 +487,8 @@ static int msdos_sb_init(int rate, int channels, int buffer, int flags)
         return -1;
     }
 
-    if (__fb_sfx && g_fb_sfx_msdos_rate > 0)
-        __fb_sfx->samplerate = g_fb_sfx_msdos_rate;
+    if (fb_sfx_context && g_fb_sfx_msdos_rate > 0)
+        fb_sfx_context->samplerate = g_fb_sfx_msdos_rate;
 
     g_fb_sfx_msdos_dma_channel = dma_channel;
     g_fb_sfx_msdos_dma_buffer_frames = dma_frames;
@@ -556,8 +556,8 @@ static int msdos_sb_write(const float *samples, int frames)
         linear_offset = (int)(g_fb_sfx_msdos_dma_buffer.dma_linear -
                               g_fb_sfx_msdos_dma_buffer.linear);
 
-        fb_sfxMsdosConvertToUnsignedMono8(samples + (written * ((__fb_sfx && __fb_sfx->output_channels > 0)
-            ? __fb_sfx->output_channels
+        fb_sfxMsdosConvertToUnsignedMono8(samples + (written * ((fb_sfx_context && fb_sfx_context->output_channels > 0)
+            ? fb_sfx_context->output_channels
             : 2)),
             chunk_frames,
             g_fb_sfx_msdos_mix_buffer);
@@ -659,7 +659,7 @@ const FB_SFX_DRIVER fb_sfxDriverSoundBlaster =
 extern const FB_SFX_DRIVER fb_sfxDriverPcSpeaker;
 extern const FB_SFX_DRIVER fb_sfxDriverAc97;
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
     /* A working BLASTER configuration keeps ISA Sound Blaster first.
      * AC'97 must discover its own PCI controller and codec before use.
@@ -667,7 +667,7 @@ const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
     &fb_sfxDriverSoundBlaster,
     &fb_sfxDriverAc97,
     &fb_sfxDriverPcSpeaker,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

@@ -29,6 +29,10 @@ typedef struct FB_DROP_ITEM {
 	int identifier;
 	int count;
 	int kind;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing this layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_DROP_ITEM;
 
 /* Every access, including supported/enabled, holds the containing input lock.

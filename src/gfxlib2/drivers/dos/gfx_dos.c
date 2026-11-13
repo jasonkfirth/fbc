@@ -32,7 +32,7 @@ extern const GFXDRIVER fb_gfxDriverBIOS;
 extern const GFXDRIVER fb_gfxDriverVGA;
 extern const GFXDRIVER fb_gfxDriverModeX;
 
-const GFXDRIVER *__fb_gfx_drivers_list[] = {
+const GFXDRIVER *fb_gfx_drivers_list[] = {
 	&fb_gfxDriverVESAlinear,
 	&fb_gfxDriverVESA,
 	&fb_gfxDriverVGA,
@@ -83,8 +83,6 @@ extern void fb_MMX_code_start(void);
 extern void fb_MMX_code_end(void);
 
 /* from gfx_core.c */
-void fb_hPostEvent_code_start(void);
-void fb_hPostEvent_code_end(void);
 
 static const unsigned char kb_scan_to_ascii[128][3] = {
 	/*
@@ -398,22 +396,22 @@ static int fb_dos_timer_handler(unsigned irq)
 	mouse_y = fb_dos_mouse_y;
 
 	if ( fb_dos.mouse_ok ) {
-		if( __fb_gfx->scanline_size != 1 ) {
-			mouse_y /= __fb_gfx->scanline_size;
+		if( fb_gfx->scanline_size != 1 ) {
+			mouse_y /= fb_gfx->scanline_size;
 		}
 	}
 
 	cursor_visible = fb_dos.mouse_ok && fb_dos.mouse_cursor &&
-		mouse_x >= 0 && mouse_x < __fb_gfx->w &&
-		mouse_y >= 0 && mouse_y < __fb_gfx->h;
+		mouse_x >= 0 && mouse_x < fb_gfx->w &&
+		mouse_y >= 0 && mouse_y < fb_gfx->h;
 	cursor_changed = cursor_visible != fb_dos_cursor_visible ||
 		(cursor_visible && (mouse_x != fb_dos_cursor_x || mouse_y != fb_dos_cursor_y));
 	if (fb_dos_cursor_visible && cursor_changed)
 		fb_hSoftCursorMarkDirty(fb_dos_cursor_y);
 
 	dirty = FALSE;
-	for (line = 0; line < __fb_gfx->h * __fb_gfx->scanline_size; line++) {
-		if (__fb_gfx->dirty[line]) {
+	for (line = 0; line < fb_gfx->h * fb_gfx->scanline_size; line++) {
+		if (fb_gfx->dirty[line]) {
 			dirty = TRUE;
 			break;
 		}
@@ -432,7 +430,7 @@ static int fb_dos_timer_handler(unsigned irq)
 		/* IRQ0 excludes foreground drawing until this handler returns. Clear
 		 * consumed damage after restoring the borrowed cursor background.
 		 */
-		fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h * __fb_gfx->scanline_size);
+		fb_hMemSet(fb_gfx->dirty, FALSE, fb_gfx->h * fb_gfx->scanline_size);
 	}
 	fb_dos_cursor_visible = cursor_visible;
 	fb_dos_cursor_x = mouse_x;
@@ -594,21 +592,21 @@ int fb_dos_init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	
 	/* lock code and data accessed in int handlers */
 	
-	lock_var(__fb_gfx);
-	lock_var(*__fb_gfx);
-	fb_dos_lock_data(__fb_gfx->page, sizeof(unsigned char *) * __fb_gfx->num_pages);
-	for (i = 0; i < __fb_gfx->num_pages; i++)
-		fb_dos_lock_data(__fb_gfx->page[i], __fb_gfx->pitch * __fb_gfx->h);
-	fb_dos_lock_data(__fb_gfx->dirty, __fb_gfx->h * __fb_gfx->scanline_size);
-	fb_dos_lock_data(__fb_gfx->device_palette, sizeof(int) * 256);
-	fb_dos_lock_data(__fb_gfx->palette, sizeof(int) * 256);
-	fb_dos_lock_data(__fb_color_conv_16to32, sizeof(int) * 512);
+	lock_var(fb_gfx);
+	lock_var(*fb_gfx);
+	fb_dos_lock_data(fb_gfx->page, sizeof(unsigned char *) * fb_gfx->num_pages);
+	for (i = 0; i < fb_gfx->num_pages; i++)
+		fb_dos_lock_data(fb_gfx->page[i], fb_gfx->pitch * fb_gfx->h);
+	fb_dos_lock_data(fb_gfx->dirty, fb_gfx->h * fb_gfx->scanline_size);
+	fb_dos_lock_data(fb_gfx->device_palette, sizeof(int) * 256);
+	fb_dos_lock_data(fb_gfx->palette, sizeof(int) * 256);
+	fb_dos_lock_data(fb_color_conv_16to32, sizeof(int) * 512);
 	lock_var(fb_dos);
 	lock_var(fb_dos_idle_timer_ticks);
 	lock_var(fb_dos_cursor_visible);
 	lock_var(fb_dos_cursor_x);
 	lock_var(fb_dos_cursor_y);
-	fb_dos_lock_data(&__fb_gfx->key, 128);
+	fb_dos_lock_data(&fb_gfx->key, 128);
 	lock_proc(fb_dos_timer_handler);
 	lock_proc(fb_dos_timer_handler);
 	fb_dos_lock_code(fb_dos.update, fb_dos.update_len);
@@ -625,7 +623,7 @@ int fb_dos_init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	fb_dos_lock_code(memcpy, 1024); /* we don't know how big memcpy and memset are, */
 	fb_dos_lock_code(memset, 1024); /* so we guess 1k each... */
 	lock_code(fb_hPostEvent_code_start, fb_hPostEvent_code_end);
-	fb_dos_lock_data(&__fb_gfx->event_queue, sizeof(EVENT) * MAX_EVENTS);
+	fb_dos_lock_data(&fb_gfx->event_queue, sizeof(EVENT) * MAX_EVENTS);
 	lock_array(kb_scan_to_ascii);
 	lock_array(kb_numpad_to_ascii);
 	lock_code(fb_dos_vesa_set_palette, fb_dos_vesa_set_palette_end);
@@ -636,7 +634,7 @@ int fb_dos_init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	fb_dos.h = h;
 	fb_dos.depth = depth;
 	fb_dos.Bpp = (depth + 7) / 8;
-	__fb_gfx->refresh_rate = fb_dos.refresh = refresh_rate;
+	fb_gfx->refresh_rate = fb_dos.refresh = refresh_rate;
 	
 	fb_dos_kb_init();
 	
@@ -660,7 +658,7 @@ int fb_dos_init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	if (!fb_dos_timer_init(timer_hz))
 		return -1;
 	
-	fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h * __fb_gfx->scanline_size);
+	fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h * fb_gfx->scanline_size);
 	
 	fb_dos.locked = 0;
 	
@@ -691,21 +689,21 @@ void fb_dos_exit(void)
 
 	/* unlock code and data */
 
-	unlock_var(__fb_gfx);
-	unlock_var(*__fb_gfx);
-	fb_dos_unlock_data(__fb_gfx->page, sizeof(unsigned char *) * __fb_gfx->num_pages);
-	for (i = 0; i < __fb_gfx->num_pages; i++)
-		fb_dos_unlock_data(__fb_gfx->page[i], __fb_gfx->pitch * __fb_gfx->h);
-	fb_dos_unlock_data(__fb_gfx->dirty, __fb_gfx->h * __fb_gfx->scanline_size);
-	fb_dos_unlock_data(__fb_gfx->device_palette, sizeof(int) * 256);
-	fb_dos_unlock_data(__fb_gfx->palette, sizeof(int) * 256);
-	fb_dos_unlock_data(__fb_color_conv_16to32, sizeof(int) * 512);
+	unlock_var(fb_gfx);
+	unlock_var(*fb_gfx);
+	fb_dos_unlock_data(fb_gfx->page, sizeof(unsigned char *) * fb_gfx->num_pages);
+	for (i = 0; i < fb_gfx->num_pages; i++)
+		fb_dos_unlock_data(fb_gfx->page[i], fb_gfx->pitch * fb_gfx->h);
+	fb_dos_unlock_data(fb_gfx->dirty, fb_gfx->h * fb_gfx->scanline_size);
+	fb_dos_unlock_data(fb_gfx->device_palette, sizeof(int) * 256);
+	fb_dos_unlock_data(fb_gfx->palette, sizeof(int) * 256);
+	fb_dos_unlock_data(fb_color_conv_16to32, sizeof(int) * 512);
 	unlock_var(fb_dos);
 	unlock_var(fb_dos_idle_timer_ticks);
 	unlock_var(fb_dos_cursor_visible);
 	unlock_var(fb_dos_cursor_x);
 	unlock_var(fb_dos_cursor_y);
-	fb_dos_unlock_data(&__fb_gfx->key, 128);
+	fb_dos_unlock_data(&fb_gfx->key, 128);
 	unlock_proc(fb_dos_timer_handler);
 	unlock_proc(fb_dos_timer_handler);
 	fb_dos_unlock_code(fb_dos.update, fb_dos.update_len);
@@ -722,7 +720,7 @@ void fb_dos_exit(void)
 	fb_dos_unlock_code(memcpy, 1024); /* we don't know how big memcpy and memset are, */
 	fb_dos_unlock_code(memset, 1024); /* so we guess 1k each... */
 	unlock_code(fb_hPostEvent_code_start, fb_hPostEvent_code_end);
-	fb_dos_unlock_data(&__fb_gfx->event_queue, sizeof(EVENT) * MAX_EVENTS);
+	fb_dos_unlock_data(&fb_gfx->event_queue, sizeof(EVENT) * MAX_EVENTS);
 	unlock_array(kb_scan_to_ascii);
 	unlock_array(kb_numpad_to_ascii);
 	unlock_code(fb_dos_vesa_set_palette, fb_dos_vesa_set_palette_end);

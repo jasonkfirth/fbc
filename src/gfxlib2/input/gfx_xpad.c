@@ -67,7 +67,13 @@
 #endif
 
 #define XPAD_MAX_DEVICES 16
+#if defined(FB_XPAD_HAS_JOYDEV) || defined(HOST_JS)
 #define XPAD_TRIGGER_DIGITAL_THRESHOLD (30.0f / 255.0f)
+#elif defined(HOST_WII)
+#if FB_WII_ENABLE_GC_PAD
+#define XPAD_TRIGGER_DIGITAL_THRESHOLD (30.0f / 255.0f)
+#endif
+#endif
 
 static void xpad_clear_outputs(ssize_t *buttons,
 							   float *lstick_x, float *lstick_y,

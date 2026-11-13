@@ -37,9 +37,9 @@ FBCALL void fb_hRestoreConsoleWindow( void )
 void fb_ConsoleGetMaxWindowSize( int *columns, int *rows )
 {
 	if( columns != NULL )
-		*columns = __fb_con.columns;
+		*columns = fb_console_context.columns;
 	if( rows != NULL )
-		*rows = __fb_con.rows;
+		*rows = fb_console_context.rows;
 }
 
 FBCALL void fb_hConvertToConsole( int *left, int *top, int *right,
@@ -75,9 +75,9 @@ void fb_hConsoleGetWindow( int *left, int *top, int *columns, int *rows )
 	if( top != NULL )
 		*top = 0;
 	if( columns != NULL )
-		*columns = __fb_con.columns;
+		*columns = fb_console_context.columns;
 	if( rows != NULL )
-		*rows = __fb_con.rows;
+		*rows = fb_console_context.rows;
 }
 
 /* end of drivers/wince/io_window.c */

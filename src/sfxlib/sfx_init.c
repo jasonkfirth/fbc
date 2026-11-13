@@ -95,7 +95,7 @@ int fb_sfxInit(void)
     fb_sfxRuntimeLockInit();
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx && __fb_sfx->initialized)
+    if (fb_sfx_context && fb_sfx_context->initialized)
     {
         fb_sfxRuntimeUnlock();
         return 0;
@@ -162,7 +162,7 @@ int fb_sfxInit(void)
 
 int fb_sfxEnsureInit(void)
 {
-    if (__fb_sfx && __fb_sfx->initialized)
+    if (fb_sfx_context && fb_sfx_context->initialized)
         return 0;
 
     return fb_sfxInit();

@@ -37,44 +37,44 @@ static int fb_sfxCaptureFramesFromSamples(int samples, int frames, int channels)
 
 void fb_sfxCaptureInit(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    memset(&__fb_sfx->capture, 0, sizeof(__fb_sfx->capture));
-    __fb_sfx->capture.rate = __fb_sfx->samplerate > 0 ? __fb_sfx->samplerate : FB_SFX_DEFAULT_RATE;
-    __fb_sfx->capture.channels = __fb_sfx->output_channels > 0 ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS;
+    memset(&fb_sfx_context->capture, 0, sizeof(fb_sfx_context->capture));
+    fb_sfx_context->capture.rate = fb_sfx_context->samplerate > 0 ? fb_sfx_context->samplerate : FB_SFX_DEFAULT_RATE;
+    fb_sfx_context->capture.channels = fb_sfx_context->output_channels > 0 ? fb_sfx_context->output_channels : FB_SFX_DEFAULT_CHANNELS;
 }
 
 void fb_sfxCaptureShutdown(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    memset(&__fb_sfx->capture, 0, sizeof(__fb_sfx->capture));
+    memset(&fb_sfx_context->capture, 0, sizeof(fb_sfx_context->capture));
 }
 
 void fb_sfxCapturePause(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    __fb_sfx->capture.enabled = FB_SFX_CAPTURE_PAUSED;
+    fb_sfx_context->capture.enabled = FB_SFX_CAPTURE_PAUSED;
 }
 
 void fb_sfxCaptureResume(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    __fb_sfx->capture.enabled = FB_SFX_CAPTURE_RUNNING;
+    fb_sfx_context->capture.enabled = FB_SFX_CAPTURE_RUNNING;
 }
 
 int fb_sfxCaptureStatus(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_CAPTURE_STOPPED;
 
-    return __fb_sfx->capture.enabled;
+    return fb_sfx_context->capture.enabled;
 }
 
 void fb_sfxCaptureBufferInit(void)
@@ -96,10 +96,10 @@ int fb_sfxCaptureBufferWrite(const short *samples, int frames)
     int frames_to_write;
     int i;
 
-    if (!__fb_sfx || !samples || frames <= 0)
+    if (!fb_sfx_context || !samples || frames <= 0)
         return 0;
 
-    cap = &__fb_sfx->capture;
+    cap = &fb_sfx_context->capture;
     channels = cap->channels > 0 ? cap->channels : FB_SFX_DEFAULT_CHANNELS;
     writable_samples = fb_sfxCaptureFreeSamples(cap);
 
@@ -126,10 +126,10 @@ int fb_sfxCaptureBufferRead(short *samples, int frames)
     int frames_to_read;
     int i;
 
-    if (!__fb_sfx || !samples || frames <= 0)
+    if (!fb_sfx_context || !samples || frames <= 0)
         return 0;
 
-    cap = &__fb_sfx->capture;
+    cap = &fb_sfx_context->capture;
     channels = cap->channels > 0 ? cap->channels : FB_SFX_DEFAULT_CHANNELS;
     readable_samples = fb_sfxCaptureStoredSamples(cap);
 
@@ -161,10 +161,10 @@ int fb_sfxCaptureRead(float *samples, int frames)
     int frames_to_read;
     int i;
 
-    if (!__fb_sfx || !samples || frames <= 0)
+    if (!fb_sfx_context || !samples || frames <= 0)
         return 0;
 
-    cap = &__fb_sfx->capture;
+    cap = &fb_sfx_context->capture;
     channels = cap->channels > 0 ? cap->channels : FB_SFX_DEFAULT_CHANNELS;
     readable_samples = fb_sfxCaptureStoredSamples(cap);
 
@@ -184,12 +184,12 @@ int fb_sfxCaptureRead(float *samples, int frames)
 
 void fb_sfxCaptureBufferClear(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    __fb_sfx->capture.read_pos = 0;
-    __fb_sfx->capture.write_pos = 0;
-    memset(__fb_sfx->capture.buffer, 0, sizeof(__fb_sfx->capture.buffer));
+    fb_sfx_context->capture.read_pos = 0;
+    fb_sfx_context->capture.write_pos = 0;
+    memset(fb_sfx_context->capture.buffer, 0, sizeof(fb_sfx_context->capture.buffer));
 }
 
 int fb_sfxCaptureAvailable(void)
@@ -197,10 +197,10 @@ int fb_sfxCaptureAvailable(void)
     FB_SFXCAPTURE *cap;
     int channels;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
-    cap = &__fb_sfx->capture;
+    cap = &fb_sfx_context->capture;
     channels = cap->channels > 0 ? cap->channels : FB_SFX_DEFAULT_CHANNELS;
 
     return fb_sfxCaptureStoredSamples(cap) / channels;

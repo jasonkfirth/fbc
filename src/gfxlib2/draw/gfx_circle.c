@@ -113,7 +113,7 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx || radius <= 0.0) {
+	if (!fb_gfx || radius <= 0.0) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}
@@ -142,7 +142,7 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 	}
 
 	if (aspect == 0.0)
-		aspect = __fb_gfx->aspect;
+		aspect = fb_gfx->aspect;
 
 	if (aspect > 1.0) {
 		a = (radius / aspect);

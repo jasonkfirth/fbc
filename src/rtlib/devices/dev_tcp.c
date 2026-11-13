@@ -112,7 +112,6 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	/* The published DJGPP Watt-32 headers omit SHUT_* names. Its shutdown.c
 	   defines the BSD values privately: 1 disables sends, 2 both directions. */
 	#define FB_TCP_SHUT_WR 1
-	#define FB_TCP_SHUT_RDWR 2
 	#define FB_TCP_SELECT(n, r, w, e, t) fb_DosTcpSelect( n, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) ioctlsocket( s, cmd, (char *)(argp) )
 	#define FB_TCP_RECV(s, b, l, f) fb_DosTcpRecv( s, b, l, f )
@@ -125,7 +124,6 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_ERRNO() 0
 	#define FB_TCP_WOULDBLOCK(err) FALSE
 	#define FB_TCP_SHUT_WR 1
-	#define FB_TCP_SHUT_RDWR 2
 #elif defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 	#define FB_TCP_CLOSESOCKET(s) closesocket( s )
 	#define FB_TCP_SOCKET_ERROR(s) ((s) == FB_TCP_INVALID_SOCKET)
@@ -133,7 +131,6 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_WOULDBLOCK(err) \
 		((err) == WSAEWOULDBLOCK || (err) == WSAETIMEDOUT)
 	#define FB_TCP_SHUT_WR SD_SEND
-	#define FB_TCP_SHUT_RDWR SD_BOTH
 	#define FB_TCP_SELECT(n, r, w, e, t) select( 0, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) ioctlsocket( s, cmd, argp )
 	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )
@@ -148,7 +145,6 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 		((err) == EAGAIN || (err) == EWOULDBLOCK || \
 		 (err) == -EAGAIN || (err) == -EWOULDBLOCK)
 	#define FB_TCP_SHUT_WR SHUT_WR
-	#define FB_TCP_SHUT_RDWR SHUT_RDWR
 	#define FB_TCP_SELECT(n, r, w, e, t) net_select( n, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) net_ioctl( s, cmd, argp )
 	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )
@@ -161,7 +157,6 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_ERRNO() errno
 	#define FB_TCP_WOULDBLOCK(err) ((err) == EAGAIN || (err) == EWOULDBLOCK)
 	#define FB_TCP_SHUT_WR 1
-	#define FB_TCP_SHUT_RDWR 2
 	#define FB_TCP_SELECT(n, r, w, e, t) fb_AmigaTcpSelect( n, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) fb_AmigaTcpIoctl( s, cmd, argp )
 	#define FB_TCP_RECV(s, b, l, f) fb_AmigaTcpRecv( s, b, l, f )
@@ -180,7 +175,6 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_ERRNO() errno
 	#define FB_TCP_WOULDBLOCK(err) ((err) == EAGAIN || (err) == EWOULDBLOCK)
 	#define FB_TCP_SHUT_WR SHUT_WR
-	#define FB_TCP_SHUT_RDWR SHUT_RDWR
 	#define FB_TCP_SELECT(n, r, w, e, t) select( n, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, cmd, argp )
 	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )

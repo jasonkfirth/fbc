@@ -96,11 +96,11 @@ static int has_dirty_lines(void)
 {
 	int y;
 
-	if (!__fb_gfx || !__fb_gfx->dirty)
+	if (!fb_gfx || !fb_gfx->dirty)
 		return FALSE;
 
-	for (y = 0; y < __fb_gfx->h; ++y) {
-		if (__fb_gfx->dirty[y])
+	for (y = 0; y < fb_gfx->h; ++y) {
+		if (fb_gfx->dirty[y])
 			return TRUE;
 	}
 
@@ -121,9 +121,9 @@ static void wii_get_mouse_bounds(int *width, int *height)
 	int w = video_w;
 	int h = video_h;
 
-	if (__fb_gfx) {
-		w = __fb_gfx->w;
-		h = __fb_gfx->h;
+	if (fb_gfx) {
+		w = fb_gfx->w;
+		h = fb_gfx->h;
 	}
 
 	if (w <= 0)
@@ -223,8 +223,8 @@ static int wii_find_pointer_channel(ir_t *ir, int *channel)
 
 static void wii_set_key_state(int scancode, int down)
 {
-	if (__fb_gfx && __fb_gfx->key && (scancode >= 0) && (scancode < 128))
-		__fb_gfx->key[scancode] = down ? TRUE : FALSE;
+	if (fb_gfx && fb_gfx->key && (scancode >= 0) && (scancode < 128))
+		fb_gfx->key[scancode] = down ? TRUE : FALSE;
 }
 
 static void wii_post_key_on_press(int down, int was_down, int key)
@@ -465,7 +465,7 @@ static uint32_t sample_16bpp_pixel(int x, int y)
 	uint32_t g;
 	uint32_t b;
 
-	row = __fb_gfx->framebuffer + (y * __fb_gfx->pitch);
+	row = fb_gfx->framebuffer + (y * fb_gfx->pitch);
 	pixel = ((uint16_t *)row)[x];
 
 	r = (uint32_t)((pixel & MASK_R_16) >> 11);
@@ -484,23 +484,23 @@ static uint32_t sample_source_pixel(int dst_x, int dst_y)
 	int src_x;
 	int src_y;
 
-	src_x = (dst_x * __fb_gfx->w) / video_w;
-	src_y = (dst_y * __fb_gfx->h) / video_h;
+	src_x = (dst_x * fb_gfx->w) / video_w;
+	src_y = (dst_y * fb_gfx->h) / video_h;
 
 	if (src_x < 0)
 		src_x = 0;
-	else if (src_x >= __fb_gfx->w)
-		src_x = __fb_gfx->w - 1;
+	else if (src_x >= fb_gfx->w)
+		src_x = fb_gfx->w - 1;
 
 	if (src_y < 0)
 		src_y = 0;
-	else if (src_y >= __fb_gfx->h)
-		src_y = __fb_gfx->h - 1;
+	else if (src_y >= fb_gfx->h)
+		src_y = fb_gfx->h - 1;
 
-	if (__fb_gfx->depth == 16)
+	if (fb_gfx->depth == 16)
 		return sample_16bpp_pixel(src_x, src_y);
 
-	return rgb_buffer[(src_y * __fb_gfx->w) + src_x];
+	return rgb_buffer[(src_y * fb_gfx->w) + src_x];
 }
 
 static void clear_xfb(void *buffer)
@@ -617,9 +617,9 @@ static void dump_xfb_samples(void *buffer)
 	xs[2] = (video_w * 5) / 6;
 
 	fprintf(file, "depth=%d source=%dx%d video=%dx%d\n",
-		__fb_gfx ? __fb_gfx->depth : 0,
-		__fb_gfx ? __fb_gfx->w : 0,
-		__fb_gfx ? __fb_gfx->h : 0,
+		fb_gfx ? fb_gfx->depth : 0,
+		fb_gfx ? fb_gfx->w : 0,
+		fb_gfx ? fb_gfx->h : 0,
 		video_w,
 		video_h);
 
@@ -701,18 +701,18 @@ static void driver_present_framebuffer(void)
 	int x;
 	int y;
 
-	if (!__fb_gfx || !blitter || !rmode || !xfb[0] || !xfb[1])
+	if (!fb_gfx || !blitter || !rmode || !xfb[0] || !xfb[1])
 		return;
 
 	if (!has_dirty_lines())
 		return;
 
-	if (__fb_gfx->depth != 16) {
-		if (!ensure_rgb_buffer((size_t)__fb_gfx->w * (size_t)__fb_gfx->h))
+	if (fb_gfx->depth != 16) {
+		if (!ensure_rgb_buffer((size_t)fb_gfx->w * (size_t)fb_gfx->h))
 			return;
 
 		blitter((unsigned char *)rgb_buffer,
-			__fb_gfx->w * (int)sizeof(uint32_t));
+			fb_gfx->w * (int)sizeof(uint32_t));
 	}
 
 	back = visible_xfb ^ 1;
@@ -736,7 +736,7 @@ static void driver_present_framebuffer(void)
 	VIDEO_WaitVSync();
 
 	visible_xfb = back;
-	fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h);
+	fb_hMemSet(fb_gfx->dirty, FALSE, fb_gfx->h);
 }
 
 static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rate, int flags)
@@ -831,7 +831,7 @@ static void driver_unlock(void)
 		unlock there would turn a single logical frame into many hardware
 		updates and expose partially drawn offscreen pages.
 	*/
-	if (!quitting && __fb_gfx && (__fb_gfx->num_pages <= 1))
+	if (!quitting && fb_gfx && (fb_gfx->num_pages <= 1))
 		driver_present_framebuffer();
 }
 
@@ -955,7 +955,7 @@ static const GFXDRIVER fb_gfxDriverWii =
 	NULL
 };
 
-const GFXDRIVER *__fb_gfx_drivers_list[] = {
+const GFXDRIVER *fb_gfx_drivers_list[] = {
 	&fb_gfxDriverWii,
 	NULL
 };

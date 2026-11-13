@@ -12,22 +12,22 @@ FBCALL unsigned int fb_ConsoleReadXY( int x, int y, int colorflag )
 {
 	unsigned char *buffer;
 
-	if( !__fb_con.inited )
+	if( !fb_console_context.inited )
 		return 0;
 
 	BG_LOCK( );
 	fb_hRecheckConsoleSize( TRUE );
 	BG_UNLOCK( );
 
-	if ((x < 1) || (x > __fb_con.w) || (y < 1) || (y > __fb_con.h))
+	if ((x < 1) || (x > fb_console_context.w) || (y < 1) || (y > fb_console_context.h))
 		return 0;
 
 	if (colorflag)
-		buffer = __fb_con.attr_buffer;
+		buffer = fb_console_context.attr_buffer;
 	else
-		buffer = __fb_con.char_buffer;
+		buffer = fb_console_context.char_buffer;
 
-	return (unsigned int)buffer[((y - 1) * __fb_con.w) + x - 1];
+	return (unsigned int)buffer[((y - 1) * fb_console_context.w) + x - 1];
 }
 
 /* end of drivers/unix/io_readxy.c */

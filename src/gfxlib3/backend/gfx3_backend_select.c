@@ -68,17 +68,17 @@ static int backend_matches_name(const FB_GFX3_BACKEND_VTABLE *backend,
 		return FALSE;
 	if (backend_name_equal(backend->name, name))
 		return TRUE;
-	if (backend == &__fb_gfx3_backend_vulkan)
+	if (backend == &fb_gfx3_backend_vulkan)
 		return backend_name_equal(name, "vulkan") ||
 			backend_name_equal(name, "vk");
-	if (backend == &__fb_gfx3_backend_opengl)
+	if (backend == &fb_gfx3_backend_opengl)
 		return backend_name_equal(name, "opengl") ||
 			backend_name_equal(name, "gl");
-	if (backend == &__fb_gfx3_backend_gles)
+	if (backend == &fb_gfx3_backend_gles)
 		return backend_name_equal(name, "opengl es") ||
 			backend_name_equal(name, "opengles") ||
 			backend_name_equal(name, "gles");
-	return backend == &__fb_gfx3_backend_null &&
+	return backend == &fb_gfx3_backend_null &&
 		backend_name_equal(name, "null");
 }
 
@@ -123,11 +123,11 @@ size_t fb_gfx3_backend_plan(int flags, const char *requested_name,
 	if ((plan == NULL) || (capacity == 0))
 		return 0;
 	if ((flags == -1) || backend_name_equal(requested_name, "null")) {
-		plan[0] = &__fb_gfx3_backend_null;
+		plan[0] = &fb_gfx3_backend_null;
 		return 1;
 	}
 	if (((uint32_t)flags & FB_GFX3_SCREEN_VULKAN) != 0) {
-		plan[0] = &__fb_gfx3_backend_vulkan;
+		plan[0] = &fb_gfx3_backend_vulkan;
 		return 1;
 	}
 	if (((uint32_t)flags & FB_GFX3_SCREEN_OPENGL) != 0) {
@@ -209,7 +209,7 @@ size_t fb_gfx3_backend_attempt_plan(int flags, const char *requested_name,
 				attempt_count++;
 			}
 			if ((backend_count == 1) &&
-			    (backends[0] == &__fb_gfx3_backend_null))
+			    (backends[0] == &fb_gfx3_backend_null))
 				break;
 		}
 		return attempt_count;

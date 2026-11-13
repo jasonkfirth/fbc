@@ -1661,9 +1661,9 @@ static int png_prepare_destination(FB_GFXCTX *ctx, const PNG_IMAGE *image,
 			}
 		}
 	} else {
-		*width = MIN(__fb_gfx->w, (int)image->width);
-		*height = MIN(__fb_gfx->h, (int)image->height);
-		*bpp = __fb_gfx->bpp;
+		*width = MIN(fb_gfx->w, (int)image->width);
+		*height = MIN(fb_gfx->h, (int)image->height);
+		*bpp = fb_gfx->bpp;
 	}
 
 	if ((*width < 0) || (*height < 0) ||
@@ -1769,7 +1769,7 @@ int fb_hGfxPngLoad(FB_GFXCTX *ctx, FILE *file, void *dest, void *pal,
 	int bpp;
 	int result;
 
-	if (__fb_gfx == NULL)
+	if (fb_gfx == NULL)
 		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 	result = png_load_chunks(file, &image);
 	if (result != FB_RTERROR_OK) {
@@ -1788,13 +1788,13 @@ int fb_hGfxPngLoad(FB_GFXCTX *ctx, FILE *file, void *dest, void *pal,
 
 	DRIVER_LOCK();
 	if ((pal == NULL) && (palette_entries != 0)) {
-		fb_hMemCpy(__fb_gfx->device_palette, palette,
+		fb_hMemCpy(fb_gfx->device_palette, palette,
 			palette_entries * sizeof(*palette));
 		fb_hRestorePalette();
 	}
 	if (!png_convert_passes(ctx, &image, width, height, bpp))
 		result = FB_RTERROR_FILEIO;
-	SET_DIRTY(ctx, 0, __fb_gfx->h);
+	SET_DIRTY(ctx, 0, fb_gfx->h);
 	DRIVER_UNLOCK();
 
 exit:
@@ -1840,7 +1840,7 @@ static int png_prepare_source(FB_GFXCTX *ctx, void *src, void *pal,
 			image->width = header->old.width;
 			image->height = header->old.height;
 			image->input_bpp = header->old.bpp ?
-				header->old.bpp : (unsigned int)__fb_gfx->bpp;
+				header->old.bpp : (unsigned int)fb_gfx->bpp;
 			if (!png_multiply_size(image->width, image->input_bpp,
 			    &old_pitch) || (old_pitch > UINT_MAX))
 				return FB_RTERROR_ILLEGALFUNCTIONCALL;
@@ -1848,10 +1848,10 @@ static int png_prepare_source(FB_GFXCTX *ctx, void *src, void *pal,
 			image->pixels = (unsigned char *)src + 4;
 		}
 	} else {
-		image->width = (unsigned int)__fb_gfx->w;
-		image->height = (unsigned int)__fb_gfx->h;
-		image->input_bpp = (unsigned int)__fb_gfx->bpp;
-		image->input_pitch = (unsigned int)__fb_gfx->pitch;
+		image->width = (unsigned int)fb_gfx->w;
+		image->height = (unsigned int)fb_gfx->h;
+		image->input_bpp = (unsigned int)fb_gfx->bpp;
+		image->input_pitch = (unsigned int)fb_gfx->pitch;
 		image->pixels = ctx->line[0];
 	}
 
@@ -1874,7 +1874,7 @@ static int png_prepare_source(FB_GFXCTX *ctx, void *src, void *pal,
 			image->channels = 1;
 		}
 		if (source_palette == NULL) {
-			image->palette = __fb_gfx->device_palette;
+			image->palette = fb_gfx->device_palette;
 		} else {
 			for (i = 0; i < 256u; i++) {
 				image->converted_palette[i] =
@@ -2152,7 +2152,7 @@ int fb_hGfxPngSave(FB_GFXCTX *ctx, FILE *file, void *src, void *pal,
 	size_t compressed_size = 0;
 	int result;
 
-	if (__fb_gfx == NULL)
+	if (fb_gfx == NULL)
 		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 	result = png_prepare_source(ctx, src, pal, bitsperpixel, &image);
 	if (result != FB_RTERROR_OK)

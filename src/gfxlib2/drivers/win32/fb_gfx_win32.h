@@ -1,8 +1,16 @@
+/*
+ * Project: FreeBASIC runtime libraries
+ * File: fb_gfx_win32.h
+ * Purpose: Share the Windows graphics driver interface.
+ * Responsibilities: Native window state, event helpers and driver entry points.
+ * This file intentionally does NOT contain: Portable rasterization algorithms.
+ */
 /* common win32 internal definitions */
 
-#ifndef __FB_GFX_WIN32_H__
-#define __FB_GFX_WIN32_H__
+#ifndef FB_GFX_WIN32_H
+#define FB_GFX_WIN32_H
 
+#include "../../../rtlib/fb_abi.h"
 #include <windows.h>
 
 /* see also fb_win32.window_class setup in fb_hWin32Init() */
@@ -26,7 +34,7 @@ typedef BOOL (WINAPI *SETLAYEREDWINDOWATTRIBUTES)(HWND hWnd, COLORREF crKey, BYT
 typedef HMONITOR (WINAPI *MONITORFROMWINDOW)(HWND hwnd, DWORD dwFlags);
 typedef HMONITOR (WINAPI *MONITORFROMPOINT)(POINT pt, DWORD dwFlags);
 typedef BOOL (WINAPI *FLASHWINDOWEX)(PFB_FLASHWINFO pwfi);
-typedef BOOL (WINAPI *_TRACKMOUSEEVENT)(TRACKMOUSEEVENT *);
+typedef BOOL (WINAPI *FB_TRACKMOUSEEVENT_PROC)(TRACKMOUSEEVENT *);
 typedef BOOL (WINAPI *GETMONITORINFO)(HMONITOR hMonitor, LPMONITORINFO lpmi);
 typedef LONG (WINAPI *CHANGEDISPLAYSETTINGSEX)(LPCTSTR lpszDeviceName, LPDEVMODE lpDevMode, HWND hwnd, DWORD dwflags, LPVOID lParam);
 typedef BOOL (WINAPI *REGISTERTOUCHWINDOW)(HWND hwnd, ULONG flags);
@@ -64,7 +72,7 @@ typedef struct {
 	MONITORFROMWINDOW MonitorFromWindow;
 	MONITORFROMPOINT MonitorFromPoint;
 	FLASHWINDOWEX FlashWindowEx;
-	_TRACKMOUSEEVENT TrackMouseEvent;
+	FB_TRACKMOUSEEVENT_PROC TrackMouseEvent;
 	GETMONITORINFO GetMonitorInfo;
 	CHANGEDISPLAYSETTINGSEX ChangeDisplaySettingsEx;
 	REGISTERTOUCHWINDOW RegisterTouchWindow;
@@ -106,6 +114,8 @@ extern int fb_hWin32LoadProcedure(HMODULE module, const char *name,
                                  void *destination, size_t destination_size);
 
 /* from the rtlib */
-extern const unsigned char __fb_keytable[][3];
+extern const unsigned char fb_keytable[][3] FB_C_SYMBOL("__fb_keytable");
 
 #endif
+
+/* end of fb_gfx_win32.h */

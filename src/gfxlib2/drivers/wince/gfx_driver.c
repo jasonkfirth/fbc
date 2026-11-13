@@ -49,7 +49,7 @@ static int wince_driver_init(char *title, int width, int height, int depth,
     }
 
     fb_winceGfxInputInit();
-    __fb_gfx->refresh_rate = fb_wince_gfx.refresh_rate;
+    fb_gfx->refresh_rate = fb_wince_gfx.refresh_rate;
     return 0;
 }
 
@@ -133,10 +133,10 @@ const GFXDRIVER fb_gfxDriverWinCE =
     NULL
 };
 
-const GFXDRIVER *__fb_gfx_drivers_list[] =
+const GFXDRIVER *fb_gfx_drivers_list[] =
 {
     &fb_gfxDriverWinCE,
-    &__fb_gfxDriverNull,
+    &fb_gfxDriverNull,
     NULL
 };
 

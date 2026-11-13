@@ -183,9 +183,9 @@ static int console_uses_gpu_glyphs(const FB_GFX3_SURFACE *surface)
 	if ((surface == NULL) || (surface->context == NULL))
 		return FALSE;
 	return (surface->context->renderer.backend_vtable ==
-		&__fb_gfx3_backend_opengl) ||
+		&fb_gfx3_backend_opengl) ||
 		(surface->context->renderer.backend_vtable ==
-		 &__fb_gfx3_backend_vulkan);
+		 &fb_gfx3_backend_vulkan);
 }
 
 static void console_clear_cells(FB_GFX3_DRAW_STATE *state, uint32_t x1,

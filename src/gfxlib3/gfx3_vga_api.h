@@ -19,8 +19,8 @@
         - screen mode lifecycle
 */
 
-#ifndef __FB_GFX3_VGA_API_H__
-#define __FB_GFX3_VGA_API_H__
+#ifndef FB_GFX3_VGA_API_H
+#define FB_GFX3_VGA_API_H
 
 #include "fb_gfx3.h"
 

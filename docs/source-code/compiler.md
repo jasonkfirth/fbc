@@ -141,6 +141,14 @@ overload ranking. See [qualified pointer slots](../c-emitter-const-slots.md),
 [the value regression](../../tests/compiler-support/c-byref-qualified-temporaries.bas)
 and [the diagnostic fixture](../../tests/compiler-support/source-const-qualification.bas).
 
+`backend/c/c-asm-addresses.bi` owns borrowed assembly-visible parameter
+identities during procedure emission. The reachable-storage walk collects
+homes before the native definition header is written; the emitter then keeps
+source addresses stable for the entire call. Intel static address operands
+and automatic memory operands have distinct constraints. See
+[assembly storage addresses](../c-emitter-asm-addresses.md) and
+[the live-address regression](../../tests/compiler-support/c-asm-real-addresses.bas).
+
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage
 is released. It must not reparse text to invent a competing interpretation.

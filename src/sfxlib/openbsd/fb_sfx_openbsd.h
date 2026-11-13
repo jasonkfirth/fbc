@@ -1,9 +1,16 @@
 /*
+ * Project: FreeBASIC runtime libraries
+ * File: fb_sfx_openbsd.h
+ * Purpose: Share the openbsd sound backend interface.
+ * Responsibilities: Backend state and playback lifecycle declarations.
+ * This file intentionally does NOT contain: Device I/O or audio mixing.
+ */
+/*
     Shared declarations for the OpenBSD backend layer.
 */
 
-#ifndef __FB_SFX_OPENBSD_H__
-#define __FB_SFX_OPENBSD_H__
+#ifndef FB_SFX_OPENBSD_H
+#define FB_SFX_OPENBSD_H
 
 #include "../unix/fb_sfx_bsd.h"
 

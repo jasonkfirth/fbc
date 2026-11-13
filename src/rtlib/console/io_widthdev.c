@@ -8,7 +8,7 @@
 #include "fb.h"
 #include <ctype.h>
 
-typedef struct _DEV_INFO_WIDTH {
+typedef struct FB_DEV_INFO_WIDTH {
     FB_LISTELEM     elem;
     char           *device;
     int             width;

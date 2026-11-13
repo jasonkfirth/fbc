@@ -1595,7 +1595,7 @@ static void *opengl_get_opengl_proc(FB_GFX3_BACKEND *backend,
 
 #endif
 
-const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_opengl = {
+const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_opengl = {
 	FB_GFX3_BACKEND_ABI_VERSION,
 	"OpenGL 4.3 compute",
 	opengl_probe,

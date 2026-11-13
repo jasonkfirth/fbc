@@ -20,8 +20,8 @@
         - public FreeBASIC interfaces
 */
 
-#ifndef __FB_GFX3_PLATFORM_DRM_H__
-#define __FB_GFX3_PLATFORM_DRM_H__
+#ifndef FB_GFX3_PLATFORM_DRM_H
+#define FB_GFX3_PLATFORM_DRM_H
 
 #include "../../gfx3_platform.h"
 
@@ -31,3 +31,5 @@ int fb_gfx3_platform_drm_should_default(void);
 #endif
 
 /* end of linux/gfx3_platform_drm.h */
+
+/* end of gfx3_platform_drm.h */

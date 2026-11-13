@@ -23,8 +23,8 @@
         - window-system event handling
 */
 
-#ifndef __FB_GFX3_RENDERER_H__
-#define __FB_GFX3_RENDERER_H__
+#ifndef FB_GFX3_RENDERER_H
+#define FB_GFX3_RENDERER_H
 
 #include "gfx3_backend.h"
 #include "gfx3_resource.h"
@@ -39,6 +39,10 @@ typedef struct FB_GFX3_RENDERER_CONFIG {
 	size_t queue_capacity;
 	size_t resource_capacity;
 	uint32_t idle_poll_milliseconds;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing 8-byte-aligned size. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_RENDERER_CONFIG;
 
 typedef struct FB_GFX3_RENDERER {

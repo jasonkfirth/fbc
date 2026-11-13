@@ -22,6 +22,7 @@
         - MMX, SIMD, or platform-specific acceleration
 */
 
+#include "../gfx3_exports.h"
 #include "../fb_gfx3.h"
 
 #define FB_GFX3_MASK_RED_BLUE 0x00FF00FFu

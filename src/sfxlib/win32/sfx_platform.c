@@ -22,6 +22,7 @@
 */
 
 #include "fb_sfx_win32.h"
+#include "../fb_sfx_internal.h"
 
 #include <objbase.h>
 

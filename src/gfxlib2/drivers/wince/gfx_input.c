@@ -30,12 +30,12 @@ static int wince_virtual_to_scancode(unsigned int virtual_key)
 {
     int index;
 
-    for (index = 0; __fb_keytable[index][0] != 0; ++index)
+    for (index = 0; fb_keytable[index][0] != 0; ++index)
     {
-        if (__fb_keytable[index][1] == virtual_key ||
-            __fb_keytable[index][2] == virtual_key)
+        if (fb_keytable[index][1] == virtual_key ||
+            fb_keytable[index][2] == virtual_key)
         {
-            return __fb_keytable[index][0];
+            return fb_keytable[index][0];
         }
     }
 
@@ -56,7 +56,7 @@ static void wince_post_key(unsigned int message, WPARAM virtual_key,
     scancode = wince_virtual_to_scancode((unsigned int)virtual_key);
 
     if (scancode > 0 && scancode < 128)
-        __fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
+        fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
 
     memset(&event, 0, sizeof(event));
     if (!pressed)
@@ -171,7 +171,7 @@ LRESULT CALLBACK fb_winceGfxWindowProc(HWND window, UINT message,
 {
     EVENT event;
 
-    if (__fb_gfx == NULL)
+    if (fb_gfx == NULL)
         return DefWindowProcW(window, message, wparam, lparam);
 
     switch (message)
@@ -180,7 +180,7 @@ LRESULT CALLBACK fb_winceGfxWindowProc(HWND window, UINT message,
             fb_wince_gfx.active = (LOWORD(wparam) != WA_INACTIVE);
             if (!fb_wince_gfx.active)
             {
-                memset(__fb_gfx->key, FALSE, 128);
+                memset(fb_gfx->key, FALSE, 128);
                 fb_wince_gfx.mouse_buttons = 0;
             }
             memset(&event, 0, sizeof(event));

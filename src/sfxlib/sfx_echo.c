@@ -91,7 +91,7 @@ int fb_sfxEchoCmd(float wet, float delay_seconds, float feedback)
 
     fb_sfxRuntimeLock();
 
-    if (!__fb_sfx || __fb_sfx->samplerate <= 0)
+    if (!fb_sfx_context || fb_sfx_context->samplerate <= 0)
     {
         fb_sfxRuntimeUnlock();
         return -1;
@@ -104,7 +104,7 @@ int fb_sfxEchoCmd(float wet, float delay_seconds, float feedback)
         return 0;
     }
 
-    requested_frames = (double)delay_seconds * (double)__fb_sfx->samplerate;
+    requested_frames = (double)delay_seconds * (double)fb_sfx_context->samplerate;
     if (requested_frames < 1.0 ||
         requested_frames > (double)FB_SFX_ECHO_MAX_DELAY_FRAMES)
     {

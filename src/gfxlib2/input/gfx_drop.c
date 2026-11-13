@@ -19,11 +19,11 @@ FBCALL int fb_GfxDropEnable(int enabled)
 	if (enabled != 0 && enabled != 1 && enabled != -1) return FB_DROP_INVALID;
 	enabled = enabled != 0;
 	FB_GRAPHICS_LOCK();
-	if (__fb_gfx != NULL) {
+	if (fb_gfx != NULL) {
 		EVENT_LOCK();
-		if (__fb_gfx->drops.supported) {
-			__fb_gfx->drops.enabled = enabled;
-			if (!enabled) fb_hDropClear(&__fb_gfx->drops);
+		if (fb_gfx->drops.supported) {
+			fb_gfx->drops.enabled = enabled;
+			if (!enabled) fb_hDropClear(&fb_gfx->drops);
 			result = FB_DROP_OK;
 		}
 		EVENT_UNLOCK();
@@ -38,9 +38,9 @@ FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING_ACCESS *output)
 	int result = FB_DROP_UNAVAILABLE;
 	if (output == NULL) return FB_DROP_INVALID;
 	FB_GRAPHICS_LOCK();
-	if (__fb_gfx != NULL) {
+	if (fb_gfx != NULL) {
 		EVENT_LOCK();
-		result = fb_hDropCopy(&__fb_gfx->drops, identifier, index, &text);
+		result = fb_hDropCopy(&fb_gfx->drops, identifier, index, &text);
 		EVENT_UNLOCK();
 	}
 	FB_GRAPHICS_UNLOCK();
@@ -59,9 +59,9 @@ int fb_hGfxDropSubmit(int kind, const char *data, size_t bytes, int count)
 {
 	EVENT event;
 	int result;
-	if (__fb_gfx == NULL) return FB_DROP_UNAVAILABLE;
+	if (fb_gfx == NULL) return FB_DROP_UNAVAILABLE;
 	EVENT_LOCK();
-	result = fb_hDropPublish(&__fb_gfx->drops, kind, data, bytes, count, &event);
+	result = fb_hDropPublish(&fb_gfx->drops, kind, data, bytes, count, &event);
 	EVENT_UNLOCK();
 	if (result == FB_DROP_OK) fb_hPostEvent(&event);
 	return result;

@@ -107,7 +107,15 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #elif defined HOST_MINGW || defined HOST_CYGWIN
 #	include <wchar.h>
 #	include <wctype.h>
-#	define FB_WCHAR wchar_t
+/*
+ * GCC and Clang expose the exact native type used for wchar_t. Keep internal
+ * C declarations compatible with wide APIs without spelling a C++ keyword.
+ */
+#	if defined __GNUC__ || defined __clang__
+#		define FB_WCHAR __WCHAR_TYPE__
+#	else
+#		define FB_WCHAR wchar_t
+#	endif
 #	define FB_WCHAR_LITERAL(c) L ## c
 #	if defined HOST_MINGW
 #		define FB_WEOF ((FB_WCHAR)WEOF)
@@ -329,11 +337,12 @@ static __inline__ FB_WCHAR fb_wstr_ToUpper( FB_WCHAR c )
 /* Copy n characters from A to B and terminate with NUL. */
 static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t chars )
 {
+	const FB_WCHAR terminator = FB_WCHAR_LITERAL('\0');
+
 	if( (src != NULL) && (chars > 0) )
 		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, (size_t)chars * sizeof( FB_WCHAR ) );
 
 	/* The destination may be a packed field, so do not dereference it. */
-	const FB_WCHAR terminator = FB_WCHAR_LITERAL('\0');
 	memcpy( dst, &terminator, sizeof( terminator ) );
 }
 
@@ -358,10 +367,11 @@ static __inline__ void fb_wstr_Fill( FB_WCHAR *dst, FB_WCHAR c, ssize_t chars )
 /* Skip all characters (c) from the beginning of the string, max 'n' chars. */
 static __inline__ const FB_WCHAR *fb_wstr_SkipChar( const FB_WCHAR *s, ssize_t chars, FB_WCHAR c )
 {
+	const FB_WCHAR *p = s;
+
 	if( s == NULL )
 		return NULL;
 
-	const FB_WCHAR *p = s;
 	while( chars > 0 )
 	{
 		if( *p != c )
@@ -376,11 +386,13 @@ static __inline__ const FB_WCHAR *fb_wstr_SkipChar( const FB_WCHAR *s, ssize_t c
 /* Skip all characters (c) from the end of the string, max 'n' chars. */
 static __inline__ const FB_WCHAR *fb_wstr_SkipCharRev( const FB_WCHAR *s, ssize_t chars, FB_WCHAR c )
 {
+	const FB_WCHAR *p;
+
 	if( (s == NULL) || (chars <= 0) )
 		return s;
 
 	/* fixed-len's are filled with null's as in PB, strip them too */
-	const FB_WCHAR *p = &s[chars];
+	p = &s[chars];
 	while( chars > 0 )
 	{
 		--p;

@@ -8,6 +8,11 @@
 
 #include "fbcunit.bi"
 #include once "vbcompat.bi"
+#ifdef __FB_DOS__
+#include once "crt/errno.bi"
+#include once "crt/fcntl.bi"
+#include once "crt/unistd.bi"
+#endif
 
 SUITE( fbc_tests.file_.path_attributes )
 
@@ -118,6 +123,74 @@ SUITE( fbc_tests.file_.path_attributes )
 		CU_ASSERT_EQUAL( status, 0 )
 		status = RmDir( root_path )
 		CU_ASSERT_EQUAL( status, 0 )
+	END_TEST
+#endif
+
+#ifdef __FB_DOS__
+	TEST( dos_pathnames )
+		const root_path = "FBATTR"
+		const first_path = root_path & "/A.TXT"
+		const second_path = root_path & "/B.TXT"
+		dim saved_cwd as string = CurDir
+		dim status as long = MkDir( root_path )
+		CU_ASSERT_EQUAL( status, 0 )
+		if status <> 0 then exit sub
+		dim file_number as long = FreeFile
+		status = Open( first_path for output as #file_number )
+		CU_ASSERT_EQUAL( status, 0 )
+		if status <> 0 then
+			RmDir root_path
+			exit sub
+		end if
+		Print #file_number, "DOS attribute fixture"
+		Close #file_number
+		CU_ASSERT_EQUAL( FileCopy( first_path, second_path ), 0 )
+		CU_ASSERT( (GetAttr( root_path ) and vbDirectory) <> 0 )
+		CU_ASSERT( (GetAttr( root_path & "/" ) and vbDirectory) <> 0 )
+		dim drive_root as string = Left( saved_cwd, 2 ) & "/"
+		CU_ASSERT( (GetAttr( drive_root ) and vbDirectory) <> 0 )
+		drive_root = Left( saved_cwd, 2 ) & Chr(92)
+		CU_ASSERT( (GetAttr( drive_root ) and vbDirectory) <> 0 )
+		dim first_entry as string = Dir( root_path & "/*.TXT" )
+		CU_ASSERT( first_entry <> "" )
+		CU_ASSERT_EQUAL( SetAttr( first_path, vbReadOnly or vbHidden or vbSystem or vbArchive ), 0 )
+		CU_ASSERT_EQUAL( GetAttr( first_path ), vbReadOnly or vbHidden or vbSystem or vbArchive )
+		CU_ASSERT_EQUAL( SetAttr( first_path, vbDirectory ), 1 )
+		CU_ASSERT_EQUAL( GetAttr( first_path ) and vbReadOnly, vbReadOnly )
+		CU_ASSERT_EQUAL( SetAttr( first_path, fbFileAttrNormal ), 0 )
+		CU_ASSERT_EQUAL( GetAttr( first_path ), fbFileAttrNormal )
+		dim next_entry as string = Dir()
+		CU_ASSERT( next_entry <> "" andalso next_entry <> first_entry )
+		CU_ASSERT_EQUAL( Dir(), "" )
+		CU_ASSERT_EQUAL( CurDir, saved_cwd )
+		CU_ASSERT_EQUAL( GetAttr( root_path & "/MISSING" ), -1 )
+		CU_ASSERT_EQUAL( Err, 2 )
+		CU_ASSERT_EQUAL( SetAttr( root_path & "/MISSING", fbFileAttrNormal ), 2 )
+		CU_ASSERT_EQUAL( GetAttr( "" ), -1 )
+		CU_ASSERT_EQUAL( Err, 1 )
+		CU_ASSERT_EQUAL( GetAttr( root_path & "/*.TXT" ), -1 )
+		CU_ASSERT_EQUAL( Err, 1 )
+		dim missing_path as string = root_path & "/MISSING"
+		dim descriptor as long = open_( StrPtr( missing_path ), O_RDONLY )
+		CU_ASSERT_EQUAL( descriptor, -1 )
+		CU_ASSERT_EQUAL( errno, ENOENT )
+		if descriptor >= 0 then close_( descriptor )
+		dim existing_path as string = first_path
+		CU_ASSERT_EQUAL( access_( StrPtr( existing_path ), 0 ), 0 )
+		descriptor = open_( StrPtr( existing_path ), O_RDWR or O_BINARY )
+		CU_ASSERT( descriptor >= 0 )
+		if descriptor >= 0 then
+			dim prefix as string = Space( 3 )
+			CU_ASSERT_EQUAL( read_( descriptor, StrPtr( prefix ), 3 ), 3 )
+			CU_ASSERT_EQUAL( prefix, "DOS" )
+			CU_ASSERT_EQUAL( lseek( descriptor, 0, SEEK_SET ), 0 )
+			CU_ASSERT_EQUAL( write_( descriptor, StrPtr( prefix ), 3 ), 3 )
+			CU_ASSERT_EQUAL( close_( descriptor ), 0 )
+		end if
+		CU_ASSERT_EQUAL( Kill( first_path ), 0 )
+		CU_ASSERT_EQUAL( Kill( second_path ), 0 )
+		dim root_name as string = root_path
+		CU_ASSERT_EQUAL( rmdir_( StrPtr( root_name ) ), 0 )
 	END_TEST
 #endif
 

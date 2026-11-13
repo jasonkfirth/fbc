@@ -10,6 +10,7 @@
 /*:::::*/
 FBCALL int fb_Pos( int dummy )
 {
+	(void)dummy;
 	return fb_GetX();
 }
 

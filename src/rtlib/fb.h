@@ -93,7 +93,10 @@
 #define MIN(a,b)		((a) < (b) ? (a) : (b))
 #define MAX(a,b)		((a) > (b) ? (a) : (b))
 #define MID(a,b,c)		MIN(MAX((a), (b)), (c))
-#define CINT(x)			((x) > 0.0 ? (int)((x) + 0.5) : (int)((x) - 0.5))
+/* Keep coordinate rounding in double precision without implicit promotions. */
+#define CINT(x) \
+	((double)(x) > 0.0 ? (int)((double)(x) + 0.5) : \
+	                    (int)((double)(x) - 0.5))
 
 #define SWAP(a,b)		((a) ^= (b), (b) ^= (a), (a) ^= (b))
 
@@ -443,6 +446,10 @@ enum FB_LANG {
 
 typedef struct FB_RTLIB_CTX_ {
 	int             argc;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep argv at its existing Win64 offset. */
+	unsigned char   argv_alignment_padding[4];
+#endif
 	char          **argv;
 	FBSTRING        null_desc;
 	char           *errmsg;

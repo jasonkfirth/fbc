@@ -12,6 +12,12 @@
 #include "fb.h"
 #include "utf_size.h"
 
+#if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
+#define FB_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FB_FALLTHROUGH ((void)0)
+#endif
+
 static void hUTF16ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_t *total_bytes )
 {
 	UTF_32 c;
@@ -45,15 +51,15 @@ static void hUTF16ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 		case 4:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
-			/* fall through */
+			FB_FALLTHROUGH;
 		case 3:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
-			/* fall through */
+			FB_FALLTHROUGH;
 		case 2:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
-			/* fall through */
+			FB_FALLTHROUGH;
 		case 1:
 			*--dst = (UTF_8)(c | fb_utf8_bmarkTb[bytes]);
 		}
@@ -89,15 +95,15 @@ static void hUTF32ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 		case 4:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
-			/* fall through */
+			FB_FALLTHROUGH;
 		case 3:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
-			/* fall through */
+			FB_FALLTHROUGH;
 		case 2:
 			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
-			/* fall through */
+			FB_FALLTHROUGH;
 		case 1:
 			*--dst = (UTF_8)(c | fb_utf8_bmarkTb[bytes]);
 		}

@@ -22,7 +22,7 @@
 
 int fb_ConsoleGetMaxRow( void )
 {
-	return __fb_con.rows;
+	return fb_console_context.rows;
 }
 
 /* end of drivers/wince/io_maxrow.c */

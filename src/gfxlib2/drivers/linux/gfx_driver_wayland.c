@@ -645,8 +645,8 @@ static void fb_wayland_shell_surface_configure(void *data,
 	(void)data;
 	(void)shell_surface;
 	(void)edges;
-	if ((width > 0) && (height > 0) && __fb_gfx &&
-		(__fb_gfx->flags & DRIVER_RESIZABLE)) {
+	if ((width > 0) && (height > 0) && fb_gfx &&
+		(fb_gfx->flags & DRIVER_RESIZABLE)) {
 		fb_hRequestResize(width, height);
 	}
 	fb_wayland_window.configured = 1;
@@ -676,9 +676,9 @@ static void fb_wayland_observe_keyboard_viewport(FB_WAYLAND_WINDOW *window)
 	/* Only a maximized, resizable v3 surface delegates its work area to the
 	 * compositor. A floating user resize or fullscreen overlay is not evidence
 	 * of keyboard reservation. Observe only acknowledged buffer transactions. */
-	if (!window->maximized || !window->text_input || !__fb_gfx ||
-		!(__fb_gfx->flags & DRIVER_RESIZABLE) ||
-		(__fb_gfx->flags & DRIVER_FULLSCREEN)) {
+	if (!window->maximized || !window->text_input || !fb_gfx ||
+		!(fb_gfx->flags & DRIVER_RESIZABLE) ||
+		(fb_gfx->flags & DRIVER_FULLSCREEN)) {
 		window->keyboard_viewport_reserved = 0;
 		return;
 	}
@@ -695,10 +695,10 @@ static int fb_wayland_ack_configure(FB_WAYLAND_WINDOW *window)
 		return 1;
 	if ((window->configure_width > 0 &&
 		(window->width != window->configure_width ||
-		 (__fb_gfx && __fb_gfx->w != window->configure_width))) ||
+		 (fb_gfx && fb_gfx->w != window->configure_width))) ||
 		(window->configure_height > 0 &&
 		(window->height != window->configure_height ||
-		 (__fb_gfx && __fb_gfx->h != window->configure_height))))
+		 (fb_gfx && fb_gfx->h != window->configure_height))))
 		return 0;
 	fb_wayland_observe_keyboard_viewport(window);
 	window->api->proxy_marshal((struct wl_proxy *)window->xdg_surface,
@@ -715,13 +715,13 @@ static void fb_wayland_xdg_configure(void *data, struct xdg_surface *surface,
 	(void)surface;
 	window->configure_width = window->configure_height = 0;
 	window->maximized = window->toplevel_maximized;
-	if (__fb_gfx && (__fb_gfx->flags & DRIVER_RESIZABLE)) {
+	if (fb_gfx && (fb_gfx->flags & DRIVER_RESIZABLE)) {
 		window->configure_width = window->toplevel_width;
 		window->configure_height = window->toplevel_height;
 		if (window->configure_width > 0 || window->configure_height > 0)
 			fb_hRequestResize(
-				window->configure_width > 0 ? window->configure_width : __fb_gfx->w,
-				window->configure_height > 0 ? window->configure_height : __fb_gfx->h);
+				window->configure_width > 0 ? window->configure_width : fb_gfx->w,
+				window->configure_height > 0 ? window->configure_height : fb_gfx->h);
 	}
 	/* A newer configure supersedes any unacknowledged serial. */
 	window->configure_serial = serial;
@@ -1014,15 +1014,15 @@ static void fb_wayland_keyboard_release_all(FB_WAYLAND_WINDOW *window)
 		}
 		window->evdev_scancode[key] = 0;
 	}
-	if (!__fb_gfx)
+	if (!fb_gfx)
 		return;
 	for (scancode = 1; scancode < 128; scancode++) {
-		if (__fb_gfx->key[scancode]) {
+		if (fb_gfx->key[scancode]) {
 			EVENT event;
 			memset(&event, 0, sizeof(event));
 			event.type = EVENT_KEY_RELEASE;
 			event.scancode = scancode;
-			__fb_gfx->key[scancode] = FALSE;
+			fb_gfx->key[scancode] = FALSE;
 			fb_hPostEvent(&event);
 		}
 	}
@@ -1252,7 +1252,7 @@ static void fb_wayland_set_keyboard_focus(FB_WAYLAND_WINDOW *window, int focused
 	if (window->keyboard_focused == focused)
 		return;
 	window->keyboard_focused = focused;
-	if (!__fb_gfx)
+	if (!fb_gfx)
 		return;
 	memset(&event, 0, sizeof(event));
 	event.type = focused ? EVENT_WINDOW_GOT_FOCUS : EVENT_WINDOW_LOST_FOCUS;
@@ -1270,7 +1270,7 @@ static void fb_wayland_keyboard_enter(void *data, struct wl_keyboard *keyboard,
 	fb_wayland_set_keyboard_focus(window, surface == window->surface);
 	if (window->keyboard_focused && window->webos.text_ready && window->keyboard_requested)
 		(void)fb_wayland_set_keyboard_locked(1);
-	if (!window->keyboard_focused || !__fb_gfx || !keys || !keys->data ||
+	if (!window->keyboard_focused || !fb_gfx || !keys || !keys->data ||
 		(keys->size > 128u * sizeof(uint32_t)) ||
 		(keys->size % sizeof(uint32_t)) != 0)
 		return;
@@ -1279,7 +1279,7 @@ static void fb_wayland_keyboard_enter(void *data, struct wl_keyboard *keyboard,
 		key++) {
 		int scancode = fb_wayland_evdev_scancode(*key);
 		if ((scancode > 0) && (scancode < 128))
-			__fb_gfx->key[scancode] = TRUE;
+			fb_gfx->key[scancode] = TRUE;
 		if ((*key < FB_WL_EVDEV_KEY_MAX) && window->xkb_state) {
 			(void)window->xkb.state_update_key(window->xkb_state,
 				*key + 8u, 1u);
@@ -1317,7 +1317,7 @@ static void fb_wayland_keyboard_key(void *data, struct wl_keyboard *keyboard,
 	(void)keyboard;
 	(void)serial;
 	(void)time;
-	if (!window->keyboard_focused || !__fb_gfx)
+	if (!window->keyboard_focused || !fb_gfx)
 		return;
 	if (key >= FB_WL_EVDEV_KEY_MAX)
 		return;
@@ -1364,10 +1364,10 @@ static void fb_wayland_keyboard_key(void *data, struct wl_keyboard *keyboard,
 	if (key_down) {
 		if (key_value)
 			fb_hPostKey(key_value);
-		__fb_gfx->key[scancode] = TRUE;
+		fb_gfx->key[scancode] = TRUE;
 		fb_wayland_start_key_repeat(window, key, scancode);
 	} else {
-		__fb_gfx->key[scancode] = FALSE;
+		fb_gfx->key[scancode] = FALSE;
 		if (window->repeat_key == key)
 			window->repeat_key = FB_WL_EVDEV_KEY_MAX;
 	}
@@ -1445,9 +1445,9 @@ static void fb_wayland_post_pointer_motion(FB_WAYLAND_WINDOW *window,
 	event.y = window->mouse_y;
 	event.dx = event.x - old_x;
 	event.dy = event.y - old_y;
-	if (__fb_gfx && __fb_gfx->scanline_size > 1) {
-		event.y /= __fb_gfx->scanline_size;
-		event.dy /= __fb_gfx->scanline_size;
+	if (fb_gfx && fb_gfx->scanline_size > 1) {
+		event.y /= fb_gfx->scanline_size;
+		event.dy /= fb_gfx->scanline_size;
 	}
 	fb_hPostEvent(&event);
 }
@@ -2288,8 +2288,8 @@ static int fb_wayland_driver_init(char *title, int width, int height,
 	fb_wayland_thread_failed = 0;
 	fb_wayland_window.flags = flags;
 	fb_wayland_window.keyboard_visible = -2;
-	if (__fb_gfx)
-		__fb_gfx->flags |= DRIVER_RESIZABLE;
+	if (fb_gfx)
+		fb_gfx->flags |= DRIVER_RESIZABLE;
 	if (fb_hWaylandGetApi(&fb_wayland_window.api) != 0 ||
 		fb_hWaylandInitProtocols() != 0 ||
 		fb_hWaylandLoadSymbols(names, symbols, 3) != 0 ||
@@ -2533,10 +2533,10 @@ static int fb_wayland_has_dirty_lines(void)
 {
 	int y;
 
-	if (!__fb_gfx || !__fb_gfx->dirty || __fb_gfx->h <= 0)
+	if (!fb_gfx || !fb_gfx->dirty || fb_gfx->h <= 0)
 		return 0;
-	for (y = 0; y < __fb_gfx->h; y++) {
-		if (__fb_gfx->dirty[y])
+	for (y = 0; y < fb_gfx->h; y++) {
+		if (fb_gfx->dirty[y])
 			return 1;
 	}
 	return 0;
@@ -2551,13 +2551,13 @@ static void fb_wayland_record_dirty_lines(void)
 	for (i = 0; i < FB_WL_BUFFER_SLOTS; i++) {
 		FB_WAYLAND_BUFFER *slot = &fb_wayland_window.buffers[i];
 		if (slot->buffer && !slot->retired && slot->dirty &&
-		    slot->height >= __fb_gfx->h)
+		    slot->height >= fb_gfx->h)
 			active_buffers++;
 	}
 	if (!active_buffers)
 		return;
-	for (y = 0; y < __fb_gfx->h; y++) {
-		if (!__fb_gfx->dirty[y])
+	for (y = 0; y < fb_gfx->h; y++) {
+		if (!fb_gfx->dirty[y])
 			continue;
 		for (i = 0; i < FB_WL_BUFFER_SLOTS; i++) {
 			FB_WAYLAND_BUFFER *slot = &fb_wayland_window.buffers[i];
@@ -2565,7 +2565,7 @@ static void fb_wayland_record_dirty_lines(void)
 			    slot->height > y)
 				slot->dirty[y] = TRUE;
 		}
-		__fb_gfx->dirty[y] = FALSE;
+		fb_gfx->dirty[y] = FALSE;
 	}
 }
 
@@ -2583,8 +2583,8 @@ static void fb_wayland_present(void)
 		!fb_wayland_window.repaint_pending ||
 		(fb_wayland_window.frame_callback &&
 		 !fb_wayland_window.resize_present_pending) ||
-		!__fb_gfx || __fb_gfx->lock_count > 0 || !__fb_gfx->framebuffer ||
-		!__fb_gfx->dirty || __fb_gfx->h <= 0)
+		!fb_gfx || fb_gfx->lock_count > 0 || !fb_gfx->framebuffer ||
+		!fb_gfx->dirty || fb_gfx->h <= 0)
 		return;
 	if (!fb_wayland_ack_configure(&fb_wayland_window))
 		return;
@@ -2604,7 +2604,7 @@ static void fb_wayland_present(void)
 	    fb_wayland_create_buffer(empty, fb_wayland_window.width,
 		fb_wayland_window.height) == 0)
 		slot = empty;
-	if (!slot || !slot->pixels || !slot->dirty || slot->height < __fb_gfx->h)
+	if (!slot || !slot->pixels || !slot->dirty || slot->height < fb_gfx->h)
 		return;
 
 	/*
@@ -2628,12 +2628,12 @@ static void fb_wayland_present(void)
 	}
 
 	/* The driver lock keeps drawing away while the blitter uses this mask. */
-	saved_dirty = __fb_gfx->dirty;
-	__fb_gfx->dirty = slot->dirty;
+	saved_dirty = fb_gfx->dirty;
+	fb_gfx->dirty = slot->dirty;
 	fb_wayland_window.blitter((unsigned char *)slot->pixels,
 		fb_wayland_window.stride);
-	__fb_gfx->dirty = saved_dirty;
-	memset(slot->dirty, FALSE, (size_t)__fb_gfx->h);
+	fb_gfx->dirty = saved_dirty;
+	memset(slot->dirty, FALSE, (size_t)fb_gfx->h);
 	fb_wayland_window.api->proxy_marshal((struct wl_proxy *)fb_wayland_window.surface,
 		FB_WL_SURFACE_ATTACH, slot->buffer, 0, 0);
 	fb_wayland_window.api->proxy_marshal((struct wl_proxy *)fb_wayland_window.surface,
@@ -2664,7 +2664,7 @@ static void fb_wayland_keyboard_repeat(void)
 	uint32_t codepoint = 0;
 	int key_value;
 	EVENT event;
-	if (!window->keyboard_focused || !__fb_gfx ||
+	if (!window->keyboard_focused || !fb_gfx ||
 		(window->repeat_key >= FB_WL_EVDEV_KEY_MAX) ||
 		!window->repeat_interval_ms ||
 		!window->evdev_key_down[window->repeat_key])
@@ -3134,49 +3134,49 @@ int fb_hWaylandGetKeyboardOcclusion(int *top, int *height)
 	if (!top || !height || !fb_wayland_prepare_mutex())
 		return 0;
 	pthread_mutex_lock(&fb_wayland_mutex);
-	if (window->active && __fb_gfx && window->text_input_v2 &&
+	if (window->active && fb_gfx && window->text_input_v2 &&
 		window->keyboard_visible == -1 && window->panel_width > 0 &&
-		window->panel_height > 0 && window->panel_x < __fb_gfx->w &&
+		window->panel_height > 0 && window->panel_x < fb_gfx->w &&
 		(int64_t)window->panel_x + window->panel_width > 0 &&
-		window->panel_y < __fb_gfx->h) {
+		window->panel_y < fb_gfx->h) {
 		int panel_top = window->panel_y > 0 ? window->panel_y : 0;
 		int64_t bottom = (int64_t)window->panel_y + window->panel_height;
-		if (bottom > __fb_gfx->h)
-			bottom = __fb_gfx->h;
+		if (bottom > fb_gfx->h)
+			bottom = fb_gfx->h;
 		if (bottom > panel_top) {
 			*top = panel_top;
 			*height = (int)(bottom - panel_top);
 			result = 1;
 		}
-	} else if (window->active && __fb_gfx && webos->visible == -1 &&
-		webos->panel_height > 0 && webos->panel_top < __fb_gfx->h) {
+	} else if (window->active && fb_gfx && webos->visible == -1 &&
+		webos->panel_height > 0 && webos->panel_top < fb_gfx->h) {
 		int panel_top = webos->panel_top > 0 ? webos->panel_top : 0;
 		int64_t bottom = (int64_t)webos->panel_top + webos->panel_height;
-		if (bottom > __fb_gfx->h)
-			bottom = __fb_gfx->h;
+		if (bottom > fb_gfx->h)
+			bottom = fb_gfx->h;
 		if (bottom > panel_top) {
 			*top = panel_top;
 			*height = (int)(bottom - panel_top);
 			result = 1;
 		}
 	}
-	if (!result && window->active && __fb_gfx && __fb_gfx->h > 0 &&
+	if (!result && window->active && fb_gfx && fb_gfx->h > 0 &&
 		window->text_input && window->text_input_entered &&
 		window->keyboard_requested && window->keyboard_viewport_reserved) {
 		/* Empty overlap at the drawable end means the acknowledged maximized
 		 * viewport already excludes the keyboard. v3 cannot confirm visibility;
 		 * callers must also obtain a known-visible observation from the OSK. */
-		*top = __fb_gfx->h;
+		*top = fb_gfx->h;
 		*height = 0;
 		result = 1;
 	}
 	/* Direct Maliit is the fallback on shells without a text-input protocol.
 	 * Its observed area is preferable to a guessed whole-window reservation.
 	 * Native text-input and webOS panel observations keep their priority. */
-	if (!result && window->active && __fb_gfx &&
+	if (!result && window->active && fb_gfx &&
 		!window->text_input && !window->text_input_v2)
-		result = fb_hLinuxMaliitGetKeyboardOcclusion(__fb_gfx->w,
-			__fb_gfx->h, top, height);
+		result = fb_hLinuxMaliitGetKeyboardOcclusion(fb_gfx->w,
+			fb_gfx->h, top, height);
 	pthread_mutex_unlock(&fb_wayland_mutex);
 	return result;
 }

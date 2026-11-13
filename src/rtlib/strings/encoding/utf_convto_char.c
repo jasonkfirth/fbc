@@ -14,6 +14,12 @@
 
 /* Use the shared declarations so readers keep the same ABI labels. */
 
+#if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
+#define FB_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FB_FALLTHROUGH ((void)0)
+#endif
+
 
 #define FB_UTF8_MAX_TRAILING_BYTES 5
 
@@ -102,19 +108,19 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 4:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 3:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 2:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 1:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 0:
 					c += *src++;
 			}
@@ -170,19 +176,19 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			{
 				case 5:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 4:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 3:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 2:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 1:
 					c += *src++; c <<= 6;
-					/* fall through */
+					FB_FALLTHROUGH;
 				case 0:
 					c += *src++;
 			}

@@ -15,17 +15,17 @@ FBCALL void fb_GfxPaletteGetUsing64(long long *data)
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}
 
-	imax = __fb_gfx->default_palette->colors;
-	if(imax > (1 << __fb_gfx->depth))
-		imax = (1 << __fb_gfx->depth);
+	imax = fb_gfx->default_palette->colors;
+	if(imax > (1 << fb_gfx->depth))
+		imax = (1 << fb_gfx->depth);
 
 	for (i = 0; i < imax; i++)
-		data[i] = (__fb_gfx->device_palette[i] & 0xFCFCFC) >> 2;
+		data[i] = (fb_gfx->device_palette[i] & 0xFCFCFC) >> 2;
 
 	FB_GRAPHICS_UNLOCK( );
 }

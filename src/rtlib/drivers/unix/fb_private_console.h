@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include <stdbool.h>
+#include "../../fb_abi.h"
 
 #define INIT_CONSOLE 1
 #define INIT_X11     2
@@ -75,7 +76,7 @@ typedef struct FBCONSOLE
 	void (*gfx_exit)(void);
 } FBCONSOLE;
 
-extern FBCONSOLE __fb_con;
+extern FBCONSOLE fb_console_context FB_C_SYMBOL("__fb_con");
 
 void fb_hRecheckCursorPos( void );
 void fb_hRecheckConsoleSize( int requery_cursorpos );

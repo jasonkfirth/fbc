@@ -70,7 +70,7 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 	}
@@ -203,8 +203,8 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 					fb_hPixelCpy(dest, src, s->x2 & 0x7);
 			}
 
-			if (__fb_gfx->framebuffer == context->line[0])
-				__fb_gfx->dirty[y] = TRUE;
+			if (fb_gfx->framebuffer == context->line[0])
+				fb_gfx->dirty[y] = TRUE;
 		}
 	}
 done:

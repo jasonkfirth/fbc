@@ -41,7 +41,7 @@ static int x11_drop_enabled(void *user)
 	int enabled;
 	(void)user;
 	EVENT_LOCK();
-	enabled = __fb_gfx->drops.enabled;
+	enabled = fb_gfx->drops.enabled;
 	EVENT_UNLOCK();
 	return enabled;
 }
@@ -207,7 +207,7 @@ static void hOnAltEnter( void )
 		fb_x11.init();
 	}
 	fb_hRestorePalette();
-	fb_hMemSet(__fb_gfx->key, FALSE, 128);
+	fb_hMemSet(fb_gfx->key, FALSE, 128);
 }
 
 void fb_hX11RefreshLayout(int view_w, int view_h)
@@ -382,9 +382,9 @@ static void fb_hX11PostTouchMouse(int type, int x, int y)
 	if ((type == EVENT_MOUSE_BUTTON_PRESS) ||
 	    (type == EVENT_MOUSE_BUTTON_RELEASE))
 		event.button = BUTTON_LEFT;
-	if (__fb_gfx->scanline_size != 1) {
-		event.y /= __fb_gfx->scanline_size;
-		event.dy /= __fb_gfx->scanline_size;
+	if (fb_gfx->scanline_size != 1) {
+		event.y /= fb_gfx->scanline_size;
+		event.dy /= fb_gfx->scanline_size;
 	}
 	mouse_x = x;
 	mouse_y = y;
@@ -748,11 +748,11 @@ static void *window_thread(void *arg)
 					/* fallthrough */
 
 				case Expose:
-					fb_hMemSet(__fb_gfx->dirty, TRUE, fb_x11.h);
+					fb_hMemSet(fb_gfx->dirty, TRUE, fb_x11.h);
 					break;
 
 				case FocusOut:
-					fb_hMemSet(__fb_gfx->key, FALSE, 128);
+					fb_hMemSet(fb_gfx->key, FALSE, 128);
 					fb_hX11TouchReset();
 					hSetWindowFocus(FALSE, &e);
 					mouse_on = FALSE;
@@ -791,9 +791,9 @@ static void *window_thread(void *arg)
 						e.y = mouse_y;
 						e.dx = mouse_x - old_mouse_x;
 						e.dy = mouse_y - old_mouse_y;
-						if( __fb_gfx->scanline_size != 1 ) {
-							e.y /= __fb_gfx->scanline_size;
-							e.dy /= __fb_gfx->scanline_size;
+						if( fb_gfx->scanline_size != 1 ) {
+							e.y /= fb_gfx->scanline_size;
+							e.dy /= fb_gfx->scanline_size;
 						}
 					}
 					break;
@@ -855,8 +855,8 @@ static void *window_thread(void *arg)
 						if (fb_x11.flags & DRIVER_RESIZABLE) {
 							int logical_height =
 								(event.xconfigure.height +
-								 __fb_gfx->scanline_size - 1) /
-								__fb_gfx->scanline_size;
+								 fb_gfx->scanline_size - 1) /
+								fb_gfx->scanline_size;
 
 							fb_hRequestResize(event.xconfigure.width,
 								logical_height);
@@ -864,7 +864,7 @@ static void *window_thread(void *arg)
 							fb_hX11RefreshLayout(event.xconfigure.width,
 								event.xconfigure.height);
 						}
-						fb_hMemSet(__fb_gfx->dirty, TRUE, fb_x11.h);
+						fb_hMemSet(fb_gfx->dirty, TRUE, fb_x11.h);
 						XClearWindow(fb_x11.display, fb_x11.window);
 					}
 					break;
@@ -877,9 +877,9 @@ static void *window_thread(void *arg)
 					if (has_focus) {
 						e.scancode = fb_x11keycode_to_scancode[event.xkey.keycode];
 						e.ascii = 0;
-						__fb_gfx->key[e.scancode] = TRUE;
+						fb_gfx->key[e.scancode] = TRUE;
 
-						if( __fb_gfx->key[SC_ENTER] && __fb_gfx->key[SC_ALT] && !(fb_x11.flags & DRIVER_NO_SWITCH) ) {
+						if( fb_gfx->key[SC_ENTER] && fb_gfx->key[SC_ALT] && !(fb_x11.flags & DRIVER_NO_SWITCH) ) {
 							hOnAltEnter( );
 						} else {
 							key = translate_key( &event, e.scancode, &text_scalar );
@@ -906,7 +906,7 @@ static void *window_thread(void *arg)
 								fb_hPostKey( key );
 							e.type = EVENT_KEY_REPEAT;
 						} else {
-							__fb_gfx->key[e.scancode] = FALSE;
+							fb_gfx->key[e.scancode] = FALSE;
 							e.type = EVENT_KEY_RELEASE;
 						}
 					}
@@ -955,7 +955,7 @@ int fb_hX11EnterFullscreen(int *h)
 	} else {
 		if (XRRSetScreenConfigAndRate(fb_x11.display, fb_x11.config, root_window, target_size, orig_rotation, target_rate, CurrentTime) == BadValue)
 			return -1;
-		__fb_gfx->refresh_rate = fb_x11.refresh_rate = target_rate;
+		fb_gfx->refresh_rate = fb_x11.refresh_rate = target_rate;
 	}
 
 	XWarpPointer(fb_x11.display, None, fb_x11.window, 0, 0, 0, 0, fb_x11.w >> 1, real_h >> 1);
@@ -987,7 +987,7 @@ void fb_hX11LeaveFullscreen(void)
 			XRRSetScreenConfig(fb_x11.display, fb_x11.config, root_window, orig_size, orig_rotation, CurrentTime);
 		XUngrabPointer(fb_x11.display, CurrentTime);
 		current_size = orig_size;
-		__fb_gfx->refresh_rate = fb_x11.refresh_rate = orig_rate;
+		fb_gfx->refresh_rate = fb_x11.refresh_rate = orig_rate;
 	}
 }
 
@@ -1095,8 +1095,8 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 
 	fb_x11.w = w;
 	fb_x11.h = h;
-	fb_x11.content_w = __fb_gfx ? __fb_gfx->w : w;
-	fb_x11.content_h = __fb_gfx ? (__fb_gfx->h * __fb_gfx->scanline_size) : h;
+	fb_x11.content_w = fb_gfx ? fb_gfx->w : w;
+	fb_x11.content_h = fb_gfx ? (fb_gfx->h * fb_gfx->scanline_size) : h;
 	fb_x11.view_w = w;
 	fb_x11.view_h = h;
 	fb_hX11RefreshLayout(w, h);
@@ -1161,7 +1161,7 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	fb_hX11DropInit(&drop_windows[2], fb_x11.display, fb_x11.fswindow,
 		x11_drop_enabled, x11_drop_submit, NULL);
 	EVENT_LOCK();
-	__fb_gfx->drops.supported = TRUE;
+	fb_gfx->drops.supported = TRUE;
 	EVENT_UNLOCK();
 	fb_hX11SetWindowTitle( title );
 #ifndef DISABLE_XPM
@@ -1184,8 +1184,8 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	size->base_height = fb_x11.content_h;
 	if (flags & DRIVER_RESIZABLE) {
 		size->min_width = 8;
-		size->min_height = (__fb_gfx && __fb_gfx->font) ?
-			__fb_gfx->font->h * __fb_gfx->scanline_size : 16;
+		size->min_height = (fb_gfx && fb_gfx->font) ?
+			fb_gfx->font->h * fb_gfx->scanline_size : 16;
 	} else {
 		size->min_width = fb_x11.content_w;
 		size->min_height = fb_x11.content_h;
@@ -1289,7 +1289,7 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 		} else {
 			fb_x11.refresh_rate = orig_rate;
 		}
-		__fb_gfx->refresh_rate = fb_x11.refresh_rate;
+		fb_gfx->refresh_rate = fb_x11.refresh_rate;
 	}
 
 	fb_hInitX11KeycodeToScancodeTb( fb_x11.display, XDisplayKeycodes, XGetKeyboardMapping, XFree );
@@ -1316,8 +1316,8 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 		pthread_cond_wait(&cond, &mutex);
 		pthread_mutex_unlock(&mutex);
 		if (is_running)
-			if (__fb_gfx)
-				__fb_gfx->get_mouse_fast = fb_hX11GetMouseFast;
+			if (fb_gfx)
+				fb_gfx->get_mouse_fast = fb_hX11GetMouseFast;
 		if (is_running)
 			return 0;
 		pthread_join(thread, NULL);
@@ -1334,8 +1334,8 @@ void fb_hX11Exit(void)
 	/* Stop input callbacks before the X11 lock and mode storage are torn down. */
 	fb_hLinuxMaliitCancelPending();
 #endif
-	if (__fb_gfx)
-		__fb_gfx->get_mouse_fast = NULL;
+	if (fb_gfx)
+		fb_gfx->get_mouse_fast = NULL;
 	if (is_running) {
 		pthread_mutex_lock(&mutex);
 		is_running = FALSE;

@@ -62,10 +62,10 @@ static int fb_sfxBeepDurationFrames(float duration)
 {
     int frames;
 
-    if (!__fb_sfx || __fb_sfx->samplerate <= 0 || duration <= 0.0f)
+    if (!fb_sfx_context || fb_sfx_context->samplerate <= 0 || duration <= 0.0f)
         return 0;
 
-    frames = (int)(duration * (float)__fb_sfx->samplerate + 0.5f);
+    frames = (int)(duration * (float)fb_sfx_context->samplerate + 0.5f);
     if (frames <= 0)
         frames = 1;
 

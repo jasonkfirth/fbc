@@ -22,7 +22,7 @@ static void *gfx_imagecreate(int width, int height, unsigned int color, int dept
 
 	FB_GRAPHICS_LOCK( );
 
-	if ((!__fb_gfx) || (width <= 0) || (height <= 0)) {
+	if ((!fb_gfx) || (width <= 0) || (height <= 0)) {
 		FB_GRAPHICS_UNLOCK( );
 		fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		return NULL;
@@ -38,7 +38,7 @@ static void *gfx_imagecreate(int width, int height, unsigned int color, int dept
 			return NULL;
 		}
 	} else {
-		bpp = __fb_gfx->bpp;
+		bpp = fb_gfx->bpp;
 	}
 
 	if (flags & DEFAULT_COLOR_1) {

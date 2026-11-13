@@ -63,13 +63,13 @@
 	__start_/__stop_ symbols used by GNU ld.
 */
 #define FB_PROFILE_CYCLE_SECTION "__DATA,fb_profcycdata"
-extern char __start_fb_profilecycledata[] __asm("section$start$__DATA$fb_profcycdata");
-extern char __stop_fb_profilecycledata[] __asm("section$end$__DATA$fb_profcycdata");
+extern char fb_profilecycledata_start[] __asm("section$start$__DATA$fb_profcycdata");
+extern char fb_profilecycledata_stop[] __asm("section$end$__DATA$fb_profcycdata");
 #else
 /* profile section data */
 #define FB_PROFILE_CYCLE_SECTION "fb_profilecycledata"
-extern char __start_fb_profilecycledata[];
-extern char __stop_fb_profilecycledata[];
+extern char fb_profilecycledata_start[];
+extern char fb_profilecycledata_stop[];
 #endif
 
 /* profiler record ids - these indicate what the record is */
@@ -82,13 +82,13 @@ enum FB_PROFILE_REDORD_ID
 /* the current profiler version number */
 #define FB_PROFILE_VERSION 100
 
-typedef struct _FB_PROFILE_RECORD_HEADER
+typedef struct FB_PROFILE_RECORD_HEADER
 {
 	ssize_t size;
 	ssize_t id;
 } FB_PROFILE_RECORD_HEADER;
 
-typedef struct _FB_PROFILE_RECORD_VERSION
+typedef struct FB_PROFILE_RECORD_VERSION
 {
 	ssize_t size;
 	ssize_t id;
@@ -96,7 +96,7 @@ typedef struct _FB_PROFILE_RECORD_VERSION
 	void * reserved1;
 } FB_PROFILE_RECORD_VERSION;
 
-typedef struct _FB_PROFILE_RECORD_DATA
+typedef struct FB_PROFILE_RECORD_DATA
 {
 	ssize_t size;
 	ssize_t id;
@@ -110,7 +110,7 @@ typedef struct _FB_PROFILE_RECORD_DATA
 	ssize_t reserved;
 } FB_PROFILE_RECORD_DATA;
 
-typedef struct _FB_PROFILE_FILE_DATA
+typedef struct FB_PROFILE_FILE_DATA
 {
 	ssize_t init0;
 	ssize_t grand_total;
@@ -332,8 +332,8 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 		fprintf( f, "Total program execution time: %5.4g seconds\n", fb_Timer() - prof->start_time );
 	}
 
-	data = (unsigned char *)&__start_fb_profilecycledata[0];
-	length = (ssize_t)&__stop_fb_profilecycledata[0] - (ssize_t)&__start_fb_profilecycledata[0];
+	data = (unsigned char *)&fb_profilecycledata_start[0];
+	length = (ssize_t)&fb_profilecycledata_stop[0] - (ssize_t)&fb_profilecycledata_start[0];
 
 	count = hProfilerCountProcs( data, length );
 	if( count ) {

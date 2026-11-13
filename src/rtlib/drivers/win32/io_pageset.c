@@ -20,7 +20,7 @@ HANDLE fb_hConsoleCreateBuffer( void )
 
 	/* size must be the stdout ones */
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	GetConsoleScreenBufferInfo( __fb_con.outHandle, &csbi );
+	GetConsoleScreenBufferInfo( fb_console_context.outHandle, &csbi );
 	SetConsoleScreenBufferSize( hnd, csbi.dwSize );
 
 	return hnd;
@@ -30,62 +30,62 @@ static void hHideCursor( int pg1, int pg2 )
 {
 	CONSOLE_CURSOR_INFO cci;
 
-	GetConsoleCursorInfo( __fb_con.outHandle, &cci );
+	GetConsoleCursorInfo( fb_console_context.outHandle, &cci );
 	cci.bVisible = FALSE;
 
-	SetConsoleCursorInfo( __fb_con.pgHandleTb[pg1], &cci );
+	SetConsoleCursorInfo( fb_console_context.pgHandleTb[pg1], &cci );
 	if( pg2 >= 0 )
-		SetConsoleCursorInfo( __fb_con.pgHandleTb[pg2], &cci );
+		SetConsoleCursorInfo( fb_console_context.pgHandleTb[pg2], &cci );
 }
 
 int fb_ConsolePageSet ( int active, int visible )
 {
 	fb_hConsoleGetHandle( FALSE );
 
-	int res = __fb_con.active | (__fb_con.visible << 8);
+	int res = fb_console_context.active | (fb_console_context.visible << 8);
 
 	if( active >= 0 )
 	{
-		if( __fb_con.pgHandleTb[active] == NULL )
+		if( fb_console_context.pgHandleTb[active] == NULL )
 		{
             HANDLE hnd = fb_hConsoleCreateBuffer( );
             if( hnd == NULL )
             	return -1;
 			else
-				__fb_con.pgHandleTb[active] = hnd;
+				fb_console_context.pgHandleTb[active] = hnd;
 		}
 
 		/* if page isn't visible, hide the cursor */
-		if( active != __fb_con.visible )
+		if( active != fb_console_context.visible )
 		{
 			hHideCursor( active, -1 );
 		}
 
-		__fb_con.active = active;
+		fb_console_context.active = active;
 	}
 
 	if( visible >= 0 )
 	{
-		if( __fb_con.pgHandleTb[visible] == NULL )
+		if( fb_console_context.pgHandleTb[visible] == NULL )
 		{
             HANDLE hnd = fb_hConsoleCreateBuffer( );
             if( hnd == NULL )
             	return -1;
 			else
-				__fb_con.pgHandleTb[visible] = hnd;
+				fb_console_context.pgHandleTb[visible] = hnd;
 		}
 
-		if( __fb_con.visible != visible )
+		if( fb_console_context.visible != visible )
 		{
-            SetConsoleActiveScreenBuffer( __fb_con.pgHandleTb[visible] );
+            SetConsoleActiveScreenBuffer( fb_console_context.pgHandleTb[visible] );
 
 			/* if pages aren't the same, hide the cursor */
-			if( visible != __fb_con.active )
+			if( visible != fb_console_context.active )
 			{
-				hHideCursor( __fb_con.active, visible );
+				hHideCursor( fb_console_context.active, visible );
 			}
 
-			__fb_con.visible = visible;
+			fb_console_context.visible = visible;
 		}
 	}
 

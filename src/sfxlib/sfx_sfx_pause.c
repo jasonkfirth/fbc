@@ -57,16 +57,16 @@ void fb_sfxSfxPause(int id)
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (!__fb_sfx->voices[i].active)
+        if (!fb_sfx_context->voices[i].active)
             continue;
 
-        if (__fb_sfx->voices[i].type != FB_SFX_VOICE_SFX)
+        if (fb_sfx_context->voices[i].type != FB_SFX_VOICE_SFX)
             continue;
 
-        if (__fb_sfx->voices[i].sfx_id != id)
+        if (fb_sfx_context->voices[i].sfx_id != id)
             continue;
 
-        __fb_sfx->voices[i].paused = 1;
+        fb_sfx_context->voices[i].paused = 1;
     }
 
     SFX_DEBUG("sfx_sfx_pause: id=%d", id);
@@ -95,16 +95,16 @@ void fb_sfxSfxPauseChannel(int channel)
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (!__fb_sfx->voices[i].active)
+        if (!fb_sfx_context->voices[i].active)
             continue;
 
-        if (__fb_sfx->voices[i].type != FB_SFX_VOICE_SFX)
+        if (fb_sfx_context->voices[i].type != FB_SFX_VOICE_SFX)
             continue;
 
-        if (__fb_sfx->voices[i].channel != channel)
+        if (fb_sfx_context->voices[i].channel != channel)
             continue;
 
-        __fb_sfx->voices[i].paused = 1;
+        fb_sfx_context->voices[i].paused = 1;
     }
 
     SFX_DEBUG("sfx_sfx_pause: channel=%d", channel);
@@ -130,9 +130,9 @@ void fb_sfxSfxPauseAll(void)
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (__fb_sfx->voices[i].active &&
-            __fb_sfx->voices[i].type == FB_SFX_VOICE_SFX)
-            __fb_sfx->voices[i].paused = 1;
+        if (fb_sfx_context->voices[i].active &&
+            fb_sfx_context->voices[i].type == FB_SFX_VOICE_SFX)
+            fb_sfx_context->voices[i].paused = 1;
     }
 
     SFX_DEBUG("sfx_sfx_pause: all");

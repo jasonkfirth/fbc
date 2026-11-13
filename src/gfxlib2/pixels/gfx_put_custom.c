@@ -14,7 +14,8 @@ static void fb_hPutCustom1(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned char *s = (unsigned char *)src;
 	unsigned char *d;
 	int x;
-	
+	(void)alpha;
+
 	src_pitch -= w;
 	for (; h; h--) {
 		d = (unsigned char *)dest;
@@ -34,7 +35,8 @@ static void fb_hPutCustom2(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned short *d;
 	int x;
 	unsigned int cs, cd;
-	
+	(void)alpha;
+
 	src_pitch = (src_pitch >> 1) - w;
 	for (; h; h--) {
 		d = (unsigned short *)dest;
@@ -60,6 +62,7 @@ static void fb_hPutCustom4(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned int *s = (unsigned int *)src;
 	unsigned int *d;
 	int x;
+	(void)alpha;
 	
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {

@@ -165,7 +165,7 @@ static DWORD WINAPI xbox_audio_worker(LPVOID unused)
 
     while (InterlockedCompareExchange(&g_xbox_worker_stop, 0, 0) == 0)
     {
-        if (__fb_sfx && __fb_sfx->shutting_down)
+        if (fb_sfx_context && fb_sfx_context->shutting_down)
         {
             Sleep(5);
             continue;
@@ -298,12 +298,12 @@ static int xbox_driver_init(int rate, int channels, int buffer_frames, int flags
 
     XAudioInit(16, FB_SFX_XBOX_CHANNELS, xbox_audio_callback, NULL);
 
-    if (__fb_sfx)
+    if (fb_sfx_context)
     {
-        __fb_sfx->samplerate = FB_SFX_XBOX_RATE;
-        __fb_sfx->output_channels = FB_SFX_XBOX_CHANNELS;
-        __fb_sfx->buffer_size = g_xbox_buffer_frames;
-        __fb_sfx->buffer_frames = g_xbox_buffer_frames;
+        fb_sfx_context->samplerate = FB_SFX_XBOX_RATE;
+        fb_sfx_context->output_channels = FB_SFX_XBOX_CHANNELS;
+        fb_sfx_context->buffer_size = g_xbox_buffer_frames;
+        fb_sfx_context->buffer_frames = g_xbox_buffer_frames;
     }
 
     xbox_queue_startup_silence();
@@ -399,8 +399,8 @@ static int xbox_driver_write(const float *samples, int frames)
     if (!g_xbox_initialized || !samples || frames <= 0)
         return -1;
 
-    channels = (__fb_sfx && __fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    channels = (fb_sfx_context && fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
     fb_sfxDriverDiagnostics("XAudio", samples, frames, channels);
@@ -444,10 +444,10 @@ static const FB_SFX_DRIVER fb_sfxDriverXboxXAudio =
     NULL
 };
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
     &fb_sfxDriverXboxXAudio,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

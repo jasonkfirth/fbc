@@ -1,7 +1,14 @@
+/*
+ * Project: FreeBASIC runtime libraries
+ * File: fb_gfx_mmx.h
+ * Purpose: Share the x86 assembler graphics interface.
+ * Responsibilities: Calling-convention offsets, symbol spelling and pixel masks.
+ * This file intentionally does NOT contain: BASIC statement implementations or native window management.
+ */
 /* assembler definitions for MMX routines */
 
-#ifndef __FB_GFX_MMX_H__
-#define __FB_GFX_MMX_H__
+#ifndef FB_GFX_MMX_H
+#define FB_GFX_MMX_H
 
 #include "../../../rtlib/fb_config.h"
 
@@ -109,3 +116,5 @@
 #define CTX_FLAGS				112
 
 #endif
+
+/* end of fb_gfx_mmx.h */

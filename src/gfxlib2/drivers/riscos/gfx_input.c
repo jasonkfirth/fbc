@@ -166,8 +166,8 @@ static void riscos_poll_physical_keys(void)
 
     for (fb_scancode = 1; fb_scancode < 128; ++fb_scancode)
     {
-        previous = (__fb_gfx->key[fb_scancode] != FALSE);
-        __fb_gfx->key[fb_scancode] = current[fb_scancode];
+        previous = (fb_gfx->key[fb_scancode] != FALSE);
+        fb_gfx->key[fb_scancode] = current[fb_scancode];
 
         if (previous != (current[fb_scancode] != FALSE))
         {
@@ -390,7 +390,7 @@ void fb_riscosGfxInputExit(void)
 
 void fb_riscosGfxPollEvents(void)
 {
-    if (!fb_riscos_gfx.active || __fb_gfx == NULL || __fb_gfx->key == NULL)
+    if (!fb_riscos_gfx.active || fb_gfx == NULL || fb_gfx->key == NULL)
         return;
 
     if (fb_riscos_gfx.windowed)

@@ -27,8 +27,8 @@
 
 static void poll_events(void)
 {
-	if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
-		__fb_gfx->driver->poll_events();
+	if ((fb_gfx) && (fb_gfx->driver->poll_events))
+		fb_gfx->driver->poll_events();
 }
 
 static int get_mouse_touch_locked(int *x, int *y, int *id)
@@ -38,22 +38,22 @@ static int get_mouse_touch_locked(int *x, int *y, int *id)
 	int clip = 0;
 	int fast_state;
 
-	if (!__fb_gfx)
+	if (!fb_gfx)
 		return -1;
 
 	/* The mouse fallback shares a cached sample when the driver can provide it.
 	   A known outside-window pointer is not a touch contact and needs no query. */
-	if (__fb_gfx->get_mouse_fast) {
-		fast_state = __fb_gfx->get_mouse_fast(x, y, &z, &buttons, &clip);
+	if (fb_gfx->get_mouse_fast) {
+		fast_state = fb_gfx->get_mouse_fast(x, y, &z, &buttons, &clip);
 		if (fast_state < 0)
 			return -1;
-		if ((fast_state == 0) && ((!__fb_gfx->driver) || (!__fb_gfx->driver->get_mouse) ||
-			(__fb_gfx->driver->get_mouse(x, y, &z, &buttons, &clip) != 0)))
+		if ((fast_state == 0) && ((!fb_gfx->driver) || (!fb_gfx->driver->get_mouse) ||
+			(fb_gfx->driver->get_mouse(x, y, &z, &buttons, &clip) != 0)))
 			return -1;
 	} else {
-		if ((!__fb_gfx->driver) || (!__fb_gfx->driver->get_mouse))
+		if ((!fb_gfx->driver) || (!fb_gfx->driver->get_mouse))
 			return -1;
-		if (__fb_gfx->driver->get_mouse(x, y, &z, &buttons, &clip) != 0)
+		if (fb_gfx->driver->get_mouse(x, y, &z, &buttons, &clip) != 0)
 			return -1;
 	}
 
@@ -81,10 +81,10 @@ static int get_mouse_touch_cached(int *x, int *y, int *id)
 	int clip = 0;
 	int fast_state;
 
-	if ((!__fb_gfx) || (!__fb_gfx->get_mouse_fast))
+	if ((!fb_gfx) || (!fb_gfx->get_mouse_fast))
 		return -1;
 
-	fast_state = __fb_gfx->get_mouse_fast(x, y, &z, &buttons, &clip);
+	fast_state = fb_gfx->get_mouse_fast(x, y, &z, &buttons, &clip);
 	if (fast_state == 0)
 		return -1;
 	if ((fast_state < 0) || ((buttons & BUTTON_LEFT) == 0))
@@ -98,18 +98,18 @@ static int get_mouse_touch_cached(int *x, int *y, int *id)
 
 static int get_platform_touch_locked(int index, int *x, int *y, int *id)
 {
-	if ((!__fb_gfx) || (!__fb_gfx->driver->get_touch))
+	if ((!fb_gfx) || (!fb_gfx->driver->get_touch))
 		return -1;
 
-	return __fb_gfx->driver->get_touch(index, x, y, id);
+	return fb_gfx->driver->get_touch(index, x, y, id);
 }
 
 static int get_platform_touch_count_locked(void)
 {
-	if ((!__fb_gfx) || (!__fb_gfx->driver->get_touch_count))
+	if ((!fb_gfx) || (!fb_gfx->driver->get_touch_count))
 		return 0;
 
-	return __fb_gfx->driver->get_touch_count();
+	return fb_gfx->driver->get_touch_count();
 }
 
 FBCALL ssize_t fb_GfxGetTouchCount(void)
@@ -120,9 +120,9 @@ FBCALL ssize_t fb_GfxGetTouchCount(void)
 
 	poll_events( );
 
-	if (__fb_gfx)
+	if (fb_gfx)
 	{
-		if (__fb_gfx->driver && __fb_gfx->driver->get_touch_count) {
+		if (fb_gfx->driver && fb_gfx->driver->get_touch_count) {
 			DRIVER_LOCK();
 			count = get_platform_touch_count_locked();
 			DRIVER_UNLOCK();
@@ -166,9 +166,9 @@ FBCALL ssize_t fb_GfxGetTouch(ssize_t index, ssize_t *x, ssize_t *y, ssize_t *id
 
 	poll_events( );
 
-	if (__fb_gfx && (index >= 0) && (index <= INT_MAX))
+	if (fb_gfx && (index >= 0) && (index <= INT_MAX))
 	{
-		if (__fb_gfx->driver && __fb_gfx->driver->get_touch_count) {
+		if (fb_gfx->driver && fb_gfx->driver->get_touch_count) {
 			DRIVER_LOCK();
 			platform_count = get_platform_touch_count_locked();
 			if (platform_count > 0) {
@@ -189,8 +189,8 @@ FBCALL ssize_t fb_GfxGetTouch(ssize_t index, ssize_t *x, ssize_t *y, ssize_t *id
 			}
 		}
 
-		if (!failure && (__fb_gfx->scanline_size != 1))
-			iy /= __fb_gfx->scanline_size;
+		if (!failure && (fb_gfx->scanline_size != 1))
+			iy /= fb_gfx->scanline_size;
 	}
 
 	FB_GRAPHICS_UNLOCK( );

@@ -207,7 +207,7 @@ static void *wii_audio_worker(void *unused)
 
     while (!g_wii_worker_stop)
     {
-        if (__fb_sfx && __fb_sfx->shutting_down)
+        if (fb_sfx_context && fb_sfx_context->shutting_down)
         {
             usleep(5000);
             continue;
@@ -299,12 +299,12 @@ static int wii_driver_init(int rate, int channels, int buffer_frames, int flags)
     ASND_Init();
     ASND_Pause(0);
 
-    if (__fb_sfx)
+    if (fb_sfx_context)
     {
-        __fb_sfx->samplerate = FB_SFX_WII_RATE;
-        __fb_sfx->output_channels = FB_SFX_WII_CHANNELS;
-        __fb_sfx->buffer_size = g_wii_buffer_frames;
-        __fb_sfx->buffer_frames = g_wii_buffer_frames;
+        fb_sfx_context->samplerate = FB_SFX_WII_RATE;
+        fb_sfx_context->output_channels = FB_SFX_WII_CHANNELS;
+        fb_sfx_context->buffer_size = g_wii_buffer_frames;
+        fb_sfx_context->buffer_frames = g_wii_buffer_frames;
     }
 
     g_wii_initialized = 1;
@@ -451,8 +451,8 @@ static int wii_driver_write(const float *samples, int frames)
     if (!g_wii_initialized || !samples || frames <= 0)
         return -1;
 
-    channels = (__fb_sfx && __fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    channels = (fb_sfx_context && fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
     fb_sfxDriverDiagnostics("ASND", samples, frames, channels);
@@ -496,10 +496,10 @@ static const FB_SFX_DRIVER fb_sfxDriverWiiAsnd =
     NULL
 };
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
     &fb_sfxDriverWiiAsnd,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

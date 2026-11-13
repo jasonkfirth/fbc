@@ -8,6 +8,17 @@ language reference.
 
 ## Start here
 
+- [Intel assembly storage addresses](c-emitter-asm-addresses.md) records the
+  selected Win32 operand-limit repair, live parameter aliases, floating bit
+  preservation, complete recount and remaining qualification boundaries.
+
+- [Runtime library warning audit](library-warning-audit.md) separates complete
+  per-object warning captures from current native runtime checks and pending
+  source recounts across runtime, graphics and sound libraries.
+
+- [DOS qualification](dos-qualification.md) covers the DOS ZIP build, bounded
+  emulator runner, x87 preflight, unit-suite CI and remaining acceptance work.
+
 - [Qualified pointer slots](c-emitter-const-slots.md) records the new source
   diagnostic, safe value temporaries, GCC-clean fb-ext-lib expansion and
   the selected compiler's complete broad qualification.

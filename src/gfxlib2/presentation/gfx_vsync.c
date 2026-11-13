@@ -13,13 +13,13 @@ FBCALL int fb_GfxWaitVSync(void)
 {
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
-	if (__fb_gfx->driver->wait_vsync)
-		__fb_gfx->driver->wait_vsync();
+	if (fb_gfx->driver->wait_vsync)
+		fb_gfx->driver->wait_vsync();
 
 	FB_GRAPHICS_UNLOCK( );
 	return fb_ErrorSetNum( FB_RTERROR_OK );

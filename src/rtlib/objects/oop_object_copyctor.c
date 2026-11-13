@@ -13,6 +13,7 @@ void fb_ObjectCopyCtor( FB_OBJECT *this_, const FB_OBJECT *rhs )
 	/* Just initialize the vptr properly (we cannot just copy it from the
 	   rhs, because that may really be a different object type that just was
 	   up-casted), nothing else to do. */
+	(void)rhs;
 	fb_ObjectCtor( this_ );
 }
 

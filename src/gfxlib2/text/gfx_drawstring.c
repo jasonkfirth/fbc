@@ -96,12 +96,12 @@ FBCALL int fb_GfxDrawStringSize(FBSTRING_ACCESS *string, int *width, int *height
 	if (font_image) {
 		if (!parse_font(font_image, 0, &font, &pixels, &pitch))
 			goto done;
-	} else if (!__fb_gfx) {
+	} else if (!fb_gfx) {
 		goto done;
 	}
 	if (fb_hGfxMeasureFont((unsigned char *)string->data, FB_STRSIZE(string),
-	    font_image ? &font : NULL, __fb_gfx ? __fb_gfx->font->w : 0,
-	    __fb_gfx ? __fb_gfx->font->h : 0, &measured_width, &measured_height)) {
+	    font_image ? &font : NULL, fb_gfx ? fb_gfx->font->w : 0,
+	    fb_gfx ? fb_gfx->font->h : 0, &measured_width, &measured_height)) {
 		*width = measured_width;
 		*height = measured_height;
 		result = FB_RTERROR_OK;
@@ -138,7 +138,7 @@ FBCALL int fb_GfxDrawString
 
 	context = fb_hGetContext();
 
-	if ((!__fb_gfx) || (!string) || (!string->data)) {
+	if ((!fb_gfx) || (!string) || (!string->data)) {
 		if (!string)
 			res = FB_RTERROR_ILLEGALFUNCTIONCALL;
 		goto exit_error_unlocked;
@@ -221,8 +221,8 @@ FBCALL int fb_GfxDrawString
 	} else {
 		/* use default font */
 
-		font_height = __fb_gfx->font->h;
-		w = __fb_gfx->font->w;
+		font_height = fb_gfx->font->h;
+		w = fb_gfx->font->w;
 		bytes_count = BYTES_PER_PIXEL(w);
 		offset = 0;
 
@@ -256,7 +256,7 @@ FBCALL int fb_GfxDrawString
 			if (x >= context->view_x + context->view_w)
 				break;
 
-			data = (unsigned char *)__fb_gfx->font->data + ((unsigned char)string->data[i] * bytes_count * __fb_gfx->font->h) + offset;
+			data = (unsigned char *)fb_gfx->font->data + ((unsigned char)string->data[i] * bytes_count * fb_gfx->font->h) + offset;
 			for (py = 0; py < font_height; py++) {
 				for (px = 0; px < w; px++) {
 					if ((*data & (1 << (px & 0x7))) && (x + px >= context->view_x) && (x + px < context->view_x + context->view_w))

@@ -15,10 +15,11 @@
 #include "../../fb_private_thread.h"
 #include "dev_tcp_watt.h"
 #include <float.h>
+#include <libm/math.h>
 #include <unistd.h>
 #include <conio.h>
 
-FB_CONSOLE_CTX __fb_con;
+FB_CONSOLE_CTX fb_console_context;
 char *__fb_startup_cwd;
 
 void fb_hInit( void )
@@ -34,10 +35,16 @@ void fb_hInit( void )
 	/* set FPU precision to 64-bit and round to nearest (as in QB) */
 	_control87(PC_64|RC_NEAR, MCW_PC|MCW_RC);
 
+	/* BASIC constant evaluation uses IEEE infinities and NaNs. DJGPP's
+	 * default X/Open mode returns a negative infinity for pow(0, negative),
+	 * which disagrees with both the language and its other target runtimes.
+	 */
+	_LIB_VERSION = _IEEE_;
+
 	/* turn off blink */
 	intensevideo();
 
-	memset( &__fb_con, 0, sizeof( FB_CONSOLE_CTX ) );
+	memset( &fb_console_context, 0, sizeof( FB_CONSOLE_CTX ) );
 
 	__fb_startup_cwd = getcwd(NULL, 1024);
 	fb_hConvertPath( __fb_startup_cwd );

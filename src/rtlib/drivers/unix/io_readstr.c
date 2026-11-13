@@ -23,7 +23,7 @@ char *fb_ConsoleReadStr( char *buffer, ssize_t len )
 	if (fb_ConsoleIsRedirected(TRUE))
 		return fgets(buffer, len, stdin);
 #endif
-	if (!__fb_con.inited)
+	if (!fb_console_context.inited)
 		return fgets(buffer, len, stdin);
 
 	fb_ConsoleGetSize(&cols, NULL);

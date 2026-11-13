@@ -101,20 +101,20 @@ int fb_sfxBufferInit(int frames)
 {
     size_t size;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return -1;
 
-    if (fb_sfxBufferByteSize(frames, __fb_sfx->output_channels, &size) != 0)
+    if (fb_sfxBufferByteSize(frames, fb_sfx_context->output_channels, &size) != 0)
         return -1;
 
-    __fb_sfx->mixbuffer = (float*)malloc(size);
+    fb_sfx_context->mixbuffer = (float*)malloc(size);
 
-    if (!__fb_sfx->mixbuffer)
+    if (!fb_sfx_context->mixbuffer)
         return -1;
 
-    memset(__fb_sfx->mixbuffer, 0, size);
+    memset(fb_sfx_context->mixbuffer, 0, size);
 
-    __fb_sfx->buffer_frames = frames;
+    fb_sfx_context->buffer_frames = frames;
 
     SFX_DEBUG("sfx_buffer: allocated %d frames (%llu bytes)",
               frames, (unsigned long long)size);
@@ -135,16 +135,16 @@ int fb_sfxBufferInit(int frames)
 
 void fb_sfxBufferShutdown(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    if (__fb_sfx->mixbuffer)
+    if (fb_sfx_context->mixbuffer)
     {
-        free(__fb_sfx->mixbuffer);
-        __fb_sfx->mixbuffer = NULL;
+        free(fb_sfx_context->mixbuffer);
+        fb_sfx_context->mixbuffer = NULL;
     }
 
-    __fb_sfx->buffer_frames = 0;
+    fb_sfx_context->buffer_frames = 0;
 
     SFX_DEBUG("sfx_buffer: buffer released");
 }
@@ -164,18 +164,18 @@ void fb_sfxBufferClear(void)
 {
     size_t size;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    if (!__fb_sfx->mixbuffer)
+    if (!fb_sfx_context->mixbuffer)
         return;
 
-    if (fb_sfxBufferByteSize(__fb_sfx->buffer_frames,
-                             __fb_sfx->output_channels,
+    if (fb_sfxBufferByteSize(fb_sfx_context->buffer_frames,
+                             fb_sfx_context->output_channels,
                              &size) != 0)
         return;
 
-    memset(__fb_sfx->mixbuffer, 0, size);
+    memset(fb_sfx_context->mixbuffer, 0, size);
 }
 
 
@@ -193,10 +193,10 @@ void fb_sfxBufferClear(void)
 
 float *fb_sfxBufferPtr(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return NULL;
 
-    return __fb_sfx->mixbuffer;
+    return fb_sfx_context->mixbuffer;
 }
 
 
@@ -208,10 +208,10 @@ float *fb_sfxBufferPtr(void)
 
 int fb_sfxBufferFrames(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
-    return __fb_sfx->buffer_frames;
+    return fb_sfx_context->buffer_frames;
 }
 
 
@@ -225,11 +225,11 @@ int fb_sfxBufferSamples(void)
 {
     int samples;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
-    if (fb_sfxBufferSampleCount(__fb_sfx->buffer_frames,
-                                __fb_sfx->output_channels,
+    if (fb_sfxBufferSampleCount(fb_sfx_context->buffer_frames,
+                                fb_sfx_context->output_channels,
                                 &samples) != 0)
         return 0;
 
@@ -254,21 +254,21 @@ void fb_sfxBufferWrite(int index, float value)
 {
     int samples;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    if (!__fb_sfx->mixbuffer)
+    if (!fb_sfx_context->mixbuffer)
         return;
 
-    if (fb_sfxBufferSampleCount(__fb_sfx->buffer_frames,
-                                __fb_sfx->output_channels,
+    if (fb_sfxBufferSampleCount(fb_sfx_context->buffer_frames,
+                                fb_sfx_context->output_channels,
                                 &samples) != 0)
         return;
 
     if (index < 0 || index >= samples)
         return;
 
-    __fb_sfx->mixbuffer[index] = value;
+    fb_sfx_context->mixbuffer[index] = value;
 }
 
 
@@ -289,30 +289,30 @@ float fb_sfxBufferRead(int index)
 {
     int samples;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0.0f;
 
-    if (!__fb_sfx->mixbuffer)
+    if (!fb_sfx_context->mixbuffer)
         return 0.0f;
 
-    if (fb_sfxBufferSampleCount(__fb_sfx->buffer_frames,
-                                __fb_sfx->output_channels,
+    if (fb_sfxBufferSampleCount(fb_sfx_context->buffer_frames,
+                                fb_sfx_context->output_channels,
                                 &samples) != 0)
         return 0.0f;
 
     if (index < 0 || index >= samples)
         return 0.0f;
 
-    return __fb_sfx->mixbuffer[index];
+    return fb_sfx_context->mixbuffer[index];
 }
 
 
 void fb_sfxMixBufferInit(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    (void)fb_sfxBufferInit(__fb_sfx->buffer_size);
+    (void)fb_sfxBufferInit(fb_sfx_context->buffer_size);
 }
 
 
@@ -331,7 +331,7 @@ int fb_sfxMixBufferWrite(const float *samples, int frames)
     if (!samples || frames <= 0)
         return 0;
 
-    channels = (__fb_sfx ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS);
+    channels = (fb_sfx_context ? fb_sfx_context->output_channels : FB_SFX_DEFAULT_CHANNELS);
     if (fb_sfxBufferSampleCount(frames, channels, &total) != 0)
         return 0;
 
@@ -351,7 +351,7 @@ int fb_sfxMixBufferRead(float *samples, int frames)
     if (!samples || frames <= 0)
         return 0;
 
-    channels = (__fb_sfx ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS);
+    channels = (fb_sfx_context ? fb_sfx_context->output_channels : FB_SFX_DEFAULT_CHANNELS);
     if (fb_sfxBufferSampleCount(frames, channels, &total) != 0)
         return 0;
 

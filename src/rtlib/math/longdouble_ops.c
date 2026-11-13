@@ -219,7 +219,8 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 	if (c_locale == (locale_t)0) abort();
 	value = strtold_l(text, &end, c_locale);
 	freelocale(c_locale);
-#elif defined(__unix__) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__)
+/* DJGPP defines __unix__ for compatibility, but has no POSIX locale objects. */
+#elif (defined(__unix__) && !defined(__DJGPP__)) || defined(__APPLE__) || defined(__CYGWIN__) || defined(__HAIKU__)
 	locale_t c_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
 	locale_t previous_locale;
 	if (c_locale == (locale_t)0) abort();

@@ -25,10 +25,10 @@
 
 extern const GFXDRIVER fb_gfxDriverRiscos;
 
-const GFXDRIVER *__fb_gfx_drivers_list[] =
+const GFXDRIVER *fb_gfx_drivers_list[] =
 {
     &fb_gfxDriverRiscos,
-    &__fb_gfxDriverNull,
+    &fb_gfxDriverNull,
     NULL
 };
 

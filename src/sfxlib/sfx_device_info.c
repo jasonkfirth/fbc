@@ -69,7 +69,7 @@ void fb_sfxDeviceInfo(int id)
     }
 
     fb_sfxRuntimeLock();
-    drv = __fb_sfx_drivers_list[id];
+    drv = fb_sfx_drivers_list[id];
 
     if (!drv)
     {
@@ -79,11 +79,11 @@ void fb_sfxDeviceInfo(int id)
     }
 
     current = -1;
-    if (__fb_sfx && __fb_sfx->driver)
+    if (fb_sfx_context && fb_sfx_context->driver)
     {
-        for (i = 0; __fb_sfx_drivers_list[i]; ++i)
+        for (i = 0; fb_sfx_drivers_list[i]; ++i)
         {
-            if (__fb_sfx_drivers_list[i] == __fb_sfx->driver)
+            if (fb_sfx_drivers_list[i] == fb_sfx_context->driver)
             {
                 current = i;
                 break;
@@ -106,12 +106,12 @@ void fb_sfxDeviceInfo(int id)
               (drv->capabilities & FB_SFX_DRIVER_CAP_BACKGROUND) ? " background" : "",
               (drv->capabilities & FB_SFX_DRIVER_CAP_BLOCKING) ? " blocking" : "");
 
-    if (current == id && __fb_sfx)
+    if (current == id && fb_sfx_context)
     {
         SFX_DEBUG("sfx_device_info: format: rate=%d channels=%d buffer=%d",
-                  __fb_sfx->samplerate,
-                  __fb_sfx->output_channels,
-                  __fb_sfx->buffer_size);
+                  fb_sfx_context->samplerate,
+                  fb_sfx_context->output_channels,
+                  fb_sfx_context->buffer_size);
     }
 
     if (fb_sfxDriverStatsSnapshot(drv->name, &stats) == 0)
@@ -156,13 +156,13 @@ const char *fb_sfxDeviceInfoName(int id)
         return NULL;
 
     fb_sfxRuntimeLock();
-    if (!__fb_sfx_drivers_list[id])
+    if (!fb_sfx_drivers_list[id])
     {
         fb_sfxRuntimeUnlock();
         return NULL;
     }
 
-    name = __fb_sfx_drivers_list[id]->name;
+    name = fb_sfx_drivers_list[id]->name;
     fb_sfxRuntimeUnlock();
 
     return name;
@@ -187,7 +187,7 @@ int fb_sfxDeviceValid(int id)
         return 0;
 
     fb_sfxRuntimeLock();
-    valid = (__fb_sfx_drivers_list[id] != NULL);
+    valid = (fb_sfx_drivers_list[id] != NULL);
     fb_sfxRuntimeUnlock();
 
     return valid;

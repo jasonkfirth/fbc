@@ -135,7 +135,7 @@ static void aros_post_key(struct IntuiMessage *message)
 
     scancode = aros_raw_to_scancode(raw);
     if (scancode > 0 && scancode < 128)
-        __fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
+        fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
 
     memset(&event, 0, sizeof(event));
     event.type = pressed ? EVENT_KEY_PRESS : EVENT_KEY_RELEASE;
@@ -241,7 +241,7 @@ void fb_arosGfxPollEvents(void)
     int refresh;
 
     if (!fb_aros_gfx.active || fb_aros_gfx.window == NULL ||
-        __fb_gfx == NULL || __fb_gfx->key == NULL)
+        fb_gfx == NULL || fb_gfx->key == NULL)
     {
         return;
     }
@@ -295,8 +295,8 @@ void fb_arosGfxPollEvents(void)
 
     if (refresh)
     {
-        if (__fb_gfx->dirty != NULL)
-            memset(__fb_gfx->dirty, TRUE, (size_t)fb_aros_gfx.height);
+        if (fb_gfx->dirty != NULL)
+            memset(fb_gfx->dirty, TRUE, (size_t)fb_aros_gfx.height);
         fb_arosGfxPresent();
     }
 }

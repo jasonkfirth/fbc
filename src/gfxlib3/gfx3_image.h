@@ -22,8 +22,8 @@
         - file-format loading or saving
 */
 
-#ifndef __FB_GFX3_IMAGE_H__
-#define __FB_GFX3_IMAGE_H__
+#ifndef FB_GFX3_IMAGE_H
+#define FB_GFX3_IMAGE_H
 
 #include "gfx3_compat.h"
 #include "../rtlib/fb_gfx_private.h"
@@ -44,6 +44,10 @@ typedef struct FB_GFX3_IMAGE_VIEW {
 	uint32_t pitch;
 	uint32_t bytes_per_pixel;
 	uint32_t header_size;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing 8-byte-aligned size. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_IMAGE_VIEW;
 
 int fb_gfx3_image_parse(void *image, FB_GFX3_IMAGE_VIEW *view);

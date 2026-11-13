@@ -7,6 +7,9 @@
 
 .*
 /fbc.exe
+# A redirected Windows device name can become a file on a hosted source tree.
+/nul
+/NUL
 /freebasic-dist.tar
 /freebasic-package.tar
 /freebasic-package.zip

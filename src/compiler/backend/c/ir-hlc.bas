@@ -415,6 +415,7 @@ dim shared as TLIST c_pointer_views
 dim shared as integer c_pointer_view_id, c_pointer_raw_types, c_pointer_prototypes
 #include once "backend/c/asm-names.bi"
 #include once "backend/c/c-identifiers.bi"
+#include once "backend/c/c-asm-addresses.bi"
 declare sub hCAbiRemoveDebugRetention(byval identifier as const zstring ptr)
 #include once "backend/c/c-generated-leaves.bi"
 #include once "backend/c/c-procedure-prototypes.bi"
@@ -501,6 +502,7 @@ private sub _init( )
 end sub
 
 private sub _end( )
+	hCAsmHomesClear()
 	hCReadOnlyLocalsFinish()
 	hCStaticCodeFinish()
 	hCLeafFinish( )
@@ -1410,6 +1412,8 @@ private function hCNativeParameterName _
 	var identifier = hGetCId(symbGetParamVar(param))
 	if( hUsesCLongDoubleCABI(proc) andalso hIsCLongDoubleType(dtype, subtype) ) then
 		identifier = "fb_c_native_" + identifier
+	elseif( hCAsmParameterHome(proc, symbGetParamVar(param)) ) then
+		identifier = "fb_c_asm_argument_" + identifier
 	end if
 	return identifier
 end function
@@ -2128,7 +2132,10 @@ private sub hMarkReferencedLocalInTree( byval n as ASTNODE ptr )
 		'' assembly opaque, including hidden stack and quoted C operands.
 		var token = n->asm.tokhead
 		while( token <> NULL )
-			if( token->type = AST_ASMTOK_SYMB ) then hRememberCLocalReference(token->sym)
+			if( token->type = AST_ASMTOK_SYMB ) then
+				hRememberCLocalReference(token->sym)
+				hCAsmRememberParameterHome(token->sym)
+			end if
 			token = token->next
 		wend
 		if( hCScalarAsmReferencesComplete(n->asm.tokhead) = FALSE ) then
@@ -2180,6 +2187,7 @@ private sub hMarkReferencedCStatement( byval n as ASTNODE ptr, byref fallthrough
 end sub
 
 private sub hMarkReferencedLocals( byval n as ASTNODE ptr )
+	hCAsmHomesBegin(ctx.currproc)
 	'' Direct C GOSUB calls address this context through emitted runtime calls,
 	'' even when no RETURN or reachable procedure exit supplies an AST read.
 	if( symbGetProcStatGosub(ctx.currproc) ) then
@@ -3085,6 +3093,9 @@ private function _emitBegin( ) as integer
 	hCRememberViewType(FB_DATATYPE_STRING, NULL)
 	hWriteLine( "typedef int8 boolean;", TRUE )
 	hWriteLine( "extern long double fb_LongDoubleToNative(const void *, unsigned int);", TRUE )
+	if( env.clopt.target = FB_COMPTARGET_DOS ) then
+		hWriteLine( "extern double fb_DosTan(double);", TRUE )
+	end if
 
 	'' body
 	sectionBegin( )
@@ -3919,9 +3930,18 @@ private function exprNewUOP _
 		return n
 	end if
 
-	n = exprNew( EXPRCLASS_UOP, dtype, l->subtype )
+	'' DJGPP's asinf loses several Single ulps near the interval endpoints.
+	'' Evaluate its accurate Double entry point, then explicitly round back to
+	'' Single so surrounding expressions retain their declared precision.
+	var use_dos_asin = (op = AST_OP_ASIN) andalso _
+	                   (typeGetDtAndPtrOnly(dtype) = FB_DATATYPE_SINGLE) andalso _
+	                   (env.clopt.target = FB_COMPTARGET_DOS)
+	if( use_dos_asin ) then l = exprNewCAST( FB_DATATYPE_DOUBLE, NULL, l )
+
+	n = exprNew( EXPRCLASS_UOP, iif(use_dos_asin, FB_DATATYPE_DOUBLE, dtype), l->subtype )
 	n->l = l
 	n->op = op
+	if( use_dos_asin ) then n = exprNewCAST( dtype, NULL, n )
 
 	function = n
 end function
@@ -4565,7 +4585,12 @@ private function hFloatUopToStr( byval op as integer, byval dtype as integer ) a
 		case AST_OP_ASIN  : function = @"__builtin_asin"
 		case AST_OP_COS   : function = @"__builtin_cos"
 		case AST_OP_ACOS  : function = @"__builtin_acos"
-		case AST_OP_TAN   : function = @"__builtin_tan"
+		case AST_OP_TAN
+			if( env.clopt.target = FB_COMPTARGET_DOS ) then
+				function = @"fb_DosTan"
+			else
+				function = @"__builtin_tan"
+			end if
 		case AST_OP_ATAN  : function = @"__builtin_atan"
 		case AST_OP_SQRT  : function = @"__builtin_sqrt"
 		case AST_OP_LOG   : function = @"__builtin_log"
@@ -7146,11 +7171,14 @@ end function
 
 private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	c_leaf_opaque = TRUE
+	var address_operands = sectionInsideProc() andalso hCAsmAddressOperands()
 	'' 1st pass to count some stats (no emitting yet)
 	dim as integer uses_label, labelindex, labelindexbase
-	dim as TLIST seenlabellist, seenvarlist
+	dim as TLIST seenlabellist, seenvarlist, seenaddresslist
+	dim as integer automatic_count, address_count
 	listInit( @seenlabellist, 8, sizeof( FBSYMBOL ptr ) )
 	listInit( @seenvarlist, 8, sizeof( FBSYMBOL ptr ) )
+	listInit( @seenaddresslist, 8, sizeof( FBSYMBOL ptr ) )
 	var n = asmtokenhead
 	while( n )
 		if( n->type = AST_ASMTOK_SYMB ) then
@@ -7159,11 +7187,17 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 				'' Determine whether to use <asm()> or <asm goto()>
 				uses_label = TRUE
 			case FB_SYMBCLASS_VAR
-				'' Find first valid index into the label list;
-				'' it starts behind the constraints.
-				'' We'll emit 1 input operand per variable (and no outputs).
-				if( hFindAsmSymbolInSeenList(seenvarlist, n->sym) < 0 ) then
+				'' Fix the operand order before rendering placeholders: ordinary
+				'' memory operands precede private static-address inputs.
+				if( address_operands andalso hCAsmStaticAddress(n->sym) ) then
+					if( hFindAsmSymbolInSeenList(seenaddresslist, n->sym) < 0 ) then
+						*cptr(FBSYMBOL ptr ptr, listNewNode(@seenaddresslist)) = n->sym
+						address_count += 1
+						labelindex += 1
+					end if
+				elseif( hFindAsmSymbolInSeenList(seenvarlist, n->sym) < 0 ) then
 					*cptr(FBSYMBOL ptr ptr, listNewNode(@seenvarlist)) = n->sym
+					automatic_count += 1
 					labelindex += 1
 				end if
 			end select
@@ -7172,8 +7206,6 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	wend
 
 	labelindexbase = labelindex
-	listEnd( @seenvarlist )
-	listInit( @seenvarlist, 8, sizeof(FBSYMBOL ptr) )
 	dim as string ln = "__asm__"
 
 	'' Only when inside normal procedures
@@ -7196,7 +7228,6 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	DZstrZero( labelbuffer )
 
 	'' 2nd pass - emitting
-	dim as integer operandindex
 	dim as integer clang_lea = FALSE, asmlinebegin = TRUE
 
 	dim as string outputconstraints, inputconstraints, labellist
@@ -7245,35 +7276,13 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 				if( sectionInsideProc( ) ) then
 					select case( n->sym->class )
 					case FB_SYMBCLASS_VAR
-						'' Referencing a variable: insert %N place-holder...
-						'' (N refers to N'th operand written in the whole
-						'' asm [goto]([outputs...] inputs... [labels...]) statement)
-						var seenindex = hFindAsmSymbolInSeenList( seenvarlist, n->sym )
-						if( seenindex >= 0 ) then
-							DZstrConcatAssign( asmbuffer, "%" & seenindex )
-							n = n->next
-							continue while
-						end if
-						*cptr(FBSYMBOL ptr ptr, listNewNode(@seenvarlist)) = n->sym
-						DZstrConcatAssign( asmbuffer, "%" & operandindex )
-						operandindex += 1
-
-						'' ... and add the symbol to a constraint list
-						if( uses_label ) then
-							'' read-only input operand constraint: "m" (symbol)
-							'' "asm goto" doesn't allow output constraints, so we can only use
-							'' input constraints. Hopefully there are no jump instructions that
-							'' modify their memory operand...
-							if( inputbuffer.len > 0 ) then
-								DZstrConcatAssign( inputbuffer, ", " )
-							end if
-							DZstrConcatAssign( inputbuffer, """m"" (" + hGetCId( n->sym ) + ")" )
+						var addressindex = hFindAsmSymbolInSeenList(seenaddresslist, n->sym)
+						if( addressindex >= 0 ) then
+							DZstrConcatAssign(asmbuffer, "%" & (automatic_count + addressindex))
 						else
-							'' read+write output operand constraint: "+m" (symbol)
-							if( outputbuffer.len > 0 ) then
-								DZstrConcatAssign( outputbuffer, ", " )
-							end if
-							DZstrConcatAssign( outputbuffer, """+m"" (" + hGetCId( n->sym ) + ")" )
+							var seenindex = hFindAsmSymbolInSeenList(seenvarlist, n->sym)
+							assert(seenindex >= 0)
+							DZstrConcatAssign(asmbuffer, "%" & seenindex)
 						end if
 
 					case FB_SYMBCLASS_LABEL
@@ -7332,6 +7341,30 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 
 		n = n->next
 	wend
+	if( sectionInsideProc() andalso env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
+		var item = cptr(FBSYMBOL ptr ptr, listGetHead(@seenvarlist))
+		while( item <> NULL )
+			if( uses_label ) then
+				'' Retain the existing input-only contract of asm goto on
+				'' native compilers that cannot accept its output constraints.
+				if( inputbuffer.len > 0 ) then DZstrConcatAssign(inputbuffer, ", ")
+				DZstrConcatAssign(inputbuffer, """m"" (" + hGetCId(*item) + ")")
+			else
+				if( outputbuffer.len > 0 ) then DZstrConcatAssign(outputbuffer, ", ")
+				DZstrConcatAssign(outputbuffer, """+m"" (" + hGetCId(*item) + ")")
+			end if
+			item = listGetNext(item)
+		wend
+		item = cptr(FBSYMBOL ptr ptr, listGetHead(@seenaddresslist))
+		while( item <> NULL )
+			'' The input address is unchanged. The memory clobber covers
+			'' writes through it without duplicating a read/write operand.
+			if( inputbuffer.len > 0 ) then DZstrConcatAssign(inputbuffer, ", ")
+			DZstrConcatAssign(inputbuffer, """p"" (&" + hGetCId(*item) + ")")
+			item = listGetNext(item)
+		wend
+	end if
+
 	if( asmbuffer.data <> NULL ) then asmcode = *asmbuffer.data
 	if( outputbuffer.data <> NULL ) then outputconstraints = *outputbuffer.data
 	if( inputbuffer.data <> NULL ) then inputconstraints = *inputbuffer.data
@@ -7342,7 +7375,10 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 	DZstrAllocate( labelbuffer, 0 )
 	listEnd( @seenlabellist )
 	listEnd( @seenvarlist )
+	listEnd( @seenaddresslist )
 
+	dim as string clang_template
+	dim as integer template_start, template_end
 	if( env.clopt.asmsyntax = FB_ASMSYNTAX_INTEL ) then
 		if( sectionInsideProc( ) ) then asmcode = hAsmLocalizeNames( asmcode )
 		'' A C memory operand supplies its own address brackets. Normalize
@@ -7369,7 +7405,13 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 		'' .asm:
 		''    .ascii "zzz\"\0"
 		''
+		template_start = len(ln)
+		if( address_count > 0 ) then
+			hBuildStrLit(clang_template, strptr(asmcode), len(asmcode) + 1, 0)
+			asmcode = hCAsmGCCAddressTemplate(asmcode, automatic_count)
+		end if
 		hBuildStrLit( ln, strptr( asmcode ), len( asmcode ) + 1, 0 )
+		template_end = len(ln)
 
 		'' Only when inside normal procedures
 		'' (NAKED procedures don't increase the indentation)
@@ -7412,7 +7454,15 @@ private sub _emitAsmLine( byval asmtokenhead as ASTASMTOK ptr )
 
 	ln += " );"
 
-	hWriteLine( ln )
+	if( len(clang_template) > 0 ) then
+		hWriteLine("#if defined(__clang__)")
+		hWriteLine(left(ln, template_start) + clang_template + mid(ln, template_end + 1))
+		hWriteLine("#else")
+		hWriteLine(ln)
+		hWriteLine("#endif")
+	else
+		hWriteLine( ln )
+	end if
 end sub
 
 private sub hVarIniDiscardScopes( )
@@ -8145,6 +8195,36 @@ private sub _emitProcBegin _
 				            "(sizeof( " + local_identifier + " ) < sizeof( " + _
 				            native_identifier + " ) ? sizeof( " + local_identifier + _
 				            " ) : sizeof( " + native_identifier + " )) );" )
+			elseif( hCAsmParameterHome(proc, symbGetParamVar(param)) ) then
+				'' A real source home avoids GCC's incoming-stack argument
+				'' pointer when Intel assembly clobbers the general registers.
+				'' All BASIC references, including escaped addresses, use this
+				'' one home throughout the call; there is no assembly copyback.
+				var storage = symbGetParamVar(param)
+				var type_name = hEmitType(typeUnsetIsConst(dtype), subtype, TRUE)
+				if( param->stats and FB_SYMBSTATS_ARGV ) then type_name = "char**"
+				var declaration = type_name + " " + hGetCId(storage)
+				if( storage->var_.align > typeCalcNaturalAlign(dtype, subtype) ) then
+					declaration += " __attribute__((aligned(" + str(storage->var_.align) + ")))"
+				end if
+				var native_identifier = hCNativeParameterName(proc, param, dtype, subtype)
+				if( typeGetClass(dtype) = FB_DATACLASS_FPOINT ) then
+					'' Assembly can inspect the representation without evaluating
+					'' the floating value. An x87 assignment can quiet a signaling
+					'' NaN; even memcpy can become that assignment under GCC O2.
+					'' Volatile byte accesses keep this entry transfer bit exact.
+					'' Fixed array bounds and offsets expose the complete access
+					'' range to native diagnostics without pointer arithmetic.
+					var local_identifier = hGetCId(storage)
+					var destination_bytes = "(*(volatile uint8 (*)[sizeof( " + local_identifier + " )])&" + local_identifier + ")"
+					var source_bytes = "(*(const volatile uint8 (*)[sizeof( " + native_identifier + " )])&" + native_identifier + ")"
+					hWriteLine(declaration + ";")
+					for index as integer = 0 to typeGetSize(dtype) - 1
+						hWriteLine(destination_bytes + "[" + str(index) + "] = " + source_bytes + "[" + str(index) + "];")
+					next
+				else
+					hWriteLine(declaration + " = " + native_identifier + ";")
+				end if
 			end if
 		end if
 		param = symbGetProcPrevParam( proc, param )
@@ -8274,6 +8354,7 @@ private sub _emitProcEnd _
 	irhlEmitProcEnd( )
 	hCErrEmitHelpers( )
 	hCErrDestroy( )
+	hCAsmHomesClear()
 
 end sub
 

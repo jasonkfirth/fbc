@@ -48,7 +48,7 @@ void fb_ConsoleLocateRawEx( HANDLE hConsole, int row, int col, int cursor )
   		SetConsoleCursorInfo( hConsole, &info );
   	}
 
-    __fb_con.scrollWasOff = FALSE;
+    fb_console_context.scrollWasOff = FALSE;
     SetConsoleCursorPosition( hConsole, c );
 }
 

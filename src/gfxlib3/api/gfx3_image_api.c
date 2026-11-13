@@ -24,6 +24,7 @@
         - GPU-only public surface extensions
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../gfx3_gpu_surface.h"
 #include "../gfx3_image.h"

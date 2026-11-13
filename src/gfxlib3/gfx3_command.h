@@ -23,8 +23,8 @@
         - resource lookup or destruction
 */
 
-#ifndef __FB_GFX3_COMMAND_H__
-#define __FB_GFX3_COMMAND_H__
+#ifndef FB_GFX3_COMMAND_H
+#define FB_GFX3_COMMAND_H
 
 #include "fb_gfx3.h"
 
@@ -115,6 +115,10 @@ typedef struct FB_GFX3_COMMAND_QUEUE {
 	int accepting;
 	int failed;
 	int failure_code;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing 8-byte-aligned size. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_COMMAND_QUEUE;
 
 FB_GFX3_COMMAND *fb_gfx3_command_create(uint32_t type, size_t payload_size);

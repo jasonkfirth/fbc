@@ -11,6 +11,12 @@
 
 #include "fb.h"
 
+#if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
+#define FB_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FB_FALLTHROUGH ((void)0)
+#endif
+
 /* Use the shared declarations so readers keep the same ABI labels. */
 
 
@@ -52,23 +58,23 @@ static ssize_t hReadUTF8ToChar( FILE *fp, char *dst, ssize_t max_chars )
 			case 5:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 4:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 3:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 2:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 1:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 0:
 				wc += *p++;
 		}
@@ -193,23 +199,23 @@ static ssize_t hUTF8ToUTF16( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 			case 5:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 4:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 3:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 2:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 1:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 0:
 				wc += *p++;
 		}
@@ -269,23 +275,23 @@ static ssize_t hUTF8ToUTF32( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 			case 5:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 4:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 3:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 2:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 1:
 				wc += *p++;
 				wc <<= 6;
-				/* fall through */
+				FB_FALLTHROUGH;
 			case 0:
 				wc += *p++;
 		}

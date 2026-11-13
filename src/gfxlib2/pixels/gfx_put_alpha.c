@@ -10,7 +10,6 @@
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
 
-extern void fb_hPutPSetC(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
 
 #ifdef HOST_X86
 #include "../drivers/x86/fb_gfx_mmx.h"
@@ -23,7 +22,10 @@ static void fb_hPutAlpha4C(unsigned char *src, unsigned char *dest, int w, int h
 	unsigned int *s = (unsigned int *)src;
 	unsigned int *d, sc, dc, a, drb, dga, srb, sga;
 	int x;
-	
+	(void)alpha;
+	(void)blender;
+	(void)param;
+
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
 		d = (unsigned int *)dest;
@@ -71,7 +73,7 @@ void fb_hPutAlpha(unsigned char *src, unsigned char *dest, int w, int h, int src
 		else
 #endif
 #ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
+		if (fb_gfx->flags & X86_MMX_ENABLED)
 			context->putter[PUT_MODE_ALPHA] = mmx_putters;
 		else
 #endif

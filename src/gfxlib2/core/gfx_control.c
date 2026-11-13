@@ -25,26 +25,26 @@ FBCALL void fb_GfxControl_s( int what, FBSTRING_ACCESS *param )
 
 	switch ( what ) {
 	case GET_WINDOW_TITLE:
-		if (!__fb_window_title )
+		if (!fb_window_title )
 			src = &fb_ctx.null_desc;
 		else
-			src = fb_StrAllocTempDescF( __fb_window_title, strlen(__fb_window_title) + 1 );
+			src = fb_StrAllocTempDescF( fb_window_title, strlen(fb_window_title) + 1 );
 		fb_StrAssign( param, -1, src, -1, FB_FALSE );
 		break;
 
 	case GET_DRIVER_NAME:
-		if (!__fb_gfx)
+		if (!fb_gfx)
 			src = &fb_ctx.null_desc;
 		else
-			src = fb_StrAllocTempDescF( __fb_gfx->driver->name, strlen(__fb_gfx->driver->name) + 1 );
+			src = fb_StrAllocTempDescF( fb_gfx->driver->name, strlen(fb_gfx->driver->name) + 1 );
 		fb_StrAssign( param, -1, src, -1, FB_FALSE );
 		break;
 
 	case GET_GL_EXTENSIONS:
 		src = &fb_ctx.null_desc;
 #ifndef DISABLE_OPENGL
-		if ((__fb_gfx) && (__fb_gfx->flags & OPENGL_SUPPORT))
-			src = fb_StrAllocTempDescF( __fb_gl_extensions, strlen(__fb_gl_extensions) + 1 );
+		if ((fb_gfx) && (fb_gfx->flags & OPENGL_SUPPORT))
+			src = fb_StrAllocTempDescF( fb_gl_extensions, strlen(fb_gl_extensions) + 1 );
 #endif
 		fb_StrAssign( param, -1, src, -1, FB_FALSE );
 		break;
@@ -54,11 +54,11 @@ FBCALL void fb_GfxControl_s( int what, FBSTRING_ACCESS *param )
 		break;
 
 	case SET_DRIVER_NAME:
-		if (__fb_gfx_driver_name)
-			free(__fb_gfx_driver_name);
-		__fb_gfx_driver_name = NULL;
+		if (fb_gfx_driver_name)
+			free(fb_gfx_driver_name);
+		fb_gfx_driver_name = NULL;
 		if (strlen(param->data) > 0)
-			__fb_gfx_driver_name = strdup(param->data);
+			fb_gfx_driver_name = strdup(param->data);
 		break;
 	}
 
@@ -94,9 +94,9 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 
 			/* A null mode has no focused surface and must not summon a session OSK. */
 			FB_GRAPHICS_LOCK();
-			has_displayed_mode = (__fb_gfx != NULL) &&
-				(__fb_gfx->driver != NULL) &&
-				(__fb_gfx->driver != &__fb_gfxDriverNull);
+			has_displayed_mode = (fb_gfx != NULL) &&
+				(fb_gfx->driver != NULL) &&
+				(fb_gfx->driver != &fb_gfxDriverNull);
 			FB_GRAPHICS_UNLOCK();
 			if (!has_displayed_mode) {
 				if (what == GET_SOFT_KEYBOARD)
@@ -110,15 +110,15 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 		if (what == GET_WINDOW_METRICS) {
 			FB_GRAPHICS_LOCK();
 			fb_hApplyPendingResize();
-			if (__fb_gfx) {
-				*param1 = __fb_gfx->w;
-				*param2 = __fb_gfx->h;
+			if (fb_gfx) {
+				*param1 = fb_gfx->w;
+				*param2 = fb_gfx->h;
 			} else {
 				fb_hScreenInfo(param1, param2, &res3, &res4);
 			}
 			*param3 = 96;
 #ifdef HOST_WIN32
-			*param3 = fb_hWindowDpi(__fb_gfx ? fb_hGetWindowHandle() : 0);
+			*param3 = fb_hWindowDpi(fb_gfx ? fb_hGetWindowHandle() : 0);
 #endif
 			*param4 = 0;
 			FB_GRAPHICS_UNLOCK();
@@ -140,14 +140,14 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 
 	switch ( what ) {
 	case GET_WINDOW_POS:
-		if ((__fb_gfx) && (__fb_gfx->driver->set_window_pos))
-			res = __fb_gfx->driver->set_window_pos(0x80000000, 0x80000000);
+		if ((fb_gfx) && (fb_gfx->driver->set_window_pos))
+			res = fb_gfx->driver->set_window_pos(0x80000000, 0x80000000);
 		res1 = (short)(res & 0xFFFF);
 		res2 = res >> 16;
 		break;
 
 	case GET_WINDOW_HANDLE:
-		if (__fb_gfx) {
+		if (fb_gfx) {
 			res1 = fb_hGetWindowHandle();
 			res2 = fb_hGetDisplayHandle();
 		}
@@ -163,39 +163,39 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 		break;
 
 	case GET_SCREEN_SIZE:
-		if (__fb_gfx) {
-			res1 = __fb_gfx->w;
-			res2 = __fb_gfx->h;
+		if (fb_gfx) {
+			res1 = fb_gfx->w;
+			res2 = fb_gfx->h;
 		}
 		break;
 
 	case GET_SCREEN_DEPTH:
-		if (__fb_gfx)
-			res1 = __fb_gfx->depth;
+		if (fb_gfx)
+			res1 = fb_gfx->depth;
 		break;
 
 	case GET_SCREEN_BPP:
-		if (__fb_gfx)
-			res1 = __fb_gfx->bpp;
+		if (fb_gfx)
+			res1 = fb_gfx->bpp;
 		break;
 
 	case GET_SCREEN_PITCH:
-		if (__fb_gfx)
-			res1 = __fb_gfx->pitch;
+		if (fb_gfx)
+			res1 = fb_gfx->pitch;
 		break;
 
 	case GET_SCREEN_REFRESH:
-		if (__fb_gfx)
-			res1 = __fb_gfx->refresh_rate;
+		if (fb_gfx)
+			res1 = fb_gfx->refresh_rate;
 		break;
 
 	case GET_TRANSPARENT_COLOR:
-		if ((__fb_gfx) && (__fb_gfx->bpp > 1))
+		if ((fb_gfx) && (fb_gfx->bpp > 1))
 			res1 = MASK_COLOR_32;
 		break;
 
 	case GET_VIEWPORT:
-		if (__fb_gfx) {
+		if (fb_gfx) {
 			res1 = context->view_x;
 			res2 = context->view_y;
 			res3 = context->view_x + context->view_w - 1;
@@ -204,46 +204,46 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 		break;
 
 	case GET_PEN_POS:
-		if (__fb_gfx) {
+		if (fb_gfx) {
 			res1 = context->last_x;
 			res2 = context->last_y;
 		}
 		break;
 
 	case GET_COLOR:
-		if (__fb_gfx) {
+		if (fb_gfx) {
 			res1 = context->fg_color;
 			res2 = context->bg_color;
 		}
 		break;
 
 	case GET_ALPHA_PRIMITIVES:
-		if (__fb_gfx)
-			res1 = (__fb_gfx->flags & ALPHA_PRIMITIVES) ? FB_TRUE : FB_FALSE;
+		if (fb_gfx)
+			res1 = (fb_gfx->flags & ALPHA_PRIMITIVES) ? FB_TRUE : FB_FALSE;
 		break;
 
 	case GET_HIGH_PRIORITY:
-		if (__fb_gfx)
-			res1 = (__fb_gfx->flags & GFX_HIGH_PRIORITY) ? FB_TRUE : FB_FALSE;
+		if (fb_gfx)
+			res1 = (fb_gfx->flags & GFX_HIGH_PRIORITY) ? FB_TRUE : FB_FALSE;
 		break;
 
 	case GET_SCANLINE_SIZE:
-		if (__fb_gfx)
-			res1 = __fb_gfx->scanline_size;
+		if (fb_gfx)
+			res1 = fb_gfx->scanline_size;
 		break;
 
 	case GET_X86_MMX_ENABLED:
-		if (__fb_gfx)
-			res1 = (__fb_gfx->flags & X86_MMX_ENABLED) ? FB_TRUE : FB_FALSE;
+		if (fb_gfx)
+			res1 = (fb_gfx->flags & X86_MMX_ENABLED) ? FB_TRUE : FB_FALSE;
 		break;
 
 	case SET_WINDOW_POS:
-		if ((__fb_gfx) && (__fb_gfx->driver->set_window_pos))
-			__fb_gfx->driver->set_window_pos(*param1, *param2);
+		if ((fb_gfx) && (fb_gfx->driver->set_window_pos))
+			fb_gfx->driver->set_window_pos(*param1, *param2);
 		break;
 
 	case SET_PEN_POS:
-		if (__fb_gfx) {
+		if (fb_gfx) {
 			if (*param1 != (ssize_t)0x80000000)
 				context->last_x = *param1;
 			if (*param2 != (ssize_t)0x80000000)
@@ -252,142 +252,142 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 		break;
 
 	case SET_ALPHA_PRIMITIVES:
-		if ((__fb_gfx) && (*param1 != (ssize_t)0x80000000)) {
+		if ((fb_gfx) && (*param1 != (ssize_t)0x80000000)) {
 			if (*param1)
-				__fb_gfx->flags |= ALPHA_PRIMITIVES;
+				fb_gfx->flags |= ALPHA_PRIMITIVES;
 			else
-				__fb_gfx->flags &= ~ALPHA_PRIMITIVES;
+				fb_gfx->flags &= ~ALPHA_PRIMITIVES;
 			/* Pixel transfer routines depend on the current alpha mode. */
-			fb_hSetupFuncs(__fb_gfx->bpp);
+			fb_hSetupFuncs(fb_gfx->bpp);
 		}
 		break;
 
 #ifndef DISABLE_OPENGL
 	case GET_GL_COLOR_BITS:
-		res1 = __fb_gl_params.color_bits;
+		res1 = fb_gl_params.color_bits;
 		break;
 
 	case GET_GL_COLOR_RED_BITS:
-		res1 = __fb_gl_params.color_red_bits;
+		res1 = fb_gl_params.color_red_bits;
 		break;
 
 	case GET_GL_COLOR_GREEN_BITS:
-		res1 = __fb_gl_params.color_green_bits;
+		res1 = fb_gl_params.color_green_bits;
 		break;
 
 	case GET_GL_COLOR_BLUE_BITS:
-		res1 = __fb_gl_params.color_blue_bits;
+		res1 = fb_gl_params.color_blue_bits;
 		break;
 
 	case GET_GL_COLOR_ALPHA_BITS:
-		res1 = __fb_gl_params.color_alpha_bits;
+		res1 = fb_gl_params.color_alpha_bits;
 		break;
 
 	case GET_GL_DEPTH_BITS:
-		res1 = __fb_gl_params.depth_bits;
+		res1 = fb_gl_params.depth_bits;
 		break;
 
 	case GET_GL_STENCIL_BITS:
-		res1 = __fb_gl_params.stencil_bits;
+		res1 = fb_gl_params.stencil_bits;
 		break;
 
 	case GET_GL_ACCUM_BITS:
-		res1 = __fb_gl_params.accum_bits;
+		res1 = fb_gl_params.accum_bits;
 		break;
 
 	case GET_GL_ACCUM_RED_BITS:
-		res1 = __fb_gl_params.accum_red_bits;
+		res1 = fb_gl_params.accum_red_bits;
 		break;
 
 	case GET_GL_ACCUM_GREEN_BITS:
-		res1 = __fb_gl_params.accum_green_bits;
+		res1 = fb_gl_params.accum_green_bits;
 		break;
 
 	case GET_GL_ACCUM_BLUE_BITS:
-		res1 = __fb_gl_params.accum_blue_bits;
+		res1 = fb_gl_params.accum_blue_bits;
 		break;
 
 	case GET_GL_ACCUM_ALPHA_BITS:
-		res1 = __fb_gl_params.accum_alpha_bits;
+		res1 = fb_gl_params.accum_alpha_bits;
 		break;
 
 	case GET_GL_NUM_SAMPLES:
-		res1 = __fb_gl_params.num_samples;
+		res1 = fb_gl_params.num_samples;
 		break;
 
 	case GET_GL_2D_MODE:
 		/* return the active setting (not the initializing setting) */
-		res1 = __fb_gl_params.mode_2d;
+		res1 = fb_gl_params.mode_2d;
 		break;
 
 	case GET_GL_SCALE:
 		/* return the active setting (not the initializing setting) */
-		res1 = __fb_gl_params.scale;
+		res1 = fb_gl_params.scale;
 		break;
 
 	case SET_GL_COLOR_BITS:
-		__fb_gl_params.color_bits = *param1;
+		fb_gl_params.color_bits = *param1;
 		break;
 
 	case SET_GL_COLOR_RED_BITS:
-		__fb_gl_params.color_red_bits = *param1;
+		fb_gl_params.color_red_bits = *param1;
 		break;
 
 	case SET_GL_COLOR_GREEN_BITS:
-		__fb_gl_params.color_green_bits = *param1;
+		fb_gl_params.color_green_bits = *param1;
 		break;
 
 	case SET_GL_COLOR_BLUE_BITS:
-		__fb_gl_params.color_blue_bits = *param1;
+		fb_gl_params.color_blue_bits = *param1;
 		break;
 
 	case SET_GL_COLOR_ALPHA_BITS:
-		__fb_gl_params.color_alpha_bits = *param1;
+		fb_gl_params.color_alpha_bits = *param1;
 		break;
 
 	case SET_GL_DEPTH_BITS:
-		__fb_gl_params.depth_bits = *param1;
+		fb_gl_params.depth_bits = *param1;
 		break;
 
 	case SET_GL_STENCIL_BITS:
-		__fb_gl_params.stencil_bits = *param1;
+		fb_gl_params.stencil_bits = *param1;
 		break;
 
 	case SET_GL_ACCUM_BITS:
-		__fb_gl_params.accum_bits = *param1;
+		fb_gl_params.accum_bits = *param1;
 		break;
 
 	case SET_GL_ACCUM_RED_BITS:
-		__fb_gl_params.accum_red_bits = *param1;
+		fb_gl_params.accum_red_bits = *param1;
 		break;
 
 	case SET_GL_ACCUM_GREEN_BITS:
-		__fb_gl_params.accum_green_bits = *param1;
+		fb_gl_params.accum_green_bits = *param1;
 		break;
 
 	case SET_GL_ACCUM_BLUE_BITS:
-		__fb_gl_params.accum_blue_bits = *param1;
+		fb_gl_params.accum_blue_bits = *param1;
 		break;
 
 	case SET_GL_ACCUM_ALPHA_BITS:
-		__fb_gl_params.accum_alpha_bits = *param1;
+		fb_gl_params.accum_alpha_bits = *param1;
 		break;
 
 	case SET_GL_NUM_SAMPLES:
-		__fb_gl_params.num_samples = *param1;
+		fb_gl_params.num_samples = *param1;
 		break;
 
 	case SET_X86_MMX_ENABLED:
 #ifdef HOST_X86
-		if (__fb_gfx) {
+		if (fb_gfx) {
 			if (fb_CpuDetect() & 0x800000) {
 				if (*param1) {
-					__fb_gfx->flags |= X86_MMX_ENABLED;
+					fb_gfx->flags |= X86_MMX_ENABLED;
 				} else {
-					__fb_gfx->flags &= ~X86_MMX_ENABLED;
+					fb_gfx->flags &= ~X86_MMX_ENABLED;
 				}
 			} else {
-				__fb_gfx->flags &= ~X86_MMX_ENABLED;
+				fb_gfx->flags &= ~X86_MMX_ENABLED;
 			}
 		}
 #endif
@@ -398,20 +398,20 @@ FBCALL void fb_GfxControl_i( int what, ssize_t *param1, ssize_t *param2, ssize_t
 		/* set the initial 2d mode only; we don't want to
 		   change the active mode in use.  The activie mode
 		   only gets set in driver_init() */
-		__fb_gl_params.init_mode_2d = *param1;
+		fb_gl_params.init_mode_2d = *param1;
 		break;
 
 	case SET_GL_SCALE:
 		/* set the initial scale only; we don't want to
 		   change the active scale in use.  The activie scale
 		   only gets set in driver_init() */
-		__fb_gl_params.init_scale = *param1;
+		fb_gl_params.init_scale = *param1;
 		break;
 #endif
 
 	case POLL_EVENTS:
-		if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
-			__fb_gfx->driver->poll_events();
+		if ((fb_gfx) && (fb_gfx->driver->poll_events))
+			fb_gfx->driver->poll_events();
 		break;
 
 	}

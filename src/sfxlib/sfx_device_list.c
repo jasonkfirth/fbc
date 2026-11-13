@@ -58,7 +58,7 @@ int fb_sfxDeviceCount(void)
     int count = 0;
 
     fb_sfxRuntimeLock();
-    while (__fb_sfx_drivers_list[count])
+    while (fb_sfx_drivers_list[count])
         count++;
     fb_sfxRuntimeUnlock();
 
@@ -84,13 +84,13 @@ const char *fb_sfxDeviceName(int id)
         return NULL;
 
     fb_sfxRuntimeLock();
-    if (!__fb_sfx_drivers_list[id])
+    if (!fb_sfx_drivers_list[id])
     {
         fb_sfxRuntimeUnlock();
         return NULL;
     }
 
-    name = __fb_sfx_drivers_list[id]->name;
+    name = fb_sfx_drivers_list[id]->name;
     fb_sfxRuntimeUnlock();
 
     return name;
@@ -128,7 +128,7 @@ void fb_sfxDeviceList(void)
 
     for (i = 0; i < count; i++)
     {
-        const FB_SFX_DRIVER *drv = __fb_sfx_drivers_list[i];
+        const FB_SFX_DRIVER *drv = fb_sfx_drivers_list[i];
 
         if (!drv)
             continue;
@@ -157,9 +157,9 @@ int fb_sfxDeviceFind(const char *name)
         return -1;
 
     fb_sfxRuntimeLock();
-    for (i = 0; __fb_sfx_drivers_list[i]; i++)
+    for (i = 0; fb_sfx_drivers_list[i]; i++)
     {
-        const FB_SFX_DRIVER *drv = __fb_sfx_drivers_list[i];
+        const FB_SFX_DRIVER *drv = fb_sfx_drivers_list[i];
 
         if (!drv || !drv->name)
             continue;
@@ -191,7 +191,7 @@ void fb_sfxDeviceListInfo(int id)
     const FB_SFX_DRIVER *drv;
 
     fb_sfxRuntimeLock();
-    drv = __fb_sfx_drivers_list[id];
+    drv = fb_sfx_drivers_list[id];
 
     if (!drv)
     {

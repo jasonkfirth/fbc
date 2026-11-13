@@ -150,11 +150,11 @@ static int count_dirty_lines(void)
 {
 	int y, count = 0;
 
-	if (!__fb_gfx || !__fb_gfx->dirty)
+	if (!fb_gfx || !fb_gfx->dirty)
 		return 0;
 
-	for (y = 0; y < __fb_gfx->h; ++y) {
-		if (__fb_gfx->dirty[y])
+	for (y = 0; y < fb_gfx->h; ++y) {
+		if (fb_gfx->dirty[y])
 			++count;
 	}
 
@@ -187,8 +187,8 @@ static void choose_video_mode(int src_w, int src_h, int *out_w, int *out_h)
 
 static void get_viewport(int *scale, int *skip, int *out_w, int *out_h, int *off_x, int *off_y)
 {
-	int src_w = __fb_gfx->w;
-	int src_h = __fb_gfx->h;
+	int src_w = fb_gfx->w;
+	int src_h = fb_gfx->h;
 #ifndef GFXLIB_NEVERSCALE
 	int local_scale;
 	int local_skip;
@@ -249,15 +249,15 @@ static void driver_update_framebuffer(void)
 	int dirty_lines;
 	int x, y;
 
-	if (!__fb_gfx || !framebuffer || !blitter || !scan_buffer[0])
+	if (!fb_gfx || !framebuffer || !blitter || !scan_buffer[0])
 		return;
 
 	dirty_lines = count_dirty_lines();
 	if (dirty_lines == 0)
 		return;
 
-	src_w = __fb_gfx->w;
-	src_h = __fb_gfx->h;
+	src_w = fb_gfx->w;
+	src_h = fb_gfx->h;
 	src_pitch = src_w * (int)sizeof(uint32_t);
 
 	if (!ensure_scale_buffer((size_t)src_w * (size_t)src_h))
@@ -282,7 +282,7 @@ static void driver_update_framebuffer(void)
 				src_y = src_h - 1;
 		}
 
-		if (!__fb_gfx->dirty[src_y])
+		if (!fb_gfx->dirty[src_y])
 			continue;
 
 		src = scale_buffer + (src_y * src_w);
@@ -325,7 +325,7 @@ static void driver_update_framebuffer(void)
 	*/
 	wait_for_vblank_edge();
 	front_scan_buffer = back_scan_buffer;
-	fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h);
+	fb_hMemSet(fb_gfx->dirty, FALSE, fb_gfx->h);
 }
 
 static DWORD WINAPI presenter_thread_proc(LPVOID param)
@@ -569,7 +569,7 @@ static const GFXDRIVER fb_gfxDriverXbox =
 	NULL                     /* int (*resize)(int width, int height); */
 };
 
-const GFXDRIVER *__fb_gfx_drivers_list[] = {
+const GFXDRIVER *fb_gfx_drivers_list[] = {
 	&fb_gfxDriverXbox,
 	NULL
 };

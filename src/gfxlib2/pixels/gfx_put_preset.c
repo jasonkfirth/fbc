@@ -19,6 +19,9 @@ static void fb_hPutPResetC(unsigned char *src, unsigned char *dest, int w, int h
 {
 	int x;
 	FB_GFXCTX *context = fb_hGetContext();
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	
 	w <<= (context->target_bpp >> 1);
 	src_pitch -= w;
@@ -68,7 +71,7 @@ void fb_hPutPReset(unsigned char *src, unsigned char *dest, int w, int h, int sr
 		else
 #endif
 #ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
+		if (fb_gfx->flags & X86_MMX_ENABLED)
 			context->putter[PUT_MODE_PRESET] = mmx_putters;
 		else
 #endif

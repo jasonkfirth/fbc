@@ -8,13 +8,13 @@
 #include "../../fb.h"
 #include <math.h>
 
-typedef enum _eMaskType {
+typedef enum FB_MASK_TYPE {
 	eMT_Unknown = 0,
 	eMT_Number,
 	eMT_DateTime
 } eMaskType;
 
-typedef struct _FormatMaskInfo {
+typedef struct FB_FORMAT_MASK_INFO {
 	eMaskType mask_type;
 
 	int has_decimal_point;

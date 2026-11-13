@@ -22,9 +22,10 @@
         - FreeBASIC public API declarations
 */
 
-#ifndef __FB_GFX3_BACKEND_H__
-#define __FB_GFX3_BACKEND_H__
+#ifndef FB_GFX3_BACKEND_H
+#define FB_GFX3_BACKEND_H
 
+#include "../rtlib/fb_abi.h"
 #include "gfx3_command.h"
 
 #define FB_GFX3_BACKEND_ABI_VERSION 1u
@@ -110,6 +111,10 @@ typedef struct FB_GFX3_BACKEND_CONFIG {
 	uint32_t page_count;
 	uint32_t flags;
 	uint32_t reserved[6];
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing 8-byte-aligned size. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_BACKEND_CONFIG;
 
 typedef struct FB_GFX3_BACKEND {

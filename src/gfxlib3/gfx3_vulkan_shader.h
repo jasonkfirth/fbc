@@ -24,8 +24,8 @@
         1.0 with glslangValidator and optimized with spirv-opt.
 */
 
-#ifndef __FB_GFX3_VULKAN_SHADER_H__
-#define __FB_GFX3_VULKAN_SHADER_H__
+#ifndef FB_GFX3_VULKAN_SHADER_H
+#define FB_GFX3_VULKAN_SHADER_H
 
 static const uint32_t fb_gfx3_vulkan_compute_smoke_spirv[] = {
 	0x07230203u, 0x00010000u, 0x0008000Bu, 0x0000002Au, 0x00000000u, 0x00020011u, 0x00000001u, 0x0006000Bu,

@@ -261,17 +261,17 @@ int fb_sfxPlatformCaptureStart(void)
 
     requested_channels = FB_SFX_DEFAULT_CHANNELS;
     requested_rate = FB_SFX_DEFAULT_RATE;
-    if (__fb_sfx)
+    if (fb_sfx_context)
     {
-        if (__fb_sfx->capture.channels > 0)
-            requested_channels = (unsigned int)__fb_sfx->capture.channels;
-        else if (__fb_sfx->output_channels > 0)
-            requested_channels = (unsigned int)__fb_sfx->output_channels;
+        if (fb_sfx_context->capture.channels > 0)
+            requested_channels = (unsigned int)fb_sfx_context->capture.channels;
+        else if (fb_sfx_context->output_channels > 0)
+            requested_channels = (unsigned int)fb_sfx_context->output_channels;
 
-        if (__fb_sfx->capture.rate > 0)
-            requested_rate = (unsigned int)__fb_sfx->capture.rate;
-        else if (__fb_sfx->samplerate > 0)
-            requested_rate = (unsigned int)__fb_sfx->samplerate;
+        if (fb_sfx_context->capture.rate > 0)
+            requested_rate = (unsigned int)fb_sfx_context->capture.rate;
+        else if (fb_sfx_context->samplerate > 0)
+            requested_rate = (unsigned int)fb_sfx_context->samplerate;
     }
 
     device = openbsd_sndio_capture_device_name();
@@ -327,10 +327,10 @@ int fb_sfxPlatformCaptureStart(void)
     openbsd_sio_capture = hdl;
     openbsd_sndio_capture_channels = (int)par.rchan;
 
-    if (__fb_sfx)
+    if (fb_sfx_context)
     {
-        __fb_sfx->capture.rate = (int)par.rate;
-        __fb_sfx->capture.channels = (int)par.rchan;
+        fb_sfx_context->capture.rate = (int)par.rate;
+        fb_sfx_context->capture.channels = (int)par.rchan;
         fb_sfxCaptureBufferClear();
     }
 

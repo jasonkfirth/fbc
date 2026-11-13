@@ -22,8 +22,8 @@
         - public FreeBASIC declarations
 */
 
-#ifndef __FB_GFX3_TARGET_H__
-#define __FB_GFX3_TARGET_H__
+#ifndef FB_GFX3_TARGET_H
+#define FB_GFX3_TARGET_H
 
 #include "gfx3_backend.h"
 

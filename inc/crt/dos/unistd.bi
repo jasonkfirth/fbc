@@ -1,4 +1,8 @@
-''
+'' FreeBASIC DJGPP CRT bindings
+'' File: crt/dos/unistd.bi
+'' Purpose: Declare native descriptor and process interfaces.
+'' Responsibilities: Preserve DJGPP symbol names and argument widths.
+'' File-creation flags and error constants belong to their own headers.
 ''
 '' unistd -- header translated with help of SWIG FB wrapper
 ''
@@ -77,11 +81,11 @@ extern "c"
 
 declare sub __exit (byval _status as integer)
 declare sub _exit (byval _status as integer)
-declare function access_ (byval _path as zstring ptr, byval _amode as integer) as integer
+declare function access_ alias "access" (byval _path as zstring ptr, byval _amode as integer) as integer
 declare function alarm (byval _seconds as uinteger) as uinteger
 declare function chdir_ (byval _path as zstring ptr) as integer
 declare function chown (byval _path as zstring ptr, byval _owner as uid_t, byval _group as gid_t) as integer
-declare function close_ (byval _filedes as integer) as integer
+declare function close_ alias "close" (byval _filedes as integer) as integer
 declare function confstr (byval _name as integer, byval _buf as zstring ptr, byval _len as size_t) as size_t
 declare function ctermid (byval _s as zstring ptr) as zstring ptr
 declare function dup (byval _filedes as integer) as integer
@@ -113,8 +117,8 @@ declare function pathconf (byval _path as zstring ptr, byval _name as integer) a
 declare function pause () as integer
 declare function pipe (byval _filedes as integer ptr) as integer
 declare function pwrite (byval _filedes as integer, byval _buf as any ptr, byval _nbyte as size_t, byval _offset as off_t) as ssize_t
-declare function read_ (byval _filedes as integer, byval _buf as any ptr, byval _nbyte as size_t) as ssize_t
-declare function rmdir_ (byval _path as zstring ptr) as integer
+declare function read_ alias "read" (byval _filedes as integer, byval _buf as any ptr, byval _nbyte as size_t) as ssize_t
+declare function rmdir_ alias "rmdir" (byval _path as zstring ptr) as integer
 declare function setgid (byval _gid as gid_t) as integer
 declare function setpgid (byval _pid as pid_t, byval _pgid as pid_t) as integer
 declare function setsid () as pid_t
@@ -125,7 +129,7 @@ declare function tcgetpgrp (byval _filedes as integer) as pid_t
 declare function tcsetpgrp (byval _filedes as integer, byval _pgrp_id as pid_t) as integer
 declare function ttyname (byval _filedes as integer) as zstring ptr
 declare function unlink (byval _path as zstring ptr) as integer
-declare function write_ (byval _filedes as integer, byval _buf as any ptr, byval _nbyte as size_t) as ssize_t
+declare function write_ alias "write" (byval _filedes as integer, byval _buf as any ptr, byval _nbyte as size_t) as ssize_t
 
 #define D_OK	0x10
 
@@ -156,3 +160,5 @@ declare function vfork () as pid_t
 end extern
 
 #endif
+
+'' end of crt/dos/unistd.bi

@@ -64,13 +64,13 @@ int fb_sfxCaptureStart(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx->capture.enabled == FB_SFX_CAPTURE_RUNNING)
+    if (fb_sfx_context->capture.enabled == FB_SFX_CAPTURE_RUNNING)
     {
         fb_sfxRuntimeUnlock();
         return 0;
     }
 
-    driver = __fb_sfx->driver;
+    driver = fb_sfx_context->driver;
 
     /*
         The null driver is used by automated tests and headless package
@@ -81,7 +81,7 @@ int fb_sfxCaptureStart(void)
     */
     if (fb_sfxDriverIsNull(driver))
     {
-        __fb_sfx->capture.enabled = FB_SFX_CAPTURE_RUNNING;
+        fb_sfx_context->capture.enabled = FB_SFX_CAPTURE_RUNNING;
         fb_sfxRuntimeUnlock();
         return 0;
     }
@@ -97,8 +97,8 @@ int fb_sfxCaptureStart(void)
     }
 
     fb_sfxRuntimeLock();
-    if (__fb_sfx)
-        __fb_sfx->capture.enabled = FB_SFX_CAPTURE_RUNNING;
+    if (fb_sfx_context)
+        fb_sfx_context->capture.enabled = FB_SFX_CAPTURE_RUNNING;
     fb_sfxRuntimeUnlock();
 
     return 0;
@@ -117,10 +117,10 @@ int fb_sfxCaptureStart(void)
 
 int fb_sfxCaptureRunning(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
-    return (__fb_sfx->capture.enabled == FB_SFX_CAPTURE_RUNNING);
+    return (fb_sfx_context->capture.enabled == FB_SFX_CAPTURE_RUNNING);
 }
 
 

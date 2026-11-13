@@ -25,6 +25,7 @@
 		- page lifecycle, page switching, or presentation policy
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../gfx3_file_api.h"
 #include "../gfx3_gpu_surface.h"

@@ -9,7 +9,10 @@
 #include <windows.h>
 #include "fb_private_console.h"
 
-const unsigned char __fb_keytable[][3] = {
+/* Graphics backends use this runtime table to translate virtual keys. */
+extern const unsigned char fb_keytable[][3] FB_C_SYMBOL("__fb_keytable");
+
+const unsigned char fb_keytable[][3] FB_C_SYMBOL("__fb_keytable") = {
 	{ SC_ESCAPE,    VK_ESCAPE,  0           },  { SC_1,         '1',        0           },
 	{ SC_2,         '2',        0           },  { SC_3,         '3',        0           },
 	{ SC_4,         '4',        0           },  { SC_5,         '5',        0           },
@@ -61,9 +64,9 @@ int fb_hVirtualToScancode(int vkey)
 {
 	int i;
 
-	for (i = 0; __fb_keytable[i][0]; i++)
-		if ((__fb_keytable[i][2] == vkey) || (__fb_keytable[i][1] == vkey))
-			return __fb_keytable[i][0];
+	for (i = 0; fb_keytable[i][0]; i++)
+		if ((fb_keytable[i][2] == vkey) || (fb_keytable[i][1] == vkey))
+			return fb_keytable[i][0];
 	return 0;
 }
 
@@ -74,10 +77,10 @@ int fb_ConsoleMultikey( int scancode )
 	if(fb_ConsoleHasFocus()) {
 		int i;
 
-		for( i = 0; __fb_keytable[i][0]; i++ ) {
-			if( __fb_keytable[i][0] == scancode ) {
-				return ((GetAsyncKeyState(__fb_keytable[i][1])
-				| (__fb_keytable[i][2] ? GetAsyncKeyState(__fb_keytable[i][2]) : 0 ))
+		for( i = 0; fb_keytable[i][0]; i++ ) {
+			if( fb_keytable[i][0] == scancode ) {
+				return ((GetAsyncKeyState(fb_keytable[i][1])
+				| (fb_keytable[i][2] ? GetAsyncKeyState(fb_keytable[i][2]) : 0 ))
 				& 0x8000) ? FB_TRUE : FB_FALSE;
 			}
 		}

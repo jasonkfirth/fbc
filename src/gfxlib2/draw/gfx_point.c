@@ -17,7 +17,7 @@ FBCALL unsigned int fb_GfxPoint(void *target, float fx, float fy)
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return -1;
 	}
@@ -43,7 +43,7 @@ FBCALL unsigned int fb_GfxPoint(void *target, float fx, float fy)
 	color = context->get_pixel(context, x, y);
 	DRIVER_UNLOCK();
 
-	if (__fb_gfx->depth == 16)
+	if (fb_gfx->depth == 16)
 		/* approximate: for each component we also report high bits in lower bits of new value */
 		color = (((color & 0x001F) << 3) | ((color >> 2) & 0x7) |
 			 ((color & 0x07E0) << 5) | ((color >> 1) & 0x300) |

@@ -197,6 +197,7 @@ int fb_DevLptTestProtocol( FB_FILE *handle, const char *filename, size_t filenam
 {
 	DEV_LPT_PROTOCOL *lpt_proto = NULL;
 	int ret = fb_DevLptParseProtocol( &lpt_proto, filename, filename_len, FALSE );
+	(void)handle;
 	if( lpt_proto )
 		free( lpt_proto );
 	return ret;

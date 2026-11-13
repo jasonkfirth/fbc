@@ -6,8 +6,8 @@
  * This file intentionally does not contain driver implementations or policy.
  */
 
-#ifndef __FB_GFX_LINUX_H__
-#define __FB_GFX_LINUX_H__
+#ifndef FB_GFX_LINUX_H
+#define FB_GFX_LINUX_H
 
 #include "fb_wayland_display.h"
 

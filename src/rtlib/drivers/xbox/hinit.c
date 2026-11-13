@@ -55,11 +55,11 @@ typedef struct FB_XBOX_LOCK {
 	unsigned int recursion;
 } FB_XBOX_LOCK;
 
-static FB_XBOX_LOCK __fb_global_mutex;
-static FB_XBOX_LOCK __fb_string_mutex;
-static FB_XBOX_LOCK __fb_graphics_mutex;
-static FB_XBOX_LOCK __fb_math_mutex;
-static FB_XBOX_LOCK __fb_profile_mutex;
+static FB_XBOX_LOCK fb_global_mutex;
+static FB_XBOX_LOCK fb_string_mutex;
+static FB_XBOX_LOCK fb_graphics_mutex;
+static FB_XBOX_LOCK fb_math_mutex;
+static FB_XBOX_LOCK fb_profile_mutex;
 
 static void fb_XboxLockInit( FB_XBOX_LOCK *lock )
 {
@@ -112,16 +112,16 @@ static void fb_XboxLockLeave( FB_XBOX_LOCK *lock )
 	LeaveCriticalSection( &lock->section );
 }
 
-FBCALL void fb_Lock( void )      { fb_XboxLockEnter( &__fb_global_mutex ); }
-FBCALL void fb_Unlock( void )    { fb_XboxLockLeave( &__fb_global_mutex ); }
-FBCALL void fb_StrLock( void )   { fb_XboxLockEnter( &__fb_string_mutex ); }
-FBCALL void fb_StrUnlock( void ) { fb_XboxLockLeave( &__fb_string_mutex ); }
-FBCALL void fb_GraphicsLock  ( void ) { fb_XboxLockEnter( &__fb_graphics_mutex ); }
-FBCALL void fb_GraphicsUnlock( void ) { fb_XboxLockLeave( &__fb_graphics_mutex ); }
-FBCALL void fb_MathLock  ( void ) { fb_XboxLockEnter( &__fb_math_mutex ); }
-FBCALL void fb_MathUnlock( void ) { fb_XboxLockLeave( &__fb_math_mutex ); }
-FBCALL void fb_ProfileLock  ( void ) { fb_XboxLockEnter( &__fb_profile_mutex ); }
-FBCALL void fb_ProfileUnlock( void ) { fb_XboxLockLeave( &__fb_profile_mutex ); }
+FBCALL void fb_Lock( void )      { fb_XboxLockEnter( &fb_global_mutex ); }
+FBCALL void fb_Unlock( void )    { fb_XboxLockLeave( &fb_global_mutex ); }
+FBCALL void fb_StrLock( void )   { fb_XboxLockEnter( &fb_string_mutex ); }
+FBCALL void fb_StrUnlock( void ) { fb_XboxLockLeave( &fb_string_mutex ); }
+FBCALL void fb_GraphicsLock  ( void ) { fb_XboxLockEnter( &fb_graphics_mutex ); }
+FBCALL void fb_GraphicsUnlock( void ) { fb_XboxLockLeave( &fb_graphics_mutex ); }
+FBCALL void fb_MathLock  ( void ) { fb_XboxLockEnter( &fb_math_mutex ); }
+FBCALL void fb_MathUnlock( void ) { fb_XboxLockLeave( &fb_math_mutex ); }
+FBCALL void fb_ProfileLock  ( void ) { fb_XboxLockEnter( &fb_profile_mutex ); }
+FBCALL void fb_ProfileUnlock( void ) { fb_XboxLockLeave( &fb_profile_mutex ); }
 #endif
 
 void fb_hInit( void )
@@ -143,22 +143,22 @@ void fb_hInit( void )
 
 
 #ifdef ENABLE_MT
-	fb_XboxLockInit( &__fb_global_mutex );
-	fb_XboxLockInit( &__fb_string_mutex );
-	fb_XboxLockInit( &__fb_graphics_mutex );
-	fb_XboxLockInit( &__fb_math_mutex );
-	fb_XboxLockInit( &__fb_profile_mutex );
+	fb_XboxLockInit( &fb_global_mutex );
+	fb_XboxLockInit( &fb_string_mutex );
+	fb_XboxLockInit( &fb_graphics_mutex );
+	fb_XboxLockInit( &fb_math_mutex );
+	fb_XboxLockInit( &fb_profile_mutex );
 #endif
 }
 
 void fb_hEnd( int unused )
 {
 #ifdef ENABLE_MT
-	fb_XboxLockDelete( &__fb_global_mutex );
-	fb_XboxLockDelete( &__fb_string_mutex );
-	fb_XboxLockDelete( &__fb_graphics_mutex );
-	fb_XboxLockDelete( &__fb_math_mutex );
-	fb_XboxLockDelete( &__fb_profile_mutex );
+	fb_XboxLockDelete( &fb_global_mutex );
+	fb_XboxLockDelete( &fb_string_mutex );
+	fb_XboxLockDelete( &fb_graphics_mutex );
+	fb_XboxLockDelete( &fb_math_mutex );
+	fb_XboxLockDelete( &fb_profile_mutex );
 #endif
 }
 

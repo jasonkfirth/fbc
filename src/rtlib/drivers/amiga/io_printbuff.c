@@ -102,7 +102,7 @@ void fb_ConsolePrintBufferEx(const void *buffer, size_t length, int mask)
     if (buffer == NULL || length == 0)
         return;
 
-    if (__fb_con.inited == FALSE) {
+    if (fb_console_context.inited == FALSE) {
         fb_hAmigaWrite(buffer, length);
         return;
     }
@@ -111,15 +111,15 @@ void fb_ConsolePrintBufferEx(const void *buffer, size_t length, int mask)
     fb_hRecheckConsoleSize(TRUE);
     BG_UNLOCK();
 
-    available = (__fb_con.w * __fb_con.h) -
-        (((__fb_con.cur_y - 1) * __fb_con.w) + __fb_con.cur_x - 1);
+    available = (fb_console_context.w * fb_console_context.h) -
+        (((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1);
     copy_length = (available < length) ? available : length;
-    memcpy(__fb_con.char_buffer +
-        ((__fb_con.cur_y - 1) * __fb_con.w) + __fb_con.cur_x - 1,
+    memcpy(fb_console_context.char_buffer +
+        ((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1,
         buffer, copy_length);
-    memset(__fb_con.attr_buffer +
-        ((__fb_con.cur_y - 1) * __fb_con.w) + __fb_con.cur_x - 1,
-        __fb_con.fg_color | (__fb_con.bg_color << 4), copy_length);
+    memset(fb_console_context.attr_buffer +
+        ((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1,
+        fb_console_context.fg_color | (fb_console_context.bg_color << 4), copy_length);
 
     input = buffer;
     output_length = 0;
@@ -146,12 +146,12 @@ void fb_ConsolePrintBufferEx(const void *buffer, size_t length, int mask)
                 &output_length);
         }
 
-        ++__fb_con.cur_x;
-        if (character == '\n' || __fb_con.cur_x >= __fb_con.w) {
-            __fb_con.cur_x = 1;
-            ++__fb_con.cur_y;
-            if (__fb_con.cur_y > __fb_con.h)
-                __fb_con.cur_y = __fb_con.h;
+        ++fb_console_context.cur_x;
+        if (character == '\n' || fb_console_context.cur_x >= fb_console_context.w) {
+            fb_console_context.cur_x = 1;
+            ++fb_console_context.cur_y;
+            if (fb_console_context.cur_y > fb_console_context.h)
+                fb_console_context.cur_y = fb_console_context.h;
         }
 
         ++input;

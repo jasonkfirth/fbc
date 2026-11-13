@@ -99,7 +99,7 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
     fb_dos_detect();
 
     /* Remove this dumb "fake" scan line size */
-    h /= __fb_gfx->scanline_size;
+    h /= fb_gfx->scanline_size;
 
 	if (flags & DRIVER_OPENGL)
 		return -1;
@@ -139,7 +139,7 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 
     /* We only need a scanline_size of 1 because the doubling will be done
      * by the graphics card itself. */
-    __fb_gfx->scanline_size = 1;
+    fb_gfx->scanline_size = 1;
     refresh_rate = 70;
 
     fb_dos.bios_mode = depth_modes->modes[ iFoundRes ];
@@ -321,7 +321,7 @@ static void driver_update_planar_ega_vga( unsigned int planes )
     /* EGA/VGA planar mode */
     int y;
     unsigned w = fb_dos.w, w8 = w >> 3, w32 = w >> 5;
-    unsigned char *buffer = (unsigned char *)__fb_gfx->framebuffer;
+    unsigned char *buffer = (unsigned char *)fb_gfx->framebuffer;
     unsigned screen_offset = 0xA0000;
     static const unsigned char vga_bitmap[8] = {
         128, 64, 32, 16, 8, 4, 2, 1
@@ -337,7 +337,7 @@ static void driver_update_planar_ega_vga( unsigned int planes )
          y != fb_dos.h;
          ++y)
     {
-        if (__fb_gfx->dirty[y]) {
+        if (fb_gfx->dirty[y]) {
             unsigned x, uiDestIndex = 0;
             unsigned char *pFrameBuffer = buffer;
             unsigned plane;
@@ -377,7 +377,7 @@ static void driver_update_bpp1(void)
     if( fb_dos.bios_mode==0x06 ) {
         /* CGA interlaced mode */
         int y, w = fb_dos.w, w4 = w >> 2, w8 = w >> 3, w32 = w >> 5;
-        unsigned int *buffer = (unsigned int *)__fb_gfx->framebuffer;
+        unsigned int *buffer = (unsigned int *)fb_gfx->framebuffer;
         unsigned int screen_even = 0xB8000;
         unsigned int screen_odd  = 0xBA000;
 
@@ -386,7 +386,7 @@ static void driver_update_bpp1(void)
              ++y)
         {
             unsigned int *pScreenOffset = ( ((y & 1)==0) ? &screen_even : &screen_odd );
-            if (__fb_gfx->dirty[y]) {
+            if (fb_gfx->dirty[y]) {
                 unsigned dx = w8;
                 unsigned x = w4;
                 unsigned char uchDst = 0;
@@ -423,7 +423,7 @@ static void driver_update_bpp1(void)
     } else {
         /* EGA/VGA linear mode */
         int y, w = fb_dos.w, w4 = w >> 2, w8 = w >> 3, w32 = w >> 5;
-        unsigned int *buffer = (unsigned int *)__fb_gfx->framebuffer;
+        unsigned int *buffer = (unsigned int *)fb_gfx->framebuffer;
         unsigned int screen_offset = 0xA0000;
 
         init_planar_access();
@@ -433,7 +433,7 @@ static void driver_update_bpp1(void)
              y != fb_dos.h;
              ++y)
         {
-            if (__fb_gfx->dirty[y]) {
+            if (fb_gfx->dirty[y]) {
                 unsigned dx = w8;
                 unsigned x = w4;
                 unsigned char uchDst = 0;
@@ -473,7 +473,7 @@ static void driver_update_bpp1(void)
 static void driver_update_bpp2(void)
 {
 	int y, w = fb_dos.w, w4 = w >> 2, w16 = w >> 4;
-	unsigned int *buffer = (unsigned int *)__fb_gfx->framebuffer;
+	unsigned int *buffer = (unsigned int *)fb_gfx->framebuffer;
     unsigned int screen_even = 0xB8000;
     unsigned int screen_odd  = 0xBA000;
 
@@ -482,7 +482,7 @@ static void driver_update_bpp2(void)
          ++y)
     {
         unsigned int *pScreenOffset = ( ((y & 1)==0) ? &screen_even : &screen_odd );
-        if (__fb_gfx->dirty[y]) {
+        if (fb_gfx->dirty[y]) {
             unsigned x = w4;
             while( x-- ) {
                 unsigned value = buffer[x];

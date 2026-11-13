@@ -23,8 +23,8 @@
         - mouse or touch event state
 */
 
-#ifndef __FB_GFX3_PRESENTATION_H__
-#define __FB_GFX3_PRESENTATION_H__
+#ifndef FB_GFX3_PRESENTATION_H
+#define FB_GFX3_PRESENTATION_H
 
 #include "fb_gfx3.h"
 

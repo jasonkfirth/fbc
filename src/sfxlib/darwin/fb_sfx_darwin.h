@@ -1,9 +1,16 @@
 /*
+ * Project: FreeBASIC runtime libraries
+ * File: fb_sfx_darwin.h
+ * Purpose: Share the macOS sound backend interface.
+ * Responsibilities: Backend state and playback/capture lifecycle declarations.
+ * This file intentionally does NOT contain: Audio mixing or native device implementations.
+ */
+/*
     Shared declarations for the macOS backend layer.
 */
 
-#ifndef __FB_SFX_DARWIN_H__
-#define __FB_SFX_DARWIN_H__
+#ifndef FB_SFX_DARWIN_H
+#define FB_SFX_DARWIN_H
 
 #ifndef DISABLE_DARWIN
 

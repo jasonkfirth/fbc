@@ -10,7 +10,7 @@
 
 FBCALL void fb_ConsoleGetSize( int *cols, int *rows )
 {
-	if( !__fb_con.inited ) {
+	if( !fb_console_context.inited ) {
 		if( cols ) *cols = 80;
 		if( rows ) *rows = 24;
 		return;
@@ -20,8 +20,8 @@ FBCALL void fb_ConsoleGetSize( int *cols, int *rows )
 	fb_hRecheckConsoleSize( TRUE );
 	BG_UNLOCK( );
 
-	if( cols ) *cols = __fb_con.w;
-	if( rows ) *rows = __fb_con.h;
+	if( cols ) *cols = fb_console_context.w;
+	if( rows ) *rows = fb_console_context.h;
 }
 
 /* end of drivers/unix/io_getsize.c */

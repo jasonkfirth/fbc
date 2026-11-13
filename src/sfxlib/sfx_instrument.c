@@ -72,7 +72,7 @@ void fb_sfxInstrumentDefine(int id, int wave_id, int env_id)
     if (env_id < 0 || env_id >= FB_SFX_MAX_ENVELOPES)
         env_id = -1;
 
-    inst = &__fb_sfx->instruments[id];
+    inst = &fb_sfx_context->instruments[id];
 
     inst->wave_id = wave_id;
     inst->env_id  = env_id;
@@ -108,10 +108,10 @@ void fb_sfxInstrumentAssign(int channel, int instrument_id)
     if (instrument_id < 0 || instrument_id >= FB_SFX_MAX_INSTRUMENTS)
         return;
 
-    if (!__fb_sfx->instruments[instrument_id].defined)
+    if (!fb_sfx_context->instruments[instrument_id].defined)
         return;
 
-    __fb_sfx->channels[channel].instrument = instrument_id;
+    fb_sfx_context->channels[channel].instrument = instrument_id;
 
     SFX_DEBUG(
         "sfx_instrument: channel=%d instrument=%d",
@@ -143,31 +143,31 @@ void fb_sfxInstrumentApply(
     if (default_env >= 0)
         fb_sfxVoiceSetEnvelope(voice, default_env);
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         return;
 
-    instrument_id = __fb_sfx->channels[channel].instrument;
+    instrument_id = fb_sfx_context->channels[channel].instrument;
 
     if (instrument_id < 0 || instrument_id >= FB_SFX_MAX_INSTRUMENTS)
         return;
 
-    inst = &__fb_sfx->instruments[instrument_id];
+    inst = &fb_sfx_context->instruments[instrument_id];
 
     if (!inst->defined)
         return;
 
     if (inst->wave_id >= 0 && inst->wave_id < FB_SFX_MAX_WAVES)
     {
-        if (__fb_sfx->waves[inst->wave_id].defined)
-            fb_sfxVoiceSetWaveform(voice, __fb_sfx->waves[inst->wave_id].type);
+        if (fb_sfx_context->waves[inst->wave_id].defined)
+            fb_sfxVoiceSetWaveform(voice, fb_sfx_context->waves[inst->wave_id].type);
     }
 
     if (inst->env_id >= 0 && inst->env_id < FB_SFX_MAX_ENVELOPES)
     {
-        if (__fb_sfx->envelopes[inst->env_id].defined)
+        if (fb_sfx_context->envelopes[inst->env_id].defined)
             fb_sfxVoiceSetEnvelope(voice, inst->env_id);
     }
 }
@@ -179,13 +179,13 @@ void fb_sfxInstrumentApply(
 
 int fb_sfxInstrumentDefined(int id)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     if (id < 0 || id >= FB_SFX_MAX_INSTRUMENTS)
         return 0;
 
-    return __fb_sfx->instruments[id].defined;
+    return fb_sfx_context->instruments[id].defined;
 }
 
 
@@ -201,7 +201,7 @@ void fb_sfxInstrumentReset(void)
         return;
 
     for (i = 0; i < FB_SFX_MAX_INSTRUMENTS; i++)
-        __fb_sfx->instruments[i].defined = 0;
+        fb_sfx_context->instruments[i].defined = 0;
 
     SFX_DEBUG("sfx_instrument: instrument table reset");
 }

@@ -51,10 +51,10 @@ FBCALL void fb_hUpdateConsoleWindow( void )
     /* Whenever the console was set by the user, we MUST NOT query this
      * information again because this would cause a mess with SAA
      * applications otherwise. */
-    if (__fb_con.setByUser)
+    if (fb_console_context.setByUser)
         return;
 
-    hReadConsoleRect( &__fb_con.window, FALSE );
+    hReadConsoleRect( &fb_console_context.window, FALSE );
     hReadConsoleRect( &srRealConsoleWindow, TRUE );
 }
 
@@ -76,7 +76,7 @@ FBCALL void fb_hRestoreConsoleWindow( void )
     /* Whenever the console was set by the user, there's no need to
      * restore the original window console because we don't have to
      * mess around with scrollable windows */
-    if (__fb_con.setByUser)
+    if (fb_console_context.setByUser)
         return;
 
     fb_InitConsoleWindow( );
@@ -92,8 +92,8 @@ FBCALL void fb_hRestoreConsoleWindow( void )
     	int i;
     	for( i = 0; i < FB_CONSOLE_MAXPAGES; i++ )
     	{
-       		if( __fb_con.pgHandleTb[i] != NULL )
-        		SetConsoleWindowInfo( __fb_con.pgHandleTb[i], TRUE, &srRealConsoleWindow );
+		if( fb_console_context.pgHandleTb[i] != NULL )
+			SetConsoleWindowInfo( fb_console_context.pgHandleTb[i], TRUE, &srRealConsoleWindow );
         }
     }
 }
@@ -165,13 +165,13 @@ void fb_hConsoleGetWindow( int *left, int *top, int *cols, int *rows )
     else
     {
         if( left != NULL )
-            *left = __fb_con.window.Left;
+            *left = fb_console_context.window.Left;
         if( top != NULL )
-            *top = __fb_con.window.Top;
+            *top = fb_console_context.window.Top;
         if( cols != NULL )
-            *cols = __fb_con.window.Right - __fb_con.window.Left + 1;
+            *cols = fb_console_context.window.Right - fb_console_context.window.Left + 1;
         if( rows != NULL )
-            *rows = __fb_con.window.Bottom - __fb_con.window.Top + 1;
+            *rows = fb_console_context.window.Bottom - fb_console_context.window.Top + 1;
     }
 }
 

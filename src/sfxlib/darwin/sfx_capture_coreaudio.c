@@ -135,7 +135,7 @@ static void fb_sfxDarwinCaptureCallback(void *user_data,
     frames = (int)(buffer->mAudioDataByteSize / g_capture_format.mBytesPerFrame);
     if (g_capture_running && frames > 0)
     {
-        if (!__fb_sfx || __fb_sfx->capture.enabled != FB_SFX_CAPTURE_PAUSED)
+        if (!fb_sfx_context || fb_sfx_context->capture.enabled != FB_SFX_CAPTURE_PAUSED)
             fb_sfxCaptureWrite((const short *)buffer->mAudioData, frames);
     }
 
@@ -157,11 +157,11 @@ int fb_sfxPlatformCaptureStart(void)
     if (!fb_sfxDarwinHasInputDevice())
         return -1;
 
-    rate = (__fb_sfx && __fb_sfx->capture.rate > 0)
-        ? __fb_sfx->capture.rate
+    rate = (fb_sfx_context && fb_sfx_context->capture.rate > 0)
+        ? fb_sfx_context->capture.rate
         : FB_SFX_DEFAULT_RATE;
-    channels = (__fb_sfx && __fb_sfx->capture.channels > 0)
-        ? __fb_sfx->capture.channels
+    channels = (fb_sfx_context && fb_sfx_context->capture.channels > 0)
+        ? fb_sfx_context->capture.channels
         : FB_SFX_DEFAULT_CHANNELS;
 
     memset(&g_capture_format, 0, sizeof(g_capture_format));

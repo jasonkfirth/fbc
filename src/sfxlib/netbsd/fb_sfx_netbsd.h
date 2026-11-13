@@ -1,9 +1,16 @@
 /*
+ * Project: FreeBASIC runtime libraries
+ * File: fb_sfx_netbsd.h
+ * Purpose: Share the netbsd sound backend interface.
+ * Responsibilities: Backend state and playback lifecycle declarations.
+ * This file intentionally does NOT contain: Device I/O or audio mixing.
+ */
+/*
     Shared declarations for the NetBSD backend layer.
 */
 
-#ifndef __FB_SFX_NETBSD_H__
-#define __FB_SFX_NETBSD_H__
+#ifndef FB_SFX_NETBSD_H
+#define FB_SFX_NETBSD_H
 
 #include "../unix/fb_sfx_bsd.h"
 

@@ -25,6 +25,7 @@
         - image allocation or file codecs
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../../gfxlib2/gfx_paint_pattern.h"
 #include "../gfx3_backend_gles.h"
@@ -380,7 +381,7 @@ static int paint_gpu_compute_available(const FB_GFX3_SURFACE *surface,
 	if (fb_gfx3_size_multiply(width, height, &pixel_count) != FB_GFX3_OK)
 		return FALSE;
 	if (surface->context->renderer.backend_vtable ==
-	    &__fb_gfx3_backend_gles) {
+	    &fb_gfx3_backend_gles) {
 		/*
 			ES 3.0 has no compute or image-store primitive. Its exact frontier
 			shader needs one full texture pass per Manhattan-distance expansion.
@@ -401,14 +402,14 @@ static int paint_gpu_compute_available(const FB_GFX3_SURFACE *surface,
 	*/
 	if (paint_mode == FB_GFX3_PAINT_PATTERN)
 		return ((surface->context->renderer.backend_vtable ==
-			 &__fb_gfx3_backend_opengl) ||
+			 &fb_gfx3_backend_opengl) ||
 			(surface->context->renderer.backend_vtable ==
-			 &__fb_gfx3_backend_vulkan)) &&
+			 &fb_gfx3_backend_vulkan)) &&
 			pixel_count <= FB_GFX3_PAINT_GPU_MAX_PIXELS;
 	if ((surface->context->renderer.backend_vtable !=
-	     &__fb_gfx3_backend_opengl) &&
+	     &fb_gfx3_backend_opengl) &&
 	    (surface->context->renderer.backend_vtable !=
-	     &__fb_gfx3_backend_vulkan))
+	     &fb_gfx3_backend_vulkan))
 		return FALSE;
 	return pixel_count <= FB_GFX3_PAINT_GPU_MAX_PIXELS;
 }

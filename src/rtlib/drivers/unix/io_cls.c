@@ -12,7 +12,7 @@ void fb_ConsoleClear( int mode )
 {
 	int start, end, i;
 
-	if (!__fb_con.inited || mode==1)
+	if (!fb_console_context.inited || mode==1)
 		return;
 
 	BG_LOCK( );
@@ -24,19 +24,19 @@ void fb_ConsoleClear( int mode )
 		start = 1;
 		end = fb_ConsoleGetMaxRow();
 	}
-	if (start > __fb_con.h)
-		start = __fb_con.h;
-	if (end > __fb_con.h)
-		end = __fb_con.h;
+	if (start > fb_console_context.h)
+		start = fb_console_context.h;
+	if (end > fb_console_context.h)
+		end = fb_console_context.h;
 	for (i = start; i <= end; i++) {
-		memset(__fb_con.char_buffer + ((i - 1) * __fb_con.w), ' ', __fb_con.w);
-		memset(__fb_con.attr_buffer + ((i - 1) * __fb_con.w), __fb_con.fg_color | (__fb_con.bg_color << 4), __fb_con.w);
+		memset(fb_console_context.char_buffer + ((i - 1) * fb_console_context.w), ' ', fb_console_context.w);
+		memset(fb_console_context.attr_buffer + ((i - 1) * fb_console_context.w), fb_console_context.fg_color | (fb_console_context.bg_color << 4), fb_console_context.w);
 		fb_hTermOut(SEQ_LOCATE, 0, i-1);
 		fb_hTermOut(SEQ_CLEOL, 0, 0);
 	}
 	fb_hTermOut(SEQ_LOCATE, 0, start-1);
-	__fb_con.cur_y = start;
-	__fb_con.cur_x = 1;
+	fb_console_context.cur_y = start;
+	fb_console_context.cur_x = 1;
 }
 
 /* end of drivers/unix/io_cls.c */

@@ -733,10 +733,10 @@ const FB_SFX_DRIVER fb_sfxDriverCoreAudio =
     darwin_device_select
 };
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
     &fb_sfxDriverCoreAudio,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

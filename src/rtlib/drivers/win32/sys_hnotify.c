@@ -26,7 +26,7 @@ static int on_owner(FB_NOTIFY_WIN32 *context)
 int fb_hNotifyCreate(const char *app_name, void **output)
 {
 	FB_NOTIFY_WIN32 *context = calloc(1, sizeof(*context));
-	wchar_t path[MAX_PATH];
+	FB_WCHAR path[MAX_PATH];
 	UINT length;
 	FARPROC address;
 	if (context == NULL)

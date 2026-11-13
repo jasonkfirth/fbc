@@ -12,7 +12,7 @@ FBCALL void fb_ConsoleGetXY( int *col, int *row )
 {
 	int x, y;
 
-	if (__fb_con.inited) {
+	if (fb_console_context.inited) {
 		BG_LOCK();
 
 		/* We always want to requery the cursor position here, because
@@ -26,8 +26,8 @@ FBCALL void fb_ConsoleGetXY( int *col, int *row )
 		fb_hRecheckConsoleSize( FALSE );
 		fb_hRecheckCursorPos( );
 
-		x = __fb_con.cur_x;
-		y = __fb_con.cur_y;
+		x = fb_console_context.cur_x;
+		y = fb_console_context.cur_y;
 
 		BG_UNLOCK();
 	} else {

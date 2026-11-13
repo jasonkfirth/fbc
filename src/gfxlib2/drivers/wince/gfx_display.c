@@ -70,16 +70,16 @@ static void wince_source_rgb(const unsigned char *source, int x,
 {
     unsigned int pixel;
 
-    if (__fb_gfx->depth <= 8)
+    if (fb_gfx->depth <= 8)
     {
-        pixel = __fb_gfx->device_palette[source[x]];
+        pixel = fb_gfx->device_palette[source[x]];
         *red = (unsigned char)(pixel & 255U);
         *green = (unsigned char)((pixel >> 8) & 255U);
         *blue = (unsigned char)((pixel >> 16) & 255U);
         return;
     }
 
-    if (__fb_gfx->depth == 15)
+    if (fb_gfx->depth == 15)
     {
         pixel = ((const unsigned short *)source)[x];
         *red = (unsigned char)(((pixel >> 10) & 31U) * 255U / 31U);
@@ -88,7 +88,7 @@ static void wince_source_rgb(const unsigned char *source, int x,
         return;
     }
 
-    if (__fb_gfx->depth == 16)
+    if (fb_gfx->depth == 16)
     {
         pixel = ((const unsigned short *)source)[x];
         *red = (unsigned char)(((pixel >> 11) & 31U) * 255U / 31U);
@@ -97,7 +97,7 @@ static void wince_source_rgb(const unsigned char *source, int x,
         return;
     }
 
-    if (__fb_gfx->depth == 24)
+    if (fb_gfx->depth == 24)
     {
         source += (size_t)x * 3U;
         *blue = source[0];
@@ -128,8 +128,8 @@ static void wince_convert_framebuffer(void)
     */
     for (source_y = 0; source_y < fb_wince_gfx.height; ++source_y)
     {
-        source = __fb_gfx->framebuffer +
-            ((size_t)source_y * (size_t)__fb_gfx->pitch);
+        source = fb_gfx->framebuffer +
+            ((size_t)source_y * (size_t)fb_gfx->pitch);
         destination = fb_wince_gfx.present_buffer +
             ((size_t)(fb_wince_gfx.height - source_y - 1) *
              (size_t)fb_wince_gfx.width * 4U);
@@ -151,7 +151,7 @@ void fb_winceGfxPresentToDevice(HDC device)
     RECT client;
 
     if (device == NULL || fb_wince_gfx.present_buffer == NULL ||
-        __fb_gfx == NULL || __fb_gfx->framebuffer == NULL ||
+        fb_gfx == NULL || fb_gfx->framebuffer == NULL ||
         fb_wince_gfx.window == NULL)
     {
         return;
@@ -177,17 +177,17 @@ void fb_winceGfxPresent(void)
     int dirty;
 
     if (!fb_wince_gfx.active || fb_wince_gfx.window == NULL ||
-        __fb_gfx == NULL)
+        fb_gfx == NULL)
     {
         return;
     }
 
-    dirty = (__fb_gfx->dirty == NULL);
+    dirty = (fb_gfx->dirty == NULL);
     if (!dirty)
     {
         for (row = 0; row < fb_wince_gfx.height; ++row)
         {
-            if (__fb_gfx->dirty[row])
+            if (fb_gfx->dirty[row])
             {
                 dirty = TRUE;
                 break;
@@ -205,8 +205,8 @@ void fb_winceGfxPresent(void)
         ReleaseDC(fb_wince_gfx.window, device);
     }
 
-    if (__fb_gfx->dirty != NULL)
-        memset(__fb_gfx->dirty, FALSE, (size_t)fb_wince_gfx.height);
+    if (fb_gfx->dirty != NULL)
+        memset(fb_gfx->dirty, FALSE, (size_t)fb_wince_gfx.height);
 }
 
 int fb_winceGfxDisplayInit(const char *title, int width, int height,

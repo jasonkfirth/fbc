@@ -51,7 +51,7 @@ static int riscos_driver_init(char *title, int width, int height, int depth,
         return -1;
 
     fb_riscosGfxInputInit();
-    __fb_gfx->refresh_rate = (refresh_rate > 0) ? refresh_rate : 60;
+    fb_gfx->refresh_rate = (refresh_rate > 0) ? refresh_rate : 60;
 
     return 0;
 }

@@ -10,13 +10,13 @@
 
 int fb_ConsoleGetMaxRow( void )
 {
-	if( !__fb_con.inited )
+	if( !fb_console_context.inited )
 		return 24;
 
 	BG_LOCK( );
 	fb_hRecheckConsoleSize( TRUE );
 	BG_UNLOCK( );
-	return __fb_con.h;
+	return fb_console_context.h;
 }
 
 /* end of drivers/unix/io_maxrow.c */

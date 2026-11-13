@@ -233,10 +233,10 @@ static unsigned int nuttx_qemu_pixel_at(const unsigned char *data, int x, int y)
 {
     const unsigned char *row;
 
-    if ((x < 0) || (y < 0) || (x >= __fb_gfx->w) || (y >= __fb_gfx->h))
+    if ((x < 0) || (y < 0) || (x >= fb_gfx->w) || (y >= fb_gfx->h))
         return 0;
 
-    row = data + ((size_t)y * (size_t)__fb_gfx->pitch);
+    row = data + ((size_t)y * (size_t)fb_gfx->pitch);
     return (unsigned int)row[x];
 }
 
@@ -253,14 +253,14 @@ static void nuttx_qemu_trace_present(void)
     uint32_t checksum;
     const unsigned char *framebuffer;
 
-    if ((__fb_gfx == NULL) || (__fb_gfx->framebuffer == NULL))
+    if ((fb_gfx == NULL) || (fb_gfx->framebuffer == NULL))
         return;
 
-    if ((__fb_gfx->w <= 0) || (__fb_gfx->h <= 0) || (__fb_gfx->pitch <= 0))
+    if ((fb_gfx->w <= 0) || (fb_gfx->h <= 0) || (fb_gfx->pitch <= 0))
         return;
 
-    framebuffer = __fb_gfx->framebuffer;
-    bytes = (size_t)__fb_gfx->pitch * (size_t)__fb_gfx->h;
+    framebuffer = fb_gfx->framebuffer;
+    bytes = (size_t)fb_gfx->pitch * (size_t)fb_gfx->h;
     checksum = nuttx_qemu_checksum_framebuffer(framebuffer, bytes);
 
     if ((nuttx_qemu_present_count > 0) &&
@@ -272,15 +272,15 @@ static void nuttx_qemu_trace_present(void)
 
     printf("FB_NUTTX_QEMU_GFX_PRESENT frame=%u w=%d h=%d depth=%d pitch=%d bytes=%lu checksum=%08lx\n",
         nuttx_qemu_present_count,
-        __fb_gfx->w,
-        __fb_gfx->h,
-        __fb_gfx->depth,
-        __fb_gfx->pitch,
+        fb_gfx->w,
+        fb_gfx->h,
+        fb_gfx->depth,
+        fb_gfx->pitch,
         (unsigned long)bytes,
         (unsigned long)checksum);
 
-    min_x = __fb_gfx->w;
-    min_y = __fb_gfx->h;
+    min_x = fb_gfx->w;
+    min_y = fb_gfx->h;
     max_x = -1;
     max_y = -1;
     nonzero = 0;
@@ -289,12 +289,12 @@ static void nuttx_qemu_trace_present(void)
         The visual signature gives the QEMU lab a stronger graphics contract
         without dumping an entire 64 KB framebuffer into the serial log.
     */
-    for (y = 0; y < __fb_gfx->h; y++) {
+    for (y = 0; y < fb_gfx->h; y++) {
         const unsigned char *row;
 
-        row = framebuffer + ((size_t)y * (size_t)__fb_gfx->pitch);
+        row = framebuffer + ((size_t)y * (size_t)fb_gfx->pitch);
 
-        for (x = 0; x < __fb_gfx->w; x++) {
+        for (x = 0; x < fb_gfx->w; x++) {
             if (row[x] == 0)
                 continue;
 
@@ -331,7 +331,7 @@ static void nuttx_qemu_trace_present(void)
         nuttx_qemu_pixel_at(framebuffer, 2, 2),
         nuttx_qemu_pixel_at(framebuffer, 3, 3),
         nuttx_qemu_pixel_at(framebuffer, 10, 10),
-        nuttx_qemu_pixel_at(framebuffer, __fb_gfx->w / 2, __fb_gfx->h / 2));
+        nuttx_qemu_pixel_at(framebuffer, fb_gfx->w / 2, fb_gfx->h / 2));
     fflush(stdout);
 }
 #endif
@@ -375,8 +375,8 @@ static void driver_post_key(unsigned char ch)
     if ((key <= 0) || (key >= 128))
         return;
 
-    if (__fb_gfx->key != NULL)
-        __fb_gfx->key[key] = TRUE;
+    if (fb_gfx->key != NULL)
+        fb_gfx->key[key] = TRUE;
 
     fb_hPostKey(key);
 }
@@ -425,7 +425,7 @@ static void driver_poll_mouse_fd(void)
     ssize_t got;
     int reads_left;
 
-    if ((nuttx_mouse_fd < 0) || (__fb_gfx == NULL))
+    if ((nuttx_mouse_fd < 0) || (fb_gfx == NULL))
         return;
 
     pfd.fd = nuttx_mouse_fd;
@@ -444,8 +444,8 @@ static void driver_poll_mouse_fd(void)
 
         if (got == (ssize_t)sizeof(report)) {
             reads_left--;
-            nuttx_mouse_x = clamp_int((int)report.x, 0, __fb_gfx->w - 1);
-            nuttx_mouse_y = clamp_int((int)report.y, 0, __fb_gfx->h - 1);
+            nuttx_mouse_x = clamp_int((int)report.x, 0, fb_gfx->w - 1);
+            nuttx_mouse_y = clamp_int((int)report.y, 0, fb_gfx->h - 1);
             nuttx_mouse_z = (int)report.wheel;
             nuttx_mouse_buttons = (int)report.buttons;
             continue;
@@ -543,7 +543,7 @@ static void driver_lock(void)
 
 static void driver_unlock(void)
 {
-    if (!nuttx_active || (__fb_gfx == NULL)) {
+    if (!nuttx_active || (fb_gfx == NULL)) {
         fb_nuttx_dvi_framebuffer_unlock();
         return;
     }
@@ -553,9 +553,9 @@ static void driver_unlock(void)
         gfxlib's dirty markers after drawing while continuous scanout samples
         the current framebuffer contents.
     */
-    if (__fb_gfx->dirty)
-        fb_hMemSet(__fb_gfx->dirty, FALSE,
-            __fb_gfx->h * __fb_gfx->scanline_size);
+    if (fb_gfx->dirty)
+        fb_hMemSet(fb_gfx->dirty, FALSE,
+            fb_gfx->h * fb_gfx->scanline_size);
 
 #ifdef FB_NUTTX_QEMU_MOCK_DEVICES
     nuttx_qemu_trace_present();
@@ -599,7 +599,7 @@ static void driver_wait_vsync(void)
 
 static void driver_poll_events(void)
 {
-    if (!nuttx_active || (__fb_gfx == NULL))
+    if (!nuttx_active || (fb_gfx == NULL))
         return;
 
     /*
@@ -607,8 +607,8 @@ static void driver_poll_events(void)
         accepting serial console input.  That keeps QEMU smoke tests and
         recovery consoles usable until the harness can inject USB HID events.
     */
-    if (__fb_gfx->key != NULL)
-        fb_hMemSet(__fb_gfx->key, FALSE, 128);
+    if (fb_gfx->key != NULL)
+        fb_hMemSet(fb_gfx->key, FALSE, 128);
 
     if (nuttx_keyboard_fd >= 0)
         driver_poll_keyboard_fd(nuttx_keyboard_fd);
@@ -636,14 +636,14 @@ static void driver_set_mouse(int x, int y, int cursor, int clip)
 {
     (void)cursor;
 
-    if (!nuttx_active || (__fb_gfx == NULL))
+    if (!nuttx_active || (fb_gfx == NULL))
         return;
 
     if (x >= 0)
-        nuttx_mouse_x = clamp_int(x, 0, __fb_gfx->w - 1);
+        nuttx_mouse_x = clamp_int(x, 0, fb_gfx->w - 1);
 
     if (y >= 0)
-        nuttx_mouse_y = clamp_int(y, 0, __fb_gfx->h - 1);
+        nuttx_mouse_y = clamp_int(y, 0, fb_gfx->h - 1);
 
     if (clip >= 0)
         nuttx_mouse_clip = (clip != 0);
@@ -719,10 +719,10 @@ static const GFXDRIVER fb_gfxDriverNuttX =
     NULL
 };
 
-const GFXDRIVER *__fb_gfx_drivers_list[] =
+const GFXDRIVER *fb_gfx_drivers_list[] =
 {
     &fb_gfxDriverNuttX,
-    &__fb_gfxDriverNull,
+    &fb_gfxDriverNull,
     NULL
 };
 

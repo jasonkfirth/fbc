@@ -51,7 +51,7 @@
 #define FB_AmigaOS_CONSOLE_ROWS 25
 #define FB_AmigaOS_CSI "\233"
 
-FBCONSOLE __fb_con;
+FBCONSOLE fb_console_context;
 
 static pthread_t __fb_bg_thread;
 static pthread_mutex_t __fb_bg_mutex;
@@ -60,11 +60,11 @@ static int console_raw_mode = FALSE;
 static volatile int __fb_console_resized;
 
 #ifdef ENABLE_MT
-static pthread_mutex_t __fb_global_mutex;
-static pthread_mutex_t __fb_string_mutex;
-static pthread_mutex_t __fb_graphics_mutex;
-static pthread_mutex_t __fb_math_mutex;
-static pthread_mutex_t __fb_profile_mutex;
+static pthread_mutex_t fb_global_mutex;
+static pthread_mutex_t fb_string_mutex;
+static pthread_mutex_t fb_graphics_mutex;
+static pthread_mutex_t fb_math_mutex;
+static pthread_mutex_t fb_profile_mutex;
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -84,52 +84,52 @@ FBCALL void fb_BgUnlock(void)
 #ifdef ENABLE_MT
 FBCALL void fb_Lock(void)
 {
-    pthread_mutex_lock(&__fb_global_mutex);
+    pthread_mutex_lock(&fb_global_mutex);
 }
 
 FBCALL void fb_Unlock(void)
 {
-    pthread_mutex_unlock(&__fb_global_mutex);
+    pthread_mutex_unlock(&fb_global_mutex);
 }
 
 FBCALL void fb_StrLock(void)
 {
-    pthread_mutex_lock(&__fb_string_mutex);
+    pthread_mutex_lock(&fb_string_mutex);
 }
 
 FBCALL void fb_StrUnlock(void)
 {
-    pthread_mutex_unlock(&__fb_string_mutex);
+    pthread_mutex_unlock(&fb_string_mutex);
 }
 
 FBCALL void fb_GraphicsLock(void)
 {
-    pthread_mutex_lock(&__fb_graphics_mutex);
+    pthread_mutex_lock(&fb_graphics_mutex);
 }
 
 FBCALL void fb_GraphicsUnlock(void)
 {
-    pthread_mutex_unlock(&__fb_graphics_mutex);
+    pthread_mutex_unlock(&fb_graphics_mutex);
 }
 
 FBCALL void fb_MathLock(void)
 {
-    pthread_mutex_lock(&__fb_math_mutex);
+    pthread_mutex_lock(&fb_math_mutex);
 }
 
 FBCALL void fb_MathUnlock(void)
 {
-    pthread_mutex_unlock(&__fb_math_mutex);
+    pthread_mutex_unlock(&fb_math_mutex);
 }
 
 FBCALL void fb_ProfileLock(void)
 {
-    pthread_mutex_lock(&__fb_profile_mutex);
+    pthread_mutex_lock(&fb_profile_mutex);
 }
 
 FBCALL void fb_ProfileUnlock(void)
 {
-    pthread_mutex_unlock(&__fb_profile_mutex);
+    pthread_mutex_unlock(&fb_profile_mutex);
 }
 #endif
 
@@ -143,14 +143,14 @@ static void *bg_thread(void *unused)
 
     while (TRUE) {
         BG_LOCK();
-        if (__fb_con.inited == FALSE) {
+        if (fb_console_context.inited == FALSE) {
             BG_UNLOCK();
             break;
         }
-        if (__fb_con.keyboard_handler != NULL)
-            __fb_con.keyboard_handler();
-        if (__fb_con.mouse_handler != NULL)
-            __fb_con.mouse_handler();
+        if (fb_console_context.keyboard_handler != NULL)
+            fb_console_context.keyboard_handler();
+        if (fb_console_context.mouse_handler != NULL)
+            fb_console_context.mouse_handler();
         BG_UNLOCK();
         Delay(2);
     }
@@ -379,8 +379,8 @@ void fb_hRecheckCursorPos(void)
     if (query.unit != NULL && query.unit->cu_XCP >= 0 && query.unit->cu_YCP >= 0 &&
         query.unit->cu_XCP <= query.unit->cu_XMax &&
         query.unit->cu_YCP <= query.unit->cu_YMax) {
-        __fb_con.cur_x = (int)query.unit->cu_XCP + 1;
-        __fb_con.cur_y = (int)query.unit->cu_YCP + 1;
+        fb_console_context.cur_x = (int)query.unit->cu_XCP + 1;
+        fb_console_context.cur_y = (int)query.unit->cu_YCP + 1;
     }
     fb_hAmigaConsoleRelease(&query);
 }
@@ -395,10 +395,10 @@ void fb_hRecheckConsoleSize(int requery_cursorpos)
     int copy_rows;
     int row;
 
-    columns = (__fb_con.w > 0) ? __fb_con.w : FB_AmigaOS_CONSOLE_COLUMNS;
-    rows = (__fb_con.h > 0) ? __fb_con.h : FB_AmigaOS_CONSOLE_ROWS;
+    columns = (fb_console_context.w > 0) ? fb_console_context.w : FB_AmigaOS_CONSOLE_COLUMNS;
+    rows = (fb_console_context.h > 0) ? fb_console_context.h : FB_AmigaOS_CONSOLE_ROWS;
     fb_hAmigaConsoleSize(&columns, &rows);
-    if (columns != __fb_con.w || rows != __fb_con.h)
+    if (columns != fb_console_context.w || rows != fb_console_context.h)
         __fb_console_resized = TRUE;
     if (__fb_console_resized == FALSE)
         return;
@@ -408,31 +408,31 @@ void fb_hRecheckConsoleSize(int requery_cursorpos)
         return;
     attr_buffer = char_buffer + ((size_t)columns * (size_t)rows);
 
-    if (__fb_con.char_buffer != NULL) {
-        copy_columns = (__fb_con.w < columns) ? __fb_con.w : columns;
-        copy_rows = (__fb_con.h < rows) ? __fb_con.h : rows;
+    if (fb_console_context.char_buffer != NULL) {
+        copy_columns = (fb_console_context.w < columns) ? fb_console_context.w : columns;
+        copy_rows = (fb_console_context.h < rows) ? fb_console_context.h : rows;
         for (row = 0; row < copy_rows; ++row) {
             memcpy(char_buffer + (row * columns),
-                __fb_con.char_buffer + (row * __fb_con.w),
+                fb_console_context.char_buffer + (row * fb_console_context.w),
                 (size_t)copy_columns);
             memcpy(attr_buffer + (row * columns),
-                __fb_con.attr_buffer + (row * __fb_con.w),
+                fb_console_context.attr_buffer + (row * fb_console_context.w),
                 (size_t)copy_columns);
         }
-        free(__fb_con.char_buffer);
+        free(fb_console_context.char_buffer);
     }
 
-    __fb_con.char_buffer = char_buffer;
-    __fb_con.attr_buffer = attr_buffer;
-    __fb_con.w = columns;
-    __fb_con.h = rows;
+    fb_console_context.char_buffer = char_buffer;
+    fb_console_context.attr_buffer = attr_buffer;
+    fb_console_context.w = columns;
+    fb_console_context.h = rows;
 
     /* A resized window may leave cached coordinates outside the new cell
        buffer. Keep subsequent PRINT copies inside the successful allocation. */
-    if (__fb_con.cur_x < 1) __fb_con.cur_x = 1;
-    if (__fb_con.cur_y < 1) __fb_con.cur_y = 1;
-    if (__fb_con.cur_x > columns) __fb_con.cur_x = columns;
-    if (__fb_con.cur_y > rows) __fb_con.cur_y = rows;
+    if (fb_console_context.cur_x < 1) fb_console_context.cur_x = 1;
+    if (fb_console_context.cur_y < 1) fb_console_context.cur_y = 1;
+    if (fb_console_context.cur_x > columns) fb_console_context.cur_x = columns;
+    if (fb_console_context.cur_y > rows) fb_console_context.cur_y = rows;
 
     if (requery_cursorpos != FALSE)
         fb_hRecheckCursorPos();
@@ -446,7 +446,7 @@ int fb_hTermOut(int code, int param1, int param2)
     int pen;
     BPTR output;
 
-    if (__fb_con.inited == FALSE)
+    if (fb_console_context.inited == FALSE)
         return FALSE;
 
     switch (code) {
@@ -476,12 +476,12 @@ int fb_hTermOut(int code, int param1, int param2)
         length = snprintf(sequence, sizeof(sequence), "\a");
         break;
     case SEQ_FG_COLOR:
-        pen = fb_hAmigaConsolePen(__fb_con.fg_color);
+        pen = fb_hAmigaConsolePen(fb_console_context.fg_color);
         length = snprintf(sequence, sizeof(sequence),
             FB_AmigaOS_CSI "%dm", 30 + ((pen >= 0) ? pen : param2));
         break;
     case SEQ_BG_COLOR:
-        pen = fb_hAmigaConsolePen(__fb_con.bg_color);
+        pen = fb_hAmigaConsolePen(fb_console_context.bg_color);
         length = snprintf(sequence, sizeof(sequence),
             FB_AmigaOS_CSI "%dm", 40 + ((pen >= 0) ? pen : param2));
         break;
@@ -530,7 +530,7 @@ int fb_hInitConsole(void)
     BPTR input;
     BPTR output;
 
-    if (__fb_con.inited == FALSE)
+    if (fb_console_context.inited == FALSE)
         return -1;
 
     input = Input();
@@ -548,10 +548,10 @@ int fb_hInitConsole(void)
         console_raw_mode = (SetMode(input, 1) == DOSTRUE);
 
     BG_LOCK();
-    if (__fb_con.keyboard_init != NULL)
-        __fb_con.keyboard_init();
-    if (__fb_con.mouse_init != NULL)
-        __fb_con.mouse_init();
+    if (fb_console_context.keyboard_init != NULL)
+        fb_console_context.keyboard_init();
+    if (fb_console_context.mouse_init != NULL)
+        fb_console_context.mouse_init();
     BG_UNLOCK();
 
     /* Native CON: starts black on grey; BASIC's logical defaults are grey
@@ -559,10 +559,10 @@ int fb_hInitConsole(void)
     {
         static const unsigned char ansi[8] = { 0, 4, 2, 6, 1, 5, 3, 7 };
         fb_hTermOut(SEQ_RESET_COLOR, 0, 0);
-        if (__fb_con.fg_color & 8U)
+        if (fb_console_context.fg_color & 8U)
             fb_hTermOut(SEQ_BRIGHT_COLOR, 0, 0);
-        fb_hTermOut(SEQ_FG_COLOR, 0, ansi[__fb_con.fg_color & 7U]);
-        fb_hTermOut(SEQ_BG_COLOR, 0, ansi[__fb_con.bg_color & 7U]);
+        fb_hTermOut(SEQ_FG_COLOR, 0, ansi[fb_console_context.fg_color & 7U]);
+        fb_hTermOut(SEQ_BG_COLOR, 0, ansi[fb_console_context.bg_color & 7U]);
     }
     return 0;
 }
@@ -572,17 +572,17 @@ void fb_hExitConsole(void)
     BPTR input;
     BPTR output;
 
-    if (__fb_con.inited == FALSE)
+    if (fb_console_context.inited == FALSE)
         return;
 
-    if (__fb_con.gfx_exit != NULL)
-        __fb_con.gfx_exit();
+    if (fb_console_context.gfx_exit != NULL)
+        fb_console_context.gfx_exit();
 
     BG_LOCK();
-    if (__fb_con.keyboard_exit != NULL)
-        __fb_con.keyboard_exit();
-    if (__fb_con.mouse_exit != NULL)
-        __fb_con.mouse_exit();
+    if (fb_console_context.keyboard_exit != NULL)
+        fb_console_context.keyboard_exit();
+    if (fb_console_context.mouse_exit != NULL)
+        fb_console_context.mouse_exit();
     BG_UNLOCK();
 
     /*
@@ -613,33 +613,33 @@ void fb_hInit(void)
     pthread_mutexattr_settype(&attributes, PTHREAD_MUTEX_RECURSIVE);
 
 #ifdef ENABLE_MT
-    pthread_mutex_init(&__fb_global_mutex, &attributes);
-    pthread_mutex_init(&__fb_string_mutex, &attributes);
-    pthread_mutex_init(&__fb_graphics_mutex, &attributes);
-    pthread_mutex_init(&__fb_math_mutex, &attributes);
-    pthread_mutex_init(&__fb_profile_mutex, &attributes);
+    pthread_mutex_init(&fb_global_mutex, &attributes);
+    pthread_mutex_init(&fb_string_mutex, &attributes);
+    pthread_mutex_init(&fb_graphics_mutex, &attributes);
+    pthread_mutex_init(&fb_math_mutex, &attributes);
+    pthread_mutex_init(&fb_profile_mutex, &attributes);
 #endif
     pthread_mutex_init(&__fb_bg_mutex, &attributes);
     pthread_mutexattr_destroy(&attributes);
 
-    memset(&__fb_con, 0, sizeof(__fb_con));
-    __fb_con.inited = INIT_CONSOLE;
-    __fb_con.term_type = TERM_GENERIC;
-    __fb_con.keyboard_getch = default_getch;
-    __fb_con.fg_color = 7;
-    __fb_con.bg_color = 0;
-    __fb_con.cur_x = 1;
-    __fb_con.cur_y = 1;
+    memset(&fb_console_context, 0, sizeof(fb_console_context));
+    fb_console_context.inited = INIT_CONSOLE;
+    fb_console_context.term_type = TERM_GENERIC;
+    fb_console_context.keyboard_getch = default_getch;
+    fb_console_context.fg_color = 7;
+    fb_console_context.bg_color = 0;
+    fb_console_context.cur_x = 1;
+    fb_console_context.cur_y = 1;
     __fb_console_resized = TRUE;
 
     if (fb_hInitConsole() != 0)
-        __fb_con.inited = FALSE;
+        fb_console_context.inited = FALSE;
 }
 
 void fb_hAmigaStopBgThread(void)
 {
     BG_LOCK();
-    __fb_con.inited = FALSE;
+    fb_console_context.inited = FALSE;
     BG_UNLOCK();
 
     if (bgthread_inited != FALSE) {
@@ -655,18 +655,18 @@ void fb_hEnd(int unused)
     fb_hAmigaStopBgThread();
     pthread_mutex_destroy(&__fb_bg_mutex);
 
-    if (__fb_con.char_buffer != NULL) {
-        free(__fb_con.char_buffer);
-        __fb_con.char_buffer = NULL;
-        __fb_con.attr_buffer = NULL;
+    if (fb_console_context.char_buffer != NULL) {
+        free(fb_console_context.char_buffer);
+        fb_console_context.char_buffer = NULL;
+        fb_console_context.attr_buffer = NULL;
     }
 
 #ifdef ENABLE_MT
-    pthread_mutex_destroy(&__fb_global_mutex);
-    pthread_mutex_destroy(&__fb_string_mutex);
-    pthread_mutex_destroy(&__fb_graphics_mutex);
-    pthread_mutex_destroy(&__fb_math_mutex);
-    pthread_mutex_destroy(&__fb_profile_mutex);
+    pthread_mutex_destroy(&fb_global_mutex);
+    pthread_mutex_destroy(&fb_string_mutex);
+    pthread_mutex_destroy(&fb_graphics_mutex);
+    pthread_mutex_destroy(&fb_math_mutex);
+    pthread_mutex_destroy(&fb_profile_mutex);
 #endif
 }
 

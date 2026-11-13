@@ -166,11 +166,14 @@ int fb_hOut( unsigned short port, unsigned char value )
 
 int fb_hIn( unsigned short port )
 {
+	(void)port;
 	return -fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 }
 
 int fb_hOut( unsigned short port, unsigned char value )
 {
+	(void)port;
+	(void)value;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 }
 

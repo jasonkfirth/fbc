@@ -56,8 +56,8 @@ static int aros_workerCanMix(void)
     int ready;
 
     fb_sfxRuntimeLock();
-    ready = (__fb_sfx != NULL) && __fb_sfx->initialized &&
-        !__fb_sfx->shutting_down;
+    ready = (fb_sfx_context != NULL) && fb_sfx_context->initialized &&
+        !fb_sfx_context->shutting_down;
     fb_sfxRuntimeUnlock();
     return ready;
 }

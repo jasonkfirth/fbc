@@ -397,8 +397,8 @@ int fb_sfxPlatformCaptureRead(float *buffer, int frames)
         if (frames_to_copy > (UINT32)(frames - produced))
             frames_to_copy = (UINT32)(frames - produced);
 
-        out_channels = (__fb_sfx && __fb_sfx->capture.channels > 0)
-            ? __fb_sfx->capture.channels
+        out_channels = (fb_sfx_context && fb_sfx_context->capture.channels > 0)
+            ? fb_sfx_context->capture.channels
             : FB_SFX_DEFAULT_CHANNELS;
 
         if (flags & AUDCLNT_BUFFERFLAGS_SILENT)

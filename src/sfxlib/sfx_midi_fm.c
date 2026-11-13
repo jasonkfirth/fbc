@@ -530,10 +530,10 @@ static float fb_sfxMidiFmNoise(FB_SFX_MIDI_FM_VOICE *voice)
 
 static int fb_sfxMidiFmSampleRate(void)
 {
-    if (!__fb_sfx || __fb_sfx->samplerate <= 0)
+    if (!fb_sfx_context || fb_sfx_context->samplerate <= 0)
         return FB_SFX_DEFAULT_RATE;
 
-    return __fb_sfx->samplerate;
+    return fb_sfx_context->samplerate;
 }
 
 static void fb_sfxMidiFmUpdateIncrements(FB_SFX_MIDI_FM_VOICE *voice)
@@ -1330,7 +1330,7 @@ static void fb_sfxMidiFmControlChange(int channel, int controller, int value)
 
 int fb_sfxMidiSoftwareOpen(void)
 {
-    if (!__fb_sfx || __fb_sfx->samplerate <= 0)
+    if (!fb_sfx_context || fb_sfx_context->samplerate <= 0)
         return -1;
 
     if (fb_sfxMidiFmValidateTimbres() != 0)
@@ -1546,8 +1546,8 @@ void fb_sfxMidiSoftwareMixBlock(float *buffer, int frames)
         return;
     }
 
-    master_volume = (__fb_sfx) ? __fb_sfx->master_volume : 1.0f;
-    balance = (__fb_sfx) ? __fb_sfx->balance : 0.0f;
+    master_volume = (fb_sfx_context) ? fb_sfx_context->master_volume : 1.0f;
+    balance = (fb_sfx_context) ? fb_sfx_context->balance : 0.0f;
     use_simd = fb_sfxMidiFmUseSimd();
 
     for (block_start = 0; block_start < frames;

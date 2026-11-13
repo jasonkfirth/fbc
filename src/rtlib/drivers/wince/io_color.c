@@ -27,11 +27,11 @@ unsigned int fb_ConsoleColor( unsigned int foreground,
 {
 	unsigned int previous;
 
-	previous = __fb_con.foreground | (__fb_con.background << 16);
+	previous = fb_console_context.foreground | (fb_console_context.background << 16);
 	if( !(flags & FB_COLOR_FG_DEFAULT) )
-		__fb_con.foreground = foreground & 0x0Fu;
+		fb_console_context.foreground = foreground & 0x0Fu;
 	if( !(flags & FB_COLOR_BG_DEFAULT) )
-		__fb_con.background = background & 0x0Fu;
+		fb_console_context.background = background & 0x0Fu;
 
 	return previous;
 }
@@ -39,7 +39,7 @@ unsigned int fb_ConsoleColor( unsigned int foreground,
 unsigned int fb_ConsoleGetColorAttEx( HANDLE console )
 {
 	(void)console;
-	return __fb_con.foreground | (__fb_con.background << 4);
+	return fb_console_context.foreground | (fb_console_context.background << 4);
 }
 
 unsigned int fb_ConsoleGetColorAtt( void )

@@ -9,15 +9,6 @@
 
 #if defined(HOST_WIN32) || defined(HOST_LINUX) || defined(HOST_ANDROID) || defined(HOST_DARWIN)
 
-void fb_gfx3_vk_buffer_allocation_destroy_immediate(
-	FB_GFX3_VULKAN_IMPLEMENTATION *implementation,
-	FB_GFX3_VULKAN_BUFFER_ALLOCATION *allocation);
-int fb_gfx3_vk_submission_slot_wait(
-	FB_GFX3_VULKAN_IMPLEMENTATION *implementation,
-	FB_GFX3_VULKAN_SUBMISSION_SLOT *slot);
-int fb_gfx3_vk_batch_flush_commands(
-	FB_GFX3_VULKAN_IMPLEMENTATION *implementation);
-
 /* ------------------------------------------------------------------------- */
 /* Command recording and submission ownership                               */
 /* ------------------------------------------------------------------------- */

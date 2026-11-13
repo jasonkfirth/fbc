@@ -72,6 +72,7 @@ int fb_DevScrnReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 
 static int hReadFromStdin( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 {
+	(void)handle;
 	return fb_DevFileReadWstr( NULL, dst, pchars );
 }
 

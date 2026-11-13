@@ -14,7 +14,7 @@
 int fb_FileRename( const char *oldname, const char *newname )
 {
 #if defined(HOST_MINGW) && !defined(HOST_WINCE)
-	wchar_t *oldpath, *newpath;
+	FB_WCHAR *oldpath, *newpath;
 	int result;
 	if( fb_hWin32IsWin9x() ) return rename(oldname, newname);
 	oldpath = fb_hConvertPathToWC(oldname, NULL);

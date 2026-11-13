@@ -487,18 +487,18 @@ static void riscos_window_copy_dirty_lines(void)
     const unsigned char *source;
     int y;
 
-    if (__fb_gfx == NULL || __fb_gfx->framebuffer == NULL ||
+    if (fb_gfx == NULL || fb_gfx->framebuffer == NULL ||
         fb_riscos_gfx.sprite_pixels == NULL)
     {
         return;
     }
 
-    source = __fb_gfx->framebuffer;
+    source = fb_gfx->framebuffer;
     for (y = 0; y < fb_riscos_gfx.viewport_height; ++y)
     {
-        if (__fb_gfx->dirty != NULL && !__fb_gfx->dirty[y])
+        if (fb_gfx->dirty != NULL && !fb_gfx->dirty[y])
         {
-            source += __fb_gfx->pitch;
+            source += fb_gfx->pitch;
             continue;
         }
 
@@ -525,9 +525,9 @@ static void riscos_window_copy_dirty_lines(void)
                 fb_riscos_gfx.viewport_width);
         }
 
-        if (__fb_gfx->dirty != NULL)
-            __fb_gfx->dirty[y] = FALSE;
-        source += __fb_gfx->pitch;
+        if (fb_gfx->dirty != NULL)
+            fb_gfx->dirty[y] = FALSE;
+        source += fb_gfx->pitch;
     }
 }
 

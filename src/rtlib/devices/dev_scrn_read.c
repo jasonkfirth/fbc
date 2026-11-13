@@ -64,6 +64,7 @@ int fb_DevScrnRead( FB_FILE *handle, void* value, size_t *pLength )
 
 static int hReadFromStdin( FB_FILE *handle, void* dst, size_t *pLength )
 {
+	(void)handle;
     return fb_DevFileRead( NULL, dst, pLength );
 }
 

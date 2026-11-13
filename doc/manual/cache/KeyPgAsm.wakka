@@ -25,6 +25,8 @@ Code block that allows the use of architecture-specific instructions.
 			The syntax of the inline assembler is a simplified form of Intel syntax.  Intel syntax is used by the majority of x86 assemblers, such as MASM, TASM, NASM, YASM and FASM. In general, the destination of an instruction is placed first, followed by the source. Variables and functions defined by a program may be referenced in an ##**Asm**## block.  The assembler used by ""FreeBASIC"" is GAS, using the ##.intel_syntax noprefix## directive, and ##**Asm**## blocks are passed through unmodified, except for the substitution of local variable names for stack frame references, and commenting removal.
 			
 			Instruction syntax is mostly the same as FASM uses, one important difference is that GAS requires size settings to be followed by the word "##ptr##".
+
+			With ##-gen gcc## or ##-gen clang##, Intel assembly uses native memory operands for automatic variables and address operands for private static variables. Assembly-visible scalar parameters retain one source storage location for the entire call, including references through an address taken before the assembly block. Reading a ##Single## or ##Double## parameter's raw bits does not first evaluate it as a floating-point value. Native compiler operand limits still apply; a read/write memory operand counts twice toward GCC's limit.
 			
 			%%(freebasic)
 ' Assuming "n" is a FB global or local ULONG variable

@@ -1,0 +1,107 @@
+--- a/src/dos/dos_devices.cpp
++++ b/src/dos/dos_devices.cpp
+@@ -35,6 +35,7 @@
+ unsigned int BeepDuration();
+
+ #include "dev_con.h"
++#include "dev_xlrng.h"
+ #include <fstream>
+
+ #if (!defined(WIN32) && defined(C_SDL2)) || defined(MACOSX)
+@@ -1001,6 +1002,9 @@
+	DOS_Device * newdev2;
+	newdev2=new device_NUL();
+	DOS_AddDevice(newdev2);
++#if defined(WIN32)
++	DOS_AddDevice(new device_XLRNG());
++#endif
+ #if !defined(OSFREE)
+	DOS_Device * newdev3;
+	newdev3=new device_PRN();
+--- a/src/output/output_tools.cpp
++++ b/src/output/output_tools.cpp
+@@ -244,7 +244,7 @@
+ #ifdef C_OPENGL
+         mainMenu.get_item("load_glsl_shader").enable(sdl.desktop.want_type==SCREEN_OPENGL&&initgl==2).refresh_item(mainMenu);
+ #endif
+-#ifdef C_DIRECT3D
++#if C_DIRECT3D
+         mainMenu.get_item("load_d3d_shader").enable(sdl.desktop.want_type==SCREEN_DIRECT3D).refresh_item(mainMenu);
+ #endif
+ #ifdef USE_TTF
+--- a/src/gui/sdlmain.cpp
++++ b/src/gui/sdlmain.cpp
+@@ -10056,7 +10056,7 @@
+ #ifdef C_OPENGL
+         mainMenu.get_item("load_glsl_shader").enable(OpenGL_using()&&initgl==2);
+ #endif
+-#ifdef C_DIRECT3D
++#if C_DIRECT3D
+         mainMenu.get_item("load_d3d_shader").enable(Direct3D_using());
+ #endif
+ #ifdef USE_TTF
+--- /dev/null
++++ b/src/dos/dev_xlrng.h
+@@ -0,0 +1,62 @@
++/*
++ * Project: FreeBASIC DOS host support
++ * File: dev_xlrng.h
++ * Purpose: Expose the version-one checked host randomness device in DOSBox-X.
++ * Responsibilities: Bounded CNG reads and the XLRNG001 capability response.
++ * Runtime validation and application credential storage live in their owners.
++ */
++#ifndef FBC_DOSBOX_XLRNG_H
++#define FBC_DOSBOX_XLRNG_H
++#if defined(WIN32)
++#include <windows.h>
++#include <bcrypt.h>
++
++/* DOSBox serializes guest device calls on its emulation thread. Each read
++ * asks Windows for fresh system randomness and retains no generator state.
++ * The 4096-byte limit is part of the runtime's version-one IOCTL contract.
++ */
++class device_XLRNG : public DOS_Device {
++public:
++	device_XLRNG() { SetName("XLRNG$"); }
++	bool Read(uint8_t *data, uint16_t *size) override {
++		if (size == nullptr) return false;
++		const uint16_t requested = *size;
++		*size = 0;
++		if (data == nullptr || requested == 0 || requested > 4096) return false;
++		if (BCryptGenRandom(nullptr, data, requested,
++			BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0) {
++			SecureZeroMemory(data, requested);
++			return false;
++		}
++		*size = requested;
++		return true;
++	}
++	bool Write(const uint8_t *, uint16_t *size) override {
++		if (size != nullptr) *size = 0;
++		return false;
++	}
++	bool Seek(uint32_t *, uint32_t) override { return false; }
++	bool Close() override { return true; }
++	/* DOS bit 7 identifies a character device. Bit 14 permits control reads. */
++	uint16_t GetInformation() override { return 0x4080; }
++	bool ReadFromControlChannel(PhysPt destination, uint16_t size,
++		uint16_t *returned) override {
++		static const uint8_t capability[16] = {
++			'X', 'L', 'R', 'N', 'G', '0', '0', '1', 0, 16, 1, 0, 0, 0, 0, 0
++		};
++		if (returned == nullptr) return false;
++		*returned = 0;
++		if (size != sizeof(capability)) return false;
++		for (uint16_t index = 0; index < sizeof(capability); index++)
++			mem_writeb(destination + index, capability[index]);
++		*returned = sizeof(capability);
++		return true;
++	}
++	bool WriteToControlChannel(PhysPt, uint16_t, uint16_t *returned) override {
++		if (returned != nullptr) *returned = 0;
++		return false;
++	}
++};
++#endif
++#endif
++/* end of dev_xlrng.h */

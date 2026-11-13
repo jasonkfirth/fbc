@@ -32,7 +32,7 @@
 #include "../../fb_private_thread.h"
 
 FB_RTLIB_CTX fb_ctx;
-static int __fb_is_inicnt = 0;
+static int fb_runtime_init_count = 0;
 static char *fb_wince_argv0 = NULL;
 
 /* ------------------------------------------------------------------------- */
@@ -41,8 +41,8 @@ static char *fb_wince_argv0 = NULL;
 
 void fb_hRtInit(void)
 {
-    ++__fb_is_inicnt;
-    if (__fb_is_inicnt != 1)
+    ++fb_runtime_init_count;
+    if (fb_runtime_init_count != 1)
         return;
 
     memset(&fb_ctx, 0, sizeof(FB_RTLIB_CTX));
@@ -56,8 +56,8 @@ void fb_hRtInit(void)
 
 void fb_hRtExit(void)
 {
-    --__fb_is_inicnt;
-    if (__fb_is_inicnt != 0)
+    --fb_runtime_init_count;
+    if (fb_runtime_init_count != 0)
         return;
 
     fb_FileReset();

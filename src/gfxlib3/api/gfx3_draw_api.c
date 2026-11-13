@@ -23,6 +23,7 @@
         - string glyph rendering
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../gfx3_gpu_surface.h"
 #include "../gfx3_image.h"
@@ -35,9 +36,6 @@ enum {
 	FB_GFX3_DRAW_PAINT_FILL = 0
 };
 
-FBCALL void fb_GfxPaint(void *target, float x, float y,
-	unsigned int color, unsigned int border_color, FBSTRING_ACCESS *pattern,
-	int paint_mode, int flags);
 
 /* ------------------------------------------------------------------------- */
 /* Parser helpers                                                            */

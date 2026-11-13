@@ -23,6 +23,7 @@
         - CPU FB.IMAGE storage and transfer implementation
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_backend_null.h"
 #include "../gfx3_backend_opengl.h"
 #include "../gfx3_backend_select.h"
@@ -387,7 +388,7 @@ static int api_screen_res(int width, int height, int depth, int page_count,
 		config.backend = backend_plan[backend_index];
 		config.flags = (uint32_t)backend_attempt_flags[backend_index];
 		config.idle_poll_milliseconds =
-			(config.backend == &__fb_gfx3_backend_null) ? 0u : 10u;
+			(config.backend == &fb_gfx3_backend_null) ? 0u : 10u;
 		result = fb_gfx3_mode_init(&active_mode, &config,
 			(depth == 32) ? 0xFF000000u : 0u);
 		if (result == FB_GFX3_OK)

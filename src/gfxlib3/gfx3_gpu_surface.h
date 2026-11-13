@@ -22,8 +22,8 @@
 		- backend-specific GPU objects
 */
 
-#ifndef __FB_GFX3_GPU_SURFACE_H__
-#define __FB_GFX3_GPU_SURFACE_H__
+#ifndef FB_GFX3_GPU_SURFACE_H
+#define FB_GFX3_GPU_SURFACE_H
 
 #include "gfx3_compat.h"
 

@@ -40,8 +40,8 @@
         BASIC capture commands
 */
 
-#ifndef __FB_SFX_CAPTURE_H__
-#define __FB_SFX_CAPTURE_H__
+#ifndef FB_SFX_CAPTURE_H
+#define FB_SFX_CAPTURE_H
 
 #include "fb_sfx.h"
 

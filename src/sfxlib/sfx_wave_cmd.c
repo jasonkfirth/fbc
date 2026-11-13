@@ -72,7 +72,7 @@ void fb_sfxWaveCmd(int id, int waveform_type)
     if (waveform_type > FB_SFX_WAVE_NOISE)
         waveform_type = FB_SFX_WAVE_NOISE;
 
-    wave = &__fb_sfx->waves[id];
+    wave = &fb_sfx_context->waves[id];
 
     wave->type = waveform_type;
     wave->defined = 1;
@@ -91,13 +91,13 @@ void fb_sfxWaveCmd(int id, int waveform_type)
 
 int fb_sfxWaveDefined(int id)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     if (id < 0 || id >= FB_SFX_MAX_WAVES)
         return 0;
 
-    return __fb_sfx->waves[id].defined;
+    return fb_sfx_context->waves[id].defined;
 }
 
 
@@ -113,7 +113,7 @@ void fb_sfxWaveCmdReset(void)
         return;
 
     for (i = 0; i < FB_SFX_MAX_WAVES; i++)
-        __fb_sfx->waves[i].defined = 0;
+        fb_sfx_context->waves[i].defined = 0;
 
     SFX_DEBUG("sfx_wave_cmd: waveform table reset");
 }

@@ -9,6 +9,7 @@
 
 int fb_DevScrnWriteWstr( FB_FILE *handle, const FB_WCHAR* value, size_t valuelen )
 {
+	(void)handle;
 	fb_PrintBufferWstrEx( value, valuelen, 0 );
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }

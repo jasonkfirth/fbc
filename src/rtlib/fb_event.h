@@ -5,6 +5,9 @@
  * File: fb_event.h
  * This file intentionally does NOT contain: unrelated runtime subsystems.
  */
+
+/* SCREENEVENT is a byte-packed public payload, including aggregate alignment. */
+#pragma pack(push, 1)
 struct FB_EVENT_ {
 	int type;
 	union {
@@ -26,7 +29,8 @@ struct FB_EVENT_ {
 		int z;
 		int w;
 	};
-} FBPACKED;
+};
+#pragma pack(pop)
 
 typedef struct FB_EVENT_ EVENT;
 

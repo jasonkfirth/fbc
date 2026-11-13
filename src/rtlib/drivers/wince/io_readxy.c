@@ -26,7 +26,7 @@ FBCALL unsigned int fb_ConsoleReadXY( int column, int row, int color_flag )
 {
 	FB_WINCE_CONSOLE_CELL *cell;
 
-	cell = fb_hWinCEConsoleCell( __fb_con.active, column - 1, row - 1 );
+	cell = fb_hWinCEConsoleCell( fb_console_context.active, column - 1, row - 1 );
 	if( cell == NULL )
 		return 0;
 

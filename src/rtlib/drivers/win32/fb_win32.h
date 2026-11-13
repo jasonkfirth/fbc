@@ -32,8 +32,9 @@
 
 /* These defines let us use the same code for all platforms while still mapping
    to the proper win32 functions. Of those, we prefer to use the non-oldnames
-   versions, which is also why we #define NO_OLDNAMES and _NO_OLDNAMES.
-   However, this sort of re-defining should only be used for functions that
+   versions, which is why all MinGW targets define NO_OLDNAMES and other
+   MinGW targets also define _NO_OLDNAMES. However, these mappings should
+   only be used for functions that
    are used more than once, for the others #ifdef should do */
 /*
    MinGW-w64 provides ISO C99 snprintf through its runtime support library.

@@ -38,6 +38,7 @@ int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 	    int res = fb_ErrorSetNum( FB_RTERROR_OK );
 	    FILE *fp = NULL;
 	    const char *openmask = NULL;
+	    (void)filename_len;
 
     FB_LOCK();
 

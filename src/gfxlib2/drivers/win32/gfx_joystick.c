@@ -6,7 +6,7 @@
 
 #define CALCPOS(pos, min, max)	(((((float)(pos) - (float)(min)) * 2.0) / ((float)(max) - (float)(min) + 1.0)) - 1.0)
 
-typedef struct _JOYDATA {
+typedef struct FB_JOYDATA {
 	int detected, available;
 	JOYCAPS caps;
 } JOYDATA;

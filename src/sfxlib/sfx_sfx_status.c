@@ -66,7 +66,7 @@ int fb_sfxSfxStatus(int id)
     int playing = 0;
     int paused  = 0;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_SFX_STOPPED;
 
     if (id < 0 || id >= FB_SFX_MAX_SFX)
@@ -74,16 +74,16 @@ int fb_sfxSfxStatus(int id)
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (!__fb_sfx->voices[i].active)
+        if (!fb_sfx_context->voices[i].active)
             continue;
 
-        if (__fb_sfx->voices[i].type != FB_SFX_VOICE_SFX)
+        if (fb_sfx_context->voices[i].type != FB_SFX_VOICE_SFX)
             continue;
 
-        if (__fb_sfx->voices[i].sfx_id != id)
+        if (fb_sfx_context->voices[i].sfx_id != id)
             continue;
 
-        if (__fb_sfx->voices[i].paused)
+        if (fb_sfx_context->voices[i].paused)
             paused = 1;
         else
             playing = 1;
@@ -109,7 +109,7 @@ int fb_sfxSfxStatusChannel(int channel)
     int playing = 0;
     int paused  = 0;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_SFX_STOPPED;
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
@@ -117,16 +117,16 @@ int fb_sfxSfxStatusChannel(int channel)
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (!__fb_sfx->voices[i].active)
+        if (!fb_sfx_context->voices[i].active)
             continue;
 
-        if (__fb_sfx->voices[i].type != FB_SFX_VOICE_SFX)
+        if (fb_sfx_context->voices[i].type != FB_SFX_VOICE_SFX)
             continue;
 
-        if (__fb_sfx->voices[i].channel != channel)
+        if (fb_sfx_context->voices[i].channel != channel)
             continue;
 
-        if (__fb_sfx->voices[i].paused)
+        if (fb_sfx_context->voices[i].paused)
             paused = 1;
         else
             playing = 1;
@@ -150,13 +150,13 @@ int fb_sfxSfxAnyActive(void)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (__fb_sfx->voices[i].active &&
-            __fb_sfx->voices[i].type == FB_SFX_VOICE_SFX)
+        if (fb_sfx_context->voices[i].active &&
+            fb_sfx_context->voices[i].type == FB_SFX_VOICE_SFX)
             return 1;
     }
 

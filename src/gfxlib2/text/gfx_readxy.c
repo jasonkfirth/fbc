@@ -17,23 +17,23 @@ unsigned int fb_GfxReadXY( int col, int row, int colorflag )
 
 	FB_GRAPHICS_LOCK( );
 
-	if( __fb_gfx == NULL ||
-	    col < 1 || col > __fb_gfx->text_w ||
-	    row < 1 || row > __fb_gfx->text_h ) {
+	if( fb_gfx == NULL ||
+	    col < 1 || col > fb_gfx->text_w ||
+	    row < 1 || row > fb_gfx->text_h ) {
 		FB_GRAPHICS_UNLOCK( );
 		return 0;
 	}
 
 	context = fb_hGetContext( );
-	cell = __fb_gfx->con_pages[context->work_page] +
-		((row - 1) * __fb_gfx->text_w) + (col - 1);
+	cell = fb_gfx->con_pages[context->work_page] +
+		((row - 1) * fb_gfx->text_w) + (col - 1);
 	if( colorflag == 0 ) {
 		result = cell->ch;
-	} else if( __fb_gfx->depth <= 4 ) {
+	} else if( fb_gfx->depth <= 4 ) {
 		result = cell->fg + (cell->bg << 4);
-	} else if( __fb_gfx->depth <= 8 ) {
+	} else if( fb_gfx->depth <= 8 ) {
 		result = cell->fg + (cell->bg << 8);
-	} else if( __fb_gfx->depth == 16 ) {
+	} else if( fb_gfx->depth == 16 ) {
 		unsigned c = colorflag == 2 ? cell->bg : cell->fg;
 		result = (((c & 0x001F) << 3) | ((c >> 2) & 0x7) |
 			  ((c & 0x07E0) << 5) | ((c >> 1) & 0x300) |

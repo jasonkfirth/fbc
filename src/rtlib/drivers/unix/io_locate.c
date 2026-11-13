@@ -13,7 +13,7 @@ int fb_ConsoleLocate( int row, int col, int cursor )
 	int x, y;
 	static int visible = 0x10000;
 
-	if (!__fb_con.inited)
+	if (!fb_console_context.inited)
 		return 0;
 
 	if ((row <= 0) || (col <= 0))
@@ -28,14 +28,14 @@ int fb_ConsoleLocate( int row, int col, int cursor )
 
 	fb_hRecheckConsoleSize( TRUE );
 
-	if (x <= __fb_con.w)
-		__fb_con.cur_x = x;
+	if (x <= fb_console_context.w)
+		fb_console_context.cur_x = x;
 	else
-		__fb_con.cur_x = __fb_con.w;
-	if (y <= __fb_con.h)
-		__fb_con.cur_y = y;
+		fb_console_context.cur_x = fb_console_context.w;
+	if (y <= fb_console_context.h)
+		fb_console_context.cur_y = y;
 	else
-		__fb_con.cur_y = __fb_con.h;
+		fb_console_context.cur_y = fb_console_context.h;
 	fb_hTermOut(SEQ_LOCATE, x-1, y-1);
 	if (cursor == 0) {
 		fb_hTermOut(SEQ_HIDE_CURSOR, 0, 0);

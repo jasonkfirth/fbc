@@ -52,8 +52,8 @@ static void hFillCells( FB_WINCE_CONSOLE_CELL *cells, size_t count )
 	size_t index;
 	unsigned char attribute;
 
-	attribute = (unsigned char)(__fb_con.foreground |
-	                            (__fb_con.background << 4));
+	attribute = (unsigned char)(fb_console_context.foreground |
+	                            (fb_console_context.background << 4));
 	for( index = 0; index < count; ++index ) {
 		cells[index].character = (FB_WCHAR)' ';
 		cells[index].attribute = attribute;
@@ -67,29 +67,29 @@ int fb_hWinCEConsoleEnsurePage( int page )
 	if( (page < 0) || (page >= FB_CONSOLE_MAXPAGES) )
 		return FALSE;
 
-	if( __fb_con.pages[page].cells != NULL )
+	if( fb_console_context.pages[page].cells != NULL )
 		return TRUE;
 
-	count = hCellCount( __fb_con.columns, __fb_con.rows );
+	count = hCellCount( fb_console_context.columns, fb_console_context.rows );
 	if( count == 0 )
 		return FALSE;
 
-	__fb_con.pages[page].cells =
+	fb_console_context.pages[page].cells =
 		malloc( count * sizeof(FB_WINCE_CONSOLE_CELL) );
-	if( __fb_con.pages[page].cells == NULL )
+	if( fb_console_context.pages[page].cells == NULL )
 		return FALSE;
 
-	hFillCells( __fb_con.pages[page].cells, count );
+	hFillCells( fb_console_context.pages[page].cells, count );
 	return TRUE;
 }
 
 int fb_hWinCEConsoleInitialize( void )
 {
-	__fb_con.columns = FB_SCRN_DEFAULT_WIDTH;
-	__fb_con.rows = FB_SCRN_DEFAULT_HEIGHT;
-	__fb_con.cursor_visible = TRUE;
-	__fb_con.foreground = FB_COLOR_WHITE;
-	__fb_con.background = FB_COLOR_BLACK;
+	fb_console_context.columns = FB_SCRN_DEFAULT_WIDTH;
+	fb_console_context.rows = FB_SCRN_DEFAULT_HEIGHT;
+	fb_console_context.cursor_visible = TRUE;
+	fb_console_context.foreground = FB_COLOR_WHITE;
+	fb_console_context.background = FB_COLOR_BLACK;
 
 	return fb_hWinCEConsoleEnsurePage( 0 );
 }
@@ -99,8 +99,8 @@ void fb_hWinCEConsoleShutdown( void )
 	int page;
 
 	for( page = 0; page < FB_CONSOLE_MAXPAGES; ++page ) {
-		free( __fb_con.pages[page].cells );
-		__fb_con.pages[page].cells = NULL;
+		free( fb_console_context.pages[page].cells );
+		fb_console_context.pages[page].cells = NULL;
 	}
 }
 
@@ -117,11 +117,11 @@ int fb_hWinCEConsoleResize( int columns, int rows )
 	if( count == 0 )
 		return FALSE;
 
-	copy_columns = (columns < __fb_con.columns) ? columns : __fb_con.columns;
-	copy_rows = (rows < __fb_con.rows) ? rows : __fb_con.rows;
+	copy_columns = (columns < fb_console_context.columns) ? columns : fb_console_context.columns;
+	copy_rows = (rows < fb_console_context.rows) ? rows : fb_console_context.rows;
 
 	for( page = 0; page < FB_CONSOLE_MAXPAGES; ++page ) {
-		if( __fb_con.pages[page].cells == NULL )
+		if( fb_console_context.pages[page].cells == NULL )
 			continue;
 
 		replacement[page] =
@@ -132,8 +132,8 @@ int fb_hWinCEConsoleResize( int columns, int rows )
 		hFillCells( replacement[page], count );
 		for( row = 0; row < copy_rows; ++row ) {
 			memcpy( replacement[page] + ((size_t)row * columns),
-			        __fb_con.pages[page].cells +
-			            ((size_t)row * __fb_con.columns),
+			        fb_console_context.pages[page].cells +
+			            ((size_t)row * fb_console_context.columns),
 			        (size_t)copy_columns * sizeof(FB_WINCE_CONSOLE_CELL) );
 		}
 	}
@@ -142,16 +142,16 @@ int fb_hWinCEConsoleResize( int columns, int rows )
 		if( replacement[page] == NULL )
 			continue;
 
-		free( __fb_con.pages[page].cells );
-		__fb_con.pages[page].cells = replacement[page];
+		free( fb_console_context.pages[page].cells );
+		fb_console_context.pages[page].cells = replacement[page];
 	}
 
-	__fb_con.columns = columns;
-	__fb_con.rows = rows;
-	if( __fb_con.cursor_x >= columns )
-		__fb_con.cursor_x = columns - 1;
-	if( __fb_con.cursor_y >= rows )
-		__fb_con.cursor_y = rows - 1;
+	fb_console_context.columns = columns;
+	fb_console_context.rows = rows;
+	if( fb_console_context.cursor_x >= columns )
+		fb_console_context.cursor_x = columns - 1;
+	if( fb_console_context.cursor_y >= rows )
+		fb_console_context.cursor_y = rows - 1;
 
 	return TRUE;
 
@@ -171,12 +171,12 @@ FB_WINCE_CONSOLE_CELL *fb_hWinCEConsoleCell( int page, int column, int row )
 	if( !fb_hWinCEConsoleEnsurePage( page ) )
 		return NULL;
 
-	if( (column < 0) || (column >= __fb_con.columns) ||
-	    (row < 0) || (row >= __fb_con.rows) )
+	if( (column < 0) || (column >= fb_console_context.columns) ||
+	    (row < 0) || (row >= fb_console_context.rows) )
 		return NULL;
 
-	return __fb_con.pages[page].cells +
-	       ((size_t)row * __fb_con.columns) + column;
+	return fb_console_context.pages[page].cells +
+	       ((size_t)row * fb_console_context.columns) + column;
 }
 
 static int hClipRegion( int *left, int *top, int *right, int *bottom )
@@ -185,10 +185,10 @@ static int hClipRegion( int *left, int *top, int *right, int *bottom )
 		*left = 0;
 	if( *top < 0 )
 		*top = 0;
-	if( *right >= __fb_con.columns )
-		*right = __fb_con.columns - 1;
-	if( *bottom >= __fb_con.rows )
-		*bottom = __fb_con.rows - 1;
+	if( *right >= fb_console_context.columns )
+		*right = fb_console_context.columns - 1;
+	if( *bottom >= fb_console_context.rows )
+		*bottom = fb_console_context.rows - 1;
 
 	return (*left <= *right) && (*top <= *bottom);
 }
@@ -204,8 +204,8 @@ void fb_hWinCEConsoleClearRegion( int page, int left, int top, int right,
 	if( !hClipRegion( &left, &top, &right, &bottom ) )
 		return;
 
-	attribute = (unsigned char)(__fb_con.foreground |
-	                            (__fb_con.background << 4));
+	attribute = (unsigned char)(fb_console_context.foreground |
+	                            (fb_console_context.background << 4));
 	for( row = top; row <= bottom; ++row ) {
 		for( column = left; column <= right; ++column ) {
 			cell = fb_hWinCEConsoleCell( page, column, row );
@@ -234,12 +234,12 @@ void fb_hWinCEConsoleScrollRegion( int page, int left, int top, int right,
 		return;
 	}
 
-	cells = __fb_con.pages[page].cells;
+	cells = fb_console_context.pages[page].cells;
 	line_bytes = (size_t)(right - left + 1) *
 	             sizeof(FB_WINCE_CONSOLE_CELL);
 	for( row = top; row <= (bottom - rows); ++row ) {
-		memmove( cells + ((size_t)row * __fb_con.columns) + left,
-		         cells + ((size_t)(row + rows) * __fb_con.columns) + left,
+		memmove( cells + ((size_t)row * fb_console_context.columns) + left,
+		         cells + ((size_t)(row + rows) * fb_console_context.columns) + left,
 		         line_bytes );
 	}
 
@@ -260,18 +260,18 @@ static void hCheckCursor( void )
 	bottom = fb_ConsoleGetBotRow();
 	if( top < 0 )
 		top = 0;
-	if( bottom >= __fb_con.rows )
-		bottom = __fb_con.rows - 1;
+	if( bottom >= fb_console_context.rows )
+		bottom = fb_console_context.rows - 1;
 
-	if( __fb_con.cursor_x >= __fb_con.columns ) {
-		__fb_con.cursor_x = 0;
-		++__fb_con.cursor_y;
+	if( fb_console_context.cursor_x >= fb_console_context.columns ) {
+		fb_console_context.cursor_x = 0;
+		++fb_console_context.cursor_y;
 	}
 
-	if( __fb_con.cursor_y > bottom ) {
-		fb_hWinCEConsoleScrollRegion( __fb_con.active, 0, top,
-		                            __fb_con.columns - 1, bottom, 1 );
-		__fb_con.cursor_y = bottom;
+	if( fb_console_context.cursor_y > bottom ) {
+		fb_hWinCEConsoleScrollRegion( fb_console_context.active, 0, top,
+		                            fb_console_context.columns - 1, bottom, 1 );
+		fb_console_context.cursor_y = bottom;
 	}
 }
 
@@ -282,22 +282,22 @@ static void hWriteCharacter( unsigned char character )
 
 	switch( character ) {
 	case '\r':
-		__fb_con.cursor_x = 0;
+		fb_console_context.cursor_x = 0;
 		return;
 
 	case '\n':
-		__fb_con.cursor_x = 0;
-		++__fb_con.cursor_y;
+		fb_console_context.cursor_x = 0;
+		++fb_console_context.cursor_y;
 		hCheckCursor();
 		return;
 
 	case '\b':
-		if( __fb_con.cursor_x > 0 )
-			--__fb_con.cursor_x;
+		if( fb_console_context.cursor_x > 0 )
+			--fb_console_context.cursor_x;
 		return;
 
 	case '\t':
-		spaces = FB_TAB_WIDTH - (__fb_con.cursor_x % FB_TAB_WIDTH);
+		spaces = FB_TAB_WIDTH - (fb_console_context.cursor_x % FB_TAB_WIDTH);
 		while( spaces-- > 0 )
 			hWriteCharacter( (unsigned char)' ' );
 		return;
@@ -308,16 +308,16 @@ static void hWriteCharacter( unsigned char character )
 		break;
 	}
 
-	cell = fb_hWinCEConsoleCell( __fb_con.active, __fb_con.cursor_x,
-	                            __fb_con.cursor_y );
+	cell = fb_hWinCEConsoleCell( fb_console_context.active, fb_console_context.cursor_x,
+	                            fb_console_context.cursor_y );
 	if( cell != NULL ) {
 		cell->character = (FB_WCHAR)character;
 		cell->attribute =
-			(unsigned char)(__fb_con.foreground |
-			                (__fb_con.background << 4));
+			(unsigned char)(fb_console_context.foreground |
+			                (fb_console_context.background << 4));
 	}
 
-	++__fb_con.cursor_x;
+	++fb_console_context.cursor_x;
 	hCheckCursor();
 }
 

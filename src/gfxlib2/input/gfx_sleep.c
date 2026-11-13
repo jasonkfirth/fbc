@@ -9,14 +9,13 @@
 
 #include "../fb_gfx.h"
 
-int fb_hGfxInputBufferChanged( void );
 
 static void poll_events(void)
 {
 	FB_GRAPHICS_LOCK( );
 
-	if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
-		__fb_gfx->driver->poll_events();
+	if ((fb_gfx) && (fb_gfx->driver->poll_events))
+		fb_gfx->driver->poll_events();
 
 	FB_GRAPHICS_UNLOCK( );
 }
@@ -24,8 +23,8 @@ static void poll_events(void)
 #ifndef HOST_JS
 static void update_display(void)
 {
-	if ((__fb_gfx) && (__fb_gfx->driver->update))
-		__fb_gfx->driver->update();
+	if ((fb_gfx) && (fb_gfx->driver->update))
+		fb_gfx->driver->update();
 }
 #endif
 

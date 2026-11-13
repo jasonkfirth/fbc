@@ -19,12 +19,12 @@
         - compatibility front-end behavior
 */
 
-#ifndef __FB_GFX3_BACKEND_GLES_H__
-#define __FB_GFX3_BACKEND_GLES_H__
+#ifndef FB_GFX3_BACKEND_GLES_H
+#define FB_GFX3_BACKEND_GLES_H
 
 #include "gfx3_backend.h"
 
-extern const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_gles;
+extern const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_gles FB_C_SYMBOL("__fb_gfx3_backend_gles");
 
 #endif
 

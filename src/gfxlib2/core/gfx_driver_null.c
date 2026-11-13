@@ -12,7 +12,7 @@
 static void driver_dummy(void);
 
 /* GFXDRIVER */
-const GFXDRIVER __fb_gfxDriverNull =
+const GFXDRIVER fb_gfxDriverNull =
 {
 	"Null",         /* char *name; */
 	NULL,           /* int (*init)(char *title, int w, int h, int depth, int refresh_rate, int flags); */

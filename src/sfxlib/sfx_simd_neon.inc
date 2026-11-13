@@ -30,8 +30,8 @@
         The including source must include sfx_simd.h and arm_neon.h first.
 */
 
-#ifndef __FB_SFX_SIMD_NEON_INC__
-#define __FB_SFX_SIMD_NEON_INC__
+#ifndef FB_SFX_SIMD_NEON_INC
+#define FB_SFX_SIMD_NEON_INC
 
 /* ------------------------------------------------------------------------- */
 /* Shared sample normalization                                               */

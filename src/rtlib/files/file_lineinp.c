@@ -9,7 +9,7 @@
 
 #define BUFFER_LEN 1024
 
-typedef enum _eInputMode {
+typedef enum FB_INPUT_MODE {
     eIM_Invalid,
     eIM_ReadLine,
     eIM_Read

@@ -5,7 +5,7 @@
  * Responsibilities: Target-specific runtime support for dos.
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
-typedef struct _FB_CONSOLE_CTX {
+typedef struct FB_CONSOLE_CTX {
 	int           active, visible;
 	int           w, h;
 	unsigned long phys_addr;
@@ -13,7 +13,9 @@ typedef struct _FB_CONSOLE_CTX {
 	int           forceInpBufferChanged;
 } FB_CONSOLE_CTX;
 
-extern FB_CONSOLE_CTX __fb_con;
+#include "../../fb_abi.h"
+
+extern FB_CONSOLE_CTX fb_console_context FB_C_SYMBOL("__fb_con");
 
 int fb_ConsoleLocate_BIOS( int row, int col, int cursor );
 void fb_ConsoleGetXY_BIOS( int *col, int *row );

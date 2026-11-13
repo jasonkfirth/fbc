@@ -48,7 +48,6 @@ int fb_FileSetEofEx( FB_FILE *handle )
     default:
         FB_UNLOCK();
         return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
-        break;
     }
 
     /* flush stream buffers before truncating */

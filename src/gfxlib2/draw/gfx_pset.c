@@ -16,7 +16,7 @@ FBCALL void fb_GfxPset(void *target, float fx, float fy, unsigned int color, int
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}
@@ -58,10 +58,10 @@ FBCALL void fb_GfxPset(void *target, float fx, float fy, unsigned int color, int
 		return;
 	}
 
-	if (__fb_gfx->framebuffer == context->line[0]) {
+	if (fb_gfx->framebuffer == context->line[0]) {
 		DRIVER_LOCK();
 		context->put_pixel(context, x, y, color);
-		__fb_gfx->dirty[y] = TRUE;
+		fb_gfx->dirty[y] = TRUE;
 		DRIVER_UNLOCK();
 	} else {
 		context->put_pixel(context, x, y, color);

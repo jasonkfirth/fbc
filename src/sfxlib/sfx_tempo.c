@@ -74,7 +74,7 @@ void fb_sfxTempo(int bpm)
     if (bpm > FB_SFX_TEMPO_MAX)
         bpm = FB_SFX_TEMPO_MAX;
 
-    __fb_sfx->tempo = bpm;
+    fb_sfx_context->tempo = bpm;
 
     SFX_DEBUG("sfx_tempo: tempo set to %d BPM", bpm);
 }
@@ -86,10 +86,10 @@ void fb_sfxTempo(int bpm)
 
 int fb_sfxTempoGet(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_TEMPO_DEFAULT;
 
-    return __fb_sfx->tempo;
+    return fb_sfx_context->tempo;
 }
 
 
@@ -102,7 +102,7 @@ void fb_sfxTempoReset(void)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    __fb_sfx->tempo = FB_SFX_TEMPO_DEFAULT;
+    fb_sfx_context->tempo = FB_SFX_TEMPO_DEFAULT;
 
     SFX_DEBUG("sfx_tempo: tempo reset to %d BPM",
               FB_SFX_TEMPO_DEFAULT);
@@ -127,10 +127,10 @@ float fb_sfxTempoBeatDuration(void)
 {
     int tempo;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0.5f;
 
-    tempo = __fb_sfx->tempo;
+    tempo = fb_sfx_context->tempo;
 
     if (tempo <= 0)
         tempo = FB_SFX_TEMPO_DEFAULT;

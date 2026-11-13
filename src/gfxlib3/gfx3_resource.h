@@ -22,8 +22,8 @@
         - GPU fence polling
 */
 
-#ifndef __FB_GFX3_RESOURCE_H__
-#define __FB_GFX3_RESOURCE_H__
+#ifndef FB_GFX3_RESOURCE_H
+#define FB_GFX3_RESOURCE_H
 
 #include "fb_gfx3.h"
 

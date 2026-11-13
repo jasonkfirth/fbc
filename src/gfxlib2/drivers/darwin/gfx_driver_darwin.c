@@ -812,8 +812,8 @@ static void fb_hDarwinHandleKeyEvent(id event, int pressed)
 	key = fb_hDarwinEventKey(event);
 	repeated = pressed ? fb_msg_bool(event, "isARepeat") : FALSE;
 
-	if (__fb_gfx && scancode > 0 && scancode < 128)
-		__fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
+	if (fb_gfx && scancode > 0 && scancode < 128)
+		fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
 
 	if (pressed && key)
 		fb_hPostKey(key);
@@ -863,8 +863,8 @@ static void fb_hDarwinHandleModifierEvent(id event)
 		break;
 	}
 
-	if (__fb_gfx && scancode > 0 && scancode < 128)
-		__fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
+	if (fb_gfx && scancode > 0 && scancode < 128)
+		fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
 
 	memset(&e, 0, sizeof(e));
 	e.type = pressed ? EVENT_KEY_PRESS : EVENT_KEY_RELEASE;
@@ -999,13 +999,13 @@ static void fb_hDarwinDumpDisplayBuffer(void)
 
 static void fb_hDarwinBlitDisplayBuffer(void)
 {
-	if (!__fb_gfx || !__fb_gfx->framebuffer || !__fb_gfx->dirty)
+	if (!fb_gfx || !fb_gfx->framebuffer || !fb_gfx->dirty)
 		return;
 	if (!fb_darwin.display_buffer || !fb_darwin.blitter)
 		return;
 
 	fb_darwin.blitter(fb_darwin.display_buffer, fb_darwin.display_pitch);
-	fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h);
+	fb_hMemSet(fb_gfx->dirty, FALSE, fb_gfx->h);
 	fb_hDarwinDumpDisplayBuffer();
 }
 
@@ -1021,7 +1021,7 @@ static void fb_hDarwinDrawCurrentFramebuffer(CGContextRef ctx, CGRect bounds)
 	CGContextSetRGBFillColor(ctx, 0.0, 0.0, 0.0, 1.0);
 	CGContextFillRect(ctx, bounds);
 
-	if (!__fb_gfx || !__fb_gfx->framebuffer)
+	if (!fb_gfx || !fb_gfx->framebuffer)
 		return;
 
 	fb_hDarwinRefreshLayout();
@@ -1191,32 +1191,32 @@ static id fb_hDarwinCreateOpenGLPixelFormat(void)
 	attribute = attributes;
 	*attribute++ = FB_NSOPENGL_PFA_DOUBLE_BUFFER;
 	*attribute++ = FB_NSOPENGL_PFA_COLOR_SIZE;
-	*attribute++ = (unsigned int)__fb_gl_params.color_bits;
+	*attribute++ = (unsigned int)fb_gl_params.color_bits;
 
-	if (__fb_gl_params.color_alpha_bits > 0) {
+	if (fb_gl_params.color_alpha_bits > 0) {
 		*attribute++ = FB_NSOPENGL_PFA_ALPHA_SIZE;
-		*attribute++ = (unsigned int)__fb_gl_params.color_alpha_bits;
+		*attribute++ = (unsigned int)fb_gl_params.color_alpha_bits;
 	}
-	if (__fb_gl_params.depth_bits > 0) {
+	if (fb_gl_params.depth_bits > 0) {
 		*attribute++ = FB_NSOPENGL_PFA_DEPTH_SIZE;
-		*attribute++ = (unsigned int)__fb_gl_params.depth_bits;
+		*attribute++ = (unsigned int)fb_gl_params.depth_bits;
 	}
-	if (__fb_gl_params.stencil_bits > 0) {
+	if (fb_gl_params.stencil_bits > 0) {
 		*attribute++ = FB_NSOPENGL_PFA_STENCIL_SIZE;
-		*attribute++ = (unsigned int)__fb_gl_params.stencil_bits;
+		*attribute++ = (unsigned int)fb_gl_params.stencil_bits;
 	}
-	if (__fb_gl_params.accum_bits > 0) {
+	if (fb_gl_params.accum_bits > 0) {
 		*attribute++ = FB_NSOPENGL_PFA_ACCUM_SIZE;
-		*attribute++ = (unsigned int)__fb_gl_params.accum_bits;
+		*attribute++ = (unsigned int)fb_gl_params.accum_bits;
 	}
 
 	sample_count = NULL;
-	if (__fb_gl_params.num_samples > 0) {
+	if (fb_gl_params.num_samples > 0) {
 		*attribute++ = FB_NSOPENGL_PFA_SAMPLE_BUFFERS;
 		*attribute++ = 1;
 		*attribute++ = FB_NSOPENGL_PFA_SAMPLES;
 		sample_count = attribute;
-		*attribute++ = (unsigned int)__fb_gl_params.num_samples;
+		*attribute++ = (unsigned int)fb_gl_params.num_samples;
 	}
 	*attribute = 0;
 
@@ -1225,7 +1225,7 @@ static id fb_hDarwinCreateOpenGLPixelFormat(void)
 		pixel_format = fb_msg_id_ptr(pixel_format, "initWithAttributes:", attributes);
 		if (pixel_format) {
 			if (sample_count)
-				__fb_gl_params.num_samples = (int)*sample_count;
+				fb_gl_params.num_samples = (int)*sample_count;
 			return pixel_format;
 		}
 
@@ -1540,8 +1540,8 @@ void fb_hDarwinSetPalette(int index, int r, int g, int b)
 	(void)b;
 	(void)g;
 
-	if (__fb_gfx && __fb_gfx->dirty)
-		fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h);
+	if (fb_gfx && fb_gfx->dirty)
+		fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h);
 
 	if (fb_darwin.lock_count == 0)
 		fb_hDarwinUpdate();

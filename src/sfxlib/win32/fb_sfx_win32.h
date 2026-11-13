@@ -26,8 +26,8 @@
         • driver implementations
 */
 
-#ifndef __FB_SFX_WIN32_H__
-#define __FB_SFX_WIN32_H__
+#ifndef FB_SFX_WIN32_H
+#define FB_SFX_WIN32_H
 
 #ifndef DISABLE_WIN32
 

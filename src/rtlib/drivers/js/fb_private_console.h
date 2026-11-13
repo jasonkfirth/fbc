@@ -7,6 +7,7 @@
  */
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
+#include "../../fb_abi.h"
 
 #define KEY_BUFFER_LEN 256
 
@@ -36,7 +37,7 @@ typedef struct _FB_CONSOLE_MOUSE {
     int           button;
 } FB_CONSOLE_MOUSE;
 
-typedef struct _FB_CONSOLE_CTX {
+typedef struct FB_CONSOLE_CTX {
 	int                 active, visible;
 	int                 w, h;
 	unsigned long       key_buffer[KEY_BUFFER_LEN];
@@ -47,7 +48,7 @@ typedef struct _FB_CONSOLE_CTX {
 	const char          *color_remap;
 } FB_CONSOLE_CTX;
 
-extern FB_CONSOLE_CTX __fb_con;
+extern FB_CONSOLE_CTX fb_console_context FB_C_SYMBOL("__fb_con");
 
 extern EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEvent, void *userData);
 extern EM_BOOL fb_hMouseEventHandler(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);

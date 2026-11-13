@@ -26,7 +26,7 @@ void fb_ConsoleClearViewRawEx( HANDLE console, int left, int top, int right,
 	                           int bottom )
 {
 	(void)console;
-	fb_hWinCEConsoleClearRegion( __fb_con.active, left, top, right, bottom );
+	fb_hWinCEConsoleClearRegion( fb_console_context.active, left, top, right, bottom );
 	fb_ConsoleLocateRawEx( NULL, top, left, -1 );
 }
 
@@ -44,10 +44,10 @@ void fb_ConsoleClear( int mode )
 		bottom = fb_ConsoleGetBotRow();
 	} else {
 		top = 0;
-		bottom = __fb_con.rows - 1;
+		bottom = fb_console_context.rows - 1;
 	}
 
-	fb_ConsoleClearViewRawEx( NULL, 0, top, __fb_con.columns - 1, bottom );
+	fb_ConsoleClearViewRawEx( NULL, 0, top, fb_console_context.columns - 1, bottom );
 }
 
 /* end of drivers/wince/io_cls.c */

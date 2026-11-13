@@ -166,15 +166,15 @@ void fb_sfxMixerInit(void)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     SFX_DEBUG("sfx_mixer: initializing mixer");
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        __fb_sfx->voices[i].active = 0;
-        __fb_sfx->voices[i].position = 0;
+        fb_sfx_context->voices[i].active = 0;
+        fb_sfx_context->voices[i].position = 0;
     }
 }
 
@@ -185,7 +185,7 @@ void fb_sfxMixerInit(void)
 
 void fb_sfxMixerShutdown(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     SFX_DEBUG("sfx_mixer: shutting down mixer");
@@ -200,14 +200,14 @@ void fb_sfxMixerClear(float *buffer, int frames)
 {
     int samples;
 
-    if (!buffer || !__fb_sfx || frames <= 0 ||
-        __fb_sfx->output_channels <= 0)
+    if (!buffer || !fb_sfx_context || frames <= 0 ||
+        fb_sfx_context->output_channels <= 0)
         return;
 
-    if (frames > INT_MAX / __fb_sfx->output_channels)
+    if (frames > INT_MAX / fb_sfx_context->output_channels)
         return;
 
-    samples = frames * __fb_sfx->output_channels;
+    samples = frames * fb_sfx_context->output_channels;
 
     memset(buffer, 0, (size_t)samples * sizeof(float));
 }
@@ -221,14 +221,14 @@ FB_SFXVOICE *fb_sfxMixerAllocVoice(void)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return NULL;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (!__fb_sfx->voices[i].active)
+        if (!fb_sfx_context->voices[i].active)
         {
-            FB_SFXVOICE *v = &__fb_sfx->voices[i];
+            FB_SFXVOICE *v = &fb_sfx_context->voices[i];
 
             memset(v, 0, sizeof(FB_SFXVOICE));
 
@@ -266,15 +266,15 @@ void fb_sfxMixerStopChannel(int channel)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (__fb_sfx->voices[i].active &&
-            __fb_sfx->voices[i].channel == channel)
+        if (fb_sfx_context->voices[i].active &&
+            fb_sfx_context->voices[i].channel == channel)
         {
-            __fb_sfx->voices[i].active = 0;
+            fb_sfx_context->voices[i].active = 0;
         }
     }
 }
@@ -284,11 +284,11 @@ void fb_sfxMixerStopAll(void)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
-        __fb_sfx->voices[i].active = 0;
+        fb_sfx_context->voices[i].active = 0;
 }
 
 
@@ -298,25 +298,25 @@ void fb_sfxMixerStopAll(void)
 
 void fb_sfxMixerSetChannelVolume(int channel, float volume)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         return;
 
-    __fb_sfx->channels[channel].volume = volume;
+    fb_sfx_context->channels[channel].volume = volume;
 }
 
 
 void fb_sfxMixerSetChannelPan(int channel, float pan)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         return;
 
-    __fb_sfx->channels[channel].pan = pan;
+    fb_sfx_context->channels[channel].pan = pan;
 }
 
 
@@ -326,10 +326,10 @@ void fb_sfxMixerSetChannelPan(int channel, float pan)
 
 void fb_sfxMixerProcessEnvelope(FB_SFXVOICE *voice)
 {
-    if (!voice || !__fb_sfx || __fb_sfx->samplerate <= 0)
+    if (!voice || !fb_sfx_context || fb_sfx_context->samplerate <= 0)
         return;
 
-    (void)fb_sfxEnvelopeProcess(voice, 1.0f / (float)__fb_sfx->samplerate);
+    (void)fb_sfxEnvelopeProcess(voice, 1.0f / (float)fb_sfx_context->samplerate);
 }
 
 
@@ -379,17 +379,17 @@ void fb_sfxMixerProcess(int frames)
 
     float *buffer;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    buffer = __fb_sfx->mixbuffer;
+    buffer = fb_sfx_context->mixbuffer;
 
     if (!buffer)
         return;
 
     fb_sfxMixerClear(buffer, frames);
-    master_volume = __fb_sfx->master_volume;
-    balance = __fb_sfx->balance;
+    master_volume = fb_sfx_context->master_volume;
+    balance = fb_sfx_context->balance;
 
     for (frame = 0; frame < frames; frame++)
     {
@@ -398,7 +398,7 @@ void fb_sfxMixerProcess(int frames)
 
         for (voice = 0; voice < FB_SFX_MAX_VOICES; voice++)
         {
-            FB_SFXVOICE *v = &__fb_sfx->voices[voice];
+            FB_SFXVOICE *v = &fb_sfx_context->voices[voice];
 
             if (!v->active)
                 continue;
@@ -429,21 +429,21 @@ void fb_sfxMixerProcess(int frames)
 
             if (ch >= 0 && ch < FB_SFX_MAX_CHANNELS)
             {
-                if (__fb_sfx->channels[ch].mute)
+                if (fb_sfx_context->channels[ch].mute)
                     continue;
 
-                volume *= __fb_sfx->channels[ch].volume;
+                volume *= fb_sfx_context->channels[ch].volume;
             }
 
             sample *= env_level * volume * master_volume;
 
-            if (v->type == FB_SFX_VOICE_MUSIC && __fb_sfx->music_playing >= 0)
-                __fb_sfx->music_pos = v->position;
+            if (v->type == FB_SFX_VOICE_MUSIC && fb_sfx_context->music_playing >= 0)
+                fb_sfx_context->music_pos = v->position;
 
             float pan = v->pan;
 
             if (ch >= 0 && ch < FB_SFX_MAX_CHANNELS)
-                pan += __fb_sfx->channels[ch].pan;
+                pan += fb_sfx_context->channels[ch].pan;
 
             pan += balance;
 

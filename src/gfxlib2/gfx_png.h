@@ -21,8 +21,8 @@
         - PNG codec implementation
 */
 
-#ifndef __FB_GFX_PNG_H__
-#define __FB_GFX_PNG_H__
+#ifndef FB_GFX_PNG_H
+#define FB_GFX_PNG_H
 
 #include "fb_gfx.h"
 

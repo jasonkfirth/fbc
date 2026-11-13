@@ -90,7 +90,7 @@ FB_SFXCTX *fb_sfxGetContext(void)
     if (!fb_sfxEnsureInitialized())
         return NULL;
 
-    return __fb_sfx;
+    return fb_sfx_context;
 }
 
 
@@ -116,7 +116,7 @@ void fb_sfxPoll(void)
         return;
 
     fb_sfxRuntimeLock();
-    driver = __fb_sfx->driver;
+    driver = fb_sfx_context->driver;
     if (driver && driver->poll)
         driver->poll();
     fb_sfxRuntimeUnlock();

@@ -45,7 +45,7 @@ static int aros_driver_init(char *title, int width, int height, int depth,
         return -1;
 
     fb_arosGfxInputInit();
-    __fb_gfx->refresh_rate = fb_aros_gfx.refresh_rate;
+    fb_gfx->refresh_rate = fb_aros_gfx.refresh_rate;
     return 0;
 }
 

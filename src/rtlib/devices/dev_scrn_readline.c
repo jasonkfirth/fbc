@@ -9,6 +9,7 @@
 
 int fb_DevScrnReadLine( FB_FILE *handle, FBSTRING_ACCESS *dst )
 {
+	(void)handle;
 	return fb_LineInput( NULL, dst, -1, FALSE, FALSE, TRUE );
 }
 

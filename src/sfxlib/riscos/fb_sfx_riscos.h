@@ -21,8 +21,8 @@
         - public FreeBASIC sound APIs
 */
 
-#ifndef __FB_SFX_RISCOS_H__
-#define __FB_SFX_RISCOS_H__
+#ifndef FB_SFX_RISCOS_H
+#define FB_SFX_RISCOS_H
 
 #ifdef __cplusplus
 extern "C" {

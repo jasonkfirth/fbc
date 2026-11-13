@@ -27,8 +27,8 @@
         The including source must include gfx_simd.h and arm_neon.h first.
 */
 
-#ifndef __FB_GFX_SIMD_NEON_INC__
-#define __FB_GFX_SIMD_NEON_INC__
+#ifndef FB_GFX_SIMD_NEON_INC
+#define FB_GFX_SIMD_NEON_INC
 
 enum FB_GFX_SIMD_LOGIC {
 	FB_GFX_SIMD_AND,

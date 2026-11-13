@@ -55,7 +55,7 @@ char *UP;
 #include <sys/ioctl.h>
 #include <fcntl.h>
 
-FBCONSOLE __fb_con;
+FBCONSOLE fb_console_context;
 
 typedef void (*SIGHANDLER)(int);
 static SIGHANDLER old_sighandler[NSIG];
@@ -100,32 +100,32 @@ FBCALL void fb_BgLock   ( void ) { pthread_mutex_lock  ( &__fb_bg_mutex     ); }
 FBCALL void fb_BgUnlock ( void ) { pthread_mutex_unlock( &__fb_bg_mutex     ); }
 
 #ifdef ENABLE_MT
-static pthread_mutex_t __fb_global_mutex;
-static pthread_mutex_t __fb_string_mutex;
-static pthread_mutex_t __fb_graphics_mutex;
-static pthread_mutex_t __fb_math_mutex;
-static pthread_mutex_t __fb_profile_mutex;
-FBCALL void fb_Lock     ( void ) { pthread_mutex_lock  ( &__fb_global_mutex ); }
-FBCALL void fb_Unlock   ( void ) { pthread_mutex_unlock( &__fb_global_mutex ); }
-FBCALL void fb_StrLock  ( void ) { pthread_mutex_lock  ( &__fb_string_mutex ); }
-FBCALL void fb_StrUnlock( void ) { pthread_mutex_unlock( &__fb_string_mutex ); }
-FBCALL void fb_GraphicsLock  ( void ) { pthread_mutex_lock  ( &__fb_graphics_mutex ); }
-FBCALL void fb_GraphicsUnlock( void ) { pthread_mutex_unlock( &__fb_graphics_mutex ); }
-FBCALL void fb_MathLock  ( void ) { pthread_mutex_lock  ( &__fb_math_mutex ); }
-FBCALL void fb_MathUnlock( void ) { pthread_mutex_unlock( &__fb_math_mutex ); }
-FBCALL void fb_ProfileLock  ( void ) { pthread_mutex_lock  ( &__fb_profile_mutex ); }
-FBCALL void fb_ProfileUnlock( void ) { pthread_mutex_unlock( &__fb_profile_mutex ); }
+static pthread_mutex_t fb_global_mutex;
+static pthread_mutex_t fb_string_mutex;
+static pthread_mutex_t fb_graphics_mutex;
+static pthread_mutex_t fb_math_mutex;
+static pthread_mutex_t fb_profile_mutex;
+FBCALL void fb_Lock     ( void ) { pthread_mutex_lock  ( &fb_global_mutex ); }
+FBCALL void fb_Unlock   ( void ) { pthread_mutex_unlock( &fb_global_mutex ); }
+FBCALL void fb_StrLock  ( void ) { pthread_mutex_lock  ( &fb_string_mutex ); }
+FBCALL void fb_StrUnlock( void ) { pthread_mutex_unlock( &fb_string_mutex ); }
+FBCALL void fb_GraphicsLock  ( void ) { pthread_mutex_lock  ( &fb_graphics_mutex ); }
+FBCALL void fb_GraphicsUnlock( void ) { pthread_mutex_unlock( &fb_graphics_mutex ); }
+FBCALL void fb_MathLock  ( void ) { pthread_mutex_lock  ( &fb_math_mutex ); }
+FBCALL void fb_MathUnlock( void ) { pthread_mutex_unlock( &fb_math_mutex ); }
+FBCALL void fb_ProfileLock  ( void ) { pthread_mutex_lock  ( &fb_profile_mutex ); }
+FBCALL void fb_ProfileUnlock( void ) { pthread_mutex_unlock( &fb_profile_mutex ); }
 #endif
 
 static void *bg_thread(void *arg)
 {
-	while (__fb_con.inited) {
+	while (fb_console_context.inited) {
 
 		BG_LOCK();
-		if (__fb_con.keyboard_handler)
-			__fb_con.keyboard_handler();
-		if (__fb_con.mouse_handler)
-			__fb_con.mouse_handler();
+		if (fb_console_context.keyboard_handler)
+			fb_console_context.keyboard_handler();
+		if (fb_console_context.mouse_handler)
+			fb_console_context.mouse_handler();
 		BG_UNLOCK();
 
 		usleep(30000);
@@ -143,7 +143,7 @@ void fb_hStartBgThread( void )
 
 static int default_getch(void)
 {
-	return fgetc(__fb_con.f_in);
+	return fgetc(fb_console_context.f_in);
 }
 
 static void signal_handler(int sig)
@@ -208,20 +208,20 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 	if( char_buffer == NULL )
 		return;
 	unsigned char *attr_buffer = char_buffer + (win.ws_row * win.ws_col);
-	if (__fb_con.char_buffer) {
-		int h = (__fb_con.h < win.ws_row) ? __fb_con.h : win.ws_row;
-		int w = (__fb_con.w < win.ws_col) ? __fb_con.w : win.ws_col;
+	if (fb_console_context.char_buffer) {
+		int h = (fb_console_context.h < win.ws_row) ? fb_console_context.h : win.ws_row;
+		int w = (fb_console_context.w < win.ws_col) ? fb_console_context.w : win.ws_col;
 		int r;
 		for (r = 0; r < h; r++) {
-			memcpy(char_buffer + (r * win.ws_col), __fb_con.char_buffer + (r * __fb_con.w), w);
-			memcpy(attr_buffer + (r * win.ws_col), __fb_con.attr_buffer + (r * __fb_con.w), w);
+			memcpy(char_buffer + (r * win.ws_col), fb_console_context.char_buffer + (r * fb_console_context.w), w);
+			memcpy(attr_buffer + (r * win.ws_col), fb_console_context.attr_buffer + (r * fb_console_context.w), w);
 		}
-		free(__fb_con.char_buffer);
+		free(fb_console_context.char_buffer);
 	}
-	__fb_con.char_buffer = char_buffer;
-	__fb_con.attr_buffer = attr_buffer;
-	__fb_con.h = win.ws_row;
-	__fb_con.w = win.ws_col;
+	fb_console_context.char_buffer = char_buffer;
+	fb_console_context.attr_buffer = attr_buffer;
+	fb_console_context.h = win.ws_row;
+	fb_console_context.w = win.ws_col;
 
 	/* Also update the cursor position if wanted */
 	if (requery_cursorpos) {
@@ -265,7 +265,7 @@ int fb_hTermOut( int code, int param1, int param2 )
 		"\e[H\e[J\e[0m",      /* SEQ_EXIT_GFX_MODE */
 	};
 
-	if (!__fb_con.inited)
+	if (!fb_console_context.inited)
 		return FALSE;
 
 	if (code >= SEQ_EXTRA) {
@@ -296,10 +296,10 @@ int fb_hTermOut( int code, int param1, int param2 )
 		/* 	puts() */
 		/* else */
 #else
-		if (!__fb_con.seq[code])
+		if (!fb_console_context.seq[code])
 			return FALSE;
 		char *str;
-		str = tgoto(__fb_con.seq[code], param1, param2);
+		str = tgoto(fb_console_context.seq[code], param1, param2);
 		if (!str)
 			return FALSE;
 		tputs(str, 1, putchar);
@@ -359,17 +359,17 @@ int fb_hInitConsole(void)
 {
 	struct termios term_out, term_in;
 
-	if (!__fb_con.inited)
+	if (!fb_console_context.inited)
 		return -1;
 
 	/* Init terminal I/O */
 	if( !isatty( STDOUT_FILENO ) || !isatty( STDIN_FILENO ) )
 		return -1;
-	if (!__fb_con.f_in) {
-		__fb_con.f_in = fopen("/dev/tty", "r+b");
-		if (!__fb_con.f_in)
+	if (!fb_console_context.f_in) {
+		fb_console_context.f_in = fopen("/dev/tty", "r+b");
+		if (!fb_console_context.f_in)
 			return -1;
-		__fb_con.h_in = fileno(__fb_con.f_in);
+		fb_console_context.h_in = fileno(fb_console_context.f_in);
 	}
 
 	/* Cannot control console if process was started in background. */
@@ -387,23 +387,23 @@ int fb_hInitConsole(void)
 	   calls from multi-threaded uses of fb_hShell() etc. */
 
 	/* Output setup */
-	if (!__fb_con.saved_old_term_out) {
-		if (tcgetattr(STDOUT_FILENO, &__fb_con.old_term_out))
+	if (!fb_console_context.saved_old_term_out) {
+		if (tcgetattr(STDOUT_FILENO, &fb_console_context.old_term_out))
 			return -1;
-		__fb_con.saved_old_term_out = true;
+		fb_console_context.saved_old_term_out = true;
 	}
-	memcpy(&term_out, &__fb_con.old_term_out, sizeof(term_out));
+	memcpy(&term_out, &fb_console_context.old_term_out, sizeof(term_out));
 	term_out.c_oflag |= OPOST;
 	if( tcsetattr( STDOUT_FILENO, TCSANOW, &term_out ) )
 		return -1;
 
 	/* Input setup */
-	if (!__fb_con.saved_old_term_in) {
-		if (tcgetattr(__fb_con.h_in, &__fb_con.old_term_in))
+	if (!fb_console_context.saved_old_term_in) {
+		if (tcgetattr(fb_console_context.h_in, &fb_console_context.old_term_in))
 			return -1;
-		__fb_con.saved_old_term_in = true;
+		fb_console_context.saved_old_term_in = true;
 	}
-	memcpy(&term_in, &__fb_con.old_term_in, sizeof(term_in));
+	memcpy(&term_in, &fb_console_context.old_term_in, sizeof(term_in));
 	/* Send SIGINT on control-C */
 	term_in.c_iflag |= BRKINT;
 	/* Disable Xon/off and input BREAK condition ignoring */
@@ -413,24 +413,24 @@ int fb_hInitConsole(void)
 	/* No timeout, just don't block */
 	term_in.c_cc[VMIN] = 1;
 	term_in.c_cc[VTIME] = 0;
-	if (tcsetattr(__fb_con.h_in, TCSANOW, &term_in))
+	if (tcsetattr(fb_console_context.h_in, TCSANOW, &term_in))
 		return -1;
 
 	/* Don't block */
-	if (!__fb_con.saved_old_in_flags) {
-		__fb_con.old_in_flags = fcntl(__fb_con.h_in, F_GETFL, 0);
-		__fb_con.saved_old_in_flags = true;
+	if (!fb_console_context.saved_old_in_flags) {
+		fb_console_context.old_in_flags = fcntl(fb_console_context.h_in, F_GETFL, 0);
+		fb_console_context.saved_old_in_flags = true;
 	}
-	fcntl(__fb_con.h_in, F_SETFL, __fb_con.old_in_flags | O_NONBLOCK);
+	fcntl(fb_console_context.h_in, F_SETFL, fb_console_context.old_in_flags | O_NONBLOCK);
 
 	fb_hTermOut(SEQ_INIT_KEYPAD, 0, 0);
 
 	/* Initialize keyboard and mouse handlers if set */
 	BG_LOCK();
-	if (__fb_con.keyboard_init)
-		__fb_con.keyboard_init();
-	if (__fb_con.mouse_init)
-		__fb_con.mouse_init();
+	if (fb_console_context.keyboard_init)
+		fb_console_context.keyboard_init();
+	if (fb_console_context.mouse_init)
+		fb_console_context.mouse_init();
 	BG_UNLOCK();
 
 	return 0;
@@ -442,7 +442,7 @@ void fb_hExitConsole( void )
 	int bottom;
 	SIGHANDLER old_sigttou_handler;
 
-	if (__fb_con.inited) {
+	if (fb_console_context.inited) {
 
 		/* Ignore SIGTTOU, which is sent in case we write to the
 		   terminal while being in the background (e.g. CTRL+Z + bg).
@@ -465,14 +465,14 @@ void fb_hExitConsole( void )
 		   signal should be ignored only here. */
 		old_sigttou_handler = signal(SIGTTOU, SIG_IGN);
 
-		if (__fb_con.gfx_exit)
-			__fb_con.gfx_exit();
+		if (fb_console_context.gfx_exit)
+			fb_console_context.gfx_exit();
 
 		BG_LOCK();
-		if (__fb_con.keyboard_exit)
-			__fb_con.keyboard_exit();
-		if (__fb_con.mouse_exit)
-			__fb_con.mouse_exit();
+		if (fb_console_context.keyboard_exit)
+			fb_console_context.keyboard_exit();
+		if (fb_console_context.mouse_exit)
+			fb_console_context.mouse_exit();
 		BG_UNLOCK();
 
 		/* Only restore scrolling region if we changed it. This way we can avoid
@@ -480,7 +480,7 @@ void fb_hExitConsole( void )
 		   It's best to avoid that as much as possible (not all terminals support
 		   the escape sequence, it's slow, it's unsafe if fb_hExitConsole() is called
 		   during a signal handler). */
-		if (__fb_con.scroll_region_changed) {
+		if (fb_console_context.scroll_region_changed) {
 			bottom = fb_ConsoleGetMaxRow();
 			if ((fb_ConsoleGetTopRow() != 0) || (fb_ConsoleGetBotRow() != bottom - 1)) {
 				/* Restore scrolling region to whole screen and clear */
@@ -488,7 +488,7 @@ void fb_hExitConsole( void )
 				fb_hTermOut(SEQ_CLS, 0, 0);
 				fb_hTermOut(SEQ_HOME, 0, 0);
 			}
-			__fb_con.scroll_region_changed = FALSE;
+			fb_console_context.scroll_region_changed = FALSE;
 		}
 
 		/* Restore in/out tty to the saved state, if we have any.
@@ -501,21 +501,21 @@ void fb_hExitConsole( void )
 		fb_hTermOut(SEQ_RESET_COLOR, 0, 0);
 		fb_hTermOut(SEQ_SHOW_CURSOR, 0, 0);
 		fb_hTermOut(SEQ_EXIT_KEYPAD, 0, 0);
-		if (__fb_con.saved_old_term_out) {
-			tcsetattr(STDOUT_FILENO, TCSANOW, &__fb_con.old_term_out);
+		if (fb_console_context.saved_old_term_out) {
+			tcsetattr(STDOUT_FILENO, TCSANOW, &fb_console_context.old_term_out);
 		}
 
 		/* Restore old console keyboard state */
-		if (__fb_con.saved_old_in_flags) {
-			fcntl(__fb_con.h_in, F_SETFL, __fb_con.old_in_flags);
+		if (fb_console_context.saved_old_in_flags) {
+			fcntl(fb_console_context.h_in, F_SETFL, fb_console_context.old_in_flags);
 		}
-		if (__fb_con.saved_old_term_in) {
-			tcsetattr(__fb_con.h_in, TCSANOW, &__fb_con.old_term_in);
+		if (fb_console_context.saved_old_term_in) {
+			tcsetattr(fb_console_context.h_in, TCSANOW, &fb_console_context.old_term_in);
 		}
 
-		if (__fb_con.f_in) {
-			fclose(__fb_con.f_in);
-			__fb_con.f_in = NULL;
+		if (fb_console_context.f_in) {
+			fclose(fb_console_context.f_in);
+			fb_console_context.f_in = NULL;
 		}
 
 		/* Restore SIGTTOU handler (so it's no longer ignored) */
@@ -552,16 +552,16 @@ static void hInit( void )
 
 #ifdef ENABLE_MT
 	/* Init multithreading support */
-	pthread_mutex_init(&__fb_global_mutex, &attr);
-	pthread_mutex_init(&__fb_string_mutex, &attr);
-	pthread_mutex_init(&__fb_graphics_mutex, &attr);
-	pthread_mutex_init(&__fb_math_mutex, &attr);
-	pthread_mutex_init(&__fb_profile_mutex, &attr);
+	pthread_mutex_init(&fb_global_mutex, &attr);
+	pthread_mutex_init(&fb_string_mutex, &attr);
+	pthread_mutex_init(&fb_graphics_mutex, &attr);
+	pthread_mutex_init(&fb_math_mutex, &attr);
+	pthread_mutex_init(&fb_profile_mutex, &attr);
 #endif
 
 	pthread_mutex_init(&__fb_bg_mutex, &attr);
 
-	memset(&__fb_con, 0, sizeof(__fb_con));
+	memset(&fb_console_context, 0, sizeof(fb_console_context));
 
 #ifdef DISABLE_NCURSES
 
@@ -587,35 +587,35 @@ static void hInit( void )
 	if (!tgetflag(FB_TERMCAP_ID( "am" )))
 		return;
 	for (i = 0; i < SEQ_MAX; i++)
-		__fb_con.seq[i] = tgetstr(FB_TERMCAP_ID( seq[i] ), NULL);
+		fb_console_context.seq[i] = tgetstr(FB_TERMCAP_ID( seq[i] ), NULL);
 #endif
 
 	/* !!!TODO!!! detect other OS consoles? (freebsd: 'cons25', etc?) */
 	if ((!strcmp(term, "console")) || (!strncmp(term, "linux", 5)))
-		__fb_con.inited = INIT_CONSOLE;
+		fb_console_context.inited = INIT_CONSOLE;
 	else
-		__fb_con.inited = INIT_X11;
+		fb_console_context.inited = INIT_X11;
 
 	if (!strncasecmp(term, "eterm", 5))
-		__fb_con.term_type = TERM_ETERM;
+		fb_console_context.term_type = TERM_ETERM;
 	else if (!strncmp(term, "xterm", 5))
-		__fb_con.term_type = TERM_XTERM;
+		fb_console_context.term_type = TERM_XTERM;
 	else
-		__fb_con.term_type = TERM_GENERIC;
+		fb_console_context.term_type = TERM_GENERIC;
 
 	if (fb_hInitConsole()) {
-		__fb_con.inited = FALSE;
+		fb_console_context.inited = FALSE;
 		return;
 	}
-	__fb_con.keyboard_getch = default_getch;
+	fb_console_context.keyboard_getch = default_getch;
 
 	/* Install signal handlers to quietly shut down */
 	for (i = 0; sigs[i] >= 0; i++)
 		old_sighandler[sigs[i]] = signal(sigs[i],  signal_handler);
 
-	__fb_con.char_buffer = NULL;
-	__fb_con.fg_color = 7;
-	__fb_con.bg_color = 0;
+	fb_console_context.char_buffer = NULL;
+	fb_console_context.fg_color = 7;
+	fb_console_context.bg_color = 0;
 
 	/* Trigger console window size & cursor position checks the first time
 	   fb_hRecheckConsoleSize() is invoked (lazy initialization).
@@ -634,7 +634,7 @@ static void hInit( void )
 
 	/* In case it's not possible to retrieve the real cursor position from
 	   the terminal, we assume to start out at 1,1. */
-	__fb_con.cur_y = __fb_con.cur_x = 1;
+	fb_console_context.cur_y = fb_console_context.cur_x = 1;
 
 	signal(SIGWINCH, sigwinch_handler);
 }
@@ -647,26 +647,26 @@ void fb_hInit( void )
 void fb_hEnd( int unused )
 {
 	fb_hExitConsole();
-	__fb_con.inited = FALSE;
+	fb_console_context.inited = FALSE;
 	if( bgthread_inited ) {
 		pthread_join(__fb_bg_thread, NULL);
 		bgthread_inited = FALSE;
 	}
 	pthread_mutex_destroy(&__fb_bg_mutex);
 
-	if (__fb_con.char_buffer) {
-		free(__fb_con.char_buffer);
-		__fb_con.char_buffer = NULL;
-		__fb_con.attr_buffer = NULL;
+	if (fb_console_context.char_buffer) {
+		free(fb_console_context.char_buffer);
+		fb_console_context.char_buffer = NULL;
+		fb_console_context.attr_buffer = NULL;
 	}
 
 #ifdef ENABLE_MT
 	/* Release multithreading support resources */
-	pthread_mutex_destroy(&__fb_global_mutex);
-	pthread_mutex_destroy(&__fb_string_mutex);
-	pthread_mutex_destroy(&__fb_graphics_mutex);
-	pthread_mutex_destroy(&__fb_math_mutex);
-	pthread_mutex_destroy(&__fb_profile_mutex);
+	pthread_mutex_destroy(&fb_global_mutex);
+	pthread_mutex_destroy(&fb_string_mutex);
+	pthread_mutex_destroy(&fb_graphics_mutex);
+	pthread_mutex_destroy(&fb_math_mutex);
+	pthread_mutex_destroy(&fb_profile_mutex);
 #endif
 }
 /* NOLINTEND(bugprone-signal-handler) */

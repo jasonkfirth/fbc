@@ -55,7 +55,7 @@
     the subsystem has been initialized.
 */
 
-FB_SFXCTX *__fb_sfx = NULL;
+FB_SFXCTX *fb_sfx_context = NULL;
 
 
 /* ------------------------------------------------------------------------- */
@@ -129,18 +129,18 @@ void fb_sfxDefaultConfig(FB_SFXCTX *ctx)
 
 int fb_sfxAllocContext(void)
 {
-    if (__fb_sfx)
+    if (fb_sfx_context)
         return 0;
 
-    __fb_sfx = (FB_SFXCTX *)malloc(sizeof(FB_SFXCTX));
+    fb_sfx_context = (FB_SFXCTX *)malloc(sizeof(FB_SFXCTX));
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
     {
         SFX_DEBUG("sfx_vars: failed to allocate runtime context");
         return -1;
     }
 
-    fb_sfxDefaultConfig(__fb_sfx);
+    fb_sfxDefaultConfig(fb_sfx_context);
 
     SFX_DEBUG("sfx_vars: runtime context allocated");
 
@@ -162,11 +162,11 @@ int fb_sfxAllocContext(void)
 
 void fb_sfxFreeContext(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    free(__fb_sfx);
-    __fb_sfx = NULL;
+    free(fb_sfx_context);
+    fb_sfx_context = NULL;
 
     SFX_DEBUG("sfx_vars: runtime context released");
 }

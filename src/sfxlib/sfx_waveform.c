@@ -74,10 +74,10 @@ static void fb_sfxWaveAdvance(FB_SFXVOICE *v)
     if (!v)
         return;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    if (__fb_sfx->samplerate <= 0)
+    if (fb_sfx_context->samplerate <= 0)
         return;
 
     step = fb_sfxOscillatorPhaseStep(v);
@@ -178,7 +178,7 @@ static float fb_sfxWaveNoise(FB_SFXVOICE *v)
     if (v->frequency <= 0)
         return fb_sfxWaveRandomNoise();
 
-    if (!__fb_sfx || __fb_sfx->samplerate <= 0)
+    if (!fb_sfx_context || fb_sfx_context->samplerate <= 0)
         return fb_sfxWaveRandomNoise();
 
     if (!v->noise_ready)
@@ -189,7 +189,7 @@ static float fb_sfxWaveNoise(FB_SFXVOICE *v)
 
     fb_sfxWaveAdvance(v);
 
-    if (v->phase < ((float)v->frequency / (float)__fb_sfx->samplerate))
+    if (v->phase < ((float)v->frequency / (float)fb_sfx_context->samplerate))
         v->noise_value = fb_sfxWaveRandomNoise();
 
     return v->noise_value;

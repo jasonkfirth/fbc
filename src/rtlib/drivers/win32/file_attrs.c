@@ -29,7 +29,7 @@ static int attribute_error( DWORD error )
    mask before entering here. Convert the path once for the entire operation. */
 static int file_attributes( const char *filename, int requested )
 {
-	wchar_t *wide_path = NULL;
+	FB_WCHAR *wide_path = NULL;
 	char *ansi_path = NULL;
 	const char *pattern;
 	DWORD attributes, native_error;

@@ -37,8 +37,8 @@
         sfxlib/haiku
 */
 
-#ifndef __FB_SFX_DRIVER_H__
-#define __FB_SFX_DRIVER_H__
+#ifndef FB_SFX_DRIVER_H
+#define FB_SFX_DRIVER_H
 
 #include "fb_sfx.h"
 
@@ -293,7 +293,7 @@ typedef struct SFXDRIVER
         ALSA → PulseAudio → Null driver
 */
 
-extern const SFXDRIVER *__fb_sfx_drivers_list[];
+extern const SFXDRIVER *fb_sfx_drivers_list[] FB_C_SYMBOL("__fb_sfx_drivers_list");
 
 
 
@@ -309,7 +309,7 @@ extern const SFXDRIVER *__fb_sfx_drivers_list[];
     to any device.
 */
 
-extern const SFXDRIVER __fb_sfxDriverNull;
+extern const SFXDRIVER fb_sfxDriverNull_internal FB_C_SYMBOL("__fb_sfxDriverNull");
 extern const SFXDRIVER fb_sfxDriverNull;
 
 

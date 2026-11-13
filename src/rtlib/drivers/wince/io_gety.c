@@ -22,17 +22,17 @@
 int fb_ConsoleGetRawYEx( HANDLE console )
 {
 	(void)console;
-	return __fb_con.cursor_y;
+	return fb_console_context.cursor_y;
 }
 
 int fb_ConsoleGetRawY( void )
 {
-	return __fb_con.cursor_y;
+	return fb_console_context.cursor_y;
 }
 
 int fb_ConsoleGetY( void )
 {
-	return __fb_con.cursor_y + 1;
+	return fb_console_context.cursor_y + 1;
 }
 
 /* end of drivers/wince/io_gety.c */

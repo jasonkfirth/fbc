@@ -64,9 +64,9 @@ static int fb_sfxDeviceDriverIndexLocked(const FB_SFX_DRIVER *driver)
     if (!driver)
         return -1;
 
-    for (i = 0; __fb_sfx_drivers_list[i]; ++i)
+    for (i = 0; fb_sfx_drivers_list[i]; ++i)
     {
-        if (__fb_sfx_drivers_list[i] == driver)
+        if (fb_sfx_drivers_list[i] == driver)
             return i;
     }
 
@@ -75,8 +75,8 @@ static int fb_sfxDeviceDriverIndexLocked(const FB_SFX_DRIVER *driver)
 
 static const FB_SFX_DRIVER *fb_sfxCurrentDriverLocked(void)
 {
-    if (__fb_sfx && __fb_sfx->driver)
-        return __fb_sfx->driver;
+    if (fb_sfx_context && fb_sfx_context->driver)
+        return fb_sfx_context->driver;
 
     return g_current_driver;
 }
@@ -104,8 +104,8 @@ static void fb_sfxShutdownCurrentDriver(void)
         goto clear_state;
 
 clear_state:
-    if (__fb_sfx)
-        __fb_sfx->driver = NULL;
+    if (fb_sfx_context)
+        fb_sfx_context->driver = NULL;
 
     g_current_driver = NULL;
     g_current_device_id = -1;
@@ -149,7 +149,7 @@ int fb_sfxDeviceSelect(int id)
         return -1;
     }
 
-    drv = __fb_sfx_drivers_list[id];
+    drv = fb_sfx_drivers_list[id];
 
     if (!drv)
     {
@@ -167,9 +167,9 @@ int fb_sfxDeviceSelect(int id)
 
     fb_sfxSyncCurrentDriverLocked();
     current = g_current_driver;
-    samplerate = __fb_sfx ? __fb_sfx->samplerate : FB_SFX_DEFAULT_RATE;
-    channels = __fb_sfx ? __fb_sfx->output_channels : FB_SFX_DEFAULT_CHANNELS;
-    buffer_size = __fb_sfx ? __fb_sfx->buffer_size : FB_SFX_DEFAULT_BUFFER;
+    samplerate = fb_sfx_context ? fb_sfx_context->samplerate : FB_SFX_DEFAULT_RATE;
+    channels = fb_sfx_context ? fb_sfx_context->output_channels : FB_SFX_DEFAULT_CHANNELS;
+    buffer_size = fb_sfx_context ? fb_sfx_context->buffer_size : FB_SFX_DEFAULT_BUFFER;
 
     if (current == drv)
     {
@@ -201,7 +201,7 @@ int fb_sfxDeviceSelect(int id)
             if (current && current->init &&
                 current->init(samplerate, channels, buffer_size, FB_SFX_INIT_DEFAULT) == 0)
             {
-                __fb_sfx->driver = current;
+                fb_sfx_context->driver = current;
                 fb_sfxSyncCurrentDriverLocked();
                 SFX_DEBUG("sfx_device_select: restored '%s' after failed selection",
                           current->name);
@@ -230,7 +230,7 @@ int fb_sfxDeviceSelect(int id)
 
     g_current_driver = drv;
     g_current_device_id = id;
-    __fb_sfx->driver = drv;
+    fb_sfx_context->driver = drv;
     fb_sfxDriverStatsReset(drv->name);
 
     SFX_DEBUG("sfx_device_select: audio device selected: %s", drv->name);

@@ -30,7 +30,7 @@ static void fb_hPutAlphaMask(unsigned char *src, unsigned char *dest, int w, int
 	}
 #endif
 #ifdef HOST_X86
-	if (__fb_gfx->flags & X86_MMX_ENABLED) {
+	if (fb_gfx->flags & X86_MMX_ENABLED) {
 		fb_hPutAlphaMaskMMX(src, dest, w, h, src_pitch, dest_pitch, alpha, blender, param);
 		return;
 	}
@@ -60,7 +60,7 @@ FBCALL int fb_GfxPut(void *target, float fx, float fy, unsigned char *src, int x
 
 	FB_GRAPHICS_LOCK( );
 
-	if ((!__fb_gfx) || (!src)) {
+	if ((!fb_gfx) || (!src)) {
 		FB_GRAPHICS_UNLOCK( );
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	}

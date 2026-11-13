@@ -15,7 +15,7 @@ FBCALL float fb_GfxPMap(float coord, int func)
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return 0.0;
 	}
@@ -69,7 +69,7 @@ FBCALL float fb_GfxCursor(int func)
 
 	context = fb_hGetContext( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return 0.0;
 	}

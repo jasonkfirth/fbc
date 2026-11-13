@@ -88,7 +88,12 @@ FBTHREADFLAGS fb_AtomicSetThreadFlags( volatile FBTHREADFLAGS *threadFlags, FBTH
 
 #else
 
-#if GCC_VERSION >= 40100
+#if defined(__clang__)
+	/* Preserve __sync's full-barrier behavior with explicit atomic ordering. */
+	return __atomic_fetch_or( threadFlags, newFlag, __ATOMIC_SEQ_CST );
+#elif GCC_VERSION >= 40700
+	return __atomic_fetch_or( threadFlags, newFlag, __ATOMIC_SEQ_CST );
+#elif GCC_VERSION >= 40100
 	return __sync_fetch_and_or( threadFlags, newFlag );
 #elif defined ( InterlockedOr )
 	return InterlockedOr( (volatile LONG *) threadFlags, newFlag );

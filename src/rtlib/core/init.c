@@ -10,14 +10,14 @@
 #include "fb_private_thread.h"
 
 FB_RTLIB_CTX fb_ctx /* not initialized */;
-static int __fb_is_inicnt = 0;
+static int fb_runtime_init_count = 0;
 
 /* called from fbrt0 */
 void fb_hRtInit( void )
 {
 	/* already initialized? */
-	++__fb_is_inicnt;
-	if( __fb_is_inicnt != 1 )
+	++fb_runtime_init_count;
+	if( fb_runtime_init_count != 1 )
 		return;
 
 	/* initialize context */
@@ -56,8 +56,8 @@ void fb_hRtInit( void )
 /* called from fbrt0 */
 void fb_hRtExit( void )
 {
-	--__fb_is_inicnt;
-	if( __fb_is_inicnt != 0 )
+	--fb_runtime_init_count;
+	if( fb_runtime_init_count != 0 )
 		return;
 
 #if defined(HOST_DOS) && defined(ENABLE_MT) && defined(FB_DOS_PDMLWP)
@@ -138,6 +138,9 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 
 /* called by FB program,
    or fb_Die() in case of assert() failure or runtime error */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noreturn))
+#endif
 FBCALL void fb_End( int errlevel )
 {
 	if( fb_ctx.exit_sfxlib )

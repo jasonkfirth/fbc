@@ -48,16 +48,16 @@ static void aros_source_rgb(const unsigned char *source, int x,
 {
     unsigned int pixel;
 
-    if (__fb_gfx->depth <= 8)
+    if (fb_gfx->depth <= 8)
     {
-        pixel = __fb_gfx->device_palette[source[x]];
+        pixel = fb_gfx->device_palette[source[x]];
         *red = (unsigned char)(pixel & 255U);
         *green = (unsigned char)((pixel >> 8) & 255U);
         *blue = (unsigned char)((pixel >> 16) & 255U);
         return;
     }
 
-    if (__fb_gfx->depth == 16)
+    if (fb_gfx->depth == 16)
     {
         pixel = ((const unsigned short *)source)[x];
         *red = (unsigned char)(((pixel >> 11) & 31U) * 255U / 31U);
@@ -81,7 +81,7 @@ static void aros_convert_row(int y)
     unsigned char blue;
     int x;
 
-    source = __fb_gfx->framebuffer + ((size_t)y * __fb_gfx->pitch);
+    source = fb_gfx->framebuffer + ((size_t)y * fb_gfx->pitch);
     destination = fb_aros_gfx.present_buffer +
         ((size_t)y * (size_t)fb_aros_gfx.width * 4U);
 
@@ -207,8 +207,8 @@ void fb_arosGfxPresent(void)
     int row;
 
     if (!fb_aros_gfx.active || fb_aros_gfx.window == NULL ||
-        fb_aros_gfx.present_buffer == NULL || __fb_gfx == NULL ||
-        __fb_gfx->framebuffer == NULL)
+        fb_aros_gfx.present_buffer == NULL || fb_gfx == NULL ||
+        fb_gfx->framebuffer == NULL)
     {
         return;
     }
@@ -218,12 +218,12 @@ void fb_arosGfxPresent(void)
     {
         int dirty;
 
-        dirty = (__fb_gfx->dirty == NULL || __fb_gfx->dirty[row]);
+        dirty = (fb_gfx->dirty == NULL || fb_gfx->dirty[row]);
         if (dirty)
         {
             aros_convert_row(row);
-            if (__fb_gfx->dirty != NULL)
-                __fb_gfx->dirty[row] = FALSE;
+            if (fb_gfx->dirty != NULL)
+                fb_gfx->dirty[row] = FALSE;
             if (first_dirty < 0)
                 first_dirty = row;
         }

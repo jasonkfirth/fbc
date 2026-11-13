@@ -42,13 +42,15 @@ static void hFreeTlsContext( void *ctx );
 	#define FB_TLSGET(key)        TlsGetValue( (key) )
 #else
 	#define FB_TLSENTRY           uintptr_t
-	#define FB_TLSALLOC(key)      key = NULL
-	#define FB_TLSFREE(key)       key = NULL
+	#ifdef ENABLE_MT
+		#define FB_TLSALLOC(key)  key = NULL
+		#define FB_TLSFREE(key)   key = NULL
+	#endif
 	#define FB_TLSSET(key,value)  key = (FB_TLSENTRY)value
 	#define FB_TLSGET(key)        key
 #endif
 
-static FB_TLSENTRY __fb_tls_ctxtb[FB_TLSKEYS];
+static FB_TLSENTRY fb_tls_context_table[FB_TLSKEYS];
 
 #define FB_TLS_DATA_TO_HEADER( data ) ( ( ( FB_TLS_CTX_HEADER *)data ) - 1 )
 #define FB_TLS_HEADER_TO_DATA( header ) ( ( void *) ( header + 1 ) )
@@ -70,7 +72,7 @@ FBCALL void *fb_TlsGetCtxExisting( int index )
 {
 	if( index < 0 || index >= FB_TLSKEYS )
 		return NULL;
-	return (void *)FB_TLSGET( __fb_tls_ctxtb[index] );
+	return (void *)FB_TLSGET( fb_tls_context_table[index] );
 }
 
 /* Retrieve or create new TLS context for given key */
@@ -85,17 +87,17 @@ FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn
 			ctx = FB_TLS_HEADER_TO_DATA( ctxHeader );
 
 			#if defined ENABLE_MT && (defined HOST_UNIX || (defined HOST_DOS && defined FB_DOS_PDMLWP))
-				if( FB_TLSSET( __fb_tls_ctxtb[index], ctx ) != 0 ) {
+				if( FB_TLSSET( fb_tls_context_table[index], ctx ) != 0 ) {
 					free( ctxHeader );
 					ctx = NULL;
 				}
 			#elif defined ENABLE_MT && ( defined HOST_WIN32 || defined HOST_XBOX )
-				if( FB_TLSSET( __fb_tls_ctxtb[index], ctx ) == 0 ) {
+				if( FB_TLSSET( fb_tls_context_table[index], ctx ) == 0 ) {
 					free( ctxHeader );
 					ctx = NULL;
 				}
 			#else
-				FB_TLSSET( __fb_tls_ctxtb[index], ctx );
+				FB_TLSSET( fb_tls_context_table[index], ctx );
 			#endif
 		}
 
@@ -118,16 +120,12 @@ FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn
 
 FBCALL void fb_TlsDelCtx( int index )
 {
-	void *ctx = (void *)FB_TLSGET( __fb_tls_ctxtb[index] );
+	void *ctx = (void *)FB_TLSGET( fb_tls_context_table[index] );
 
 	/* free mem block if any */
 	if( ctx != NULL ) {
-		FB_TLS_CTX_HEADER *ctxHeader = FB_TLS_DATA_TO_HEADER( ctx );
-		if( ctxHeader->destructor ) {
-			( ctxHeader->destructor )( ctx );
-		}
-		free( ctxHeader );
-		FB_TLSSET( __fb_tls_ctxtb[index], NULL );
+		hFreeTlsContext( ctx );
+		FB_TLSSET( fb_tls_context_table[index], NULL );
 	}
 }
 
@@ -146,7 +144,7 @@ void fb_TlsInit( void )
 	/* allocate thread local storage keys */
 	int i;
 	for( i = 0; i < FB_TLSKEYS; i++ )
-		FB_TLSALLOC( __fb_tls_ctxtb[i] );
+		FB_TLSALLOC( fb_tls_context_table[i] );
 }
 
 void fb_TlsExit( void )
@@ -154,7 +152,7 @@ void fb_TlsExit( void )
 	/* free thread local storage keys */
 	int i;
 	for( i = 0; i < FB_TLSKEYS; i++ ) {
-		FB_TLSFREE( __fb_tls_ctxtb[i] );
+		FB_TLSFREE( fb_tls_context_table[i] );
 	}
 	fb_CloseAtomicFBThreadFlagMutex( );
 }

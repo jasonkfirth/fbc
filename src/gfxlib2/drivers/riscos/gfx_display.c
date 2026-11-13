@@ -339,10 +339,10 @@ unsigned int fb_riscosGfxSourceRgb(int x, const unsigned char *source)
     unsigned int green;
     unsigned int blue;
 
-    if (__fb_gfx->depth <= 8)
-        return __fb_gfx->device_palette[source[x]];
+    if (fb_gfx->depth <= 8)
+        return fb_gfx->device_palette[source[x]];
 
-    if (__fb_gfx->depth == 16)
+    if (fb_gfx->depth == 16)
     {
         pixel = ((const unsigned short *)source)[x];
         red = ((pixel >> 11) & 31U) * 255U / 31U;
@@ -371,15 +371,15 @@ unsigned int fb_riscosGfxReadSourcePixel(int x, int y)
         a Wimp sprite or the direct display.
     */
 
-    if (!fb_riscos_gfx.active || __fb_gfx == NULL ||
-        __fb_gfx->framebuffer == NULL || x < 0 || y < 0 ||
+    if (!fb_riscos_gfx.active || fb_gfx == NULL ||
+        fb_gfx->framebuffer == NULL || x < 0 || y < 0 ||
         x >= fb_riscos_gfx.viewport_width ||
         y >= fb_riscos_gfx.viewport_height)
     {
         return 0;
     }
 
-    source = __fb_gfx->framebuffer + (y * __fb_gfx->pitch);
+    source = fb_gfx->framebuffer + (y * fb_gfx->pitch);
     rgb = fb_riscosGfxSourceRgb(x, source);
     return 0xFF000000U | ((rgb & 255U) << 16) |
         (rgb & 0x0000FF00U) | ((rgb >> 16) & 255U);
@@ -529,8 +529,8 @@ void fb_riscosGfxPresent(void)
         return;
     }
 
-    if (!fb_riscos_gfx.active || __fb_gfx == NULL ||
-        __fb_gfx->framebuffer == NULL || __fb_gfx->dirty == NULL)
+    if (!fb_riscos_gfx.active || fb_gfx == NULL ||
+        fb_gfx->framebuffer == NULL || fb_gfx->dirty == NULL)
     {
         return;
     }
@@ -542,13 +542,13 @@ void fb_riscosGfxPresent(void)
     */
 
     (void)riscos_remove_cursors();
-    source = __fb_gfx->framebuffer;
+    source = fb_gfx->framebuffer;
 
     for (y = 0; y < fb_riscos_gfx.viewport_height; ++y)
     {
-        if (!__fb_gfx->dirty[y])
+        if (!fb_gfx->dirty[y])
         {
-            source += __fb_gfx->pitch;
+            source += fb_gfx->pitch;
             continue;
         }
 
@@ -567,8 +567,8 @@ void fb_riscosGfxPresent(void)
                 fb_riscos_gfx.viewport_width);
         }
 
-        __fb_gfx->dirty[y] = FALSE;
-        source += __fb_gfx->pitch;
+        fb_gfx->dirty[y] = FALSE;
+        source += fb_gfx->pitch;
     }
 
     /* Modern RISC OS video drivers may map screen memory as cacheable. */

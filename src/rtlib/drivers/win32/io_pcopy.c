@@ -14,47 +14,47 @@ int fb_ConsolePageCopy( int src, int dst )
 
 	/* use current? */
 	if( src < 0 )
-		src = __fb_con.active;
+		src = fb_console_context.active;
 
 	/* not allocated yet? */
-	if( __fb_con.pgHandleTb[src] == NULL )
+	if( fb_console_context.pgHandleTb[src] == NULL )
 	{
     	HANDLE hnd = fb_hConsoleCreateBuffer( );
         if( hnd == NULL )
            	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		else
-			__fb_con.pgHandleTb[src] = hnd;
+			fb_console_context.pgHandleTb[src] = hnd;
 	}
 
 	/* use current? */
 	if( dst < 0 )
-		dst = __fb_con.visible;
+		dst = fb_console_context.visible;
 
 	if( src == dst )
 		return fb_ErrorSetNum( FB_RTERROR_OK );
 
 	/* not allocated yet? */
-	if( __fb_con.pgHandleTb[dst] == NULL )
+	if( fb_console_context.pgHandleTb[dst] == NULL )
 	{
     	HANDLE hnd = fb_hConsoleCreateBuffer( );
         if( hnd == NULL )
            	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		else
-			__fb_con.pgHandleTb[dst] = hnd;
+			fb_console_context.pgHandleTb[dst] = hnd;
 	}
 
 	/* do the copy */
 
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	GetConsoleScreenBufferInfo( __fb_con.pgHandleTb[src], &csbi );
+	GetConsoleScreenBufferInfo( fb_console_context.pgHandleTb[src], &csbi );
 	PCHAR_INFO buff = malloc( csbi.dwSize.X * csbi.dwSize.Y * sizeof( CHAR_INFO ) );
 	if(buff)
 	{
 		COORD pos = { 0, 0 };
-		ReadConsoleOutput( __fb_con.pgHandleTb[src], buff, csbi.dwSize, pos, &csbi.srWindow );
+		ReadConsoleOutput( fb_console_context.pgHandleTb[src], buff, csbi.dwSize, pos, &csbi.srWindow );
 
-		GetConsoleScreenBufferInfo( __fb_con.pgHandleTb[dst], &csbi );
-		WriteConsoleOutput( __fb_con.pgHandleTb[dst], buff, csbi.dwSize, pos, &csbi.srWindow );
+		GetConsoleScreenBufferInfo( fb_console_context.pgHandleTb[dst], &csbi );
+		WriteConsoleOutput( fb_console_context.pgHandleTb[dst], buff, csbi.dwSize, pos, &csbi.srWindow );
 		free( buff );
 	}
 	return fb_ErrorSetNum( buff ? FB_RTERROR_OK : FB_RTERROR_OUTOFMEM );

@@ -22,11 +22,9 @@
         - keyboard, mouse, or touch input
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 
-FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *axis1,
-	float *axis2, float *axis3, float *axis4, float *axis5, float *axis6,
-	float *axis7, float *axis8);
 
 static int stick_positions[4];
 static int stick_buttons[2];

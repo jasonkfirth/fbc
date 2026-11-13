@@ -24,23 +24,23 @@
 
 HANDLE fb_hConsoleCreateBuffer( void )
 {
-	return fb_hWinCEConsoleEnsurePage( __fb_con.active ) ? (HANDLE)1 : NULL;
+	return fb_hWinCEConsoleEnsurePage( fb_console_context.active ) ? (HANDLE)1 : NULL;
 }
 
 int fb_ConsolePageSet( int active, int visible )
 {
 	int previous;
 
-	previous = __fb_con.active | (__fb_con.visible << 8);
+	previous = fb_console_context.active | (fb_console_context.visible << 8);
 	if( (active >= 0) && !fb_hWinCEConsoleEnsurePage( active ) )
 		return -1;
 	if( (visible >= 0) && !fb_hWinCEConsoleEnsurePage( visible ) )
 		return -1;
 
 	if( active >= 0 )
-		__fb_con.active = active;
+		fb_console_context.active = active;
 	if( visible >= 0 )
-		__fb_con.visible = visible;
+		fb_console_context.visible = visible;
 
 	return previous;
 }

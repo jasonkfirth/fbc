@@ -66,8 +66,8 @@ int fb_sfxControlDeviceList(void)
     if (!fb_sfxEnsureInitialized())
         return 0;
 
-    if (__fb_sfx->driver && __fb_sfx->driver->device_list)
-        return __fb_sfx->driver->device_list();
+    if (fb_sfx_context->driver && fb_sfx_context->driver->device_list)
+        return fb_sfx_context->driver->device_list();
 
     return 0;
 }
@@ -93,8 +93,8 @@ int fb_sfxControlDeviceSelect(int device)
     if (!fb_sfxEnsureInitialized())
         return -1;
 
-    if (__fb_sfx->driver && __fb_sfx->driver->device_select)
-        return __fb_sfx->driver->device_select(device);
+    if (fb_sfx_context->driver && fb_sfx_context->driver->device_select)
+        return fb_sfx_context->driver->device_select(device);
 
     return -1;
 }
@@ -126,7 +126,7 @@ void fb_sfxSetMasterVolume(float volume)
     if (volume > 1.0f)
         volume = 1.0f;
 
-    __fb_sfx->master_volume = volume;
+    fb_sfx_context->master_volume = volume;
 
     SFX_DEBUG("sfx_control: master volume set to %f", volume);
 }
@@ -143,7 +143,7 @@ float fb_sfxGetMasterVolume(void)
     if (!fb_sfxEnsureInitialized())
         return 0.0f;
 
-    return __fb_sfx->master_volume;
+    return fb_sfx_context->master_volume;
 }
 
 
@@ -167,7 +167,7 @@ void fb_sfxSetChannelVolume(int channel, float volume)
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         return;
 
-    ch = &__fb_sfx->channels[channel];
+    ch = &fb_sfx_context->channels[channel];
 
     if (volume < 0.0f)
         volume = 0.0f;
@@ -203,7 +203,7 @@ void fb_sfxSetChannelPan(int channel, float pan)
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
         return;
 
-    ch = &__fb_sfx->channels[channel];
+    ch = &fb_sfx_context->channels[channel];
 
     if (pan < -1.0f)
         pan = -1.0f;
@@ -234,10 +234,10 @@ void fb_sfxSetChannelPan(int channel, float pan)
 
 int fb_sfxStatus(void)
 {
-    if (__fb_sfx == NULL)
+    if (fb_sfx_context == NULL)
         return 0;
 
-    return __fb_sfx->initialized ? 1 : 0;
+    return fb_sfx_context->initialized ? 1 : 0;
 }
 
 
@@ -256,10 +256,10 @@ const char *fb_sfxDriverName(void)
     if (!fb_sfxEnsureInitialized())
         return "none";
 
-    if (!__fb_sfx->driver)
+    if (!fb_sfx_context->driver)
         return "none";
 
-    return __fb_sfx->driver->name;
+    return fb_sfx_context->driver->name;
 }
 
 

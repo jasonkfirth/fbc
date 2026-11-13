@@ -243,7 +243,7 @@ int fb_sfxPlatformCaptureRead(float *buffer, int frames)
 }
 #endif
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
 #ifndef DISABLE_PULSE
     &fb_sfxDriverPulse,
@@ -251,7 +251,7 @@ const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
 #ifndef DISABLE_ALSA
     &fb_sfxDriverAlsa,
 #endif
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

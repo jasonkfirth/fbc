@@ -1572,7 +1572,7 @@ int fb_hAndroidInit(char *title, int w, int h, int depth, int refresh_rate, int 
 
 	fb_android.active = 1;
 	configure_window_locked();
-	__fb_gfx->refresh_rate = fb_android.refresh_rate;
+	fb_gfx->refresh_rate = fb_android.refresh_rate;
 	/* ScreenRes replaces the queue during IME/window resizes. The new queue
 	 * needs the current lifecycle even if its last edge reached the old mode. */
 	android_post_focus_locked();
@@ -1612,12 +1612,12 @@ static int android_has_dirty_lines_locked(void)
 {
 	int y;
 
-	if (!__fb_gfx || !__fb_gfx->dirty)
+	if (!fb_gfx || !fb_gfx->dirty)
 		return 0;
 
-	for (y = 0; y < __fb_gfx->h; y++)
+	for (y = 0; y < fb_gfx->h; y++)
 	{
-		if (__fb_gfx->dirty[y])
+		if (fb_gfx->dirty[y])
 			return 1;
 	}
 
@@ -1643,9 +1643,9 @@ void fb_hAndroidUnlock(void)
 	if (fb_android.display_locked > 0)
 		fb_android.display_locked--;
 
-	context = __fb_gfx ? fb_hGetContext() : NULL;
-	if (__fb_gfx && __fb_gfx->dirty && context &&
-	    (__fb_gfx->visible_page == context->work_page))
+	context = fb_gfx ? fb_hGetContext() : NULL;
+	if (fb_gfx && fb_gfx->dirty && context &&
+	    (fb_gfx->visible_page == context->work_page))
 		needs_update = android_has_dirty_lines_locked();
 
 	pthread_mutex_unlock(&fb_android.mutex);
@@ -2102,14 +2102,14 @@ static int ensure_scale_buffer_locked(size_t bytes)
 
 static void mark_framebuffer_dirty_locked(void)
 {
-	if (__fb_gfx && __fb_gfx->dirty)
-		fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h);
+	if (fb_gfx && fb_gfx->dirty)
+		fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h);
 }
 
 static void clear_framebuffer_dirty_locked(void)
 {
-	if (__fb_gfx && __fb_gfx->dirty)
-		fb_hMemSet(__fb_gfx->dirty, FALSE, __fb_gfx->h);
+	if (fb_gfx && fb_gfx->dirty)
+		fb_hMemSet(fb_gfx->dirty, FALSE, fb_gfx->h);
 }
 
 static void make_pixels_opaque(uint32_t *pixels, int width, int height)
@@ -2605,7 +2605,7 @@ void fb_hAndroidUpdate(void)
 	pthread_mutex_lock(&fb_android.mutex);
 	window = fb_android.window;
 	if (fb_android.opengl || fb_android.display_locked || !fb_android.active || !can_render_locked() ||
-	    !window || !fb_android.blitter || !__fb_gfx || !__fb_gfx->framebuffer)
+	    !window || !fb_android.blitter || !fb_gfx || !fb_gfx->framebuffer)
 	{
 		pthread_mutex_unlock(&fb_android.mutex);
 		return;
@@ -3087,8 +3087,8 @@ static int android_key_to_ascii(int32_t keycode)
 
 static void android_set_gfx_key_state(int code, int pressed)
 {
-	if (__fb_gfx && code > 0 && code < 128)
-		__fb_gfx->key[code] = pressed ? TRUE : FALSE;
+	if (fb_gfx && code > 0 && code < 128)
+		fb_gfx->key[code] = pressed ? TRUE : FALSE;
 }
 
 void fb_hAndroidKey(int32_t keycode, int action, int unicode)

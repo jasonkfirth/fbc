@@ -26,6 +26,8 @@ static FB_FILE_HOOKS hooks_dev_cons = {
 
 int fb_DevConsOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {
+	(void)filename;
+	(void)filename_len;
     switch ( handle->mode )
     {
 	case FB_FILE_MODE_INPUT:

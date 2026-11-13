@@ -25,10 +25,10 @@
 
 extern const GFXDRIVER fb_gfxDriverAros;
 
-const GFXDRIVER *__fb_gfx_drivers_list[] =
+const GFXDRIVER *fb_gfx_drivers_list[] =
 {
     &fb_gfxDriverAros,
-    &__fb_gfxDriverNull,
+    &fb_gfxDriverNull,
     NULL
 };
 

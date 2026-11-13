@@ -65,16 +65,16 @@ int fb_sfxMusicStatus(void)
     int i;
     int status;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_MUSIC_STOPPED;
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx->music_playing >= 0)
+    if (fb_sfx_context->music_playing >= 0)
     {
         for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
         {
-            FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+            FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
             if (voice->active &&
                 voice->type == FB_SFX_VOICE_MUSIC)
@@ -83,18 +83,18 @@ int fb_sfxMusicStatus(void)
 
         if (i >= FB_SFX_MAX_VOICES)
         {
-            __fb_sfx->music_playing = -1;
-            __fb_sfx->music_paused = 0;
-            __fb_sfx->music_loop = 0;
-            __fb_sfx->music_pos = 0;
+            fb_sfx_context->music_playing = -1;
+            fb_sfx_context->music_paused = 0;
+            fb_sfx_context->music_loop = 0;
+            fb_sfx_context->music_pos = 0;
             fb_sfxRuntimeUnlock();
             return FB_SFX_MUSIC_STOPPED;
         }
     }
 
-    if (__fb_sfx->music_playing < 0)
+    if (fb_sfx_context->music_playing < 0)
         status = FB_SFX_MUSIC_STOPPED;
-    else if (__fb_sfx->music_paused)
+    else if (fb_sfx_context->music_paused)
         status = FB_SFX_MUSIC_PAUSED;
     else
         status = FB_SFX_MUSIC_PLAYING;
@@ -121,11 +121,11 @@ long fb_sfxMusicPosition(void)
 {
     long result;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     fb_sfxRuntimeLock();
-    result = __fb_sfx->music_pos;
+    result = fb_sfx_context->music_pos;
     fb_sfxRuntimeUnlock();
 
     return result;

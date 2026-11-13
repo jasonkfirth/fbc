@@ -146,10 +146,17 @@ typedef struct FB_GFX3_VK_SWAPCHAIN_CREATE_INFO {
 	FB_GFX3_VK_SWAPCHAIN old_swapchain;
 } FB_GFX3_VK_SWAPCHAIN_CREATE_INFO;
 
+/*
+	On 64-bit targets, these fields name tail bytes the Vulkan ABI already
+	pads to eight-byte boundaries. They carry no Vulkan API data.
+*/
 typedef struct FB_GFX3_VK_SEMAPHORE_CREATE_INFO {
 	uint32_t structure_type;
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VK_SEMAPHORE_CREATE_INFO;
 
 typedef struct FB_GFX3_VK_PRESENT_INFO {
@@ -326,6 +333,9 @@ typedef struct FB_GFX3_VK_FENCE_CREATE_INFO {
 	uint32_t structure_type;
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VK_FENCE_CREATE_INFO;
 
 typedef struct FB_GFX3_VK_SUBMIT_INFO {
@@ -355,6 +365,9 @@ typedef struct FB_GFX3_VK_MEMORY_REQUIREMENTS {
 	uint64_t size;
 	uint64_t alignment;
 	uint32_t memory_type_bits;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VK_MEMORY_REQUIREMENTS;
 
 typedef struct FB_GFX3_VK_MEMORY_TYPE {
@@ -365,6 +378,9 @@ typedef struct FB_GFX3_VK_MEMORY_TYPE {
 typedef struct FB_GFX3_VK_MEMORY_HEAP {
 	uint64_t size;
 	FB_GFX3_VK_FLAGS flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VK_MEMORY_HEAP;
 
 typedef struct FB_GFX3_VK_PHYSICAL_DEVICE_MEMORY_PROPERTIES {
@@ -379,6 +395,9 @@ typedef struct FB_GFX3_VK_MEMORY_ALLOCATE_INFO {
 	const void *next;
 	uint64_t allocation_size;
 	uint32_t memory_type_index;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VK_MEMORY_ALLOCATE_INFO;
 
 typedef struct FB_GFX3_VK_MEMORY_BARRIER {
@@ -419,6 +438,9 @@ typedef struct FB_GFX3_VK_IMAGE_MEMORY_BARRIER {
 	uint32_t destination_queue_family_index;
 	FB_GFX3_VK_IMAGE image;
 	FB_GFX3_VK_IMAGE_SUBRESOURCE_RANGE subresource_range;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VK_IMAGE_MEMORY_BARRIER;
 
 typedef struct FB_GFX3_VK_IMAGE_SUBRESOURCE_LAYERS {
@@ -495,6 +517,9 @@ typedef struct FB_GFX3_VK_COMPUTE_PIPELINE_CREATE_INFO {
 	FB_GFX3_VK_PIPELINE_LAYOUT layout;
 	FB_GFX3_VK_PIPELINE base_pipeline_handle;
 	int32_t base_pipeline_index;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VK_COMPUTE_PIPELINE_CREATE_INFO;
 
 typedef struct FB_GFX3_VK_DESCRIPTOR_POOL_SIZE {
@@ -1168,6 +1193,9 @@ typedef struct FB_GFX3_VULKAN_SURFACE_IMPLEMENTATION {
 	uint32_t width;
 	uint32_t height;
 	uint32_t depth;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t alignment_padding;
+#endif
 } FB_GFX3_VULKAN_SURFACE_IMPLEMENTATION;
 
 /* ------------------------------------------------------------------------- */

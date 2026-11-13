@@ -58,23 +58,23 @@ void fb_sfxMusicPause(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx->music_playing < 0)
+    if (fb_sfx_context->music_playing < 0)
     {
         fb_sfxRuntimeUnlock();
         return;
     }
 
-    if (__fb_sfx->music_paused)
+    if (fb_sfx_context->music_paused)
     {
         fb_sfxRuntimeUnlock();
         return;
     }
 
-    __fb_sfx->music_paused = 1;
+    fb_sfx_context->music_paused = 1;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (voice->active &&
             voice->type == FB_SFX_VOICE_MUSIC)

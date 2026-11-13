@@ -170,30 +170,30 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 		return -1;
 	fb_hGL_NormalizeParameters(flags);
 	*attrib++ = GLX_RED_SIZE;
-	*attrib++ = __fb_gl_params.color_red_bits;
+	*attrib++ = fb_gl_params.color_red_bits;
 	*attrib++ = GLX_GREEN_SIZE;
-	*attrib++ = __fb_gl_params.color_green_bits;
+	*attrib++ = fb_gl_params.color_green_bits;
 	*attrib++ = GLX_BLUE_SIZE;
-	*attrib++ = __fb_gl_params.color_blue_bits;
+	*attrib++ = fb_gl_params.color_blue_bits;
 	*attrib++ = GLX_ALPHA_SIZE;
-	*attrib++ = __fb_gl_params.color_alpha_bits;
+	*attrib++ = fb_gl_params.color_alpha_bits;
 	*attrib++ = GLX_DEPTH_SIZE;
-	*attrib++ = __fb_gl_params.depth_bits;
-	if (__fb_gl_params.stencil_bits > 0) {
+	*attrib++ = fb_gl_params.depth_bits;
+	if (fb_gl_params.stencil_bits > 0) {
 		*attrib++ = GLX_STENCIL_SIZE;
-		*attrib++ = __fb_gl_params.stencil_bits;
+		*attrib++ = fb_gl_params.stencil_bits;
 	}
-	if (__fb_gl_params.accum_bits > 0) {
+	if (fb_gl_params.accum_bits > 0) {
 		*attrib++ = GLX_ACCUM_RED_SIZE;
-		*attrib++ = __fb_gl_params.accum_red_bits;
+		*attrib++ = fb_gl_params.accum_red_bits;
 		*attrib++ = GLX_ACCUM_GREEN_SIZE;
-		*attrib++ = __fb_gl_params.accum_green_bits;
+		*attrib++ = fb_gl_params.accum_green_bits;
 		*attrib++ = GLX_ACCUM_BLUE_SIZE;
-		*attrib++ = __fb_gl_params.accum_blue_bits;
+		*attrib++ = fb_gl_params.accum_blue_bits;
 		*attrib++ = GLX_ACCUM_ALPHA_SIZE;
-		*attrib++ = __fb_gl_params.accum_alpha_bits;
+		*attrib++ = fb_gl_params.accum_alpha_bits;
 	}
-	if (__fb_gl_params.num_samples > 0) {
+	if (fb_gl_params.num_samples > 0) {
 		*attrib++ = GLX_SAMPLE_BUFFERS_ARB;
 		*attrib++ = GL_TRUE;
 		*attrib++ = GLX_SAMPLES_ARB;
@@ -230,17 +230,17 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 		return -1;
 	}
 
-	__fb_gl_params.mode_2d = __fb_gl_params.init_mode_2d;
+	fb_gl_params.mode_2d = fb_gl_params.init_mode_2d;
 
-	if (__fb_gl_params.init_scale>=1){
-		__fb_gl_params.scale = __fb_gl_params.init_scale;
+	if (fb_gl_params.init_scale>=1){
+		fb_gl_params.scale = fb_gl_params.init_scale;
 	}
-	if (__fb_gl_params.scale>1){
-		free(__fb_gfx->dirty);
-		__fb_gfx->dirty = (char *)calloc(1, __fb_gfx->h * __fb_gfx->scanline_size * __fb_gl_params.scale);
+	if (fb_gl_params.scale>1){
+		free(fb_gfx->dirty);
+		fb_gfx->dirty = (char *)calloc(1, fb_gfx->h * fb_gfx->scanline_size * fb_gl_params.scale);
 	}
 
-	result = fb_hX11Init(title, w * __fb_gl_params.scale, h * __fb_gl_params.scale, info->depth, refresh_rate, flags);
+	result = fb_hX11Init(title, w * fb_gl_params.scale, h * fb_gl_params.scale, info->depth, refresh_rate, flags);
 
 	XFree(info);
 	info = NULL;
@@ -254,12 +254,12 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 		return -1;
 
 	if ((samples_attrib) && (*samples_attrib > 0))
-		__fb_gl.Enable(GL_MULTISAMPLE_ARB);
+		fb_gl.Enable(GL_MULTISAMPLE_ARB);
 
-	if (__fb_gl_params.mode_2d != DRIVER_OGL_2D_NONE)
+	if (fb_gl_params.mode_2d != DRIVER_OGL_2D_NONE)
 		fb_hGL_ScreenCreate();
 
-	if (__fb_gl_params.mode_2d == DRIVER_OGL_2D_AUTO_SYNC){
+	if (fb_gl_params.mode_2d == DRIVER_OGL_2D_AUTO_SYNC){
 		__fb_glX.MakeCurrent(fb_x11.display, None, NULL);
 		fb_x11.update = opengl_window_update;
 	}
@@ -280,7 +280,7 @@ static void driver_exit(void)
 static void driver_flip(void)
 {
 	fb_hX11Lock();
-	if (__fb_gl_params.mode_2d == DRIVER_OGL_2D_MANUAL_SYNC)
+	if (fb_gl_params.mode_2d == DRIVER_OGL_2D_MANUAL_SYNC)
 		fb_hGL_SetupProjection();
 
 	__fb_glX.SwapBuffers(fb_x11.display, fb_x11.window);

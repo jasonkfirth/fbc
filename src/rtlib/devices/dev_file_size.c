@@ -11,6 +11,7 @@ int fb_hDevFileSeekStart( FILE *fp, int mode, FB_FILE_ENCOD encod, int seek_zero
 {
 	/* skip the BOM if in UTF-mode */
 	size_t ofs;
+	(void)mode;
 
 	switch( encod )
 	{

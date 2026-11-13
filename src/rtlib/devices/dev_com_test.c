@@ -19,6 +19,7 @@ int fb_DevComTestProtocolEx
 {
     char ch;
     size_t i, port, digit;
+	(void)handle;
 
     if( pPort ) {
         *pPort = 0;

@@ -14,7 +14,7 @@
 /* Raw DOS console cursor positioning function, faster than console LOCATE */
 unsigned short fb_hSetCursorPos( int col, int row )
 {
-	unsigned long addr = 0x450 + __fb_con.active * sizeof( short );
+	unsigned long addr = 0x450 + fb_console_context.active * sizeof( short );
 
 	if( row >= 0 ) {
 		unsigned short old = _farpeekw( _dos_ds, addr );
@@ -33,7 +33,7 @@ int fb_ConsoleLocate_BIOS( int row, int col, int cursor )
     int shape_visible;
     unsigned short usShapePos, usShapeSize;
 
-    usShapePos = _farpeekw( _dos_ds, 0x450 + __fb_con.active * sizeof( short ) );
+    usShapePos = _farpeekw( _dos_ds, 0x450 + fb_console_context.active * sizeof( short ) );
     usShapeSize = _farpeekw( _dos_ds, 0x460 );
     shape_visible = (usShapeSize & 0xC000)==0x0000;
 
@@ -53,12 +53,12 @@ int fb_ConsoleLocate_BIOS( int row, int col, int cursor )
     	the authoritative location when pages are switched.
     */
     regs.x.ax = 0x0200;
-    regs.x.bx = __fb_con.active;
+    regs.x.bx = fb_console_context.active;
     regs.h.dh = (unsigned char) y;
     regs.h.dl = (unsigned char) x;
     __dpmi_int(0x10, &regs);
 
-    _farpokew( _dos_ds, 0x450 + __fb_con.active * sizeof( short ), (y << 8) | x );
+    _farpokew( _dos_ds, 0x450 + fb_console_context.active * sizeof( short ), (y << 8) | x );
 
     if( cursor >= 0)
     {
@@ -80,7 +80,7 @@ int fb_ConsoleLocate_BIOS( int row, int col, int cursor )
 int fb_ConsoleLocate( int row, int col, int cursor )
 {
     int result = fb_ConsoleLocate_BIOS( row-1, col-1, cursor );
-    __fb_con.scrollWasOff = FALSE;
+    fb_console_context.scrollWasOff = FALSE;
     return result + 0x0101;
 }
 

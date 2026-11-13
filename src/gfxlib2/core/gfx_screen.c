@@ -166,33 +166,33 @@ static void free_aligned_pages(unsigned char **pages, int page_count);
 
 static void release_gfx_mem(void)
 {
-	if (__fb_gfx) {
-		if ((__fb_gfx->driver) && (__fb_gfx->driver->exit))
-            __fb_gfx->driver->exit();
+	if (fb_gfx) {
+		if ((fb_gfx->driver) && (fb_gfx->driver->exit))
+            fb_gfx->driver->exit();
         fb_hResetCharCells(NULL, FALSE);
-		free_aligned_pages(__fb_gfx->page, __fb_gfx->num_pages);
-		if (__fb_gfx->device_palette)
-			free(__fb_gfx->device_palette);
-		if (__fb_gfx->palette)
-			free(__fb_gfx->palette);
-		if (__fb_gfx->color_association)
-			free(__fb_gfx->color_association);
-		if (__fb_gfx->dirty)
-			free(__fb_gfx->dirty);
-		if (__fb_gfx->key)
-			free(__fb_gfx->key);
-		if (__fb_gfx->event_queue)
-			free(__fb_gfx->event_queue);
+		free_aligned_pages(fb_gfx->page, fb_gfx->num_pages);
+		if (fb_gfx->device_palette)
+			free(fb_gfx->device_palette);
+		if (fb_gfx->palette)
+			free(fb_gfx->palette);
+		if (fb_gfx->color_association)
+			free(fb_gfx->color_association);
+		if (fb_gfx->dirty)
+			free(fb_gfx->dirty);
+		if (fb_gfx->key)
+			free(fb_gfx->key);
+		if (fb_gfx->event_queue)
+			free(fb_gfx->event_queue);
 		/* The native producer has stopped before mode storage is released. */
-		fb_hDropClear(&__fb_gfx->drops);
-		if (__fb_gfx->event_mutex)
-			fb_MutexDestroy(__fb_gfx->event_mutex);
-		free(__fb_gfx);
-        __fb_gfx = NULL;
+		fb_hDropClear(&fb_gfx->drops);
+		if (fb_gfx->event_mutex)
+			fb_MutexDestroy(fb_gfx->event_mutex);
+		free(fb_gfx);
+        fb_gfx = NULL;
 	}
-    if (__fb_color_conv_16to32) {
-        free(__fb_color_conv_16to32);
-        __fb_color_conv_16to32 = NULL;
+    if (fb_color_conv_16to32) {
+        free(fb_color_conv_16to32);
+        fb_color_conv_16to32 = NULL;
     }
 }
 
@@ -201,7 +201,7 @@ static void exit_proc(void)
 #ifndef HOST_JS
 	FB_LOCK( );
 	FB_GRAPHICS_LOCK( );
-	if( __fb_gfx )
+	if( fb_gfx )
 		set_mode( 0, 0, 0, 0, 0, 1, 0, 0, 0, SCREEN_EXIT, 0.0, 0, 0 );
 	FB_GRAPHICS_UNLOCK( );
 	FB_UNLOCK( );
@@ -265,13 +265,13 @@ static void free_char_pages(GFX_CHAR_CELL **pages, int page_count)
 */
 void fb_hRequestResize(int width, int height)
 {
-	if (!__fb_gfx || !(__fb_gfx->flags & DRIVER_RESIZABLE))
+	if (!fb_gfx || !(fb_gfx->flags & DRIVER_RESIZABLE))
 		return;
 	if ((width <= 0) || (height <= 0))
 		return;
 
-	__fb_gfx->pending_width = width;
-	__fb_gfx->pending_height = height;
+	fb_gfx->pending_width = width;
+	fb_gfx->pending_height = height;
 }
 
 /*
@@ -298,11 +298,11 @@ int fb_hApplyPendingResize(void)
 	char *old_dirty;
 	int page, row;
 
-	if (!__fb_gfx || !(__fb_gfx->flags & DRIVER_RESIZABLE))
+	if (!fb_gfx || !(fb_gfx->flags & DRIVER_RESIZABLE))
 		return 0;
-	if (__fb_gfx->lock_count != 0)
+	if (fb_gfx->lock_count != 0)
 		return 0;
-	if (!__fb_gfx->driver || !__fb_gfx->driver->resize)
+	if (!fb_gfx->driver || !fb_gfx->driver->resize)
 		return -1;
 	/*
 		The native window thread publishes both dimensions while holding the
@@ -310,51 +310,51 @@ int fb_hApplyPendingResize(void)
 		not a data race.  Allocation remains outside the lock because changing a
 		large multi-page mode can otherwise stall the presentation thread.
 	*/
-	__fb_gfx->driver->lock();
-	width = __fb_gfx->pending_width;
-	height = __fb_gfx->pending_height;
+	fb_gfx->driver->lock();
+	width = fb_gfx->pending_width;
+	height = fb_gfx->pending_height;
 	if ((width <= 0) || (height <= 0)) {
-		__fb_gfx->driver->unlock();
+		fb_gfx->driver->unlock();
 		return 0;
 	}
-	if ((width == __fb_gfx->w) && (height == __fb_gfx->h)) {
-		__fb_gfx->pending_width = 0;
-		__fb_gfx->pending_height = 0;
-		__fb_gfx->driver->unlock();
+	if ((width == fb_gfx->w) && (height == fb_gfx->h)) {
+		fb_gfx->pending_width = 0;
+		fb_gfx->pending_height = 0;
+		fb_gfx->driver->unlock();
 		return 0;
 	}
-	page_count = __fb_gfx->num_pages;
-	visible_page = __fb_gfx->visible_page;
-	bytes_per_pixel = __fb_gfx->bpp;
-	scanline_size = __fb_gfx->scanline_size;
-	color_mask = __fb_gfx->color_mask;
-	depth = __fb_gfx->depth;
-	old_width = __fb_gfx->w;
-	old_height = __fb_gfx->h;
-	old_pitch = __fb_gfx->pitch;
-	old_text_width = __fb_gfx->text_w;
-	old_text_height = __fb_gfx->text_h;
-	old_pages = __fb_gfx->page;
-	old_con_pages = __fb_gfx->con_pages;
-	old_dirty = __fb_gfx->dirty;
+	page_count = fb_gfx->num_pages;
+	visible_page = fb_gfx->visible_page;
+	bytes_per_pixel = fb_gfx->bpp;
+	scanline_size = fb_gfx->scanline_size;
+	color_mask = fb_gfx->color_mask;
+	depth = fb_gfx->depth;
+	old_width = fb_gfx->w;
+	old_height = fb_gfx->h;
+	old_pitch = fb_gfx->pitch;
+	old_text_width = fb_gfx->text_w;
+	old_text_height = fb_gfx->text_h;
+	old_pages = fb_gfx->page;
+	old_con_pages = fb_gfx->con_pages;
+	old_dirty = fb_gfx->dirty;
 	if ((page_count <= 0) || (visible_page < 0) ||
 	    (visible_page >= page_count) || (bytes_per_pixel <= 0) ||
 	    (scanline_size <= 0) || (old_pitch <= 0) ||
 	    (old_text_width < 0) || (old_text_height < 0) ||
 	    (old_pages == NULL) ||
 	    (old_con_pages == NULL)) {
-		__fb_gfx->driver->unlock();
+		fb_gfx->driver->unlock();
 		return -1;
 	}
 	for (page = 0; page < page_count; ++page) {
 		if ((old_pages[page] == NULL) ||
 		    (((old_text_width > 0) && (old_text_height > 0)) &&
 		     (old_con_pages[page] == NULL))) {
-			__fb_gfx->driver->unlock();
+			fb_gfx->driver->unlock();
 			return -1;
 		}
 	}
-	__fb_gfx->driver->unlock();
+	fb_gfx->driver->unlock();
 	if ((size_t)width > ((size_t)INT_MAX / (size_t)bytes_per_pixel))
 		return -1;
 
@@ -383,8 +383,8 @@ int fb_hApplyPendingResize(void)
 		goto fail;
 	fb_hMemSet(new_dirty, TRUE, dirty_size);
 
-	text_width = __fb_gfx->font ? width / __fb_gfx->font->w : __fb_gfx->text_w;
-	text_height = __fb_gfx->font ? height / __fb_gfx->font->h : __fb_gfx->text_h;
+	text_width = fb_gfx->font ? width / fb_gfx->font->w : fb_gfx->text_w;
+	text_height = fb_gfx->font ? height / fb_gfx->font->h : fb_gfx->text_h;
 	if ((text_width < 0) || (text_height < 0))
 		goto fail;
 	if ((text_width != 0) && ((size_t)text_height > ((size_t)-1 / (size_t)text_width)))
@@ -440,37 +440,37 @@ int fb_hApplyPendingResize(void)
 		}
 	}
 
-	__fb_gfx->driver->lock();
-	width = __fb_gfx->pending_width;
-	height = __fb_gfx->pending_height;
+	fb_gfx->driver->lock();
+	width = fb_gfx->pending_width;
+	height = fb_gfx->pending_height;
 	if ((width != (pitch / bytes_per_pixel)) ||
 	    (height != (int)(page_size / (size_t)pitch))) {
-		__fb_gfx->driver->unlock();
+		fb_gfx->driver->unlock();
 		goto fail;
 	}
-	if (__fb_gfx->driver->resize(width, height) != 0) {
-		__fb_gfx->driver->unlock();
+	if (fb_gfx->driver->resize(width, height) != 0) {
+		fb_gfx->driver->unlock();
 		goto fail;
 	}
 
 	{
-		__fb_gfx->page = new_pages;
-		__fb_gfx->con_pages = new_con_pages;
-		__fb_gfx->dirty = new_dirty;
-		__fb_gfx->w = width;
-		__fb_gfx->h = height;
-		__fb_gfx->pitch = pitch;
-		__fb_gfx->text_w = text_width;
-		__fb_gfx->text_h = text_height;
-		__fb_gfx->framebuffer = new_pages[visible_page];
-		__fb_gfx->aspect = 1.0f;
-		__fb_gfx->pending_width = 0;
-		__fb_gfx->pending_height = 0;
-		__fb_gfx->id = screen_id++;
-		if (__fb_gfx->cursor_x >= text_width)
-			__fb_gfx->cursor_x = MAX(text_width - 1, 0);
-		if (__fb_gfx->cursor_y >= text_height)
-			__fb_gfx->cursor_y = MAX(text_height - 1, 0);
+		fb_gfx->page = new_pages;
+		fb_gfx->con_pages = new_con_pages;
+		fb_gfx->dirty = new_dirty;
+		fb_gfx->w = width;
+		fb_gfx->h = height;
+		fb_gfx->pitch = pitch;
+		fb_gfx->text_w = text_width;
+		fb_gfx->text_h = text_height;
+		fb_gfx->framebuffer = new_pages[visible_page];
+		fb_gfx->aspect = 1.0f;
+		fb_gfx->pending_width = 0;
+		fb_gfx->pending_height = 0;
+		fb_gfx->id = screen_id++;
+		if (fb_gfx->cursor_x >= text_width)
+			fb_gfx->cursor_x = MAX(text_width - 1, 0);
+		if (fb_gfx->cursor_y >= text_height)
+			fb_gfx->cursor_y = MAX(text_height - 1, 0);
 
 		new_pages = NULL;
 		new_con_pages = NULL;
@@ -479,7 +479,7 @@ int fb_hApplyPendingResize(void)
 		free_char_pages(old_con_pages, page_count);
 		free(old_dirty);
 	}
-	__fb_gfx->driver->unlock();
+	fb_gfx->driver->unlock();
 
 	fb_DevScrnMaybeUpdateWidth();
 	fb_hMemSet(&event, 0, sizeof(event));
@@ -507,33 +507,33 @@ void fb_hResetCharCells(FB_GFXCTX *context, int do_alloc)
 {
     int i;
 
-    if( __fb_gfx!=NULL ) {
+    if( fb_gfx!=NULL ) {
         /* Free the previously allocated character cells */
-        if( __fb_gfx->con_pages!=NULL ) {
-            for (i = 0; i < __fb_gfx->num_pages; i++) {
-                free(__fb_gfx->con_pages[i]);
+        if( fb_gfx->con_pages!=NULL ) {
+            for (i = 0; i < fb_gfx->num_pages; i++) {
+                free(fb_gfx->con_pages[i]);
             }
-            free((void *)__fb_gfx->con_pages);
+            free((void *)fb_gfx->con_pages);
         }
 
         if( do_alloc ) {
-            size_t text_size = __fb_gfx->text_w * __fb_gfx->text_h;
+            size_t text_size = fb_gfx->text_w * fb_gfx->text_h;
 
             /* Allocate memory for all character cells */
-            __fb_gfx->con_pages = (GFX_CHAR_CELL **)malloc(sizeof(GFX_CHAR_CELL *) * __fb_gfx->num_pages);
-            for (i = 0; i < __fb_gfx->num_pages; i++) {
-                __fb_gfx->con_pages[i] =
+            fb_gfx->con_pages = (GFX_CHAR_CELL **)malloc(sizeof(GFX_CHAR_CELL *) * fb_gfx->num_pages);
+            for (i = 0; i < fb_gfx->num_pages; i++) {
+                fb_gfx->con_pages[i] =
                     (GFX_CHAR_CELL *)calloc(1, sizeof(GFX_CHAR_CELL) * text_size);
             }
 
             /* Reset all character cells with default values */
             fb_hClearCharCells( 0, 0,
-                                __fb_gfx->text_w, __fb_gfx->text_h,
+                                fb_gfx->text_w, fb_gfx->text_h,
                                 context->work_page,
                                 32,
                                 context->fg_color, context->bg_color );
         } else {
-            __fb_gfx->con_pages = NULL;
+            fb_gfx->con_pages = NULL;
         }
     }
 }
@@ -545,9 +545,9 @@ void fb_hClearCharCells( int x1, int y1, int x2, int y2,
 {
     GFX_CHAR_CELL fill_cell = { ch, fg, bg };
     int clear_w = x2 - x1;
-    int text_w = __fb_gfx->text_w;
+    int text_w = fb_gfx->text_w;
     int move_w = text_w - clear_w;
-    GFX_CHAR_CELL *cell_line = __fb_gfx->con_pages[page]
+    GFX_CHAR_CELL *cell_line = fb_gfx->con_pages[page]
         + y1 * text_w + x1;
     int y;
     for( y=y1; y!=y2; ++y ) {
@@ -635,81 +635,81 @@ static int set_mode
         fb_ctx.hooks.pagecopyproc = fb_GfxPageCopy;
         fb_ctx.hooks.pagesetproc = fb_GfxPageSet;
         fb_ctx.hooks.posteventproc = NULL;
-        __fb_gfx = (FBGFX *)calloc(1, sizeof(FBGFX));
+        fb_gfx = (FBGFX *)calloc(1, sizeof(FBGFX));
     }
 
 	FB_UNLOCK( );
-	if ((mode != 0) && (w != 0) && (__fb_gfx == NULL))
+	if ((mode != 0) && (w != 0) && (fb_gfx == NULL))
 		goto allocation_failed;
 
-    if (__fb_gfx) {
-    	__fb_gfx->id = screen_id++;
-        __fb_gfx->mode_num = mode;
-        __fb_gfx->w = w;
-        __fb_gfx->h = h;
-        __fb_gfx->depth = depth;
+    if (fb_gfx) {
+	fb_gfx->id = screen_id++;
+        fb_gfx->mode_num = mode;
+        fb_gfx->w = w;
+        fb_gfx->h = h;
+        fb_gfx->depth = depth;
        /* if ((flags >= 0) && (flags & DRIVER_OPENGL))
             __fb_gfx->depth = MAX(16, __fb_gfx->depth);*/
-        __fb_gfx->default_palette = (palette >= 0) ? &__fb_palette[palette] : NULL;
-        __fb_gfx->scanline_size = scanline_size;
-        __fb_gfx->font = (font >= 0) ? &__fb_font[font] : NULL;
+        fb_gfx->default_palette = (palette >= 0) ? &fb_palette[palette] : NULL;
+        fb_gfx->scanline_size = scanline_size;
+        fb_gfx->font = (font >= 0) ? &fb_font[font] : NULL;
 
 		if( aspect != 0.0f )
-			__fb_gfx->aspect = aspect;
+			fb_gfx->aspect = aspect;
 		else
-			__fb_gfx->aspect = (4.0 / 3.0) * ((float)__fb_gfx->h / (float)__fb_gfx->w);
+			fb_gfx->aspect = (4.0 / 3.0) * ((float)fb_gfx->h / (float)fb_gfx->w);
 
-        switch (__fb_gfx->depth) {
+        switch (fb_gfx->depth) {
         case 15:
-        case 16:	__fb_gfx->color_mask = 0xFFFF; __fb_gfx->depth = 16; break;
+        case 16:	fb_gfx->color_mask = 0xFFFF; fb_gfx->depth = 16; break;
         case 24:
-        case 32:	__fb_gfx->color_mask = 0xFFFFFFFF; __fb_gfx->depth = 32; break;
-        default:	__fb_gfx->color_mask = (1 << __fb_gfx->depth) - 1;
+        case 32:	fb_gfx->color_mask = 0xFFFFFFFF; fb_gfx->depth = 32; break;
+        default:	fb_gfx->color_mask = (1 << fb_gfx->depth) - 1;
         }
 
-        __fb_gfx->bpp = BYTES_PER_PIXEL(__fb_gfx->depth);
-		if ((__fb_gfx->bpp <= 0) || (num_pages <= 0) ||
-		    ((size_t)__fb_gfx->w > ((size_t)INT_MAX /
-		                            (size_t)__fb_gfx->bpp)))
+        fb_gfx->bpp = BYTES_PER_PIXEL(fb_gfx->depth);
+		if ((fb_gfx->bpp <= 0) || (num_pages <= 0) ||
+		    ((size_t)fb_gfx->w > ((size_t)INT_MAX /
+		                            (size_t)fb_gfx->bpp)))
 			goto allocation_failed;
 
-        __fb_gfx->pitch = __fb_gfx->w * __fb_gfx->bpp;
-		if ((size_t)__fb_gfx->pitch >
-		    ((size_t)-1 / (size_t)__fb_gfx->h))
+        fb_gfx->pitch = fb_gfx->w * fb_gfx->bpp;
+		if ((size_t)fb_gfx->pitch >
+		    ((size_t)-1 / (size_t)fb_gfx->h))
 			goto allocation_failed;
-		page_size = (size_t)__fb_gfx->pitch * (size_t)__fb_gfx->h;
+		page_size = (size_t)fb_gfx->pitch * (size_t)fb_gfx->h;
 
-		__fb_gfx->num_pages = num_pages;
-        __fb_gfx->page = (unsigned char **)calloc((size_t)num_pages,
-			sizeof(__fb_gfx->page[0]));
-		if (!__fb_gfx->page)
+		fb_gfx->num_pages = num_pages;
+        fb_gfx->page = (unsigned char **)calloc((size_t)num_pages,
+			sizeof(fb_gfx->page[0]));
+		if (!fb_gfx->page)
 			goto allocation_failed;
         for (i = 0; i < num_pages; i++) {
-			__fb_gfx->page[i] = allocate_aligned_page(page_size);
-			if (!__fb_gfx->page[i])
+			fb_gfx->page[i] = allocate_aligned_page(page_size);
+			if (!fb_gfx->page[i])
 				goto allocation_failed;
 	}
-        __fb_gfx->framebuffer = __fb_gfx->page[0];
+        fb_gfx->framebuffer = fb_gfx->page[0];
 
         /* dirty lines array may be bigger than needed; this is to please the
          gfx driver which is not aware of the scanline size */
-		__fb_gfx->dirty = (char *)calloc((size_t)__fb_gfx->h,
-			(size_t)__fb_gfx->scanline_size);
-        __fb_gfx->device_palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
-        __fb_gfx->palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
-        __fb_gfx->color_association = (unsigned char *)malloc(16);
-        __fb_gfx->key = (char *)calloc(1, 128);
-        __fb_gfx->event_queue = (EVENT *)malloc(sizeof(EVENT) * MAX_EVENTS);
-        __fb_gfx->event_mutex = fb_MutexCreate();
-        __fb_color_conv_16to32 = (unsigned int *)malloc(sizeof(unsigned int) * 512);
+		fb_gfx->dirty = (char *)calloc((size_t)fb_gfx->h,
+			(size_t)fb_gfx->scanline_size);
+        fb_gfx->device_palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
+        fb_gfx->palette = (unsigned int *)calloc(1, sizeof(unsigned int) * 256);
+        fb_gfx->color_association = (unsigned char *)malloc(16);
+        fb_gfx->key = (char *)calloc(1, 128);
+        fb_gfx->event_queue = (EVENT *)malloc(sizeof(EVENT) * MAX_EVENTS);
+        fb_gfx->event_mutex = fb_MutexCreate();
+        fb_color_conv_16to32 = (unsigned int *)malloc(sizeof(unsigned int) * 512);
 
-		if (!__fb_gfx->dirty || !__fb_gfx->device_palette ||
-		    !__fb_gfx->palette || !__fb_gfx->color_association ||
-		    !__fb_gfx->key || !__fb_gfx->event_queue ||
+		if (!fb_gfx->dirty || !fb_gfx->device_palette ||
+		    !fb_gfx->palette || !fb_gfx->color_association ||
+		    !fb_gfx->key || !fb_gfx->event_queue ||
 #ifndef HOST_JS
-		    !__fb_gfx->event_mutex ||
+		    !fb_gfx->event_mutex ||
 #endif
-		    !__fb_color_conv_16to32)
+		    !fb_color_conv_16to32)
 			goto allocation_failed;
 		/* The cooperative JavaScript runtime implements mutex operations as
 		 * no-ops and intentionally returns NULL from MutexCreate. That token
@@ -717,46 +717,46 @@ static int set_mode
 
 		if (flags != DRIVER_NULL) {
 			if (flags & DRIVER_ALPHA_PRIMITIVES) {
-				__fb_gfx->flags |= ALPHA_PRIMITIVES;
+				fb_gfx->flags |= ALPHA_PRIMITIVES;
 			}
 			if (flags & DRIVER_OPENGL) {
-				__fb_gfx->flags |= OPENGL_SUPPORT;
+				fb_gfx->flags |= OPENGL_SUPPORT;
 			}
 			if (flags & DRIVER_HIGH_PRIORITY) {
-				__fb_gfx->flags |= GFX_HIGH_PRIORITY;
+				fb_gfx->flags |= GFX_HIGH_PRIORITY;
 			}
 			if (flags & DRIVER_RESIZABLE) {
-				__fb_gfx->flags |= DRIVER_RESIZABLE;
+				fb_gfx->flags |= DRIVER_RESIZABLE;
 			}
 		}
 
 #ifdef HOST_X86
 		if (fb_CpuDetect() & 0x800000) {
 			if (!(flags & DRIVER_NO_X86_MMX)) {
-				__fb_gfx->flags |= X86_MMX_ENABLED;
+				fb_gfx->flags |= X86_MMX_ENABLED;
 			}
 		}
 #endif
 
-        fb_hSetupFuncs(__fb_gfx->bpp);
+        fb_hSetupFuncs(fb_gfx->bpp);
         fb_hSetupData();
 
-        if (!__fb_window_title)
+        if (!fb_window_title)
         {
-            __fb_window_title = fb_hGetExeName( window_title_buff, WINDOW_TITLE_SIZE - 1 );
-            if ((c = strrchr(__fb_window_title, '.')))
+            fb_window_title = fb_hGetExeName( window_title_buff, WINDOW_TITLE_SIZE - 1 );
+            if ((c = strrchr(fb_window_title, '.')))
                 *c = '\0';
         }
 
-		driver_name = __fb_gfx_driver_name;
+		driver_name = fb_gfx_driver_name;
 		if (!driver_name)
 	        driver_name = getenv("FBGFX");
         if ((flags == DRIVER_NULL) || ((driver_name) && (!strcasecmp(driver_name, "null"))))
-            driver = &__fb_gfxDriverNull;
+            driver = &fb_gfxDriverNull;
         else {
             for (try_count = (driver_name ? 4 : 2); try_count; try_count--) {
-				for (i = 0; __fb_gfx_drivers_list[i >> 1]; i++) {
-					driver = __fb_gfx_drivers_list[i >> 1];
+				for (i = 0; fb_gfx_drivers_list[i >> 1]; i++) {
+					driver = fb_gfx_drivers_list[i >> 1];
 					if ((flags & DRIVER_RESIZABLE) && !driver->resize) {
 						driver = NULL;
 						continue;
@@ -765,7 +765,7 @@ static int set_mode
                         driver = NULL;
                         continue;
 					}
-                    if (!driver->init(__fb_window_title, __fb_gfx->w, __fb_gfx->h * __fb_gfx->scanline_size, __fb_gfx->depth, (i & 0x1) ? 0 : refresh_rate, flags))
+                    if (!driver->init(fb_window_title, fb_gfx->w, fb_gfx->h * fb_gfx->scanline_size, fb_gfx->depth, (i & 0x1) ? 0 : refresh_rate, flags))
                         break;
                     driver->exit();
                     driver = NULL;
@@ -789,21 +789,21 @@ static int set_mode
 #endif
             return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
         }
-        __fb_gfx->driver = driver;
+        fb_gfx->driver = driver;
 
         fb_GfxPalette(-1, 0, 0, 0);
 
-        __fb_gfx->text_w = text_w;
-        __fb_gfx->text_h = text_h;
+        fb_gfx->text_w = text_w;
+        fb_gfx->text_h = text_h;
 
         context = fb_hGetContext();
 
         fb_hResetCharCells(context, TRUE);
         for (i = 0; i < num_pages; i++) {
-        	dest = __fb_gfx->page[i];
-        	for (j = 0; j < __fb_gfx->h; j++) {
+		dest = fb_gfx->page[i];
+		for (j = 0; j < fb_gfx->h; j++) {
 	        	context->pixel_set(dest, context->bg_color, context->view_w);
-	        	dest += __fb_gfx->pitch;
+			dest += fb_gfx->pitch;
 	        }
 		}
 
@@ -854,11 +854,11 @@ allocation_complete:
          * on DOS, the cursor position will automatically be reset when the screen
          * mode changes and not changing the console cursor position on Win32
          * and Linux seem to be more "natural". */
-        fb_ConsoleViewEx( 0, 0, __fb_gfx!=NULL );
+        fb_ConsoleViewEx( 0, 0, fb_gfx!=NULL );
 
 		/* Foreground drivers can now service the fully initialized mode. */
-		if (__fb_gfx && __fb_gfx->driver && __fb_gfx->driver->poll_events)
-			__fb_gfx->driver->poll_events();
+		if (fb_gfx && fb_gfx->driver && fb_gfx->driver->poll_events)
+			fb_gfx->driver->poll_events();
     }
 
     return fb_ErrorSetNum( FB_RTERROR_OK );
@@ -1006,7 +1006,7 @@ FBCALL int fb_GfxScreenRes
 	                    num_pages, refresh_rate,
 	                    FB_PALETTE_256, FB_FONT_8,
 	                    flags, 1.0,
-	                    w / __fb_font[FB_FONT_8].w, h / __fb_font[FB_FONT_8].h );
+	                    w / fb_font[FB_FONT_8].w, h / fb_font[FB_FONT_8].h );
 
 	if( res == FB_RTERROR_OK ) {
 		FB_LOCK( );
@@ -1026,10 +1026,10 @@ FBCALL void fb_GfxSetWindowTitle(FBSTRING_ACCESS *title)
 
 	fb_hMemSet(window_title_buff, 0, WINDOW_TITLE_SIZE);
 	fb_hMemCpy(window_title_buff, title->data, MIN(WINDOW_TITLE_SIZE - 1, FB_STRSIZE(title)));
-	__fb_window_title = window_title_buff;
+	fb_window_title = window_title_buff;
 
-	if ((__fb_gfx) && (__fb_gfx->driver->set_window_title))
-		__fb_gfx->driver->set_window_title(__fb_window_title);
+	if ((fb_gfx) && (fb_gfx->driver->set_window_title))
+		fb_gfx->driver->set_window_title(fb_window_title);
 
 	/* del if temp */
 	fb_hStrDelTemp( title );

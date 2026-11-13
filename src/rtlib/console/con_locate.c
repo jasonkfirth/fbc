@@ -12,6 +12,9 @@ FBCALL int fb_Locate( int row, int col, int cursor, int start, int stop )
 {
     int new_pos;
     int res = fb_LocateEx( row, col, cursor, &new_pos );
+    /* The shared locate hook supports position and visibility, not scan lines. */
+    (void)start;
+    (void)stop;
     if( res!=FB_RTERROR_OK )
         fb_LocateEx( 0, 0, cursor, &new_pos );
     return new_pos;

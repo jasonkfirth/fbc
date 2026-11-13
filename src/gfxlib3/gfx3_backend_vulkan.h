@@ -19,12 +19,12 @@
         - FreeBASIC compatibility state
 */
 
-#ifndef __FB_GFX3_BACKEND_VULKAN_H__
-#define __FB_GFX3_BACKEND_VULKAN_H__
+#ifndef FB_GFX3_BACKEND_VULKAN_H
+#define FB_GFX3_BACKEND_VULKAN_H
 
 #include "gfx3_backend.h"
 
-extern const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_vulkan;
+extern const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_vulkan FB_C_SYMBOL("__fb_gfx3_backend_vulkan");
 
 #endif
 

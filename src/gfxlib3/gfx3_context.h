@@ -22,8 +22,8 @@
         - backend-specific texture or image objects
 */
 
-#ifndef __FB_GFX3_CONTEXT_H__
-#define __FB_GFX3_CONTEXT_H__
+#ifndef FB_GFX3_CONTEXT_H
+#define FB_GFX3_CONTEXT_H
 
 #include "gfx3_debug.h"
 #include "gfx3_protocol.h"
@@ -132,6 +132,10 @@ typedef struct FB_GFX3_IMAGE_CACHE_ENTRY {
 	uint32_t atlas_x;
 	uint32_t atlas_y;
 	int uses_atlas;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing 8-byte-aligned size. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_IMAGE_CACHE_ENTRY;
 
 struct FB_GFX3_CONTEXT {

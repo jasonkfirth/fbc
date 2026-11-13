@@ -14,22 +14,22 @@ FBCALL int fb_GfxEvent(EVENT *event)
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return FB_FALSE;
 	}
 
 	/* Foreground drivers fill this queue only when explicitly polled.
 	   Do this before EVENT_LOCK because posting also takes the queue lock. */
-	if (__fb_gfx->driver->poll_events)
-		__fb_gfx->driver->poll_events();
+	if (fb_gfx->driver->poll_events)
+		fb_gfx->driver->poll_events();
 	fb_hApplyPendingResize();
 
 	EVENT_LOCK();
-	if (__fb_gfx->event_head != __fb_gfx->event_tail) {
-		e = &__fb_gfx->event_queue[__fb_gfx->event_head];
+	if (fb_gfx->event_head != fb_gfx->event_tail) {
+		e = &fb_gfx->event_queue[fb_gfx->event_head];
 		if (event)
-			__fb_gfx->event_head = (__fb_gfx->event_head + 1) & (MAX_EVENTS - 1);
+			fb_gfx->event_head = (fb_gfx->event_head + 1) & (MAX_EVENTS - 1);
 	}
 	if (e && event)
 		fb_hMemCpy(event, e, sizeof(EVENT));

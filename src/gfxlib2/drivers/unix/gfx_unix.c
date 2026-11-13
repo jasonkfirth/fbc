@@ -14,7 +14,7 @@
 
 #if defined HOST_FREEBSD || defined HOST_OPENBSD || defined HOST_LINUX || defined HOST_DARWIN || defined HOST_SOLARIS || defined HOST_DRAGONFLY || defined HOST_NETBSD
 
-const GFXDRIVER *__fb_gfx_drivers_list[] = {
+const GFXDRIVER *fb_gfx_drivers_list[] = {
 
 #if defined HOST_LINUX && !defined DISABLE_WAYLAND
 	&fb_gfxDriverWayland,

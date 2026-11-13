@@ -49,7 +49,6 @@ typedef struct {
 #endif
 
 #define SNG_AUTODIGS 7
-#define DBL_AUTODIGS 15
 #define DBL_MAXDIGS 16
 
 #define CHARS_NAN  ('#' << 24 | 'N' << 16 | 'A' << 8 | 'N')

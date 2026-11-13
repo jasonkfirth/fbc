@@ -111,10 +111,10 @@ void fb_sfxNoisePitch(int channel, int frequency, float duration, float volume)
 
     /* compute duration in samples */
 
-    if (__fb_sfx->samplerate > 0)
+    if (fb_sfx_context->samplerate > 0)
     {
         voice->length =
-            (int)(duration * (float)__fb_sfx->samplerate);
+            (int)(duration * (float)fb_sfx_context->samplerate);
     }
 
     voice->position = 0;

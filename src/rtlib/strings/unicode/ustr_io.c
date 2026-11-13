@@ -217,6 +217,8 @@ FBCALL int fb_UStrFileLineInput( int fnum, void *destination, ssize_t size, int 
 	USTR_READER reader = { .file = FB_FILE_TO_HANDLE(fnum), .pending = EOF };
 	FBSTRING text = { NULL, 0, 0 };
 	int scalar, status = FB_RTERROR_OK;
+	(void)size;
+	(void)fill;
 	FB_LOCK();
 	if( !FB_HANDLE_USED(reader.file) || dst == NULL ) status = FB_RTERROR_ILLEGALFUNCTIONCALL;
 	else if( !hEncoded(reader.file) ) {
@@ -252,6 +254,8 @@ FBCALL int fb_UStrInput( void *destination, ssize_t size, int fill )
 	reader = (USTR_READER){ .file = input->handle, .input = input, .pending = EOF };
 	FBSTRING text = { NULL, 0, 0 };
 	int scalar, quoted = FALSE, delimiter = TRUE, status = FB_RTERROR_OK;
+	(void)size;
+	(void)fill;
 	FB_LOCK();
 	do scalar = hReadScalar( &reader ); while( scalar == ' ' || scalar == '\t' );
 	while( scalar != EOF ) {
@@ -285,6 +289,8 @@ FBCALL void fb_UStrDataRead( void *destination, ssize_t size, int fill )
 	   The high length bit identifies wide text; other text lengths are
 	   byte counts. data.c owns the shared cursor, so reading and advancing
 	   it must be one operation under the runtime lock. */
+	(void)size;
+	(void)fill;
 	FB_LOCK();
 	if( fb_data_ptr == NULL || fb_data_ptr->len == FB_DATATYPE_OFS ) fb_UStrAssign( dst, -1, NULL, 0, 0 );
 	else if( fb_data_ptr->len & FB_DATATYPE_WSTR )

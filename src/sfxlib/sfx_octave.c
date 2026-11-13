@@ -73,7 +73,7 @@ void fb_sfxOctave(int octave)
     if (octave > FB_SFX_OCTAVE_MAX)
         octave = FB_SFX_OCTAVE_MAX;
 
-    __fb_sfx->octave = octave;
+    fb_sfx_context->octave = octave;
 
     SFX_DEBUG("sfx_octave: octave set to %d", octave);
 }
@@ -85,10 +85,10 @@ void fb_sfxOctave(int octave)
 
 int fb_sfxOctaveGet(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_OCTAVE_DEFAULT;
 
-    return __fb_sfx->octave;
+    return fb_sfx_context->octave;
 }
 
 
@@ -101,7 +101,7 @@ void fb_sfxOctaveReset(void)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    __fb_sfx->octave = FB_SFX_OCTAVE_DEFAULT;
+    fb_sfx_context->octave = FB_SFX_OCTAVE_DEFAULT;
 
     SFX_DEBUG(
         "sfx_octave: octave reset to %d",
@@ -127,12 +127,12 @@ void fb_sfxOctaveUp(void)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    octave = __fb_sfx->octave + 1;
+    octave = fb_sfx_context->octave + 1;
 
     if (octave > FB_SFX_OCTAVE_MAX)
         octave = FB_SFX_OCTAVE_MAX;
 
-    __fb_sfx->octave = octave;
+    fb_sfx_context->octave = octave;
 
     SFX_DEBUG("sfx_octave: octave increased to %d", octave);
 }
@@ -151,12 +151,12 @@ void fb_sfxOctaveDown(void)
     if (!fb_sfxEnsureInitialized())
         return;
 
-    octave = __fb_sfx->octave - 1;
+    octave = fb_sfx_context->octave - 1;
 
     if (octave < FB_SFX_OCTAVE_MIN)
         octave = FB_SFX_OCTAVE_MIN;
 
-    __fb_sfx->octave = octave;
+    fb_sfx_context->octave = octave;
 
     SFX_DEBUG("sfx_octave: octave decreased to %d", octave);
 }

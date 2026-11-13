@@ -104,8 +104,8 @@ static int msdos_pcspk_init(int rate, int channels, int buffer, int flags)
     g_fb_sfx_pcspk_next_tick = 0.0;
     g_fb_sfx_pcspk_active = 1;
 
-    if (__fb_sfx && g_fb_sfx_pcspk_rate > 0)
-        __fb_sfx->samplerate = g_fb_sfx_pcspk_rate;
+    if (fb_sfx_context && g_fb_sfx_pcspk_rate > 0)
+        fb_sfx_context->samplerate = g_fb_sfx_pcspk_rate;
 
     SFX_DEBUG("msdos_pcspk: initialized rate=%d", g_fb_sfx_pcspk_rate);
     return 0;
@@ -141,8 +141,8 @@ static int msdos_pcspk_write(const float *samples, int frames)
     if (!samples || frames <= 0 || !g_fb_sfx_pcspk_active)
         return -1;
 
-    channels = (__fb_sfx && __fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    channels = (fb_sfx_context && fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : 2;
 
     if (channels > INT_MAX / frames)

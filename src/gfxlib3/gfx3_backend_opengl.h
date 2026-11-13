@@ -19,12 +19,12 @@
         - compatibility front-end state
 */
 
-#ifndef __FB_GFX3_BACKEND_OPENGL_H__
-#define __FB_GFX3_BACKEND_OPENGL_H__
+#ifndef FB_GFX3_BACKEND_OPENGL_H
+#define FB_GFX3_BACKEND_OPENGL_H
 
 #include "gfx3_backend.h"
 
-extern const FB_GFX3_BACKEND_VTABLE __fb_gfx3_backend_opengl;
+extern const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_opengl FB_C_SYMBOL("__fb_gfx3_backend_opengl");
 
 #endif
 

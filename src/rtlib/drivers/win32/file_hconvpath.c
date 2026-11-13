@@ -20,6 +20,7 @@
 */
 
 #include "../../fb.h"
+#include <errno.h>
 
 #ifdef HOST_MINGW
 #include <windows.h>
@@ -75,27 +76,35 @@ static char *fb_hConvertPathToAC( const char *path )
 	return result;
 }
 
-static void fb_hCopyModeToWC( const char *mode, wchar_t *wmode, size_t wmode_len )
+static int fb_hCopyModeToWC( const char *mode, FB_WCHAR *wmode, size_t wmode_len )
 {
 	size_t i;
 
-	DBG_ASSERT( mode != NULL );
-	DBG_ASSERT( wmode != NULL );
-	DBG_ASSERT( wmode_len >= 2 );
+	if( mode == NULL || wmode == NULL || wmode_len == 0 ) {
+		errno = EINVAL;
+		return FALSE;
+	}
 
-	for( i = 0; mode[i] != '\0'; ++i ) {
-		DBG_ASSERT( i < (wmode_len - 1) );
-		wmode[i] = (wchar_t)(unsigned char)mode[i];
+	/* Keep the terminator inside the caller's buffer in release builds too.
+	   The file entry points must reject a truncated mode before calling CRT. */
+	for( i = 0; i < wmode_len - 1 && mode[i] != '\0'; ++i ) {
+		wmode[i] = (FB_WCHAR)(unsigned char)mode[i];
 	}
 	wmode[i] = L'\0';
+	if( mode[i] != '\0' ) {
+		wmode[0] = L'\0';
+		errno = EINVAL;
+		return FALSE;
+	}
+	return TRUE;
 }
 
-static wchar_t *fb_hConvertPathToWCInternal( const char *path, UINT codepage, DWORD flags )
+static FB_WCHAR *fb_hConvertPathToWCInternal( const char *path, UINT codepage, DWORD flags )
 {
 	char *tmp;
 	int chars;
 	size_t path_len;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 
 	DBG_ASSERT( path != NULL );
 
@@ -113,7 +122,7 @@ static wchar_t *fb_hConvertPathToWCInternal( const char *path, UINT codepage, DW
 		return NULL;
 	}
 
-	wpath = (wchar_t*)malloc( chars * sizeof( wchar_t ) );
+	wpath = (FB_WCHAR*)malloc( chars * sizeof( FB_WCHAR ) );
 	if( wpath != NULL ) {
 		if( MultiByteToWideChar( codepage, flags, tmp, -1, wpath, chars ) <= 0 ) {
 			free( wpath );
@@ -125,20 +134,21 @@ static wchar_t *fb_hConvertPathToWCInternal( const char *path, UINT codepage, DW
 	return wpath;
 }
 
-static FILE *fb_hOpenFileFromWC( const wchar_t *path, const char *mode )
+static FILE *fb_hOpenFileFromWC( const FB_WCHAR *path, const char *mode )
 {
-	wchar_t wmode[8];
+	FB_WCHAR wmode[8];
 
 	DBG_ASSERT( path != NULL );
 	DBG_ASSERT( mode != NULL );
 
-	fb_hCopyModeToWC( mode, wmode, ARRAY_SIZE( wmode ) );
+	if( !fb_hCopyModeToWC( mode, wmode, ARRAY_SIZE( wmode ) ) )
+		return NULL;
 	return _wfopen( path, wmode );
 }
 
-wchar_t *fb_hConvertPathToWC( const char *path, int *used_utf8 )
+FB_WCHAR *fb_hConvertPathToWC( const char *path, int *used_utf8 )
 {
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 
 	if( used_utf8 != NULL )
 		*used_utf8 = FALSE;
@@ -153,7 +163,7 @@ wchar_t *fb_hConvertPathToWC( const char *path, int *used_utf8 )
 	return fb_hConvertPathToWCInternal( path, CP_ACP, 0 );
 }
 
-char *fb_hConvertPathFromWC( const wchar_t *path, int use_utf8 )
+char *fb_hConvertPathFromWC( const FB_WCHAR *path, int use_utf8 )
 {
 	UINT codepage;
 	int bytes;
@@ -186,7 +196,7 @@ FILE *fb_hOpenFile( const char *path, const char *mode )
 {
 	char *apath;
 	FILE *fp;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 
 	if( fb_hWin32IsWin9x( ) ) {
 		apath = fb_hConvertPathToAC( path );
@@ -210,9 +220,9 @@ FILE *fb_hOpenFile( const char *path, const char *mode )
 FILE *fb_hReopenFile( const char *path, const char *mode, FILE *stream )
 {
 	char *apath;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 	FILE *fp;
-	wchar_t wmode[8];
+	FB_WCHAR wmode[8];
 
 	if( fb_hWin32IsWin9x( ) ) {
 		apath = fb_hConvertPathToAC( path );
@@ -228,7 +238,10 @@ FILE *fb_hReopenFile( const char *path, const char *mode, FILE *stream )
 	if( wpath == NULL )
 		return freopen( path, mode, stream );
 
-	fb_hCopyModeToWC( mode, wmode, ARRAY_SIZE( wmode ) );
+	if( !fb_hCopyModeToWC( mode, wmode, ARRAY_SIZE( wmode ) ) ) {
+		free( wpath );
+		return NULL;
+	}
 	fp = _wfreopen( wpath, wmode, stream );
 	free( wpath );
 	return fp;
@@ -237,7 +250,7 @@ FILE *fb_hReopenFile( const char *path, const char *mode, FILE *stream )
 int fb_hStatFile( const char *path, struct _stat *buffer )
 {
 	char *apath;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 	int result;
 
 	if( fb_hWin32IsWin9x( ) ) {
@@ -262,7 +275,7 @@ int fb_hStatFile( const char *path, struct _stat *buffer )
 int fb_hRemoveFile( const char *path )
 {
 	char *apath;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 	int result;
 
 	if( fb_hWin32IsWin9x( ) ) {
@@ -287,7 +300,7 @@ int fb_hRemoveFile( const char *path )
 int fb_hMakeDir( const char *path )
 {
 	char *apath;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 	int result;
 
 	if( fb_hWin32IsWin9x( ) ) {
@@ -312,7 +325,7 @@ int fb_hMakeDir( const char *path )
 int fb_hChangeDir( const char *path )
 {
 	char *apath;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 	int result;
 
 	if( fb_hWin32IsWin9x( ) ) {
@@ -337,7 +350,7 @@ int fb_hChangeDir( const char *path )
 int fb_hRemoveDir( const char *path )
 {
 	char *apath;
-	wchar_t *wpath;
+	FB_WCHAR *wpath;
 	int result;
 
 	if( fb_hWin32IsWin9x( ) ) {

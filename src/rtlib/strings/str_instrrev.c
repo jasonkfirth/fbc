@@ -91,16 +91,21 @@ static ssize_t fb_hFindNaive
 	)
 {
 	ssize_t i;
-	pachText += start;
-	for( i=0; i<=start; ++i ) {
+	if( start < 0 || len_pattern <= 0 || len_pattern > len_text ||
+	    start > len_text - len_pattern )
+		return 0;
+
+	/* Keep the base pointer inside its object when the first candidate also
+	   fails. Decrementing that pointer after the final comparison forms an
+	   invalid pointer even when the loop never dereferences it again. */
+	for( i=start; i>=0; --i ) {
 		ssize_t j;
 		for( j=0; j!=len_pattern; ++j ) {
-			if( pachText[j]!=pachPattern[j] )
+			if( pachText[i+j]!=pachPattern[j] )
 				break;
 		}
 		if( j==len_pattern )
-			return start - i + 1;
-		--pachText;
+			return i + 1;
 	}
 	return 0;
 }

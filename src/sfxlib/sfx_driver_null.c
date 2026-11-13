@@ -295,7 +295,7 @@ static int null_driver_write(const float *buffer, int frames)
 /* Driver status                                                             */
 /* ------------------------------------------------------------------------- */
 
-const FB_SFX_DRIVER __fb_sfxDriverNull =
+const FB_SFX_DRIVER fb_sfxDriverNull_internal =
 {
     "null",
     0,

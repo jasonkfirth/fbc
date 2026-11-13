@@ -69,15 +69,15 @@ void fb_sfxMusicStopLocked(void)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    if (__fb_sfx->music_playing >= 0)
+    if (fb_sfx_context->music_playing >= 0)
         SFX_DEBUG("sfx_music_stop: current music stopped");
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (voice->type == FB_SFX_VOICE_MUSIC)
         {
@@ -86,10 +86,10 @@ void fb_sfxMusicStopLocked(void)
         }
     }
 
-    __fb_sfx->music_playing = -1;
-    __fb_sfx->music_paused  = 0;
-    __fb_sfx->music_loop    = 0;
-    __fb_sfx->music_pos     = 0;
+    fb_sfx_context->music_playing = -1;
+    fb_sfx_context->music_paused  = 0;
+    fb_sfx_context->music_loop    = 0;
+    fb_sfx_context->music_pos     = 0;
 }
 
 

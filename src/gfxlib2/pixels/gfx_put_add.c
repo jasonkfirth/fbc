@@ -10,7 +10,6 @@
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
 
-extern void fb_hPutOrC(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
 
 #ifdef HOST_X86
 #include "../drivers/x86/fb_gfx_mmx.h"
@@ -24,7 +23,9 @@ static void fb_hPutAdd2C(unsigned char *src, unsigned char *dest, int w, int h, 
 	unsigned short *s = (unsigned short *)src, *d;
 	unsigned int sc, dc, overflow;
 	int x;
-	
+	(void)blender;
+	(void)param;
+
 	alpha = (alpha + 7) >> 3;
 	src_pitch = (src_pitch >> 1) - w;
 	for (; h; h--) {
@@ -57,6 +58,8 @@ static void fb_hPutAdd4C(unsigned char *src, unsigned char *dest, int w, int h, 
 	unsigned int *s = (unsigned int *)src, *d;
 	unsigned int sc, dc, temp1, temp2;
 	int x;
+	(void)blender;
+	(void)param;
 
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
@@ -115,7 +118,7 @@ void fb_hPutAdd(unsigned char *src, unsigned char *dest, int w, int h, int src_p
 		else
 #endif
 #ifdef HOST_X86
-		if (__fb_gfx->flags & X86_MMX_ENABLED)
+		if (fb_gfx->flags & X86_MMX_ENABLED)
 			context->putter[PUT_MODE_ADD] = mmx_putters;
 		else
 #endif

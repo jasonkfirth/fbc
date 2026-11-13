@@ -48,6 +48,10 @@ typedef struct FB_GFXCTX {
 	void *(*pixel_set)(void *dest, int color, size_t size);
 	PUTTER **putter[PUT_MODES];
 	int flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing this layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFXCTX;
 
 /* end of fb_gfx_private.h */

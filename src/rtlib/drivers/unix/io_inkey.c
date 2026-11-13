@@ -169,9 +169,9 @@ static int get_input(void)
 	NODE *node;
 	int k, cb, cx, cy;
 
-	k = __fb_con.keyboard_getch();
+	k = fb_console_context.keyboard_getch();
 	if (k == '\e') {
-		k = __fb_con.keyboard_getch();
+		k = fb_console_context.keyboard_getch();
 		if (k == EOF)
 			return 27;
 
@@ -185,16 +185,16 @@ static int get_input(void)
 			if (k == node->key) {
 				if (node->code) {
 					if (node->code == KEY_MOUSE) {
-						cb = __fb_con.keyboard_getch();
-						cx = __fb_con.keyboard_getch();
-						cy = __fb_con.keyboard_getch();
-						if (__fb_con.mouse_update)
-							__fb_con.mouse_update(cb, cx, cy);
+						cb = fb_console_context.keyboard_getch();
+						cx = fb_console_context.keyboard_getch();
+						cy = fb_console_context.keyboard_getch();
+						if (fb_console_context.mouse_update)
+							fb_console_context.mouse_update(cb, cx, cy);
 						return -1;
 					}
 					return node->code;
 				}
-				k = __fb_con.keyboard_getch();
+				k = fb_console_context.keyboard_getch();
 				if (k == -1)
 					return -1;
 				node = node->child;
@@ -204,7 +204,7 @@ static int get_input(void)
 		}
 
 		/* not found yet, skip rest and ignore */
-		while(__fb_con.keyboard_getch() >= 0)
+		while(fb_console_context.keyboard_getch() >= 0)
 			;
 
 		return -1;
@@ -254,7 +254,7 @@ FBSTRING_ACCESS *fb_ConsoleInkey( void )
 	FBSTRING_ACCESS *res;
 	int ch;
 
-	if (!__fb_con.inited)
+	if (!fb_console_context.inited)
 		return &fb_ctx.null_desc;
 
 	if ((ch = fb_hGetCh(TRUE)) >= 0) {
@@ -274,7 +274,7 @@ int fb_ConsoleGetkey( void )
 	do {
 		FB_LOCK( );
 
-		if (!__fb_con.inited) {
+		if (!fb_console_context.inited) {
 			FB_UNLOCK( );
 			return fgetc(stdin);
 		}
@@ -298,7 +298,7 @@ int fb_ConsoleKeyHit( void )
 {
 	int result;
 
-	if (!__fb_con.inited)
+	if (!fb_console_context.inited)
 		return feof(stdin) ? FALSE : TRUE;
 
 	fb_hGetCh(FALSE);

@@ -23,6 +23,7 @@
         - graphical console hooks
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../gfx3_backend_null.h"
 #include "../gfx3_backend_select.h"
@@ -38,7 +39,6 @@
 #include "../../gfxlib2/drivers/win32/gfx_metrics.h"
 #endif
 
-FBCALL void fb_GfxSetWindowTitle(FBSTRING_ACCESS *title);
 
 enum FB_GFX3_CONTROL_ID {
 	FB_GFX3_GET_WINDOW_POS = 0,
@@ -1023,7 +1023,7 @@ void fb_gfx3_linux_control_mode(int what, ssize_t *p1, ssize_t *p2,
 	mode = fb_gfx3_linux_mode_acquire();
 	if ((mode != NULL) &&
 	    (mode->context.renderer.backend_vtable != NULL) &&
-	    (mode->context.renderer.backend_vtable != &__fb_gfx3_backend_null))
+	    (mode->context.renderer.backend_vtable != &fb_gfx3_backend_null))
 		displayed = TRUE;
 	if (displayed)
 		fb_gfx3_linux_mobile_control(what, p1, p2, p3, p4, &mode->input);
@@ -1074,7 +1074,7 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 			if ((mobile_state != NULL) && (mobile_state->mode != NULL) &&
 			    (mobile_state->mode->context.renderer.backend_vtable != NULL) &&
 			    (mobile_state->mode->context.renderer.backend_vtable !=
-			     &__fb_gfx3_backend_null))
+			     &fb_gfx3_backend_null))
 				has_displayed_mode = 1;
 			FB_GRAPHICS_UNLOCK();
 			if (!has_displayed_mode) {

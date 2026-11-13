@@ -20,8 +20,8 @@ unsigned int fb_ConsoleColor( unsigned int fc, unsigned int bc, int flags )
 	if( !( flags & FB_COLOR_BG_DEFAULT ) )
 		last_bc = bc & 15;
 
-    char fc_c = __fb_con.color_remap[last_fc];
-    char bc_c = __fb_con.color_remap[last_bc];
+    char fc_c = fb_console_context.color_remap[last_fc];
+    char bc_c = fb_console_context.color_remap[last_bc];
 
 	EM_ASM_ARGS({
         __fb_rtlib.console.color_set($0, $1);

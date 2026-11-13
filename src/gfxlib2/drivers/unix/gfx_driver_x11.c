@@ -202,9 +202,9 @@ static int x11_init(void)
 		values.foreground = 1;
 		values.background = 0;											 
 		shape_gc = XCreateGC(fb_x11.display, shape_pixmap, GCForeground | GCBackground, &values);
-		if (__fb_gfx->bpp == 1)
+		if (fb_gfx->bpp == 1)
 			update_mask = update_mask_8;
-		else if (__fb_gfx->bpp == 2)
+		else if (fb_gfx->bpp == 2)
 			update_mask = update_mask_16;
 		else
 			update_mask = update_mask_32;
@@ -370,7 +370,7 @@ static void x11_update(void)
 	/* The window thread still services input on idle frames. Avoid converting
 	 * the whole framebuffer when there are no changed rows to present. */
 	for (i = 0; i < fb_x11.h; i++) {
-		if (__fb_gfx->dirty[i]) {
+		if (fb_gfx->dirty[i]) {
 			any_dirty = TRUE;
 			break;
 		}
@@ -379,12 +379,12 @@ static void x11_update(void)
 		return;
 	blitter((unsigned char *)image->data, image->bytes_per_line);
 	for (i = 0; i < fb_x11.h; i++) {
-		if (__fb_gfx->dirty[i]) {
-			for (y = i, h = 0; (i < fb_x11.h) && __fb_gfx->dirty[i]; h++, i++)
+		if (fb_gfx->dirty[i]) {
+			for (y = i, h = 0; (i < fb_x11.h) && fb_gfx->dirty[i]; h++, i++)
 				;
 			byte_swap_image_region(y, h);
 			if (shape_image) {
-				update_mask((unsigned char *)__fb_gfx->framebuffer + (y * __fb_gfx->pitch),
+				update_mask((unsigned char *)fb_gfx->framebuffer + (y * fb_gfx->pitch),
 							(unsigned char *)shape_image->data + (y * shape_image->bytes_per_line), fb_x11.w, h);
 				XPutImage(fb_x11.display, shape_pixmap, shape_gc, shape_image, 0, y, 0, y, fb_x11.w, h);
 				XShapeCombineMask(fb_x11.display, fb_x11.window, ShapeBounding, 0, 0, shape_pixmap, ShapeSet);
@@ -408,7 +408,7 @@ static void x11_update(void)
 			}
 		}
 	}
-	fb_hMemSet(__fb_gfx->dirty, FALSE, fb_x11.h);
+	fb_hMemSet(fb_gfx->dirty, FALSE, fb_x11.h);
 }
 
 static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rate, int flags)
@@ -515,9 +515,9 @@ static int driver_resize(int width, int height)
 
 	if ((width <= 0) || (height <= 0) || (image == NULL) ||
 	    ((size_t)height > ((size_t)INT_MAX /
-	     (size_t)__fb_gfx->scanline_size)))
+	     (size_t)fb_gfx->scanline_size)))
 		return -1;
-	physical_height = height * __fb_gfx->scanline_size;
+	physical_height = height * fb_gfx->scanline_size;
 	replacement = create_replacement_image(width, physical_height,
 		&replacement_shm, &replacement_is_shm);
 	if (!replacement)

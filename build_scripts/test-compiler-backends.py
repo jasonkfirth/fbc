@@ -196,6 +196,10 @@ def main() -> int:
          "CUSTOM_ENTRY_VALUES_PASS"),
         ("named-memory-asm", "tests/compiler-support/c-named-memory-asm.bas",
          "C_NAMED_MEMORY_ASM_PASS"),
+        ("asm-real-addresses", "tests/compiler-support/c-asm-real-addresses.bas",
+         "ASM_REAL_ADDRESSES_PASS"),
+        ("asm-real-addresses-opt", "tests/compiler-support/c-asm-real-addresses.bas",
+         "ASM_REAL_ADDRESSES_PASS"),
         ("static-erased-callbacks", "tests/compiler-support/c-static-erased-callbacks.bas",
          "C_STATIC_ERASED_CALLBACKS_PASS"),
         ("predefined-timestamps", "tests/compiler-support/c-predefined-timestamps.bas",
@@ -676,6 +680,22 @@ def main() -> int:
             int128_input_object = None
             thread_local_extern_object = None
             incomplete_extern_object = None
+            asm_addresses_object = None
+            if (architecture in ("x86", "686", "x86_64") or
+                    (system == "win32" and architecture == "")) and any(
+                    backend in ("gcc", "clang") for backend in backends):
+                asm_addresses_object = working / "asm-real-addresses.o"
+                machine = "-m64" if architecture == "x86_64" else "-m32"
+                c_build = subprocess.run(
+                    [os.environ.get("GCC") or "gcc", machine, "-masm=intel", "-std=c11",
+                     "-Wall", "-Wextra", "-Werror", "-c",
+                     str(root / "tests/compiler-support/c-asm-real-addresses.c"),
+                     "-o", str(asm_addresses_object)], cwd=working, text=True,
+                    capture_output=True, timeout=60, check=False)
+                if c_build.returncode:
+                    print("Assembly alias observer compilation failed\n" +
+                          c_build.stdout + c_build.stderr)
+                    return 1
             if architecture == "x86_64" and system in (
                     "linux", "android", "darwin", "freebsd", "openbsd", "netbsd",
                     "dragonfly", "solaris", "illumos", "haiku"):
@@ -818,6 +838,21 @@ def main() -> int:
             return 1
         for backend in backends:
             for fixture_index, (name, source, expected) in enumerate(fixtures):
+                if name.startswith("asm-real-addresses"):
+                    if backend not in ("gcc", "clang"):
+                        continue
+                    if asm_addresses_object is None:
+                        print(f"{backend}/{name}: Intel fixture is unavailable on {architecture}")
+                        continue
+                    if (name == "asm-real-addresses" and
+                            architecture in ("x86", "686", "") and
+                            system in ("haiku", "openbsd", "android")):
+                        # These targets require PIC. At O0, i386 address
+                        # materialization exhausts registers in the old and
+                        # new emitters alike. Keep the optimized case required.
+                        print(f"{backend}/{name}: existing i386 PIC O0 register limit; "
+                              "optimized address checks remain required")
+                        continue
                 if name in ("wide-libc", "long-literals", "procedure-address-identity", "deep-reachability", "destructor-reachability", "array-virtual-origins") and backend not in ("gcc", "clang"):
                     continue
                 if name in ("gosub-values", "label-flag-layout") and backend not in ("gcc", "clang"):
@@ -845,6 +880,11 @@ def main() -> int:
                     # The warning remains intentional here; both pointees are
                     # mutable and the callee must observe its caller's real slot.
                     command += ['-d', 'QUALIFIED_ALIAS_PROOF']
+                if name.startswith("asm-real-addresses"):
+                    command += [str(asm_addresses_object), "-asm", "intel",
+                                "-Wc", "-Werror=unused-variable"]
+                    if name.endswith("-opt"):
+                        command += ["-O", "2"]
                 if system == "darwin" and architecture in ("x86", "x86_64") and name in (
                         "abi", "asm-registers") and backend in ("gcc", "clang"):
                     # These fixtures contain Intel tokens. Darwin defaults to

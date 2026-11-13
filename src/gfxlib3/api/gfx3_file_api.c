@@ -25,6 +25,7 @@
         - drawing or presentation logic
 */
 
+#include "../gfx3_exports.h"
 #include "../gfx3_api_internal.h"
 #include "../gfx3_file_api.h"
 #include "../gfx3_image.h"

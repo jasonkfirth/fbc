@@ -51,12 +51,12 @@ static void fb_sfxSfxStopIdLocked(int id)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (voice->active &&
             voice->type == FB_SFX_VOICE_SFX &&
@@ -150,9 +150,9 @@ void fb_sfxSfxLoad(int id, const char *filename)
 
     fb_sfxRuntimeLock();
 
-    old_data = __fb_sfx->sfx[id].data;
+    old_data = fb_sfx_context->sfx[id].data;
     fb_sfxSfxStopIdLocked(id);
-    __fb_sfx->sfx[id] = next_asset;
+    fb_sfx_context->sfx[id] = next_asset;
 
     fb_sfxRuntimeUnlock();
 
@@ -190,15 +190,15 @@ void fb_sfxSfxUnload(int id)
 
     fb_sfxRuntimeLock();
 
-    old_data = __fb_sfx->sfx[id].data;
+    old_data = fb_sfx_context->sfx[id].data;
     fb_sfxSfxStopIdLocked(id);
 
-    __fb_sfx->sfx[id].data = NULL;
-    __fb_sfx->sfx[id].size = 0;
-    __fb_sfx->sfx[id].frames = 0;
-    __fb_sfx->sfx[id].sample_rate = 0;
-    __fb_sfx->sfx[id].loaded = 0;
-    __fb_sfx->sfx[id].name[0] = '\0';
+    fb_sfx_context->sfx[id].data = NULL;
+    fb_sfx_context->sfx[id].size = 0;
+    fb_sfx_context->sfx[id].frames = 0;
+    fb_sfx_context->sfx[id].sample_rate = 0;
+    fb_sfx_context->sfx[id].loaded = 0;
+    fb_sfx_context->sfx[id].name[0] = '\0';
 
     fb_sfxRuntimeUnlock();
 

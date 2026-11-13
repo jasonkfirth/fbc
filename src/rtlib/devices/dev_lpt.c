@@ -59,7 +59,6 @@ static char *fb_DevLptMakeDeviceName( DEV_LPT_PROTOCOL *lpt_proto )
 		size_t proto_len = strlen( lpt_proto->proto );
 		size_t name_len = strlen( lpt_proto->name );
 		size_t path_len;
-		int written;
 		char *p;
 
 		if( name_len > ((size_t)-1) - 2 )
@@ -68,16 +67,15 @@ static char *fb_DevLptMakeDeviceName( DEV_LPT_PROTOCOL *lpt_proto )
 			return NULL;
 
 		path_len = proto_len + name_len + 2;
-		p = calloc( path_len, 1 );
+		p = malloc( path_len );
 		if( p==NULL )
 			return NULL;
 
-		written = snprintf( p, path_len, "%s:%s", lpt_proto->proto, lpt_proto->name );
-		if( (written < 0) || ((size_t)written >= path_len) )
-		{
-			free( p );
-			return NULL;
-		}
+		/* The checked lengths include the separator and final NUL. Copying
+		   them directly also avoids snprintf's signed-int result limit. */
+		memcpy( p, lpt_proto->proto, proto_len );
+		p[proto_len] = ':';
+		memcpy( p + proto_len + 1, lpt_proto->name, name_len + 1 );
 
 		return p;
 	}
@@ -147,6 +145,7 @@ int fb_DevLptOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 		tmp_handle = fb_DevLptFindDeviceByName( devInfo->iPort, devInfo->pszDevice, FALSE );
 		if( tmp_handle )
 		{
+			free(devInfo->pszDevice);
 			free(devInfo);
       redir_handle = tmp_handle;
 			devInfo = (DEV_LPT_INFO*) tmp_handle->opaque;

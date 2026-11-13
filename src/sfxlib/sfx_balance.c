@@ -75,7 +75,7 @@ void fb_sfxBalance(float position)
         position = FB_SFX_BALANCE_RIGHT;
 
     fb_sfxRuntimeLock();
-    __fb_sfx->balance = position;
+    fb_sfx_context->balance = position;
     fb_sfxRuntimeUnlock();
     SFX_DEBUG(
         "sfx_balance: balance set to %f",
@@ -92,11 +92,11 @@ float fb_sfxBalanceGet(void)
 {
     float balance;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_BALANCE_CENTER;
 
     fb_sfxRuntimeLock();
-    balance = __fb_sfx->balance;
+    balance = fb_sfx_context->balance;
     fb_sfxRuntimeUnlock();
 
     return balance;
@@ -113,7 +113,7 @@ void fb_sfxBalanceReset(void)
         return;
 
     fb_sfxRuntimeLock();
-    __fb_sfx->balance = FB_SFX_BALANCE_CENTER;
+    fb_sfx_context->balance = FB_SFX_BALANCE_CENTER;
     fb_sfxRuntimeUnlock();
     SFX_DEBUG("sfx_balance: balance reset to center");
 }

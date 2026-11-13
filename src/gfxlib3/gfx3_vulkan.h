@@ -26,8 +26,8 @@
         - a FreeBASIC-visible low-level Vulkan API
 */
 
-#ifndef __FB_GFX3_VULKAN_H__
-#define __FB_GFX3_VULKAN_H__
+#ifndef FB_GFX3_VULKAN_H
+#define FB_GFX3_VULKAN_H
 
 #include "gfx3_protocol.h"
 

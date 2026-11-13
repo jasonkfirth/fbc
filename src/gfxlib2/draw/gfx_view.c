@@ -16,7 +16,7 @@ FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, 
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}
@@ -32,7 +32,7 @@ FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, 
            clipping done below would move the rectangle instead of just clipping
            it. It may be better to trigger an "Illegal function call" here, but
            there's no error return here currently. */
-        if (x1 >= __fb_gfx->w || y1 >= __fb_gfx->h || x2 < 0 || y2 < 0) {
+        if (x1 >= fb_gfx->w || y1 >= fb_gfx->h || x2 < 0 || y2 < 0) {
             FB_GRAPHICS_UNLOCK( );
             return;
         }
@@ -49,9 +49,9 @@ FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, 
             /* Temporarily set full screen area clipping to draw view border */
             context->view_x = 0;
             context->view_y = 0;
-            context->view_w = __fb_gfx->w;
-            context->view_h = __fb_gfx->h;
-            fb_hGfxBox(x1 - 1, y1 - 1, x2 + 1, y2 + 1, border_color & __fb_gfx->color_mask, FALSE, 0xFFFF);
+            context->view_w = fb_gfx->w;
+            context->view_h = fb_gfx->h;
+            fb_hGfxBox(x1 - 1, y1 - 1, x2 + 1, y2 + 1, border_color & fb_gfx->color_mask, FALSE, 0xFFFF);
         }
 
         /* Clip viewport to screen (without "moving" the viewport). The drawing
@@ -62,20 +62,20 @@ FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, 
            with such "bad input" coordinates nevertheless, if they were given by
            the program. Clipping seems like a good solution. */
 
-        x1 = MID(0, x1, __fb_gfx->w - 1);
-        y1 = MID(0, y1, __fb_gfx->h - 1);
-        x2 = MID(0, x2, __fb_gfx->w - 1);
-        y2 = MID(0, y2, __fb_gfx->h - 1);
+        x1 = MID(0, x1, fb_gfx->w - 1);
+        y1 = MID(0, y1, fb_gfx->h - 1);
+        x2 = MID(0, x2, fb_gfx->w - 1);
+        y2 = MID(0, y2, fb_gfx->h - 1);
 
         context->view_x = x1;
         context->view_y = y1;
         context->view_w = x2 - x1 + 1;
         context->view_h = y2 - y1 + 1;
 
-        DBG_ASSERT(context->view_x >= 0 && context->view_x < __fb_gfx->w);
-        DBG_ASSERT(context->view_y >= 0 && context->view_y < __fb_gfx->h);
-        DBG_ASSERT(context->view_w > 0 && context->view_w <= __fb_gfx->w);
-        DBG_ASSERT(context->view_h > 0 && context->view_h <= __fb_gfx->h);
+        DBG_ASSERT(context->view_x >= 0 && context->view_x < fb_gfx->w);
+        DBG_ASSERT(context->view_y >= 0 && context->view_y < fb_gfx->h);
+        DBG_ASSERT(context->view_w > 0 && context->view_w <= fb_gfx->w);
+        DBG_ASSERT(context->view_h > 0 && context->view_h <= fb_gfx->h);
 
         if (!(flags & DEFAULT_COLOR_1)) {
             old_bg_color = context->bg_color;
@@ -86,8 +86,8 @@ FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, 
     } else {
         context->flags &= ~CTX_VIEWPORT_SET;
         context->view_x = context->view_y = 0;
-        context->view_w = __fb_gfx->w;
-        context->view_h = __fb_gfx->h;
+        context->view_w = fb_gfx->w;
+        context->view_h = fb_gfx->h;
     }
 
 	FB_GRAPHICS_UNLOCK( );

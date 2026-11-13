@@ -23,9 +23,9 @@ void fb_ConsoleGetRawXYEx( HANDLE console, int *column, int *row )
 {
 	(void)console;
 	if( column != NULL )
-		*column = __fb_con.cursor_x;
+		*column = fb_console_context.cursor_x;
 	if( row != NULL )
-		*row = __fb_con.cursor_y;
+		*row = fb_console_context.cursor_y;
 }
 
 void fb_ConsoleGetRawXY( int *column, int *row )
@@ -36,9 +36,9 @@ void fb_ConsoleGetRawXY( int *column, int *row )
 FBCALL void fb_ConsoleGetXY( int *column, int *row )
 {
 	if( column != NULL )
-		*column = __fb_con.cursor_x + 1;
+		*column = fb_console_context.cursor_x + 1;
 	if( row != NULL )
-		*row = __fb_con.cursor_y + 1;
+		*row = fb_console_context.cursor_y + 1;
 }
 
 /* end of drivers/wince/io_getxy.c */

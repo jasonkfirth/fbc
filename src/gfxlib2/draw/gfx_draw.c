@@ -11,8 +11,13 @@
 #include <math.h>
 #include <ctype.h>
 
+#if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
+#define FB_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FB_FALLTHROUGH ((void)0)
+#endif
+
 #define FB_NAN		((intptr_t)0x80000000)
-#define SQRT_2		1.4142135623730950488016
 
 static float base_scale = 1.0;
 static int base_angle = 0;
@@ -96,7 +101,7 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 
 	FB_GRAPHICS_LOCK( );
 
-	if ((!__fb_gfx) || (!command) || (!command->data)) {
+	if ((!fb_gfx) || (!command) || (!command->data)) {
 		if (command)
 			fb_hStrDelTemp(command);
 		FB_GRAPHICS_UNLOCK( );
@@ -190,7 +195,7 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 						goto error;
 				}
 				DRIVER_UNLOCK();
-				fb_GfxPaint(target, x, y, value1 & __fb_gfx->color_mask, value2 & __fb_gfx->color_mask, NULL, PAINT_TYPE_FILL, COORD_TYPE_A);
+				fb_GfxPaint(target, x, y, value1 & fb_gfx->color_mask, value2 & fb_gfx->color_mask, NULL, PAINT_TYPE_FILL, COORD_TYPE_A);
 				DRIVER_LOCK();
 				break;
 
@@ -227,9 +232,9 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 				move = draw = TRUE;
 				break;
 
-			case 'F': case 'D': angle += 90; /* fall through */
-			case 'G': case 'L': angle += 90; /* fall through */
-			case 'H': case 'U': angle += 90; /* fall through */
+			case 'F': case 'D': angle += 90; FB_FALLTHROUGH;
+			case 'G': case 'L': angle += 90; FB_FALLTHROUGH;
+			case 'H': case 'U': angle += 90; FB_FALLTHROUGH;
 			case 'E': case 'R':
 				diagonal = ((toupper(*c) >= 'E') && (toupper(*c) <= 'H'));
 				c++;

@@ -132,20 +132,20 @@ int fb_sfxInitCore(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx == NULL)
+    if (fb_sfx_context == NULL)
     {
         SFX_DEBUG("sfx_core: runtime context missing");
         fb_sfxRuntimeUnlock();
         return -1;
     }
 
-    if (__fb_sfx->initialized)
+    if (fb_sfx_context->initialized)
     {
         fb_sfxRuntimeUnlock();
         return 0;
     }
 
-    __fb_sfx->shutting_down = 0;
+    fb_sfx_context->shutting_down = 0;
 
     SFX_DEBUG("sfx_core: initializing sound subsystem");
 
@@ -161,7 +161,7 @@ int fb_sfxInitCore(void)
     fb_sfxMixBufferInit();
     fb_sfxCaptureBufferInit();
 
-    if (!__fb_sfx->mixbuffer)
+    if (!fb_sfx_context->mixbuffer)
     {
         SFX_DEBUG("sfx_core: failed to allocate mix buffer");
         fb_sfxInitCoreRollbackLocked();
@@ -191,7 +191,7 @@ int fb_sfxInitCore(void)
         return -1;
     }
 
-    __fb_sfx->initialized = 1;
+    fb_sfx_context->initialized = 1;
 
     SFX_DEBUG("sfx_core: initialization complete");
 
@@ -214,20 +214,20 @@ void fb_sfxExitCore(void)
 {
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx == NULL)
+    if (fb_sfx_context == NULL)
     {
         fb_sfxRuntimeUnlock();
         return;
     }
 
-    if (!__fb_sfx->initialized)
+    if (!fb_sfx_context->initialized)
     {
         fb_sfxRuntimeUnlock();
         return;
     }
 
     SFX_DEBUG("sfx_core: shutting down sound subsystem");
-    __fb_sfx->shutting_down = 1;
+    fb_sfx_context->shutting_down = 1;
     fb_sfxRuntimeUnlock();
 
     /*
@@ -255,7 +255,7 @@ void fb_sfxExitCore(void)
     fb_sfxEchoShutdown();
     fb_sfxMixerShutdown();
 
-    __fb_sfx->initialized = 0;
+    fb_sfx_context->initialized = 0;
     fb_sfxRuntimeUnlock();
 }
 
@@ -263,11 +263,11 @@ static int fb_sfxDriverFallback(const SFXDRIVER *failed_driver);
 
 static void fb_sfxInitCoreRollbackLocked(void)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
-    __fb_sfx->driver = NULL;
-    __fb_sfx->initialized = 0;
+    fb_sfx_context->driver = NULL;
+    fb_sfx_context->initialized = 0;
 
     fb_sfxCaptureShutdown();
     fb_sfxOutputCaptureShutdown();
@@ -310,14 +310,14 @@ void fb_sfxUpdate(int frames)
         return;
     }
 
-    if (__fb_sfx->mixbuffer == NULL)
+    if (fb_sfx_context->mixbuffer == NULL)
     {
         fb_sfxRuntimeUnlock();
         return;
     }
 
-    chunk_limit = (__fb_sfx->buffer_frames > 0)
-        ? __fb_sfx->buffer_frames
+    chunk_limit = (fb_sfx_context->buffer_frames > 0)
+        ? fb_sfx_context->buffer_frames
         : FB_SFX_DEFAULT_BUFFER;
 
     if (chunk_limit <= 0)
@@ -389,8 +389,8 @@ void fb_sfxRunForeground(int frames)
 
     SFX_DEBUG("sfx_core: foreground feed starts with %d frames", frames);
 
-    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
-        ? __fb_sfx->samplerate
+    samplerate = (fb_sfx_context && fb_sfx_context->samplerate > 0)
+        ? fb_sfx_context->samplerate
         : 0;
 
     tick_frames = (samplerate > 0)
@@ -406,8 +406,8 @@ void fb_sfxRunForeground(int frames)
         drivers still need the explicit delay to preserve foreground command
         timing.
     */
-    if (driver_blocks_audio && __fb_sfx && __fb_sfx->buffer_frames > 0)
-        tick_frames = __fb_sfx->buffer_frames;
+    if (driver_blocks_audio && fb_sfx_context && fb_sfx_context->buffer_frames > 0)
+        tick_frames = fb_sfx_context->buffer_frames;
 
     if (tick_frames <= 0)
         tick_frames = 220;
@@ -514,7 +514,7 @@ int fb_sfxRawWrite(const float *samples, int frames, int channels)
 
     fb_sfxRuntimeLock();
 
-    if (!__fb_sfx || !__fb_sfx->mixbuffer)
+    if (!fb_sfx_context || !fb_sfx_context->mixbuffer)
     {
         fb_sfxRuntimeUnlock();
         return -1;
@@ -541,8 +541,8 @@ int fb_sfxRawWrite(const float *samples, int frames, int channels)
             g_output_stream_epoch = 1;
     }
 
-    output_channels = (__fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    output_channels = (fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
     if (channels != 1 && channels != 2 && channels != output_channels)
@@ -561,8 +561,8 @@ int fb_sfxRawWrite(const float *samples, int frames, int channels)
     if (frames > writable)
         frames = writable;
 
-    chunk_limit = (__fb_sfx->buffer_frames > 0)
-        ? __fb_sfx->buffer_frames
+    chunk_limit = (fb_sfx_context->buffer_frames > 0)
+        ? fb_sfx_context->buffer_frames
         : FB_SFX_DEFAULT_BUFFER;
 
     if (chunk_limit <= 0)
@@ -579,7 +579,7 @@ int fb_sfxRawWrite(const float *samples, int frames, int channels)
         if (chunk > chunk_limit)
             chunk = chunk_limit;
 
-        if (fb_sfxRawCopyFramesLocked(__fb_sfx->mixbuffer,
+        if (fb_sfxRawCopyFramesLocked(fb_sfx_context->mixbuffer,
                                       samples + (written * channels),
                                       chunk,
                                       channels,
@@ -589,10 +589,10 @@ int fb_sfxRawWrite(const float *samples, int frames, int channels)
             return (written > 0) ? written : -1;
         }
 
-        fb_sfxMixerDiagnostics(__fb_sfx->mixbuffer, chunk);
+        fb_sfxMixerDiagnostics(fb_sfx_context->mixbuffer, chunk);
 
         accepted = fb_sfxRingBufferWrite(&g_output_queue,
-                                         __fb_sfx->mixbuffer,
+                                         fb_sfx_context->mixbuffer,
                                          chunk);
         if (accepted <= 0)
             break;
@@ -616,7 +616,7 @@ int fb_sfxRawOpen(void)
 
     fb_sfxRuntimeLock();
 
-    if (!__fb_sfx ||
+    if (!fb_sfx_context ||
         (!g_output_queue_initialized && fb_sfxOutputQueueInitLocked() != 0))
     {
         fb_sfxRuntimeUnlock();
@@ -635,7 +635,7 @@ int fb_sfxRawOpen(void)
         g_output_stream_epoch = 1;
 
     g_raw_output_active = 1;
-    sample_rate = __fb_sfx->samplerate;
+    sample_rate = fb_sfx_context->samplerate;
 
     fb_sfxRuntimeUnlock();
 
@@ -670,8 +670,8 @@ unsigned long long fb_sfxOutputUnderruns(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx && __fb_sfx->driver)
-        driver_name = __fb_sfx->driver->name;
+    if (fb_sfx_context && fb_sfx_context->driver)
+        driver_name = fb_sfx_context->driver->name;
 
     fb_sfxRuntimeUnlock();
 
@@ -694,7 +694,7 @@ int fb_sfxOutputSampleRate(void)
         return -1;
 
     fb_sfxRuntimeLock();
-    sample_rate = (__fb_sfx) ? __fb_sfx->samplerate : -1;
+    sample_rate = (fb_sfx_context) ? fb_sfx_context->samplerate : -1;
     fb_sfxRuntimeUnlock();
 
     return (sample_rate > 0) ? sample_rate : -1;
@@ -782,10 +782,10 @@ static int fb_sfxCurrentDriverBlocksLocked(void)
 {
     const SFXDRIVER *driver;
 
-    if (!__fb_sfx || __fb_sfx->shutting_down)
+    if (!fb_sfx_context || fb_sfx_context->shutting_down)
         return 0;
 
-    driver = __fb_sfx->driver;
+    driver = fb_sfx_context->driver;
     if (!driver)
         return 0;
 
@@ -812,8 +812,8 @@ static int fb_sfxCurrentDriverIsNull(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx && __fb_sfx->driver && !__fb_sfx->shutting_down)
-        result = fb_sfxDriverNameEquals(__fb_sfx->driver->name, "null");
+    if (fb_sfx_context && fb_sfx_context->driver && !fb_sfx_context->shutting_down)
+        result = fb_sfxDriverNameEquals(fb_sfx_context->driver->name, "null");
 
     fb_sfxRuntimeUnlock();
 
@@ -829,12 +829,12 @@ static int fb_sfxUpdateDelayFrames(int msecs, int return_after_update)
 
     fb_sfxRuntimeLock();
 
-    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
-        ? __fb_sfx->samplerate
+    samplerate = (fb_sfx_context && fb_sfx_context->samplerate > 0)
+        ? fb_sfx_context->samplerate
         : 0;
 
-    buffer_frames = (__fb_sfx && __fb_sfx->buffer_frames > 0)
-        ? __fb_sfx->buffer_frames
+    buffer_frames = (fb_sfx_context && fb_sfx_context->buffer_frames > 0)
+        ? fb_sfx_context->buffer_frames
         : 0;
 
     fb_sfxRuntimeUnlock();
@@ -915,9 +915,9 @@ static int fb_sfxDriverIndexOf(const SFXDRIVER *driver)
     if (!driver)
         return -1;
 
-    for (i = 0; __fb_sfx_drivers_list[i]; ++i)
+    for (i = 0; fb_sfx_drivers_list[i]; ++i)
     {
-        if (__fb_sfx_drivers_list[i] == driver)
+        if (fb_sfx_drivers_list[i] == driver)
             return i;
     }
 
@@ -932,17 +932,17 @@ static int fb_sfxOutputQueueInitLocked(void)
     int driver_samples;
     size_t driver_bytes;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return -1;
 
     if (g_output_queue_initialized)
         return 0;
 
-    channels = __fb_sfx->output_channels;
+    channels = fb_sfx_context->output_channels;
     if (channels <= 0)
         return -1;
 
-    queue_frames = __fb_sfx->buffer_size;
+    queue_frames = fb_sfx_context->buffer_size;
     if (queue_frames <= 0)
         queue_frames = FB_SFX_DEFAULT_BUFFER;
 
@@ -964,8 +964,8 @@ static int fb_sfxOutputQueueInitLocked(void)
         return -1;
     }
 
-    driver_frames = (__fb_sfx->buffer_frames > 0)
-        ? __fb_sfx->buffer_frames
+    driver_frames = (fb_sfx_context->buffer_frames > 0)
+        ? fb_sfx_context->buffer_frames
         : FB_SFX_DEFAULT_BUFFER;
 
     if (driver_frames <= 0 || driver_frames > INT_MAX / channels)
@@ -1013,7 +1013,7 @@ static int fb_sfxOutputQueueFillLocked(int frames)
     int target_frames;
     int max_frames;
 
-    if (!__fb_sfx || !__fb_sfx->mixbuffer)
+    if (!fb_sfx_context || !fb_sfx_context->mixbuffer)
         return -1;
 
     if (!g_output_queue_initialized && fb_sfxOutputQueueInitLocked() != 0)
@@ -1029,10 +1029,10 @@ static int fb_sfxOutputQueueFillLocked(int frames)
         return 0;
 
     if (frames <= 0)
-        frames = __fb_sfx->buffer_size;
+        frames = fb_sfx_context->buffer_size;
 
-    max_frames = (__fb_sfx->buffer_frames > 0)
-        ? __fb_sfx->buffer_frames
+    max_frames = (fb_sfx_context->buffer_frames > 0)
+        ? fb_sfx_context->buffer_frames
         : frames;
     if (max_frames <= 0)
         max_frames = FB_SFX_DEFAULT_BUFFER;
@@ -1076,10 +1076,10 @@ static int fb_sfxOutputQueueFillLocked(int frames)
         /* generate audio using the mixer */
         fb_sfxMixerProcess(frames_this_pass);
 
-        fb_sfxMixerDiagnostics(__fb_sfx->mixbuffer, frames_this_pass);
+        fb_sfxMixerDiagnostics(fb_sfx_context->mixbuffer, frames_this_pass);
 
         written = fb_sfxRingBufferWrite(&g_output_queue,
-                                        __fb_sfx->mixbuffer,
+                                        fb_sfx_context->mixbuffer,
                                         frames_this_pass);
         if (written != frames_this_pass)
             return -1;
@@ -1100,10 +1100,10 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     int zero_retry_count;
     int zero_retry_limit;
 
-    if (!__fb_sfx || !g_driver_output_buffer || frames <= 0)
+    if (!fb_sfx_context || !g_driver_output_buffer || frames <= 0)
         return 0;
 
-    if (__fb_sfx->shutting_down)
+    if (fb_sfx_context->shutting_down)
         return 0;
 
     if (!g_output_queue_initialized)
@@ -1120,8 +1120,8 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     fb_sfxDriverIoLock();
     fb_sfxRuntimeLock();
 
-    if (!__fb_sfx ||
-        __fb_sfx->shutting_down ||
+    if (!fb_sfx_context ||
+        fb_sfx_context->shutting_down ||
         !g_output_queue_initialized ||
         !g_driver_output_buffer)
     {
@@ -1139,8 +1139,8 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
     if (frames > queued)
         frames = queued;
 
-    if (__fb_sfx->buffer_frames > 0 && frames > __fb_sfx->buffer_frames)
-        frames = __fb_sfx->buffer_frames;
+    if (fb_sfx_context->buffer_frames > 0 && frames > fb_sfx_context->buffer_frames)
+        frames = fb_sfx_context->buffer_frames;
 
     if (frames > g_driver_output_frames)
         frames = g_driver_output_frames;
@@ -1154,11 +1154,11 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         return 0;
     }
 
-    channels = (__fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    channels = (fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
-    driver = __fb_sfx->driver;
+    driver = fb_sfx_context->driver;
     if (driver && driver->name)
     {
         fb_sfxDriverStatsRecordQueueFill(driver->name, queued);
@@ -1177,14 +1177,14 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
         int write_frames;
         int (*write_proc)(const float *samples, int frames);
 
-        if (!__fb_sfx ||
-            __fb_sfx->driver != driver ||
-            __fb_sfx->shutting_down ||
-            !__fb_sfx->mixbuffer ||
+        if (!fb_sfx_context ||
+            fb_sfx_context->driver != driver ||
+            fb_sfx_context->shutting_down ||
+            !fb_sfx_context->mixbuffer ||
             !driver ||
             !driver->write)
         {
-            driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
+            driver = (fb_sfx_context) ? fb_sfx_context->driver : NULL;
             continue;
         }
 
@@ -1203,13 +1203,13 @@ static int fb_sfxOutputQueueDrainLocked(int frames)
             a real driver error, so the active driver is rechecked after the
             I/O lock is acquired.
         */
-        if (!__fb_sfx ||
-            __fb_sfx->driver != driver ||
-            __fb_sfx->shutting_down ||
+        if (!fb_sfx_context ||
+            fb_sfx_context->driver != driver ||
+            fb_sfx_context->shutting_down ||
             !driver ||
             !driver->write)
         {
-            driver = (__fb_sfx) ? __fb_sfx->driver : NULL;
+            driver = (fb_sfx_context) ? fb_sfx_context->driver : NULL;
             continue;
         }
         write_proc = driver->write;
@@ -1298,15 +1298,15 @@ static int fb_sfxDriverTryFromIndex(int start_index)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return -1;
 
     if (start_index < 0)
         start_index = 0;
 
-    for (i = start_index; __fb_sfx_drivers_list[i]; ++i)
+    for (i = start_index; fb_sfx_drivers_list[i]; ++i)
     {
-        const SFXDRIVER *driver = __fb_sfx_drivers_list[i];
+        const SFXDRIVER *driver = fb_sfx_drivers_list[i];
 
         if (!driver || !driver->init)
             continue;
@@ -1317,12 +1317,12 @@ static int fb_sfxDriverTryFromIndex(int start_index)
         SFX_DEBUG("sfx_core: attempting driver '%s'", driver->name);
 
         if (driver->init(
-                __fb_sfx->samplerate,
-                __fb_sfx->output_channels,
-                __fb_sfx->buffer_size,
+                fb_sfx_context->samplerate,
+                fb_sfx_context->output_channels,
+                fb_sfx_context->buffer_size,
                 FB_SFX_INIT_DEFAULT) == 0)
         {
-            __fb_sfx->driver = driver;
+            fb_sfx_context->driver = driver;
             fb_sfxDriverStatsReset(driver->name);
 
             SFX_DEBUG("sfx_core: driver '%s' initialized", driver->name);
@@ -1331,7 +1331,7 @@ static int fb_sfxDriverTryFromIndex(int start_index)
         }
     }
 
-    __fb_sfx->driver = NULL;
+    fb_sfx_context->driver = NULL;
     return -1;
 }
 
@@ -1374,12 +1374,12 @@ static int fb_sfxDriverTryByName(const char *name)
 {
     int i;
 
-    if (!__fb_sfx || !name || !*name)
+    if (!fb_sfx_context || !name || !*name)
         return -1;
 
-    for (i = 0; __fb_sfx_drivers_list[i]; ++i)
+    for (i = 0; fb_sfx_drivers_list[i]; ++i)
     {
-        const SFXDRIVER *driver = __fb_sfx_drivers_list[i];
+        const SFXDRIVER *driver = fb_sfx_drivers_list[i];
 
         if (!driver || !driver->name || !driver->init)
             continue;
@@ -1397,12 +1397,12 @@ static int fb_sfxDriverTryByName(const char *name)
         SFX_DEBUG("sfx_core: attempting requested driver '%s'", driver->name);
 
         if (driver->init(
-                __fb_sfx->samplerate,
-                __fb_sfx->output_channels,
-                __fb_sfx->buffer_size,
+                fb_sfx_context->samplerate,
+                fb_sfx_context->output_channels,
+                fb_sfx_context->buffer_size,
                 FB_SFX_INIT_DEFAULT) == 0)
         {
-            __fb_sfx->driver = driver;
+            fb_sfx_context->driver = driver;
             fb_sfxDriverStatsReset(driver->name);
 
             SFX_DEBUG("sfx_core: requested driver '%s' initialized",
@@ -1424,10 +1424,10 @@ static int fb_sfxDriverFallback(const SFXDRIVER *failed_driver)
     const SFXDRIVER *driver_to_exit;
     int next_index;
 
-    if (!__fb_sfx || !failed_driver)
+    if (!fb_sfx_context || !failed_driver)
         return -1;
 
-    if (__fb_sfx->shutting_down)
+    if (fb_sfx_context->shutting_down)
         return -1;
 
     next_index = fb_sfxDriverIndexOf(failed_driver);
@@ -1502,7 +1502,7 @@ void fb_sfxDriverShutdown(void)
 
     fb_sfxRuntimeLock();
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
     {
         fb_sfxRuntimeUnlock();
         return;
@@ -1527,8 +1527,8 @@ int fb_sfxDriverFeedsAudio(void)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx && __fb_sfx->driver &&
-        (__fb_sfx->driver->capabilities & FB_SFX_DRIVER_CAP_BACKGROUND))
+    if (fb_sfx_context && fb_sfx_context->driver &&
+        (fb_sfx_context->driver->capabilities & FB_SFX_DRIVER_CAP_BACKGROUND))
     {
         result = 1;
     }
@@ -1570,17 +1570,17 @@ const SFXDRIVER *fb_sfxDriverDetachLocked(const SFXDRIVER *expected_driver)
 {
     const SFXDRIVER *driver;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return NULL;
 
-    driver = __fb_sfx->driver;
+    driver = fb_sfx_context->driver;
     if (!driver)
         return NULL;
 
     if (expected_driver && driver != expected_driver)
         return NULL;
 
-    __fb_sfx->driver = NULL;
+    fb_sfx_context->driver = NULL;
     return driver;
 }
 

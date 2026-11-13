@@ -62,6 +62,52 @@
 	#define ENOSYS (__FB_HAIKU_POSIX_ERROR_BASE + 9)
 	#define ENOTEMPTY (__FB_HAIKU_STORAGE_ERROR_BASE + 6)
 	#define EILSEQ (__FB_HAIKU_POSIX_ERROR_BASE + 38)
+#elseif defined(__FB_DOS__)
+	'' DJGPP assigns its own errno numbers. Match its public errno.h so
+	'' missing files and access failures keep their native meanings.
+	#define EDOM 1
+	#define ERANGE 2
+	#define E2BIG 3
+	#define EACCES 4
+	#define EAGAIN 5
+	#define EBADF 6
+	#define EBUSY 7
+	#define ECHILD 8
+	#define EDEADLK 9
+	#define EDEADLOCK EDEADLK
+	#define EEXIST 10
+	#define EFAULT 11
+	#define EFBIG 12
+	#define EINTR 13
+	#define EINVAL 14
+	#define EIO 15
+	#define EISDIR 16
+	#define EMFILE 17
+	#define EMLINK 18
+	#define ENAMETOOLONG 19
+	#define ENFILE 20
+	#define ENODEV 21
+	#define ENOENT 22
+	#define ENOFILE ENOENT
+	#define ENOEXEC 23
+	#define ENOLCK 24
+	#define ENOMEM 25
+	#define ENOSPC 26
+	#define ENOSYS 27
+	#define ENOTDIR 28
+	#define ENOTEMPTY 29
+	#define ENOTTY 30
+	#define ENXIO 31
+	#define EPERM 32
+	#define EPIPE 33
+	#define EROFS 34
+	#define ESPIPE 35
+	#define ESRCH 36
+	#define EXDEV 37
+	#define ENMFILE 38
+	#define ELOOP 39
+	#define EOVERFLOW 40
+	#define EILSEQ 41
 #elseif defined(__FB_DARWIN__)
         '' Darwin errno numbers are different from Linux, so use Darwin values here.
         '' XNU's sys/errno.h uses 17 for an existing filesystem entry.

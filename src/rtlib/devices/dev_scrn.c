@@ -26,6 +26,8 @@ static FB_FILE_HOOKS hooks_dev_scrn = {
 
 int fb_DevScrnOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {
+	(void)filename;
+	(void)filename_len;
     FB_LOCK();
 
     if (handle!=FB_HANDLE_SCREEN)

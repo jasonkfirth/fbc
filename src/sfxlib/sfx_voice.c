@@ -117,7 +117,7 @@ static FB_SFXVOICE *fb_sfxVoiceAllocSlotLocked(void)
 
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        FB_SFXVOICE *v = &__fb_sfx->voices[i];
+        FB_SFXVOICE *v = &fb_sfx_context->voices[i];
 
         if (!v->active)
         {
@@ -138,7 +138,7 @@ static FB_SFXVOICE *fb_sfxVoiceAllocSlotLocked(void)
 
 FB_SFXVOICE *fb_sfxVoiceAllocLocked(void)
 {
-    if (!__fb_sfx || !__fb_sfx->initialized)
+    if (!fb_sfx_context || !fb_sfx_context->initialized)
         return NULL;
 
     return fb_sfxVoiceAllocSlotLocked();
@@ -294,13 +294,13 @@ int fb_sfxVoiceActiveCount(void)
     int i;
     int count = 0;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     fb_sfxRuntimeLock();
     for (i = 0; i < FB_SFX_MAX_VOICES; i++)
     {
-        if (__fb_sfx->voices[i].active)
+        if (fb_sfx_context->voices[i].active)
             count++;
     }
     fb_sfxRuntimeUnlock();
@@ -341,12 +341,12 @@ void fb_sfxVoiceStopTypeChannel(int voice_type, int channel)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (!fb_sfxVoiceMatchesTypeChannel(voice, voice_type, channel))
             continue;
@@ -364,12 +364,12 @@ void fb_sfxVoicePauseTypeChannel(int voice_type, int channel)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (!fb_sfxVoiceMatchesTypeChannel(voice, voice_type, channel))
             continue;
@@ -387,12 +387,12 @@ void fb_sfxVoiceResumeTypeChannel(int voice_type, int channel)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (!fb_sfxVoiceMatchesTypeChannel(voice, voice_type, channel))
             continue;
@@ -412,7 +412,7 @@ int fb_sfxVoiceStatusTypeChannel(int voice_type, int channel)
     int playing;
     int paused;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_VOICE_STATUS_STOPPED;
 
     playing = 0;
@@ -420,7 +420,7 @@ int fb_sfxVoiceStatusTypeChannel(int voice_type, int channel)
 
     for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
     {
-        FB_SFXVOICE *voice = &__fb_sfx->voices[i];
+        FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
 
         if (!fb_sfxVoiceMatchesTypeChannel(voice, voice_type, channel))
             continue;

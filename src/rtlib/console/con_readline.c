@@ -6,42 +6,72 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
+#include <stdint.h>
+
+/* String lengths are stored as signed values by the runtime. */
+static int64_t SizeToDelta( size_t value )
+{
+    if( value > (size_t)FB_STRSIZEMSK ) {
+        DBG_ASSERT( value <= (size_t)FB_STRSIZEMSK );
+        value = (size_t)FB_STRSIZEMSK;
+    }
+
+    return (int64_t)value;
+}
 
 static void DoAdjust
 	(
 		int *x, int *y,
-		int dx, int dy,
-		int cols, int rows
+		int64_t dx,
+		int cols
 	)
 {
+    int64_t x_pos, y_pos, row_delta;
+    const int64_t min_y = (int64_t)INT_MIN - 1;
+    const int64_t max_y = (int64_t)INT_MAX - 1;
+
     DBG_ASSERT( x!=NULL && y!=NULL );
+    DBG_ASSERT( cols > 0 );
+    if( cols <= 0 )
+        return;
 
-    *x -= 1;
-    *y -= 1;
+    x_pos = (int64_t)*x - 1;
+    y_pos = (int64_t)*y - 1;
 
-    *x += dx;
-    if( *x < 0 ) {
-        *x = -*x + cols;
-        *y -= *x / cols;
-        *x = cols - (*x % cols);
+    row_delta = dx / cols;
+    x_pos += dx % cols;
+    if( x_pos < 0 ) {
+        x_pos += cols;
+        --row_delta;
+    } else if( x_pos >= cols ) {
+        x_pos -= cols;
+        ++row_delta;
     }
-    *y += *x / cols;
-    *x %= cols;
-    *y += dy;
 
-    *x += 1;
-    *y += 1;
+    if( row_delta > max_y - y_pos )
+        y_pos = max_y;
+    else if( row_delta < min_y - y_pos )
+        y_pos = min_y;
+    else
+        y_pos += row_delta;
+
+    *x = (int)(x_pos + 1);
+    *y = (int)(y_pos + 1);
 }
 
 static void DoMove
 	(
 		int *x, int *y,
-		int dx, int dy,
+		int64_t dx,
 		int cols, int rows
 	)
 {
-    DoAdjust( x, y, dx, dy, cols, rows );
-    if( *y==(rows+1) && *x==1 ) {
+	if( cols <= 0 )
+		return;
+
+	DoAdjust( x, y, dx, cols );
+	if( rows < INT_MAX && *y==(rows+1) && *x==1 ) {
         fb_Locate( rows, cols, -1, 0, 0 );
         fb_PrintBufferEx( FB_NEWLINE, sizeof(FB_NEWLINE)-1, 0 );
     } else {
@@ -109,7 +139,7 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 		switch( k ) {
 		case 8:  /* Backspace */
 			if( pos != 0 ) {
-				DoMove( &current_x, &current_y, -1, 0, cols, rows );
+				DoMove( &current_x, &current_y, -1, cols, rows );
 				--pos;
 				delete_char_count = 1;
 			}
@@ -122,7 +152,7 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 			break;
 
 		case 27:  /* ESC */
-			DoMove( &current_x, &current_y, -pos, 0, cols, rows );
+			DoMove( &current_x, &current_y, -SizeToDelta( pos ), cols, rows );
 			pos = 0;
 			delete_char_count = len;
 			break;
@@ -139,7 +169,7 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 		case KEY_LEFT:  /* Move cursor left */
 			/* not at begin-of-line already? */
 			if( pos != 0 ) {
-				DoMove( &current_x, &current_y, -1, 0, cols, rows );
+				DoMove( &current_x, &current_y, -1, cols, rows );
 				--pos;
 			}
 			break;
@@ -147,31 +177,31 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 		case KEY_RIGHT: /* Move cursor right */
 			/* not at EOL already? */
 			if( pos != len ) {
-				DoMove( &current_x, &current_y, 1, 0, cols, rows );
+				DoMove( &current_x, &current_y, 1, cols, rows );
 				++pos;
 			}
 			break;
 
 		case KEY_HOME:  /* Move cursor to begin-of-line */
-			DoMove( &current_x, &current_y, -pos, 0, cols, rows );
+			DoMove( &current_x, &current_y, -SizeToDelta( pos ), cols, rows );
 			pos = 0;
 			break;
 
 		case KEY_END:  /* Move cursor to EOL */
-			DoMove( &current_x, &current_y, len-pos, 0, cols, rows );
+			DoMove( &current_x, &current_y, SizeToDelta( len - pos ), cols, rows );
 			pos = len;
 			break;
 
 		case KEY_UP:  /* Move cursor up */
 			if( pos >= (size_t)cols ) {
-				DoMove( &current_x, &current_y, -cols, 0, cols, rows );
+				DoMove( &current_x, &current_y, -cols, cols, rows );
 				pos -= cols;
 			}
 			break;
 
 		case KEY_DOWN:  /* Move cursor down */
 			if( (pos + cols) <= len ) {
-				DoMove( &current_x, &current_y, cols, 0, cols, rows );
+				DoMove( &current_x, &current_y, cols, cols, rows );
 				pos += cols;
 			}
 			break;
@@ -181,7 +211,6 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 				tmp_buffer[0] = (char) k;
 				tmp_buffer_len = 1;
 				add_char = TRUE;
-				/* DoMove( &current_x, &current_y, 1, 0, cols ); */
 			}
 			break;
 		}
@@ -235,15 +264,15 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 
             if( pos==(len-tmp_buffer_len) ) {
                 current_x = old_x; current_y = old_y;
-                DoMove( &current_x, &current_y, tmp_buffer_len, 0, cols, rows );
+				DoMove( &current_x, &current_y, SizeToDelta( tmp_buffer_len ), cols, rows );
             } else {
                 int tmp_x_2 = old_x, tmp_y_2 = old_y;
-                DoAdjust( &tmp_x_2, &tmp_y_2, len - pos, 0, cols, rows );
+                DoAdjust( &tmp_x_2, &tmp_y_2, SizeToDelta( len - pos ), cols );
                 if( tmp_y_2 > (rows+1) || (tmp_y_2==(rows+1) && tmp_x_2>1) ) {
-                    DoMove( &current_x, &current_y, -(len - pos - tmp_buffer_len), 0, cols, rows );
+					DoMove( &current_x, &current_y, -SizeToDelta( len - pos - tmp_buffer_len ), cols, rows );
                 } else {
                     current_x = old_x; current_y = old_y;
-                    DoMove( &current_x, &current_y, tmp_buffer_len, 0, cols, rows );
+					DoMove( &current_x, &current_y, SizeToDelta( tmp_buffer_len ), cols, rows );
                 }
             }
             pos += tmp_buffer_len;
@@ -259,7 +288,7 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 
     /* set cursor to end of line */
     fb_GetXY(&current_x, &current_y);
-    DoMove( &current_x, &current_y, len - pos, 0, cols, rows );
+	DoMove( &current_x, &current_y, SizeToDelta( len - pos ), cols, rows );
 
     /* Restore old cursor visibility */
     fb_Locate( 0, 0, cursor_visible, 0, 0 );

@@ -77,10 +77,10 @@ static int fb_sfxPlayDurationFrames(float duration)
 {
     int frames;
 
-    if (!__fb_sfx || __fb_sfx->samplerate <= 0 || duration <= 0.0f)
+    if (!fb_sfx_context || fb_sfx_context->samplerate <= 0 || duration <= 0.0f)
         return 0;
 
-    frames = (int)(duration * (float)__fb_sfx->samplerate + 0.5f);
+    frames = (int)(duration * (float)fb_sfx_context->samplerate + 0.5f);
     if (frames <= 0)
         frames = 1;
 
@@ -189,7 +189,7 @@ static int fb_sfxPlayPendingFramesLocked(int channel)
     int i;
     int pending;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0;
 
     pending = 0;
@@ -199,7 +199,7 @@ static int fb_sfxPlayPendingFramesLocked(int channel)
         FB_SFXVOICE *voice;
         int remaining;
 
-        voice = &__fb_sfx->voices[i];
+        voice = &fb_sfx_context->voices[i];
         if (!voice->active)
             continue;
 
@@ -224,8 +224,8 @@ static int fb_sfxPlayQueueLimitFrames(void)
 {
     int samplerate;
 
-    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
-        ? __fb_sfx->samplerate
+    samplerate = (fb_sfx_context && fb_sfx_context->samplerate > 0)
+        ? fb_sfx_context->samplerate
         : FB_SFX_DEFAULT_RATE;
 
     if (samplerate <= 0)
@@ -269,10 +269,10 @@ static void fb_sfxPlaySaveState(const FB_SFX_PLAYSTATE *st)
 
     fb_sfxRuntimeLock();
 
-    if (__fb_sfx)
+    if (fb_sfx_context)
     {
-        __fb_sfx->tempo = st->tempo;
-        __fb_sfx->octave = st->octave;
+        fb_sfx_context->tempo = st->tempo;
+        fb_sfx_context->octave = st->octave;
     }
 
     fb_sfxRuntimeUnlock();
@@ -493,16 +493,16 @@ static int fb_sfxPlayStringImpl(int channel, const char *str, int default_foregr
 
     resolved_channel = fb_sfxResolveChannel(channel);
 
-    st.tempo = (__fb_sfx && __fb_sfx->tempo > 0)
-        ? __fb_sfx->tempo
+    st.tempo = (fb_sfx_context && fb_sfx_context->tempo > 0)
+        ? fb_sfx_context->tempo
         : 120;
-    st.octave = (__fb_sfx)
-        ? fb_sfxPlayClampOctave(__fb_sfx->octave)
+    st.octave = (fb_sfx_context)
+        ? fb_sfxPlayClampOctave(fb_sfx_context->octave)
         : 4;
     st.default_length = 4;
     st.channel = resolved_channel;
     st.foreground = default_foreground ? 1 : 0;
-    if (__fb_sfx && __fb_sfx->channel_context_active)
+    if (fb_sfx_context && fb_sfx_context->channel_context_active)
         st.foreground = 0;
     st.articulation = FB_SFX_PLAY_MODE_NORMAL;
     st.volume = FB_SFX_PLAY_VOLUME;

@@ -20,8 +20,8 @@
         - mode creation or destruction
 */
 
-#ifndef __FB_GFX3_LINE_INPUT_H__
-#define __FB_GFX3_LINE_INPUT_H__
+#ifndef FB_GFX3_LINE_INPUT_H
+#define FB_GFX3_LINE_INPUT_H
 
 #include "fb_gfx3.h"
 

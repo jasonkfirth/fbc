@@ -293,8 +293,8 @@ static unsigned int js_multikey_handler(unsigned long key, unsigned long locatio
                 break;
         }
 
-        if( scancode < (sizeof(__fb_con.multikey) / sizeof(__fb_con.multikey[0])) )
-            __fb_con.multikey[scancode] = isKeyDown? 1: 0;
+        if( scancode < (sizeof(fb_console_context.multikey) / sizeof(fb_console_context.multikey[0])) )
+            fb_console_context.multikey[scancode] = isKeyDown? 1: 0;
     }
 
     return scancode;
@@ -302,11 +302,11 @@ static unsigned int js_multikey_handler(unsigned long key, unsigned long locatio
 
 static void js_key_buffer_add(unsigned int key)
 {
-    __fb_con.key_buffer[__fb_con.key_tail] = key;
-    __fb_con.key_tail = (__fb_con.key_tail + 1) % KEY_BUFFER_LEN;
+    fb_console_context.key_buffer[fb_console_context.key_tail] = key;
+    fb_console_context.key_tail = (fb_console_context.key_tail + 1) % KEY_BUFFER_LEN;
 
-    if( __fb_con.key_tail == __fb_con.key_head )
-        __fb_con.key_head = (__fb_con.key_head + 1) % KEY_BUFFER_LEN;
+    if( fb_console_context.key_tail == fb_console_context.key_head )
+        fb_console_context.key_head = (fb_console_context.key_head + 1) % KEY_BUFFER_LEN;
 
 }
 
@@ -668,11 +668,11 @@ EM_BOOL fb_hMouseEventHandler(int eventType, const EmscriptenMouseEvent *mouseEv
         case EMSCRIPTEN_EVENT_MOUSEUP:
         case EMSCRIPTEN_EVENT_DBLCLICK:
         {
-            __fb_con.mouse.x = mouseEvent->clientX;
-            __fb_con.mouse.y = mouseEvent->clientY;
-            __fb_con.mouse.dx = mouseEvent->movementX;
-            __fb_con.mouse.dy = mouseEvent->movementY;
-            __fb_con.mouse.button = mouseEvent->button == 0? BUTTON_LEFT: (mouseEvent->button == 1? BUTTON_MIDDLE: BUTTON_RIGHT);
+            fb_console_context.mouse.x = mouseEvent->clientX;
+            fb_console_context.mouse.y = mouseEvent->clientY;
+            fb_console_context.mouse.dx = mouseEvent->movementX;
+            fb_console_context.mouse.dy = mouseEvent->movementY;
+            fb_console_context.mouse.button = mouseEvent->button == 0? BUTTON_LEFT: (mouseEvent->button == 1? BUTTON_MIDDLE: BUTTON_RIGHT);
 			break;
         }
     }

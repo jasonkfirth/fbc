@@ -8,7 +8,7 @@
 #include "../../fb.h"
 #include "fb_private_console.h"
 
-FB_CONSOLE_CTX __fb_con;
+FB_CONSOLE_CTX fb_console_context;
 
 #ifdef ENABLE_MT
 FBCALL void fb_Lock( void )      { return; }
@@ -45,9 +45,9 @@ static const char color_remap[16] =
 
 static void fb_fs_init_console(void)
 {
-	memset( &__fb_con, 0, sizeof(__fb_con) );
+	memset( &fb_console_context, 0, sizeof(fb_console_context) );
 
-	__fb_con.color_remap = color_remap;
+	fb_console_context.color_remap = color_remap;
 
 	// Install key/mouse input callbacks only when running in a web browser; under
 	// node.js using EMSCRIPTEN_EVENT_TARGET_WINDOW causes an error as window doesn't exist.

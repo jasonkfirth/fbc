@@ -104,7 +104,7 @@ static int fb_MultikeyHandler(unsigned irq_number)
 				}
 
 				/* Remeber scancode status */
-				__fb_con.forceInpBufferChanged = key[code] = !release_code;
+				fb_console_context.forceInpBufferChanged = key[code] = !release_code;
 				if( __fb_dos_multikey_hook != 0 )
 				{
 					int flags = 0;
@@ -156,7 +156,7 @@ static void fb_ConsoleMultikeyExit(void)
 	unlock_proc(fb_MultikeyHandler);
 	unlock_array(key);
 	unlock_var(got_extended_key);
-	unlock_var(__fb_con.forceInpBufferChanged);
+	unlock_var(fb_console_context.forceInpBufferChanged);
 	unlock_var(__fb_dos_multikey_hook);
 }
 
@@ -171,7 +171,7 @@ void fb_ConsoleMultikeyInit( void )
 	/* We have to lock the memory BEFORE we redirect the ISR! */
 	lock_array(key);
 	lock_var(got_extended_key);
-	lock_var(__fb_con.forceInpBufferChanged);
+	lock_var(fb_console_context.forceInpBufferChanged);
 	lock_var(__fb_dos_multikey_hook);
 	lock_proc(fb_MultikeyHandler);
 	lock_proc(fb_ConsoleMultikey);

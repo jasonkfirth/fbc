@@ -18,12 +18,12 @@ int fb_GfxMultikey(int scancode)
 	/* Some drivers receive events on the calling thread. Match GETMOUSE and
 	   INKEY so MULTIKEY-only loops observe queued presses and releases, even
 	   when SLEEP uses its delay-only form. Poll before taking the driver lock. */
-	if ((__fb_gfx) && (__fb_gfx->driver->poll_events))
-		__fb_gfx->driver->poll_events();
+	if ((fb_gfx) && (fb_gfx->driver->poll_events))
+		fb_gfx->driver->poll_events();
 
-	if ((__fb_gfx) && (scancode >= 0) && (scancode < 128)) {
+	if ((fb_gfx) && (scancode >= 0) && (scancode < 128)) {
 		DRIVER_LOCK();
-		result = (__fb_gfx->key[scancode]? FB_TRUE : FB_FALSE);
+		result = (fb_gfx->key[scancode]? FB_TRUE : FB_FALSE);
 		DRIVER_UNLOCK();
 	}
 

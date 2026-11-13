@@ -34,9 +34,9 @@ void fb_js_events_check(void)
                     .dx = event.motion.xrel,
                     .dy = event.motion.yrel,
                 };
-                if( __fb_gfx->scanline_size != 1 ) {
-                    e.y /= __fb_gfx->scanline_size;
-                    e.dy /= __fb_gfx->scanline_size;
+                if( fb_gfx->scanline_size != 1 ) {
+                    e.y /= fb_gfx->scanline_size;
+                    e.dy /= fb_gfx->scanline_size;
                 } 
 
                 fb_hPostEvent(&e);
@@ -55,8 +55,8 @@ void fb_js_events_check(void)
                     .x = event.button.x,
                     .y = event.button.y,
                 };
-                if( __fb_gfx->scanline_size != 1 )
-                    position.y /= __fb_gfx->scanline_size;
+                if( fb_gfx->scanline_size != 1 )
+                    position.y /= fb_gfx->scanline_size;
                 fb_hPostEvent(&position);
                 EVENT e =
                 {

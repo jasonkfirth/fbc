@@ -26,14 +26,14 @@ int fb_ConsoleWidth( int columns, int rows )
 {
 	int previous;
 
-	previous = __fb_con.columns | (__fb_con.rows << 16);
+	previous = fb_console_context.columns | (fb_console_context.rows << 16);
 	if( (columns <= 0) && (rows <= 0) )
 		return previous;
 
 	if( columns <= 0 )
-		columns = __fb_con.columns;
+		columns = fb_console_context.columns;
 	if( rows <= 0 )
-		rows = __fb_con.rows;
+		rows = fb_console_context.rows;
 
 	if( !fb_hWinCEConsoleResize( columns, rows ) )
 		fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );

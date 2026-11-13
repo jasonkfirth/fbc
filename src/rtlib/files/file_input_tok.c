@@ -7,6 +7,12 @@
  */
 #include "fb.h"
 
+#if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
+#define FB_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FB_FALLTHROUGH ((void)0)
+#endif
+
 static int hReadChar( FB_INPUTCTX *ctx )
 {
     /* device? */
@@ -179,7 +185,7 @@ int fb_FileInputNextToken
 			{
 				++c;
 			}
-			/* fall through */
+			FB_FALLTHROUGH;
 
 		case 'e':
 		case 'E':

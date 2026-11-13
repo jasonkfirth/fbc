@@ -1,11 +1,18 @@
 /*
+ * Project: FreeBASIC runtime libraries
+ * File: fb_gfx.h
+ * Purpose: Share the internal graphics interface.
+ * Responsibilities: Graphics state, driver contracts and runtime entry points.
+ * This file intentionally does NOT contain: Rendering algorithms and native driver implementations.
+ */
+/*
     FreeBASIC gfxlib2: fb_gfx.h
     Internal graphics state, driver contracts and runtime entry points.
     Rendering algorithms and platform implementations belong to their modules.
 */
 
-#ifndef __FB_GFX_H__
-#define __FB_GFX_H__
+#ifndef FB_GFX_H
+#define FB_GFX_H
 
 #include "../rtlib/fb.h"
 #include "../rtlib/fb_gfx_private.h"
@@ -18,10 +25,10 @@
 
 #define DRIVER_LOCK()		do { fb_GfxLock(); } while (0)
 #define DRIVER_UNLOCK()		do { fb_GfxUnlock(1, 0); } while (0) /* start_line > end_line so dirty is not modified */
-#define SET_DIRTY(c,y,h)	{ if (__fb_gfx->framebuffer == (c)->line[0]) fb_hMemSet(__fb_gfx->dirty + (y), TRUE, (h)); }
+#define SET_DIRTY(c,y,h)	do { if (fb_gfx->framebuffer == (c)->line[0]) fb_hMemSet(fb_gfx->dirty + (y), TRUE, (h)); } while (0)
 
-#define EVENT_LOCK()		{ fb_MutexLock(__fb_gfx->event_mutex); }
-#define EVENT_UNLOCK()		{ fb_MutexUnlock(__fb_gfx->event_mutex); }
+#define EVENT_LOCK()		do { fb_MutexLock(fb_gfx->event_mutex); } while (0)
+#define EVENT_UNLOCK()		do { fb_MutexUnlock(fb_gfx->event_mutex); } while (0)
 
 /*
 gfx driver flags and gfx context flags
@@ -232,7 +239,7 @@ OPENGL_SUPPORT          0x20000000    no   yes  no   yes  yes
 
 typedef void (BLITTER)(unsigned char *, int);
 
-typedef struct _GFX_CHAR_CELL {
+typedef struct FB_GFX_CHAR_CELL {
 	FB_WCHAR ch;
 	unsigned fg, bg;
 } GFX_CHAR_CELL;
@@ -493,7 +500,15 @@ typedef struct FONT
 	const unsigned char *data;
 } FONT;
 
-struct _PUT_HEADER {
+/* Keep MinGW's existing bitfield convention while packing the header. */
+#if defined(HOST_MINGW) && !defined(HOST_WINCE)
+#define FB_GFX_GCC_STRUCT __attribute__((gcc_struct))
+#else
+#define FB_GFX_GCC_STRUCT
+#endif
+
+#pragma pack(push, 1)
+struct FB_PUT_HEADER {
 	union {
 		struct {
 			/* BASIC bitfields start at the low bits of the native word.
@@ -517,20 +532,23 @@ struct _PUT_HEADER {
 	unsigned int tex;
 	char _reserved[8];
 	unsigned char data[0];
-} FBPACKED;
-typedef struct _PUT_HEADER PUT_HEADER;
+} FB_GFX_GCC_STRUCT;
+#pragma pack(pop)
+#undef FB_GFX_GCC_STRUCT
+typedef struct FB_PUT_HEADER PUT_HEADER;
 
 /* Global variables */
-extern FBGFX *__fb_gfx;
-extern char *__fb_gfx_driver_name;
-extern const GFXDRIVER *__fb_gfx_drivers_list[];
-extern const GFXDRIVER __fb_gfxDriverNull;
+/* Keep ordinary C names separate from the existing linker symbols. */
+extern FBGFX *fb_gfx FB_C_SYMBOL("__fb_gfx");
+extern char *fb_gfx_driver_name FB_C_SYMBOL("__fb_gfx_driver_name");
+extern const GFXDRIVER *fb_gfx_drivers_list[] FB_C_SYMBOL("__fb_gfx_drivers_list");
+extern const GFXDRIVER fb_gfxDriverNull FB_C_SYMBOL("__fb_gfxDriverNull");
 extern void *(*fb_hMemCpy)(void *dest, const void *src, size_t size);
 extern void *(*fb_hMemSet)(void *dest, int value, size_t size);
 extern void *(*fb_hPixelCpy)(void *dest, const void *src, size_t size);
 extern void *(*fb_hPixelSet)(void *dest, int color, size_t size);
-extern unsigned int *__fb_color_conv_16to32;
-extern char *__fb_window_title;
+extern unsigned int *fb_color_conv_16to32 FB_C_SYMBOL("__fb_color_conv_16to32");
+extern char *fb_window_title FB_C_SYMBOL("__fb_window_title");
 
 /* must match data.c */
 enum {
@@ -549,8 +567,8 @@ enum {
 	FB_PALETTE_COUNT
 };
 
-extern const FONT __fb_font[FB_FONT_COUNT];
-extern const PALETTE __fb_palette[FB_PALETTE_COUNT];
+extern const FONT fb_font[FB_FONT_COUNT] FB_C_SYMBOL("__fb_font");
+extern const PALETTE fb_palette[FB_PALETTE_COUNT] FB_C_SYMBOL("__fb_palette");
 
 /* Internal functions */
 extern FB_GFXCTX *fb_hGetContext(void);
@@ -700,6 +718,28 @@ int fb_GfxIsRedir( int is_input );
 int fb_GfxPageCopy(int from_page, int to_page);
 int fb_GfxPageSet(int work_page, int visible_page);
 
+/* Shared implementation helpers and UTF text entry points. */
+void fb_hPostEvent_code_start(void);
+void fb_hPostEvent_code_end(void);
+void fb_GFXCTX_Destructor(void* data);
+void fb_GfxViewUpdate( void );
+int fb_hGfxInputBufferChanged( void );
+FBCALL int fb_GfxDrawStringUstr( void *target, float x, float y, int flags,
+	FBSTRING_ACCESS *text, unsigned int color, void *font, int mode,
+	PUTTER *putter, BLENDER *blender, void *parameter );
+FBCALL int fb_GfxDrawStringSizeUstr( FBSTRING_ACCESS *text, int *width, int *height, void *font );
+FBCALL int fb_GfxDrawStringSizeWstr( const FB_WCHAR *text, int *width, int *height, void *font );
+FBCALL int fb_GfxPaintPatternWstr( void *target, float x, float y,
+	const FB_WCHAR *pattern, unsigned int foreground, unsigned int background,
+	unsigned int border, int relative );
+void fb_hBlit_code_start(void);
+void fb_hBlit_code_end(void);
+void fb_hPutOrC(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
+void fb_hPutPSetC(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
+void fb_hPutTrans1C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
+void fb_hSoftCursor_code_start(void);
+void fb_hSoftCursor_code_end(void);
+
 typedef void (*FBGFX_IMAGE_CONVERT)(const unsigned char *, unsigned char *, int);
 
 void fb_image_convert_8to8(const unsigned char *src, unsigned char *dest, int w);
@@ -734,7 +774,7 @@ void fb_hPutCustom(unsigned char *src, unsigned char *dest, int w, int h, int sr
 /** Returns TRUE if application is in graphics mode.
  */
 #define FB_GFX_ACTIVE() \
-    (__fb_gfx!=NULL)
+    (fb_gfx!=NULL)
 
 /** Returns the code page as integral value.
  *

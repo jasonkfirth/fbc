@@ -21,8 +21,8 @@
         - public FreeBASIC declarations
 */
 
-#ifndef __FB_GFX3_BACKEND_SELECT_H__
-#define __FB_GFX3_BACKEND_SELECT_H__
+#ifndef FB_GFX3_BACKEND_SELECT_H
+#define FB_GFX3_BACKEND_SELECT_H
 
 #include "gfx3_backend.h"
 

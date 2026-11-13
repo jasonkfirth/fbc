@@ -1,9 +1,16 @@
 /*
+ * Project: FreeBASIC runtime libraries
+ * File: fb_sfx_dragonfly.h
+ * Purpose: Share the dragonfly sound backend interface.
+ * Responsibilities: Backend state and playback lifecycle declarations.
+ * This file intentionally does NOT contain: Device I/O or audio mixing.
+ */
+/*
     Shared declarations for the DragonFly backend layer.
 */
 
-#ifndef __FB_SFX_DRAGONFLY_H__
-#define __FB_SFX_DRAGONFLY_H__
+#ifndef FB_SFX_DRAGONFLY_H
+#define FB_SFX_DRAGONFLY_H
 
 #include "../unix/fb_sfx_bsd.h"
 

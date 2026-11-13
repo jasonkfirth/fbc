@@ -20,8 +20,8 @@
         - persistent log storage
 */
 
-#ifndef __FB_GFX3_DEBUG_PLATFORM_H__
-#define __FB_GFX3_DEBUG_PLATFORM_H__
+#ifndef FB_GFX3_DEBUG_PLATFORM_H
+#define FB_GFX3_DEBUG_PLATFORM_H
 
 #include "gfx3_debug.h"
 

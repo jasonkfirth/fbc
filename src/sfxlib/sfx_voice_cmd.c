@@ -85,7 +85,7 @@ int fb_sfxVoiceGet(void)
 {
     int channel;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return -1;
 
     channel = fb_sfxChannelCmdGet();

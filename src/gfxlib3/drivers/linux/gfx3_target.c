@@ -55,14 +55,14 @@ size_t fb_gfx3_target_backend_default_list(
 		return 0u;
 	if (fb_gfx3_platform_wayland_should_default() ||
 	    fb_gfx3_platform_drm_should_default()) {
-		preferred[0] = &__fb_gfx3_backend_gles;
-		preferred[1] = &__fb_gfx3_backend_opengl;
-		preferred[2] = &__fb_gfx3_backend_vulkan;
+		preferred[0] = &fb_gfx3_backend_gles;
+		preferred[1] = &fb_gfx3_backend_opengl;
+		preferred[2] = &fb_gfx3_backend_vulkan;
 		preferred_count = sizeof(preferred) / sizeof(preferred[0]);
 	} else {
-		preferred[0] = &__fb_gfx3_backend_opengl;
-		preferred[1] = &__fb_gfx3_backend_vulkan;
-		preferred[2] = &__fb_gfx3_backend_gles;
+		preferred[0] = &fb_gfx3_backend_opengl;
+		preferred[1] = &fb_gfx3_backend_vulkan;
+		preferred[2] = &fb_gfx3_backend_gles;
 		preferred_count = sizeof(preferred) / sizeof(preferred[0]);
 	}
 	for (index = 0; (index < preferred_count) && (count < capacity); index++)
@@ -74,8 +74,8 @@ const FB_GFX3_BACKEND_VTABLE *fb_gfx3_target_opengl_backend(void)
 {
 	if (fb_gfx3_platform_wayland_should_default() ||
 	    fb_gfx3_platform_drm_should_default())
-		return &__fb_gfx3_backend_gles;
-	return &__fb_gfx3_backend_opengl;
+		return &fb_gfx3_backend_gles;
+	return &fb_gfx3_backend_opengl;
 }
 
 size_t fb_gfx3_target_image_cache_snapshot_budget(void)

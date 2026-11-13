@@ -19,8 +19,8 @@
         - rendering commands or mobile form-factor policy
 */
 
-#ifndef __FB_GFX3_PLATFORM_WAYLAND_H__
-#define __FB_GFX3_PLATFORM_WAYLAND_H__
+#ifndef FB_GFX3_PLATFORM_WAYLAND_H
+#define FB_GFX3_PLATFORM_WAYLAND_H
 
 #include "../../gfx3_platform.h"
 
@@ -30,3 +30,5 @@ int fb_gfx3_platform_wayland_should_default(void);
 #endif
 
 /* end of linux/gfx3_platform_wayland.h */
+
+/* end of gfx3_platform_wayland.h */

@@ -31,8 +31,8 @@
         The including source must include sfx_simd.h and emmintrin.h first.
 */
 
-#ifndef __FB_SFX_SIMD_SSE2_INC__
-#define __FB_SFX_SIMD_SSE2_INC__
+#ifndef FB_SFX_SIMD_SSE2_INC
+#define FB_SFX_SIMD_SSE2_INC
 
 #include <float.h>
 

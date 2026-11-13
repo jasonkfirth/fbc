@@ -397,11 +397,11 @@ static void FBDVI_TIME_CRITICAL(fbdvi_prepare_gfx_line)(int buffer,
 #endif
 
     if (!atomic_read_acquire(&g_fbdvi_scanout_enabled) ||
-        (__fb_gfx == NULL) ||
-        (__fb_gfx->framebuffer == NULL) ||
-        (__fb_gfx->w != FBDVI_FRAMEBUFFER_WIDTH) ||
-        (__fb_gfx->h != FBDVI_FRAMEBUFFER_HEIGHT) ||
-        (__fb_gfx->bpp != 1)) {
+        (fb_gfx == NULL) ||
+        (fb_gfx->framebuffer == NULL) ||
+        (fb_gfx->w != FBDVI_FRAMEBUFFER_WIDTH) ||
+        (fb_gfx->h != FBDVI_FRAMEBUFFER_HEIGHT) ||
+        (fb_gfx->bpp != 1)) {
         fbdvi_fill_black_line(buffer);
         goto done;
     }
@@ -413,7 +413,7 @@ static void FBDVI_TIME_CRITICAL(fbdvi_prepare_gfx_line)(int buffer,
         goto done;
     }
 
-    src = __fb_gfx->framebuffer + ((size_t)source_y * (size_t)__fb_gfx->pitch);
+    src = fb_gfx->framebuffer + ((size_t)source_y * (size_t)fb_gfx->pitch);
 
     for (x = 0; x < FBDVI_ACTIVE_WORDS; x++) {
         unsigned int index;
@@ -1360,20 +1360,20 @@ static void fbdvi_qemu_trace_scanout(void)
     if (!g_fbdvi_qemu_started || !g_fbdvi_qemu_scanout_enabled)
         return;
 
-    if ((__fb_gfx == NULL) || (__fb_gfx->framebuffer == NULL))
+    if ((fb_gfx == NULL) || (fb_gfx->framebuffer == NULL))
         return;
 
-    if ((__fb_gfx->w != FBDVI_FRAMEBUFFER_WIDTH) ||
-        (__fb_gfx->h != FBDVI_FRAMEBUFFER_HEIGHT) ||
-        (__fb_gfx->bpp != 1) ||
-        (__fb_gfx->pitch < FBDVI_FRAMEBUFFER_WIDTH))
+    if ((fb_gfx->w != FBDVI_FRAMEBUFFER_WIDTH) ||
+        (fb_gfx->h != FBDVI_FRAMEBUFFER_HEIGHT) ||
+        (fb_gfx->bpp != 1) ||
+        (fb_gfx->pitch < FBDVI_FRAMEBUFFER_WIDTH))
         return;
 
     source_y = FBDVI_QEMU_SAMPLE_Y;
     active_line = FBDVI_OUTPUT_TOP_BORDER +
         (source_y * FBDVI_OUTPUT_SCALE_Y);
-    src = __fb_gfx->framebuffer + ((size_t)source_y *
-        (size_t)__fb_gfx->pitch);
+    src = fb_gfx->framebuffer + ((size_t)source_y *
+        (size_t)fb_gfx->pitch);
     checksum = fbdvi_qemu_checksum_words(src, &nonblack);
 
     if ((g_fbdvi_qemu_present_count > 0) &&

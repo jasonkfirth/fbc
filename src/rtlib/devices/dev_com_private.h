@@ -5,7 +5,7 @@
  * Responsibilities: File-device callbacks and private stream state.
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
-typedef struct _DEV_COM_INFO {
+typedef struct FB_DEV_COM_INFO {
 	void *hSerial;
 	char *pszDevice;
 	int iPort;

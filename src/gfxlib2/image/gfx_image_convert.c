@@ -13,7 +13,7 @@
 void fb_image_convert_8to8(const unsigned char *src, unsigned char *dest, int w)
 {
 	for (; w; w--)
-		*dest++ = *src++ & __fb_gfx->color_mask;
+		*dest++ = *src++ & fb_gfx->color_mask;
 }
 
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
@@ -23,9 +23,9 @@ void fb_image_convert_8to16(const unsigned char *src, unsigned char *dest, int w
 	unsigned short *d = (unsigned short *)dest;
 
 	for (; w; w--) {
-		r = __fb_gfx->device_palette[*src] & 0xFF;
-		g = (__fb_gfx->device_palette[*src] >> 8) & 0xFF;
-		b = (__fb_gfx->device_palette[*src] >> 16) & 0xFF;
+		r = fb_gfx->device_palette[*src] & 0xFF;
+		g = (fb_gfx->device_palette[*src] >> 8) & 0xFF;
+		b = (fb_gfx->device_palette[*src] >> 16) & 0xFF;
 		*d++ = (b >> 3) | ((g << 3) & 0x07E0) | ((r << 8) & 0xF800);
 		src++;
 	}
@@ -38,9 +38,9 @@ void fb_image_convert_8to32(const unsigned char *src, unsigned char *dest, int w
 	unsigned int *d = (unsigned int *)dest;
 
 	for (; w; w--) {
-		r = __fb_gfx->device_palette[*src] & 0xFF;
-		g = (__fb_gfx->device_palette[*src] >> 8) & 0xFF;
-		b = (__fb_gfx->device_palette[*src] >> 16) & 0xFF;
+		r = fb_gfx->device_palette[*src] & 0xFF;
+		g = (fb_gfx->device_palette[*src] >> 8) & 0xFF;
+		b = (fb_gfx->device_palette[*src] >> 16) & 0xFF;
 		*d++ = 0xFF000000 | b | (g << 8) | (r << 16);
 		src++;
 	}

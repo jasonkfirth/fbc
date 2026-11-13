@@ -342,7 +342,7 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
 
 #define FB_THREADCALL_MAX_ELEMS 1024
 
-typedef struct _FBTHREADCALL
+typedef struct FB_THREAD_CALL
 {
 	void         *proc;
 	int           abi;

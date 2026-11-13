@@ -64,6 +64,7 @@ FBCALL void          fb_AssertWarnW     ( char *filename, int linenum, char *fun
 FBCALL FB_ERRHANDLER fb_ErrorSetHandler ( FB_ERRHANDLER newhandler );
 FBCALL int           fb_ErrorGetNum     ( void );
 FBCALL int           fb_ErrorSetNum     ( int errnum );
+FBCALL void         *fb_NullPtrChk      ( void *ptr, int linenum, const char *fname );
        void         *fb_ErrorResume     ( void );
        void         *fb_ErrorResumeNext ( void );
 FBCALL int           fb_ErrorGetLineNum ( void );

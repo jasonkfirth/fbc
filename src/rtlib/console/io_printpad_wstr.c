@@ -7,8 +7,6 @@
  */
 #include "fb.h"
 
-#define FB_PRINT_BUFFER_SIZE 2048
-
 static void fb_hPrintPadWstrEx
 	(
 		FB_FILE *handle,
@@ -18,10 +16,12 @@ static void fb_hPrintPadWstrEx
 	)
 {
 #ifdef FB_NATIVE_TAB
+	(void)mask;
     FB_PRINTWSTR_EX( handle, FB_WCHAR_LITERAL("\t"), 1, mask );
 
 #else
     FB_WCHAR tab_char_buffer[FB_TAB_WIDTH+1];
+	(void)mask;
 
     if (new_x <= current_x)
     {

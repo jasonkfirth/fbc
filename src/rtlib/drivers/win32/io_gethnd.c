@@ -16,25 +16,25 @@ HANDLE fb_hConsoleGetHandle( int is_input )
 	{
 		is_init = TRUE;
 
-		__fb_con.inHandle = GetStdHandle( STD_INPUT_HANDLE );
-		__fb_con.outHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+		fb_console_context.inHandle = GetStdHandle( STD_INPUT_HANDLE );
+		fb_console_context.outHandle = GetStdHandle( STD_OUTPUT_HANDLE );
 
-    	if( __fb_con.inHandle != NULL )
+	if( fb_console_context.inHandle != NULL )
 	    {
     	    /* Initialize console mode to enable processed input */
         	DWORD dwMode;
-        	if( GetConsoleMode( __fb_con.inHandle, &dwMode ) )
+		if( GetConsoleMode( fb_console_context.inHandle, &dwMode ) )
         	{
             	dwMode |= ENABLE_PROCESSED_INPUT;
-            	SetConsoleMode( __fb_con.inHandle, dwMode );
+		SetConsoleMode( fb_console_context.inHandle, dwMode );
         	}
     	}
 
-    	__fb_con.active = __fb_con.visible = 0;
-    	__fb_con.pgHandleTb[0] = __fb_con.outHandle;
+	fb_console_context.active = fb_console_context.visible = 0;
+	fb_console_context.pgHandleTb[0] = fb_console_context.outHandle;
     }
 
-	return (is_input? __fb_con.inHandle : __fb_con.pgHandleTb[__fb_con.active]);
+	return (is_input? fb_console_context.inHandle : fb_console_context.pgHandleTb[fb_console_context.active]);
 }
 
 void fb_hConsoleResetHandles(void)

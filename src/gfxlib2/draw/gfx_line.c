@@ -243,7 +243,7 @@ FBCALL void fb_GfxLine(void *target, float fx1, float fy1, float fx2, float fy2,
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}

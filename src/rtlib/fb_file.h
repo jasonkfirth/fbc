@@ -111,6 +111,10 @@ typedef struct FB_FILE_ {
     int             mode;
     int             len;
     FB_FILE_ENCOD   encod;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Keep the size field at its existing Win64 offset. */
+    unsigned char   size_alignment_padding[4];
+#endif
     fb_off_t        size;
     int             type;
     int             access;
@@ -132,8 +136,16 @@ typedef struct FB_FILE_ {
 typedef struct {
     FB_FILE			*handle;
     int      		status;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Preserve the string offset by naming its existing alignment bytes. */
+    unsigned char   string_alignment_padding[4];
+#endif
     FBSTRING 		str;
     int     		index;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Name the existing 64-bit tail padding without changing the ABI layout. */
+    unsigned char   tail_padding[4];
+#endif
 } FB_INPUTCTX;
 
 void	fb_INPUTCTX_Destructor( void* );
@@ -332,8 +344,8 @@ FBCALL int          fb_FileUnlockLarge  ( int fnum, long long inipos, long long 
        FILE        *fb_hReopenFile      ( const char *path, const char *mode, FILE *stream );
 #ifdef HOST_MINGW
        int          fb_hStatFile        ( const char *path, struct _stat *buffer );
-       wchar_t     *fb_hConvertPathToWC ( const char *path, int *used_utf8 );
-       char        *fb_hConvertPathFromWC( const wchar_t *path, int use_utf8 );
+       FB_WCHAR     *fb_hConvertPathToWC ( const char *path, int *used_utf8 );
+       char        *fb_hConvertPathFromWC( const FB_WCHAR *path, int use_utf8 );
 #endif
        int          fb_hRemoveFile      ( const char *path );
        int          fb_hMakeDir         ( const char *path );

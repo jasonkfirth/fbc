@@ -47,12 +47,12 @@ void fb_sfxEnvelopeInit(void)
 {
     int i;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     for (i = 0; i < FB_SFX_MAX_ENVELOPES; i++)
     {
-        FB_SFXENVELOPE *env = &__fb_sfx->envelopes[i];
+        FB_SFXENVELOPE *env = &fb_sfx_context->envelopes[i];
 
         memset(env, 0, sizeof(FB_SFXENVELOPE));
 
@@ -81,7 +81,7 @@ void fb_sfxEnvelopeDefine(
 {
     FB_SFXENVELOPE *env;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     if (id < 0 || id >= FB_SFX_MAX_ENVELOPES)
@@ -94,7 +94,7 @@ void fb_sfxEnvelopeDefine(
     if (sustain < 0.0f) sustain = 0.0f;
     if (sustain > 1.0f) sustain = 1.0f;
 
-    env = &__fb_sfx->envelopes[id];
+    env = &fb_sfx_context->envelopes[id];
 
     env->attack  = attack;
     env->decay   = decay;
@@ -115,7 +115,7 @@ void fb_sfxVoiceSetEnvelope(FB_SFXVOICE *voice, int id)
     if (!voice)
         return;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return;
 
     if (id < 0 || id >= FB_SFX_MAX_ENVELOPES)
@@ -156,14 +156,14 @@ float fb_sfxEnvelopeProcess(FB_SFXVOICE *voice, float dt)
     if (!voice)
         return 0.0f;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return 0.0f;
 
     /* Mixer paths apply the same bounds check before reading this table. */
     if (voice->envelope < 0 || voice->envelope >= FB_SFX_MAX_ENVELOPES)
         return 0.0f;
 
-    env = &__fb_sfx->envelopes[voice->envelope];
+    env = &fb_sfx_context->envelopes[voice->envelope];
 
     level = voice->env_level;
 

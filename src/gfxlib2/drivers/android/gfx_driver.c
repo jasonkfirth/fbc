@@ -115,7 +115,7 @@ const GFXDRIVER fb_gfxDriverAndroidOpenGLESLegacy =
 	NULL
 };
 
-const GFXDRIVER *__fb_gfx_drivers_list[] =
+const GFXDRIVER *fb_gfx_drivers_list[] =
 {
 	&fb_gfxDriverAndroidOpenGLESModern,
 	&fb_gfxDriverAndroidOpenGLESLegacy,

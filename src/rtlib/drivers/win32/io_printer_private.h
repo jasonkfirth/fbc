@@ -8,12 +8,12 @@
 #include <windows.h>
 #include <winspool.h>
 
-struct _W32_PRINTER_INFO;
+struct FB_W32_PRINTER_INFO;
 
-typedef void (*FnEmuPrint)(struct _W32_PRINTER_INFO *pInfo, const void *pText, size_t uiLength, int isunicode);
+typedef void (*FnEmuPrint)(struct FB_W32_PRINTER_INFO *pInfo, const void *pText, size_t uiLength, int isunicode);
 
 /* Win32-specific printer information */
-typedef struct _W32_PRINTER_INFO {
+typedef struct FB_W32_PRINTER_INFO {
     HANDLE          hPrinter;
     DWORD           dwJob;
     HDC             hDc;

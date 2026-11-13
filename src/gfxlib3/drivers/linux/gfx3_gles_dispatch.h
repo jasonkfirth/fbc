@@ -20,8 +20,8 @@
         - renderer state or shader declarations
 */
 
-#ifndef __FB_GFX3_LINUX_GLES_DISPATCH_H__
-#define __FB_GFX3_LINUX_GLES_DISPATCH_H__
+#ifndef FB_GFX3_LINUX_GLES_DISPATCH_H
+#define FB_GFX3_LINUX_GLES_DISPATCH_H
 
 #include <GLES3/gl3.h>
 
@@ -175,3 +175,5 @@ typedef struct FB_GFX3_GLES_DISPATCH {
 #endif
 
 /* end of linux/gfx3_gles_dispatch.h */
+
+/* end of gfx3_gles_dispatch.h */

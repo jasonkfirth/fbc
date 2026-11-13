@@ -42,7 +42,7 @@ FBCALL int fb_Out( unsigned short port, unsigned char value )
 }
 
 /*:::::*/
-FBCALL int fb_Wait( unsigned short port, int and, int xor )
+FBCALL int fb_Wait( unsigned short port, int andMask, int xorMask )
 {
 	int res;
 	
@@ -50,8 +50,8 @@ FBCALL int fb_Wait( unsigned short port, int and, int xor )
 		res = fb_In( port );
 		if( res < 0 )
 			return res;
-		res ^= xor;
-	} while( ( res & and ) == 0 );
+		res ^= xorMask;
+	} while( ( res & andMask ) == 0 );
 	
 	return FB_RTERROR_OK;
 }

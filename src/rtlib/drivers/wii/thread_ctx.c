@@ -201,19 +201,19 @@ void fb_TlsExit( void )
 
 #else
 
-static uintptr_t __fb_tls_ctxtb[FB_TLSKEYS];
+static uintptr_t fb_tls_context_table[FB_TLSKEYS];
 
 /* Retrieve or create new TLS context for given key */
 FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn )
 {
-	void *ctx = (void *)__fb_tls_ctxtb[index];
+	void *ctx = (void *)fb_tls_context_table[index];
 
 	if( ctx == NULL ) {
 		FB_TLS_CTX_HEADER *ctxHeader = (FB_TLS_CTX_HEADER *)calloc( 1, len + sizeof( FB_TLS_CTX_HEADER ) );
 		if( ctxHeader != NULL ) {
 			ctxHeader->destructor = destructorFn;
 			ctx = FB_TLS_HEADER_TO_DATA( ctxHeader );
-			__fb_tls_ctxtb[index] = (uintptr_t)ctx;
+			fb_tls_context_table[index] = (uintptr_t)ctx;
 		}
 	}
 #ifdef DEBUG
@@ -228,10 +228,10 @@ FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn
 
 FBCALL void fb_TlsDelCtx( int index )
 {
-	void *ctx = (void *)__fb_tls_ctxtb[index];
+	void *ctx = (void *)fb_tls_context_table[index];
 
 	if( ctx != NULL ) {
-		__fb_tls_ctxtb[index] = 0;
+		fb_tls_context_table[index] = 0;
 		hWiiFreeCtx( ctx );
 	}
 }

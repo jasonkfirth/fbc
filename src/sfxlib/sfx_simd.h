@@ -23,16 +23,11 @@
         - public FreeBASIC declarations
 */
 
-#ifndef __FB_SFX_SIMD_H__
-#define __FB_SFX_SIMD_H__
+#ifndef FB_SFX_SIMD_H
+#define FB_SFX_SIMD_H
 
-#include "fb_sfx.h"
-
-/* Scalar tails use the conversion and oscillator policies owned elsewhere. */
-short fb_sfxFloatToS16(float value);
-int fb_sfxFloatToS32(float value);
-float fb_sfxS16ToFloat(short value);
-float fb_sfxOscillatorWaveSample(int waveform, float phase);
+/* Scalar tails share the conversion and oscillator contracts with the mixer. */
+#include "fb_sfx_internal.h"
 
 #define FB_SFX_SIMD_MMX_SSE 0x01u
 #define FB_SFX_SIMD_SSE2    0x02u

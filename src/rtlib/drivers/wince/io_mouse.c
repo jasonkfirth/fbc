@@ -49,9 +49,9 @@ int fb_ConsoleGetMouse( int *x, int *y, int *z, int *buttons, int *clip )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
 	if( x != NULL )
-		*x = (int)(((long)point.x * __fb_con.columns) / screen_width);
+		*x = (int)(((long)point.x * fb_console_context.columns) / screen_width);
 	if( y != NULL )
-		*y = (int)(((long)point.y * __fb_con.rows) / screen_height);
+		*y = (int)(((long)point.y * fb_console_context.rows) / screen_height);
 	if( z != NULL )
 		*z = 0;
 
@@ -77,9 +77,9 @@ int fb_ConsoleSetMouse( int x, int y, int cursor, int clip )
 
 	(void)clip;
 	if( (x >= 0) && (y >= 0) &&
-	    (__fb_con.columns > 0) && (__fb_con.rows > 0) ) {
-		pixel_x = (x * GetSystemMetrics( SM_CXSCREEN )) / __fb_con.columns;
-		pixel_y = (y * GetSystemMetrics( SM_CYSCREEN )) / __fb_con.rows;
+	    (fb_console_context.columns > 0) && (fb_console_context.rows > 0) ) {
+		pixel_x = (x * GetSystemMetrics( SM_CXSCREEN )) / fb_console_context.columns;
+		pixel_y = (y * GetSystemMetrics( SM_CYSCREEN )) / fb_console_context.rows;
 		if( !SetCursorPos( pixel_x, pixel_y ) )
 			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}

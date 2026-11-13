@@ -241,12 +241,12 @@ int fb_sfxOutputCaptureStart(void)
 
     fb_sfxRuntimeLock();
 
-    samplerate = (__fb_sfx && __fb_sfx->samplerate > 0)
-        ? __fb_sfx->samplerate
+    samplerate = (fb_sfx_context && fb_sfx_context->samplerate > 0)
+        ? fb_sfx_context->samplerate
         : FB_SFX_DEFAULT_RATE;
 
-    channels = (__fb_sfx && __fb_sfx->output_channels > 0)
-        ? __fb_sfx->output_channels
+    channels = (fb_sfx_context && fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
         : FB_SFX_DEFAULT_CHANNELS;
 
     if (g_output_capture.samples &&

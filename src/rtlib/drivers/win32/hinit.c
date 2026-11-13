@@ -16,27 +16,27 @@
 #endif
 
 #ifdef ENABLE_MT
-static CRITICAL_SECTION __fb_global_mutex;
-static CRITICAL_SECTION __fb_string_mutex;
-static CRITICAL_SECTION __fb_mtcore_mutex;
-static CRITICAL_SECTION __fb_graphics_mutex;
-static CRITICAL_SECTION __fb_math_mutex;
-static CRITICAL_SECTION __fb_profile_mutex;
-FBCALL void fb_Lock( void )      { EnterCriticalSection( &__fb_global_mutex ); }
-FBCALL void fb_Unlock( void )    { LeaveCriticalSection( &__fb_global_mutex ); }
-FBCALL void fb_StrLock( void )   { EnterCriticalSection( &__fb_string_mutex ); }
-FBCALL void fb_StrUnlock( void ) { LeaveCriticalSection( &__fb_string_mutex ); }
-FBCALL void fb_MtLock( void )    { EnterCriticalSection( &__fb_mtcore_mutex ); }
-FBCALL void fb_MtUnlock( void )  { LeaveCriticalSection( &__fb_mtcore_mutex ); }
-FBCALL void fb_GraphicsLock  ( void ) { EnterCriticalSection( &__fb_graphics_mutex ); }
-FBCALL void fb_GraphicsUnlock( void ) { LeaveCriticalSection( &__fb_graphics_mutex ); }
-FBCALL void fb_MathLock  ( void ) { EnterCriticalSection( &__fb_math_mutex ); }
-FBCALL void fb_MathUnlock( void ) { LeaveCriticalSection( &__fb_math_mutex ); }
-FBCALL void fb_ProfileLock  ( void ) { EnterCriticalSection( &__fb_profile_mutex ); }
-FBCALL void fb_ProfileUnlock( void ) { LeaveCriticalSection( &__fb_profile_mutex ); }
+static CRITICAL_SECTION fb_global_mutex;
+static CRITICAL_SECTION fb_string_mutex;
+static CRITICAL_SECTION fb_mtcore_mutex;
+static CRITICAL_SECTION fb_graphics_mutex;
+static CRITICAL_SECTION fb_math_mutex;
+static CRITICAL_SECTION fb_profile_mutex;
+FBCALL void fb_Lock( void )      { EnterCriticalSection( &fb_global_mutex ); }
+FBCALL void fb_Unlock( void )    { LeaveCriticalSection( &fb_global_mutex ); }
+FBCALL void fb_StrLock( void )   { EnterCriticalSection( &fb_string_mutex ); }
+FBCALL void fb_StrUnlock( void ) { LeaveCriticalSection( &fb_string_mutex ); }
+FBCALL void fb_MtLock( void )    { EnterCriticalSection( &fb_mtcore_mutex ); }
+FBCALL void fb_MtUnlock( void )  { LeaveCriticalSection( &fb_mtcore_mutex ); }
+FBCALL void fb_GraphicsLock  ( void ) { EnterCriticalSection( &fb_graphics_mutex ); }
+FBCALL void fb_GraphicsUnlock( void ) { LeaveCriticalSection( &fb_graphics_mutex ); }
+FBCALL void fb_MathLock  ( void ) { EnterCriticalSection( &fb_math_mutex ); }
+FBCALL void fb_MathUnlock( void ) { LeaveCriticalSection( &fb_math_mutex ); }
+FBCALL void fb_ProfileLock  ( void ) { EnterCriticalSection( &fb_profile_mutex ); }
+FBCALL void fb_ProfileUnlock( void ) { LeaveCriticalSection( &fb_profile_mutex ); }
 #endif
 
-FB_CONSOLE_CTX __fb_con /* not initialized */;
+FB_CONSOLE_CTX fb_console_context /* not initialized */;
 
 void fb_hInit( void )
 {
@@ -64,26 +64,27 @@ _CRTIMP unsigned int __cdecl __MINGW_NOTHROW _controlfp (unsigned int unNew, uns
 #endif
 
 #ifdef ENABLE_MT
-	InitializeCriticalSection(&__fb_global_mutex);
-	InitializeCriticalSection(&__fb_string_mutex);
-	InitializeCriticalSection(&__fb_mtcore_mutex);
-	InitializeCriticalSection(&__fb_graphics_mutex);
-	InitializeCriticalSection(&__fb_math_mutex);
-	InitializeCriticalSection(&__fb_profile_mutex);
+	InitializeCriticalSection(&fb_global_mutex);
+	InitializeCriticalSection(&fb_string_mutex);
+	InitializeCriticalSection(&fb_mtcore_mutex);
+	InitializeCriticalSection(&fb_graphics_mutex);
+	InitializeCriticalSection(&fb_math_mutex);
+	InitializeCriticalSection(&fb_profile_mutex);
 #endif
 
-	memset( &__fb_con, 0, sizeof( FB_CONSOLE_CTX ) );
+	memset( &fb_console_context, 0, sizeof( FB_CONSOLE_CTX ) );
 }
 
 void fb_hEnd( int unused )
 {
+	(void)unused;
 #ifdef ENABLE_MT
-	DeleteCriticalSection(&__fb_global_mutex);
-	DeleteCriticalSection(&__fb_string_mutex);
-	DeleteCriticalSection(&__fb_mtcore_mutex);
-	DeleteCriticalSection(&__fb_graphics_mutex);
-	DeleteCriticalSection(&__fb_math_mutex);
-	DeleteCriticalSection(&__fb_profile_mutex);
+	DeleteCriticalSection(&fb_global_mutex);
+	DeleteCriticalSection(&fb_string_mutex);
+	DeleteCriticalSection(&fb_mtcore_mutex);
+	DeleteCriticalSection(&fb_graphics_mutex);
+	DeleteCriticalSection(&fb_math_mutex);
+	DeleteCriticalSection(&fb_profile_mutex);
 #endif
 }
 

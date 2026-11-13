@@ -36,8 +36,8 @@ int fb_hConsoleInputBufferChanged( void )
 
     /* Ensure that no IRQ disturbs us ... */
     fb_dos_cli();
-    is_changed |= __fb_con.forceInpBufferChanged;
-    __fb_con.forceInpBufferChanged = FALSE;
+    is_changed |= fb_console_context.forceInpBufferChanged;
+    fb_console_context.forceInpBufferChanged = FALSE;
     fb_dos_sti();
 
     FB_UNLOCK();

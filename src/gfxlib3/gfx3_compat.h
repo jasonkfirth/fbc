@@ -22,8 +22,8 @@
         - CPU FB.IMAGE compatibility storage
 */
 
-#ifndef __FB_GFX3_COMPAT_H__
-#define __FB_GFX3_COMPAT_H__
+#ifndef FB_GFX3_COMPAT_H
+#define FB_GFX3_COMPAT_H
 
 #include "gfx3_context.h"
 #include "gfx3_input.h"
@@ -95,6 +95,7 @@ typedef struct FB_GFX3_POINT_CACHE {
 	uint32_t color;
 	uint32_t read_modify_pairs;
 	unsigned char valid;
+	unsigned char tail_padding[3];
 } FB_GFX3_POINT_CACHE;
 
 typedef struct FB_GFX3_MODE {

@@ -25,8 +25,8 @@
         • platform driver implementations
 */
 
-#ifndef __FB_SFX_UNIX_H__
-#define __FB_SFX_UNIX_H__
+#ifndef FB_SFX_UNIX_H
+#define FB_SFX_UNIX_H
 
 #ifndef DISABLE_UNIX
 
@@ -103,3 +103,5 @@ int  fb_sfxUnixDebugEnabled(void);
 
 #endif
 #endif
+
+/* end of fb_sfx_unix.h */

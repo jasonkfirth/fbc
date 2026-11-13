@@ -22,8 +22,8 @@
         - renderer error-state policy
 */
 
-#ifndef __FB_GFX3_DEBUG_H__
-#define __FB_GFX3_DEBUG_H__
+#ifndef FB_GFX3_DEBUG_H
+#define FB_GFX3_DEBUG_H
 
 #include "fb_gfx3.h"
 
@@ -44,6 +44,10 @@ typedef struct FB_GFX3_LOGGER {
 	FB_GFX3_LOG_CALLBACK callback;
 	void *user_data;
 	int maximum_level;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing 8-byte-aligned size. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_LOGGER;
 
 int fb_gfx3_log_init(FB_GFX3_LOGGER *logger);

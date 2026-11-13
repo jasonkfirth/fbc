@@ -12,7 +12,7 @@
 #include <dpmi.h>
 #include <sys/farptr.h>
 
-typedef struct _fb_PrintInfo {
+typedef struct FB_PRINT_INFO {
     unsigned short usAttr;
 } fb_PrintInfo;
 
@@ -46,7 +46,7 @@ static int fb_hHookConWrite_BIOS
         ++pos;
         regs.h.ah = 0x09;
         regs.h.al = *pachText++;
-        regs.h.bh = __fb_con.active;
+        regs.h.bh = fb_console_context.active;
         regs.h.bl = uchAttr;
         regs.x.cx = 1;
         __dpmi_int(0x10, &regs);
@@ -79,7 +79,7 @@ static int fb_hHookConWrite_MEM
     }
 
     _movedataw( _my_ds(), (int) puchBuffer,
-                _dos_ds, __fb_con.phys_addr + (__fb_con.w << 1) * tmp_y + (tmp_x << 1),
+                _dos_ds, fb_console_context.phys_addr + (fb_console_context.w << 1) * tmp_y + (tmp_x << 1),
                 length );
 
     return TRUE;
@@ -138,12 +138,12 @@ static void fb_ConsolePrintBufferEx_SCRN
     fb_ConsoleGetView( &view_top, &view_bottom );
     win_left = win_top = 0;
 
-    __fb_con.w = win_cols;
-    __fb_con.h = win_rows;
-    __fb_con.phys_addr = fb_hGetPageAddr( __fb_con.active, win_cols, win_rows );
+    fb_console_context.w = win_cols;
+    fb_console_context.h = win_rows;
+    fb_console_context.phys_addr = fb_hGetPageAddr( fb_console_context.active, win_cols, win_rows );
 
     hooks.Opaque        = &info;
-    if( __fb_con.phys_addr ) {
+    if( fb_console_context.phys_addr ) {
         hooks.Scroll = fb_hHookConScroll_BIOS;
         hooks.Write  = fb_hHookConWrite_MEM;
     } else {
@@ -160,8 +160,8 @@ static void fb_ConsolePrintBufferEx_SCRN
     {
         fb_ConsoleGetXY_BIOS( &hooks.Coord.X, &hooks.Coord.Y );
 
-        if( __fb_con.scrollWasOff ) {
-            __fb_con.scrollWasOff = FALSE;
+        if( fb_console_context.scrollWasOff ) {
+            fb_console_context.scrollWasOff = FALSE;
             ++hooks.Coord.Y;
             hooks.Coord.X = hooks.Border.Left;
             fb_hConCheckScroll( &hooks );
@@ -174,7 +174,7 @@ static void fb_ConsolePrintBufferEx_SCRN
         {
             fb_hConCheckScroll( &hooks );
         } else {
-            __fb_con.scrollWasOff = TRUE;
+            fb_console_context.scrollWasOff = TRUE;
             hooks.Coord.X = hooks.Border.Right;
             hooks.Coord.Y = hooks.Border.Bottom;
         }

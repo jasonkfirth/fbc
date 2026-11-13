@@ -34,14 +34,14 @@ typedef BOOL (WINAPI *FnGetDefaultPrinter)(LPTSTR pszBuffer, LPDWORD pcchBuffer)
 /* ------------------------------------------------------------------------- */
 
 /* Entry for the list of available printers */
-typedef struct _DEV_PRINTER_DEVICE {
+typedef struct FB_DEV_PRINTER_DEVICE {
     FB_LISTELEM     elem;
     char           *device;
     char           *printer_name;
 } DEV_PRINTER_DEVICE;
 
 /* Information about a single printer emulation mode */
-typedef struct _DEV_PRINTER_EMU_MODE {
+typedef struct FB_DEV_PRINTER_EMU_MODE {
     const char     *pszId;
     FnEmuPrint      pfnPrint;
 } DEV_PRINTER_EMU_MODE;

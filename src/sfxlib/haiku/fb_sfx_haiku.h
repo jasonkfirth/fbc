@@ -23,8 +23,8 @@
         - BASIC command declarations
 */
 
-#ifndef __FB_SFX_HAIKU_H__
-#define __FB_SFX_HAIKU_H__
+#ifndef FB_SFX_HAIKU_H
+#define FB_SFX_HAIKU_H
 
 #ifndef DISABLE_HAIKU
 

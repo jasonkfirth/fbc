@@ -13,6 +13,7 @@
 #     * build native packages for Haiku and the supported BSD guests under QEMU
 #     * install and test those packages, then retain them as workflow artifacts
 #     * run fbctests and Exampleageddon on AROS and RISC OS emulators
+#     * build a DOS ZIP and run its emulator preflight and full unit suite
 #     * compile fbctests and Exampleageddon for Windows CE without a licensed ROM
 #     * retain platform reports and failure evidence as workflow artifacts
 #
@@ -90,6 +91,70 @@ jobs:
         env:
           CI_SOURCE_REF: ${{ inputs.source_ref }}
         run: python3 -B build_scripts/ci-change-scope.py
+
+  dos:
+    needs: changes
+    if: needs.changes.outputs.run_builds == 'true' && !inputs.package_guests_only
+    name: DOS compiler ZIP, fbctests and Exampleageddon
+    runs-on: windows-2025
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      MAKE_JOBS: 4
+      DOS_UNIT_TIMEOUT: 600
+      DOSBOX_X_VERSION: '2026.10.01'
+      DOS_TEST_CORE: dynamic_x86
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          release: false
+          update: true
+          install: >-
+            make git curl rsync tar xz gzip zip unzip patch pkgconf python
+            mingw-w64-x86_64-toolchain mingw-w64-x86_64-libffi
+            mingw-w64-x86_64-python
+      - name: Build native compiler for the DOS cross build
+        run: |
+          bash build_scripts/ci-seed-source-bootstrap.sh win64 win64
+          make -j4 bootstrap-minimal </dev/null
+          make -j4 compiler BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__" </dev/null
+          make clean-compiler
+          make -j4 compiler </dev/null
+      - name: Build DOS distribution and ZIP
+        id: dos-build
+        run: |
+          export HOST_FBC_ROOT="$PWD"
+          bash build_scripts/msdos-build-freebasic.sh --skip-deps --keep-buildroot
+      - name: Run DOS emulator preflight and full fbctests
+        run: bash build_scripts/msdos-unit-tests.sh
+      - name: Run DOS Exampleageddon with the packaged compiler
+        if: ${{ !cancelled() && steps.dos-build.outcome == 'success' }}
+        run: bash build_scripts/msdos-exampleageddon.sh
+      - name: Retain DOS package and qualification receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fbc-xl-dos
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            out/msdos/*.zip
+            out/msdos/qualification/
+            out/msdos/exampleageddon/reports/
+            out/msdos/exampleageddon/manifest.json
+            out/msdos/exampleageddon/B*/receipt.json
+            out/msdos/exampleageddon/B*/RESULT.TSV
+            out/msdos/exampleageddon/B*/DONE.TXT
+            out/msdos/exampleageddon/B*/dosbox-*.log
+            out/msdos/exampleageddon/B*/LOG/
 
   qemu-guests:
     needs: changes

@@ -110,7 +110,7 @@ static DWORD WINAPI winmm_audio_worker(LPVOID unused)
 
     while (InterlockedCompareExchange(&g_worker_stop, 0, 0) == 0)
     {
-        if (__fb_sfx && __fb_sfx->shutting_down)
+        if (fb_sfx_context && fb_sfx_context->shutting_down)
         {
             Sleep(5);
             continue;

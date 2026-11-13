@@ -308,6 +308,9 @@ void fb_hPutAndSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_AND);
 }
@@ -316,6 +319,9 @@ void fb_hPutOrSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_OR);
 }
@@ -324,6 +330,9 @@ void fb_hPutXorSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_XOR);
 }
@@ -332,6 +341,9 @@ void fb_hPutPResetSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_PRESET);
 }
@@ -345,6 +357,9 @@ void fb_hPutTrans1SIMD(unsigned char *src, unsigned char *dest,
 	BLENDER *blender, void *param)
 {
 	const __m128i zero = _mm_setzero_si128();
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
@@ -374,6 +389,9 @@ void fb_hPutTrans2SIMD(unsigned char *src, unsigned char *dest,
 	BLENDER *blender, void *param)
 {
 	const __m128i transparent_color = _mm_set1_epi16((short)MASK_COLOR_16);
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
@@ -409,6 +427,9 @@ void fb_hPutTrans4SIMD(unsigned char *src, unsigned char *dest,
 {
 	const __m128i rgb_mask = _mm_set1_epi32((int)FB_GFX_SIMD_RGB_MASK_32);
 	const __m128i transparent_color = _mm_set1_epi32(MASK_COLOR_32);
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
@@ -448,6 +469,9 @@ void fb_hPutAlpha4SIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
@@ -495,6 +519,8 @@ void fb_hPutAdd4SIMD(unsigned char *src, unsigned char *dest,
 	const __m128i rgb_mask = _mm_set1_epi32((int)FB_GFX_SIMD_RGB_MASK_32);
 	const __m128i transparent_color = _mm_set1_epi32(MASK_COLOR_32);
 	unsigned int amount = (unsigned int)alpha & 0xFFu;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
@@ -562,6 +588,8 @@ void fb_hPutBlend2SIMD(unsigned char *src, unsigned char *dest,
 {
 	unsigned int amount = ((unsigned int)(alpha & 0xFF) + 7u) >> 3;
 	const __m128i factor = _mm_set1_epi16((short)amount);
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
@@ -612,6 +640,8 @@ void fb_hPutBlend4SIMD(unsigned char *src, unsigned char *dest,
 	const __m128i rgb_mask = _mm_set1_epi32((int)FB_GFX_SIMD_RGB_MASK_32);
 	const __m128i transparent_color = _mm_set1_epi32(MASK_COLOR_32);
 	unsigned int factor = (unsigned int)(alpha & 0xFF) + 1u;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
@@ -670,6 +700,9 @@ void fb_hPutAlphaMaskSIMD(unsigned char *src, unsigned char *dest,
 	BLENDER *blender, void *param)
 {
 	const __m128i rgb_mask = _mm_set1_epi32((int)FB_GFX_SIMD_RGB_MASK_32);
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;

@@ -17,13 +17,13 @@
 #define FB_FORMAT_PRINTF_FORMAT( format_index, first_arg )
 #endif
 
-typedef enum _eMaskType {
+typedef enum FB_MASK_TYPE {
 	eMT_Unknown = 0,
 	eMT_Number,
 	eMT_DateTime
 } eMaskType;
 
-typedef struct _FormatMaskInfo {
+typedef struct FB_FORMAT_MASK_INFO {
 	eMaskType mask_type;
 
 	int has_decimal_point;
@@ -402,7 +402,9 @@ int fb_hProcessMask
 	)
 {
 	char FixPart[128], FracPart[128], ExpPart[128], chSign = 0;
-	ssize_t LenFix, LenFrac, LenExp = 0, IndexFix, IndexFrac, IndexExp = 0;
+	/* Date and literal masks have no numeric parts. The numeric output pass
+	   replaces these empty lengths after splitting the value. */
+	ssize_t LenFix = 0, LenFrac = 0, LenExp = 0, IndexFix, IndexFrac, IndexExp = 0;
 	ssize_t ExpValue, ExpAdjust = 0, NumSkipFix = 0, NumSkipExp = 0, NonZero = 0;
 	int do_skip = FALSE, do_exp = FALSE, do_string = FALSE;
 	int did_sign = FALSE, did_exp = FALSE, did_hour = FALSE, did_thousandsep = FALSE;

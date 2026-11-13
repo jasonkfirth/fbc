@@ -351,13 +351,14 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 		hRndCtxInitFAST32( (uint32_t)seed );
 		break;
 
-	case FB_RND_QB:
+	case FB_RND_QB: {
 		seedbits = hDoubleToBits( seed );
 		uint32_t s = (uint32_t)( seedbits >> 32 );
 		s ^= ( s >> 16 );
 		s = ( ( s & 0xFFFF ) << 8 ) | ( ctx.iseed32 & 0xFF );
 		hRndCtxInitQB32( (uint32_t)s );
 		break;
+	}
 
 #if defined HOST_WIN32 || defined HOST_LINUX || defined HOST_ANDROID
 	case FB_RND_REAL:

@@ -23,8 +23,8 @@
 		- platform window declarations
 */
 
-#ifndef __FB_GFX3_CONSOLE_H__
-#define __FB_GFX3_CONSOLE_H__
+#ifndef FB_GFX3_CONSOLE_H
+#define FB_GFX3_CONSOLE_H
 
 #include "gfx3_compat.h"
 

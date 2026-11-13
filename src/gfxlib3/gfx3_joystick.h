@@ -20,8 +20,8 @@
         - render-thread input snapshots
 */
 
-#ifndef __FB_GFX3_JOYSTICK_H__
-#define __FB_GFX3_JOYSTICK_H__
+#ifndef FB_GFX3_JOYSTICK_H
+#define FB_GFX3_JOYSTICK_H
 
 #include "fb_gfx3.h"
 

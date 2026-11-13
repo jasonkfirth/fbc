@@ -15,13 +15,13 @@ FBCALL void fb_GfxPaletteGet(int index, int *r, int *g, int *b)
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!__fb_gfx) {
+	if (!fb_gfx) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}
 
-	index &= (__fb_gfx->default_palette->colors - 1);
-	color = __fb_gfx->device_palette[index];
+	index &= (fb_gfx->default_palette->colors - 1);
+	color = fb_gfx->device_palette[index];
 	if (!g) {
 		*r = (color & 0xFCFCFC) >> 2;
 	} else {

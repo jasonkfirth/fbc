@@ -74,7 +74,7 @@ void fb_sfxVolume(float level)
         level = FB_SFX_VOLUME_MAX;
 
     fb_sfxRuntimeLock();
-    __fb_sfx->master_volume = level;
+    fb_sfx_context->master_volume = level;
     fb_sfxRuntimeUnlock();
     SFX_DEBUG("sfx_volume: master volume set to %f", level);
 }
@@ -88,11 +88,11 @@ float fb_sfxVolumeGet(void)
 {
     float level;
 
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_VOLUME_DEFAULT;
 
     fb_sfxRuntimeLock();
-    level = __fb_sfx->master_volume;
+    level = fb_sfx_context->master_volume;
     fb_sfxRuntimeUnlock();
 
     return level;
@@ -167,7 +167,7 @@ void fb_sfxVolumeChannel(int channel, float level)
 
 float fb_sfxVolumeChannelGet(int channel)
 {
-    if (!__fb_sfx)
+    if (!fb_sfx_context)
         return FB_SFX_VOLUME_DEFAULT;
 
     if (channel < 0 || channel >= FB_SFX_MAX_CHANNELS)
@@ -189,7 +189,7 @@ void fb_sfxVolumeReset(void)
         return;
 
     fb_sfxRuntimeLock();
-    __fb_sfx->master_volume = FB_SFX_VOLUME_DEFAULT;
+    fb_sfx_context->master_volume = FB_SFX_VOLUME_DEFAULT;
 
     for (i = 0; i < FB_SFX_MAX_CHANNELS; i++)
         fb_sfxChannelSetVolume(i, FB_SFX_VOLUME_DEFAULT);

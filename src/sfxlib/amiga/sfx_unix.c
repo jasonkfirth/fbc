@@ -66,8 +66,8 @@ static void *amiga_audioWorker(void *unused)
         fb_sfxRuntimeLock();
         stop = g_amiga_audio_thread_stop;
         frames = g_amiga_audio_worker_frames;
-        ready = (__fb_sfx != NULL) && __fb_sfx->initialized &&
-            !__fb_sfx->shutting_down;
+        ready = (fb_sfx_context != NULL) && fb_sfx_context->initialized &&
+            !fb_sfx_context->shutting_down;
         fb_sfxRuntimeUnlock();
         if (stop) break;
         if (!ready || fb_sfxForegroundFeedActive())

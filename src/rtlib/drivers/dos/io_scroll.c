@@ -17,7 +17,7 @@ static void hFillRect( int x1, int y1, int x2, int y2 )
 
 	int chars = (x2 - x1 + 1) * (y2 - y1 + 1);
 
-	unsigned long physAddr = fb_hGetPageAddr( __fb_con.active, cols, rows );
+	unsigned long physAddr = fb_hGetPageAddr( fb_console_context.active, cols, rows );
 	if( physAddr == 0 )
 	{
     	/* change the cursor pos (faster than using LOCATE) */
@@ -25,7 +25,7 @@ static void hFillRect( int x1, int y1, int x2, int y2 )
 
 		__dpmi_regs regs;
 		regs.x.ax = 0x0920;
-		regs.h.bh = __fb_con.active;
+		regs.h.bh = fb_console_context.active;
 		regs.h.bl = fb_ConsoleGetColorAtt();
 		regs.x.cx = chars;
 		__dpmi_int(0x10, &regs);
@@ -70,7 +70,7 @@ static void hMoveRect( int x1, int y1, int x2, int y2, int nrows )
 
 	int chars = (x2 - x1 + 1) * (y2 - y1 + 1 - nrows);
 
-	unsigned long physAddr = fb_hGetPageAddr( __fb_con.active, cols, rows );
+	unsigned long physAddr = fb_hGetPageAddr( fb_console_context.active, cols, rows );
 	if( physAddr == 0 )
 	{
 		/*
@@ -105,7 +105,7 @@ void fb_ConsoleScroll_BIOS( int x1, int y1, int x2, int y2, int nrows )
     __dpmi_regs regs;
 
     /* stupid BIOS can't scroll a specific page */
-	if( __fb_con.active != __fb_con.visible )
+	if( fb_console_context.active != fb_console_context.visible )
 	{
 		if( nrows == 0 )
 		{

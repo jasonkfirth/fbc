@@ -28,11 +28,11 @@
 extern const FB_SFX_DRIVER fb_sfxDriverAmigaAhi;
 extern const FB_SFX_DRIVER fb_sfxDriverAmigaPaula;
 
-const FB_SFX_DRIVER *__fb_sfx_drivers_list[] =
+const FB_SFX_DRIVER *fb_sfx_drivers_list[] =
 {
     &fb_sfxDriverAmigaAhi,
     &fb_sfxDriverAmigaPaula,
-    &__fb_sfxDriverNull,
+    &fb_sfxDriverNull_internal,
     NULL
 };
 

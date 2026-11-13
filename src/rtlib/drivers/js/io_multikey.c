@@ -11,12 +11,12 @@
 int fb_ConsoleMultikey( int scancode )
 {
 	if( scancode < 0 ||
-	    scancode >= (int)(sizeof(__fb_con.multikey) / sizeof(__fb_con.multikey[0])) ) {
+	    scancode >= (int)(sizeof(fb_console_context.multikey) / sizeof(fb_console_context.multikey[0])) ) {
 		fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		return FB_FALSE;
 	}
 
-	return __fb_con.multikey[scancode] != 0? FB_TRUE: FB_FALSE;
+	return fb_console_context.multikey[scancode] != 0? FB_TRUE: FB_FALSE;
 }
 
 /* end of drivers/js/io_multikey.c */

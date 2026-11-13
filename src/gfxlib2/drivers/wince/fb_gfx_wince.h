@@ -52,7 +52,7 @@ typedef struct FB_WINCE_GFX_STATE
 } FB_WINCE_GFX_STATE;
 
 extern FB_WINCE_GFX_STATE fb_wince_gfx;
-extern const unsigned char __fb_keytable[][3];
+extern const unsigned char fb_keytable[][3] FB_C_SYMBOL("__fb_keytable");
 
 int fb_winceGfxDisplayInit(const char *title, int width, int height,
     int refresh_rate, int flags);

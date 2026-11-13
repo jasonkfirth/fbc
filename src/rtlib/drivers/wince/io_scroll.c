@@ -31,8 +31,8 @@ void fb_ConsoleScroll( int rows )
 
 	top = fb_ConsoleGetTopRow();
 	bottom = fb_ConsoleGetBotRow();
-	fb_hWinCEConsoleScrollRegion( __fb_con.active, 0, top,
-	                            __fb_con.columns - 1, bottom, rows );
+	fb_hWinCEConsoleScrollRegion( fb_console_context.active, 0, top,
+	                            fb_console_context.columns - 1, bottom, rows );
 }
 
 /* end of drivers/wince/io_scroll.c */

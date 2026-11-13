@@ -103,7 +103,7 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	if( buffer )
 	{
 		fb_dos_lock_data( &buffer, sizeof(buffer) );
-		fb_dos_lock_data( buffer, h * __fb_gfx->pitch );
+		fb_dos_lock_data( buffer, h * fb_gfx->pitch );
 	}
 	data_locked = TRUE;
 
@@ -167,7 +167,7 @@ static void driver_update(void)
 	}
 	else
 	{
-		framebuffer = __fb_gfx->framebuffer;
+		framebuffer = fb_gfx->framebuffer;
 	}
 
 	bank_size = fb_dos.vesa_mode_info.WinSize * 1024;
@@ -175,15 +175,15 @@ static void driver_update(void)
 	bank_add = bank_size / bank_granularity;
 	
 	for (y1 = 0; y1 < fb_dos.h; y1++) {
-		if (__fb_gfx->dirty[y1]) {
-			for (y2 = fb_dos.h - 1; !__fb_gfx->dirty[y2]; y2--)
+		if (fb_gfx->dirty[y1]) {
+			for (y2 = fb_dos.h - 1; !fb_gfx->dirty[y2]; y2--)
 				;
 			
-			fb_dos_vesa_bank_number = (y1 * __fb_gfx->pitch) / bank_granularity;
+			fb_dos_vesa_bank_number = (y1 * fb_gfx->pitch) / bank_granularity;
 			
 			framebuffer_start = fb_dos_vesa_bank_number * bank_granularity;
 			
-			todo = ((y2 + 1) * __fb_gfx->pitch) - framebuffer_start;
+			todo = ((y2 + 1) * fb_gfx->pitch) - framebuffer_start;
 			
 			memory_buffer = framebuffer + framebuffer_start;
 			

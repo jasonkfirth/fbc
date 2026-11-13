@@ -35,11 +35,11 @@ int fb_ConsoleGetkey( void )
     	Do not block the JavaScript event loop.  Keyboard events are delivered
     	asynchronously, so an empty buffer means no key is currently available.
     */
-	if( __fb_con.key_head == __fb_con.key_tail)
+	if( fb_console_context.key_head == fb_console_context.key_tail)
         return 0;
 
-	int key = __fb_con.key_buffer[__fb_con.key_head];
-	__fb_con.key_head = (__fb_con.key_head + 1) % KEY_BUFFER_LEN;
+	int key = fb_console_context.key_buffer[fb_console_context.key_head];
+	fb_console_context.key_head = (fb_console_context.key_head + 1) % KEY_BUFFER_LEN;
 
 	return key;
 }
@@ -47,7 +47,7 @@ int fb_ConsoleGetkey( void )
 /* Caller is expected to hold FB_LOCK() */
 int fb_ConsoleKeyHit( void )
 {
-	return __fb_con.key_head != __fb_con.key_tail;
+	return fb_console_context.key_head != fb_console_context.key_tail;
 }
 
 /* end of drivers/js/io_inkey.c */

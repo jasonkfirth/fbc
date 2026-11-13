@@ -38,42 +38,42 @@ void fb_hRestorePalette(void)
 {
 	int i;
 
-	if (!__fb_gfx->driver->set_palette)
+	if (!fb_gfx->driver->set_palette)
 		return;
 
 	for (i = 0; i < 256; i++) {
-		__fb_gfx->driver->set_palette(i, (__fb_gfx->device_palette[i] & 0xFF),
-						(__fb_gfx->device_palette[i] >> 8) & 0xFF,
-						(__fb_gfx->device_palette[i] >> 16) & 0xFF);
+		fb_gfx->driver->set_palette(i, (fb_gfx->device_palette[i] & 0xFF),
+						(fb_gfx->device_palette[i] >> 8) & 0xFF,
+						(fb_gfx->device_palette[i] >> 16) & 0xFF);
 	}
 }
 
 void fb_hSetPaletteColorRgb(int index, int r, int g, int b)
 {
-	index &= (__fb_gfx->default_palette->colors - 1);
+	index &= (fb_gfx->default_palette->colors - 1);
 
-	__fb_gfx->device_palette[index] = r | (g << 8) | (b << 16);
+	fb_gfx->device_palette[index] = r | (g << 8) | (b << 16);
 
-	if (__fb_gfx->driver->set_palette)
-		__fb_gfx->driver->set_palette(index, r, g, b);
+	if (fb_gfx->driver->set_palette)
+		fb_gfx->driver->set_palette(index, r, g, b);
 }
 
 void fb_hSetPaletteColor(int index, unsigned int color)
 {
 	int r, g, b;
 
-	index &= (__fb_gfx->default_palette->colors - 1);
+	index &= (fb_gfx->default_palette->colors - 1);
 
-	if (__fb_gfx->default_palette == &__fb_palette[FB_PALETTE_256]) {
+	if (fb_gfx->default_palette == &fb_palette[FB_PALETTE_256]) {
 		r = ((color & 0x3F) * 255.0) / 63.0;
 		g = (((color & 0x3F00) >> 8) * 255.0) / 63.0;
 		b = (((color & 0x3F0000) >> 16) * 255.0) / 63.0;
 	} else {
-		color &= (__fb_gfx->default_palette->colors - 1);
-		r = (__fb_gfx->palette[color] & 0xFF);
-		g = (__fb_gfx->palette[color] >> 8) & 0xFF;
-		b = (__fb_gfx->palette[color] >> 16) & 0xFF;
-		__fb_gfx->color_association[index] = color;
+		color &= (fb_gfx->default_palette->colors - 1);
+		r = (fb_gfx->palette[color] & 0xFF);
+		g = (fb_gfx->palette[color] >> 8) & 0xFF;
+		b = (fb_gfx->palette[color] >> 16) & 0xFF;
+		fb_gfx->color_association[index] = color;
 	}
 
 	fb_hSetPaletteColorRgb(index, r, g, b);
@@ -87,7 +87,7 @@ FBCALL void fb_GfxPalette(int index, int red, int green, int blue)
 
 	FB_GRAPHICS_LOCK( );
 
-	if ((!__fb_gfx) || (__fb_gfx->depth > 8)) {
+	if ((!fb_gfx) || (fb_gfx->depth > 8)) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}
@@ -95,8 +95,8 @@ FBCALL void fb_GfxPalette(int index, int red, int green, int blue)
 	DRIVER_LOCK();
 
 	if (index < 0) {
-		palette = __fb_gfx->default_palette;
-		switch (__fb_gfx->mode_num) {
+		palette = fb_gfx->default_palette;
+		switch (fb_gfx->mode_num) {
 			case 1:
 				index = MID(0, -(index + 1), 3);
 				mode_association = cga_association[index];
@@ -119,17 +119,17 @@ FBCALL void fb_GfxPalette(int index, int red, int green, int blue)
 			r = palette->data[i * 3];
 			g = palette->data[(i * 3) + 1];
 			b = palette->data[(i * 3) + 2];
-			__fb_gfx->palette[i] = r | (g << 8) | (b << 16);
-			if (i < (1 << __fb_gfx->depth)) {
+			fb_gfx->palette[i] = r | (g << 8) | (b << 16);
+			if (i < (1 << fb_gfx->depth)) {
 				if (mode_association) {
-					__fb_gfx->color_association[i] = mode_association[i];
-					r = palette->data[__fb_gfx->color_association[i] * 3];
-					g = palette->data[(__fb_gfx->color_association[i] * 3) + 1];
-					b = palette->data[(__fb_gfx->color_association[i] * 3) + 2];
+					fb_gfx->color_association[i] = mode_association[i];
+					r = palette->data[fb_gfx->color_association[i] * 3];
+					g = palette->data[(fb_gfx->color_association[i] * 3) + 1];
+					b = palette->data[(fb_gfx->color_association[i] * 3) + 2];
 				}
-				__fb_gfx->device_palette[i] = r | (g << 8) | (b << 16);
-				if (__fb_gfx->driver->set_palette)
-					__fb_gfx->driver->set_palette(i, r, g, b);
+				fb_gfx->device_palette[i] = r | (g << 8) | (b << 16);
+				if (fb_gfx->driver->set_palette)
+					fb_gfx->driver->set_palette(i, r, g, b);
 			}
 		}
 	} else {
@@ -139,7 +139,7 @@ FBCALL void fb_GfxPalette(int index, int red, int green, int blue)
 			fb_hSetPaletteColorRgb(index, red, green, blue);
 	}
 
-	fb_hMemSet(__fb_gfx->dirty, TRUE, __fb_gfx->h);
+	fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h);
 
 	DRIVER_UNLOCK();
 	FB_GRAPHICS_UNLOCK( );

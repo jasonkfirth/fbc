@@ -27,8 +27,8 @@ FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
 
 #else /* DISABLE_OPENGL */
 
-FB_GL_PARAMS __fb_gl_params = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, NULL };
-char __fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE];
+FB_GL_PARAMS fb_gl_params = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, NULL };
+char fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE];
 
 FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
 {
@@ -39,7 +39,7 @@ FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
 
 	FB_GRAPHICS_LOCK( );
 
-	if (__fb_gfx && (__fb_gfx->flags & OPENGL_SUPPORT)) {
+	if (fb_gfx && (fb_gfx->flags & OPENGL_SUPPORT)) {
 		result = fb_hGL_GetProcAddress(proc);
 	} else {
 		result = NULL;
@@ -63,7 +63,7 @@ FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
 #define GL_UNSIGNED_SHORT_5_6_5           0x8363
 #endif
 
-FB_GL __fb_gl;
+FB_GL fb_gl;
 static GLfloat texcoords[8];
 static GLuint ScreenTex;
 static GLfloat map_r[256], map_g[256], map_b[256];
@@ -83,7 +83,7 @@ static int next_pow2(int n)
 int fb_hGL_ExtensionSupported(const char *extension)
 {
 	ssize_t len;
-	char *string = __fb_gl_extensions;
+	char *string = fb_gl_extensions;
 
 	len = strlen(extension);
 	while ((string = strstr(string, extension)) != NULL) {
@@ -99,14 +99,14 @@ void fb_hGL_SetState(int state)
 {
 	int diffs;
 
-	diffs = state ^ __fb_gl.state;
-	__fb_gl.state = state;
+	diffs = state ^ fb_gl.state;
+	fb_gl.state = state;
 
 	if (diffs & FBGL_TEXTURE) {
 		if (state & FBGL_TEXTURE)
-			__fb_gl.Enable(GL_TEXTURE_2D);
+			fb_gl.Enable(GL_TEXTURE_2D);
 		else
-			__fb_gl.Disable(GL_TEXTURE_2D);
+			fb_gl.Disable(GL_TEXTURE_2D);
 	}
 	if (diffs & FBGL_BLEND) {
 	}
@@ -122,9 +122,9 @@ GLuint fb_hGL_ImageCreate(PUT_HEADER *image, unsigned int color)
 	h = next_pow2(image->height);
 	data = (unsigned char *)calloc(1, w * h * 4);
 	fb_hPixelSet(data, color, w * h);
-	__fb_gl.GenTextures(1, &id);
-	__fb_gl.BindTexture(GL_TEXTURE_2D, id);
-	__fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
+	fb_gl.GenTextures(1, &id);
+	fb_gl.BindTexture(GL_TEXTURE_2D, id);
+	fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
 	free(data);
 
 	return id;
@@ -135,31 +135,31 @@ void fb_hGL_ScreenCreate(void)
 	int w, h;
 	GLuint id;
 
-	w = next_pow2(__fb_gfx->w);
-	h = next_pow2(__fb_gfx->h);
+	w = next_pow2(fb_gfx->w);
+	h = next_pow2(fb_gfx->h);
 
-	__fb_gl.GenTextures(1, &id);
-	__fb_gl.BindTexture(GL_TEXTURE_2D, id);
-	__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-	__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+	fb_gl.GenTextures(1, &id);
+	fb_gl.BindTexture(GL_TEXTURE_2D, id);
+	fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+	fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
 
-	switch (__fb_gfx->depth){
+	switch (fb_gfx->depth){
 	case 32:
 	case 24:
-		__fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+		fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0);
 		break;
 	case 16:
 	case 15:
-		__fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+		fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
 		break;
 	case 8:
 	case 4:
 	case 2:
 	case 1:
-		__fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, 0);
+		fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, 0);
 	}
 
-	GLfloat ratio_w = (GLfloat)__fb_gfx->w / w, ratio_h = (GLfloat)__fb_gfx->h / h;
+	GLfloat ratio_w = (GLfloat)fb_gfx->w / w, ratio_h = (GLfloat)fb_gfx->h / h;
 	texcoords[0] = 0	; texcoords[1] = ratio_h;
 	texcoords[2] = 0	; texcoords[3] = 0;
 	texcoords[4] = ratio_w	; texcoords[5] = 0;
@@ -170,7 +170,7 @@ void fb_hGL_ScreenCreate(void)
 
 void fb_hGL_ImageDestroy(GLuint id)
 {
-	__fb_gl.DeleteTextures(1, &id);
+	fb_gl.DeleteTextures(1, &id);
 }
 
 #endif /* not OPENGL_CONTEXT_ONLY */
@@ -181,56 +181,56 @@ void fb_hGL_NormalizeParameters(int gl_options)
 	int default_alpha_bits[4] = { 0, 0, 0, 8 };
 	int bpp;
 
-	if (!__fb_gl_params.color_bits) {
-		__fb_gl_params.color_bits = __fb_gl_params.color_red_bits +
-									__fb_gl_params.color_green_bits +
-									__fb_gl_params.color_blue_bits +
-									__fb_gl_params.color_alpha_bits;
-		if (!__fb_gl_params.color_bits)
-			__fb_gl_params.color_bits = __fb_gfx->depth;
+	if (!fb_gl_params.color_bits) {
+		fb_gl_params.color_bits = fb_gl_params.color_red_bits +
+									fb_gl_params.color_green_bits +
+									fb_gl_params.color_blue_bits +
+									fb_gl_params.color_alpha_bits;
+		if (!fb_gl_params.color_bits)
+			fb_gl_params.color_bits = fb_gfx->depth;
 	}
-	bpp = BYTES_PER_PIXEL(__fb_gl_params.color_bits) - 1;
+	bpp = BYTES_PER_PIXEL(fb_gl_params.color_bits) - 1;
 	if (bpp > 3) bpp = 3;
-	if (!__fb_gl_params.color_red_bits)
-		__fb_gl_params.color_red_bits = default_color_bits[bpp];
-	if (!__fb_gl_params.color_green_bits)
-		__fb_gl_params.color_green_bits = default_color_bits[bpp];
-	if (!__fb_gl_params.color_blue_bits)
-		__fb_gl_params.color_blue_bits = default_color_bits[bpp];
-	if (!__fb_gl_params.color_alpha_bits)
-		__fb_gl_params.color_alpha_bits = default_alpha_bits[bpp];
+	if (!fb_gl_params.color_red_bits)
+		fb_gl_params.color_red_bits = default_color_bits[bpp];
+	if (!fb_gl_params.color_green_bits)
+		fb_gl_params.color_green_bits = default_color_bits[bpp];
+	if (!fb_gl_params.color_blue_bits)
+		fb_gl_params.color_blue_bits = default_color_bits[bpp];
+	if (!fb_gl_params.color_alpha_bits)
+		fb_gl_params.color_alpha_bits = default_alpha_bits[bpp];
 
-	if (!__fb_gl_params.accum_bits) {
-		__fb_gl_params.accum_bits = __fb_gl_params.accum_red_bits +
-									__fb_gl_params.accum_green_bits +
-									__fb_gl_params.accum_blue_bits +
-									__fb_gl_params.accum_alpha_bits;
+	if (!fb_gl_params.accum_bits) {
+		fb_gl_params.accum_bits = fb_gl_params.accum_red_bits +
+									fb_gl_params.accum_green_bits +
+									fb_gl_params.accum_blue_bits +
+									fb_gl_params.accum_alpha_bits;
 	}
-	bpp = BYTES_PER_PIXEL(__fb_gl_params.accum_bits) - 1;
+	bpp = BYTES_PER_PIXEL(fb_gl_params.accum_bits) - 1;
 	if (bpp > 3) bpp = 3;
 	if ((bpp < 0) && (gl_options & HAS_ACCUMULATION_BUFFER)) {
-		__fb_gl_params.accum_bits = 32;
+		fb_gl_params.accum_bits = 32;
 		bpp = 3;
 	}
 	if (bpp >= 0) {
-		if (!__fb_gl_params.accum_red_bits)
-			__fb_gl_params.accum_red_bits = default_color_bits[bpp];
-		if (!__fb_gl_params.accum_green_bits)
-			__fb_gl_params.accum_green_bits = default_color_bits[bpp];
-		if (!__fb_gl_params.accum_blue_bits)
-			__fb_gl_params.accum_blue_bits = default_color_bits[bpp];
-		if (!__fb_gl_params.accum_alpha_bits)
-			__fb_gl_params.accum_alpha_bits = default_alpha_bits[bpp];
+		if (!fb_gl_params.accum_red_bits)
+			fb_gl_params.accum_red_bits = default_color_bits[bpp];
+		if (!fb_gl_params.accum_green_bits)
+			fb_gl_params.accum_green_bits = default_color_bits[bpp];
+		if (!fb_gl_params.accum_blue_bits)
+			fb_gl_params.accum_blue_bits = default_color_bits[bpp];
+		if (!fb_gl_params.accum_alpha_bits)
+			fb_gl_params.accum_alpha_bits = default_alpha_bits[bpp];
 	}
 
-	if (!__fb_gl_params.depth_bits)
-		__fb_gl_params.depth_bits = 16;
+	if (!fb_gl_params.depth_bits)
+		fb_gl_params.depth_bits = 16;
 
-	if ((!__fb_gl_params.stencil_bits) && (gl_options & HAS_STENCIL_BUFFER))
-		__fb_gl_params.stencil_bits = 8;
+	if ((!fb_gl_params.stencil_bits) && (gl_options & HAS_STENCIL_BUFFER))
+		fb_gl_params.stencil_bits = 8;
 
-	if ((!__fb_gl_params.num_samples) && (gl_options & HAS_MULTISAMPLE))
-		__fb_gl_params.num_samples = 4;
+	if ((!fb_gl_params.num_samples) && (gl_options & HAS_MULTISAMPLE))
+		fb_gl_params.num_samples = 4;
 }
 
 #ifndef OPENGL_CONTEXT_ONLY
@@ -246,27 +246,27 @@ int fb_hGL_Init(FB_DYLIB lib, char *os_extensions)
 							   "glPushMatrix", "glPopMatrix", "glPushAttrib", "glPopAttrib", 
 							   "glPushClientAttrib", "glPopClientAttrib", "glPixelStorei",
 							   "glPixelTransferi", "glPixelMapfv" };
-	FB_GL *funcs = &__fb_gl;
+	FB_GL *funcs = &fb_gl;
 	void **funcs_ptr = (void **)funcs;
 	const char *extensions;
 	int res = 0, size = FBGL_EXTENSIONS_STRING_SIZE - 1;
 
-	fb_hMemSet(&__fb_gl, 0, sizeof(FB_GL));
-	__fb_gl_extensions[0] = '\0';
+	fb_hMemSet(&fb_gl, 0, sizeof(FB_GL));
+	fb_gl_extensions[0] = '\0';
 
 	if (fb_hDynLoadAlso(lib, gl_funcs, funcs_ptr, ARRAY_SIZE(gl_funcs)))
 		return -1;
 
-	extensions = (const char *)__fb_gl.GetString(GL_EXTENSIONS);
+	extensions = (const char *)fb_gl.GetString(GL_EXTENSIONS);
 	if (!extensions)
 		return -1;
 
-	strncpy(__fb_gl_extensions, extensions, size);
-	__fb_gl_extensions[size] = '\0';
-	size -= strlen(__fb_gl_extensions);
+	strncpy(fb_gl_extensions, extensions, size);
+	fb_gl_extensions[size] = '\0';
+	size -= strlen(fb_gl_extensions);
 	if (os_extensions)
-		strncat(__fb_gl_extensions, os_extensions, size);
-	__fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE - 1] = '\0';
+		strncat(fb_gl_extensions, os_extensions, size);
+	fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE - 1] = '\0';
 
 	res |= !fb_hGL_ExtensionSupported("GL_EXT_bgra");
 
@@ -344,8 +344,8 @@ void fb_hGL_SetupProjection(void)
 	const GLfloat vert[] = {-1,-1,-1,1,1,1,1,-1};
 	GLint viewport_x = 0;
 	GLint viewport_y = 0;
-	GLsizei viewport_w = __fb_gfx->w * __fb_gl_params.scale;
-	GLsizei viewport_h = __fb_gfx->h * __fb_gl_params.scale;
+	GLsizei viewport_w = fb_gfx->w * fb_gl_params.scale;
+	GLsizei viewport_h = fb_gfx->h * fb_gl_params.scale;
 	int clear_backbuffer = 0;
 
 #ifdef HOST_WIN32
@@ -354,78 +354,78 @@ void fb_hGL_SetupProjection(void)
 	clear_backbuffer = fb_hGL_GetX11WindowViewport(&viewport_x, &viewport_y, &viewport_w, &viewport_h);
 #endif
 
-	__fb_gl.PushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-	__fb_gl.PushAttrib(GL_ALL_ATTRIB_BITS);
-	__fb_gl.Viewport(viewport_x, viewport_y, viewport_w, viewport_h);
-	__fb_gl.MatrixMode(GL_PROJECTION);
-	__fb_gl.PushMatrix();
-	__fb_gl.LoadIdentity();
+	fb_gl.PushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+	fb_gl.PushAttrib(GL_ALL_ATTRIB_BITS);
+	fb_gl.Viewport(viewport_x, viewport_y, viewport_w, viewport_h);
+	fb_gl.MatrixMode(GL_PROJECTION);
+	fb_gl.PushMatrix();
+	fb_gl.LoadIdentity();
 
-	__fb_gl.Ortho(-1, 1, -1, 1, -1, 1);
-	__fb_gl.MatrixMode(GL_MODELVIEW);
-	__fb_gl.PushMatrix();
-	__fb_gl.LoadIdentity();
-	__fb_gl.ShadeModel(GL_FLAT);
-	__fb_gl.Disable(GL_DEPTH_TEST);
+	fb_gl.Ortho(-1, 1, -1, 1, -1, 1);
+	fb_gl.MatrixMode(GL_MODELVIEW);
+	fb_gl.PushMatrix();
+	fb_gl.LoadIdentity();
+	fb_gl.ShadeModel(GL_FLAT);
+	fb_gl.Disable(GL_DEPTH_TEST);
 #ifdef GL_SCISSOR_TEST
 	if (clear_backbuffer)
-		__fb_gl.Disable(GL_SCISSOR_TEST);
+		fb_gl.Disable(GL_SCISSOR_TEST);
 #endif
-	__fb_gl.DepthMask(GL_FALSE);
+	fb_gl.DepthMask(GL_FALSE);
 	if (clear_backbuffer) {
-		__fb_gl.ClearColor(0.0, 0.0, 0.0, 1.0);
-		__fb_gl.Clear(GL_COLOR_BUFFER_BIT);
+		fb_gl.ClearColor(0.0, 0.0, 0.0, 1.0);
+		fb_gl.Clear(GL_COLOR_BUFFER_BIT);
 	}
-	__fb_gl.EnableClientState( GL_VERTEX_ARRAY );
-	__fb_gl.EnableClientState( GL_TEXTURE_COORD_ARRAY );
-	__fb_gl.DisableClientState(GL_NORMAL_ARRAY);
-	__fb_gl.DisableClientState(GL_COLOR_ARRAY);
+	fb_gl.EnableClientState( GL_VERTEX_ARRAY );
+	fb_gl.EnableClientState( GL_TEXTURE_COORD_ARRAY );
+	fb_gl.DisableClientState(GL_NORMAL_ARRAY);
+	fb_gl.DisableClientState(GL_COLOR_ARRAY);
 
-	__fb_gl.VertexPointer(2, GL_FLOAT, 0, vert);
-	__fb_gl.TexCoordPointer(2, GL_FLOAT, 0, texcoords);
+	fb_gl.VertexPointer(2, GL_FLOAT, 0, vert);
+	fb_gl.TexCoordPointer(2, GL_FLOAT, 0, texcoords);
 
 	//__fb_gl.ActiveTexture(GL_TEXTURE0);
-	__fb_gl.BindTexture(GL_TEXTURE_2D, ScreenTex);
+	fb_gl.BindTexture(GL_TEXTURE_2D, ScreenTex);
 	if (clear_backbuffer) {
-		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+		fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+		fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
 	}
 	else {
-		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-		__fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+		fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+		fb_gl.TexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
 	}
-	switch(__fb_gfx->depth){
+	switch(fb_gfx->depth){
 	case 32:
 	case 24:
-		__fb_gl.TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, __fb_gfx->w, __fb_gfx->h, GL_BGRA, GL_UNSIGNED_BYTE, (unsigned char *)__fb_gfx->framebuffer);
+		fb_gl.TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fb_gfx->w, fb_gfx->h, GL_BGRA, GL_UNSIGNED_BYTE, (unsigned char *)fb_gfx->framebuffer);
 		break;
 	case 16:
 	case 15:
-		__fb_gl.PixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		__fb_gl.TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, __fb_gfx->w, __fb_gfx->h, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, (unsigned char *)__fb_gfx->framebuffer);
+		fb_gl.PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		fb_gl.TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fb_gfx->w, fb_gfx->h, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, (unsigned char *)fb_gfx->framebuffer);
 		break;
 	case 8:
 	case 4:
 	case 2:
 	case 1:
-		__fb_gl.PixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		__fb_gl.PixelTransferi(GL_MAP_COLOR, GL_TRUE );
-		__fb_gl.PixelMapfv(GL_PIXEL_MAP_I_TO_R,256, map_r);
-		__fb_gl.PixelMapfv(GL_PIXEL_MAP_I_TO_G,256, map_g);
-		__fb_gl.PixelMapfv(GL_PIXEL_MAP_I_TO_B,256, map_b);
+		fb_gl.PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		fb_gl.PixelTransferi(GL_MAP_COLOR, GL_TRUE );
+		fb_gl.PixelMapfv(GL_PIXEL_MAP_I_TO_R,256, map_r);
+		fb_gl.PixelMapfv(GL_PIXEL_MAP_I_TO_G,256, map_g);
+		fb_gl.PixelMapfv(GL_PIXEL_MAP_I_TO_B,256, map_b);
 
-		__fb_gl.TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, __fb_gfx->w, __fb_gfx->h, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, (unsigned char *)__fb_gfx->framebuffer);
+		fb_gl.TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fb_gfx->w, fb_gfx->h, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, (unsigned char *)fb_gfx->framebuffer);
 
 	}
 
-	__fb_gl.Enable(GL_TEXTURE_2D);
-	__fb_gl.DrawArrays(GL_TRIANGLE_FAN,0,4);
+	fb_gl.Enable(GL_TEXTURE_2D);
+	fb_gl.DrawArrays(GL_TRIANGLE_FAN,0,4);
 
-	__fb_gl.PopMatrix(); /* GL_MODELVIEW */
-	__fb_gl.MatrixMode(GL_PROJECTION);
-	__fb_gl.PopMatrix();
-	__fb_gl.PopAttrib();
-	__fb_gl.PopClientAttrib();
+	fb_gl.PopMatrix(); /* GL_MODELVIEW */
+	fb_gl.MatrixMode(GL_PROJECTION);
+	fb_gl.PopMatrix();
+	fb_gl.PopAttrib();
+	fb_gl.PopClientAttrib();
 
 }
 

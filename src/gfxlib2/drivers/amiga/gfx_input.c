@@ -126,7 +126,7 @@ static void amiga_post_key(struct IntuiMessage *message)
 
     scancode = amiga_raw_to_scancode(raw);
     if (scancode > 0 && scancode < 128)
-        __fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
+        fb_gfx->key[scancode] = pressed ? TRUE : FALSE;
 
     memset(&event, 0, sizeof(event));
     event.type = pressed ? EVENT_KEY_PRESS : EVENT_KEY_RELEASE;
@@ -242,7 +242,7 @@ void fb_amigaGfxPollEvents(void)
     int refresh;
 
     if (!fb_amiga_gfx.active || fb_amiga_gfx.window == NULL ||
-        __fb_gfx == NULL || __fb_gfx->key == NULL)
+        fb_gfx == NULL || fb_gfx->key == NULL)
     {
         return;
     }
@@ -297,8 +297,8 @@ void fb_amigaGfxPollEvents(void)
     if (refresh)
     {
         fb_amigaGfxInvalidate();
-        if (__fb_gfx->dirty != NULL)
-            memset(__fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
+        if (fb_gfx->dirty != NULL)
+            memset(fb_gfx->dirty, TRUE, (size_t)fb_amiga_gfx.height);
         fb_amigaGfxPresent();
     }
 }

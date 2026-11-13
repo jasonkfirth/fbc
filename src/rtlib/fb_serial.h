@@ -94,8 +94,8 @@ typedef struct FB_COM_STATUS_ {
 	unsigned int tx_queued;
 } FB_COM_STATUS;
 
-STATIC_ASSERT( sizeof( unsigned int ) == 4 );
-STATIC_ASSERT( sizeof( FB_COM_STATUS ) == 20 );
+STATIC_ASSERT_LEGACY( sizeof( unsigned int ) == 4 )
+STATIC_ASSERT_LEGACY( sizeof( FB_COM_STATUS ) == 20 )
 
 /* ------------------------------------------------------------------------- */
 /* Platform serial backend                                                   */

@@ -13,10 +13,10 @@ int fb_ConsolePageCopy( int src, int dst )
 {
 	/* use current? */
 	if( src < 0 )
-		src = __fb_con.active;
+		src = fb_console_context.active;
 
 	if( dst < 0 )
-		dst = __fb_con.visible;
+		dst = fb_console_context.visible;
 
 	if( src == dst )
 		return fb_ErrorSetNum( FB_RTERROR_OK );
