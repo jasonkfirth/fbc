@@ -340,6 +340,27 @@ sub hBuildByrefArg( byval param as FBSYMBOL ptr, byval n as ASTNODE ptr )
 	n->arg.mode = FB_PARAMMODE_BYVAL
 end sub
 
+private function hByrefArgNeedsTemp( byval tree as ASTNODE ptr ) as integer
+
+	tree = astSkipConstCASTs(tree)
+	if( astCanTakeAddrOf(tree) = FALSE ) then return TRUE
+	'' IIF and TYPEINI expose addresses only after materializing their value.
+	'' A pointer value there still owns a fresh slot, not the selected source
+	'' variable's slot. Links retain the value category of their result branch.
+	select case tree->class
+	case AST_NODECLASS_IIF, AST_NODECLASS_TYPEINI
+		return typeIsPtr(astGetFullType(tree))
+	case AST_NODECLASS_LINK
+		select case tree->link.ret
+		case AST_LINK_RETURN_LEFT
+			return hByrefArgNeedsTemp(tree->l)
+		case AST_LINK_RETURN_RIGHT
+			return hByrefArgNeedsTemp(tree->r)
+		end select
+	end select
+	return FALSE
+end function
+
 private sub hCheckByrefParam _
 	( _
 		byval param as FBSYMBOL ptr, _
@@ -370,7 +391,7 @@ private sub hCheckByrefParam _
 	'' that (BYREF semantics). For other expressions though (especially
 	'' BOPs, CONSTs, etc.) we have to create a temp var to hold the arg's
 	'' value and then pass the temp var byref.
-	if( astCanTakeAddrOf( t ) = FALSE ) then
+	if( hByrefArgNeedsTemp(t) ) then
 		assert( param->class = FB_SYMBCLASS_PARAM )
 
 		''
@@ -398,8 +419,20 @@ private sub hCheckByrefParam _
 			errReportWarn( FB_WARNINGMSG_BYREFTEMPVAR )
 		end if
 
+		'' The temporary is a fresh pointer slot, not an alias of caller
+		'' storage. Apply safe value qualification before taking its address,
+		'' so the C ABI does not need an incompatible pointer-to-pointer cast.
+		dim as integer temp_dtype = n->l->dtype
+		if( (is_byref_void = FALSE) andalso typeIsPtr(temp_dtype) andalso _
+		    (n->l->subtype = symbGetSubtype(param)) ) then
+			var param_dtype = symbGetFullType(param)
+			if( typeGetDtAndPtrOnly(temp_dtype) = typeGetDtAndPtrOnly(param_dtype) andalso _
+			    symbHasUnsafeConstAddition(param_dtype, temp_dtype) = FALSE ) then
+				temp_dtype = param_dtype
+			end if
+		end if
 		n->l = astNewASSIGN( _
-			astNewVAR( symbAddTempVar( n->l->dtype, n->l->subtype ) ), _
+			astNewVAR( symbAddTempVar( temp_dtype, n->l->subtype ) ), _
 			n->l, _
 			AST_OPOPT_DONTCHKPTR or AST_OPOPT_ISINI )
 	end if
@@ -916,6 +949,21 @@ private function hCheckParam _
 	'' strip the non-type flags
 	param_dtype = symbGetType( param )
 	arg_dtype   = astGetDatatype( n->l )
+
+	'' Diagnose the selected argument before conversions hide its original
+	'' qualifiers. A value temporary has no caller-owned slot to alias; real
+	'' BYREF results and variables retain their storage and the stricter check.
+	if( symbGetSubtype(param) = astGetSubtype(n->l) ) then
+		dim as FB_PARAMMODE qualification_mode = symbGetParamMode(param)
+		if( n->arg.mode = FB_PARAMMODE_BYVAL ) then
+			qualification_mode = FB_PARAMMODE_BYVAL
+		elseif( qualification_mode = FB_PARAMMODE_BYREF ) then
+			if( hByrefArgNeedsTemp(n->l) ) then qualification_mode = FB_PARAMMODE_BYVAL
+		end if
+		if( symbHasUnsafeConstAddition(symbGetFullType(param), astGetFullType(n->l), qualification_mode) ) then
+			errReportWarn( FB_WARNINGMSG_UNSAFECONSTADDITION )
+		end if
+	end if
 
 	'' An incomplete object can only cross a call boundary by reference.
 	if( astTypeIsIncompleteValue( arg_dtype ) ) then

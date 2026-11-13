@@ -121,6 +121,7 @@ declare function hMakeParamDesc _
 		( /'FB_WARNINGMSG_UNUSEDVARIABLE            '/ 0, @"Variable is not read" ), _
 		( /'FB_WARNINGMSG_COMPARISONRANGE           '/ 1, @"Comparison result is fixed by the operand range" ), _
 		( /'FB_WARNINGMSG_NULLACCESS                '/ 1, @"Memory access through a provably null pointer" ), _
+		( /'FB_WARNINGMSG_UNSAFECONSTADDITION       '/ 1, @"Unsafe nested CONST qualification" ), _
 		( /'FB_WARNINGMSGS                          '/ 0, @"FB_WARNINGMSGS" ) _
 	}
 

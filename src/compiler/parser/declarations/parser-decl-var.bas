@@ -924,6 +924,12 @@ private function hCheckAndBuildByrefInitializer( byval sym as FBSYMBOL ptr, byre
 		astDelTree( expr )
 		expr = hBuildFakeByrefInitExpr( sym->typ, sym->subtype )
 	else
+		'' A reference declaration aliases the original pointer slot, just as
+		'' a BYREF argument does. Check before resolving reference chains.
+		if( sym->subtype = astGetSubtype(expr) andalso _
+		    symbHasUnsafeConstAddition(sym->typ, astGetFullType(expr), FB_PARAMMODE_BYREF) ) then
+			errReportWarn( FB_WARNINGMSG_UNSAFECONSTADDITION )
+		end if
 		expr = hResolveRefToRefInitializer( sym->typ, expr )
 	end if
 

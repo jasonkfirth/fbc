@@ -214,6 +214,8 @@ def main() -> int:
         ("label-flag-gosub", "tests/compiler-support/label-flag-gosub.bas", "LABEL_FLAG_GOSUB_PASS"),
         ("member-pointer-slots", "tests/compiler-support/c-member-pointer-slots.bas", "MEMBER_POINTER_SLOTS_PASS"),
         ("pointer-field-words", "tests/compiler-support/c-pointer-field-words.bas", "POINTER_FIELD_WORDS_PASS  59"),
+        ("byref-qualified-temporaries", "tests/compiler-support/c-byref-qualified-temporaries.bas", "BYREF_QUALIFIED_TEMPORARIES_PASS"),
+        ("byref-qualified-aliases", "tests/compiler-support/c-byref-qualified-temporaries.bas", "BYREF_QUALIFIED_TEMPORARIES_PASS"),
         ("record-layout", "tests/compiler-support/c-record-layout.bas", "RECORD_LAYOUT_PASS 6"),
         ("packed-descriptors", "tests/compiler-support/c-packed-descriptors.bas", "PACKED_DESCRIPTORS_PASS"),
         ("packed-descriptor-tail", "tests/compiler-support/c-packed-descriptor-tail.bas", "PACKED_DESCRIPTOR_TAIL_PASS"),
@@ -241,6 +243,16 @@ def main() -> int:
                   f"{source_warnings.stdout}{source_warnings.stderr}")
             return 1
         print(source_warnings.stdout.strip())
+        qualification_warnings = subprocess.run(
+            [sys.executable, '-B', str(root / 'build_scripts/test-source-const-qualification.py'),
+             '--fbc', str(options.fbc.resolve()), '--prefix', str(toolchain_prefix),
+             '--work-dir', str(working)],
+            cwd=root, text=True, capture_output=True, check=False)
+        if qualification_warnings.returncode:
+            print('pointer qualification diagnostic regression failed\n' +
+                  qualification_warnings.stdout + qualification_warnings.stderr)
+            return 1
+        print(qualification_warnings.stdout.strip())
         debug_parameters_command = [
             sys.executable, '-B',
             str(root / 'tests/compiler-support/c-debug-unused-parameters.py'),
@@ -829,6 +841,10 @@ def main() -> int:
                            "-i", str(root / "inc"), "-i", str((root / source).parent),
                            "-gen", backend, "-v",
                            str(input_source), "-x", str(executable)]
+                if name == 'byref-qualified-aliases':
+                    # The warning remains intentional here; both pointees are
+                    # mutable and the callee must observe its caller's real slot.
+                    command += ['-d', 'QUALIFIED_ALIAS_PROOF']
                 if system == "darwin" and architecture in ("x86", "x86_64") and name in (
                         "abi", "asm-registers") and backend in ("gcc", "clang"):
                     # These fixtures contain Intel tokens. Darwin defaults to

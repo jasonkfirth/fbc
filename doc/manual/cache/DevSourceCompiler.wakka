@@ -66,6 +66,8 @@ Debug C retains formal argument names when a calling contract requires an ignore
 
 ##backend/c/c-member-access.bi## retains declared pointer-field addresses for scalar byte copies when optimized IR carries the bytes in an integer of exactly the target pointer size. The copy keeps its original width and value type; it does not become a typed integer access to pointer storage. Other widths and unknown origins keep their existing lowering. The regression in ##tests/compiler-support/c-pointer-field-words.bas## checks packed slots, short object views, callable slots and single evaluation.
 
+##ast/nodes/ast-node-arg.bas## gives fresh pointer argument slots their safely qualified parameter type before taking the address. Real variables and ByRef results retain caller storage. The pure ##symbHasUnsafeConstAddition## predicate checks intervening pointer qualifiers without diagnosing overload candidates; selected calls, assignments, initializers and reference declarations report warning 58 for unsafe additions. The regressions in ##tests/compiler-support/c-byref-qualified-temporaries.bas## and ##tests/compiler-support/source-const-qualification.bas## cover value temporaries, conditional values, actual aliases and warning policies across backends and pointer widths.
+
 ##tooling## records facts selected by the compiler. Its observers must obtain identities, types and source ranges before the corresponding compiler storage is released. It must not reparse text to invent a competing interpretation. The semantic model contract (##doc/compiler-semantic-model.md##) describes the exported format separately from these implementation boundaries.
 
 {{fbdoc item="section" value="Adding or moving a compiler module"}}

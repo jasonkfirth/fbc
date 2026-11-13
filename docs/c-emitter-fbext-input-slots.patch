@@ -1,0 +1,97 @@
+--- a/include/freebasic/ext/graphics/manip.bi
++++ b/include/freebasic/ext/graphics/manip.bi
+@@ -1,3 +1,9 @@
++'' Project: FreeBASIC Extended Library
++'' File: ext/graphics/manip.bi
++'' Purpose: Declare in-memory graphics manipulation and safe source-pointer adapters.
++'' Responsibilities: Preserve public contracts and legacy binary entry points.
++'' This file intentionally does NOT implement transforms or image loading.
++
+ ''Title: graphics/manip.bi
+ ''
+ ''About: License
+@@ -89,7 +95,7 @@
+     ''positx - x position (center of image) to draw the rotated image onto the destination buffer
+     ''posity - y position (center of image) to draw the rotated image onto the destination buffer
+     ''angle - the angle in degrees to rotate the image.
+-    declare sub Rotate( byref dst as Image ptr = 0, byref src as const Image ptr, byref positx as integer, byref posity as integer, byref angle as integer )
++    declare sub Rotate overload( byref dst as Image ptr = 0, byref src as const Image ptr, byref positx as integer, byref posity as integer, byref angle as integer )
+ 
+ 
+ 
+@@ -104,7 +110,7 @@
+     ''angle - the angle in degrees to rotate the image.
+     ''zoomx - the amount to zoom on the x axis.
+     ''zoomy - the amount to zoom on the y axis.
+-    declare sub RotoZoom( byref dst as Image ptr = 0, byref src as const Image ptr, byref positx as integer, byref posity as integer, byref angle as integer, byref zoomx as single, byref zoomy as single )
++    declare sub RotoZoom overload( byref dst as Image ptr = 0, byref src as const Image ptr, byref positx as integer, byref posity as integer, byref angle as integer, byref zoomx as single, byref zoomy as single )
+ 
+ 
+     ''Sub: RotoZoomASM
+@@ -119,7 +125,7 @@
+     ''zoomx - the amount to zoom on the x axis.
+     ''zoomy - the amount to zoom on the y axis. (optional parameter: if omitted, zoomx value is used.)
+     ''transcol - the transparent color. (optional parameter: if omitted, fbgfx's *magic pink*(&hffff00ff) color is used.)
+-    declare sub RotoZoomASM( byref dst as Image ptr = 0, byref src as const Image ptr, byval positx as integer, byval posity as integer, byref angle as integer, byref zoomx as single, byref zoomy as single = 0, byval transcol as uinteger  = &hffff00ff )
++    declare sub RotoZoomASM overload( byref dst as Image ptr = 0, byref src as const Image ptr, byval positx as integer, byval posity as integer, byref angle as integer, byref zoomx as single, byref zoomy as single = 0, byval transcol as uinteger  = &hffff00ff )
+ 
+ 
+     ''Sub: Blur
+@@ -133,7 +139,7 @@
+     ''Notes:
+     ''When attempting to apply a blur level of <= 0 this function simply copies
+     ''the source image into the destination image.
+-    declare sub Blur( byref dst as Image ptr, byref src as const Image ptr, byref blur_level as integer )
++    declare sub Blur overload( byref dst as Image ptr, byref src as const Image ptr, byref blur_level as integer )
+ 
+     ''Sub: Scale2X
+     ''performs the Scale2X algorithm on an image.
+@@ -144,7 +150,7 @@
+     ''positx - the x position to place the scaled sprite.
+     ''posity - the y position to place the scaled sprite.
+     ''
+-    declare sub Scale2X( byref dst as Image ptr = 0, byref src as const Image ptr, byref positx as integer, byref posity as integer )
++    declare sub Scale2X overload( byref dst as Image ptr = 0, byref src as const Image ptr, byref positx as integer, byref posity as integer )
+ 
+     ''Sub: AlphaBlit
+     ''performs additive alpha blending on an image.
+@@ -182,6 +188,39 @@
+     ''
+     declare function Gradient( byval from_c as ulong, byval to_c as ulong, byval w as ulong = 0, byval h as ulong = 0 ) as Image ptr
+ 
++    '' These routines read the source pointer but do not replace its slot.
++    '' Keep their legacy BYREF exports for existing archives. Mutable input
++    '' pointers select these local reference adapters, which add pointee CONST
++    '' before handing a fresh, correctly typed slot to the legacy entry.
++    '' Source argument evaluation retains its original BYREF timing; only the
++    '' legacy call receives a private view. Other reference aliases stay intact.
++    private sub Rotate overload( byref dst as Image ptr = 0, byref src as Image ptr, byref positx as integer, byref posity as integer, byref angle as integer )
++        dim source_view as const Image ptr = src
++        Rotate(dst, source_view, positx, posity, angle)
++    end sub
++
++    private sub RotoZoom overload( byref dst as Image ptr = 0, byref src as Image ptr, byref positx as integer, byref posity as integer, byref angle as integer, byref zoomx as single, byref zoomy as single )
++        dim source_view as const Image ptr = src
++        RotoZoom(dst, source_view, positx, posity, angle, zoomx, zoomy)
++    end sub
++
++    private sub RotoZoomASM overload( byref dst as Image ptr = 0, byref src as Image ptr, byval positx as integer, byval posity as integer, byref angle as integer, byref zoomx as single, byref zoomy as single = 0, byval transcol as uinteger = &hffff00ff )
++        dim source_view as const Image ptr = src
++        RotoZoomASM(dst, source_view, positx, posity, angle, zoomx, zoomy, transcol)
++    end sub
++
++    private sub Blur overload( byref dst as Image ptr, byref src as Image ptr, byref blur_level as integer )
++        dim source_view as const Image ptr = src
++        Blur(dst, source_view, blur_level)
++    end sub
++
++    private sub Scale2X overload( byref dst as Image ptr = 0, byref src as Image ptr, byref positx as integer, byref posity as integer )
++        dim source_view as const Image ptr = src
++        Scale2X(dst, source_view, positx, posity)
++    end sub
++
+ end namespace 'ext.gfx
+ 
+ #endif 'FBEXT_GFX_MANIP_BI__
++
++'' end of ext/graphics/manip.bi

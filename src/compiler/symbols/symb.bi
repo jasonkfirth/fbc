@@ -2121,6 +2121,13 @@ declare function symbCheckConstAssignTopLevel _
 		byref matches as integer = 0 _
 	) as integer
 
+declare function symbHasUnsafeConstAddition _
+	( _
+		byval ldtype as FB_DATATYPE, _
+		byval rdtype as FB_DATATYPE, _
+		byval mode as FB_PARAMMODE = FB_PARAMMODE_BYVAL _
+	) as integer
+
 declare function symbCheckConstAssign _
 	( _
 		byval ldtype as FB_DATATYPE, _

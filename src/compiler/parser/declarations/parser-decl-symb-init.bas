@@ -161,6 +161,12 @@ private function hDoAssign _
 		check_upcast = TRUE
 	end if
 
+	'' Diagnose the accepted source initializer here. Its later TYPEINI store
+	'' bypasses pointer checks, while assignment probes must stay diagnostic-free.
+	if( ctx.subtype = astGetSubtype(expr) andalso _
+	    symbHasUnsafeConstAddition(ctx.dtype, astGetFullType(expr)) ) then
+		errReportWarn( FB_WARNINGMSG_UNSAFECONSTADDITION )
+	end if
 	var semantic_initializer = astTypeIniAddAssign( ctx.tree, expr, ctx.sym, ctx.dtype, ctx.subtype, check_upcast )
 	'' NEW also uses this parser with a compiler-created temporary pointer.
 	'' Keep its original expression capture above, because lowering consumes

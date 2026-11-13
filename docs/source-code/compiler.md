@@ -132,6 +132,15 @@ unknown origins keep their existing lowering. See
 [pointer-field words](../c-emitter-pointer-field-words.md) and
 [the regression](../../tests/compiler-support/c-pointer-field-words.bas).
 
+`ast/nodes/ast-node-arg.bas` gives fresh pointer argument slots their safely
+qualified parameter type before taking their address. Real variables and
+ByRef results retain caller storage. `symbHasUnsafeConstAddition` is a pure
+predicate over intermediate pointer qualifiers; selected calls, assignments,
+initializers and reference declarations issue warning 58 separately from
+overload ranking. See [qualified pointer slots](../c-emitter-const-slots.md),
+[the value regression](../../tests/compiler-support/c-byref-qualified-temporaries.bas)
+and [the diagnostic fixture](../../tests/compiler-support/source-const-qualification.bas).
+
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage
 is released. It must not reparse text to invent a competing interpretation.

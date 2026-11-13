@@ -6,9 +6,74 @@ Responsibilities: Link source changes, diagnostic receipts and open failures.
 This file intentionally does NOT equate accepted C with runtime qualification.
 -->
 
-# Current selected compiler: pointer-field word copies, November 13
+# Current selected compiler: qualified pointer slots, November 13
 
 `build/main-gcc/bin/fbc.exe` selects
+`1b874138079b497b1cef2ca13aba6dbf07a6ff6b7117d0f42f556004b57850eb`.
+The existing pointer-word compiler,
+`d37a9052009511c8132faeafcf471847c909b0925745228c98dfe46160d00f28`,
+is its immediate rollback. Fourteen selected-path GCC/Clang runs pass; installed
+release executables and runtime archives remain unchanged. The
+[qualified-slot repair](c-emitter-const-slots.md) types safe value temporaries
+correctly, preserves actual aliases, and adds FBC warning 58 for unsafe nested
+CONST additions. The compiler reaches an exact GCC-clean 224-unit fixed point.
+Qualification covers the staged source cut, preserving a concurrent DOS ASIN
+emitter edit outside this commit. Its original emitter Git blob and all other
+current input pins are verified in the source-cut reconciliation.
+
+| Complete current queue | Profiles | Accepted C | GCC | Clang |
+| --- | ---: | ---: | ---: | ---: |
+| Retained census | 6,419 | 6,313 | 14 | 15,823 |
+| Retained plus recovered fbrtLib | 6,433 | 6,327 | 15 | 15,829 |
+| Separate fb-ext-lib expansion | 194 | 186 | 0 | 159 |
+| Separate Tiko expansion | 126 | 126 | 1 | 4,628 |
+
+Overlapping expansions must not be summed. Retained group counts below are
+unchanged; compiler and fbctests GCC counts remain zero. The fb-ext-lib cut
+removes six qualifier observations per native tool and one genuine GCC
+uninitialized-field observation. Its examples are unchanged. Scoped library
+patches initialize empty shared-pointer state and provide safe input adapters
+while retaining legacy exports and existing project/installed archives.
+
+The complete GCC/Clang backend gate, 408 warning-policy checks and 16 semantic
+models pass. Eight semantic Win32 objects retain the intentional alias control;
+the 59-check alignment matrix also passes through GCC, Clang and GAS64.
+The shared-pointer scalar regression passes 18 checks per backend. New-header
+clients link to original-header ABI providers, and eight Win64 module comparisons
+preserve exports and instruction bytes. These checks do not execute graphics.
+
+Independent closure preserves all 7,319 original source-warning lines across
+the four queues, with no additional warning-58 observations after the library
+repairs. Twenty retained and eight fb-ext-lib refusal signatures retain their
+dispositions. The two unread statics still report warning 55 under `-w all`,
+and the six deliberate null observations retain warning 57. Retained/Tiko
+scratch stays below 64 MiB in the final pass; its exact peak was not persisted.
+The initial retained peak was 29,147,064 bytes. Tiko peaks at 63,839,013 bytes
+under its 96 MiB cap.
+Only 19 retained C profiles change; all Tiko and recovered fbrtLib C identities
+are preserved. Both headless widget runs pass twelve assertions.
+
+Current receipts reuse `build/c-emitter-forward-views-20261105/`:
+`const-slot-selfhost-v2-20261113.json.zlib`,
+`const-slot-gates-v1-20261113.json.zlib`,
+`const-slot-semantic-v1-20261113.json.zlib`,
+`const-slot-class-close-v2-20261113.json.zlib`,
+`const-slot-cohort-close-v2-20261113.json.zlib`, and
+`const-slot-selected-recheck-v2-20261113.json.zlib`.
+The current databases are `const-slot-retained-v2-20261113.sqlite3`,
+`const-slot-fbrt-v1-20261113.sqlite3`,
+`current-fbext-const-slot-v3-20261113.sqlite3` and
+`current-tiko-const-slot-v1-20261113.sqlite3`.
+
+The broader audit remains open. A new foreign Win32 check exposes GCC's
+30-operand inline-assembly limit in `RotoZoomASM`; its failed baseline remains
+recorded for a structural repair. JRPG refresh, foreign providers, the remaining
+retained GCC classes and Clang cleanup remain separate. PNG work and unrelated
+dirty native-library changes are excluded.
+
+# Historical selected compiler: pointer-field word copies, November 13
+
+At that earlier cut, `build/main-gcc/bin/fbc.exe` selected
 `d37a9052009511c8132faeafcf471847c909b0925745228c98dfe46160d00f28`.
 The existing immutable unread-local compiler,
 `fc092d79d744a7491bf980fade21705900fbd39dd430dcde0898327f089f85f9`,

@@ -8,6 +8,10 @@ language reference.
 
 ## Start here
 
+- [Qualified pointer slots](c-emitter-const-slots.md) records the new source
+  diagnostic, safe value temporaries, GCC-clean fb-ext-lib expansion and
+  the selected compiler's complete broad qualification.
+
 - [Pointer fields carried as integer words](c-emitter-pointer-field-words.md)
   records eight removed GCC observations, original array-test execution and
   complete current-compiler queue qualification.

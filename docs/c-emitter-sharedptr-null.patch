@@ -1,0 +1,18 @@
+--- a/include/freebasic/ext/memory/sharedptr.bi
++++ b/include/freebasic/ext/memory/sharedptr.bi
+@@ -191,6 +191,7 @@
+ 		linkage_ constructor fbext_SharedPtr(T_) ( byval p as fbext_TypeName(T_) ptr )
+ 			m_obj = p
+ 			m_destroy = null
++			m_refcount = null
+ 			if m_obj then
+ 				m_refcount = new SizeType(1)
+ 			end if
+@@ -200,6 +201,7 @@
+ 		linkage_ constructor fbext_SharedPtr(T_) ( byval p as fbext_TypeName(T_) ptr, byval d as fbext_DestroyProc(T_) )
+ 			m_obj = p
+ 			m_destroy = d
++			m_refcount = null
+ 			if m_obj then
+ 				m_refcount = new SizeType(1)
+ 			end if

@@ -799,6 +799,11 @@ function astNewASSIGN _
 		if( hCheckConstAndPointerOps( l, ldfull, r, rdfull ) = FALSE ) then
 			exit function
 		end if
+		'' Check only a committed assignment, not astCheckASSIGN() probes
+		'' used while choosing constructors or overloads.
+		if( l->subtype = r->subtype andalso symbHasUnsafeConstAddition(ldfull, rdfull) ) then
+			errReportWarn( FB_WARNINGMSG_UNSAFECONSTADDITION )
+		end if
 	end if
 
 	'' arrays can't be converted, so don't allow if it wasn't already

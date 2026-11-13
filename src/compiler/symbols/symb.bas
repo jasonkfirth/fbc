@@ -2821,6 +2821,34 @@ function symbCheckConstAssignTopLevel _
 	function = TRUE
 end function
 
+function symbHasUnsafeConstAddition _
+	( _
+		byval ldtype as FB_DATATYPE, _
+		byval rdtype as FB_DATATYPE, _
+		byval mode as FB_PARAMMODE _
+	) as integer
+
+	'' Adding a deeper CONST is safe only if every intervening target
+	'' pointer is itself CONST. Otherwise an alias can install a pointer
+	'' to read-only storage into a slot the original owner treats as writable.
+	'' BYREF/BYDESC add an outer indirection, so the slot's own CONST bit
+	'' also participates. This predicate must not diagnose overload candidates.
+	if( typeIsPtr(ldtype) = FALSE ) then return FALSE
+	if( typeGetDtAndPtrOnly(ldtype) <> typeGetDtAndPtrOnly(rdtype) ) then return FALSE
+	if( mode = FB_PARAMMODE_VARARG ) then return FALSE
+
+	dim as integer first_level = 1
+	if( mode = FB_PARAMMODE_BYREF or mode = FB_PARAMMODE_BYDESC ) then first_level = 0
+	for level as integer = first_level to typeGetPtrCnt(ldtype)
+		if( typeIsConstAt(ldtype, level) andalso typeIsConstAt(rdtype, level) = FALSE ) then
+			for intermediate as integer = first_level to level - 1
+				if( typeIsConstAt(ldtype, intermediate) = FALSE ) then return TRUE
+			next
+		end if
+	next
+	return FALSE
+end function
+
 private function hSymbCheckConstAssignFuncPtr _
 	( _
 		byval lsubtype as FBSYMBOL ptr, _

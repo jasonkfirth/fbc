@@ -38,12 +38,15 @@ Set minimum warning level.
 	The default, if the ##**-w**## option is not specified, is as if ##**-w 1**## was used. The ##**-w**## option can be specified multiple times.  Warning messages having a level of ##0## are not shown by default.
 
 	Warning 56, "Comparison result is fixed by the operand range", is enabled by default. It checks declared integer ranges up to 32 bits against nonnegative integer constants, including variable, field, indexed and pointer-dereference operands. Ambiguous signed/unsigned conversions, wider operands and negative constants are left to other checks. This diagnostic does not evaluate the operand or remove its normal evaluation.
+
+	Warning 58, "Unsafe nested CONST qualification", is enabled by default. Adding a deeper ##Const## through writable pointer storage can let another alias install a pointer to read-only data into a slot the caller still treats as writable. Each intervening target pointer must also be const. ##ByRef## arguments, reference declarations and array parameters include their extra storage indirection; ordinary pointer values and fresh argument temporaries do not. The check covers selected arguments, assignments and initializers without changing overload ranking or the behavior of real aliases. A read-only reference can use ##ByRef value As Const Payload Const Ptr##; a value parameter can avoid sharing the pointer slot entirely. ##-w none## suppresses the diagnostic and ##-w error## promotes it like other warnings.
 	
 	##-w none##, or a significantly high ##//level//## value will have the effect of suppressing all warning messages.
 
 	##fbc## does not issue warning or error if the warning name itself is not valid.  For example ##-w flarg##, is not a recognized name for a warning.  The compiler silently ignores this to allow command lines with warnings added in new versions of ##fbc## to also be used with older versions of ##fbc## without complaint.
 
 {{fbdoc item="ver"}}
+	- Since fbc 1.20.5: unsafe nested pointer qualification is diagnosed independently of the selected backend.
 	- Since fbc 1.20.5: fixed-range integer comparison diagnostics, including typed pointer dereferences, are reported independently of the selected backend.
 	- Since fbc 1.10.0: '-w upcast' option
 	- Since fbc 1.09.0: '-w error' option.
