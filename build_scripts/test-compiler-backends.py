@@ -254,6 +254,20 @@ def main() -> int:
                   debug_parameters.stdout + debug_parameters.stderr)
             return 1
         print(debug_parameters.stdout.strip())
+        debug_locals_command = [
+            sys.executable, '-B',
+            str(root / 'tests/compiler-support/c-debug-local-storage.py'),
+            '--fbc', str(options.fbc.resolve()), '--prefix', str(toolchain_prefix),
+            '--gcc', os.environ.get('GCC') or 'gcc', '--work-dir', str(working)]
+        if clang:
+            debug_locals_command += ['--clang', clang]
+        debug_locals = subprocess.run(debug_locals_command, cwd=root,
+                                     text=True, capture_output=True, check=False)
+        if debug_locals.returncode:
+            print('debug local-storage regression failed\n' +
+                  debug_locals.stdout + debug_locals.stderr)
+            return 1
+        print(debug_locals.stdout.strip())
         # Test the C parser directly so stale installed runtime archives cannot
         # conceal a missing CRT API or a loss of native long-double precision.
         locale_test = working / ("longdouble-locale.exe" if os.name == "nt"

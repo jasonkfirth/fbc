@@ -7,6 +7,8 @@ Add debug information, define ##""__FB_DEBUG__""##, and enable asserts
 {{fbdoc item="desc"}}
 	The ##**-g**## compiler option inserts debugging symbols into output files, to use with GDB-compatible debuggers.
 
+	The C backends retain named parameters and automatic scalar/record local declarations and writes for debugging. For analyzed bodies, these do not produce duplicate native unused-storage warnings. Opaque assembly retains conservative behavior. FreeBASIC's unread-parameter and unread-variable warnings retain their normal behavior under ##[[CompilerOptw|-w all]]##. Optimization can still make individual values unavailable to the debugger.
+
 	With the C backends, private source entries retained solely for debugging also keep native code under optimization. Debug objects can be larger because these source entries remain executable. This does not retain unused compiler-generated default members or internal read-only implementations.
 	
 	The intrinsic macro ##[[KeyPgDdfbdebug|__FB_DEBUG__]]## is set to non-zero (-1) if the option was specified, and set to zero (0) otherwise.

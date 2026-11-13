@@ -114,6 +114,15 @@ Semantic definition headers wait for that decision even when the procedure has
 no arguments, so exported headers match the actual C definition.
 Optimized debug objects can grow because debugger-only entries now have code.
 
+`backend/c/c-debug-locals.bi` records local reads in the reachable optimized AST,
+including hidden call storage and address escapes. Unread named debug locals
+keep declarations and stores, with an unevaluated address-size enum on the same
+line. Compiler-owned scratch from a discarded `TYPEOF` can instead be omitted
+when no statement or lifetime code uses it. The hash owns its keys and borrows
+procedure symbols until cleanup. Source warnings and opaque-assembly behavior
+remain unchanged. See [unread debug storage](../c-emitter-debug-locals.md) and
+[the regression](../../tests/compiler-support/c-debug-local-storage.bas).
+
 `tooling` records facts selected by the compiler. Its observers must obtain
 identities, types and source ranges before the corresponding compiler storage
 is released. It must not reparse text to invent a competing interpretation.

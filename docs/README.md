@@ -8,6 +8,9 @@ language reference.
 
 ## Start here
 
+- [Unread debug storage](c-emitter-debug-locals.md) explains preserved source
+  locals, discarded TYPEOF scratch and unchanged source/data-flow diagnostics.
+
 - [Debug parameters and private bodies](c-emitter-debug-parameters.md) records
   named formal storage, executable private debug entries, preserved source
   warnings and the original-flags native rechecks.

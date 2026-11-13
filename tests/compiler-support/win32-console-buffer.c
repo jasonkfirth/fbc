@@ -84,8 +84,14 @@ static void test_TTY( fb_ConHooks *, const char *, size_t, int );
 #define fb_ConPrintTTY test_TTY
 #define fb_ConPrintTTYWstr test_TTYWide
 #define __fb_con test_console
+#define fb_console_context test_console
 /* Keep the test's console state and lock bookkeeping independent of the
-   normal runtime's process-wide startup and real console handles. */
+   normal runtime's process-wide startup and real console handles. A native
+   C identifier can carry an explicit ABI label, which must not bind this
+   fixture's mock state to the runtime's real context. */
+#pragma push_macro("FB_C_SYMBOL")
+#undef FB_C_SYMBOL
+#define FB_C_SYMBOL(name)
 #ifdef ENABLE_MT
 #undef FB_LOCK
 #undef FB_UNLOCK
@@ -101,6 +107,7 @@ static void test_TTY( fb_ConHooks *, const char *, size_t, int );
 #endif
 #endif
 #include CONSOLE_BUFFER_IMPLEMENTATION
+#pragma pop_macro("FB_C_SYMBOL")
 
 #undef malloc
 #undef free

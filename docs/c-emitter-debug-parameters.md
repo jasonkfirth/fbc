@@ -8,6 +8,10 @@ This file does not claim complete corpus cleanup or installed promotion.
 
 # Ignored parameters in debug C
 
+The current development compiler also applies the
+[unread-local storage policy](c-emitter-debug-locals.md). The counts below record
+the preceding named-parameter and private-body compiler cuts.
+
 The retained cohort has 176 GCC unused-parameter observations across 43 debug
 profiles. Removing formal names, as the non-debug C23 path does, would lose
 debugger-visible arguments. FreeBASIC already reports unread source parameters

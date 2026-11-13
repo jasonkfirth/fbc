@@ -419,6 +419,7 @@ declare sub hCAbiRemoveDebugRetention(byval identifier as const zstring ptr)
 #include once "backend/c/c-generated-leaves.bi"
 #include once "backend/c/c-procedure-prototypes.bi"
 #include once "backend/c/c-abi-parameters.bi"
+#include once "backend/c/c-debug-locals.bi"
 #include once "backend/c/c-auto-descriptors.bi"
 declare function hCStaticArrayBacking(byval sym as FBSYMBOL ptr) as FBSYMBOL ptr
 declare function hCStaticScalarCandidate(byval sym as FBSYMBOL ptr) as integer
@@ -516,6 +517,7 @@ private sub _end( )
 	listEnd(@c_scalar_stores)
 	if( c_local_refs.list <> NULL ) then hashEnd(@c_local_refs)
 	if( c_debug_decls.list <> NULL ) then hashEnd(@c_debug_decls)
+	hCDebugLocalsClear()
 	''
 	'' Section buffers are retained while the compiler processes input modules so
 	'' later modules can reuse their capacity.  The backend owns these allocations
@@ -2070,6 +2072,7 @@ private sub hEmitVarDecl _
 	end if
 	'' C static initializers are constant data. Their declaration can precede
 	'' statements; BASIC runtime initialization remains in the emitted body.
+	ln += hCDebugLocalAcknowledgement(sym, identifier)
 	if( (varini = NULL) orelse static_storage ) then
 		hWriteDeclaration( ln )
 	else
@@ -2111,6 +2114,7 @@ end sub
 private sub hClearCLocalReferences( )
 	if( c_local_refs.list <> NULL ) then hashEnd(@c_local_refs)
 	if( c_debug_decls.list <> NULL ) then hashEnd(@c_debug_decls)
+	hCDebugLocalsClear()
 end sub
 
 private sub hMarkReferencedLocalInTree( byval n as ASTNODE ptr )
@@ -2170,6 +2174,7 @@ private sub hMarkReferencedCStatement( byval n as ASTNODE ptr, byref fallthrough
 	'' C flushing discards executable children of unreachable declarations.
 	'' Only their lexical scope survives, so those children cannot keep storage.
 	if( fallthrough = FALSE ) then exit sub
+	hCDebugLocalReads(n)
 	hMarkReferencedLocalInTree(n)
 	if( astCStatementEndsFlow(n) ) then fallthrough = FALSE
 end sub
@@ -2220,7 +2225,9 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	'' source name for the debugger. User implicit declarations do not carry
 	'' FB_SYMBSTATS_IMPLICIT; that flag identifies compiler-owned storage.
 	'' Omit its storage only when the complete statement scan found no use
-	'' and neither inline assembly nor object lifetime can require it.
+	'' and inline assembly cannot hide a use. Constructor/destructor type flags
+	'' alone do not create an instance: TYPEOF discards its calls and dtors.
+	'' Actual construction, cleanup and hidden return slots are indexed above.
 	'' Reachable string initialization, copyback and cleanup are indexed
 	'' as uses above. An unreachable string temporary has no lifetime to run.
 	if( env.clopt.debuginfo andalso (ctx.computedgotoopaque = FALSE) andalso _
@@ -2229,8 +2236,7 @@ private sub hMaybeEmitLocalVar( byval sym as FBSYMBOL ptr )
 	    (symbIsRef(sym) = FALSE) andalso _
 	    (hHasCLocalReference(sym) = FALSE) andalso (symbGetTypeIniTree(sym) = NULL) andalso _
 	    ((symbGetAttrib(sym) and FB_SYMBATTRIB_FUNCRESULT) = 0) andalso _
-	    (symbGetArrayDimensions(sym) = 0) andalso _
-	    (symbHasCtor(sym) = FALSE) andalso (symbHasDtor(sym) = FALSE) ) then
+	    (symbGetArrayDimensions(sym) = 0) ) then
 		if( symbGetType(sym) = FB_DATATYPE_STRUCT ) then hEmitUDT(symbGetSubtype(sym), FALSE)
 		exit sub
 	end if
