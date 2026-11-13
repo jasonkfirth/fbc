@@ -39,9 +39,18 @@ end function
 #ifdef DEBUG_OPAQUE_CONTROL
 private sub opaqueDebug(byval opaqueValue as long)
 	'' General assembly may name formal storage outside typed IR references.
+	'' C targets outside Intel syntax require GCC-style quoted assembly.
+	#ifdef __FB_X86__
+		#if __FB_ASM__ = "intel"
 	asm
 		nop
 	end asm
+		#else
+	asm "nop"
+		#endif
+	#else
+	asm "nop"
+	#endif
 end sub
 opaqueDebug(1)
 #endif

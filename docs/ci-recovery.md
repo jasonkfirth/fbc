@@ -174,6 +174,29 @@ The ARM64 failure artifact also retains this test's executable and both native
 objects for debugging. No test is skipped, retried until successful or made
 optional.
 
+## Native debug regression portability
+
+Run `43363665023` exposed two test assumptions after successful native builds.
+The Win32 private debug entry existed as `_DORMANTDEBUGBODY@4`, but the test
+recognized only an undecorated function name. The entry check now reads the
+explicit assembler identity from the generated C declaration and requires an
+actual assembly label. Debug strings and symbol declarations cannot satisfy
+the check. Unaliased entries still accept the platform's leading underscore.
+
+The macOS ARM64 opaque-local control used bare `nop`, which belongs to the
+Intel-style BASIC assembly syntax. Non-Intel C targets require the quoted
+GCC-style assembly string. Both debug fixtures now select the appropriate
+syntax, including x86 builds explicitly using AT&T syntax. The opaque controls
+must first compile successfully with native warnings enabled. A second build
+promotes the required unused-value diagnostic to an error and must fail with
+that diagnostic. Syntax or assembler errors cannot substitute for this check;
+unexpected diagnostic failures include the native output in the CI log.
+
+Local GCC/Clang execution, Win32 optimized assembly and Darwin ARM64 object
+checks cover the repaired assumptions. Foreign objects are not executed, and
+these checks do not establish a native Windows ARM64 aggregate-varargs fix.
+No warning is suppressed, test is skipped or failed build is made optional.
+
 ## Checking exactly what will be committed
 
 Local drafts can conceal missing links. The source checker can read an immutable

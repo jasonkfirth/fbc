@@ -12,7 +12,7 @@ import re
 import subprocess
 import tempfile
 
-from native_c_support import native_command, native_machine_flags
+from native_c_support import has_assembly_function, native_command, native_machine_flags
 
 
 def main():
@@ -93,8 +93,7 @@ def main():
                         run([compiler, *flags, '-c', cpp, '-o', obj])
                         if optimization == '2':
                             run([compiler, *flags, '-S', cpp, '-o', assembly])
-                            if not re.search(r'^_?DORMANTDEBUGBODY:',
-                                             assembly.read_text(), re.MULTILINE):
+                            if not has_assembly_function(generated, assembly.read_text(), retained[0]):
                                 raise RuntimeError('Native optimizer discarded the private debug entry')
                             native_entries += 1
                         run([args.fbc, '-prefix', args.prefix, '-g', obj, '-x', exe])
@@ -130,11 +129,14 @@ def main():
             if any('OPAQUEVALUE' in name for name in marker.findall(opaque)):
                 raise RuntimeError('General assembly lost its conservative boundary')
             for _, compiler in tools:
-                diagnostic = run([compiler, *machine_flags, '-std=gnu23', '-nostdinc', '-g', '-Wall',
-                                  '-Wextra', '-Werror=unused-parameter', '-c', cpp, '-o', obj],
-                                 success=False)
+                native_control = [compiler, *machine_flags, '-std=gnu23', '-nostdinc', '-g',
+                                  '-Wall', '-Wextra', '-c', cpp, '-o', obj]
+                # First prove that this is valid target assembly. A syntax
+                # error must not satisfy an expected warning failure.
+                run(native_control)
+                diagnostic = run([*native_control, '-Werror=unused-parameter'], success=False)
                 if 'OPAQUEVALUE' not in diagnostic or 'unused-parameter' not in diagnostic:
-                    raise RuntimeError('Opaque unused-parameter control lost its diagnostic')
+                    raise RuntimeError('Opaque unused-parameter control lost its diagnostic\n' + diagnostic)
                 controls += 1
     print(f'C_DEBUG_UNUSED_PARAMETERS_PASS native_values={values} '
           f'exact_debug_C_pairs={comparisons} opaque_controls={controls} '

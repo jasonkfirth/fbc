@@ -2,7 +2,8 @@
 File: native_c_support.py
 Purpose: Select native C dialects, diagnostic spellings and ABI machine modes.
 Responsibilities: Probe capabilities without assuming that a command named gcc
-is GNU GCC, match BASIC pointer widths, and keep GNU LTO checks separate.
+is GNU GCC, match BASIC pointer widths and assembler identities, and keep
+GNU LTO checks separate.
 This file intentionally does NOT suppress warnings or weaken language modes.
 """
 from functools import lru_cache
@@ -74,5 +75,17 @@ def native_command(command):
             equivalent = {'-Wcast-align=strict': '-Wcast-align', '-Warray-bounds=2': '-Warray-bounds'}
             command = [equivalent.get(flag, flag) for flag in command]
     return command
+
+
+def has_assembly_function(generated, assembly, name):
+    # FBC can give a C identifier an explicit assembler identity. In
+    # particular, Win32 stdcall adds both an underscore and an argument-byte
+    # suffix. Inspect that identity, not debug strings containing the name.
+    alias = re.search(r'\b' + re.escape(name) +
+                      r'\([^;\n]*\)\s+__asm__\("([^"\n]+)"\);', generated)
+    label = re.escape(alias.group(1)) if alias else '_?' + re.escape(name)
+    return re.search(r'^\s*(?:' + label + '|"' + label + r'"):\s*(?:[#;].*)?$',
+                     assembly, re.MULTILINE) is not None
+
 
 # end of native_c_support.py

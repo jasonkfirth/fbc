@@ -52,9 +52,18 @@ private sub exerciseDebugLocals()
 	dim queriedOwner as typeof(makeLocalOwner)
 	localInteger = localValue()
 #ifdef DEBUG_OPAQUE_LOCAL_CONTROL
+	'' Non-x86 C targets use GCC-style quoted assembly rather than Intel syntax.
+	#ifdef __FB_X86__
+		#if __FB_ASM__ = "intel"
 	asm
 		nop
 	end asm
+		#else
+	asm "nop"
+		#endif
+	#else
+	asm "nop"
+	#endif
 #endif
 	debugLocalCheckpoint()
 end sub

@@ -120,11 +120,15 @@ def main():
             if marker.search(cpp.read_text(encoding='utf-8')):
                 raise RuntimeError('Opaque assembly lost its conservative local-storage boundary')
             for _, compiler in tools:
-                diagnostic = run([compiler, *machine, '-std=gnu23', '-nostdinc', '-g',
-                                  '-Wall', '-Wextra', '-Werror=unused-variable',
-                                  '-Werror=unused-but-set-variable', '-c', cpp, '-o', obj], success=False)
+                native_control = [compiler, *machine, '-std=gnu23', '-nostdinc', '-g',
+                                  '-Wall', '-Wextra', '-c', cpp, '-o', obj]
+                # Keep syntax/assembler failures separate from the required
+                # unused-local diagnostic, including on non-x86 targets.
+                run(native_control)
+                diagnostic = run([*native_control, '-Werror=unused-variable',
+                                  '-Werror=unused-but-set-variable'], success=False)
                 if 'LOCALINTEGER' not in diagnostic or 'unused-but-set-variable' not in diagnostic:
-                    raise RuntimeError('Opaque local control lost its native diagnostic')
+                    raise RuntimeError('Opaque local control lost its native diagnostic\n' + diagnostic)
                 controls += 1
             # Cross-target object checks exercise the hidden aggregate result
             # slots without claiming that those objects were executed.

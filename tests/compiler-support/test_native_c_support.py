@@ -1,7 +1,8 @@
 """Project: FreeBASIC native C regression tests
 File: test_native_c_support.py
 Purpose: Protect the tool capability boundaries used by hosted CI.
-Responsibilities: Exercise C23 spellings, BASIC pointer widths and Clang aliases.
+Responsibilities: Exercise C23 spellings, BASIC pointer widths, Clang aliases
+and exact assembler entry labels.
 This file intentionally does NOT compile fixtures or change diagnostic policy.
 """
 import subprocess
@@ -9,7 +10,8 @@ import sys
 import unittest
 from unittest.mock import patch
 from native_c_support import (c23_standard, is_gnu_compiler, native_command,
-                              native_machine_flags, resolve_executable)
+                              native_machine_flags, resolve_executable,
+                              has_assembly_function)
 
 
 class NativeCompilerContracts(unittest.TestCase):
@@ -71,6 +73,21 @@ class NativeCompilerContracts(unittest.TestCase):
             self.assertIn('-Warray-bounds', command)
             self.assertIn('-Werror=incompatible-pointer-types', command)
             self.assertFalse(any(flag.startswith('-Wno-') for flag in command))
+
+    def test_assembly_entry_uses_explicit_abi_identity(self):
+        generated = 'static int BODY(int) __asm__("_BODY@4");\n'
+        for assembly in ('_BODY@4:\n', '"_BODY@4": # @BODY\n'):
+            with self.subTest(assembly=assembly):
+                self.assertTrue(has_assembly_function(generated, assembly, 'BODY'))
+        for assembly in ('BODY:\n', '_BODY@8:\n', '_BODY@4_EXTRA:\n',
+                         '.ascii "_BODY@4"\n', '.def _BODY@4; .scl 3;\n'):
+            with self.subTest(assembly=assembly):
+                self.assertFalse(has_assembly_function(generated, assembly, 'BODY'))
+
+    def test_assembly_entry_without_an_explicit_alias(self):
+        for label in ('BODY', '_BODY'):
+            self.assertTrue(has_assembly_function('static int BODY(int);', label + ':\n', 'BODY'))
+        self.assertFalse(has_assembly_function('static int BODY(int);', 'OTHER_BODY:\n', 'BODY'))
 
 
 if __name__ == '__main__':
