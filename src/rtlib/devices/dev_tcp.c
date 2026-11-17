@@ -224,12 +224,15 @@ static int fb_hDevTcpSetFd(FB_TCP_SOCKET socket, fd_set *set)
 #else
 	if ((unsigned int)socket >= (unsigned int)FD_SETSIZE)
 		return FALSE;
-#if defined(HOST_OPENBSD)
-	/* OpenBSD's FD_SET helper takes a signed descriptor after this check. */
-	FD_SET((int)socket, set);
-#else
-	FD_SET((unsigned int)socket, set);
-#endif
+		/* FD_SET takes a signed descriptor, and the range check made this safe. */
+		#if defined(__GNUC__)
+		#pragma GCC diagnostic push
+		#pragma GCC diagnostic ignored "-Wsign-conversion"
+		#endif
+		FD_SET((int)socket, set);
+		#if defined(__GNUC__)
+		#pragma GCC diagnostic pop
+		#endif
 #endif
 	return TRUE;
 }
@@ -560,7 +563,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 		#else
 			struct timeval value;
 
-			value.tv_sec = timeout / 1000;
+			value.tv_sec = (time_t)(timeout / 1000u);
 			value.tv_usec = (int)((timeout % 1000u) * 1000u);
 
 			#if !defined(HOST_WII)
@@ -1548,7 +1551,7 @@ static void fb_hDevTcpAppendChunk( FBSTRING_ACCESS *dst, const char *buffer, ssi
 {
 	FBSTRING_ACCESS *src;
 
-	if( len <= 0 )
+	if( (len <= 0) || (len >= FB_STRSIZEMSK) )
 		return;
 
 	src = fb_StrAllocTempDescF( buffer, len + 1 );

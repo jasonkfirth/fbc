@@ -84,6 +84,8 @@
 		int old_rx_baud;
 		int old_tx_baud;
 		unsigned char read_ahead;
+		/* Keep the following int at its existing four-byte ABI offset. */
+		unsigned char read_ahead_padding[3];
 		int has_read_ahead;
 	} RISCOS_SERIAL_INFO;
 #endif

@@ -1374,13 +1374,13 @@ FBCALL FBSTRING_ACCESS *fb_hStrFormat
 	/* Lock to prevent inconsistent results if fb_I18nSet() called? */
 	FB_LOCK();
 	pszIntlResult = fb_IntlGet( eFIL_NumDecimalPoint, FALSE );
-	chDecimalPoint = (( pszIntlResult==NULL ) ? '.' : *pszIntlResult );
+	chDecimalPoint = (char)(( pszIntlResult==NULL ) ? '.' : *pszIntlResult );
 	pszIntlResult = fb_IntlGet( eFIL_NumThousandsSeparator, FALSE );
-	chThousandsSep = (( pszIntlResult==NULL ) ? ',' : *pszIntlResult );
+	chThousandsSep = (char)(( pszIntlResult==NULL ) ? ',' : *pszIntlResult );
 	pszIntlResult = fb_IntlGet( eFIL_DateDivider, FALSE );
-	chDateSep = (( pszIntlResult==NULL ) ? '/' : *pszIntlResult );
+	chDateSep = (char)(( pszIntlResult==NULL ) ? '/' : *pszIntlResult );
 	pszIntlResult = fb_IntlGet( eFIL_TimeDivider, FALSE );
-	chTimeSep = (( pszIntlResult==NULL ) ? ':' : *pszIntlResult );
+	chTimeSep = (char)(( pszIntlResult==NULL ) ? ':' : *pszIntlResult );
 	FB_UNLOCK();
 
 	if( chDecimalPoint==0 )

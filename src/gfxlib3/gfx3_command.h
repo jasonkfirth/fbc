@@ -28,6 +28,12 @@
 
 #include "fb_gfx3.h"
 
+/* Queue and completion records use their native ABI alignment. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
+
 #define FB_GFX3_COMMAND_MAX_SIZE (64u * 1024u * 1024u)
 
 /* Bound queued command allocations; one oversized command fits alone. */
@@ -134,6 +140,10 @@ typedef struct FB_GFX3_COMMAND_QUEUE {
 	unsigned char tail_padding[4];
 #endif
 } FB_GFX3_COMMAND_QUEUE;
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 FB_GFX3_COMMAND *fb_gfx3_command_create(uint32_t type, size_t payload_size);
 void fb_gfx3_command_destroy(FB_GFX3_COMMAND *command);

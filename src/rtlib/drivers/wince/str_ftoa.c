@@ -24,6 +24,7 @@
 #include "../../fb.h"
 
 #include <float.h>
+#include <math.h>
 
 /* ------------------------------------------------------------------------- */
 /* Decimal scaling helpers                                                   */
@@ -79,7 +80,7 @@ static int hUIntToStr( unsigned long long value, char *buffer )
 	}
 
 	while( value > 0 ) {
-		temp[len++] = '0' + (value % 10);
+		temp[len++] = (char)('0' + (int)(value % 10ULL));
 		value /= 10;
 	}
 
@@ -141,7 +142,7 @@ static char *hFloat2StrWince( double val,
 	if( mask & FB_F2A_ADDBLANK )
 		out++;
 
-	if( val != val ) {
+	if( isnan( val ) ) {
 		strcpy( out, "nan" );
 	} else {
 		if( val < 0.0 ) {
@@ -153,7 +154,7 @@ static char *hFloat2StrWince( double val,
 
 		if( abs_val > (long double)DBL_MAX ) {
 			strcpy( out, "inf" );
-		} else if( abs_val == 0.0L ) {
+		} else if( abs_val <= 0.0L ) {
 			strcpy( out, "0" );
 		} else {
 			long double normalized = abs_val;

@@ -75,14 +75,18 @@ typedef struct {
 #define CHARS_TRUE  ('t' << 24 | 'r' << 16 | 'u' << 8 | 'e')
 #define CHARS_FALSE (((uint64_t)'f') << 32 | 'a' << 24 | 'l' << 16 | 's' << 8 | 'e')
 
-#define ADD_CHAR( c )              \
-    do {                           \
-        DBG_ASSERT( p >= buffer ); \
-        if( p >= buffer )          \
-            *(p--) = (char)(c);    \
-        else if( p == buffer )     \
-            *p = CHAR_WTF;         \
-    } while (0)
+#define ADD_CHAR( c )                              \
+	do {                                               \
+		if( !output_buffer_full ) {                      \
+			buffer[output_position] = (char)(c);           \
+			if( output_position > 0 )                      \
+				--output_position;                           \
+			else                                           \
+				output_buffer_full = TRUE;                   \
+		} else {                                         \
+			output_overflowed = TRUE;                      \
+		}                                                \
+	} while( 0 )
 
 
 /*-------------------------------------------------------------*/
@@ -147,7 +151,11 @@ static void hPrintText( int fnum, const char *text, ssize_t length )
 {
 	FB_PRINTUSGCTX *ctx = FB_TLSGETCTX( PRINTUSG );
 	if( ctx->utf8 ) {
-		FBSTRING view = { (char *)text, length, length };
+		FBSTRING view;
+		/* fb_UStrPrint reads this non-owning view and does not modify its bytes. */
+		memcpy( &view.data, &text, sizeof( view.data ) );
+		view.len = length;
+		view.size = length;
 		fb_UStrPrint( fnum, &view, 0 );
 	} else fb_PrintFixString( fnum, text, 0 );
 }
@@ -163,10 +171,10 @@ static void hPrintField( int fnum, FBSTRING_ACCESS *source, ssize_t columns, int
 	FB_STRLOCK();
 	result = bytes <= FB_USTRING_MAX_BYTES - padding ? fb_hUStrAlloc_NoLock(bytes + padding) : NULL;
 	if( result != NULL && bytes + padding > 0 ) {
-		if( bytes ) memcpy(result->data, source->data, bytes);
+		if( bytes ) memcpy(result->data, source->data, (size_t)bytes);
 		/* Fixed fields retain BASIC's NUL-to-space convention. */
 		for( i = 0; i < bytes; ++i ) if( result->data[i] == 0 ) result->data[i] = ' ';
-		memset(result->data + bytes, ' ', padding);
+		memset(result->data + bytes, ' ', (size_t)padding);
 	}
 	FB_STRUNLOCK();
 	if( result != NULL ) {
@@ -257,7 +265,7 @@ static int hLog10_ULL( unsigned long long a )
 		a64 /= (int)1.E+8;
 		ret += 8;
 	}
-	a32 = a64;
+	a32 = (int)a64;
 	if( a32 >= (int)1.E+4 ) ret += 4; else a32 *= (int)1.E+4;
 	if( a32 >= (int)1.E+6 ) ret += 2; else a32 *= (int)1.E+2;
 	if( a32 >= (int)1.E+7 ) ret += 1;
@@ -367,6 +375,10 @@ static int fb_PrintUsingFmtStr( int fnum )
 				++ctx->ptr;
 				--ctx->chars;
 			}
+			break;
+
+		default:
+			break;
 		}
 
 		if( doexit )
@@ -441,7 +453,7 @@ static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicod
 				buffer[0] = ' ';
 
 			buffer[1] = '\0';
-			hPrintText( fnum, buffer, strlen(buffer) );
+			hPrintText( fnum, buffer, (ssize_t)strlen(buffer) );
 
 			++ctx->ptr;
 			--ctx->chars;
@@ -480,6 +492,9 @@ static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicod
 				doexit = FALSE;
 			}
 			break;
+
+		default:
+			break;
 		}
 
 		if( doexit )
@@ -493,7 +508,7 @@ static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicod
 	fb_PrintUsingFmtStr( fnum );
 
 	/**/
-	if( mask & FB_PRINT_ISLAST )
+	if( (unsigned int)mask & FB_PRINT_ISLAST )
 	{
 		if( mask & FB_PRINT_NEWLINE )
 			fb_PrintVoid( fnum, FB_PRINT_NEWLINE );
@@ -549,6 +564,9 @@ static int hPrintNumber
 	int intdigs2, expsignchar, totdigs, decpoint;
 	int isamp;
 	int i;
+	size_t output_position = BUFFERLEN;
+	int output_buffer_full = FALSE;
+	int output_overflowed = FALSE;
 	uint64_t chars = 0;
 
 	ctx = FB_TLSGETCTX( PRINTUSG );
@@ -881,7 +899,8 @@ static int hPrintNumber
 				intdigs = 1;
 				decdigs = val_digs - 1;
 
-				expdigs = 2 + hNumDigits( abs(val_digs + val_exp - 1) );
+				expdigs = 2 + hNumDigits(
+					(unsigned long long)abs(val_digs + val_exp - 1) );
 				if( expdigs < MIN_EXPDIGS + 1 )
 					expdigs = MIN_EXPDIGS;
 			}
@@ -1133,7 +1152,8 @@ static int hPrintNumber
 
 		if ( val_digs > 1 )
 		{
-			chars = CHARS_TRUNC >> (8 * (5 - val_digs));
+			chars = (uint64_t)((uint32_t)CHARS_TRUNC >>
+				(8u * (5u - (unsigned int)val_digs)));
 		}
 		else
 		{
@@ -1261,8 +1281,15 @@ static int hPrintNumber
 
 
 	/**/
-	++p;
-	hPrintText( fnum, p, strlen(p) );
+	if( output_overflowed ) {
+		buffer[0] = CHAR_WTF;
+		p = buffer;
+	} else if( output_buffer_full ) {
+		p = buffer;
+	} else {
+		p = &buffer[output_position + 1u];
+	}
+	hPrintText( fnum, p, (ssize_t)strlen(p) );
 
 	/* ------------------------------------------------------ */
 
@@ -1275,7 +1302,7 @@ static int hPrintNumber
 		fb_PrintVoid( fnum, mask & (FB_PRINT_NEWLINE | FB_PRINT_PAD) );
 	}
 
-	if( mask & FB_PRINT_ISLAST )
+	if( (unsigned int)mask & FB_PRINT_ISLAST )
 	{
 		fb_StrDelete( &ctx->fmtstr );
 		/* The final value can leave an unmatched field. The following
@@ -1332,7 +1359,7 @@ static unsigned long long hScaleDoubleToULL( double value, int *pval_exp )
 	int pow2, pow10;
 
 	val_ull = hDoubleToLongBits( value );
-	pow2 = (val_ull >> 52) - 1023;
+		pow2 = (int)(val_ull >> 52) - 1023;
 	val_ull &= (1ull << 52)-1;
 
 	if( pow2 > -1023 )
@@ -1485,12 +1512,12 @@ FBCALL int fb_PrintUsingLongint( int fnum, long long val_ll, int mask )
 	if( val_ll < 0 )
 	{
 		flags = VAL_ISNEG;
-		val_ull = -val_ll;
+		val_ull = 0ull - (unsigned long long)val_ll;
 	}
 	else
 	{
 		flags = 0;
-		val_ull = val_ll;
+		val_ull = (unsigned long long)val_ll;
 	}
 
 	return hPrintNumber( fnum, val_ull, 0, flags, mask );

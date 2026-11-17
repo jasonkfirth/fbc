@@ -24,7 +24,12 @@
 */
 static int fb_hGfxControlFitsInt(ssize_t value)
 {
+#if defined(HOST_64BIT)
 	return (value >= INT_MIN) && (value <= INT_MAX);
+#else
+	(void)value;
+	return TRUE;
+#endif
 }
 
 static FBSTRING_ACCESS *fb_hGfxControlCreateTempDesc(const char *value)

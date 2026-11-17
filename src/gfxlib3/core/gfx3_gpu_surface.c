@@ -1377,7 +1377,7 @@ static void gpu_surface_fix_relative(FB_GFX3_DRAW_STATE *state,
 		*y1 += state->last_y;
 		if ((x2 == NULL) || (y2 == NULL))
 			break;
-		__attribute__((fallthrough));
+		/* fall through */
 	case FB_GFX3_COORDINATE_AR:
 		if ((x2 != NULL) && (y2 != NULL)) {
 			*x2 += *x1;

@@ -124,8 +124,15 @@ static __inline__ ssize_t fb_wstr_CalcDiff( const FB_WCHAR *ini, const FB_WCHAR 
 
 static __inline__ FB_WCHAR *fb_wstr_AllocTemp( ssize_t chars )
 {
-	/* plus the null-term */
-	return (FB_WCHAR *)malloc( (chars + 1) * sizeof( FB_WCHAR ) );
+	size_t character_count;
+
+	if( chars < 0 )
+		return NULL;
+	character_count = (size_t)chars;
+	if( character_count > (SIZE_MAX / sizeof( FB_WCHAR )) - 1u )
+		return NULL;
+	return (FB_WCHAR *)malloc(
+		(character_count + 1u) * sizeof( FB_WCHAR ) );
 }
 
 static __inline__ void fb_wstr_Del( FB_WCHAR *s )
@@ -150,7 +157,14 @@ static __inline__ ssize_t fb_wstr_Len( const FB_WCHAR *s )
 		} while( TRUE );
 	}
 	/* without the null-term */
-	return wcslen( s );
+	{
+		size_t length = wcslen( s );
+		size_t ssize_max = ((size_t)-1) >> 1;
+
+		if( length > ssize_max )
+			return -1;
+		return (ssize_t)length;
+	}
 }
 
 ssize_t fb_wstr_ConvFromA( FB_WCHAR *dst, ssize_t dst_chars, const char *src );
@@ -180,7 +194,8 @@ static __inline__ FB_WCHAR fb_wstr_ToUpper( FB_WCHAR c )
 static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t chars )
 {
 	if( (src != NULL) && (chars > 0) )
-		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
+		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src,
+			(size_t)chars * sizeof( FB_WCHAR ) );
 
 	/* The destination may be a packed field, so do not dereference it. */
 	const FB_WCHAR terminator = FB_WCHAR_LITERAL('\0');
@@ -190,8 +205,10 @@ static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t
 /* Copy n characters from A to B. */
 static __inline__ FB_WCHAR *fb_wstr_Move( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t chars )
 {
-	if( chars > 0 )
-		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, chars * sizeof( FB_WCHAR ) );
+	if( chars <= 0 )
+		return dst;
+	dst = (FB_WCHAR *) FB_MEMCPYX( dst, src,
+		(size_t)chars * sizeof( FB_WCHAR ) );
 
 	return dst;
 }
@@ -275,7 +292,9 @@ static __inline__ int fb_wstr_Compare( const FB_WCHAR *str1, const FB_WCHAR *str
 		}
 		return 0;
 	}
-	return wcsncmp( str1, str2, chars );
+	if( chars <= 0 )
+		return 0;
+	return wcsncmp( str1, str2, (size_t)chars );
 }
 
 /* end of drivers/riscos/fb_unicode.h */

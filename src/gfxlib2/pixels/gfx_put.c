@@ -31,6 +31,9 @@ static void fb_hPutAlphaMask(unsigned char *src, unsigned char *dest, int w, int
 	fb_put_u32_unaligned *d;
 	unsigned int dc, sc;
 	int x;
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 #ifdef FB_GFX_HAS_SIMD
 	if (fb_hSimdAvailable()) {

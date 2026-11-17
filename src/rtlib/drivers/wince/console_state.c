@@ -131,9 +131,9 @@ int fb_hWinCEConsoleResize( int columns, int rows )
 
 		hFillCells( replacement[page], count );
 		for( row = 0; row < copy_rows; ++row ) {
-			memcpy( replacement[page] + ((size_t)row * columns),
+			memcpy( replacement[page] + ((size_t)row * (size_t)columns),
 			        fb_console_context.pages[page].cells +
-			            ((size_t)row * fb_console_context.columns),
+			            ((size_t)row * (size_t)fb_console_context.columns),
 			        (size_t)copy_columns * sizeof(FB_WINCE_CONSOLE_CELL) );
 		}
 	}
@@ -176,7 +176,8 @@ FB_WINCE_CONSOLE_CELL *fb_hWinCEConsoleCell( int page, int column, int row )
 		return NULL;
 
 	return fb_console_context.pages[page].cells +
-	       ((size_t)row * fb_console_context.columns) + column;
+	       ((size_t)row * (size_t)fb_console_context.columns) +
+	       (size_t)column;
 }
 
 static int hClipRegion( int *left, int *top, int *right, int *bottom )
@@ -238,8 +239,10 @@ void fb_hWinCEConsoleScrollRegion( int page, int left, int top, int right,
 	line_bytes = (size_t)(right - left + 1) *
 	             sizeof(FB_WINCE_CONSOLE_CELL);
 	for( row = top; row <= (bottom - rows); ++row ) {
-		memmove( cells + ((size_t)row * fb_console_context.columns) + left,
-		         cells + ((size_t)(row + rows) * fb_console_context.columns) + left,
+		memmove( cells + ((size_t)row * (size_t)fb_console_context.columns) +
+		         (size_t)left,
+		         cells + ((size_t)(row + rows) *
+		         (size_t)fb_console_context.columns) + (size_t)left,
 		         line_bytes );
 	}
 

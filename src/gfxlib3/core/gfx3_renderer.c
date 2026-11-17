@@ -109,6 +109,11 @@
 #define FB_GFX3_PROFILE_COMMAND_SLOTS 32u
 #define FB_GFX3_PROFILE_INTERVAL_SECONDS 1.0
 
+/* Counters retain natural alignment without changing the renderer profile ABI. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_GFX3_RENDER_PROFILE {
 	uint64_t command_count[FB_GFX3_PROFILE_COMMAND_SLOTS];
 	uint64_t commands;
@@ -133,6 +138,9 @@ typedef struct FB_GFX3_RENDER_PROFILE {
 	unsigned char tail_padding[4];
 #endif
 } FB_GFX3_RENDER_PROFILE;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /* ------------------------------------------------------------------------- */
 /* Render-thread execution                                                   */

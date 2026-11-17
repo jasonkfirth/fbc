@@ -26,6 +26,12 @@
 #define FB_GFX3_COMPAT_H
 
 #include "gfx3_context.h"
+
+/* The compatibility state mirrors the legacy graphics context's ABI layout. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 #include "gfx3_input.h"
 
 enum FB_GFX3_COORDINATE_TYPE {
@@ -200,6 +206,10 @@ typedef struct FB_GFX3_DRAW_STATE {
 	float draw_scale;
 	int draw_angle;
 } FB_GFX3_DRAW_STATE;
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 int fb_gfx3_mode_init(FB_GFX3_MODE *mode,
 	const FB_GFX3_CONTEXT_CONFIG *config, uint32_t clear_color);

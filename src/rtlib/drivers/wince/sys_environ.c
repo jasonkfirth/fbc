@@ -191,6 +191,7 @@ FBCALL FBSTRING_ACCESS *fb_GetEnviron( FBSTRING_ACCESS *varname )
 	FBSTRING_ACCESS *result;
 	const char *value;
 	ssize_t length;
+	size_t value_bytes;
 
 	FB_LOCK();
 
@@ -202,12 +203,17 @@ FBCALL FBSTRING_ACCESS *fb_GetEnviron( FBSTRING_ACCESS *varname )
 	FB_STRLOCK();
 
 	if( value != NULL ) {
-		length = strlen( value );
-		result = fb_hStrAllocTemp_NoLock( NULL, length );
-		if( result != NULL )
-			fb_hStrCopy( result->data, value, length );
-		else
+		value_bytes = strlen( value );
+		if( value_bytes > (size_t)FB_STRSIZEMSK ) {
 			result = &fb_ctx.null_desc;
+		} else {
+			length = (ssize_t)value_bytes;
+			result = fb_hStrAllocTemp_NoLock( NULL, length );
+			if( result != NULL )
+				fb_hStrCopy( result->data, value, length );
+			else
+				result = &fb_ctx.null_desc;
+		}
 	} else {
 		result = &fb_ctx.null_desc;
 	}

@@ -32,12 +32,19 @@ int fb_ConsolePageCopy( int source, int destination )
 		destination = fb_console_context.visible;
 	if( source == destination )
 		return fb_ErrorSetNum( FB_RTERROR_OK );
+	if( (fb_console_context.columns <= 0) ||
+	    (fb_console_context.rows <= 0) ||
+	    ((size_t)fb_console_context.columns >
+	     (SIZE_MAX / (size_t)fb_console_context.rows /
+	     sizeof(FB_WINCE_CONSOLE_CELL))) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
 	if( !fb_hWinCEConsoleEnsurePage( source ) ||
 	    !fb_hWinCEConsoleEnsurePage( destination ) )
 		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
-	bytes = (size_t)fb_console_context.columns * fb_console_context.rows *
+	bytes = (size_t)fb_console_context.columns *
+		(size_t)fb_console_context.rows *
 	        sizeof(FB_WINCE_CONSOLE_CELL);
 	memcpy( fb_console_context.pages[destination].cells,
 	        fb_console_context.pages[source].cells, bytes );

@@ -28,6 +28,8 @@
         sfxlib mixer and audio-driver path.
 */
 
+#include "fb_sfx_internal.h"
+
 #if !defined(_WIN32) && \
     !defined(__CYGWIN__) && \
     !defined(__DJGPP__) && \

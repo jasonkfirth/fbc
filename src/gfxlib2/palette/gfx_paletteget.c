@@ -23,11 +23,11 @@ FBCALL void fb_GfxPaletteGet(int index, int *r, int *g, int *b)
 	index &= (fb_gfx->default_palette->colors - 1);
 	color = fb_gfx->device_palette[index];
 	if (!g) {
-		*r = (color & 0xFCFCFC) >> 2;
+		*r = (int)((color & 0x00FCFCFCu) >> 2);
 	} else {
-		*r = color & 0xFF;
-		*g = (color & 0xFF00) >> 8;
-		*b = (color & 0xFF0000) >> 16;
+		*r = (int)(color & 0xFFu);
+		*g = (int)((color & 0xFF00u) >> 8);
+		*b = (int)((color & 0xFF0000u) >> 16);
 	}
 
 	FB_GRAPHICS_UNLOCK( );

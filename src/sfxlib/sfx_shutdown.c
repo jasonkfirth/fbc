@@ -59,7 +59,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc23-extensions"
 #pragma clang diagnostic ignored "-Wsign-conversion"
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && \
+	((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 8)))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -67,7 +68,8 @@
 #include "../rtlib/fb.h"
 #if defined(__clang__)
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && \
+	((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 8)))
 #pragma GCC diagnostic pop
 #endif
 

@@ -68,7 +68,7 @@ void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned
 			rot = (~rot) + y2 - y1;
 			SWAP(y1, y2);
 		}
-		bit = 0x8000 >> (rot & 0xF);
+		bit = 0x8000u >> (rot & 0xF);
 
 		for (y = y1; y <= y2; y++) {
 			if (style & bit)
@@ -92,7 +92,7 @@ void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned
 			rot = (~rot) + x2 - x1;
 			SWAP(x1, x2);
 		}
-		bit = 0x8000 >> (rot & 0xF );
+		bit = 0x8000u >> (rot & 0xF );
 
 		if (style == 0xFFFF)
 			context->pixel_set(context->line[y1] + (x1 * context->target_bpp),
@@ -154,7 +154,7 @@ void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned
 				if ((x < xmin) || (x > xmax))
 					goto done;
 			}
-			bit = 0x8000 >> (rot & 0xF);
+			bit = 0x8000u >> (rot & 0xF);
 			y1 = y; /* first dirty row */
 
 			while ((x != x2) && (y != y2)) {
@@ -186,7 +186,7 @@ void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned
 				if ((y < ymin) || (y > ymax))
 					goto done;
 			}
-			bit = 0x8000 >> (rot & 0xF);
+			bit = 0x8000u >> (rot & 0xF);
 			y1 = y; /* first dirty row */
 
 			while ((y != y2) && (x != x2)) {

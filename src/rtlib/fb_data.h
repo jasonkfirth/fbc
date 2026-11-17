@@ -10,6 +10,12 @@
 #define FB_DATADESC_PACKED FBPACKED
 #endif
 
+/* The two-byte DATA header is followed immediately by its pointer/offset union. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpacked"
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
 struct FB_DATADESC_ {
 	short 					len;
 	union {
@@ -19,6 +25,9 @@ struct FB_DATADESC_ {
 		struct FB_DATADESC_ *next;
 	};
 } FB_DATADESC_PACKED;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 typedef struct FB_DATADESC_ FB_DATADESC;
 

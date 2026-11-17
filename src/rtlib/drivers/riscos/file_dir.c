@@ -95,7 +95,7 @@ static int get_attrib(char *name, struct stat *information)
     */
 
     if (!S_ISDIR(information->st_mode) &&
-        (information->st_mode & mask) == 0)
+        (information->st_mode & (mode_t)mask) == 0)
     {
         attrib |= 0x1;
     }
@@ -358,8 +358,8 @@ FBCALL FBSTRING_ACCESS *fb_Dir(FBSTRING_ACCESS *filespec, int attrib, int *out_a
                 length = (separator - filespec->data) + 1;
                 if (length > MAX_PATH - 1)
                     length = MAX_PATH - 1;
-                memcpy(context->dirname, filespec->data, length);
-                context->dirname[length] = '\0';
+                memcpy(context->dirname, filespec->data, (size_t)length);
+                context->dirname[(size_t)length] = '\0';
             }
             else
             {
@@ -415,7 +415,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir(FBSTRING_ACCESS *filespec, int attrib, int *out_a
 
     if (name)
     {
-        length = strlen(name);
+        length = (ssize_t)strlen(name);
         result = fb_hStrAllocTemp_NoLock(NULL, length);
         if (result)
             fb_hStrCopy(result->data, name, length);

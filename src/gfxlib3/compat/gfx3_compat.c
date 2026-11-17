@@ -29,7 +29,7 @@
 
 #include <math.h>
 #include <stdint.h>
-#include <stdatomic.h>
+#include "../gfx3_atomic.h"
 
 /*
 	A 131072-entry stream substantially reduces GPU submission overhead for a
@@ -1389,7 +1389,7 @@ static void compat_fix_relative(FB_GFX3_DRAW_STATE *state, uint32_t flags,
 		*y1 += state->last_y;
 		if ((x2 == NULL) || (y2 == NULL))
 			break;
-		__attribute__((fallthrough));
+		/* fall through */
 	case FB_GFX3_COORDINATE_AR:
 		if ((x2 != NULL) && (y2 != NULL)) {
 			*x2 += *x1;

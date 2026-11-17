@@ -16,7 +16,7 @@
 static __inline__ unsigned char fb_hStrFoldASCII( unsigned char ch )
 {
 	if( ch >= 'A' && ch <= 'Z' )
-		ch += 'a' - 'A';
+		ch = (unsigned char)((unsigned int)ch + ('a' - 'A'));
 	return ch;
 }
 

@@ -456,7 +456,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 	if (bfOffBits == 0) {
 		bfOffBits = biSize + 14;
 		if (biBitCount <= 8) {
-			bfOffBits += (1 << biBitCount);
+			bfOffBits += (1u << biBitCount);
 		}
 	}
 

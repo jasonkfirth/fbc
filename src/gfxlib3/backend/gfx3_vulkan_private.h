@@ -8,6 +8,12 @@
 #ifndef FB_GFX3_VULKAN_PRIVATE_H
 #define FB_GFX3_VULKAN_PRIVATE_H
 
+/* Vulkan records must preserve native 64-bit ABI alignment and field offsets. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
+
 #include "../gfx3_vulkan.h"
 #include "../gfx3_vulkan_platform.h"
 #include "../gfx3_presentation.h"
@@ -1461,6 +1467,11 @@ void fb_gfx3_vk_swapchain_destroy(
 	FB_GFX3_VULKAN_IMPLEMENTATION *implementation);
 
 #endif
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #endif
 
 /* end of gfx3_vulkan_private.h */

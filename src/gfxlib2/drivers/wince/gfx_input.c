@@ -253,6 +253,9 @@ LRESULT CALLBACK fb_winceGfxWindowProc(HWND window, UINT message,
             EndPaint(window, &paint);
             return 0;
         }
+
+        default:
+            break;
     }
 
     return DefWindowProcW(window, message, wparam, lparam);

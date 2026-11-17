@@ -124,8 +124,14 @@ FBCALL void fb_PrintSPC( int fnum, ssize_t n )
 			fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 			return;
 		}
-		if( (n > INT_MAX) || (n < INT_MIN) ||
-		    ((n > 0) && (col > INT_MAX - (int)n)) ||
+		#if defined(HOST_64BIT)
+		if( (n > INT_MAX) || (n < INT_MIN) ) {
+			FB_UNLOCK();
+			fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+			return;
+		}
+		#endif
+		if( ((n > 0) && (col > INT_MAX - (int)n)) ||
 		    ((n < 0) && (col < INT_MIN - (int)n)) ) {
 			FB_UNLOCK();
 			fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );

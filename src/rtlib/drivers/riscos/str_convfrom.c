@@ -253,7 +253,11 @@ FBCALL double fb_hStr2Double( char *src, ssize_t len )
 				break;
 			}
 
-			return fb_hStrRadix2Longint( p + skip, len - skip, radix );
+			{
+				long long integer_value = fb_hStrRadix2Longint(
+					p + skip, len - skip, radix );
+				return (double)integer_value;
+			}
 		}
 
 		/* FreeBASIC accepts &h for hexadecimal, not C's 0x spelling. */

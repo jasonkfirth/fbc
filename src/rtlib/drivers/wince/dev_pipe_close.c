@@ -21,6 +21,7 @@
 
 int fb_DevPipeClose( FB_FILE *handle )
 {
+	(void)handle;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 }
 

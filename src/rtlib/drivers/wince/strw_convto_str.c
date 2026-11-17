@@ -20,6 +20,8 @@
 
 #include "../../fb.h"
 
+#include <limits.h>
+
 static ssize_t hFallbackConvToA( char *dst, ssize_t dst_chars, const FB_WCHAR *src )
 {
 	char *origdst = dst;
@@ -33,7 +35,7 @@ static ssize_t hFallbackConvToA( char *dst, ssize_t dst_chars, const FB_WCHAR *s
 		if( c > 127 )
 			c = '?';
 
-		*dst++ = c;
+		*dst++ = (char)c;
 	}
 	*dst = '\0';
 	return dst - origdst;
@@ -60,7 +62,7 @@ static ssize_t hFitUTF8Prefix( const char *src, ssize_t limit )
 		else
 			return used;
 
-		if( used + chlen > limit )
+		if( chlen > (limit - used) )
 			break;
 
 		for( i = 1; i < chlen; i++ )
@@ -142,6 +144,11 @@ ssize_t fb_wstr_ConvToA( char *dst, ssize_t dst_chars, const FB_WCHAR *src )
 	utf8 = fb_WCharToUTF( FB_FILE_ENCOD_UTF8, src, chars, NULL, &bytes );
 	if( utf8 == NULL )
 		return hFallbackConvToA( origdst, dst_chars, src );
+	if( bytes < 0 ) {
+		free( utf8 );
+		*dst = '\0';
+		return 0;
+	}
 
 	if( bytes >= dst_chars )
 	{
@@ -155,14 +162,14 @@ ssize_t fb_wstr_ConvToA( char *dst, ssize_t dst_chars, const FB_WCHAR *src )
 			return 1;
 		}
 
-		memcpy( dst, utf8, copy_len );
+		memcpy( dst, utf8, (size_t)copy_len );
 		origdst[copy_len] = '\0';
 		free( utf8 );
 		return copy_len;
 	}
 
-	memcpy( dst, utf8, bytes );
-	dst[bytes] = '\0';
+	memcpy( dst, utf8, (size_t)bytes );
+	dst[(size_t)bytes] = '\0';
 	free( utf8 );
 	return bytes;
 }
@@ -179,6 +186,8 @@ FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )
 	chars = fb_wstr_Len( src );
 	if( chars == 0 )
 		return &fb_ctx.null_desc;
+	if( chars > ((ssize_t)FB_STRSIZEMSK / 4) )
+		return &fb_ctx.null_desc;
 
 	/* Worst case is up to 4 UTF-8 bytes per wide character. */
 	dst = fb_hStrAllocTemp( NULL, chars * 4 );
@@ -186,7 +195,7 @@ FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )
 		return &fb_ctx.null_desc;
 
 	bytes = fb_wstr_ConvToA( dst->data, chars * 4, src );
-	fb_hStrSetLength( dst, bytes );
+	fb_hStrSetLength( dst, (size_t)bytes );
 
 	if( bytes == 0 )
 	{

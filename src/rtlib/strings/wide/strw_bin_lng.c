@@ -34,11 +34,12 @@ FBCALL FB_WCHAR *fb_WstrBinEx_l ( unsigned long long num, int digits )
 	i = (unsigned int)digits;
 	while( i > 0 ) {
 		i -= 1;
-		s[i] = FB_WCHAR_LITERAL('0') + (num & 1); /* '0' or '1' */
+		s[i] = (FB_WCHAR)(FB_WCHAR_LITERAL('0') +
+			(unsigned int)(num & 1ULL)); /* '0' or '1' */
 		num >>= 1;
 	}
 
-	s[digits] = FB_WCHAR_LITERAL('\0');
+	s[digits] = (FB_WCHAR)FB_WCHAR_LITERAL('\0');
 	return s;
 }
 

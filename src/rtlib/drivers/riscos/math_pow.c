@@ -24,6 +24,11 @@
 
 extern double __ieee754_pow( double base, double exponent );
 
+/* Zero, integral exponents, and the resulting parity test are exact cases. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
 double pow( double base, double exponent )
 {
 	if( (base == 0.0) && (exponent < 0.0) ) {
@@ -37,5 +42,8 @@ double pow( double base, double exponent )
 
 	return __ieee754_pow( base, exponent );
 }
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /* end of drivers/riscos/math_pow.c */

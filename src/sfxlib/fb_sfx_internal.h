@@ -40,6 +40,10 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#if defined(_WIN32_WCE)
+#include "../rtlib/fb.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -54,8 +58,6 @@ extern "C" {
     so sfxlib must use the same wrapper for files named by BASIC programs.
 */
 #if defined(_WIN32_WCE)
-FILE *fb_hOpenFile(const char *path, const char *mode);
-const char *fb_hWinCEGetEnv(const char *name);
 #define fb_sfxOpenFile(path, mode) fb_hOpenFile(path, mode)
 #define fb_sfxGetEnv(name) fb_hWinCEGetEnv(name)
 #else

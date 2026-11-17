@@ -308,8 +308,10 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 					goto error;
 				if (value1 != FB_NAN) {
 					/* The integer rasterizer cannot represent a wider length. */
+				#if defined(HOST_64BIT)
 					if ((value1 < INT_MIN) || (value1 > INT_MAX))
 						goto error;
+				#endif
 					length = (int)value1;
 				}
 				else {

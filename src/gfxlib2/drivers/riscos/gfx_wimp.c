@@ -395,33 +395,35 @@ static int riscos_window_create_sprite_translation(void)
 static void riscos_window_convert_line_32(unsigned char *destination,
     const unsigned char *source, int width)
 {
-    unsigned int *output;
     int x;
 
-    output = (unsigned int *)destination;
-    for (x = 0; x < width; ++x)
-        output[x] = fb_riscosGfxSourceRgb(x, source);
+    for (x = 0; x < width; ++x) {
+        unsigned int pixel = fb_riscosGfxSourceRgb(x, source);
+        memcpy(destination + ((size_t)x * sizeof(pixel)), &pixel,
+               sizeof(pixel));
+    }
 }
 
 static void riscos_window_convert_line_16(unsigned char *destination,
     const unsigned char *source, int width)
 {
-    unsigned short *output;
+    unsigned short pixel;
     unsigned int blue;
     unsigned int green;
     unsigned int red;
     unsigned int rgb;
     int x;
 
-    output = (unsigned short *)destination;
     for (x = 0; x < width; ++x)
     {
         rgb = fb_riscosGfxSourceRgb(x, source);
         red = rgb & 255U;
         green = (rgb >> 8) & 255U;
         blue = (rgb >> 16) & 255U;
-        output[x] = (unsigned short)((red >> 3) |
+        pixel = (unsigned short)((red >> 3) |
             ((green >> 3) << 5) | ((blue >> 3) << 10));
+		memcpy(destination + ((size_t)x * sizeof(pixel)), &pixel,
+		       sizeof(pixel));
     }
 }
 
@@ -1137,14 +1139,18 @@ unsigned int fb_riscosGfxWindowReadPresentedPixel(int x, int y)
         (x * (fb_riscos_gfx.screen_depth / 8));
     if (fb_riscos_gfx.screen_depth == 32)
     {
-        pixel = *((const unsigned int *)address);
+        memcpy(&pixel, address, sizeof(pixel));
         red = pixel & 255U;
         green = (pixel >> 8) & 255U;
         blue = (pixel >> 16) & 255U;
     }
     else if (fb_riscos_gfx.screen_depth == 16)
     {
-        pixel = *((const unsigned short *)address);
+        {
+            unsigned short pixel16;
+            memcpy(&pixel16, address, sizeof(pixel16));
+            pixel = pixel16;
+        }
         red = ((pixel >> 0) & 31U) * 255U / 31U;
         green = ((pixel >> 5) & 31U) * 255U / 31U;
         blue = ((pixel >> 10) & 31U) * 255U / 31U;

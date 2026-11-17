@@ -1039,10 +1039,21 @@ FBCALL int fb_GfxScreenRes
 
 FBCALL void fb_GfxSetWindowTitle(FBSTRING_ACCESS *title)
 {
+	size_t copy_length = 0u;
+	ssize_t title_length = 0;
+
 	FB_GRAPHICS_LOCK( );
 
 	fb_hMemSet(window_title_buff, 0, WINDOW_TITLE_SIZE);
-	fb_hMemCpy(window_title_buff, title->data, MIN(WINDOW_TITLE_SIZE - 1, FB_STRSIZE(title)));
+	if( (title != NULL) && (title->data != NULL) ) {
+		title_length = FB_STRSIZE(title);
+		if( title_length > 0 ) {
+			copy_length = (size_t)title_length;
+			if( copy_length >= WINDOW_TITLE_SIZE )
+				copy_length = WINDOW_TITLE_SIZE - 1u;
+			fb_hMemCpy(window_title_buff, title->data, copy_length);
+		}
+	}
 	fb_window_title = window_title_buff;
 
 	if ((fb_gfx) && (fb_gfx->driver->set_window_title))

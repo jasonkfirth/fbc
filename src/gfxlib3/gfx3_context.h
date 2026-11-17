@@ -29,6 +29,12 @@
 #include "gfx3_protocol.h"
 #include "gfx3_renderer.h"
 
+/* Context records retain native alignment for pointers, sizes, and commands. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
+
 typedef struct FB_GFX3_CONTEXT_CONFIG {
 	const FB_GFX3_BACKEND_VTABLE *backend;
 	void *platform;
@@ -260,6 +266,10 @@ struct FB_GFX3_CONTEXT {
 	FB_GFX3_HANDLE pending_glyph_target;
 	size_t pending_glyph_count;
 };
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 int fb_gfx3_context_init(FB_GFX3_CONTEXT *context,
 	const FB_GFX3_CONTEXT_CONFIG *config);

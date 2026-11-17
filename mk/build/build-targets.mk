@@ -72,6 +72,7 @@ endif
 	fbrt \
 	gfxlib2 \
 	gfxlib3 \
+	gfxlib3-objects \
 	sfxlib \
 	libs \
 	runtime
@@ -93,6 +94,11 @@ fbrt: $(FBRTL_LIBS)
 gfxlib2: $(GFX_LIBS)
 
 gfxlib3: $(GFX3_LIBS)
+
+# Generic gfxlib3 sources can be warning-checked on targets without a native
+# display adapter. This compiles the selected object set but does not claim a
+# supported gfxlib3 archive for those platforms.
+gfxlib3-objects: $(GFX3_OBJ)
 
 sfxlib: $(SFX_LIBS)
 

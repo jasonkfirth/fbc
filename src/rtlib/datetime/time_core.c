@@ -7,6 +7,8 @@
  */
 #include "fb.h"
 
+#include <limits.h>
+
 /*:::::*/
 int fb_hTimeLeap( int year )
 {
@@ -31,56 +33,70 @@ int fb_hTimeDaysInMonth( int month, int year )
 /*:::::*/
 void fb_hNormalizeDate( int *pDay, int *pMonth, int *pYear )
 {
-    DBG_ASSERT( pDay!=NULL );
-    DBG_ASSERT( pMonth!=NULL );
-    DBG_ASSERT( pYear!=NULL );
-    {
-        int day = *pDay;
-        int month = *pMonth;
-        int year = *pYear;
-        if( month < 1 ) {
-            int sub_months = -month + 1;
-            int sub_years = (sub_months + 11) / 12;
-            year -= sub_years;
-            month = sub_years * 12 - sub_months + 1;
-        } else {
-            --month;
-            year += month / 12;
-            month %= 12;
-            ++month;
-        }
+	int64_t year;
+	int64_t month_index;
+	int64_t day;
+	int64_t cycles;
+	int month;
+	int month_remainder;
+	int days_in_month;
 
-        if( day < 1 ) {
-            int sub_days = -day + 1;
-            while (sub_days > 0) {
-                int dom;
-                if( --month==0 ) {
-                    month=12;
-                    --year;
-                }
-                dom = fb_hTimeDaysInMonth( month, year );
-                if( sub_days > dom ) {
-                    sub_days -= dom;
-                } else {
-                    day = dom - sub_days + 1;
-                    sub_days = 0;
-                }
-            }
-        } else {
-            int dom = fb_hTimeDaysInMonth( month, year );
-            while( day > dom ) {
-                day -= dom;
-                if( ++month==13 ) {
-                    month = 1;
-                    ++year;
-                }
-                dom = fb_hTimeDaysInMonth( month, year );
-            }
-        }
-        *pDay = day;
-        *pMonth = month;
-        *pYear = year;
-    }
+	if( (pDay == NULL) || (pMonth == NULL) || (pYear == NULL) )
+		return;
+
+	day = *pDay;
+	month_index = ((int64_t)*pYear * 12) + ((int64_t)*pMonth - 1);
+	year = month_index / 12;
+	month_remainder = (int)(month_index % 12);
+	if( month_remainder < 0 ) {
+		month_remainder += 12;
+		--year;
+	}
+	month = month_remainder + 1;
+
+	/* Gregorian month and weekday patterns repeat every 400 years. */
+	if( day > 1 ) {
+		cycles = (day - 1) / 146097;
+		day -= cycles * 146097;
+		year += cycles * 400;
+	} else if( day < 1 ) {
+		cycles = (1 - day) / 146097;
+		day += cycles * 146097;
+		year -= cycles * 400;
+	}
+
+	if( (year < INT_MIN) || (year > INT_MAX) )
+		return;
+
+	while( day < 1 ) {
+		--month;
+		if( month == 0 ) {
+			month = 12;
+			--year;
+			if( (year < INT_MIN) || (year > INT_MAX) )
+				return;
+		}
+		days_in_month = fb_hTimeDaysInMonth( month, (int)year );
+		day += days_in_month;
+	}
+
+	for( ;; ) {
+		days_in_month = fb_hTimeDaysInMonth( month, (int)year );
+		if( day <= days_in_month )
+			break;
+		day -= days_in_month;
+		++month;
+		if( month == 13 ) {
+			month = 1;
+			++year;
+			if( (year < INT_MIN) || (year > INT_MAX) )
+				return;
+		}
+	}
+
+	*pDay = (int)day;
+	*pMonth = month;
+	*pYear = (int)year;
 }
 
 /*:::::*/

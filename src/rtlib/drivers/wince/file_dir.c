@@ -136,12 +136,17 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 	FB_STRLOCK();
 
 	if( name != NULL ) {
-		name_length = strlen( name );
-		result = fb_hStrAllocTemp_NoLock( NULL, name_length );
-		if( result != NULL )
-			fb_hStrCopy( result->data, name, name_length );
-		else
+		size_t name_bytes = strlen( name );
+		if( name_bytes > (size_t)FB_STRSIZEMSK ) {
 			result = &fb_ctx.null_desc;
+		} else {
+			name_length = (ssize_t)name_bytes;
+			result = fb_hStrAllocTemp_NoLock( NULL, name_length );
+			if( result != NULL )
+				fb_hStrCopy( result->data, name, name_length );
+			else
+			result = &fb_ctx.null_desc;
+		}
 
 		free( name );
 	} else {

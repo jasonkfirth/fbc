@@ -23,6 +23,12 @@
 
 #include <math.h>
 
+/* Exact comparisons preserve NaNs, signed zero, and already-integral inputs. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
+
 /* ------------------------------------------------------------------------- */
 /* Double-precision rounding                                                  */
 /* ------------------------------------------------------------------------- */
@@ -95,5 +101,9 @@ float nearbyintf(float value)
 
     return lower + 1.0f;
 }
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /* end of drivers/wince/math_nearbyint.c */

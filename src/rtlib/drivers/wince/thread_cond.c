@@ -262,7 +262,8 @@ static FBCALL void fb_CondBroadcast_9x( FBCOND *cond )
 
 static FBCALL void fb_CondWait_9x( FBCOND *cond, FBMUTEX *mutex )
 {
-	int result, last_waiter;
+	DWORD result;
+	int last_waiter;
 
 	EnterCriticalSection( &cond->waiters_count_lock );
 	cond->waiters_count++;

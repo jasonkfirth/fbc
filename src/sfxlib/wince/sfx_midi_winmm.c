@@ -28,6 +28,8 @@
         acquiring unresolved desktop multimedia imports.
 */
 
+#include "../fb_sfx_internal.h"
+
 int fb_sfxMidiDriverOpen(int device)
 {
     (void)device;

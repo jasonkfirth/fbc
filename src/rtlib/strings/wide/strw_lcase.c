@@ -31,7 +31,7 @@ FBCALL FB_WCHAR *fb_WstrLcase2( const FB_WCHAR *src, int mode )
 		for( i = 0; i < chars; i++ ) {
 			c = *s++;
 			if( (c >= 65) && (c <= 90) )
-				c += 97 - 65;
+				c = (FB_WCHAR)(c + (97 - 65));
 			*d++ = c;
 		}
 	} else {

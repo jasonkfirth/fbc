@@ -133,7 +133,8 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 		}
 
 		if( soft_cursor ) {
-			char mask[2] = { ((result.data != NULL) && (pos < len)? result.data[pos]: ' '), '\0' };
+			char mask[2] = { (char)((result.data != NULL) && (pos < len)?
+				result.data[pos]: ' '), '\0' };
 			fb_PrintFixString( 0, mask, 0 );
 			fb_Locate( current_y, current_x, FALSE, 0, 0 );
 		}

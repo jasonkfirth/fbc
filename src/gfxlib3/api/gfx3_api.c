@@ -49,6 +49,11 @@ static int gfx3_float_equal(float left, float right)
 	return (left <= right) && (left >= right);
 }
 
+/* Preserve the fixed legacy SCREEN mode-table record layout. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_GFX3_STANDARD_MODE {
 	uint16_t width;
 	uint16_t height;
@@ -59,6 +64,9 @@ typedef struct FB_GFX3_STANDARD_MODE {
 	uint8_t console_rows;
 	uint8_t tail_padding;
 } FB_GFX3_STANDARD_MODE;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 static const FB_GFX3_STANDARD_MODE standard_modes[] = {
 	{    0,    0, 0, 1, 8,  8,  0, 0 }, /* Text mode / close graphics */
@@ -179,13 +187,14 @@ static int api_log_level(void)
 static void api_tls_destructor(void *data)
 {
 	FB_GFXCTX *runtime_context = (FB_GFXCTX *)data;
+	FB_GFX3_DRAW_STATE *state;
 
 	#if FB_GFX3_NATIVE_TLS
 	api_cached_draw_state = NULL;
 	api_cached_draw_state_generation = 0;
 	#endif
-	fb_gfx3_draw_state_destroy(
-		(FB_GFX3_DRAW_STATE *)runtime_context->line);
+	state = (void *)runtime_context->line;
+	fb_gfx3_draw_state_destroy(state);
 	free((void *)runtime_context->line);
 	runtime_context->line = NULL;
 }
@@ -245,7 +254,7 @@ FB_GFX3_DRAW_STATE *fb_gfx3_api_get_draw_state_locked(void)
 		sizeof(*runtime_context), api_tls_destructor);
 	if (runtime_context == NULL)
 		return NULL;
-	state = (FB_GFX3_DRAW_STATE *)runtime_context->line;
+	state = (void *)runtime_context->line;
 	if ((state == NULL) || (state->mode != &active_mode) ||
 	    (state->generation != active_mode.generation)) {
 		fb_gfx3_draw_state_destroy(state);

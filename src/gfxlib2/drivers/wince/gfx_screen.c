@@ -36,6 +36,11 @@
 /* Mode descriptions and process state                                      */
 /* ------------------------------------------------------------------------- */
 
+/* MODEINFO keeps the compact table layout used by legacy SCREEN modes. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct {
 	unsigned short w;
 	unsigned short h;
@@ -47,6 +52,9 @@ typedef struct {
 	unsigned char text_w;
 	unsigned char text_h;
 } MODEINFO;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 static const MODEINFO mode_info[NUM_MODES] = {
 	{    0,    0, 0, 0, 1, -1            , -1        ,    0,  0 }, /* NULL mode */
@@ -90,6 +98,8 @@ static int set_mode
 		int text_w, int text_h
 	);
 
+static void *get_aligned_page_allocation(const unsigned char *page);
+
 static void release_gfx_mem(void)
 {
 	if (fb_gfx) {
@@ -100,7 +110,7 @@ static void release_gfx_mem(void)
             int i;
             for (i = 0; i < fb_gfx->num_pages; i++) {
                 if (fb_gfx->page[i])
-                    free(((void **)(fb_gfx->page[i]))[-1]);
+                    free(get_aligned_page_allocation(fb_gfx->page[i]));
             }
             free((void *)fb_gfx->page);
 		}
@@ -154,8 +164,16 @@ static unsigned char *allocate_aligned_page(size_t page_size)
 
 	aligned = ((uintptr_t)allocation + sizeof(void *) + 15u) & ~(uintptr_t)15u;
 	page = (unsigned char *)aligned;
-	((void **)page)[-1] = allocation;
+	memcpy(page - sizeof(allocation), &allocation, sizeof(allocation));
 	return page;
+}
+
+static void *get_aligned_page_allocation(const unsigned char *page)
+{
+	void *allocation;
+
+	memcpy(&allocation, page - sizeof(allocation), sizeof(allocation));
+	return allocation;
 }
 
 static void free_aligned_pages(unsigned char **pages, int page_count)
@@ -167,7 +185,7 @@ static void free_aligned_pages(unsigned char **pages, int page_count)
 
 	for (page = 0; page < page_count; ++page) {
 		if (pages[page])
-			free(((void **)pages[page])[-1]);
+			free(get_aligned_page_allocation(pages[page]));
 	}
 	free((void *)pages);
 }
@@ -255,8 +273,8 @@ int fb_hApplyPendingResize(void)
 	visible_page = fb_gfx->visible_page;
 	bytes_per_pixel = fb_gfx->bpp;
 	scanline_size = fb_gfx->scanline_size;
-	color_mask = fb_gfx->color_mask;
-	depth = fb_gfx->depth;
+	color_mask = (unsigned int)fb_gfx->color_mask;
+	depth = (unsigned int)fb_gfx->depth;
 	old_width = fb_gfx->w;
 	old_height = fb_gfx->h;
 	old_pitch = fb_gfx->pitch;
@@ -302,8 +320,8 @@ int fb_hApplyPendingResize(void)
 		if (!new_pages[page])
 			goto fail;
 		for (row = 0; row < height; ++row)
-			fb_hPixelSet(new_pages[page] + ((size_t)row * pitch),
-				MASK_A_32 & color_mask, (size_t)width);
+			fb_hPixelSet(new_pages[page] + ((size_t)row * (size_t)pitch),
+				(int)(MASK_A_32 & color_mask), (size_t)width);
 	}
 
 	new_dirty = (char *)malloc(dirty_size);
@@ -350,8 +368,8 @@ int fb_hApplyPendingResize(void)
 	copy_text_height = MIN(text_height, old_text_height);
 	for (page = 0; page < page_count; ++page) {
 		for (row = 0; row < copy_height; ++row) {
-			fb_hMemCpy(new_pages[page] + ((size_t)row * pitch),
-				old_pages[page] + ((size_t)row * old_pitch),
+			fb_hMemCpy(new_pages[page] + ((size_t)row * (size_t)pitch),
+				old_pages[page] + ((size_t)row * (size_t)old_pitch),
 				row_bytes);
 		}
 		if ((copy_text_width > 0) && (copy_text_height > 0)) {
@@ -360,9 +378,9 @@ int fb_hApplyPendingResize(void)
 				goto fail;
 			for (row = 0; row < copy_text_height; ++row) {
 				fb_hMemCpy(new_con_pages[page] +
-					((size_t)row * text_width),
+					((size_t)row * (size_t)text_width),
 					old_con_pages[page] +
-					((size_t)row * old_text_width),
+					((size_t)row * (size_t)old_text_width),
 					(size_t)copy_text_width * sizeof(GFX_CHAR_CELL));
 			}
 		}
@@ -433,37 +451,51 @@ void fb_GfxViewUpdate( void )
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
 void fb_hResetCharCells(FB_GFXCTX *context, int do_alloc)
 {
-    int i;
+	size_t text_size;
+	GFX_CHAR_CELL **new_pages;
+	int i;
 
-    if( fb_gfx!=NULL ) {
-        /* Free the previously allocated character cells */
-        if( fb_gfx->con_pages!=NULL ) {
-            for (i = 0; i < fb_gfx->num_pages; i++) {
-                free(fb_gfx->con_pages[i]);
-            }
-            free((void *)fb_gfx->con_pages);
-        }
-
-        if( do_alloc ) {
-            size_t text_size = fb_gfx->text_w * fb_gfx->text_h;
-
-            /* Allocate memory for all character cells */
-            fb_gfx->con_pages = (GFX_CHAR_CELL **)malloc(sizeof(GFX_CHAR_CELL *) * fb_gfx->num_pages);
-            for (i = 0; i < fb_gfx->num_pages; i++) {
-                fb_gfx->con_pages[i] =
-                    (GFX_CHAR_CELL *)calloc(1, sizeof(GFX_CHAR_CELL) * text_size);
-            }
-
-            /* Reset all character cells with default values */
-            fb_hClearCharCells( 0, 0,
-                                fb_gfx->text_w, fb_gfx->text_h,
-                                context->work_page,
-                                32,
-                                context->fg_color, context->bg_color );
-        } else {
-            fb_gfx->con_pages = NULL;
-        }
-    }
+	if( fb_gfx == NULL )
+		return;
+	if( fb_gfx->con_pages != NULL ) {
+		for( i = 0; i < fb_gfx->num_pages; ++i )
+			free( fb_gfx->con_pages[i] );
+		free( fb_gfx->con_pages );
+		fb_gfx->con_pages = NULL;
+	}
+	if( !do_alloc )
+		return;
+	if( (context == NULL) || (fb_gfx->num_pages <= 0) ||
+	    (fb_gfx->text_w < 0) || (fb_gfx->text_h < 0) )
+		return;
+	if( (fb_gfx->text_w > 0) &&
+	    ((size_t)fb_gfx->text_h >
+	     (SIZE_MAX / (size_t)fb_gfx->text_w)) )
+		return;
+	text_size = (size_t)fb_gfx->text_w * (size_t)fb_gfx->text_h;
+	if( text_size > (SIZE_MAX / sizeof( GFX_CHAR_CELL )) )
+		return;
+	new_pages = (GFX_CHAR_CELL **)calloc( (size_t)fb_gfx->num_pages,
+	                                     sizeof( new_pages[0] ) );
+	if( new_pages == NULL )
+		return;
+	for( i = 0; i < fb_gfx->num_pages; ++i ) {
+		if( text_size == 0 )
+			continue;
+		new_pages[i] = (GFX_CHAR_CELL *)calloc( text_size,
+		                                       sizeof( new_pages[i][0] ) );
+		if( new_pages[i] == NULL ) {
+			while( i > 0 )
+				free( new_pages[--i] );
+			free( new_pages );
+			return;
+		}
+	}
+	fb_gfx->con_pages = new_pages;
+	if( text_size > 0 )
+		fb_hClearCharCells( 0, 0, fb_gfx->text_w, fb_gfx->text_h,
+		                    context->work_page, 32,
+		                    context->fg_color, context->bg_color );
 }
 
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
@@ -581,16 +613,25 @@ static int set_mode
         fb_gfx->scanline_size = scanline_size;
         fb_gfx->font = (font >= 0) ? &fb_font[font] : NULL;
 
+		/* Zero selects the automatic aspect ratio, so exact equality is intentional. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
 		if( aspect != 0.0f )
 			fb_gfx->aspect = aspect;
 		else
-			fb_gfx->aspect = (4.0 / 3.0) * ((float)fb_gfx->h / (float)fb_gfx->w);
+		fb_gfx->aspect = (4.0f / 3.0f) *
+			((float)fb_gfx->h / (float)fb_gfx->w);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
         switch (fb_gfx->depth) {
         case 15:
         case 16:	fb_gfx->color_mask = 0xFFFF; fb_gfx->depth = 16; break;
         case 24:
-        case 32:	fb_gfx->color_mask = 0xFFFFFFFF; fb_gfx->depth = 32; break;
+	case 32:	fb_gfx->color_mask = -1; fb_gfx->depth = 32; break;
         default:	fb_gfx->color_mask = (1 << fb_gfx->depth) - 1;
         }
 
@@ -731,10 +772,13 @@ static int set_mode
         context = fb_hGetContext();
 
         fb_hResetCharCells(context, TRUE);
+        if (fb_gfx->con_pages == NULL)
+            goto allocation_failed;
         for (i = 0; i < num_pages; i++) {
             dest = fb_gfx->page[i];
             for (j = 0; j < fb_gfx->h; j++) {
-                context->pixel_set(dest, context->bg_color, context->view_w);
+                context->pixel_set(dest, (int)context->bg_color,
+				    (size_t)context->view_w);
                 dest += fb_gfx->pitch;
             }
         }

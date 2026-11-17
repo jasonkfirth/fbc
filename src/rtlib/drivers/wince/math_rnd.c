@@ -74,6 +74,20 @@ static FB_RNDSTATE ctx = {
  */
 static double last_num = 0.0;
 
+/* RND(0) is the exact language-level request for the previous result. */
+static int hRndUsesPreviousValue( float input )
+{
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
+	int uses_previous_value = (input == 0.0f);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+	return uses_previous_value;
+}
+
 typedef union {
 	double d;
 	uint64_t i;
@@ -92,16 +106,17 @@ static uint64_t hDoubleToBits( double value )
 /* FB_RND_CRT */
 static uint32_t hRnd_CRT32 ( void )
 {
-	return rand( );
+	return (uint32_t)rand( );
 }
 
 static double hRnd_CRT ( float n )
 {
-	if( n == 0.0 )
+	if( hRndUsesPreviousValue( n ) )
 		return last_num;
 
 	/* return between 0 and 1 (but never 1) */
-	return (double)hRnd_CRT32() * ( 1.0 / ( (double)RAND_MAX + 1.0 ) );
+	uint32_t random_value = hRnd_CRT32();
+	return (double)random_value * ( 1.0 / ( (double)RAND_MAX + 1.0 ) );
 }
 
 static void hRndCtxInitCRT32 ( uint32_t seed )
@@ -124,11 +139,12 @@ static uint32_t hRnd_FAST32 ( void )
 static double hRnd_FAST ( float n )
 {
 	/* return last value if argument is 0.0 */
-	if( n == 0.0 )
+	if( hRndUsesPreviousValue( n ) )
 		return (double)ctx.iseed32 / (double)4294967296ULL;
 
 	/* return between 0 and 1 (but never 1) */
-	return (double)hRnd_FAST32() / (double)4294967296ULL;
+	uint32_t random_value = hRnd_FAST32();
+	return (double)random_value / (double)4294967296ULL;
 }
 
 static void hRndCtxInitFAST32 ( uint32_t seed )
@@ -177,10 +193,11 @@ static uint32_t hRnd_MTWIST32 ( void )
 
 static double hRnd_MTWIST ( float n )
 {
-	if( n == 0.0 )
+	if( hRndUsesPreviousValue( n ) )
 		return last_num;
 
-	return (double)hRnd_MTWIST32() / (double)4294967296ULL;
+	uint32_t random_value = hRnd_MTWIST32();
+	return (double)random_value / (double)4294967296ULL;
 }
 
 static void hRndCtxInitMTWIST32 ( uint64_t seed )
@@ -208,16 +225,17 @@ static double hRnd_QB ( float n )
 		uint32_t i;
 	} ftoi;
 
-	if( n == 0.0 )
+	if( hRndUsesPreviousValue( n ) )
 		return (float)ctx.iseed32 / (float)0x1000000;
 
-	if( n < 0.0 ) {
+	if( n < 0.0f ) {
 		ftoi.f = n;
 		uint32_t s = ftoi.i;
 		ctx.iseed32 = s + ( s >> 24 );
 	}
 
-	return (float)hRnd_QB32() / (float)0x1000000;
+	uint32_t random_value = hRnd_QB32();
+	return (float)random_value / (float)0x1000000;
 }
 
 static void hRndCtxInitQB32 ( uint32_t seed )
@@ -272,10 +290,11 @@ static uint32_t hRnd_REAL32( void )
 
 static double hRnd_REAL( float n )
 {
-	if( n == 0.0 )
+	if( hRndUsesPreviousValue( n ) )
 		return last_num;
 
-	return (double)hRnd_REAL32() / (double)4294967296ULL;
+	uint32_t random_value = hRnd_REAL32();
+	return (double)random_value / (double)4294967296ULL;
 }
 
 static void hRndCtxInitREAL32 ( uint64_t seed )
@@ -344,6 +363,11 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 
 	FB_MATH_LOCK();
 
+	/* -1 is the documented RANDOMIZE request for a timer-derived seed. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
 	if( seed == -1.0 )
 	{
 		/* Take value of Timer to ensure a non-constant seed.  The seeding
@@ -353,8 +377,11 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 		seedbits = hDoubleToBits( fb_Timer() );
 		seed = (double)( (uint32_t)seedbits ^ (uint32_t)( seedbits >> 32 ) );
 	}
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
-	ctx.algorithm = getAlogrithm( algorithm );
+	ctx.algorithm = (uint32_t)getAlogrithm( algorithm );
 
 	switch( ctx.algorithm ) {
 	case FB_RND_CRT:

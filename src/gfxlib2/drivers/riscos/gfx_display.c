@@ -335,6 +335,7 @@ static void riscos_restore_mode(void)
 unsigned int fb_riscosGfxSourceRgb(int x, const unsigned char *source)
 {
     unsigned int pixel;
+    unsigned short pixel16;
     unsigned int red;
     unsigned int green;
     unsigned int blue;
@@ -344,14 +345,16 @@ unsigned int fb_riscosGfxSourceRgb(int x, const unsigned char *source)
 
     if (fb_gfx->depth == 16)
     {
-        pixel = ((const unsigned short *)source)[x];
+        memcpy(&pixel16, source + ((size_t)x * sizeof(pixel16)),
+               sizeof(pixel16));
+        pixel = pixel16;
         red = ((pixel >> 11) & 31U) * 255U / 31U;
         green = ((pixel >> 5) & 63U) * 255U / 63U;
         blue = (pixel & 31U) * 255U / 31U;
         return red | (green << 8) | (blue << 16);
     }
 
-    pixel = ((const unsigned int *)source)[x];
+    memcpy(&pixel, source + ((size_t)x * sizeof(pixel)), sizeof(pixel));
     red = (pixel >> 16) & 255U;
     green = (pixel >> 8) & 255U;
     blue = pixel & 255U;
@@ -388,26 +391,24 @@ unsigned int fb_riscosGfxReadSourcePixel(int x, int y)
 static void riscos_convert_line_32(unsigned char *destination,
     const unsigned char *source, int width)
 {
-    unsigned int *output;
     int x;
 
-    output = (unsigned int *)destination;
-
-    for (x = 0; x < width; ++x)
-        output[x] = fb_riscosGfxSourceRgb(x, source);
+    for (x = 0; x < width; ++x) {
+        unsigned int pixel = fb_riscosGfxSourceRgb(x, source);
+        memcpy(destination + ((size_t)x * sizeof(pixel)), &pixel,
+               sizeof(pixel));
+    }
 }
 
 static void riscos_convert_line_16(unsigned char *destination,
     const unsigned char *source, int width)
 {
-    unsigned short *output;
+    unsigned short pixel;
     unsigned int rgb;
     unsigned int red;
     unsigned int green;
     unsigned int blue;
     int x;
-
-    output = (unsigned short *)destination;
 
     for (x = 0; x < width; ++x)
     {
@@ -415,8 +416,10 @@ static void riscos_convert_line_16(unsigned char *destination,
         red = rgb & 255U;
         green = (rgb >> 8) & 255U;
         blue = (rgb >> 16) & 255U;
-        output[x] = (unsigned short)((red >> 3) |
+		pixel = (unsigned short)((red >> 3) |
             ((green >> 3) << 5) | ((blue >> 3) << 10));
+		memcpy(destination + ((size_t)x * sizeof(pixel)), &pixel,
+		       sizeof(pixel));
     }
 }
 
@@ -615,14 +618,18 @@ unsigned int fb_riscosGfxReadPresentedPixel(int x, int y)
 
     if (fb_riscos_gfx.screen_depth == 32)
     {
-        pixel = *((const unsigned int *)address);
+        memcpy(&pixel, address, sizeof(pixel));
         red = pixel & 255U;
         green = (pixel >> 8) & 255U;
         blue = (pixel >> 16) & 255U;
     }
     else
     {
-        pixel = *((const unsigned short *)address);
+        {
+            unsigned short pixel16;
+            memcpy(&pixel16, address, sizeof(pixel16));
+            pixel = pixel16;
+        }
         red = ((pixel >> 0) & 31U) * 255U / 31U;
         green = ((pixel >> 5) & 31U) * 255U / 31U;
         blue = ((pixel >> 10) & 31U) * 255U / 31U;

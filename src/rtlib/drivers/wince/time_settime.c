@@ -10,14 +10,18 @@
 
 int fb_hSetTime( int h, int m, int s )
 {
+	if( (h < 0) || (h > 23) || (m < 0) || (m > 59) ||
+	    (s < 0) || (s > 59) )
+		return -1;
+
 	/* get current local time and date */
 	SYSTEMTIME st;
 	GetLocalTime( &st );
 
 	/* set time fields */
-	st.wHour = h;
-	st.wMinute = m;
-	st.wSecond = s;
+	st.wHour = (WORD)h;
+	st.wMinute = (WORD)m;
+	st.wSecond = (WORD)s;
 
 	/* set system time relative to local time zone */
 	if( SetLocalTime( &st ) == 0 )

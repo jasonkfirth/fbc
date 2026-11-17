@@ -26,12 +26,14 @@ char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 	maxlen = (ssize_t)digits + 1 + 6 + 1;
 
 	/* The caller reserves digits plus exponent space; a truncation is rejected below. */
-#if defined(__GNUC__) && !defined(__clang__)
+#if defined(__GNUC__) && !defined(__clang__) && \
+	((__GNUC__ > 7) || ((__GNUC__ == 7) && (__GNUC_MINOR__ >= 0)))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 #endif
 	len = snprintf( p, (size_t)maxlen, "%.*g", digits, val );
-#if defined(__GNUC__) && !defined(__clang__)
+#if defined(__GNUC__) && !defined(__clang__) && \
+	((__GNUC__ > 7) || ((__GNUC__ == 7) && (__GNUC_MINOR__ >= 0)))
 #pragma GCC diagnostic pop
 #endif
 

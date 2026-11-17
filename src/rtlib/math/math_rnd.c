@@ -7,6 +7,7 @@
  */
 #include "fb.h"
 #include "rnd_state.h"
+#include <limits.h>
 #include <math.h>
 
 /* RANDOMIZE uses exactly -1.0 as its automatic-seed sentinel. */
@@ -112,7 +113,15 @@ static void hRndCtxInitCRT32 ( uint32_t seed )
 	ctx.rndproc = hRnd_CRT;
 	ctx.rndproc32 = hRnd_CRT32;
 
+#if defined(HOST_RISCOS) && (LONG_MAX == 2147483647L)
+	if( seed <= (uint32_t)LONG_MAX )
+		srand( (long)seed );
+	else
+		srand( LONG_MIN +
+			(long)(seed - ((uint32_t)LONG_MAX + 1u)) );
+#else
 	srand( (unsigned int)seed );
+#endif
 }
 
 /* FB_RND_FAST */

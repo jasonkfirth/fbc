@@ -23,6 +23,8 @@
 
 #include <windows.h>
 
+int remove( const char *path );
+
 int remove( const char *path )
 {
 	return fb_hRemoveFile( path );

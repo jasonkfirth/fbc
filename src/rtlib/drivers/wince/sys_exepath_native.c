@@ -35,6 +35,16 @@ typedef BOOL (WINAPI *FB_WINCE_PROCESS_FIRST)( HANDLE, LPPROCESSENTRY32 );
 typedef BOOL (WINAPI *FB_WINCE_PROCESS_NEXT)( HANDLE, LPPROCESSENTRY32 );
 typedef BOOL (WINAPI *FB_WINCE_CLOSE_SNAPSHOT)( HANDLE );
 
+#define FB_WINCE_LOAD_PROC(target, module, name) \
+	do { \
+		FARPROC procedure = GetProcAddressW( module, name ); \
+		_Static_assert( sizeof( target ) == sizeof( procedure ), \
+			"Windows CE procedure pointer size" ); \
+		(target) = NULL; \
+		if( procedure != NULL ) \
+			memcpy( &(target), &procedure, sizeof( target ) ); \
+	} while( 0 )
+
 static int fb_hWinCEJoinPath( const wchar_t *directory,
 	                          const wchar_t *name,
 	                          wchar_t *destination,
@@ -139,14 +149,10 @@ static int fb_hWinCEGetProcessFilename( wchar_t *filename,
 	if( toolhelp == NULL )
 		return FALSE;
 
-	create_snapshot = (FB_WINCE_CREATE_SNAPSHOT)GetProcAddressW(
-		toolhelp, L"CreateToolhelp32Snapshot" );
-	process_first = (FB_WINCE_PROCESS_FIRST)GetProcAddressW(
-		toolhelp, L"Process32First" );
-	process_next = (FB_WINCE_PROCESS_NEXT)GetProcAddressW(
-		toolhelp, L"Process32Next" );
-	close_snapshot = (FB_WINCE_CLOSE_SNAPSHOT)GetProcAddressW(
-		toolhelp, L"CloseToolhelp32Snapshot" );
+	FB_WINCE_LOAD_PROC( create_snapshot, toolhelp, L"CreateToolhelp32Snapshot" );
+	FB_WINCE_LOAD_PROC( process_first, toolhelp, L"Process32First" );
+	FB_WINCE_LOAD_PROC( process_next, toolhelp, L"Process32Next" );
+	FB_WINCE_LOAD_PROC( close_snapshot, toolhelp, L"CloseToolhelp32Snapshot" );
 	if( create_snapshot == NULL || process_first == NULL ||
 	    process_next == NULL || close_snapshot == NULL ) {
 		FreeLibrary( toolhelp );
@@ -220,5 +226,7 @@ int fb_hWinCEGetExecutablePathWC( wchar_t *destination,
 
 	return FALSE;
 }
+
+#undef FB_WINCE_LOAD_PROC
 
 /* end of drivers/wince/sys_exepath_native.c */

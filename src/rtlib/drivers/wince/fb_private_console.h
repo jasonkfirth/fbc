@@ -25,6 +25,11 @@
 #include <windows.h>
 #include "../../fb_abi.h"
 
+/* These runtime records use native pointer and integer alignment. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_WINCE_CONSOLE_CELL {
 	FB_WCHAR character;
 	unsigned char attribute;
@@ -46,6 +51,9 @@ typedef struct FB_CONSOLE_CTX {
 	unsigned int foreground;
 	unsigned int background;
 } FB_CONSOLE_CTX;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 extern FB_CONSOLE_CTX fb_console_context FB_C_SYMBOL("__fb_con");
 

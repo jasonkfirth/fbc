@@ -56,8 +56,13 @@ void fb_ConsolePrintBufferWstrEx( const FB_WCHAR *buffer, size_t characters,
 
 void fb_ConsolePrintBufferWstr( const FB_WCHAR *buffer, int mask )
 {
-	if( buffer != NULL )
-		fb_ConsolePrintBufferWstrEx( buffer, fb_wstr_Len( buffer ), mask );
+	ssize_t characters;
+
+	if( buffer == NULL )
+		return;
+	characters = fb_wstr_Len( buffer );
+	if( characters > 0 )
+		fb_ConsolePrintBufferWstrEx( buffer, (size_t)characters, mask );
 }
 
 /* end of drivers/wince/io_printbuff_wstr.c */

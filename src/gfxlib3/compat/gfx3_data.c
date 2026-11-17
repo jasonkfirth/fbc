@@ -24,7 +24,7 @@
 
 #include "../gfx3_data.h"
 
-#include <stdatomic.h>
+#include "../gfx3_atomic.h"
 
 /*
     The generated file is an asset shared with the established graphics

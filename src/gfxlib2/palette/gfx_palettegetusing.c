@@ -25,7 +25,7 @@ FBCALL void fb_GfxPaletteGetUsing(int *data)
 		imax = (1 << fb_gfx->depth);
 
 	for (i = 0; i < imax; i++)
-		data[i] = (fb_gfx->device_palette[i] & 0xFCFCFC) >> 2;
+		data[i] = (int)((fb_gfx->device_palette[i] & 0x00FCFCFCu) >> 2);
 
 	FB_GRAPHICS_UNLOCK( );
 }

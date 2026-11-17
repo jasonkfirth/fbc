@@ -20,6 +20,7 @@
         - portable sound runtime logic
 */
 
+#include "../fb_sfx_internal.h"
 #include "fb_sfx_riscos.h"
 
 void fb_sfxPlatformExit(void)

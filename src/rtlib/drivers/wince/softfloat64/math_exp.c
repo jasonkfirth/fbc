@@ -73,8 +73,16 @@ static inline double specialcase(double_t tmp, uint64_t sbits, uint64_t ki)
 		lo = 1.0 - hi + y + lo;
 		y = eval_as_double(hi + lo) - 1.0;
 		/* Avoid -0.0 with downward rounding.  */
+		/* Preserve the negative zero produced by downward rounding. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
 		if (WANT_ROUNDING && y == 0.0)
 			y = 0.0;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 		/* The underflow exception needs to be signaled explicitly.  */
 		fp_force_eval(fp_barrier(0x1p-1022) * 0x1p-1022);
 	}
@@ -85,7 +93,7 @@ static inline double specialcase(double_t tmp, uint64_t sbits, uint64_t ki)
 /* Top 12 bits of a double (sign and exponent bits).  */
 static inline uint32_t top12(double x)
 {
-	return asuint64(x) >> 52;
+	return (uint32_t)(asuint64(x) >> 52);
 }
 
 double exp(double x)

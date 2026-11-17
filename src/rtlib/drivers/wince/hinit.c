@@ -6,6 +6,12 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include "../../fb.h"
+
+#if defined HOST_MINGW && !defined(__aarch64__) && !defined(_M_ARM64) && \
+	!defined(_M_ARM64EC) && !defined(_clear87)
+_CRTIMP unsigned int __cdecl __MINGW_NOTHROW _controlfp(
+	unsigned int unNew, unsigned int unMask);
+#endif
 #include "fb_private_console.h"
 
 /* ARM64 runtimes do not expose the classic x87 control word API used below, and
@@ -47,7 +53,6 @@ void fb_hInit( void )
 #define	_RC_NEAR	0x00000000
 #define	_MCW_RC		0x00000300	/* Rounding */
 #define	_MCW_PC		0x00030000	/* Precision */
-_CRTIMP unsigned int __cdecl __MINGW_NOTHROW _controlfp (unsigned int unNew, unsigned int unMask);
 #endif
     /* set FPU precision to 64-bit and round to nearest (as in QB) */
     _controlfp( _PC_64|_RC_NEAR, _MCW_PC|_MCW_RC );
@@ -78,6 +83,7 @@ _CRTIMP unsigned int __cdecl __MINGW_NOTHROW _controlfp (unsigned int unNew, uns
 
 void fb_hEnd( int unused )
 {
+	(void)unused;
 	fb_hWinCEConsoleShutdown();
 
 #ifdef ENABLE_MT

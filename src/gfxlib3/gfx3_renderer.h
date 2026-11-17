@@ -29,7 +29,7 @@
 #include "gfx3_backend.h"
 #include "gfx3_resource.h"
 
-#include <stdatomic.h>
+#include "gfx3_atomic.h"
 
 #define FB_GFX3_DEFAULT_QUEUE_CAPACITY 1024u
 

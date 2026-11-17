@@ -111,7 +111,7 @@ static __inline__ unsigned long long fb_riscos_wcstoull(
 
 	if( p == NULL ) {
 		if( endptr != NULL )
-			*endptr = (FB_WCHAR *)src;
+			memcpy( endptr, &src, sizeof( *endptr ) );
 		return 0;
 	}
 
@@ -134,7 +134,7 @@ static __inline__ unsigned long long fb_riscos_wcstoull(
 	}
 
 	if( endptr != NULL )
-		*endptr = (FB_WCHAR *)p;
+		memcpy( endptr, &p, sizeof( *endptr ) );
 
 	return negative ? (0ull - value) : value;
 }

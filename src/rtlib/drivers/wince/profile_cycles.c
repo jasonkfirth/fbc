@@ -220,24 +220,64 @@ static hProfilerReportBinary( void )
 }
 #endif
 
+static int hProfilerReadRecordHeader( const unsigned char *data,
+	ssize_t index, ssize_t length, FB_PROFILE_RECORD_HEADER *record )
+{
+	ssize_t remaining;
+
+	if( (data == NULL) || (record == NULL) || (index < 0) ||
+	    (length < 0) || (index > length) )
+		return FALSE;
+	remaining = length - index;
+	if( remaining < (ssize_t)sizeof( *record ) )
+		return FALSE;
+	memcpy( record, data + (size_t)index, sizeof( *record ) );
+	if( (record->size < (ssize_t)sizeof( *record )) ||
+	    (record->size > remaining) )
+		return FALSE;
+	if( (record->id == FB_PROFILE_RECORD_DATA_ID) &&
+	    (record->size < (ssize_t)sizeof( FB_PROFILE_RECORD_DATA )) )
+		return FALSE;
+	return TRUE;
+}
+
+static int hProfilerRecordDataAligned( const unsigned char *data,
+	ssize_t index )
+{
+	size_t alignment = (size_t)__alignof__( FB_PROFILE_RECORD_DATA );
+
+	return (data != NULL) && (index >= 0) && (alignment != 0) &&
+	       ((uintptr_t)(data + (size_t)index) % alignment == 0);
+}
+
 static ssize_t hProfilerCountProcs( unsigned char *data, ssize_t length )
 {
-	ssize_t index = 0, count = 0;
+	ssize_t index = 0;
+	ssize_t count = 0;
+	FB_PROFILE_RECORD_HEADER record;
+
+	if( (length < 0) || ((data == NULL) && (length != 0)) )
+		return -1;
 	while( index < length ) {
-		FB_PROFILE_RECORD_HEADER *rec = (FB_PROFILE_RECORD_HEADER *)&data[index];
-		if( rec->id == FB_PROFILE_RECORD_DATA_ID ) {
+		if( !hProfilerReadRecordHeader( data, index, length, &record ) )
+			return -1;
+		if( record.id == FB_PROFILE_RECORD_DATA_ID ) {
+			if( !hProfilerRecordDataAligned( data, index ) )
+				return -1;
 			count += 1;
 		}
-		index += rec->size;
+		index += record.size;
 	}
 	return count;
 }
 
 static int name_sorter( const void *e1, const void *e2 )
 {
-	FB_PROFILE_RECORD_DATA *p1 = *(FB_PROFILE_RECORD_DATA **)e1;
-	FB_PROFILE_RECORD_DATA *p2 = *(FB_PROFILE_RECORD_DATA **)e2;
+	FB_PROFILE_RECORD_DATA *p1;
+	FB_PROFILE_RECORD_DATA *p2;
 	int ret;
+	memcpy( &p1, e1, sizeof( p1 ) );
+	memcpy( &p2, e2, sizeof( p2 ) );
 
 	ret = strcmp( p1->module_name, p2->module_name );
 	if( ret ) {
@@ -248,29 +288,38 @@ static int name_sorter( const void *e1, const void *e2 )
 
 static void hProfilerSortArray( FB_PROFILE_RECORD_DATA **array, ssize_t count )
 {
-	qsort( (void *)array, count, sizeof(FB_PROFILE_RECORD_DATA *), name_sorter );
+	if( count > 1 )
+		qsort( (void *)array, (size_t)count,
+		       sizeof( FB_PROFILE_RECORD_DATA * ), name_sorter );
 }
 
-static void hProfilerBuildArray (
+static int hProfilerBuildArray (
 	FB_PROFILE_RECORD_DATA **array, ssize_t count,
 	unsigned char *data, ssize_t length
 )
 {
 	ssize_t index = 0;
-	int i = 0;
+	ssize_t i = 0;
+	FB_PROFILE_RECORD_HEADER record;
+	void *record_storage;
 
-	if( !array ) {
-		return;
-	}
+	if( (array == NULL) || (count < 0) || (length < 0) ||
+	    ((data == NULL) && (length != 0)) )
+		return FALSE;
 
 	while( (index < length) && (i < count) ) {
-		FB_PROFILE_RECORD_HEADER *rec = (FB_PROFILE_RECORD_HEADER *)&data[index];
-		if( rec->id == FB_PROFILE_RECORD_DATA_ID ) {
-			array[i] = (FB_PROFILE_RECORD_DATA*)rec;
+		if( !hProfilerReadRecordHeader( data, index, length, &record ) )
+			return FALSE;
+		if( record.id == FB_PROFILE_RECORD_DATA_ID ) {
+			if( !hProfilerRecordDataAligned( data, index ) )
+				return FALSE;
+			record_storage = data + (size_t)index;
+			array[i] = record_storage;
 			i += 1;
 		}
-		index += rec->size;
+		index += record.size;
 	}
+	return i == count;
 }
 
 static void hProfilerReport (
@@ -314,6 +363,9 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 	unsigned char *data;
 	ssize_t length, count;
 	FB_PROFILE_RECORD_DATA **array;
+	uintptr_t data_start;
+	uintptr_t data_stop;
+	size_t array_bytes;
 
 	fb_ProfileGetFileName( filename, PROFILER_MAX_PATH );
 
@@ -333,15 +385,28 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 	}
 
 	data = (unsigned char *)&fb_profilecycledata_start[0];
-	length = (ssize_t)&fb_profilecycledata_stop[0] - (ssize_t)&fb_profilecycledata_start[0];
+	data_start = (uintptr_t)fb_profilecycledata_start;
+	data_stop = (uintptr_t)fb_profilecycledata_stop;
+	if( (data_stop < data_start) ||
+	    ((data_stop - data_start) > (uintptr_t)FB_STRSIZEMSK) ) {
+		fclose( f );
+		return;
+	}
+	length = (ssize_t)(data_stop - data_start);
 
 	count = hProfilerCountProcs( data, length );
-	if( count ) {
-		array = (FB_PROFILE_RECORD_DATA **)PROFILER_malloc( sizeof(FB_PROFILE_RECORD_DATA*) * count );
-		if( array ) {
-			hProfilerBuildArray( array, count, data, length );
+	if( count > 0 ) {
+		if( (size_t)count > (SIZE_MAX / sizeof( FB_PROFILE_RECORD_DATA * )) ) {
+			fclose( f );
+			return;
+		}
+		array_bytes = (size_t)count * sizeof( FB_PROFILE_RECORD_DATA * );
+		array = (FB_PROFILE_RECORD_DATA **)PROFILER_malloc( array_bytes );
+		if( array != NULL ) {
+			if( hProfilerBuildArray( array, count, data, length ) ) {
 			hProfilerSortArray( array, count );
 			hProfilerReport( prof, f, array, count );
+			}
 			PROFILER_free( (void *)array );
 		}
 	}

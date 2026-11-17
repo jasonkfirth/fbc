@@ -20,6 +20,8 @@
         - shared mixer teardown
 */
 
+#include "../fb_sfx_internal.h"
+
 void fb_sfxPlatformExit(void)
 {
 }

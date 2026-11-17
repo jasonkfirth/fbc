@@ -57,6 +57,11 @@ enum PROCINFO_FLAGS
 };
 
 /* procedure call information, and hash table for child procedures */
+/* Profiling records are shared with compiler-generated native data sections. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_PROCINFO
 {
 	const char *name;
@@ -83,6 +88,9 @@ typedef struct FB_PROCINFO_TB
 	int next_free;
 	int proc_tb_id;
 } FB_PROCINFO_TB;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /* hash table block for procedures */
 typedef struct FB_PROC_HASH_TB

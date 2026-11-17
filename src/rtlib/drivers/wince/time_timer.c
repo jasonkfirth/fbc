@@ -29,7 +29,8 @@ FBCALL double fb_Timer( void )
 	}
 
 	if( timer == TIMER_NORMAL ) {
-		return (double)GetTickCount( ) * 0.001;
+		DWORD tick_count = GetTickCount( );
+		return (double)tick_count * 0.001;
 	} else {
 		QueryPerformanceCounter( &count );
 		return (double)count.QuadPart * frequency;

@@ -34,7 +34,7 @@ FBCALL FBSTRING_ACCESS *fb_OCTEx_l ( unsigned long long num, int digits )
 	i = (unsigned int)digits;
 	while( i > 0 ) {
 		i -= 1;
-		s->data[i] = '0' + (num & 7); /* '0'..'7' */
+		s->data[i] = (char)('0' + (char)(num & 7ULL)); /* '0'..'7' */
 		num >>= 3;
 	}
 

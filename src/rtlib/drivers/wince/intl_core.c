@@ -32,36 +32,57 @@
 
 static FBSTRING_ACCESS *fb_hIntlConvertToWC( FBSTRING_ACCESS *source, UINT source_cp )
 {
-    FBSTRING_ACCESS *res;
-    int chars_required;
+	FBSTRING_ACCESS *res = &fb_ctx.null_desc;
+	WCHAR *wide_buffer = NULL;
+	ssize_t source_size;
+	size_t wide_bytes;
+	int source_length;
+	int chars_required;
+	int chars_converted;
+	size_t wide_count;
+
+	if( source == NULL )
+		return res;
 
     FB_STRLOCK();
+	source_size = FB_STRSIZE( source );
+	if( (source_size < 0) || (source_size > INT_MAX) )
+		goto done;
+	source_length = (int)source_size;
 
     chars_required = MultiByteToWideChar( source_cp,
                                           0,
                                           source->data,
-                                          FB_STRSIZE( source ),
+                                          source_length,
                                           NULL,
                                           0 );
+	if( (source_length > 0) && (chars_required <= 0) )
+		goto done;
+	wide_count = (size_t)chars_required + 1u;
+	if( (wide_count > (SIZE_MAX / sizeof( WCHAR ))) ||
+	    ((wide_count * sizeof( WCHAR ) - 1u) >
+	     (size_t)FB_STRSIZEMSK) )
+		goto done;
+	wide_bytes = wide_count * sizeof( WCHAR );
+	wide_buffer = (WCHAR *)malloc( wide_bytes );
+	if( wide_buffer == NULL )
+		goto done;
+	if( chars_required > 0 ) {
+		chars_converted = MultiByteToWideChar( source_cp, 0, source->data,
+		                                      source_length, wide_buffer,
+		                                      chars_required );
+		if( chars_converted != chars_required )
+			goto done;
+	}
+	wide_buffer[chars_required] = 0;
+	res = fb_hStrAllocTemp_NoLock( NULL, (ssize_t)(wide_bytes - 1u) );
+	if( res == NULL )
+		res = &fb_ctx.null_desc;
+	else
+		memcpy( res->data, wide_buffer, wide_bytes );
 
-    res = fb_hStrAllocTemp_NoLock(
-        NULL,
-        (chars_required + 1) * sizeof( WCHAR ) - 1 );
-
-    if( res!=NULL ) {
-        size_t terminator_index = chars_required * sizeof( WCHAR );
-
-        MultiByteToWideChar( source_cp,
-                             0,
-                             (LPCSTR)source->data,
-                             FB_STRSIZE( source ),
-                             (LPWSTR)res->data,
-                             chars_required );
-        *((WCHAR *)(res->data + terminator_index)) = 0;
-    } else {
-        res = &fb_ctx.null_desc;
-    }
-
+done:
+	free( wide_buffer );
     fb_hStrDelTemp_NoLock( source );
     FB_STRUNLOCK();
 
@@ -70,35 +91,61 @@ static FBSTRING_ACCESS *fb_hIntlConvertToWC( FBSTRING_ACCESS *source, UINT sourc
 
 static FBSTRING_ACCESS *fb_hIntlConvertFromWC( FBSTRING_ACCESS *source, UINT dest_cp )
 {
-    FBSTRING_ACCESS *res;
+	FBSTRING_ACCESS *res = &fb_ctx.null_desc;
+	WCHAR *wide_source = NULL;
+	ssize_t source_size;
+	size_t wide_bytes;
+	int source_chars;
     int chars_required;
+	int chars_converted;
+
+	if( source == NULL )
+		return res;
 
     FB_STRLOCK();
+	source_size = FB_STRSIZE( source );
+	if( (source_size < 0) ||
+	    ((source_size % (ssize_t)sizeof( WCHAR )) != 0) ||
+	    ((size_t)(source_size / (ssize_t)sizeof( WCHAR )) > INT_MAX) )
+		goto done;
+	source_chars = (int)(source_size / (ssize_t)sizeof( WCHAR ));
+	wide_bytes = (size_t)(source_chars + 1) * sizeof( WCHAR );
+	wide_source = (WCHAR *)malloc( wide_bytes );
+	if( wide_source == NULL )
+		goto done;
+	if( source_size > 0 )
+		memcpy( wide_source, source->data, (size_t)source_size );
+	wide_source[source_chars] = 0;
 
     chars_required = WideCharToMultiByte( dest_cp,
                                           0,
-                                          (LPCWSTR)source->data,
-                                          FB_STRSIZE( source ) / sizeof( WCHAR ),
+                                          wide_source,
+                                          source_chars,
                                           NULL,
                                           0,
                                           NULL,
                                           NULL );
+	if( (source_chars > 0) && (chars_required <= 0) )
+		goto done;
+	res = fb_hStrAllocTemp_NoLock( NULL, chars_required );
+	if( res == NULL ) {
+		res = &fb_ctx.null_desc;
+		goto done;
+	}
+	if( chars_required > 0 ) {
+		chars_converted = WideCharToMultiByte( dest_cp, 0, wide_source,
+		                                      source_chars, res->data,
+		                                      chars_required, NULL, NULL );
+		if( chars_converted != chars_required ) {
+			fb_hStrDelTemp_NoLock( res );
+			res = &fb_ctx.null_desc;
+			goto done;
+		}
+	}
+	res->data[chars_required] = 0;
 
-    res = fb_hStrAllocTemp_NoLock( NULL, chars_required );
-    if( res!=NULL ) {
-        WideCharToMultiByte( dest_cp,
-                             0,
-                             (LPCWSTR)source->data,
-                             FB_STRSIZE( source ) / sizeof( WCHAR ),
-                             (LPSTR)res->data,
-                             chars_required,
-                             NULL,
-                             NULL );
-        res->data[chars_required] = 0;
-    } else {
-        res = &fb_ctx.null_desc;
-    }
-
+done:
+	free( wide_source );
     fb_hStrDelTemp_NoLock( source );
     FB_STRUNLOCK();
 
@@ -109,9 +156,13 @@ FBSTRING_ACCESS *fb_hIntlConvertString( FBSTRING_ACCESS *source,
                                  int source_cp,
                                  int dest_cp )
 {
+	if( (source_cp < 0) || (dest_cp < 0) ) {
+		fb_hStrDelTemp( source );
+		return &fb_ctx.null_desc;
+	}
     return fb_hIntlConvertFromWC(
-        fb_hIntlConvertToWC( source, source_cp ),
-        dest_cp );
+	    fb_hIntlConvertToWC( source, (UINT)source_cp ),
+	    (UINT)dest_cp );
 }
 
 /* ------------------------------------------------------------------------- */

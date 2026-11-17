@@ -127,8 +127,8 @@ int fb_hWinCEGetCurrentDirectoryWC( wchar_t *destination,
 
 void fb_hConvertPath( char *path )
 {
-	ssize_t index;
-	ssize_t length;
+	size_t index;
+	size_t length;
 
 	DBG_ASSERT( path != NULL );
 

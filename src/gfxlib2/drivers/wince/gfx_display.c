@@ -69,6 +69,7 @@ static void wince_source_rgb(const unsigned char *source, int x,
     unsigned char *red, unsigned char *green, unsigned char *blue)
 {
     unsigned int pixel;
+    unsigned short pixel16;
 
     if (fb_gfx->depth <= 8)
     {
@@ -81,7 +82,9 @@ static void wince_source_rgb(const unsigned char *source, int x,
 
     if (fb_gfx->depth == 15)
     {
-        pixel = ((const unsigned short *)source)[x];
+        memcpy(&pixel16, source + ((size_t)x * sizeof(pixel16)),
+               sizeof(pixel16));
+        pixel = pixel16;
         *red = (unsigned char)(((pixel >> 10) & 31U) * 255U / 31U);
         *green = (unsigned char)(((pixel >> 5) & 31U) * 255U / 31U);
         *blue = (unsigned char)((pixel & 31U) * 255U / 31U);
@@ -90,7 +93,9 @@ static void wince_source_rgb(const unsigned char *source, int x,
 
     if (fb_gfx->depth == 16)
     {
-        pixel = ((const unsigned short *)source)[x];
+        memcpy(&pixel16, source + ((size_t)x * sizeof(pixel16)),
+               sizeof(pixel16));
+        pixel = pixel16;
         *red = (unsigned char)(((pixel >> 11) & 31U) * 255U / 31U);
         *green = (unsigned char)(((pixel >> 5) & 63U) * 255U / 63U);
         *blue = (unsigned char)((pixel & 31U) * 255U / 31U);
@@ -106,7 +111,8 @@ static void wince_source_rgb(const unsigned char *source, int x,
         return;
     }
 
-    pixel = ((const unsigned int *)source)[x];
+	memcpy(&pixel, source + ((size_t)x * sizeof(unsigned int)),
+	       sizeof(unsigned int));
     *red = (unsigned char)((pixel >> 16) & 255U);
     *green = (unsigned char)((pixel >> 8) & 255U);
     *blue = (unsigned char)(pixel & 255U);

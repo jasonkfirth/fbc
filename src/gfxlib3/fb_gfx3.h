@@ -35,7 +35,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wc23-extensions"
 #pragma clang diagnostic ignored "-Wsign-conversion"
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && \
+	((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 8)))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -45,7 +46,8 @@
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && \
+	((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 8)))
 #pragma GCC diagnostic pop
 #endif
 
@@ -54,14 +56,15 @@
 #include <stdint.h>
 
 /*
-	Clang cannot emit native thread-local storage when targeting macOS before
-	10.7. FreeBASIC retains a 10.5 deployment target on x86_64, so gfxlib3 uses
-	its runtime or POSIX TLS fallback on those builds. If an older Darwin
-	compiler does not publish the deployment macro, select the compatible path.
+	Some supported targets lack C11 thread-local storage. Use the runtime TLS
+	registry on RISC OS GCCSDK and on older Darwin deployments instead.
 */
-#if defined(HOST_DARWIN) && \
+#if defined(HOST_RISCOS) || \
+	(defined(__GNUC__) && !defined(__clang__) && \
+	 ((__GNUC__ < 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ < 9)))) || \
+	(defined(HOST_DARWIN) && \
 	(!defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) || \
-	 (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070))
+	 (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070)))
 	#define FB_GFX3_NATIVE_TLS 0
 #else
 	#define FB_GFX3_NATIVE_TLS 1

@@ -33,6 +33,11 @@
 #include "../gfx3_resource.h"
 #include "../gfx3_vulkan.h"
 
+/* Render-thread state records retain native alignment for 64-bit counters. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_GFX3_VULKAN_BACKEND_STATE {
 	FB_GFX3_RESOURCE_REGISTRY *resources;
 	FB_GFX3_LOGGER *logger;
@@ -68,6 +73,9 @@ typedef struct FB_GFX3_VULKAN_BACKEND_SURFACE {
 	FB_GFX3_VULKAN_BACKEND_STATE *owner;
 	FB_GFX3_VULKAN_SURFACE surface;
 } FB_GFX3_VULKAN_BACKEND_SURFACE;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /* One tiled dispatch accepts eight former 1,024-operation producer packets. */
 #define FB_GFX3_VULKAN_BACKEND_BLIT_BATCH_LIMIT 8192u

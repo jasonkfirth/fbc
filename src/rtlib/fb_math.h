@@ -25,6 +25,11 @@ FBCALL double       fb_DosTan           ( double value );
 
 #define FB_RND_MAX_STATE 624
 
+/* The target ABI's trailing padding keeps the 64-bit seed union naturally aligned. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_RNDSTATE_ {
 	uint32_t algorithm;        /* see FB_RND_ALGORITHMS */
 	uint32_t length;           /* length of state vector (# of uint32_t) */
@@ -42,6 +47,9 @@ typedef struct FB_RNDSTATE_ {
 	/* state vector */
 	uint32_t state32[FB_RND_MAX_STATE];
 } FB_RNDSTATE;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 FBCALL FB_RNDSTATE *fb_RndGetState ( void );
 

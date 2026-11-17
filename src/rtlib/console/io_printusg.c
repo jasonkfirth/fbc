@@ -59,7 +59,7 @@ typedef struct {
 #define CHARS_NAN  ('#' << 24 | 'N' << 16 | 'A' << 8 | 'N')
 #define CHARS_INF  ('#' << 24 | 'I' << 16 | 'N' << 8 | 'F')
 #define CHARS_IND  ('#' << 24 | 'I' << 16 | 'N' << 8 | 'D')
-#define CHARS_TRUNC ('$' << 24 | '0' << 16 | '0' << 8 | '0') /* QB glitch: truncation "rounds up" the text chars */
+#define CHARS_TRUNC ((uint64_t)('$' << 24 | '0' << 16 | '0' << 8 | '0')) /* QB glitch: truncation "rounds up" the text chars */
 
 #define CHARS_TRUE  ('t' << 24 | 'r' << 16 | 'u' << 8 | 'e')
 #define CHARS_FALSE (((uint64_t)'f') << 32 | 'a' << 24 | 'l' << 16 | 's' << 8 | 'e')

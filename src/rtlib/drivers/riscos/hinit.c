@@ -49,7 +49,7 @@ char *UP;
  * Some termcap headers, including Apple's ncurses 6.0 termcap.h, declare
  * capability id arguments as char * even though the functions only read them.
  */
-#define FB_TERMCAP_ID( id ) ((char *)(id))
+#define FB_TERMCAP_ID( id ) (id)
 #endif
 
 #include <sys/ioctl.h>
@@ -119,6 +119,7 @@ FBCALL void fb_ProfileUnlock( void ) { pthread_mutex_unlock( &fb_profile_mutex )
 
 static void *bg_thread(void *arg)
 {
+	(void)arg;
 	while (fb_console_context.inited) {
 
 		BG_LOCK();
@@ -204,17 +205,25 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 	win.ws_row = 25;
 	win.ws_col = 80;
 
-	unsigned char *char_buffer = calloc(1, win.ws_row * win.ws_col * 2);
+	size_t screen_cells = (size_t)win.ws_row * (size_t)win.ws_col;
+	unsigned char *char_buffer = calloc(1, screen_cells * 2u);
 	if( char_buffer == NULL )
 		return;
-	unsigned char *attr_buffer = char_buffer + (win.ws_row * win.ws_col);
-	if (fb_console_context.char_buffer) {
+	unsigned char *attr_buffer = char_buffer + screen_cells;
+	if (fb_console_context.char_buffer &&
+	    (fb_console_context.w > 0) && (fb_console_context.h > 0)) {
 		int h = (fb_console_context.h < win.ws_row) ? fb_console_context.h : win.ws_row;
 		int w = (fb_console_context.w < win.ws_col) ? fb_console_context.w : win.ws_col;
 		int r;
 		for (r = 0; r < h; r++) {
-			memcpy(char_buffer + (r * win.ws_col), fb_console_context.char_buffer + (r * fb_console_context.w), w);
-			memcpy(attr_buffer + (r * win.ws_col), fb_console_context.attr_buffer + (r * fb_console_context.w), w);
+			memcpy(char_buffer + ((size_t)r * (size_t)win.ws_col),
+			       fb_console_context.char_buffer +
+			       ((size_t)r * (size_t)fb_console_context.w),
+			       (size_t)w);
+			memcpy(attr_buffer + ((size_t)r * (size_t)win.ws_col),
+			       fb_console_context.attr_buffer +
+			       ((size_t)r * (size_t)fb_console_context.w),
+			       (size_t)w);
 		}
 		free(fb_console_context.char_buffer);
 	}
@@ -233,6 +242,7 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 
 static void sigwinch_handler(int sig)
 {
+	(void)sig;
 	__fb_console_resized = TRUE;
 	signal(SIGWINCH, sigwinch_handler);
 }
@@ -580,10 +590,15 @@ static void hInit( void )
 		return;
 	BC = UP = 0;
 	p = tgetstr(FB_TERMCAP_ID( "pc" ), NULL);
-	PC = p ? *p : 0;
+	PC = (char)(p ? *p : 0);
 	if (tcgetattr(1, &tty))
 		return;
-	ospeed = cfgetospeed(&tty);
+	{
+		speed_t speed = cfgetospeed(&tty);
+		if( speed > SHRT_MAX )
+			return;
+		ospeed = (short)speed;
+	}
 	if (!tgetflag(FB_TERMCAP_ID( "am" )))
 		return;
 	for (i = 0; i < SEQ_MAX; i++)
@@ -646,6 +661,7 @@ void fb_hInit( void )
 
 void fb_hEnd( int unused )
 {
+	(void)unused;
 	fb_hExitConsole();
 	fb_console_context.inited = FALSE;
 	if( bgthread_inited ) {

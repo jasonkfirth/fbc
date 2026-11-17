@@ -7,6 +7,7 @@
  */
 #include "../../fb.h"
 #include <fcntl.h>
+#include <limits.h>
 #include <string.h>
 
 static int do_lock( FILE *f, int lock, fb_off_t inipos, fb_off_t size )
@@ -16,6 +17,11 @@ static int do_lock( FILE *f, int lock, fb_off_t inipos, fb_off_t size )
 
 	if( f == NULL || inipos < 0 || size <= 0 )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#if defined(HOST_RISCOS)
+	if( (inipos > LONG_MAX) || (size > LONG_MAX) ||
+	    (inipos > ((fb_off_t)LONG_MAX - size)) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+#endif
 
 	memset( &lck, 0, sizeof(lck) );
 
@@ -35,8 +41,16 @@ static int do_lock( FILE *f, int lock, fb_off_t inipos, fb_off_t size )
 	}
 
 	lck.l_whence = SEEK_SET;
-	lck.l_start = inipos;
-	lck.l_len = size;
+	/* RISC OS UnixLib can expose narrower flock offsets than the runtime ABI. */
+#if defined(HOST_RISCOS) && defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#endif
+	lck.l_start = (off_t)inipos;
+	lck.l_len = (off_t)size;
+#if defined(HOST_RISCOS) && defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 	/* Runtime file operations hold FB_LOCK, so contention must not block here. */
 	result = fcntl( fd, F_SETLK, &lck );

@@ -34,7 +34,7 @@ FBCALL FBSTRING_ACCESS *fb_BINEx_l ( unsigned long long num, int digits )
 	i = (unsigned int)digits;
 	while( i > 0 ) {
 		i -= 1;
-		s->data[i] = '0' + (num & 1); /* '0' or '1' */
+		s->data[i] = (char)('0' + (char)(num & 1ULL)); /* '0' or '1' */
 		num >>= 1;
 	}
 

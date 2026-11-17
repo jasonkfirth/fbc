@@ -24,6 +24,18 @@
 
 #include <windows.h>
 
+static void *hProcAddressToPointer( FARPROC procedure )
+{
+	void *address = NULL;
+
+	/* The Windows CE loader exposes the same address representation for both. */
+	_Static_assert( sizeof( address ) == sizeof( procedure ),
+	                "Windows CE procedure pointer size" );
+	if( procedure != NULL )
+		memcpy( &address, &procedure, sizeof( address ) );
+	return address;
+}
+
 static FB_DYLIB hLoadLibrary( const char *name )
 {
 	wchar_t *wide_name;
@@ -51,7 +63,7 @@ static void *hLoadSymbol( FB_DYLIB library, const char *name )
 	procedure = GetProcAddressW( library, wide_name );
 	free( wide_name );
 
-	return (void *)procedure;
+	return hProcAddressToPointer( procedure );
 }
 
 FB_DYLIB fb_hDynLoad( const char *library_name,

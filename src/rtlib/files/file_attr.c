@@ -24,6 +24,17 @@
 #include <errno.h>
 #endif
 
+#if defined(HOST_WINCE) || defined(HOST_MINGW) || defined(HOST_XBOX)
+/* FB_FILE_INFO stores signed ticks. Saturate FILETIME values it cannot represent. */
+static int64_t hWindowsFileTimeTicks( const FILETIME *file_time )
+{
+	uint64_t ticks = ((uint64_t)file_time->dwHighDateTime << 32) |
+		file_time->dwLowDateTime;
+	if( ticks > (uint64_t)INT64_MAX ) return INT64_MAX;
+	return (int64_t)ticks;
+}
+#endif
+
 #if !defined(HOST_WINCE) && !defined(HOST_XBOX)
 #if defined(HOST_MINGW) && !defined(HOST_WINCE)
 #include <io.h>
@@ -188,10 +199,9 @@ static int hWindowsFileInfo( HANDLE handle, FB_FILE_INFO *info )
 	info->identity[1] = native.nFileIndexHigh;
 	info->identity[2] = native.nFileIndexLow;
 	info->bytes = ((uint64_t)native.nFileSizeHigh << 32) | native.nFileSizeLow;
-	/* FILETIME counts 100 ns units. Preserve the host's complete value without
-	   requiring callers to know its epoch or the native structure layout. */
-	info->modified = ((uint64_t)native.ftLastWriteTime.dwHighDateTime << 32) | native.ftLastWriteTime.dwLowDateTime;
-	info->changed = ((uint64_t)native.ftCreationTime.dwHighDateTime << 32) | native.ftCreationTime.dwLowDateTime;
+	/* Keep FILETIME's epoch and 100 ns units for callers that compare metadata. */
+	info->modified = hWindowsFileTimeTicks( &native.ftLastWriteTime );
+	info->changed = hWindowsFileTimeTicks( &native.ftCreationTime );
 	return 1;
 }
 #endif
@@ -217,8 +227,8 @@ int fb_FileQueryInfo( const char *filename, int follow_links, FB_FILE_INFO *info
 	info->flags = FB_FILE_INFO_EXISTS;
 	if( !(native.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ) info->flags |= FB_FILE_INFO_REGULAR;
 	info->bytes = ((uint64_t)native.nFileSizeHigh << 32) | native.nFileSizeLow;
-	info->modified = ((uint64_t)native.ftLastWriteTime.dwHighDateTime << 32) | native.ftLastWriteTime.dwLowDateTime;
-	info->changed = ((uint64_t)native.ftCreationTime.dwHighDateTime << 32) | native.ftCreationTime.dwLowDateTime;
+	info->modified = hWindowsFileTimeTicks( &native.ftLastWriteTime );
+	info->changed = hWindowsFileTimeTicks( &native.ftCreationTime );
 	return 1;
 #elif defined(HOST_XBOX)
 	HANDLE handle = fb_hOpenFileForQuery( filename );

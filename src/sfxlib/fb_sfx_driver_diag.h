@@ -24,6 +24,11 @@
 #ifndef FB_SFX_DRIVER_DIAG_H
 #define FB_SFX_DRIVER_DIAG_H
 
+/* Natural ABI padding keeps the diagnostic snapshot aligned on each target. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_SFX_DRIVER_STATS
 {
     unsigned long long write_calls;
@@ -46,6 +51,9 @@ typedef struct FB_SFX_DRIVER_STATS
 #endif
 
 } FB_SFX_DRIVER_STATS;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 void fb_sfxDriverDiagnostics(const char *driver_name,
                              const float *buffer,

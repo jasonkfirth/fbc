@@ -179,7 +179,7 @@ static int fb_hDevTcpSocketError( int result )
 	return err;
 #else
 	(void)result;
-	return FB_TCP_ERRNO();
+	return (int)FB_TCP_ERRNO();
 #endif
 }
 
@@ -1021,7 +1021,8 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 			flags = MSG_NOSIGNAL;
 		#endif
 
-		sent = fb_hDevTcpSendUnlocked( info, buffer + total, chunk, flags, &err );
+		sent = fb_hDevTcpSendUnlocked( info, buffer + total, (size_t)chunk,
+		                               flags, &err );
 		if( sent <= 0 ) {
 			if( sent < 0 && FB_TCP_WOULDBLOCK( err ) &&
 			    fb_hDevTcpWaitWritable( info ) ) {
@@ -1031,7 +1032,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 
-		total += sent;
+		total += (size_t)sent;
 	}
 
 	return FB_RTERROR_OK;
@@ -1065,8 +1066,8 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 
 		FD_ZERO( &set );
 		FD_SET( info->hSocket, &set );
-		tv.tv_sec = slice / 1000;
-		tv.tv_usec = (slice % 1000) * 1000;
+		tv.tv_sec = (long)(slice / 1000u);
+		tv.tv_usec = (long)((slice % 1000u) * 1000u);
 
 		FB_UNLOCK();
 		res = FB_TCP_SELECT( info->hSocket + 1, &set, NULL, NULL, &tv );
@@ -1203,7 +1204,7 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 		                                    0,
 		                                    &err );
 		if( bytes > 0 ) {
-			*pValuelen = buffered + bytes;
+			*pValuelen = buffered + (size_t)bytes;
 		} else if( bytes == 0 ) {
 			info->is_closed = TRUE;
 			*pValuelen = buffered;
@@ -1254,7 +1255,7 @@ static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset )
 		if( FB_TCP_IOCTL( info->hSocket, FIONREAD, &bytes ) != 0 ) {
 			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
-		*pOffset = bytes;
+		*pOffset = (fb_off_t)bytes;
 #else
 		int bytes = 0;
 		if( FB_TCP_IOCTL( info->hSocket, FIONREAD, &bytes ) != 0 ) {
@@ -1372,7 +1373,7 @@ static void fb_hDevTcpAppendChunk( FBSTRING_ACCESS *dst, const char *buffer, ssi
 	if( len <= 0 )
 		return;
 
-	src = fb_StrAllocTempDescF( (void *)buffer, len + 1 );
+	src = fb_StrAllocTempDescF( buffer, len + 1 );
 	if( dst->data == NULL ) {
 		fb_StrAssign( dst, -1, src, -1, FALSE );
 	} else {

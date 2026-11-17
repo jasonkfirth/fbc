@@ -10,14 +10,18 @@
 
 int fb_hSetDate( int y, int m, int d )
 {
+	if( (y < 1601) || (y > 9999) ||
+	    (m < 1) || (m > 12) || (d < 1) || (d > 31) )
+		return -1;
+
 	/* get current local time and date */
 	SYSTEMTIME st;
 	GetLocalTime( &st );
 
 	/* set time fields */
-	st.wYear = y;
-	st.wMonth = m;
-	st.wDay = d;
+	st.wYear = (WORD)y;
+	st.wMonth = (WORD)m;
+	st.wDay = (WORD)d;
 
 	/* set system time relative to local time zone */
 	if( SetLocalTime( &st ) == 0) {

@@ -11,6 +11,7 @@
 FBCALL size_t fb_GetMemAvail( int mode )
 {
 	MEMORYSTATUS ms;
+	(void)mode;
 	ms.dwLength = sizeof( MEMORYSTATUS );
 	GlobalMemoryStatus( &ms );
 	return ms.dwAvailPhys;

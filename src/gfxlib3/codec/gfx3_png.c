@@ -627,7 +627,7 @@ static void png_bit_reader_align(PNG_BIT_READER *reader)
 static int png_huffman_construct(PNG_HUFFMAN *table,
 	const unsigned char *lengths, unsigned int count)
 {
-	unsigned short offsets[PNG_DEFLATE_MAX_BITS + 1];
+	unsigned int offsets[PNG_DEFLATE_MAX_BITS + 1];
 	unsigned int symbol;
 	unsigned int length;
 	int available = 1;
@@ -1480,7 +1480,7 @@ static unsigned int png_read_sample(const unsigned char *row,
 	shift = 8u - bit_depth -
 		(unsigned int)(bit_position & 7u);
 	mask = (1u << bit_depth) - 1u;
-	return (row[bit_position >> 3] >> shift) & mask;
+	return ((unsigned int)row[bit_position >> 3] >> shift) & mask;
 }
 
 static unsigned int png_scale_sample(unsigned int sample,

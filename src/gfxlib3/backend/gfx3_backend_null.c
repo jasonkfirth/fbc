@@ -1227,7 +1227,7 @@ static int null_blit(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 	size_t snapshot_bytes;
 	size_t snapshot_count;
 	size_t snapshot_height;
-	size_t snapshot_width;
+	size_t snapshot_width = 0u;
 	int64_t destination_x2;
 	int64_t destination_y2;
 	int start_x;

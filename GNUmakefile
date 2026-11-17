@@ -182,6 +182,7 @@ rtlib: | maybe-prereqs
 fbrt: | maybe-prereqs
 gfxlib2: | maybe-prereqs
 gfxlib3: | maybe-prereqs
+gfxlib3-objects: | maybe-prereqs
 sfxlib: | maybe-prereqs
 
 bootstrap: | maybe-prereqs
@@ -347,6 +348,7 @@ help:
 	@echo "  fbrt                    Build startup/runtime objects"
 	@echo "  gfxlib2                 Build graphics library"
 	@echo "  gfxlib3                 Build experimental GPU graphics core"
+	@echo "  gfxlib3-objects         Compile gfxlib3 objects without requiring a platform backend"
 	@echo "  sfxlib                  Build sound library"
 	@echo ""
 	@echo "Bootstrap:"

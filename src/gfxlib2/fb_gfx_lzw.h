@@ -48,6 +48,11 @@ do {										\
 } while (0)
 
 
+/* LZW table entries keep a fixed six-byte serialized stride. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct LZW_ENTRY
 {
 	short code;
@@ -56,6 +61,9 @@ typedef struct LZW_ENTRY
 	/* Keep the existing six-byte table-entry stride explicit. */
 	unsigned char reserved_tail_padding;
 } LZW_ENTRY;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 extern LZW_ENTRY fb_lzw_entry[TABLE_SIZE];
 

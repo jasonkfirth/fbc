@@ -172,8 +172,12 @@ static int file_api_decode_rle(FILE *file, uint32_t width, uint32_t height,
 			if ((y >= height) || (count > (width - x)))
 				goto failed;
 			for (i = 0u; i < count; ++i) {
-				uint8_t index = (bits_per_pixel == 8u) ? value :
-					(uint8_t)((value >> ((i & 1u) ? 0u : 4u)) & 0x0Fu);
+				uint8_t index;
+				if (bits_per_pixel == 8u)
+					index = value;
+				else
+					index = (uint8_t)(((uint32_t)value >>
+						((i & 1u) ? 0u : 4u)) & 0x0Fu);
 
 				indices[((size_t)y * width) + x++] = index;
 			}
@@ -212,9 +216,12 @@ static int file_api_decode_rle(FILE *file, uint32_t width, uint32_t height,
 				if ((i & ((bits_per_pixel == 8u) ? 0u : 1u)) == 0u &&
 				    !file_api_read_u8(file, &packed))
 					goto failed;
-				indices[((size_t)y * width) + x++] =
-					(bits_per_pixel == 8u) ? packed :
-					(uint8_t)((packed >> ((i & 1u) ? 0u : 4u)) & 0x0Fu);
+				if (bits_per_pixel == 8u)
+					indices[((size_t)y * width) + x++] = packed;
+				else
+					indices[((size_t)y * width) + x++] =
+						(uint8_t)(((uint32_t)packed >>
+						((i & 1u) ? 0u : 4u)) & 0x0Fu);
 			}
 			if ((byte_count & 1u) != 0u && !file_api_skip(file, 1u))
 				goto failed;
@@ -835,11 +842,11 @@ static int file_api_load_bmp(FILE *file, void *destination,
 				} else if (bits_per_pixel == 8) {
 					index = source_row[x];
 				} else if (bits_per_pixel == 4) {
-					index = (uint8_t)((source_row[x / 2u] >>
+					index = (uint8_t)(((uint32_t)source_row[x / 2u] >>
 						((x & 1u) ? 0u : 4u)) & 0x0Fu);
 				} else {
-					index = (uint8_t)((source_row[x / 8u] >>
-						(7u - (x & 7u))) & 1u);
+					index = (uint8_t)(((uint32_t)source_row[x / 8u] >>
+						(7u - ((uint32_t)x & 7u))) & 1u);
 				}
 				color = source_palette[index];
 			} else if (compression == FB_GFX3_BMP_COMPRESSION_BITFIELDS) {

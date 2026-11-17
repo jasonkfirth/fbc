@@ -209,7 +209,11 @@ FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 				break;
 		}
 
-		return (double)fb_WstrRadix2Longint( r, len - fb_wstr_CalcDiff( p, r ), radix );
+			{
+				long long integer_value = fb_WstrRadix2Longint( r,
+					len - fb_wstr_CalcDiff( p, r ), radix );
+				return (double)integer_value;
+			}
 	}
 
 	return hWstrToDoubleLimited( p, len );

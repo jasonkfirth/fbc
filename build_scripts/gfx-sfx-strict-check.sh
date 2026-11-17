@@ -160,7 +160,7 @@ compiler_accepts_flag() {
 	esac
 
 	printf 'int main(void) { return 0; }\n' |
-		"$compiler" -x "$language" "$flag" -c -o "/tmp/fbc-strict-flag-test.$suffix.o" - \
+		"$compiler" -Werror -x "$language" "$flag" -c -o "/tmp/fbc-strict-flag-test.$suffix.o" - \
 		>/dev/null 2>&1
 }
 
@@ -355,12 +355,44 @@ $extra"
 			-Wpedantic \
 			-Wpointer-arith \
 			-Wcast-align \
+			-Wcast-align=strict \
+			-Wcast-qual \
 			-Wshadow \
 			-Wmissing-declarations \
 			-Wconversion \
 			-Wsign-conversion \
+			-Wfloat-conversion \
 			-Wdouble-promotion \
-			-Wfloat-equal)"
+			-Wfloat-equal \
+			-Wformat-nonliteral \
+			-Wformat-overflow=2 \
+			-Wformat-truncation=2 \
+			-Wuninitialized \
+			-Wmaybe-uninitialized \
+			-Winit-self \
+			-Warray-bounds=2 \
+			-Wstringop-overflow=4 \
+			-Wstringop-truncation \
+			-Wunused \
+			-Wunused-parameter \
+			-Wsign-compare \
+			-Wswitch \
+			-Wswitch-default \
+			-Wimplicit-fallthrough \
+			-Wshift-overflow=2 \
+			-Wshift-negative-value \
+			-Wstrict-overflow=1 \
+			-Wpadded \
+			-Wuse-after-free=3 \
+			-Wdangling-pointer=2 \
+			-Walloca \
+			-Wvla \
+			-Wduplicated-cond \
+			-Wduplicated-branches \
+			-Wlogical-op \
+			-Wtrampolines \
+			-Wmissing-include-dirs \
+			-Wdate-time)"
 		if [ "$language" = "c" ]; then
 			extra="$extra $(append_supported_flags "$compiler" "$language" \
 				-Wbad-function-cast \
@@ -609,7 +641,7 @@ main() {
 	msg "Building rtlib, gfxlib2, gfxlib3, and sfxlib with strict diagnostics"
 	(
 		cd "$ROOT"
-		make "${make_args[@]}" rtlib gfxlib2 gfxlib3 sfxlib
+		make "${make_args[@]}" rtlib gfxlib2 gfxlib3 gfxlib3-objects sfxlib
 	)
 
 	if [ "$KEEP_OBJECTS" -eq 0 ]; then

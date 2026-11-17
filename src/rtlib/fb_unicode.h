@@ -347,7 +347,7 @@ static __inline__ FB_WCHAR fb_wstr_ToUpper( FB_WCHAR c )
 /* Copy n characters from A to B and terminate with NUL. */
 static __inline__ void fb_wstr_Copy( FB_WCHAR *dst, const FB_WCHAR *src, ssize_t chars )
 {
-	const FB_WCHAR terminator = FB_WCHAR_LITERAL('\0');
+	const FB_WCHAR terminator = (FB_WCHAR)FB_WCHAR_LITERAL('\0');
 
 	if( (src != NULL) && (chars > 0) )
 		dst = (FB_WCHAR *) FB_MEMCPYX( dst, src, (size_t)chars * sizeof( FB_WCHAR ) );
@@ -371,7 +371,7 @@ static __inline__ void fb_wstr_Fill( FB_WCHAR *dst, FB_WCHAR c, ssize_t chars )
 	for( i = 0; i < chars; i++ )
 		*dst++ = c;
 	/* add null-term */
-	*dst = FB_WCHAR_LITERAL('\0');
+	*dst = (FB_WCHAR)FB_WCHAR_LITERAL('\0');
 }
 
 /* Skip all characters (c) from the beginning of the string, max 'n' chars. */

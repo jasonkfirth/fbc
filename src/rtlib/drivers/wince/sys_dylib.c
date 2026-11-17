@@ -24,6 +24,18 @@
 
 #include <windows.h>
 
+static void *hProcAddressToPointer( FARPROC procedure )
+{
+	void *address = NULL;
+
+	/* The Windows CE loader exposes the same address representation for both. */
+	_Static_assert( sizeof( address ) == sizeof( procedure ),
+	                "Windows CE procedure pointer size" );
+	if( procedure != NULL )
+		memcpy( &address, &procedure, sizeof( address ) );
+	return address;
+}
+
 static FARPROC hGetSymbol( HINSTANCE library, const char *name )
 {
 	wchar_t *wide_name;
@@ -88,7 +100,7 @@ FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 	}
 
 	fb_hStrDelTemp( symbol );
-	return (void *)procedure;
+	return hProcAddressToPointer( procedure );
 }
 
 FBCALL void *fb_DylibSymbolByOrd( void *library, short int symbol )
@@ -98,8 +110,8 @@ FBCALL void *fb_DylibSymbolByOrd( void *library, short int symbol )
 	if( module == NULL )
 		module = GetModuleHandleW( NULL );
 
-	return (void *)GetProcAddressW( module,
-	                                MAKEINTRESOURCEW( (WORD)symbol ) );
+	return hProcAddressToPointer( GetProcAddressW( module,
+	                                MAKEINTRESOURCEW( (WORD)symbol ) ) );
 }
 
 FBCALL void fb_DylibFree( void *library )

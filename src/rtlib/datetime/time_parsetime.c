@@ -65,7 +65,7 @@ static int fb_hCheckAMPM( const char *text, const char *text_end, size_t *pLengt
         break;
     }
     if( result!=0 ) {
-        char ch = (text < text_end) ? *text : 0;
+		char ch = (char)((text < text_end) ? *text : 0);
         if( ch==0 ) {
             // ignore
         } else if( ch=='m' || ch=='M' ) {

@@ -39,6 +39,42 @@
 #include "../../gfxlib2/drivers/win32/gfx_metrics.h"
 #endif
 
+static ssize_t query_u32_to_ssize(uint32_t value)
+{
+#if SSIZE_MAX < UINT32_MAX
+	if (value > (uint32_t)SSIZE_MAX)
+		return SSIZE_MAX;
+#endif
+	return (ssize_t)value;
+}
+
+static ssize_t query_color_to_ssize(uint32_t color)
+{
+	/* The FreeBASIC ABI exposes 32-bit color words through a signed integer slot. */
+	return (ssize_t)color;
+}
+
+static ssize_t query_pitch_to_ssize(uint32_t width, uint32_t bytes_per_pixel)
+{
+	uint64_t pitch = (uint64_t)width * bytes_per_pixel;
+
+	if (pitch > (uint64_t)SSIZE_MAX)
+		return SSIZE_MAX;
+	return (ssize_t)pitch;
+}
+
+static int query_parameter_fits_int(ssize_t value)
+{
+	if( value == (ssize_t)0x80000000 )
+		return TRUE;
+#if defined(HOST_64BIT)
+	return (value >= INT_MIN) && (value <= INT_MAX);
+#else
+	(void)value;
+	return TRUE;
+#endif
+}
+
 
 enum FB_GFX3_CONTROL_ID {
 	FB_GFX3_GET_WINDOW_POS = 0,
@@ -368,15 +404,15 @@ FBCALL void fb_GfxScreenInfo(ssize_t *width, ssize_t *height,
 		uint32_t bpp = query_bytes_per_pixel(mode->depth);
 
 		if (width != NULL)
-			*width = mode->width;
+			*width = query_u32_to_ssize(mode->width);
 		if (height != NULL)
-			*height = mode->height;
+			*height = query_u32_to_ssize(mode->height);
 		if (depth != NULL)
-			*depth = mode->depth;
+			*depth = query_u32_to_ssize(mode->depth);
 		if (bytes_per_pixel != NULL)
-			*bytes_per_pixel = bpp;
+			*bytes_per_pixel = query_u32_to_ssize(bpp);
 		if (pitch != NULL)
-			*pitch = (ssize_t)mode->width * bpp;
+			*pitch = query_pitch_to_ssize(mode->width, bpp);
 		if (refresh != NULL)
 			*refresh = 0;
 		driver_name = query_driver_name(mode);
@@ -470,12 +506,20 @@ enum FB_GFX3_SCREENLIST_DEPTH {
 	FB_GFX3_SCREENLIST_32 = 1u << 5
 };
 
+/* The native screen list keeps its historical record alignment. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct FB_GFX3_SCREENLIST_MODE {
 	uint16_t width;
 	uint16_t height;
 	uint8_t supported_depths;
 	uint8_t tail_padding;
 } FB_GFX3_SCREENLIST_MODE;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 static const FB_GFX3_SCREENLIST_MODE query_screenlist_modes[] = {
 	{ 320, 200, FB_GFX3_SCREENLIST_2 | FB_GFX3_SCREENLIST_4 |
@@ -1212,17 +1256,17 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 			}
 			break;
 		case FB_GFX3_GET_SCREEN_SIZE:
-			result1 = mode->width;
-			result2 = mode->height;
+			result1 = query_u32_to_ssize(mode->width);
+			result2 = query_u32_to_ssize(mode->height);
 			break;
 		case FB_GFX3_GET_SCREEN_DEPTH:
-			result1 = mode->depth;
+			result1 = query_u32_to_ssize(mode->depth);
 			break;
 		case FB_GFX3_GET_SCREEN_BPP:
-			result1 = bpp;
+			result1 = query_u32_to_ssize(bpp);
 			break;
 		case FB_GFX3_GET_SCREEN_PITCH:
-			result1 = (ssize_t)mode->width * bpp;
+			result1 = query_pitch_to_ssize(mode->width, bpp);
 			break;
 		case FB_GFX3_GET_TRANSPARENT_COLOR:
 			result1 = (bpp > 1) ? 0xFF00FF : 0;
@@ -1238,8 +1282,8 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 			result2 = CINT(state->last_y);
 			break;
 		case FB_GFX3_GET_COLOR:
-			result1 = state->foreground_color;
-			result2 = state->background_color;
+			result1 = query_color_to_ssize(state->foreground_color);
+			result2 = query_color_to_ssize(state->background_color);
 			break;
 		case FB_GFX3_GET_ALPHA_PRIMITIVES:
 			result1 = mode->alpha_primitives ? FB_TRUE : FB_FALSE;
@@ -1261,10 +1305,8 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 			fb_gfx3_context_flush(&mode->context);
 			break;
 		case FB_GFX3_SET_WINDOW_POS:
-			if (((*parameter1 == (ssize_t)0x80000000) ||
-			     ((*parameter1 >= INT_MIN) && (*parameter1 <= INT_MAX))) &&
-			    ((*parameter2 == (ssize_t)0x80000000) ||
-			     ((*parameter2 >= INT_MIN) && (*parameter2 <= INT_MAX))) &&
+			if (query_parameter_fits_int(*parameter1) &&
+			    query_parameter_fits_int(*parameter2) &&
 			    (fb_gfx3_input_request_window_position(&mode->input,
 			     (int)*parameter1, (int)*parameter2) == FB_GFX3_OK))
 				fb_gfx3_context_flush(&mode->context);

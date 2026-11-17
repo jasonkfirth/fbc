@@ -155,6 +155,8 @@ int fb_SerialOpen( FB_FILE *handle,
     case FB_FILE_ACCESS_ANY:
         dwDesiredAccess = GENERIC_READ | GENERIC_WRITE;
         break;
+    default:
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     }
 
     pszDev = fb_hSerialMakeDeviceName( iPort, pszDevice );
@@ -250,7 +252,7 @@ int fb_SerialOpen( FB_FILE *handle,
         } else {
             dcb.BaudRate = options->uiSpeed;
             dcb.fBinary = !options->AddLF; /* Windows serial ports are byte streams. */
-            dcb.fParity = options->CheckParity;
+            dcb.fParity = (unsigned char)(options->CheckParity != 0);
             dcb.fOutxCtsFlow = options->DurationCTS!=0;
             dcb.fDtrControl = ( (options->KeepDTREnabled) ? DTR_CONTROL_ENABLE : DTR_CONTROL_DISABLE );
 
@@ -285,6 +287,9 @@ int fb_SerialOpen( FB_FILE *handle,
             case FB_SERIAL_PARITY_MARK:
                 dcb.Parity = MARKPARITY;
                 break;
+            default:
+                dcb.Parity = NOPARITY;
+                break;
             }
 
             switch ( options->StopBits ) {
@@ -296,6 +301,9 @@ int fb_SerialOpen( FB_FILE *handle,
                 break;
             case FB_SERIAL_STOP_BITS_2:
                 dcb.StopBits = TWOSTOPBITS;
+                break;
+            default:
+                dcb.StopBits = ONESTOPBIT;
                 break;
             }
 

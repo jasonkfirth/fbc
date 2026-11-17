@@ -122,7 +122,8 @@ endif
 # ---------------------------------------------------------------------------
 
 ifeq ($(TARGET_OS),wince)
-  CPPFLAGS += -I$(rootdir)/lib/freebasic/wince-$(TARGET_ARCH)/include
+  # Target SDK headers such as libffi are external to the runtime sources.
+  CPPFLAGS += -isystem $(rootdir)/lib/freebasic/wince-$(TARGET_ARCH)/include
   ALLCFLAGS += \
     -DDISABLE_NCURSES \
     -DDISABLE_LANGINFO \
