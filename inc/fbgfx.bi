@@ -32,6 +32,25 @@
 namespace FB
 #endif
 
+#ifndef __FB_GFXLIB3__
+	'' One ordered batch of work-page pixels with gfxlib-compatible alpha blending.
+	type Gfx2Point
+		x as long
+		y as long
+		color as ulong
+		alpha as ulong
+	end type
+#if __FB_LANG__ = "qb"
+	declare function Gfx2DrawPoints alias "fb_GfxDrawPointBatch" _
+		( byval points as const Gfx2Point ptr, byval count as long ) as long
+#else
+	extern "rtlib"
+	declare function Gfx2DrawPoints alias "fb_GfxDrawPointBatch" _
+		( byval points as const Gfx2Point ptr, byval count as long ) as long
+	end extern
+#endif
+#endif
+
 	'' Pixel dimensions of DRAW STRING, independent of VIEW/WINDOW and clipping.
 	'' Empty text has zero width and the full font height. Explicit font images
 	'' may be measured without a display. Errors return nonzero and zero outputs.

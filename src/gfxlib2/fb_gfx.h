@@ -252,6 +252,12 @@ typedef struct FB_GFX_CHAR_CELL {
 	unsigned fg, bg;
 } GFX_CHAR_CELL;
 
+typedef struct FB_GFX_POINT_BATCH_ITEM {
+	int x, y;
+	unsigned int color;
+	unsigned int alpha;
+} FB_GFX_POINT_BATCH_ITEM;
+
 typedef struct FBGFX
 {
 	int id;                                 /**< Mode id number for contexts identification */
@@ -680,6 +686,7 @@ extern FBCALL float fb_GfxCursor(int func);
 extern FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, unsigned int border_color, int screen);
 extern FBCALL void fb_GfxWindow(float x1, float y1, float x2, float y2, int screen);
 extern FBCALL void fb_GfxLine(void *target, float x1, float y1, float x2, float y2, unsigned int color, int type, unsigned int style, int coord_type);
+extern FBCALL int fb_GfxDrawPointBatch(const FB_GFX_POINT_BATCH_ITEM *points, int count);
 extern FBCALL void fb_GfxEllipse(void *target, float x, float y, float radius, unsigned int color, float aspect, float start, float end, int fill, int coord_type);
 extern FBCALL int fb_GfxGet(void *target, float x1, float y1, float x2, float y2, unsigned char *dest, int coord_type, FBARRAY_ACCESS *array);
 extern FBCALL int fb_GfxGetQB(void *target, float x1, float y1, float x2, float y2, unsigned char *dest, int coord_type, FBARRAY_ACCESS *array);

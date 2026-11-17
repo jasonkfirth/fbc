@@ -91,13 +91,11 @@
 #endif
 
 /*
-	A 1024-command drain keeps the render thread responsive to input, readback,
-	and shutdown while allowing a normal sprite frame to reach the GPU as one
-	ordered submission. Smaller drains made the OpenGL winner/resolve path scan
-	the same framebuffer once per 64 sprites, which is correct but needlessly
-	expensive on the hardware renderer.
+	A 2048-command drain lets the backend coalesce longer ordered runs of
+	primitive commands. The renderer still yields between drains, and completion
+	commands remain batch boundaries so readback and shutdown stay responsive.
 */
-#define FB_GFX3_RENDERER_BATCH_LIMIT 1024u
+#define FB_GFX3_RENDERER_BATCH_LIMIT 2048u
 
 /*
 	Renderer profile

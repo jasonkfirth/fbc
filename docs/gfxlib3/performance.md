@@ -2365,4 +2365,42 @@ seconds under different runs. QFAK remains an end-to-end correctness
 qualification; the editor profile and primitive fixture measure the changed
 path directly.
 
+## Renderer command drain bound, 2026-11-13
+
+The renderer now drains up to 2,048 adjacent asynchronous commands at once,
+increased from 1,024. This gives the backend more room to combine ordered
+primitive work. Completion commands remain batch boundaries, and the renderer
+still yields before each nonblocking drain.
+
+Two native-display XTest runs used the 25,613-primitive
+`240703-ELEC-68214-SH2.dwg` fbCAD workload. Uncached full redraw measured 51.50
+and 50.23 FPS, with 17.93 and 18.46 ms work p95. Cached rendering measured
+112.38 and 111.82 FPS; navigation measured 116.56 and 116.97 FPS; the 120 FPS
+request measured 112.44 and 112.80 FPS. Both runs passed the same-session
+cached/full-redraw pixel comparison. An earlier separate-session uncached
+sample was 47.50 FPS / 19.54 ms work p95, so the new samples clear 50 FPS, but
+the difference is not a controlled A/B measurement.
+
+## 4,096-command drain trial, 2026-11-14
+
+The OpenGL backend advertises a 4,096-command maximum, so the renderer's
+2,048-command bound was tested against the full backend limit on the same
+25,613-primitive drawing at the native display. The 2,048 run measured 110.45
+FPS cached, 49.49 uncached, 112.88 during navigation, and 112.06 at a 120 FPS
+request. Two 4,096 runs measured 105.09/113.25 cached, 50.14/47.82 uncached,
+115.11/111.40 during navigation, and 108.21/113.37 at the 120 FPS request.
+All three runs passed cached/full-redraw pixel comparison. Input p95 remained
+between 0.24 and 0.27 ms. The uncached and cached results varied in both
+directions, so the larger bound showed no repeatable gain. The renderer stays
+at 2,048 commands per drain.
+
+## Mixed-primitive staging reuse trial, 2026-11-14
+
+Reusing a renderer-owned CPU array instead of allocating it for every mixed
+primitive batch passed the same pixel-equivalence check. The native-display
+XTest run measured 112.24 FPS cached, 47.20 uncached, 112.33 during navigation,
+and 111.68 at a 120 FPS request. These results did not show a repeatable gain
+over the earlier 2,048-command run, so the extra persistent state was removed;
+the mixed batch path retains its bounded per-batch allocation.
+
 <!-- end of performance.md -->
