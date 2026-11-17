@@ -1236,6 +1236,9 @@ private function hEmitLibcSizeParam _
 
 	case "realloc"
 		function = (param_index = 1)
+
+	case "memset", "memcpy", "memmove"
+		function = (param_index = 2)
 	end select
 end function
 
