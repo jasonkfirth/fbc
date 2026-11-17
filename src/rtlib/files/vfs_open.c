@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 /*::::::*/
 static fb_off_t hFileGetSize
@@ -33,6 +34,8 @@ static fb_off_t hFileGetSize
 
 	case FB_FILE_MODE_APPEND:
 		handle->hooks->pfnTell( handle, &size );
+		break;
+	default:
 		break;
 	}
 
@@ -62,18 +65,25 @@ int fb_FileOpenVfsRawEx
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     }
 
+    if( mode > (unsigned int)INT_MAX ||
+        access > (unsigned int)INT_MAX ||
+        lock > (unsigned int)INT_MAX ) {
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+    }
+
 	fb_ctx.do_file_reset = TRUE;
 
     /* clear handle */
     memset(handle, 0, sizeof(FB_FILE));
 
     /* specific file/device handles are stored in the member "opaque" */
-    handle->mode 	 = mode;
+    handle->mode 	 = (int)mode;
     handle->encod 	 = encoding;
     handle->size 	 = 0;
     handle->type 	 = FB_FILE_TYPE_VFS;
-    handle->access 	 = access;
-    handle->lock 	 = lock;      /* lock mode not supported yet */
+    handle->access 	 = (int)access;
+    handle->lock 	 = (int)lock;      /* lock mode not supported yet */
     handle->line_length = 0;
 
     /* reclen */
@@ -137,18 +147,29 @@ int fb_FileOpenVfsEx
 {
     char *filename;
     size_t filename_length;
+    int result;
 
 	/* copy file name */
     filename_length = FB_STRSIZE( str_filename );
-    filename = (char*) alloca( filename_length + 1 );
-    fb_hStrCopy( filename, str_filename->data, filename_length );
+    if( filename_length >= (size_t)PTRDIFF_MAX ) {
+		fb_hStrDelTemp( str_filename );
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
+	filename = (char *)malloc( filename_length + 1 );
+	if( filename == NULL ) {
+		fb_hStrDelTemp( str_filename );
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
+    fb_hStrCopy( filename, str_filename->data, (ssize_t)filename_length );
     filename[filename_length] = 0;
 
 	/* del if temp */
 	fb_hStrDelTemp( str_filename );
 
-    return fb_FileOpenVfsRawEx( handle, filename, filename_length,
-                                mode, access, lock, len, encoding, pfnOpen );
+	result = fb_FileOpenVfsRawEx( handle, filename, filename_length,
+	                              mode, access, lock, len, encoding, pfnOpen );
+	free( filename );
+	return result;
 }
 
 /* end of files/vfs_open.c */

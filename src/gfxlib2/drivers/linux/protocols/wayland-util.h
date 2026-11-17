@@ -16,6 +16,10 @@ struct wl_message {
 	const struct wl_interface **types;
 };
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 struct wl_interface {
 	const char *name;
 	int version;
@@ -24,6 +28,9 @@ struct wl_interface {
 	int event_count;
 	const struct wl_message *events;
 };
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 #endif
 

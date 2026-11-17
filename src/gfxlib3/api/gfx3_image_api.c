@@ -28,6 +28,8 @@
 #include "../gfx3_api_internal.h"
 #include "../gfx3_gpu_surface.h"
 #include "../gfx3_image.h"
+#include <limits.h>
+#include <math.h>
 #include "../gfx3_target.h"
 
 #include <math.h>
@@ -59,10 +61,9 @@ static uint32_t image_api_bytes_per_pixel(uint32_t depth)
 }
 
 /*
-	IMAGECREATE is a CPU compatibility operation.  Fill one row at the native
-	pixel width, rather than deciding how to store every individual pixel.  The
-	image header and its row pitch guarantee the 2- and 4-byte destinations are
-	properly aligned; the old QB header still starts its pixel data at offset 4.
+	IMAGECREATE is a CPU compatibility operation. Fill each row at the native
+	pixel width without assuming the byte-oriented image header provides natural
+	alignment for 2- and 4-byte pixels.
 */
 static void image_api_fill(FB_GFX3_IMAGE_VIEW *view, uint32_t row_bytes,
 	uint32_t color)
@@ -79,14 +80,23 @@ static void image_api_fill(FB_GFX3_IMAGE_VIEW *view, uint32_t row_bytes,
 		case 1:
 			memset(row, (unsigned char)color, view->width);
 			break;
-		case 2:
-			for (x = 0; x < view->width; x++)
-				((uint16_t *)row)[x] = (uint16_t)color;
+		case 2: {
+			uint16_t value = (uint16_t)color;
+			size_t offset = 0;
+			for (x = 0; x < view->width; x++) {
+				memcpy(row + offset, &value, sizeof(value));
+				offset += sizeof(value);
+			}
 			break;
-		case 4:
-			for (x = 0; x < view->width; x++)
-				((uint32_t *)row)[x] = color;
+		}
+		case 4: {
+			size_t offset = 0;
+			for (x = 0; x < view->width; x++) {
+				memcpy(row + offset, &color, sizeof(color));
+				offset += sizeof(color);
+			}
 			break;
+		}
 		default:
 			return;
 		}
@@ -401,12 +411,28 @@ static void image_api_fix_relative(FB_GFX3_DRAW_STATE *state, int flags,
 static int image_api_translate_screen(const FB_GFX3_DRAW_STATE *state,
 	float x, float y, int *translated_x, int *translated_y)
 {
-	int view_width = state->view.x2 - state->view.x1 + 1;
-	int view_height = state->view.y2 - state->view.y1 + 1;
+	int64_t view_width_wide;
+	int64_t view_height_wide;
+	int view_width;
+	int view_height;
+	int64_t translated_x_wide;
+	int64_t translated_y_wide;
+
+	if (!state || !translated_x || !translated_y)
+		return FB_GFX3_INVALID;
+	view_width_wide = (int64_t)state->view.x2 -
+		(int64_t)state->view.x1 + 1;
+	view_height_wide = (int64_t)state->view.y2 -
+		(int64_t)state->view.y1 + 1;
+	if ((view_width_wide <= 0) || (view_width_wide > INT_MAX) ||
+	    (view_height_wide <= 0) || (view_height_wide > INT_MAX))
+		return FB_GFX3_INVALID;
+	view_width = (int)view_width_wide;
+	view_height = (int)view_height_wide;
 
 	if (state->flags & FB_GFX3_WINDOW_ACTIVE) {
-		if ((state->window_width == 0.0f) ||
-		    (state->window_height == 0.0f))
+		if ((fpclassify(state->window_width) == FP_ZERO) ||
+		    (fpclassify(state->window_height) == FP_ZERO))
 			return FB_GFX3_INVALID;
 		x = ((x - state->window_x) * (float)(view_width - 1)) /
 			state->window_width;
@@ -423,24 +449,34 @@ static int image_api_translate_screen(const FB_GFX3_DRAW_STATE *state,
 		keeps its subtract-and-clip arithmetic within signed-int bounds.
 	*/
 	if ((double)x < INT_MIN + 1.0)
-		*translated_x = INT_MIN / 2;
+		translated_x_wide = INT_MIN / 2;
 	else if ((double)x > INT_MAX - 1.0)
-		*translated_x = INT_MAX / 2;
+		translated_x_wide = INT_MAX / 2;
 	else
-		*translated_x = CINT(x);
+		translated_x_wide = CINT(x);
 	if ((double)y < INT_MIN + 1.0)
-		*translated_y = INT_MIN / 2;
+		translated_y_wide = INT_MIN / 2;
 	else if ((double)y > INT_MAX - 1.0)
-		*translated_y = INT_MAX / 2;
+		translated_y_wide = INT_MAX / 2;
 	else
-		*translated_y = CINT(y);
+		translated_y_wide = CINT(y);
 	if ((state->flags & (FB_GFX3_WINDOW_ACTIVE | FB_GFX3_WINDOW_SCREEN)) ==
 	    FB_GFX3_WINDOW_ACTIVE)
-		*translated_y = view_height - 1 - *translated_y;
+		translated_y_wide = (int64_t)view_height - 1 - translated_y_wide;
 	if ((state->flags & FB_GFX3_VIEW_SCREEN) == 0) {
-		*translated_x += state->view.x1;
-		*translated_y += state->view.y1;
+		translated_x_wide += (int64_t)state->view.x1;
+		translated_y_wide += (int64_t)state->view.y1;
 	}
+	if (translated_x_wide < INT_MIN)
+		translated_x_wide = INT_MIN / 2;
+	else if (translated_x_wide > INT_MAX)
+		translated_x_wide = INT_MAX / 2;
+	if (translated_y_wide < INT_MIN)
+		translated_y_wide = INT_MIN / 2;
+	else if (translated_y_wide > INT_MAX)
+		translated_y_wide = INT_MAX / 2;
+	*translated_x = (int)translated_x_wide;
+	*translated_y = (int)translated_y_wide;
 	return FB_GFX3_OK;
 }
 
@@ -458,6 +494,39 @@ static void image_api_order_coordinates(int *x1, int *y1, int *x2, int *y2)
 		*y1 = *y2;
 		*y2 = temporary;
 	}
+}
+
+/* Relative image endpoints are signed inputs, so check before adding them. */
+static int image_api_add_int(int left, int right, int *sum)
+{
+	int64_t result;
+
+	if (sum == NULL)
+		return 0;
+	if ((left > 0) && (right > 0)) {
+		if ((uint64_t)right > (uint64_t)INT_MAX - (uint64_t)left)
+			return 0;
+	} else if ((left < 0) && (right < 0)) {
+		uint64_t left_magnitude = UINT64_C(0) - (uint64_t)(int64_t)left;
+		uint64_t right_magnitude = UINT64_C(0) - (uint64_t)(int64_t)right;
+		uint64_t minimum_magnitude = UINT64_C(0) - (uint64_t)(int64_t)INT_MIN;
+		if (right_magnitude > minimum_magnitude - left_magnitude)
+			return 0;
+	}
+	result = (int64_t)left + (int64_t)right;
+	*sum = (int)result;
+	return 1;
+}
+
+/* Check the inclusive endpoint without forming a signed sum. */
+static int image_api_endpoint_fits_int(int origin, uint32_t extent)
+{
+	uint64_t available;
+
+	if (extent == 0u)
+		return 0;
+	available = (uint64_t)((int64_t)INT_MAX - (int64_t)origin);
+	return ((uint64_t)extent - 1u) <= available;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -824,35 +893,52 @@ static int image_api_clip_put(int *destination_x, int *destination_y,
 	int *source_x, int *source_y, uint32_t *width, uint32_t *height,
 	const FB_GFX3_RECT *clip)
 {
-	int64_t destination_x2;
-	int64_t destination_y2;
+	int64_t difference;
+	int64_t adjusted_source;
+	uint64_t available;
 
-	destination_x2 = (int64_t)*destination_x + *width - 1;
-	destination_y2 = (int64_t)*destination_y + *height - 1;
-	if ((destination_x2 < clip->x1) || (destination_y2 < clip->y1) ||
+	if ((*width == 0u) || (*height == 0u) ||
+	    (clip->x1 > clip->x2) || (clip->y1 > clip->y2) ||
 	    (*destination_x > clip->x2) || (*destination_y > clip->y2)) {
 		*width = 0;
 		*height = 0;
 		return FB_GFX3_OK;
 	}
 	if (*destination_x < clip->x1) {
-		int difference = clip->x1 - *destination_x;
-
-		*source_x += difference;
+		difference = (int64_t)clip->x1 - (int64_t)*destination_x;
+		if ((uint64_t)difference >= *width) {
+			*width = 0;
+			*height = 0;
+			return FB_GFX3_OK;
+		}
+		/* Widen before adding the clipped offset to a signed source origin. */
+		adjusted_source = (int64_t)*source_x + difference;
+		if (adjusted_source > INT_MAX)
+			return FB_GFX3_INVALID;
+		*source_x = (int)adjusted_source;
 		*width -= (uint32_t)difference;
 		*destination_x = clip->x1;
 	}
 	if (*destination_y < clip->y1) {
-		int difference = clip->y1 - *destination_y;
-
-		*source_y += difference;
+		difference = (int64_t)clip->y1 - (int64_t)*destination_y;
+		if ((uint64_t)difference >= *height) {
+			*width = 0;
+			*height = 0;
+			return FB_GFX3_OK;
+		}
+		adjusted_source = (int64_t)*source_y + difference;
+		if (adjusted_source > INT_MAX)
+			return FB_GFX3_INVALID;
+		*source_y = (int)adjusted_source;
 		*height -= (uint32_t)difference;
 		*destination_y = clip->y1;
 	}
-	if (destination_x2 > clip->x2)
-		*width -= (uint32_t)(destination_x2 - clip->x2);
-	if (destination_y2 > clip->y2)
-		*height -= (uint32_t)(destination_y2 - clip->y2);
+	available = (uint64_t)((int64_t)clip->x2 - (int64_t)*destination_x) + 1u;
+	if ((uint64_t)*width > available)
+		*width = (uint32_t)available;
+	available = (uint64_t)((int64_t)clip->y2 - (int64_t)*destination_y) + 1u;
+	if ((uint64_t)*height > available)
+		*height = (uint32_t)available;
 	return FB_GFX3_OK;
 }
 
@@ -2066,6 +2152,8 @@ FBCALL int fb_GfxPut(void *target, float x, float y, unsigned char *source,
 	unsigned char *destination_pixels;
 	uint32_t width = 0;
 	uint32_t height = 0;
+	uint32_t source_width;
+	uint32_t source_height;
 	int destination_x = 0;
 	int destination_y = 0;
 	int result;
@@ -2095,6 +2183,14 @@ FBCALL int fb_GfxPut(void *target, float x, float y, unsigned char *source,
 		}
 	} else if (mode == FB_GFX3_BLIT_CUSTOM) {
 		result = FB_GFX3_UNSUPPORTED;
+		goto done;
+	}
+	source_width = (gpu_source != NULL) ? gpu_source->width : source_view.width;
+	source_height = (gpu_source != NULL) ? gpu_source->height : source_view.height;
+	if ((source_width == 0u) || (source_height == 0u) ||
+	    (source_width > (uint32_t)INT_MAX) ||
+	    (source_height > (uint32_t)INT_MAX)) {
+		result = FB_GFX3_INVALID;
 		goto done;
 	}
 	result = fb_gfx3_compat_flush_points_graphics_locked(state);
@@ -2141,38 +2237,37 @@ FBCALL int fb_GfxPut(void *target, float x, float y, unsigned char *source,
 	}
 	image_api_fix_relative(state, lhs, &x, &y, NULL, NULL);
 	if (rhs == FB_GFX3_COORDINATE_R) {
-		x2 += x1;
-		y2 += y1;
+		if (!image_api_add_int(x2, x1, &x2) ||
+		    !image_api_add_int(y2, y1, &y2)) {
+			result = FB_GFX3_INVALID;
+			goto done;
+		}
 	}
 	if (x1 == (int)0xFFFF0000u) {
 		x1 = 0;
 		y1 = 0;
-		x2 = (int)((gpu_source != NULL) ? gpu_source->width :
-			source_view.width) - 1;
-		y2 = (int)((gpu_source != NULL) ? gpu_source->height :
-			source_view.height) - 1;
+		x2 = (int)(source_width - 1u);
+		y2 = (int)(source_height - 1u);
 	} else {
-		uint32_t source_width = (gpu_source != NULL) ? gpu_source->width :
-			source_view.width;
-		uint32_t source_height = (gpu_source != NULL) ? gpu_source->height :
-			source_view.height;
-
 		image_api_order_coordinates(&x1, &y1, &x2, &y2);
 		if (x1 < 0)
 			x1 = 0;
 		if (y1 < 0)
 			y1 = 0;
 		if (x2 >= (int)source_width)
-			x2 = (int)source_width - 1;
+			x2 = (int)(source_width - 1u);
 		if (y2 >= (int)source_height)
-			y2 = (int)source_height - 1;
+			y2 = (int)(source_height - 1u);
 	}
 	if ((x2 < x1) || (y2 < y1)) {
 		result = FB_GFX3_OK;
 		goto done;
 	}
-	width = (uint32_t)(x2 - x1) + 1u;
-	height = (uint32_t)(y2 - y1) + 1u;
+	/* These ordered endpoints are nonnegative and bounded by INT_MAX. */
+	width = (uint32_t)((uint64_t)(unsigned int)x2 -
+		(uint64_t)(unsigned int)x1 + UINT64_C(1));
+	height = (uint32_t)((uint64_t)(unsigned int)y2 -
+		(uint64_t)(unsigned int)y1 + UINT64_C(1));
 	if (target == NULL) {
 		result = image_api_translate_screen(state, x, y, &destination_x,
 			&destination_y);
@@ -2234,8 +2329,8 @@ FBCALL int fb_GfxPut(void *target, float x, float y, unsigned char *source,
 
 		source_rect.x1 = x1;
 		source_rect.y1 = y1;
-		source_rect.x2 = x1 + (int32_t)width - 1;
-		source_rect.y2 = y1 + (int32_t)height - 1;
+		source_rect.x2 = (int32_t)((int64_t)x1 + (int64_t)width - 1);
+		source_rect.y2 = (int32_t)((int64_t)y1 + (int64_t)height - 1);
 		result = fb_gfx3_surface_blit_graphics_locked(destination_surface, &clip,
 			gpu_source,
 			&source_rect, destination_x, destination_y, (uint32_t)mode,
@@ -2245,14 +2340,14 @@ FBCALL int fb_GfxPut(void *target, float x, float y, unsigned char *source,
 				mode_state->shadow_valid[state->work_page] = FALSE;
 			if ((width > (uint32_t)INT_MAX) ||
 			    (height > (uint32_t)INT_MAX) ||
-			    ((int64_t)destination_x + width - 1 > INT_MAX) ||
-			    ((int64_t)destination_y + height - 1 > INT_MAX))
+			    !image_api_endpoint_fits_int(destination_x, width) ||
+			    !image_api_endpoint_fits_int(destination_y, height))
 				fb_gfx3_compat_invalidate_point_cache_graphics_locked(state);
 			else
 				fb_gfx3_compat_invalidate_point_cache_rect_graphics_locked(
 					state, destination_x, destination_y,
-					destination_x + (int)width - 1,
-					destination_y + (int)height - 1);
+					(int)((int64_t)destination_x + (int64_t)width - 1),
+					(int)((int64_t)destination_y + (int64_t)height - 1));
 		}
 	} else if (gpu_source != NULL) {
 		/* A raw FB.IMAGE destination requires a CPU-visible source. */
@@ -2276,14 +2371,14 @@ FBCALL int fb_GfxPut(void *target, float x, float y, unsigned char *source,
 				mode_state->shadow_valid[state->work_page] = FALSE;
 			if ((width > (uint32_t)INT_MAX) ||
 			    (height > (uint32_t)INT_MAX) ||
-			    ((int64_t)destination_x + width - 1 > INT_MAX) ||
-			    ((int64_t)destination_y + height - 1 > INT_MAX))
+			    !image_api_endpoint_fits_int(destination_x, width) ||
+			    !image_api_endpoint_fits_int(destination_y, height))
 				fb_gfx3_compat_invalidate_point_cache_graphics_locked(state);
 			else
 				fb_gfx3_compat_invalidate_point_cache_rect_graphics_locked(
 					state, destination_x, destination_y,
-					destination_x + (int)width - 1,
-					destination_y + (int)height - 1);
+					(int)((int64_t)destination_x + (int64_t)width - 1),
+					(int)((int64_t)destination_y + (int64_t)height - 1));
 		}
 	} else if (gpu_destination != NULL) {
 		result = fb_gfx3_image_put_surface(gpu_destination, &clip, &source_view,

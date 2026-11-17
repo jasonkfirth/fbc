@@ -19,6 +19,8 @@ Transfers execution to an external program
 {{fbdoc item="desc"}}
 	Transfers control over to an external program. When the program exits, execution will return to the system.
 
+	On Unix targets, the argument bytes and pointer array use checked temporary heap storage. Preparation failure releases that storage and the temporary input strings before returning ##-1##.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/system/run.bas"}}%%(freebasic)
 '' Attempt to transfer control to "program.exe" in the current directory.

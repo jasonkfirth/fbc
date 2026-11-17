@@ -3914,6 +3914,8 @@ static drmp3_result drmp3_wfopen(FILE** ppFile, const wchar_t* pFilePath, const 
         return DRMP3_INVALID_ARGS;
     }
 
+    (void)pAllocationCallbacks;
+
 #if defined(DRMP3_HAS_WFOPEN)
     {
         /* Use _wfopen() on Windows. */

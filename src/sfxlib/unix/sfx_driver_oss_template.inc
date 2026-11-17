@@ -476,7 +476,7 @@ int fb_sfxPlatformCaptureRead(float *buffer, int frames)
 const FB_SFX_DRIVER FB_SFX_BSD_DRIVER_NAME =
 {
     FB_SFX_BSD_LABEL " OSS",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     bsd_oss_init,
     bsd_oss_exit,
     bsd_oss_write,

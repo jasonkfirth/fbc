@@ -40,7 +40,7 @@ FBCALL FBSTRING_ACCESS *fb_TrimEx( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patter
             {                
                 while (len >= len_pattern ) 
                 {
-                    if( FB_MEMCMP( src_ptr, pattern->data, len_pattern )!=0 )
+	                    if( FB_MEMCMP( src_ptr, pattern->data, (size_t)len_pattern )!=0 )
                         break;
                     src_ptr += len_pattern;
                     len -= len_pattern;
@@ -69,7 +69,7 @@ FBCALL FBSTRING_ACCESS *fb_TrimEx( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patter
                 {
                     if( FB_MEMCMP( src_ptr + test_index,
                                    pattern->data,
-                                   len_pattern )!=0 )
+                                   (size_t)len_pattern )!=0 )
                         break;
                     test_index -= len_pattern;
                 }

@@ -39,6 +39,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include "../fb_wayland_client.h"
 #include "wayland-util.h"
 
 #ifndef __has_attribute

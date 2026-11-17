@@ -29,7 +29,7 @@
 
 void fb_hConvertPath( char *path )
 {
-	ssize_t i, len;
+	size_t i, len;
 
 	DBG_ASSERT( path != NULL );
 

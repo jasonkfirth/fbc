@@ -5,6 +5,8 @@
  * Responsibilities: Target-specific runtime support for haiku.
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
+#include "../../fb.h"
+
 #include <image.h>
 #include <string.h>
 
@@ -13,11 +15,18 @@ char *fb_hGetExeName( char *dst, ssize_t maxlen )
     image_info info;
     int32 cookie = 0;
     char *p;
+    size_t capacity;
+
+    if ((dst == NULL) || (maxlen <= 0))
+        return NULL;
+
+    capacity = (size_t)maxlen;
+    dst[0] = '\0';
 
     while (get_next_image_info(0, &cookie, &info) == B_OK) {
         if (info.type == B_APP_IMAGE) {
-            strncpy(dst, info.name, maxlen - 1);
-            dst[maxlen - 1] = '\0';
+            strncpy(dst, info.name, capacity - 1u);
+            dst[capacity - 1u] = '\0';
 
             p = strrchr(dst, '/');
             if (p != NULL)
@@ -26,9 +35,6 @@ char *fb_hGetExeName( char *dst, ssize_t maxlen )
             return dst;
         }
     }
-
-    if (maxlen > 0)
-        dst[0] = '\0';
 
     return dst;
 }

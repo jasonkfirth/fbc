@@ -12,6 +12,7 @@
 #ifndef DISABLE_FREEBSD
 #include "fb_sfx_freebsd.h"
 #endif
+#include "../fb_sfx_internal.h"
 
 void fb_sfxPlatformExit(void)
 {

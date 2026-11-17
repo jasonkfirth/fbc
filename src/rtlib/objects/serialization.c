@@ -26,6 +26,8 @@
 
 typedef struct {
 	char kind;
+	/* Retain the native size_t alignment after the one-byte schema kind. */
+	unsigned char kind_alignment_padding[sizeof(size_t) - sizeof(char)];
 	size_t size, offset, count, dims, storage, child, next, minimum;
 	int64_t lower[FB_MAXDIMENSIONS], upper[FB_MAXDIMENSIONS];
 } SER_NODE;
@@ -44,6 +46,10 @@ typedef struct {
 	unsigned char *buffer;
 	const unsigned char *input;
 	int error;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } SER_CONTEXT;
 
 /* ------------------------------------------------------------------------- */
@@ -83,7 +89,9 @@ static int ser_number( const char **cursor, const char *end, char delimiter, int
 		magnitude = magnitude * 10 + digit;
 		digits = 1;
 	}
-	if( !digits || p == end || *p++ != delimiter ) return 0;
+	if( !digits || p == end ) return 0;
+	if( *p != delimiter ) return 0;
+	++p;
 	if( negative ) *value = magnitude == UINT64_C(9223372036854775808) ? INT64_MIN : -(int64_t)magnitude;
 	else *value = (int64_t)magnitude;
 	*cursor = p;
@@ -399,6 +407,8 @@ static void ser_destroy( SER_CONTEXT *ctx, size_t index, unsigned char *base )
 			free(array.ptr);
 		}
 		break;
+	default:
+		break;
 	}
 }
 
@@ -406,7 +416,7 @@ static int ser_read( SER_CONTEXT *ctx, size_t index, unsigned char *base )
 {
 	const SER_NODE *node = &ctx->nodes[index];
 	unsigned char *ptr = base + node->offset;
-	size_t i, child, count;
+	size_t i, child, count = 0;
 	uint64_t value;
 	FBSTRING string = {0};
 	SER_ARRAY array = {0};
@@ -442,7 +452,10 @@ static int ser_read( SER_CONTEXT *ctx, size_t index, unsigned char *base )
 		array.size = count * node->size;
 		array.ptr = ser_alloc(ctx, array.size);
 		if( !array.ptr ) return 0;
-		ser_array_shape(ctx, node, &array, &count);
+		if( !ser_array_shape(ctx, node, &array, &count) ) {
+			free(array.ptr);
+			return 0;
+		}
 		/* Publish into scratch before visiting children so failure cleanup can
 		 * free this allocation and any successfully decoded child allocations. */
 		memcpy(ptr, &array, node->storage);
@@ -523,8 +536,8 @@ FBCALL ssize_t fb_Deserialize( void *value, FBSTRING_ACCESS *schema, FBSTRING_AC
 	ctx.input = (unsigned char *)payload->data;
 	ctx.length = (size_t)FB_STRSIZE(payload);
 	ctx.position = 4;
-	if( memcmp(ctx.input, "FBS1", 4) || !ser_get_uint(&ctx, &length, 4) || length != (uint64_t)FB_STRSIZE(schema) || length > ctx.length - ctx.position ) goto done;
-	if( memcmp(ctx.input + ctx.position, schema->data, (size_t)length) ) goto done;
+	if( memcmp(ctx.input, "FBS1", 4) != 0 || !ser_get_uint(&ctx, &length, 4) || length != (uint64_t)FB_STRSIZE(schema) || length > ctx.length - ctx.position ) goto done;
+	if( memcmp(ctx.input + ctx.position, schema->data, (size_t)length) != 0 ) goto done;
 	ctx.position += (size_t)length;
 	if( ctx.nodes[0].minimum > ctx.length - ctx.position ) goto done;
 	scratch = ser_alloc(&ctx, ctx.nodes[0].storage);

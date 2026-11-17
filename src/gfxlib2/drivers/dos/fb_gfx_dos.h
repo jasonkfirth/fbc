@@ -1,15 +1,19 @@
 /* DOS gfxlib include file */
 
 #include <dpmi.h>
+#include <limits.h>
+#include <pc.h>
 #include "vesa.h"
 
 /* macros */
 
-#define MASK_LINEAR(addr)   ((addr) & 0x000FFFFF)
-#define RM_TO_LINEAR(addr)  ((((addr) & 0xFFFF0000) >> 12) + ((addr) & 0xFFFF))
+#define MASK_LINEAR(addr)   ((unsigned long)(addr) & 0x000FFFFFUL)
+#define RM_TO_LINEAR(addr)  (((((unsigned long)(addr) & 0xFFFF0000UL) >> 12) + \
+	                          ((unsigned long)(addr) & 0xFFFFUL)))
 #define RM_OFFSET(addr)     ((addr) & 0xF)
 #define RM_SEGMENT(addr)    (((addr) >> 4) & 0xFFFF)
-#define SEGOFF_TO_RM(s, o)  (((s) << 4) + (o))
+#define SEGOFF_TO_RM(s, o)  (((unsigned long)(unsigned short)(s) << 4) + \
+	                          (unsigned long)(unsigned short)(o))
 
 #define SCREENLIST(w, h) ((h) | (w) << 16)
 
@@ -90,6 +94,22 @@ typedef struct fb_dos_t {
 
 extern fb_dos_t fb_dos;
 
+/* VGA and BIOS ports use a 16-bit address and an 8-bit data value. */
+static inline int fb_gfx_dos_inportb( int port )
+{
+	if( (port < 0) || (port > USHRT_MAX) )
+		return -1;
+	return inportb( (unsigned short)port );
+}
+
+static inline void fb_gfx_dos_outportb( int port, int value )
+{
+	if( (port < 0) || (port > USHRT_MAX) ||
+	    (value < 0) || (value > UCHAR_MAX) )
+		return;
+	outportb( (unsigned short)port, (unsigned char)value );
+}
+
 /* mouse */
 
 extern int fb_dos_get_mouse(int *x, int *y, int *z, int *buttons, int *clip);
@@ -123,3 +143,4 @@ extern void fb_dos_exit(void);
 extern void fb_dos_set_window_title(char *title);
 extern void fb_dos_lock(void);
 extern void fb_dos_unlock(void);
+extern void fb_GfxDosIdle(int milliseconds);

@@ -40,6 +40,10 @@ typedef struct FB_SFX_DRIVER_STATS
     int current_queue_fill;
     int max_queue_fill;
     int last_error;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Name the existing four-byte tail so the Win64 snapshot size stays fixed. */
+    unsigned char reserved_tail_padding[4];
+#endif
 
 } FB_SFX_DRIVER_STATS;
 

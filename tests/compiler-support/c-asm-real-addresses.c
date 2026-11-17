@@ -7,6 +7,41 @@
     This file contains no entry point or floating arithmetic.
 */
 
+#if defined(__x86_64__)
+
+void asm_observe_entry(void);
+void asm_leaf_call(void);
+unsigned long long asm_check_entry(void);
+extern unsigned long long asm_entry_alignment;
+unsigned long long asm_entry_alignment;
+
+#if defined(__APPLE__)
+#define ASM_ENTRY_ALIGNMENT "_asm_entry_alignment"
+#else
+#define ASM_ENTRY_ALIGNMENT "asm_entry_alignment"
+#endif
+
+/* The return address occupies eight bytes below the caller's 16-byte aligned
+   stack. A naked observer records that position before a native C prologue. */
+void __attribute__((naked)) asm_observe_entry(void)
+{
+    __asm__ __volatile__(
+        "mov rax, rsp\n"
+        "and eax, 15\n"
+        "mov qword ptr [rip + " ASM_ENTRY_ALIGNMENT "], rax\n"
+        "ret\n");
+}
+
+/* A separate C translation unit keeps the BASIC leaf call observable even
+   when the BASIC module's native compiler performs aggressive inlining. */
+unsigned long long asm_check_entry(void)
+{
+    asm_leaf_call();
+    return asm_entry_alignment;
+}
+
+#endif
+
 static int *published_slot;
 static int expected_value;
 static int observed_value;

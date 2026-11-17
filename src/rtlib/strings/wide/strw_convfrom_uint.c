@@ -51,7 +51,8 @@ FBCALL unsigned int fb_WstrToUInt( const FB_WCHAR *src, ssize_t len )
 			p = r;
 	}
 
-	return wcstoul( p, NULL, radix );
+	/* Match the byte-string VALUINT result when unsigned long is wider. */
+	return (unsigned int)wcstoul( p, NULL, radix );
 }
 
 FBCALL unsigned int fb_WstrValUInt ( const FB_WCHAR *str )

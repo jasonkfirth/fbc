@@ -51,6 +51,12 @@ void fb_hRtInit( void )
 #if !defined( HOST_DOS ) && !defined( HOST_XBOX )
 	setlocale( LC_CTYPE, "" );
 #endif
+	/* Register once, before BASIC global constructors. The fb_Init fallback
+	   also reaches this path when a caller deliberately omits fbrt0. */
+	if( atexit( fb_hRtExit ) != 0 ) {
+		fb_hRtExit();
+		abort();
+	}
 }
 
 /* called from fbrt0 */
@@ -133,17 +139,17 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 
 #ifdef HOST_XBOX
 	/*
-		nxdk's PE/XBE startup path does not give us the same constructor
-		ordering guarantees as the normal desktop targets.  Make executable
-		startup explicit here; fb_hRtInit() is counted, so this remains safe
-		if a toolchain later starts running the fbrt0 constructor first.
+		The fbrt0 PE initializer normally prepares the runtime before BASIC
+		global constructors. Preserve startup for callers which omit fbrt0,
+		without taking a second reference to the initialized runtime.
 
 		If that constructor did run already, it may have registered a
 		different startup thread as FreeBASIC's main thread.  Bind the
 		actual program thread here so ThreadSelf() reports a usable handle
 		from user code.
 	*/
-	fb_hRtInit();
+	if( fb_runtime_init_count == 0 )
+		fb_hRtInit();
 	fb_AllocateMainFBThread();
 #endif
 }
@@ -162,10 +168,6 @@ FBCALL void fb_End( int errlevel )
     // global constructors and destructors are not supported by emscripten
     fb_hRtExit();
 #endif // HOST_JS
-
-#ifdef HOST_XBOX
-	fb_hRtExit();
-#endif
 
 	exit( errlevel );
 }

@@ -103,11 +103,18 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	nearptr_enabled = TRUE;
 	
 	mapping.address = fb_dos.vesa_mode_info.PhysBasePtr;
-	mapping.size = fb_dos.vesa_info.total_memory << 16;
+	mapping.size = (unsigned long)fb_dos.vesa_info.total_memory << 16;
 	if (__dpmi_physical_address_mapping(&mapping) != 0)
 		return -1;
-	
-	video = (unsigned char *)(mapping.address - __djgpp_base_address);
+
+	if( __djgpp_base_address < 0 || mapping.address < (unsigned long)__djgpp_base_address ) {
+		__dpmi_free_physical_address_mapping(&mapping);
+		mapping.address = 0;
+		__djgpp_nearptr_disable();
+		nearptr_enabled = FALSE;
+		return -1;
+	}
+	video = (unsigned char *)(mapping.address - (unsigned long)__djgpp_base_address);
 	
 	return fb_dos_init(title, w, h, depth, refresh_rate, flags);
 }

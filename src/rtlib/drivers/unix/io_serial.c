@@ -44,6 +44,19 @@
 #define FB_SERIAL_READ_TIMEOUT_USEC 70000
 #define FB_SERIAL_WRITE_TIMEOUT_SEC 3
 
+/* fd_set stores only descriptors below FD_SETSIZE. */
+static int fb_hSerialSetFd(fd_set *set, int descriptor)
+{
+	if ((set == NULL) || (descriptor < 0) || (descriptor >= FD_SETSIZE))
+		return FALSE;
+#if defined(HOST_OPENBSD)
+	FD_SET(descriptor, set);
+#else
+	FD_SET((unsigned int)descriptor, set);
+#endif
+	return TRUE;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Baud-rate and device-name translation                                     */
 /* ------------------------------------------------------------------------- */
@@ -150,7 +163,9 @@ static int fb_hSerialGetSpeed( unsigned int baud, speed_t *native_speed )
 static int fb_hSerialDefaultDevice( int port, char *device, size_t size )
 {
 	int written;
+#if !defined(HOST_DARWIN) && !defined(HOST_HAIKU)
 	int index = port - 1;
+#endif
 
 #if defined HOST_FREEBSD
 	written = snprintf( device, size, "/dev/cuau%d", index );
@@ -234,13 +249,15 @@ static int fb_hSerialConfigure( int fd, const FB_SERIAL_OPTIONS *options,
 		tty.c_oflag |= OPOST | ONLCR;
 	}
 
+	/* Integer promotions widen these masks before complementing them. Cast the
+	   result back to tcflag_t to retain the native flag width. */
 	if( options->KeepDTREnabled )
-		tty.c_cflag &= ~HUPCL;
+		tty.c_cflag &= (tcflag_t)~(tcflag_t)HUPCL;
 	else
 		tty.c_cflag |= HUPCL;
 
 	if( options->DurationDSR || options->DurationCD )
-		tty.c_cflag &= ~CLOCAL;
+		tty.c_cflag &= (tcflag_t)~(tcflag_t)CLOCAL;
 	else
 		tty.c_cflag |= CLOCAL;
 
@@ -248,13 +265,13 @@ static int fb_hSerialConfigure( int fd, const FB_SERIAL_OPTIONS *options,
 	if( (options->DurationCTS != 0) && !options->SuppressRTS )
 		tty.c_cflag |= CRTSCTS;
 	else
-		tty.c_cflag &= ~CRTSCTS;
+		tty.c_cflag &= (tcflag_t)~(tcflag_t)CRTSCTS;
 #else
 	if( (options->DurationCTS != 0) && !options->SuppressRTS )
 		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 #endif
 
-	tty.c_cflag &= ~CSIZE;
+	tty.c_cflag &= (tcflag_t)~(tcflag_t)CSIZE;
 	switch( options->uiDataBits ) {
 	case 5:
 		tty.c_cflag |= CS5;
@@ -268,13 +285,15 @@ static int fb_hSerialConfigure( int fd, const FB_SERIAL_OPTIONS *options,
 	case 8:
 		tty.c_cflag |= CS8;
 		break;
+	default:
+		break;
 	}
 
-	tty.c_cflag &= ~(PARENB | PARODD);
+	tty.c_cflag &= (tcflag_t)~(tcflag_t)(PARENB | PARODD);
 #ifdef CMSPAR
-	tty.c_cflag &= ~CMSPAR;
+	tty.c_cflag &= (tcflag_t)~(tcflag_t)CMSPAR;
 #endif
-	tty.c_iflag &= ~(INPCK | ISTRIP | IGNPAR | PARMRK);
+	tty.c_iflag &= (tcflag_t)~(tcflag_t)(INPCK | ISTRIP | IGNPAR | PARMRK);
 
 	switch( options->Parity ) {
 	case FB_SERIAL_PARITY_NONE:
@@ -309,7 +328,7 @@ static int fb_hSerialConfigure( int fd, const FB_SERIAL_OPTIONS *options,
 		tty.c_iflag |= IGNPAR;
 
 	if( options->StopBits == FB_SERIAL_STOP_BITS_1 )
-		tty.c_cflag &= ~CSTOPB;
+		tty.c_cflag &= (tcflag_t)~(tcflag_t)CSTOPB;
 	else
 		tty.c_cflag |= CSTOPB;
 
@@ -318,7 +337,7 @@ static int fb_hSerialConfigure( int fd, const FB_SERIAL_OPTIONS *options,
 	    The Win32 backend also leaves software flow control disabled, and a
 	    binary serial stream must never consume XON or XOFF data bytes.
 	*/
-	tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+	tty.c_iflag &= (tcflag_t)~(tcflag_t)(IXON | IXOFF | IXANY);
 
 	if( (cfsetispeed( &tty, speed ) != 0) ||
 	    (cfsetospeed( &tty, speed ) != 0) )
@@ -432,7 +451,8 @@ int fb_SerialGetRemaining( FB_FILE *handle, void *serial_handle,
 		   gives EOF/LOC the portable fact it needs: at least one byte can be
 		   consumed without blocking. */
 		FD_ZERO( &read_set );
-		FD_SET( info->sfd, &read_set );
+		if (!fb_hSerialSetFd(&read_set, info->sfd))
+			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 0;
 		selected = select( info->sfd + 1, &read_set, NULL, NULL, &timeout );
@@ -470,7 +490,8 @@ int fb_SerialWrite( FB_FILE *handle, void *serial_handle, const void *data,
 			/* select may alter both the descriptor set and timeout, so rebuild
 			   them before retrying an interrupted wait. */
 			FD_ZERO( &write_set );
-			FD_SET( info->sfd, &write_set );
+			if (!fb_hSerialSetFd(&write_set, info->sfd))
+				return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 			timeout.tv_sec = FB_SERIAL_WRITE_TIMEOUT_SEC;
 			timeout.tv_usec = 0;
 			selected = select( info->sfd + 1, NULL, &write_set, NULL,
@@ -515,7 +536,8 @@ int fb_SerialRead( FB_FILE *handle, void *serial_handle, void *data,
 
 	do {
 		FD_ZERO( &read_set );
-		FD_SET( info->sfd, &read_set );
+		if (!fb_hSerialSetFd(&read_set, info->sfd))
+			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		timeout.tv_sec = 0;
 		timeout.tv_usec = FB_SERIAL_READ_TIMEOUT_USEC;
 		selected = select( info->sfd + 1, &read_set, NULL, NULL, &timeout );

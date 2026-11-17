@@ -46,6 +46,9 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 			else switch( extbytes )
 			{
+				default:
+					break;
+
 				case 5:
 					c += *src++; c <<= 6;
 					FB_FALLTHROUGH;
@@ -121,6 +124,9 @@ static FB_WCHAR *hUTF8ToUTF16( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 			else switch( extbytes )
 			{
+				default:
+					break;
+
 				case 5:
 					c += *src++; c <<= 6;
 					FB_FALLTHROUGH;
@@ -191,6 +197,9 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 			else switch( extbytes )
 			{
+				default:
+					break;
+
 				case 5:
 					c += *src++; c <<= 6;
 					FB_FALLTHROUGH;
@@ -256,6 +265,9 @@ static FB_WCHAR *hUTF8ToUTF32( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 			}
 			else switch( extbytes )
 			{
+				default:
+					break;
+
 				case 5:
 					c += *src++; c <<= 6;
 					FB_FALLTHROUGH;
@@ -296,12 +308,15 @@ static FB_WCHAR *hUTF8ToWChar( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 {
 	FB_WCHAR *res = NULL;
 	
-	/* convert.. */
+	/* DISABLE_WCHAR aliases FB_WCHAR to char for this one-byte path. */
 	switch( sizeof( FB_WCHAR ) )
 	{
 	case sizeof( char ):
-		res = (FB_WCHAR *)fb_hUTF8ToChar( src, (char *)dst, chars );
+	{
+		void *char_result = fb_hUTF8ToChar( src, (char *)dst, chars );
+		res = char_result;
 		break;
+	}
 
 	case sizeof( UTF_16 ):
 		res = hUTF8ToUTF16( src, dst, chars );
@@ -309,6 +324,9 @@ static FB_WCHAR *hUTF8ToWChar( const UTF_8 *src, FB_WCHAR *dst, ssize_t *chars )
 
 	case sizeof( UTF_32 ):
 		res = hUTF8ToUTF32( src, dst, chars );
+		break;
+
+	default:
 		break;
 	}
 	
@@ -357,7 +375,7 @@ static FB_WCHAR *hUTF16ToUTF32( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 			if( c >= UTF16_SUR_HIGH_START && c <= UTF16_SUR_HIGH_END )
 			{
 				c = ((c - UTF16_SUR_HIGH_START) << UTF16_HALFSHIFT) +
-				     ((FB_WCHAR)*src++ - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
+				     ((UTF_32)*src++ - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
 	    	}
 	
 			if( charsleft == 0 )
@@ -396,7 +414,7 @@ static FB_WCHAR *hUTF16ToUTF32( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 			if( c >= UTF16_SUR_HIGH_START && c <= UTF16_SUR_HIGH_END )
 			{
 				c = ((c - UTF16_SUR_HIGH_START) << UTF16_HALFSHIFT) +
-				     ((FB_WCHAR)*src++ - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
+				     ((UTF_32)*src++ - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
 			}
 
 			*dst++ = (FB_WCHAR)c;
@@ -418,8 +436,11 @@ static FB_WCHAR *hUTF16ToWChar( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 	switch( sizeof( FB_WCHAR ) )
 	{
 	case sizeof( char ):
-		dst = (FB_WCHAR *)fb_hUTF16ToChar( src, (char *)dst, chars );
+	{
+		void *char_result = fb_hUTF16ToChar( src, (char *)dst, chars );
+		dst = char_result;
 		break;
+	}
 
 	case sizeof( UTF_16 ):
 		dst = hUTF16ToUTF16( src, dst, chars );
@@ -427,6 +448,9 @@ static FB_WCHAR *hUTF16ToWChar( const UTF_16 *src, FB_WCHAR *dst, ssize_t *chars
 
 	case sizeof( UTF_32 ):
 		dst = hUTF16ToUTF32( src, dst, chars );
+		break;
+
+	default:
 		break;
 	}
 
@@ -468,7 +492,7 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 			if( c > UTF16_MAX_BMP )
 			{
 				c -= UTF16_HALFBASE;
-				*dst++ = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);				
+				*dst++ = (FB_WCHAR)(UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
 				c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 				--charsleft;
 			}
@@ -495,7 +519,7 @@ static FB_WCHAR *hUTF32ToUTF16( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 				c -= UTF16_HALFBASE;
 				if( charsleft > 1 )
 				{
-					*dst++ = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);				
+					*dst++ = (FB_WCHAR)(UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
 					--charsleft;
 				}
 				c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
@@ -546,8 +570,11 @@ static FB_WCHAR *hUTF32ToWChar( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 	switch( sizeof( FB_WCHAR ) )
 	{
 	case sizeof( char ):
-		dst = (FB_WCHAR *)fb_hUTF32ToChar( src, (char *)dst, chars );
+	{
+		void *char_result = fb_hUTF32ToChar( src, (char *)dst, chars );
+		dst = char_result;
 		break;
+	}
 
 	case sizeof( UTF_16 ):
 		dst = hUTF32ToUTF16( src, dst, chars );
@@ -555,6 +582,9 @@ static FB_WCHAR *hUTF32ToWChar( const UTF_32 *src, FB_WCHAR *dst, ssize_t *chars
 
 	case sizeof( UTF_32 ):
 		dst = hUTF32ToUTF32( src, dst, chars );
+		break;
+
+	default:
 		break;
 	}
 	return dst;
@@ -575,20 +605,17 @@ FB_WCHAR *fb_UTFToWChar( FB_FILE_ENCOD encod, const void *src, FB_WCHAR *dst, ss
 		*chars = 0;
 		return NULL;
 	}
-	switch( encod )
-	{
-	case FB_FILE_ENCOD_UTF8:
+	/* ASCII remains unsupported here, as in the former default branch. */
+	if( encod == FB_FILE_ENCOD_ASCII )
+		return NULL;
+	if( encod == FB_FILE_ENCOD_UTF8 )
 		return hUTF8ToWChar( src, dst, chars );
-
-	case FB_FILE_ENCOD_UTF16:
+	if( encod == FB_FILE_ENCOD_UTF16 )
 		return hUTF16ToWChar( src, dst, chars );
-
-	case FB_FILE_ENCOD_UTF32:
+	if( encod == FB_FILE_ENCOD_UTF32 )
 		return hUTF32ToWChar( src, dst, chars );
 
-	default:
-		return NULL;
-	}
+	return NULL;
 }
 
 /* end of strings/encoding/utf_convto_wchar.c */

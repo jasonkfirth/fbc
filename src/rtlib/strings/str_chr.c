@@ -27,7 +27,7 @@ FBSTRING_ACCESS *fb_CHR ( int args, ... )
 		for( i = 0; i < args; i++ )
 		{
 			num = va_arg( ap, unsigned int );
-			dst->data[i] = (unsigned char)num;
+		dst->data[i] = (char)(unsigned char)num;
 		}
 		dst->data[args] = '\0';
 	}

@@ -39,41 +39,47 @@ extern char __fb_hDrvIntHandler_end;
  */
 
 #define fb_lock_memory_fn( fn_name ) \
-	fb_dos_lock_code( fn_name, fn_name ## _end - fn_name )
+	fb_dos_lock_code( (uintptr_t)(fn_name), fb_dos_address_range_size( (uintptr_t)(fn_name), (uintptr_t)(fn_name ## _end) ) )
 
 #define fb_lock_memory_data( var_name ) \
-	fb_dos_lock_data( &var_name ## _start, &var_name ## _end - &var_name ## _start )
+	fb_dos_lock_data( &var_name ## _start, fb_dos_address_range_size( (uintptr_t)&var_name ## _start, (uintptr_t)&var_name ## _end ) )
 
-static int do_lock(int is_code, int (*proc)(__dpmi_meminfo *), const void *address, size_t size)
+static int do_lock(int is_code, int (*proc)(__dpmi_meminfo *), uintptr_t address, size_t size)
 {
 	unsigned long base;
+	uintptr_t linear_address;
 	__dpmi_meminfo mi;
 	
 	if ( __dpmi_get_segment_base_address( is_code ? _go32_my_cs() : _go32_my_ds(), &base ) == -1 )
 		return -1;
 	
-	mi.address = base + (unsigned long)address;
+	if( (uintptr_t)base > UINTPTR_MAX - address )
+		return -1;
+	linear_address = (uintptr_t)base + address;
+	if( (uintptr_t)size > UINTPTR_MAX - linear_address )
+		return -1;
+	mi.address = (unsigned long)linear_address;
 	mi.size = size;
 	
 	return proc( &mi );
 }
 
-int fb_dos_lock_data(const void *address, size_t size)
+int fb_dos_lock_data(const volatile void *address, size_t size)
 {
-	return do_lock(FALSE, __dpmi_lock_linear_region, address, size);
+	return do_lock(FALSE, __dpmi_lock_linear_region, (uintptr_t)address, size);
 }
 
-int fb_dos_lock_code(const void *address, size_t size)
+int fb_dos_lock_code(uintptr_t address, size_t size)
 {
 	return do_lock(TRUE, __dpmi_lock_linear_region, address, size);
 }
 
-int fb_dos_unlock_data(const void *address, size_t size)
+int fb_dos_unlock_data(const volatile void *address, size_t size)
 {
-	return do_lock(FALSE, __dpmi_unlock_linear_region, address, size);
+	return do_lock(FALSE, __dpmi_unlock_linear_region, (uintptr_t)address, size);
 }
 
-int fb_dos_unlock_code(const void *address, size_t size)
+int fb_dos_unlock_code(uintptr_t address, size_t size)
 {
 	return do_lock(TRUE, __dpmi_unlock_linear_region, address, size);
 }
@@ -159,7 +165,7 @@ static int fb_isr_init(void)
 {
     __dpmi_version_ret version;
     int succeeded;
-    size_t i, j;
+    int i, j;
 
     FB_LOCK();
     if( isr_inited ) {
@@ -172,11 +178,11 @@ static int fb_isr_init(void)
      * application's DS/ES/SS limit to the null page. Interrupt callbacks
      * must use the always-valid data alias while that signal is pending.
      */
-    __fb_hDrvSelectors[0] = __djgpp_ds_alias;
-    __fb_hDrvSelectors[1] = __djgpp_ds_alias;
-    __fb_hDrvSelectors[2] = _my_fs();
-    __fb_hDrvSelectors[3] = _my_gs();
-    __fb_hDrvSelectors[4] = _my_ss();
+    __fb_hDrvSelectors[0] = (unsigned int)__djgpp_ds_alias;
+    __fb_hDrvSelectors[1] = (unsigned int)__djgpp_ds_alias;
+    __fb_hDrvSelectors[2] = (unsigned int)_my_fs();
+    __fb_hDrvSelectors[3] = (unsigned int)_my_gs();
+    __fb_hDrvSelectors[4] = (unsigned int)_my_ss();
 
     /* query DPMI version */
     if( __dpmi_get_version( &version )!=0 ) {
@@ -223,9 +229,9 @@ static int fb_isr_init(void)
         if( __dpmi_set_protected_mode_interrupt_vector( irq_vector, &offset )!=0 ) {
             /* When an error occurred, restore the old ISR offsets */
             for( j=0; j!=i; ++j ) {
-                int irq_vector = version.master_pic + j;
-                __dpmi_paddr *offset = __fb_hDrvIntHandler_OldIRQs + j;
-                __dpmi_set_protected_mode_interrupt_vector( irq_vector, offset );
+                int restore_irq_vector = (int)version.master_pic + j;
+                __dpmi_paddr *restore_offset = __fb_hDrvIntHandler_OldIRQs + j;
+                __dpmi_set_protected_mode_interrupt_vector( restore_irq_vector, restore_offset );
             }
             succeeded = FALSE;
             break;
@@ -243,14 +249,14 @@ static int fb_isr_init(void)
                 /* When an error occurred, restore the old ISR offsets
                  * for both the master and the slave PIC */
                 for( j=0; j!=8; ++j ) {
-                    int irq_vector = version.master_pic + j;
-                    __dpmi_paddr *offset = __fb_hDrvIntHandler_OldIRQs + j;
-                    __dpmi_set_protected_mode_interrupt_vector( irq_vector, offset );
+                    int restore_irq_vector = (int)version.master_pic + j;
+                    __dpmi_paddr *restore_offset = __fb_hDrvIntHandler_OldIRQs + j;
+                    __dpmi_set_protected_mode_interrupt_vector( restore_irq_vector, restore_offset );
                 }
                 for( j=0; j!=i; ++j ) {
-                    int irq_vector = version.slave_pic + j;
-                    __dpmi_paddr *offset = __fb_hDrvIntHandler_OldIRQs + j + 8;
-                    __dpmi_set_protected_mode_interrupt_vector( irq_vector, offset );
+                    int restore_irq_vector = (int)version.slave_pic + j;
+                    __dpmi_paddr *restore_offset = __fb_hDrvIntHandler_OldIRQs + j + 8;
+                    __dpmi_set_protected_mode_interrupt_vector( restore_irq_vector, restore_offset );
                 }
                 succeeded = FALSE;
                 break;
@@ -286,7 +292,7 @@ int fb_isr_set( unsigned irq_number,
     if( __fb_hDrvIntHandler[irq_number]!=NULL )
         fb_isr_reset( irq_number );
 
-    if( fb_dos_lock_code( pfnIntHandler, fn_size )!=0 )
+    if( fb_dos_lock_code( (uintptr_t)pfnIntHandler, fn_size )!=0 )
         return FALSE;
 
     if( stack_size!=0 ) {
@@ -342,7 +348,7 @@ int fb_isr_reset( unsigned irq_number )
         __fb_hDrvIntStacks[irq_number].size = 0;
         fb_dos_sti();
 
-        fb_dos_unlock_code( pfnIntHandler, fn_size );
+        fb_dos_unlock_code( (uintptr_t)pfnIntHandler, fn_size );
         fb_dos_unlock_data( pStack, stack_size );
 
         free( pStack );

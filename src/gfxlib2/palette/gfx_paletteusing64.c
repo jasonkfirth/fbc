@@ -22,10 +22,11 @@ FBCALL void fb_GfxPaletteUsing64(long long *data)
 
 	for (i = 0; i < (1 << fb_gfx->depth); i++) {
 		if (data[i] >= 0)
-			fb_hSetPaletteColor(i, (int)data[i]);
+			fb_hSetPaletteColor(i, (unsigned int)data[i]);
 	}
 
-	fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h);
+	if (fb_gfx->h > 0)
+		fb_hMemSet(fb_gfx->dirty, TRUE, (size_t)fb_gfx->h);
 
 	DRIVER_UNLOCK();
 

@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <stdint.h>
 
 int fb_FilePutDataEx
 	(
@@ -50,7 +51,7 @@ int fb_FilePutDataEx
         else
         {
         	if( handle->hooks->pfnWriteWstr != NULL )
-            	res = handle->hooks->pfnWriteWstr( handle, (FB_WCHAR *)data, length );
+                res = handle->hooks->pfnWriteWstr( handle, (const FB_WCHAR *)data, length );
         	else
             	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
         }
@@ -58,25 +59,38 @@ int fb_FilePutDataEx
     }
 
     if( handle->mode == FB_FILE_MODE_RANDOM &&
-    	res==FB_RTERROR_OK &&
-    	adjust_rec_pos &&
-        handle->len!=0 &&
+        res == FB_RTERROR_OK &&
+        adjust_rec_pos &&
         handle->hooks->pfnSeek!=NULL )
     {
         /* if in random mode, writes must be of reclen.
          * The device must also support the SEEK method and the length
          * must be non-null */
 
-		if( length != (size_t)handle->len )
-			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+        if( handle->len < 0 ) {
+            res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+        } else if( handle->len > 0 ) {
+            size_t record_length = (size_t)handle->len;
+            size_t consumed_bytes;
 
-        size_t skip_size = (handle->len -
-        				   ((!is_unicode? length: length*sizeof( FB_WCHAR )) % handle->len)) % handle->len;
-        if (skip_size != 0)
-        {
-            /* devices that don't support seek should simulate it
-             with write or never allow to be opened for random access */
-            handle->hooks->pfnSeek( handle, skip_size, SEEK_CUR );
+			if( length != record_length )
+				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+
+            if( is_unicode ) {
+                /* Reduce before scaling so large writes cannot overflow. */
+                uint64_t consumed_chars = (uint64_t)(length % record_length);
+                consumed_bytes = (size_t)((consumed_chars * sizeof(FB_WCHAR)) % record_length);
+            } else {
+                consumed_bytes = length % record_length;
+            }
+
+            size_t skip_size = (record_length - consumed_bytes) % record_length;
+            if (skip_size != 0)
+            {
+                /* devices that don't support seek should simulate it
+                 with write or never allow to be opened for random access */
+                handle->hooks->pfnSeek( handle, (fb_off_t)skip_size, SEEK_CUR );
+            }
         }
     }
 
@@ -116,9 +130,9 @@ int fb_FilePutDataEx
 			{
 				++i;
 				if (i==0)
-					handle->line_length += length;
+					handle->line_length += (unsigned int)length;
 				else
-					handle->line_length = length - i;
+					handle->line_length = (unsigned int)(length - i);
 
 				if( handle->width!=0 ) {
 					handle->line_length %= handle->width;
@@ -166,7 +180,12 @@ FBCALL int fb_FilePutLarge
 		size_t valuelen
 	)
 {
-	return fb_FilePutData( fnum, pos, value, valuelen, TRUE, FALSE );
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FilePutData( fnum, offset, value, valuelen, TRUE, FALSE );
 }
 
 /* end of files/file_put.c */

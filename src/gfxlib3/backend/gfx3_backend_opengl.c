@@ -546,7 +546,7 @@ static uint32_t opengl_clear_batch_count(FB_GFX3_COMMAND *const *commands,
 	if ((commands == NULL) || (available == 0) || (commands[0] == NULL) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1;
-	first = (const FB_GFX3_CLEAR_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_CLEAR_COMMAND);
 	if ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0)
 		return 1;
 	while (count < available) {
@@ -558,7 +558,7 @@ static uint32_t opengl_clear_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_CLEAR_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_CLEAR_COMMAND);
 		if (((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0) ||
 		    (memcmp(&candidate->clip, &first->clip,
 		     sizeof(candidate->clip)) != 0))
@@ -586,7 +586,7 @@ static uint32_t opengl_paint_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_PAINT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_PAINT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_PAINT_COMMAND);
 	if ((first->paint_mode != 0u) || (first->pattern_size != 0u) ||
 	    ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 	    (first->color == first->border_color))
@@ -601,7 +601,7 @@ static uint32_t opengl_paint_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_PAINT_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_PAINT_COMMAND);
 		if ((candidate->paint_mode != 0u) ||
 		    (candidate->pattern_size != 0u) ||
 		    ((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
@@ -647,7 +647,7 @@ static int opengl_full_page_copy_description(
 	if (command->type == FB_GFX3_COMMAND_BLIT) {
 		if (fb_gfx3_command_payload_size(command) != sizeof(*blit))
 			return FALSE;
-		blit = (const FB_GFX3_BLIT_COMMAND *)command->payload;
+		blit = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 	} else if (command->type == FB_GFX3_COMMAND_BLITS) {
 		const FB_GFX3_BLITS_COMMAND *blits;
 		size_t expected_size;
@@ -655,7 +655,7 @@ static int opengl_full_page_copy_description(
 		if (fb_gfx3_command_payload_size(command) <
 		    offsetof(FB_GFX3_BLITS_COMMAND, blit))
 			return FALSE;
-		blits = (const FB_GFX3_BLITS_COMMAND *)command->payload;
+		blits = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLITS_COMMAND);
 		if ((blits->count != 1u) ||
 		    (fb_gfx3_size_add(offsetof(FB_GFX3_BLITS_COMMAND, blit),
 		     sizeof(blits->blit[0]), &expected_size) != FB_GFX3_OK) ||
@@ -1598,6 +1598,7 @@ static void *opengl_get_opengl_proc(FB_GFX3_BACKEND *backend,
 
 const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_opengl = {
 	FB_GFX3_BACKEND_ABI_VERSION,
+	FB_GFX3_BACKEND_ABI_ALIGNMENT_INITIALIZER
 	"OpenGL 4.3 compute",
 	opengl_probe,
 	opengl_init,

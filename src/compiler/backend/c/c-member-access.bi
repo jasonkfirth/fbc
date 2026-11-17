@@ -10,7 +10,14 @@ private function hCMemberTypeMatches _
 	( byval dtype as integer, byval subtype as FBSYMBOL ptr, _
 	  byval wanted as integer, byval wantedsubtype as FBSYMBOL ptr, _
 	  byval address_only as integer = FALSE, _
-	  byval read_value as integer = FALSE ) as integer
+	  byval read_value as integer = FALSE, _
+	  byval exact_type as integer = FALSE ) as integer
+
+	if( exact_type ) then
+		return (typeGetDtAndPtrOnly(dtype) = typeGetDtAndPtrOnly(wanted)) andalso _
+		       (subtype = wantedsubtype) andalso _
+		       (typeGetConstMask(typeUnsetIsConst(dtype)) = typeGetConstMask(typeUnsetIsConst(wanted)))
+	end if
 
 	if( (typeGetDtAndPtrOnly(dtype) = typeGetDtAndPtrOnly(wanted)) andalso _
 	    (subtype = wantedsubtype) ) then return TRUE
@@ -57,12 +64,13 @@ private function hFindCMemberPath _
 	  byval wantedsubtype as FBSYMBOL ptr, byref path as string, _
 	  byref actualdtype as integer, byref actualsubtype as FBSYMBOL ptr, _
 	  byval depth as integer = 0, byval address_only as integer = FALSE, _
-	  byval read_value as integer = FALSE, byval virtual_origin as integer ptr = NULL ) as integer
+	  byval read_value as integer = FALSE, byval virtual_origin as integer ptr = NULL, _
+	  byval exact_type as integer = FALSE ) as integer
 
 	'' The type model rejects recursive by-value records. Keep an independent
 	'' limit here so malformed internal metadata cannot recurse indefinitely.
 	if( offset < 0 or depth >= 64 ) then return FALSE
-	if( offset = 0 andalso hCMemberTypeMatches(dtype, subtype, wanted, wantedsubtype, address_only, read_value) ) then
+	if( offset = 0 andalso hCMemberTypeMatches(dtype, subtype, wanted, wantedsubtype, address_only, read_value, exact_type) ) then
 		actualdtype = dtype
 		actualsubtype = subtype
 		return TRUE
@@ -78,7 +86,7 @@ private function hFindCMemberPath _
 		var slot = offset \ env.pointersize
 		dim as integer memberdtype = FB_DATATYPE_INTEGER
 		if( slot = 0 ) then memberdtype = typeAddrOf(FB_DATATYPE_CHAR)
-		if( hCMemberTypeMatches(memberdtype, NULL, wanted, wantedsubtype, address_only, read_value) = FALSE ) then return FALSE
+		if( hCMemberTypeMatches(memberdtype, NULL, wanted, wantedsubtype, address_only, read_value, exact_type) = FALSE ) then return FALSE
 		select case slot
 		case 0: path += ".data"
 		case 1: path += ".len"
@@ -95,6 +103,13 @@ private function hFindCMemberPath _
 		if( symbGetUdtHasBitfield(subtype) ) then return FALSE
 		if( symbGetUDTAlign(subtype) <> 0 andalso address_only = FALSE ) then return FALSE
 		if( offset >= symbGetSizeOf(subtype) ) then return FALSE
+		'' Overlapping members can have the same representation but different
+		'' pointer qualifiers. Prefer the actual requested type before admitting
+		'' the existing byte-copy views, which may use another member's address.
+		if( exact_type = FALSE andalso symbGetUDTIsUnion(subtype) ) then
+			if( hFindCMemberPath(dtype, subtype, offset, wanted, wantedsubtype, path, _
+			    actualdtype, actualsubtype, depth, address_only, read_value, virtual_origin, TRUE) ) then return TRUE
+		end if
 		var fld = symbUdtGetFirstField(subtype)
 		while( fld <> NULL )
 			if( symbIsDynamic(fld) = FALSE ) then
@@ -134,7 +149,7 @@ private function hFindCMemberPath _
 						dim as integer child_virtual_origin = FALSE
 						if( hFindCMemberPath(fielddtype, fieldsubtype, localoffset, wanted, _
 						    wantedsubtype, tail, actualdtype, actualsubtype, depth + 1, address_only, _
-					    (read_value andalso (symbIsRef(fld) = FALSE)), @child_virtual_origin) ) then
+					    (read_value andalso (symbIsRef(fld) = FALSE)), @child_virtual_origin, exact_type) ) then
 							path += tail
 							if( virtual_origin <> NULL ) then
 								*virtual_origin = child_virtual_origin or (symbIsDescriptor(subtype) andalso _

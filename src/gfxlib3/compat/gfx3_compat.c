@@ -28,6 +28,7 @@
 #include "../gfx3_data.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdatomic.h>
 
 /*
@@ -58,6 +59,16 @@ static uint32_t compat_color_mask(uint32_t depth)
 	if (depth >= 32)
 		return UINT32_MAX;
 	return (1u << depth) - 1u;
+}
+
+/*
+	Compatibility sentinels and degenerate windows require exact equality.
+	Both ordered comparisons preserve == behavior for signed zero and NaN,
+	without replacing the exact test with a tolerance.
+*/
+static int compat_float_equal(float left, float right)
+{
+	return (left <= right) && (left >= right);
 }
 
 static uint32_t compat_fix_color(uint32_t depth, uint32_t color)
@@ -440,6 +451,12 @@ static int compat_queue_small_opaque_rectangle_locked(
 	FB_GFX3_POINT points[64];
 	uint32_t point_flags;
 	uint32_t count = 0;
+	uint32_t point_width;
+	uint32_t point_height;
+	int64_t width_difference;
+	int64_t height_difference;
+	uint32_t row;
+	uint32_t column;
 	int x;
 	int y;
 	int result;
@@ -448,14 +465,19 @@ static int compat_queue_small_opaque_rectangle_locked(
 	    (state->pending_points == NULL) ||
 	    (state->pending_points_capacity == 0))
 		return FB_GFX3_UNSUPPORTED;
-	if ((x2 < x1) || (y2 < y1) ||
-	    ((uint32_t)(x2 - x1 + 1) > 8u) ||
-	    ((uint32_t)(y2 - y1 + 1) > 8u))
+	if ((x2 < x1) || (y2 < y1))
 		return FB_GFX3_UNSUPPORTED;
-
+	width_difference = (int64_t)x2 - (int64_t)x1;
+	height_difference = (int64_t)y2 - (int64_t)y1;
+	if ((width_difference >= 8) || (height_difference >= 8))
+		return FB_GFX3_UNSUPPORTED;
+	point_width = (uint32_t)width_difference + 1u;
+	point_height = (uint32_t)height_difference + 1u;
 	point_flags = flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND;
-	for (y = y1; y <= y2; y++) {
-		for (x = x1; x <= x2; x++) {
+	for (row = 0; row < point_height; row++) {
+		y = (int)((int64_t)y1 + row);
+		for (column = 0; column < point_width; column++) {
+			x = (int)((int64_t)x1 + column);
 			points[count].x = x;
 			points[count].y = y;
 			points[count].color = color;
@@ -802,21 +824,31 @@ int fb_gfx3_compat_replace_shadow_after_full_clear_graphics_locked(
 		mode->shadow_valid[page] = TRUE;
 	}
 	if (mode->depth == 16) {
-		uint16_t *pixels = (uint16_t *)mode->shadow_pages[page];
+		unsigned char *pixel = mode->shadow_pages[page];
 		uint16_t packed_color = (uint16_t)color;
 
-		for (index = 0u; index < pixel_count; ++index)
-			pixels[index] = packed_color;
+		for (index = 0u; index < pixel_count; ++index) {
+			memcpy(pixel, &packed_color, sizeof(packed_color));
+			pixel += sizeof(packed_color);
+		}
 	} else {
-		uint32_t *pixels = (uint32_t *)mode->shadow_pages[page];
+		unsigned char *pixel = mode->shadow_pages[page];
 
 		if (alpha_blend) {
-			for (index = 0u; index < pixel_count; ++index)
-				pixels[index] = compat_alpha_primitive_pixel(color,
-					pixels[index]);
+			for (index = 0u; index < pixel_count; ++index) {
+				uint32_t old_color;
+				uint32_t new_color;
+
+				memcpy(&old_color, pixel, sizeof(old_color));
+				new_color = compat_alpha_primitive_pixel(color, old_color);
+				memcpy(pixel, &new_color, sizeof(new_color));
+				pixel += sizeof(new_color);
+			}
 		} else {
-			for (index = 0u; index < pixel_count; ++index)
-				pixels[index] = color;
+			for (index = 0u; index < pixel_count; ++index) {
+				memcpy(pixel, &color, sizeof(color));
+				pixel += sizeof(color);
+			}
 		}
 	}
 	mode->shadow_valid[page] = TRUE;
@@ -1026,12 +1058,15 @@ static int compat_render_shadow_line(
 	int x2, int y2, uint32_t color, uint32_t style, uint32_t flags,
 	int mark_dirty)
 {
-	int64_t difference_x;
-	int64_t difference_y;
+	uint64_t difference_x;
+	uint64_t difference_y;
 	int64_t direction_x;
 	int64_t direction_y;
-	int64_t point_count;
-	int64_t index;
+	uint64_t point_count;
+	uint64_t index;
+	int64_t position_x;
+	int64_t position_y;
+	uint64_t error;
 	int first_changed_y = INT_MAX;
 	int last_changed_y = INT_MIN;
 	uint32_t page;
@@ -1052,43 +1087,50 @@ static int compat_render_shadow_line(
 	    (mode->depth != 32))
 		return FB_GFX3_UNSUPPORTED;
 	page = state->work_page;
-	difference_x = llabs((int64_t)x2 - (int64_t)x1);
-	difference_y = llabs((int64_t)y2 - (int64_t)y1);
+	difference_x = (uint64_t)llabs((int64_t)x2 - (int64_t)x1);
+	difference_y = (uint64_t)llabs((int64_t)y2 - (int64_t)y1);
 	direction_x = (x2 < x1) ? -1 : 1;
 	direction_y = (y2 < y1) ? -1 : 1;
-	point_count = MAX(difference_x, difference_y) + 1;
+	point_count = MAX(difference_x, difference_y) + 1u;
+	position_x = x1;
+	position_y = y1;
+	error = MAX(difference_x, difference_y) / 2u;
 	style &= 0xFFFFu;
 
+	/*
+		Seed at half a major step to preserve the rounded interpolation without
+		multiplying endpoint deltas for every pixel.
+	*/
 	for (index = 0; index < point_count; ++index) {
-		int64_t position_x;
-		int64_t position_y;
-
-		if (difference_x >= difference_y) {
-			position_x = (int64_t)x1 + direction_x * index;
-			position_y = y1;
-			if (difference_x != 0) {
-				position_y += direction_y *
-					((difference_y * index +
-					  difference_x / 2) / difference_x);
-			}
-		} else {
-			position_y = (int64_t)y1 + direction_y * index;
-			position_x = (int64_t)x1 + direction_x *
-				((difference_x * index +
-				  difference_y / 2) / difference_y);
+		if ((position_x >= state->view.x1) &&
+		    (position_y >= state->view.y1) &&
+		    (position_x <= state->view.x2) &&
+		    (position_y <= state->view.y2) &&
+		    ((style & (0x8000u >> (index & 15u))) != 0u)) {
+			compat_write_shadow_primitive_pixel(mode, page, (int)position_x,
+				(int)position_y, color, flags);
+			if (position_y < first_changed_y)
+				first_changed_y = (int)position_y;
+			if (position_y > last_changed_y)
+				last_changed_y = (int)position_y;
 		}
-		if ((position_x < state->view.x1) ||
-		    (position_y < state->view.y1) ||
-		    (position_x > state->view.x2) ||
-		    (position_y > state->view.y2) ||
-		    ((style & (0x8000u >> ((uint64_t)index & 15u))) == 0u))
-			continue;
-		compat_write_shadow_primitive_pixel(mode, page, (int)position_x,
-			(int)position_y, color, flags);
-		if (position_y < first_changed_y)
-			first_changed_y = (int)position_y;
-		if (position_y > last_changed_y)
-			last_changed_y = (int)position_y;
+		if ((index + 1u) < point_count) {
+			if (difference_x >= difference_y) {
+				position_x += direction_x;
+				error += difference_y;
+				if (error >= difference_x) {
+					error -= difference_x;
+					position_y += direction_y;
+				}
+			} else {
+				position_y += direction_y;
+				error += difference_x;
+				if (error >= difference_y) {
+					error -= difference_y;
+					position_x += direction_x;
+				}
+			}
+		}
 	}
 	if (mark_dirty && (first_changed_y <= last_changed_y))
 		compat_mark_shadow_dirty(mode, page, (uint32_t)first_changed_y,
@@ -1172,7 +1214,7 @@ static int compat_render_authoritative_shadow_ellipse(
 	x2 = (int)((float)center_x + radius_x);
 	y1 = center_y;
 	y2 = center_y;
-	if (radius_y == 0.0f) {
+	if (compat_float_equal(radius_y, 0.0f)) {
 		compat_render_shadow_ellipse_scanline(state, mode, page, y1, x1,
 			x2, color, TRUE, flags, &first_changed_y,
 			&last_changed_y);
@@ -1378,8 +1420,8 @@ static int compat_translate(const FB_GFX3_DRAW_STATE *state, float x,
 	view_width = state->view.x2 - state->view.x1 + 1;
 	view_height = state->view.y2 - state->view.y1 + 1;
 	if (state->flags & FB_GFX3_WINDOW_ACTIVE) {
-		if ((state->window_width == 0.0f) ||
-		    (state->window_height == 0.0f))
+		if (compat_float_equal(state->window_width, 0.0f) ||
+		    compat_float_equal(state->window_height, 0.0f))
 			return FB_GFX3_INVALID;
 		x = ((x - state->window_x) * (float)(view_width - 1)) /
 			state->window_width;
@@ -2918,7 +2960,7 @@ int fb_gfx3_compat_ellipse(FB_GFX3_DRAW_STATE *state, float x, float y,
 		view_width = state->view.x2 - state->view.x1 + 1;
 		radius *= (float)view_width / state->window_width;
 	}
-	if (aspect == 0.0f)
+	if (compat_float_equal(aspect, 0.0f))
 		aspect = 1.0f;
 	if (aspect > 1.0f) {
 		radius_x = radius / aspect;
@@ -2998,7 +3040,7 @@ int fb_gfx3_compat_arc(FB_GFX3_DRAW_STATE *state, float x, float y,
 		view_width = state->view.x2 - state->view.x1 + 1;
 		radius *= (float)view_width / state->window_width;
 	}
-	if (aspect == 0.0f)
+	if (compat_float_equal(aspect, 0.0f))
 		aspect = 1.0f;
 	if (aspect <= 0.0f) {
 		result = FB_GFX3_INVALID;
@@ -3045,7 +3087,8 @@ int fb_gfx3_compat_arc(FB_GFX3_DRAW_STATE *state, float x, float y,
 		(sqrtf(radius_x) * sqrtf(radius_y) * 1.5f);
 	if (!isfinite(increment) || !(increment > 0.0f) ||
 	    !isfinite(span) || (span < 0.0f) ||
-	    ((double)span / increment + 1.5 > UINT32_MAX)) {
+	    ((double)span / (double)increment + 1.5 >
+	     (double)UINT32_MAX)) {
 		result = FB_GFX3_INVALID;
 		goto done;
 	}
@@ -3212,7 +3255,10 @@ static int compat_window_unlocked(FB_GFX3_DRAW_STATE *state,
 	result = compat_flush_pending_points_locked(state, mode);
 	if (result != FB_GFX3_OK)
 		return result;
-	if ((x1 == 0.0f) && (y1 == 0.0f) && (x2 == 0.0f) && (y2 == 0.0f)) {
+	if (compat_float_equal(x1, 0.0f) &&
+	    compat_float_equal(y1, 0.0f) &&
+	    compat_float_equal(x2, 0.0f) &&
+	    compat_float_equal(y2, 0.0f)) {
 		state->flags &= ~(uint32_t)(FB_GFX3_WINDOW_ACTIVE |
 			FB_GFX3_WINDOW_SCREEN);
 		return FB_GFX3_OK;
@@ -3227,7 +3273,7 @@ static int compat_window_unlocked(FB_GFX3_DRAW_STATE *state,
 		y1 = y2;
 		y2 = temporary;
 	}
-	if ((x2 == x1) || (y2 == y1))
+	if (compat_float_equal(x2, x1) || compat_float_equal(y2, y1))
 		return FB_GFX3_INVALID;
 	state->window_x = x1;
 	state->window_y = y1;

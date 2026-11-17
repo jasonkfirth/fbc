@@ -8,6 +8,7 @@
 /* Function to get supported video modes. */
 
 #include "../fb_gfx.h"
+#include <limits.h>
 
 static int *list = NULL, list_size, current;
 
@@ -27,7 +28,11 @@ static void add_mode(int mode)
 			if (list[i] == mode)
 				return;
 		}
-		new_list = (int *)realloc(list, sizeof(int) * (list_size + 1));
+		if ((list_size < 0) || (list_size == INT_MAX) ||
+		    ((size_t)list_size >= ((size_t)-1 / sizeof(*list))))
+			return;
+		new_list = (int *)realloc(list,
+			sizeof(*list) * ((size_t)list_size + 1));
 		if (!new_list)
 			return;
 		list = new_list;
@@ -38,8 +43,8 @@ static void add_mode(int mode)
 
 static int mode_sorter(const void *e1, const void *e2)
 {
-	int m1 = *(int *)e1;
-	int m2 = *(int *)e2;
+	int m1 = *(const int *)e1;
+	int m2 = *(const int *)e2;
 
 	if ((m1 >> 16) > (m2 >> 16))
 		return 1;
@@ -73,8 +78,8 @@ FBCALL int fb_GfxScreenList(int depth)
 				}
 			}
 		}
-		if (list)
-			qsort(list, list_size, sizeof(int), mode_sorter);
+		if (list && (list_size > 0))
+			qsort(list, (size_t)list_size, sizeof(*list), mode_sorter);
 		current = 0;
 	}
 

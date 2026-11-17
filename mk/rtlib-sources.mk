@@ -71,6 +71,13 @@ endif
 RTLIB_SRC_TARGET_ASM := $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/*.s)
 RTLIB_SRC_TARGET_ARCH_ASM := $(wildcard $(RTLIB_DRIVER_DIR)/$(SOURCE_OS)/$(TARGET_ARCH)/*.s)
 
+# sys_getexename.c owns fb_hGetExeName. The older named-source implementation
+# exports the same symbol, making whole-archive links fail and ordinary archive
+# selection depend on object order.
+ifeq ($(SOURCE_OS),haiku)
+RTLIB_SRC_TARGET := $(filter-out $(RTLIB_DRIVER_DIR)/haiku/fb_hGetExeName.c,$(RTLIB_SRC_TARGET))
+endif
+
 # Cygwin shares the Win32 driver tree, but retains its existing ERROR ABI.
 # The native activation bridge is qualified for the Win32 x86-64 target only.
 ifneq ($(TARGET_OS),win32)

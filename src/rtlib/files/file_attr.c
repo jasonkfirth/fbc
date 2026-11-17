@@ -150,9 +150,10 @@ static void hFileInfo( const FILE_INFO_STAT *native, FB_FILE_INFO *info )
 	if( (native->st_mode & S_IFMT) == S_IFREG ) info->flags |= FB_FILE_INFO_REGULAR;
 #endif
 	if( native->st_ino != 0 ) info->flags |= FB_FILE_INFO_IDENTITY;
-	info->identity[0] = native->st_dev;
-	info->identity[1] = native->st_ino;
-	info->bytes = native->st_size;
+	/* POSIX device and inode identifiers are nonnegative on successful stat. */
+	info->identity[0] = (uint64_t)native->st_dev;
+	info->identity[1] = (uint64_t)native->st_ino;
+	info->bytes = (native->st_size >= 0) ? (uint64_t)native->st_size : 0u;
 	info->modified = native->st_mtime;
 	info->changed = native->st_ctime;
 #if defined(__linux__)
@@ -288,7 +289,8 @@ int fb_FileQueryStreamInfo( void *stream, FB_FILE_INFO *info )
 	return hWindowsFileInfo( handle, info );
 #else
 #ifdef HOST_MINGW
-	HANDLE handle = (HANDLE)_get_osfhandle( _fileno( file ) );
+	intptr_t os_handle = _get_osfhandle( _fileno( file ) );
+	HANDLE handle = (HANDLE)os_handle;
 	if( handle == INVALID_HANDLE_VALUE ) return 0;
 	/* CRT fstat supplies a usable type for pipes and character streams. Only
 	   disk handles have the persistent identity queried by the Windows API. */

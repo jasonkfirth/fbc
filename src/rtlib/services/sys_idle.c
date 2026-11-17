@@ -41,6 +41,7 @@ FBCALL int fb_IdleStep(FB_IDLE_STATE *state, FB_IDLE_CALLBACK callback,
 {
 	double now;
 	double remaining;
+	double rounded_wait;
 	int wait_ms;
 	if (state == NULL || callback == NULL ||
 	    state->reserved != FB_IDLE_SIGNATURE || state->busy ||
@@ -61,8 +62,10 @@ FBCALL int fb_IdleStep(FB_IDLE_STATE *state, FB_IDLE_CALLBACK callback,
 	remaining = (state->deadline - now) * 1000.0;
 	if (remaining > 0 && maximum_wait_ms != 0) {
 		wait_ms = maximum_wait_ms;
-		if (remaining < (double)wait_ms)
-			wait_ms = (int)ceil(remaining);
+		if (remaining < (double)wait_ms) {
+			rounded_wait = ceil(remaining);
+			wait_ms = (int)rounded_wait;
+		}
 		/* SLEEP's keyboard wakeup can leave a pending key spinning an idle
 		 * loop. Delay is independent of keyboard input and never sees zero.
 		 */

@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <direct.h>
 #include <windows.h>
+#include "file_path.h"
 
 #define FB_XBOX_PATH_NO_PREFIX   0
 #define FB_XBOX_PATH_TEMP_DRIVE  1
@@ -330,6 +331,125 @@ HANDLE fb_hOpenFileForQuery( const char *path )
 	return hOpenConvertedFileForQuery( path, FB_XBOX_PATH_TEMP_DRIVE );
 }
 
+static unsigned char hFoldFileByte( unsigned char value )
+{
+	if( value >= 'A' && value <= 'Z' )
+		value += 'a' - 'A';
+	return value;
+}
+
+static int hMatchFileName( const char *mask, const char *name )
+{
+	const char *star = NULL, *retry = NULL;
+
+	/* Match the byte spelling used by file opens. Native case-folding mask
+	   queries can reject UTF-8 fragments on the Xbox's byte-based filesystem.
+	   ASCII case folds normally; high bytes retain their original spelling.
+	   A star retries from the last wildcard without recursion or allocation. */
+	if( strcmp(mask, "*.*") == 0 ) mask = "*";
+	while( *name ) {
+		if( *mask == '*' ) {
+			star = mask++;
+			retry = name;
+		} else if( *mask == '?' || hFoldFileByte(*mask) == hFoldFileByte(*name) ) {
+			++mask;
+			++name;
+		} else if( star != NULL ) {
+			mask = star + 1;
+			name = ++retry;
+		} else {
+			return FALSE;
+		}
+	}
+	while( *mask == '*' ) ++mask;
+	return *mask == '\0';
+}
+
+BOOL fb_hFindNextFile( HANDLE handle, const char *mask, WIN32_FIND_DATAA *data )
+{
+	while( FindNextFileA(handle, data) ) {
+		data->cFileName[sizeof(data->cFileName)-1] = '\0';
+		if( hMatchFileName(mask, data->cFileName) ) return TRUE;
+	}
+	return FALSE;
+}
+
+HANDLE fb_hFindFirstFile( const char *path, WIN32_FIND_DATAA *data, char *mask, size_t mask_bytes )
+{
+	char converted[MAX_PATH];
+	const char *search_path;
+	char *separator;
+	size_t length;
+	int prefixes[] = { FB_XBOX_PATH_DISC_DRIVE, FB_XBOX_PATH_TEMP_DRIVE };
+	int relative, i;
+	HANDLE handle;
+	DWORD error;
+
+	if( path == NULL || path[0] == '\0' || data == NULL || mask == NULL ) {
+		SetLastError( ERROR_INVALID_NAME );
+		return INVALID_HANDLE_VALUE;
+	}
+	relative = hIsRelativePath( path );
+	/* nxdk FindFirstFileA requires a directory separator before its mask.
+	   Unlike fopen(), it rejects an unqualified root filename. Both explicit
+	   drive forms satisfy that requirement, including non-ASCII filenames. */
+	for( i = 0; i < 2; ++i ) {
+		if( !hMakeDosPath( path, converted, sizeof(converted),
+		                  relative ? prefixes[i] : FB_XBOX_PATH_NO_PREFIX, &search_path ) ) {
+			SetLastError( ERROR_INVALID_NAME );
+			return INVALID_HANDLE_VALUE;
+		}
+		separator = strrchr(converted, '\\');
+		if( separator == NULL || separator[1] == '\0' ) {
+			SetLastError(ERROR_INVALID_NAME);
+			return INVALID_HANDLE_VALUE;
+		}
+		length = strlen(separator + 1);
+		if( length >= mask_bytes ) {
+			SetLastError(ERROR_INVALID_NAME);
+			return INVALID_HANDLE_VALUE;
+		}
+		memcpy(mask, separator + 1, length + 1);
+		/* Use the native API only to enumerate. nxdk's three-byte mask
+		   special case also broadens literals such as "abc"; matching the
+		   original bytes here preserves literal, '?' and '*.*' semantics. */
+		separator[1] = '*';
+		separator[2] = '\0';
+		handle = FindFirstFileA( search_path, data );
+		if( handle != INVALID_HANDLE_VALUE ) {
+			data->cFileName[sizeof(data->cFileName)-1] = '\0';
+			if( !hMatchFileName(mask, data->cFileName) && !fb_hFindNextFile(handle, mask, data) ) {
+				error = GetLastError();
+				FindClose(handle);
+				SetLastError(error);
+				handle = INVALID_HANDLE_VALUE;
+			}
+		}
+		if( handle != INVALID_HANDLE_VALUE || !relative )
+			return handle;
+		/* Match ordinary read lookup: title assets first, then writable
+		   files. An access failure must not silently select another file. */
+		error = GetLastError();
+		if( error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND &&
+		    error != ERROR_NO_MORE_FILES )
+			return INVALID_HANDLE_VALUE;
+	}
+	return INVALID_HANDLE_VALUE;
+}
+
+int fb_hRenameFile( const char *oldname, const char *newname )
+{
+	char oldpath[MAX_PATH], newpath[MAX_PATH];
+	const char *old_converted, *new_converted;
+
+	/* Relative writes and removes already use E:. NAME must operate on
+	   that same file, rather than the SDK's independent current directory. */
+	if( !hMakeDosPath( oldname, oldpath, sizeof(oldpath), FB_XBOX_PATH_TEMP_DRIVE, &old_converted ) ||
+	    !hMakeDosPath( newname, newpath, sizeof(newpath), FB_XBOX_PATH_TEMP_DRIVE, &new_converted ) )
+		return -1;
+	return rename( old_converted, new_converted );
+}
+
 int fb_hRemoveFile( const char *path )
 {
 	char dos_path[MAX_PATH];
@@ -393,7 +513,14 @@ int fb_hChangeDir( const char *path )
 	if( !hMakeDosPath( path, dos_path, sizeof( dos_path ), FB_XBOX_PATH_DISC_DRIVE, &chdir_path ) )
 		return -1;
 
-	return _chdir( chdir_path );
+	/* nxdk has a fixed D:\ working directory. Its _chdir implementation
+	   asserts for every other path before returning ENOSYS. Keep the same
+	   supported root and report unsupported changes through BASIC's normal
+	   error path instead of stopping the title inside that SDK assertion. */
+	if( _stricmp(chdir_path, "D:\\") == 0 || _stricmp(chdir_path, "D:") == 0 )
+		return 0;
+	errno = ENOSYS;
+	return -1;
 }
 
 int fb_hRemoveDir( const char *path )

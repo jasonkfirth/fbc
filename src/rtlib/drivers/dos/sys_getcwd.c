@@ -11,8 +11,10 @@
 ssize_t fb_hGetCurrentDir( char *dst, ssize_t maxlen )
 {
 	ssize_t len, i;
-	if( getcwd( dst, maxlen ) != NULL ) {
-		len = strlen( dst );
+	if( dst == NULL || maxlen <= 0 )
+		return 0;
+	if( getcwd( dst, (size_t)maxlen ) != NULL ) {
+		len = (ssize_t)strlen( dst );
 		/* Always return path with native path separator (backslash).
 		 * Returning a slash might break compatibility with older sources.
 		 */
@@ -21,8 +23,8 @@ ssize_t fb_hGetCurrentDir( char *dst, ssize_t maxlen )
 				dst[i]='\\';
 
 		/* make drive letter uppercase */
-		if( dst[1] == ':' )
-			dst[0] = toupper( dst[0] );
+		if( len >= 2 && dst[1] == ':' )
+			dst[0] = (char)toupper( (unsigned char)dst[0] );
 
 		return len;
 	}

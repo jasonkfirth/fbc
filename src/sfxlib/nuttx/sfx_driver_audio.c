@@ -609,7 +609,7 @@ static int nuttx_audio_device_list(void)
 const FB_SFX_DRIVER fb_sfxDriverNuttXAudio =
 {
     "NuttX audio",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     nuttx_audio_init,
     nuttx_audio_exit,
     nuttx_audio_write,

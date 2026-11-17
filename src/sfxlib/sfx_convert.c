@@ -28,6 +28,7 @@
 */
 
 #include <limits.h>
+#include <math.h>
 
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
@@ -65,7 +66,7 @@
 
 float fb_sfxClampSample(float value)
 {
-    if (value != value)
+	if (isnan(value))
         return 0.0f;
 
     if (value > 1.0f)

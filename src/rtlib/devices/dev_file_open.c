@@ -39,9 +39,13 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
     const char *openmask;
     char *fname;
 
-    FB_LOCK();
+    if( fname_len >= (size_t)PTRDIFF_MAX )
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+    fname = (char *)malloc(fname_len + 1);
+    if( fname == NULL )
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
-    fname = (char*) alloca(fname_len + 1);
+    FB_LOCK();
     memcpy(fname, filename, fname_len);
     fname[fname_len] = 0;
 
@@ -53,6 +57,8 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
     openmask = NULL;
     switch( handle->mode )
     {
+    default:
+        break;
     case FB_FILE_MODE_APPEND:
         /* will create the file if it doesn't exist */
         openmask = "ab";
@@ -88,6 +94,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
 
     if( openmask == NULL )
     {
+        free(fname);
         FB_UNLOCK();
         return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     }
@@ -120,6 +127,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
 
             if( fp == NULL )
             {
+                free(fname);
                 FB_UNLOCK();
                 return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
             }
@@ -135,6 +143,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
         /* try opening in binary mode */
         if( (fp = fb_hOpenFile( fname, "rb" )) == NULL )
         {
+            free(fname);
             FB_UNLOCK();
             return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
         }
@@ -146,6 +155,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
         if( handle->size == -1 )
         {
         	fclose( fp );
+            free(fname);
             FB_UNLOCK();
         	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
         }
@@ -153,6 +163,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
         /* now reopen it in text-mode */
         if( (fp = fb_hReopenFile( fname, openmask, fp )) == NULL )
         {
+            free(fname);
             FB_UNLOCK();
             return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
         }
@@ -168,6 +179,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
         /* try opening */
         if( (fp = fb_hOpenFile( fname, openmask )) == NULL )
         {
+            free(fname);
             FB_UNLOCK();
             return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
         }
@@ -182,6 +194,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
         if( handle->size == -1 )
         {
         	fclose( fp );
+            free(fname);
             FB_UNLOCK();
         	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
         }
@@ -195,6 +208,7 @@ int fb_DevFileOpen( FB_FILE *handle, const char *filename, size_t fname_len )
     if( strcasecmp( fname, "CON" )==0 )
         handle->type = FB_FILE_TYPE_CONSOLE;
 
+    free(fname);
     FB_UNLOCK();
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );

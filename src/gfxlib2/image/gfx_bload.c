@@ -23,6 +23,22 @@
 
 #include "../fb_gfx.h"
 #include "../gfx_png.h"
+#include <limits.h>
+
+/*
+    BLOAD conversion destinations are byte-addressed image rows, which can
+    start at offsets that are not aligned to the pixel word size.
+*/
+#if defined(__GNUC__) || defined(__clang__)
+typedef uint16_t fb_gfx_bload_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef uint32_t fb_gfx_bload_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef uint16_t fb_gfx_bload_u16_unaligned;
+typedef uint32_t fb_gfx_bload_u32_unaligned;
+#endif
+
 #ifdef HOST_WIN32
 	#include <windows.h>
 #endif
@@ -223,7 +239,7 @@ static uint32_t convert_depth(uint32_t value, int source_bits, int target_bits)
 static void convert_bf_16to16(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
 	uint32_t r, g, b, value;
-	uint16_t *d = (uint16_t *)dest;
+	fb_gfx_bload_u16_unaligned *d = (fb_gfx_bload_u16_unaligned *)dest;
 	for (; w; w--) {
 		value = load_le16_bytes(src);
 		r = (value >> shifts[0]) & masks[0];
@@ -232,7 +248,7 @@ static void convert_bf_16to16(const unsigned char *src, unsigned char *dest, int
 		r = convert_depth(r, bits[0], 5);
 		g = convert_depth(g, bits[1], 6);
 		b = convert_depth(b, bits[2], 5);
-		*d = (r << 11) | (g << 5) | b;
+		*d = (fb_gfx_bload_u16_unaligned)((r << 11) | (g << 5) | b);
 		src += 2;
 		d++;
 	}
@@ -241,7 +257,7 @@ static void convert_bf_16to16(const unsigned char *src, unsigned char *dest, int
 static void convert_bf_16to32(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
 	uint32_t r, g, b, value;
-	uint32_t *d = (uint32_t *)dest;
+	fb_gfx_bload_u32_unaligned *d = (fb_gfx_bload_u32_unaligned *)dest;
 	for (; w; w--) {
 		value = load_le16_bytes(src);
 		r = (value >> shifts[0]) & masks[0];
@@ -261,7 +277,7 @@ static void convert_bf_24to16(const unsigned char *src, unsigned char *dest, int
 	uint32_t r, g, b;
 
 	uint32_t c;
-	uint16_t *d = (uint16_t *)dest;
+	fb_gfx_bload_u16_unaligned *d = (fb_gfx_bload_u16_unaligned *)dest;
 	for (; w; w--) {
 		c = FB_GFX_BMP24_PACK(src);
 		r = (c >> shifts[0]) & masks[0];
@@ -270,7 +286,7 @@ static void convert_bf_24to16(const unsigned char *src, unsigned char *dest, int
 		r = convert_depth(r, bits[0], 5);
 		g = convert_depth(g, bits[1], 6);
 		b = convert_depth(b, bits[2], 5);
-		*d++ = (r << 11) | (g << 5) | b;
+		*d++ = (fb_gfx_bload_u16_unaligned)((r << 11) | (g << 5) | b);
 		src += 3;
 	}
 }
@@ -280,7 +296,7 @@ static void convert_bf_24to32(const unsigned char *src, unsigned char *dest, int
 	uint32_t r, g, b;
 
 	uint32_t c;
-	uint32_t *d = (uint32_t *)dest;
+	fb_gfx_bload_u32_unaligned *d = (fb_gfx_bload_u32_unaligned *)dest;
 	for (; w; w--) {
 		c = FB_GFX_BMP24_PACK(src);
 		r = (c >> shifts[0]) & masks[0];
@@ -297,7 +313,7 @@ static void convert_bf_24to32(const unsigned char *src, unsigned char *dest, int
 static void convert_bf_32to16(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
 	uint32_t r, g, b, value;
-	uint16_t *d = (uint16_t *)dest;
+	fb_gfx_bload_u16_unaligned *d = (fb_gfx_bload_u16_unaligned *)dest;
 	for (; w; w--) {
 		value = load_le32_bytes(src);
 		r = (value >> shifts[0]) & masks[0];
@@ -306,7 +322,7 @@ static void convert_bf_32to16(const unsigned char *src, unsigned char *dest, int
 		r = convert_depth(r, bits[0], 5);
 		g = convert_depth(g, bits[1], 6);
 		b = convert_depth(b, bits[2], 5);
-		*d++ = (r << 11) | (g << 5) | b;
+		*d++ = (fb_gfx_bload_u16_unaligned)((r << 11) | (g << 5) | b);
 		src += 4;
 	}
 }
@@ -314,7 +330,7 @@ static void convert_bf_32to16(const unsigned char *src, unsigned char *dest, int
 static void convert_bf_32to32(const unsigned char *src, unsigned char *dest, int w, const uint32_t *masks, const int *shifts, const int *bits)
 {
 	uint32_t r, g, b, a, value;
-	uint32_t *d = (uint32_t *)dest;
+	fb_gfx_bload_u32_unaligned *d = (fb_gfx_bload_u32_unaligned *)dest;
 	for (; w; w--) {
 		value = load_le32_bytes(src);
 		r = (value >> shifts[0]) & masks[0];
@@ -349,9 +365,10 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 	int flipped = FALSE;
 
 	PUT_HEADER *put_header = NULL;
-	unsigned char *buffer;
+	unsigned char *buffer = NULL;
 	int result = fb_ErrorSetNum( FB_RTERROR_OK );
-	int i, j, width, height, bpp, color, expand, size, padding, palette[256], palette_entries;
+	int i, j, width, height, bpp, color, expand, padding, palette[256], palette_entries;
+	size_t size, bytes_per_pixel, row_bytes;
 	int shifts[4] = {0, 0, 0, 0};
 	uint32_t masks[4];
 	int bits[4] = {0, 0, 0, 0};
@@ -426,7 +443,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 		return FB_RTERROR_FILEIO;
 	}
 
-	if ((bfType != 19778) || (biPlanes > 1) || (biWidth <= 0) || (biHeight == 0) || (biCompression > BI_BITFIELDS))
+	if ((bfType != 19778) || (biPlanes > 1) || (biWidth <= 0) || (biHeight == 0) || (biHeight == INT32_MIN) || (biCompression > BI_BITFIELDS))
 		return FB_RTERROR_FILEIO;
 
 	if (biHeight < 0) {
@@ -443,7 +460,9 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 		}
 	}
 
-	fseek(f, biSize + 14, SEEK_SET);
+	/* The accepted bitmap header sizes are all small fixed values. */
+	if (fseek(f, (long)biSize + 14L, SEEK_SET) != 0)
+		return FB_RTERROR_FILEIO;
 
 	if (biBitCount <= 8) {
 		/* OS/2 palette entries are 3 bytes; others are 4 bytes */
@@ -484,19 +503,19 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 				if (usenewheader) {
 					put_header->type = PUT_HEADER_NEW;
 					put_header->bpp = ctx->target_bpp;
-					put_header->width = biWidth;
-					put_header->height = biHeight;
-					put_header->pitch = ((put_header->width * put_header->bpp) + 0xF) & ~0xF;
+					put_header->width = (unsigned int)biWidth;
+					put_header->height = (unsigned int)biHeight;
+					put_header->pitch = ((put_header->width * (unsigned int)put_header->bpp) + 0xFu) & ~0xFu;
 
 					width = MIN((int)put_header->width, biWidth);
 					height = MIN((int)put_header->height, biHeight);
 					bpp = put_header->bpp;
 				}
 				else {
-					put_header->old.bpp = ctx->target_bpp;
-					put_header->old.width = biWidth;
-					put_header->old.height = biHeight;
-					put_header->pitch = ((put_header->width * put_header->bpp) + 0xF) & ~0xF;
+					put_header->old.bpp = (unsigned int)ctx->target_bpp & 0x7u;
+					put_header->old.width = (unsigned int)biWidth & 0x1FFFu;
+					put_header->old.height = (unsigned short)biHeight;
+					put_header->pitch = ((put_header->width * (unsigned int)put_header->bpp) + 0xFu) & ~0xFu;
 
 					width = MIN((int)put_header->old.width, biWidth);
 					height = MIN((int)put_header->old.height, biHeight);
@@ -537,6 +556,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 			case 2: convert = convert_8to16; break;
 			case 3:
 			case 4: convert = convert_8to32; break;
+			default: return FB_RTERROR_ILLEGALFUNCTIONCALL;
 		}
 	}
 	else if (biBitCount <= 16) {
@@ -545,6 +565,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 			case 2: convert = convert_bf_16to16; break;
 			case 3:
 			case 4: convert = convert_bf_16to32; break;
+			default: return FB_RTERROR_ILLEGALFUNCTIONCALL;
 		}
 	}
 	else if (biBitCount <= 24) {
@@ -553,6 +574,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 			case 2: convert = convert_bf_24to16; break;
 			case 3:
 			case 4: convert = convert_bf_24to32; break;
+			default: return FB_RTERROR_ILLEGALFUNCTIONCALL;
 		}
 	}
 	else if (biBitCount <= 32) {
@@ -561,6 +583,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 			case 2: convert = convert_bf_32to16; break;
 			case 3:
 			case 4: convert = convert_bf_32to32; break;
+			default: return FB_RTERROR_ILLEGALFUNCTIONCALL;
 		}
 	}
 	else
@@ -583,23 +606,38 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 		}
 	}
 
+	bytes_per_pixel = (size_t)BYTES_PER_PIXEL(biBitCount);
+	if ((bytes_per_pixel == 0) ||
+	    ((size_t)biWidth > (((size_t)-1 - 4u) / bytes_per_pixel)))
+		return FB_RTERROR_FILEIO;
+	row_bytes = (size_t)biWidth * bytes_per_pixel;
+	size = (row_bytes + 3u) & ~(size_t)0x3u;
+
 	DRIVER_LOCK();
-	fb_hMemCpy(target_pal, palette, palette_entries * sizeof(int));
+	fb_hMemCpy(target_pal, palette, (size_t)palette_entries * sizeof(int));
 	if (!pal)
 		fb_hRestorePalette();
-	size = ((biWidth * BYTES_PER_PIXEL(biBitCount)) + 3) & ~0x3;
 	buffer = (unsigned char *)malloc(size + 1);
 	if (!buffer) {
 		result = FB_RTERROR_OUTOFMEM;
 		goto exit_error;
 	}
 	switch (expand) {
-		case 1: padding = 4 - (((biWidth + 7) >> 3) & 0x3); break;
-		case 4: padding = 4 - (((biWidth + 1) >> 1) & 0x3); break;
-		default: padding = 4 - ((biWidth * BYTES_PER_PIXEL(biBitCount)) & 0x3); break;
+		case 1: padding = 4 - (int)((((size_t)biWidth + 7u) >> 3) & 0x3u); break;
+		case 4: padding = 4 - (int)((((size_t)biWidth + 1u) >> 1) & 0x3u); break;
+		default: padding = 4 - (int)(row_bytes & 0x3u); break;
 	}
 	padding &= 0x3;
-	fseek(f, bfOffBits, SEEK_SET);
+#if LONG_MAX < UINT32_MAX
+	if (bfOffBits > (uint32_t)LONG_MAX) {
+		result = FB_RTERROR_FILEIO;
+		goto exit_error;
+	}
+#endif
+	if (fseek(f, (long)bfOffBits, SEEK_SET) != 0) {
+		result = FB_RTERROR_FILEIO;
+		goto exit_error;
+	}
 	for (i = flipped ? 0 : (biHeight - 1);
 	     flipped ? (i < biHeight) : (i >= 0);
 	     flipped ? i++ : i--) {
@@ -615,7 +653,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 					}
 					color = (int)byte;
 				}
-				buffer[j] = color >> (8 - expand);
+				buffer[j] = (unsigned char)(color >> (8 - expand));
 				color = (color << expand) & 0xFF;
 			}
 			if (!skip_bytes(f, padding)) {
@@ -632,7 +670,7 @@ static int load_bmp(FB_GFXCTX *ctx, FILE *f, void *dest, void *pal, int usenewhe
 	}
 
 exit_error:
-	SET_DIRTY(ctx, 0, fb_gfx->h);
+	SET_DIRTY(ctx, 0, (size_t)fb_gfx->h);
 	DRIVER_UNLOCK();
 
 	free(buffer);
@@ -645,7 +683,7 @@ static int gfx_bload(FBSTRING_ACCESS *filename, void *dest, void *pal, int usene
 	FILE *f;
 	FB_GFXCTX *context;
 	int id;
-	unsigned int color, *palette = pal, size = 0;
+	unsigned int color, *palette = (unsigned int *)pal, size = 0;
 	char buffer[MAX_PATH];
 	int i, result = fb_ErrorSetNum( FB_RTERROR_OK );
 
@@ -733,7 +771,7 @@ static int gfx_bload(FBSTRING_ACCESS *filename, void *dest, void *pal, int usene
 			blocks = fread(context->line[0], size, 1, f);
 			if ((blocks != 1) && ferror(f))
 				result = FB_RTERROR_FILEIO;
-			SET_DIRTY(context, 0, fb_gfx->h);
+			SET_DIRTY(context, 0, (size_t)fb_gfx->h);
 			if ((result == FB_RTERROR_OK) && (blocks == 1)) {
 				if (!pal)
 					palette = fb_gfx->device_palette;

@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <math.h>
 
 /*:::::*/
 FBCALL void fb_hTimeDecodeSerial ( double serial,
@@ -20,27 +21,27 @@ FBCALL void fb_hTimeDecodeSerial ( double serial,
         if( use_qb_hack ) {
             /* Test for both 0.0 and -0.0 because FPUs may handle this as
              * different values ... */
-            if( dblFixValue==0.0 || dblFixValue==-0.0 ) {
+	if( fpclassify(dblFixValue) == FP_ZERO ) {
                 /* QB quirk ! */
                 serial = -serial;
             } else {
-                serial += 1.0l;
+                serial = (double)((long double)serial + 1.0l);
             }
         } else {
-            serial += 1.0l;
+            serial = (double)((long double)serial + 1.0l);
         }
     }
 
     /* The inaccuracies of the IEEE floating point data types ... */
-    serial += 0.000000001l;
+    serial = (double)((long double)serial + 0.000000001l);
 
-    serial *= 24.0l;
+    serial = (double)((long double)serial * 24.0l);
     hour = (int) serial;
     serial -= hour;
-    serial *= 60.0l;
+    serial = (double)((long double)serial * 60.0l);
     minute = (int) serial;
     serial -= minute;
-    serial *= 60.0l;
+    serial = (double)((long double)serial * 60.0l);
     second = (int) serial;
 
     if( pHour )

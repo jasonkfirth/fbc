@@ -39,6 +39,10 @@ struct FB_ERROR_OWNER {
 	FB_ERROR_C_RESUME *resume_boundary;
 	int target;
 	unsigned flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[8];
+#endif
 };
 
 typedef struct FB_ERROR_DISPATCH {
@@ -61,6 +65,10 @@ struct FB_ERROR_C_RESUME {
     void *next;
     void *selected;
     FB_ERROR_FRAME *anchor;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[8];
+#endif
 };
 
 /* A label address alone cannot distinguish recursive native activations.
@@ -114,14 +122,14 @@ typedef char FB_ERROR_HANDLER_ADDRESS_WIDTH[(sizeof( FB_ERRHANDLER ) == sizeof( 
 static FB_ERRHANDLER hLegacyAddress( void *address )
 {
 	FB_ERRHANDLER result;
-	memcpy( &result, &address, sizeof( result ) );
+	memcpy( (void *)&result, (const void *)&address, sizeof( result ) );
 	return result;
 }
 
 static void *hDataAddress( FB_ERRHANDLER address )
 {
 	void *result;
-	memcpy( &result, &address, sizeof( result ) );
+	memcpy( (void *)&result, (const void *)&address, sizeof( result ) );
 	return result;
 }
 
@@ -700,8 +708,10 @@ FBCALL void *fb_ErrorCResumeEnter( void *frame, const void *retry, const void *n
 		fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 		return NULL;
 	}
-	memcpy( &mutable_retry, &retry, sizeof( mutable_retry ) );
-	memcpy( &mutable_next, &next, sizeof( mutable_next ) );
+	memcpy( (void *)&mutable_retry, (const void *)&retry,
+		sizeof( mutable_retry ) );
+	memcpy( (void *)&mutable_next, (const void *)&next,
+		sizeof( mutable_next ) );
 	buffer = fb_ErrorCResumePush( mutable_retry, mutable_next );
 	if( buffer != NULL ) {
 		context = hGetContext();

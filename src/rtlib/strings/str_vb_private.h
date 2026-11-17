@@ -25,8 +25,11 @@ static __inline__ int fb_hStrCompareBytes( const char *a, const char *b,
 {
 	ssize_t i;
 
+	if( len <= 0 )
+		return 0;
+
 	if( compare == 0 )
-		return memcmp( a, b, len );
+		return memcmp( a, b, (size_t)len );
 
 	for( i = 0; i < len; ++i ) {
 		unsigned char x = fb_hStrFoldASCII( (unsigned char)a[i] );

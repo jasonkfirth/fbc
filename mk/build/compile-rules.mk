@@ -436,11 +436,12 @@ $(libfbgfxmtpicobjdir)/%.o: $(srcdir)/gfxlib2/%.s $(LIBFBGFX_H) | $(libfbgfxmtpi
 ##############################################################################
 
 # libdrm keeps its development headers in a pkg-config include directory on
-# distributions such as Debian. The Linux DRM adapter remains optional when
-# libdrm development headers are not installed.
+# distributions such as Debian. Treat those vendor headers as system headers
+# so the project warning policy applies to FreeBASIC sources, not libdrm internals.
+# The Linux DRM adapter remains optional when libdrm development headers are absent.
 GFX3_LINUX_DRM_CFLAGS :=
 ifeq ($(TARGET_OS),linux)
-GFX3_LINUX_DRM_CFLAGS := $(strip $(shell pkg-config --cflags libdrm 2>/dev/null))
+GFX3_LINUX_DRM_CFLAGS := $(strip $(shell pkg-config --cflags libdrm 2>/dev/null | sed 's/-I/-isystem /g'))
 endif
 
 ifeq ($(TARGET_OS),darwin)

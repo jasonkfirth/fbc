@@ -27,6 +27,8 @@
 #include once "crt/win32/unistd.bi"
 #elseif defined(__FB_DOS__)
 #include once "crt/dos/unistd.bi"
+#elseif defined(__FB_WII__)
+#include once "crt/wii/unistd.bi"
 #elseif defined(__FB_ANDROID__)
 #include once "crt/unix/unistd.bi"
 #elseif defined(__FB_LINUX__) or defined(__FB_NUTTX__)

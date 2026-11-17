@@ -7,11 +7,16 @@
  */
 #include "fb.h"
 #include <ctype.h>
+#include <limits.h>
 
 typedef struct FB_DEV_INFO_WIDTH {
     FB_LISTELEM     elem;
     char           *device;
     int             width;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } DEV_INFO_WIDTH;
 
 /** Initialize the list of device info nodes.
@@ -63,6 +68,9 @@ FBCALL int fb_WidthDev( FBSTRING_ACCESS *dev, int width )
     size_t i, size;
     char *device;
 
+    if( width < -1 )
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
     FB_LOCK();
 
     /* create list of device info nodes (if not created yet) */
@@ -79,13 +87,17 @@ FBCALL int fb_WidthDev( FBSTRING_ACCESS *dev, int width )
 
     /* */
     size = FB_STRSIZE(dev);
-    device = alloca(size + 1);
+    if( size >= (size_t)PTRDIFF_MAX )
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+    device = (char *)malloc(size + 1);
+    if( device==NULL )
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
     memcpy( device, dev->data, size );
     device[size] = 0;
 
     /* make the name uppercase */
     for( i=0; i!=size; ++i ) {
-        unsigned ch = (unsigned) device[i];
+        int ch = (unsigned char)device[i];
         if( islower(ch) )
             device[i] = (char) toupper(ch);
     }
@@ -108,6 +120,7 @@ FBCALL int fb_WidthDev( FBSTRING_ACCESS *dev, int width )
             node = fb_hListDevElemAlloc ( dev_info_widths, device, width );
             if( node==NULL ) {
                 FB_UNLOCK();
+                free( device );
                 return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
             }
         } else {
@@ -124,7 +137,12 @@ FBCALL int fb_WidthDev( FBSTRING_ACCESS *dev, int width )
         if( width!=-1 ) {
             fb_Width( width, -1 );
         }
-        cur = FB_HANDLE_SCREEN->width;
+        if( FB_HANDLE_SCREEN->width > INT_MAX ) {
+            FB_UNLOCK();
+            free( device );
+            return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+        }
+        cur = (int)FB_HANDLE_SCREEN->width;
 
     } else if ( fb_DevLptTestProtocol( NULL, device, size ) ) {
         /* PRINTER device */
@@ -141,9 +159,11 @@ FBCALL int fb_WidthDev( FBSTRING_ACCESS *dev, int width )
 	FB_UNLOCK();
 
     if( width==-1 ) {
+        free( device );
         return cur;
     }
 
+    free( device );
     return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 

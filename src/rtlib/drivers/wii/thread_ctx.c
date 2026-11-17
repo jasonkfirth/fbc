@@ -11,6 +11,7 @@
     Responsibilities:
 
         - allocate per-thread FreeBASIC TLS contexts
+        - query existing contexts without allocating during error cleanup
         - run TLS destructors when thread contexts are released
         - keep the single-threaded fallback available for non-MT builds
 
@@ -71,6 +72,25 @@ static FB_WII_TLSNODE *hWiiFindTlsNode( lwp_t id, int create )
 	__fb_wii_tls_nodes = node;
 
 	return node;
+}
+
+/* The node list uses the same recursive mutex as allocation and deletion.
+   Error cleanup must not create a node or initialize TLS merely to query it. */
+FBCALL void *fb_TlsGetCtxExisting( int index )
+{
+	FB_WII_TLSNODE *node;
+	void *ctx = NULL;
+
+	if( (index < 0) || (index >= FB_TLSKEYS) || (__fb_wii_tls_ready == FALSE) )
+		return NULL;
+
+	LWP_MutexLock( __fb_wii_tls_mutex );
+	node = hWiiFindTlsNode( LWP_GetSelf(), FALSE );
+	if( node != NULL )
+		ctx = node->ctx[index];
+	LWP_MutexUnlock( __fb_wii_tls_mutex );
+
+	return ctx;
 }
 
 /* Retrieve or create new TLS context for given key */
@@ -202,6 +222,13 @@ void fb_TlsExit( void )
 #else
 
 static uintptr_t fb_tls_context_table[FB_TLSKEYS];
+
+FBCALL void *fb_TlsGetCtxExisting( int index )
+{
+	if( (index < 0) || (index >= FB_TLSKEYS) )
+		return NULL;
+	return (void *)fb_tls_context_table[index];
+}
 
 /* Retrieve or create new TLS context for given key */
 FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn )

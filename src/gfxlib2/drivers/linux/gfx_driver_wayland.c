@@ -456,7 +456,7 @@ static void *fb_wayland_bind(struct wl_registry *registry, uint32_t name,
 		name, interface->name, version, NULL);
 }
 
-static int fb_wayland_add_listener(void *proxy, const void *listener, void *data)
+static int fb_wayland_add_listener(void *proxy, void *listener, void *data)
 {
 	return fb_wayland_window.api->proxy_add_listener((struct wl_proxy *)proxy,
 		(void (**)(void))listener, data);
@@ -528,7 +528,7 @@ static void fb_wayland_qt_windowmanager_quit(void *data,
 		fb_wayland_toplevel_close(window, NULL);
 }
 
-static const FB_WL_QT_WINDOWMANAGER_LISTENER fb_wayland_qt_windowmanager_listener = {
+static FB_WL_QT_WINDOWMANAGER_LISTENER fb_wayland_qt_windowmanager_listener = {
 	fb_wayland_qt_windowmanager_hints,
 	fb_wayland_qt_windowmanager_quit
 };
@@ -613,7 +613,7 @@ static void fb_wayland_registry_global_remove(void *data,
 	(void)name;
 }
 
-static const FB_WL_REGISTRY_LISTENER fb_wayland_registry_listener = {
+static FB_WL_REGISTRY_LISTENER fb_wayland_registry_listener = {
 	fb_wayland_registry_global,
 	fb_wayland_registry_global_remove
 };
@@ -626,7 +626,7 @@ static void fb_wayland_wm_ping(void *data, struct xdg_wm_base *wm_base,
 		FB_WL_XDG_WM_BASE_PONG, serial);
 }
 
-static const FB_WL_WM_BASE_LISTENER fb_wayland_wm_base_listener = {
+static FB_WL_WM_BASE_LISTENER fb_wayland_wm_base_listener = {
 	fb_wayland_wm_ping
 };
 
@@ -660,7 +660,7 @@ static void fb_wayland_shell_surface_popup_done(void *data,
 	(void)shell_surface;
 }
 
-static const FB_WL_SHELL_SURFACE_LISTENER fb_wayland_shell_surface_listener = {
+static FB_WL_SHELL_SURFACE_LISTENER fb_wayland_shell_surface_listener = {
 	fb_wayland_shell_surface_ping,
 	fb_wayland_shell_surface_configure,
 	fb_wayland_shell_surface_popup_done
@@ -731,7 +731,7 @@ static void fb_wayland_xdg_configure(void *data, struct xdg_surface *surface,
 	(void)fb_wayland_ack_configure(window);
 }
 
-static const FB_WL_XDG_SURFACE_LISTENER fb_wayland_xdg_surface_listener = {
+static FB_WL_XDG_SURFACE_LISTENER fb_wayland_xdg_surface_listener = {
 	fb_wayland_xdg_configure
 };
 
@@ -783,7 +783,7 @@ static void fb_wayland_toplevel_capabilities(void *data,
 	(void)capabilities;
 }
 
-static const FB_WL_TOPLEVEL_LISTENER fb_wayland_toplevel_listener = {
+static FB_WL_TOPLEVEL_LISTENER fb_wayland_toplevel_listener = {
 	fb_wayland_toplevel_configure,
 	fb_wayland_toplevel_close,
 	fb_wayland_toplevel_configure_bounds,
@@ -804,7 +804,7 @@ static void fb_wayland_buffer_release(void *data, struct wl_buffer *buffer)
 	}
 }
 
-static const FB_WL_BUFFER_LISTENER fb_wayland_buffer_listener = {
+static FB_WL_BUFFER_LISTENER fb_wayland_buffer_listener = {
 	fb_wayland_buffer_release
 };
 
@@ -823,7 +823,7 @@ static void fb_wayland_frame_done(void *data, struct wl_callback *callback,
 	fb_wayland_destroy(callback);
 }
 
-static const FB_WL_FRAME_LISTENER fb_wayland_frame_listener = {
+static FB_WL_FRAME_LISTENER fb_wayland_frame_listener = {
 	fb_wayland_frame_done
 };
 
@@ -990,7 +990,7 @@ static void fb_wayland_touch_orientation(void *data, struct wl_touch *touch,
 	(void)orientation;
 }
 
-static const FB_WL_TOUCH_LISTENER fb_wayland_touch_listener = {
+static FB_WL_TOUCH_LISTENER fb_wayland_touch_listener = {
 	fb_wayland_touch_down,
 	fb_wayland_touch_up,
 	fb_wayland_touch_motion,
@@ -1109,6 +1109,10 @@ static void fb_wayland_xkb_unload(FB_WAYLAND_WINDOW *window)
 	memset(&window->xkb, 0, sizeof(window->xkb));
 }
 
+/* POSIX defines dlsym's function-symbol conversion; scope GCC's extension. */
+#define FB_WAYLAND_ASSIGN_FUNCTION_POINTER(destination, address) \
+	__extension__ ((destination) = (__typeof__(destination))(address))
+
 static int fb_wayland_xkb_load(FB_WAYLAND_WINDOW *window)
 {
 	if (window->xkb.library)
@@ -1116,21 +1120,26 @@ static int fb_wayland_xkb_load(FB_WAYLAND_WINDOW *window)
 	window->xkb.library = dlopen("libxkbcommon.so.0", RTLD_NOW | RTLD_LOCAL);
 	if (!window->xkb.library)
 		return -1;
-	window->xkb.context_new = dlsym(window->xkb.library, "xkb_context_new");
-	window->xkb.context_unref = dlsym(window->xkb.library, "xkb_context_unref");
-	window->xkb.keymap_new_from_string = dlsym(window->xkb.library,
-		"xkb_keymap_new_from_string");
-	window->xkb.keymap_unref = dlsym(window->xkb.library, "xkb_keymap_unref");
-	window->xkb.state_new = dlsym(window->xkb.library, "xkb_state_new");
-	window->xkb.state_unref = dlsym(window->xkb.library, "xkb_state_unref");
-	window->xkb.state_update_key = dlsym(window->xkb.library,
-		"xkb_state_update_key");
-	window->xkb.state_update_mask = dlsym(window->xkb.library,
-		"xkb_state_update_mask");
-	window->xkb.state_key_get_utf8 = dlsym(window->xkb.library,
-		"xkb_state_key_get_utf8");
-	window->xkb.state_key_get_one_sym = dlsym(window->xkb.library,
-		"xkb_state_key_get_one_sym");
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.context_new,
+		dlsym(window->xkb.library, "xkb_context_new"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.context_unref,
+		dlsym(window->xkb.library, "xkb_context_unref"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.keymap_new_from_string,
+		dlsym(window->xkb.library, "xkb_keymap_new_from_string"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.keymap_unref,
+		dlsym(window->xkb.library, "xkb_keymap_unref"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.state_new,
+		dlsym(window->xkb.library, "xkb_state_new"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.state_unref,
+		dlsym(window->xkb.library, "xkb_state_unref"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.state_update_key,
+		dlsym(window->xkb.library, "xkb_state_update_key"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.state_update_mask,
+		dlsym(window->xkb.library, "xkb_state_update_mask"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.state_key_get_utf8,
+		dlsym(window->xkb.library, "xkb_state_key_get_utf8"));
+	FB_WAYLAND_ASSIGN_FUNCTION_POINTER(window->xkb.state_key_get_one_sym,
+		dlsym(window->xkb.library, "xkb_state_key_get_one_sym"));
 	if (!window->xkb.context_new || !window->xkb.context_unref ||
 		!window->xkb.keymap_new_from_string || !window->xkb.keymap_unref ||
 		!window->xkb.state_new || !window->xkb.state_unref ||
@@ -1141,6 +1150,8 @@ static int fb_wayland_xkb_load(FB_WAYLAND_WINDOW *window)
 	}
 	return 0;
 }
+
+#undef FB_WAYLAND_ASSIGN_FUNCTION_POINTER
 
 static int fb_wayland_key_repeatable(uint32_t key)
 {
@@ -1409,7 +1420,7 @@ static void fb_wayland_keyboard_repeat_info(void *data,
 		window->repeat_interval_ms = 1;
 }
 
-static const FB_WL_KEYBOARD_LISTENER fb_wayland_keyboard_listener = {
+static FB_WL_KEYBOARD_LISTENER fb_wayland_keyboard_listener = {
 	fb_wayland_keyboard_keymap,
 	fb_wayland_keyboard_enter,
 	fb_wayland_keyboard_leave,
@@ -1623,7 +1634,7 @@ static void fb_wayland_pointer_axis_discrete(void *data,
 	fb_hPostEvent(&event);
 }
 
-static const FB_WL_POINTER_LISTENER fb_wayland_pointer_listener = {
+static FB_WL_POINTER_LISTENER fb_wayland_pointer_listener = {
 	fb_wayland_pointer_enter,
 	fb_wayland_pointer_leave,
 	fb_wayland_pointer_motion,
@@ -1727,7 +1738,7 @@ static void fb_wayland_seat_name(void *data, struct wl_seat *seat,
 	(void)name;
 }
 
-static const FB_WL_SEAT_LISTENER fb_wayland_seat_listener = {
+static FB_WL_SEAT_LISTENER fb_wayland_seat_listener = {
 	fb_wayland_seat_capabilities,
 	fb_wayland_seat_name
 };
@@ -1891,7 +1902,7 @@ static void fb_wayland_text_done(void *data, struct zwp_text_input_v3 *input,
 	fb_hWaylandTextV3Reset(&window->text_v3_pending);
 }
 
-static const FB_WL_TEXT_INPUT_LISTENER fb_wayland_text_input_listener = {
+static FB_WL_TEXT_INPUT_LISTENER fb_wayland_text_input_listener = {
 	fb_wayland_text_enter,
 	fb_wayland_text_leave,
 	fb_wayland_text_preedit,
@@ -2119,7 +2130,7 @@ static void fb_wayland_text_v2_input_method_changed(void *data,
 		(void)fb_wayland_set_keyboard_locked(1);
 }
 
-static const FB_WL_TEXT_INPUT_V2_LISTENER fb_wayland_text_input_v2_listener = {
+static FB_WL_TEXT_INPUT_V2_LISTENER fb_wayland_text_input_v2_listener = {
 	fb_wayland_text_v2_enter,
 	fb_wayland_text_v2_leave,
 	fb_wayland_text_v2_panel_state,

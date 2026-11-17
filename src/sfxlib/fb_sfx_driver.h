@@ -131,6 +131,12 @@ extern "C" {
         OS audio system → driver.capture_read() → runtime capture buffer
 */
 
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+#define FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER , 0
+#else
+#define FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER
+#endif
+
 typedef struct SFXDRIVER
 {
     const char *name;
@@ -142,6 +148,14 @@ typedef struct SFXDRIVER
     */
 
     unsigned int capabilities;
+
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /*
+        This word occupies the 64-bit pointer-alignment gap that was already
+        present after the capability flags, preserving all callback offsets.
+    */
+    unsigned int abi_alignment_padding;
+#endif
 
 
     /* ------------------------------------------------------------------ */

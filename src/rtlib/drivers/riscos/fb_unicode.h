@@ -138,7 +138,7 @@ static __inline__ ssize_t fb_wstr_Len( const FB_WCHAR *s )
 {
 	/* Packed BASIC fields may begin between native wchar_t boundaries.
 	   C library wide-string functions require properly aligned pointers. */
-	if( (uintptr_t)(const void *)s % sizeof( FB_WCHAR ) != 0 ) {
+	if( (uintptr_t)s % sizeof( FB_WCHAR ) != 0 ) {
 		const unsigned char *p = (const unsigned char *)s;
 		ssize_t chars = 0;
 		FB_WCHAR value;
@@ -242,16 +242,14 @@ static __inline__ const FB_WCHAR *fb_wstr_SkipCharRev( const FB_WCHAR *s, ssize_
 	return p;
 }
 
-static __inline__ FB_WCHAR *fb_wstr_Instr( const FB_WCHAR *s, const FB_WCHAR *patt )
+static __inline__ const FB_WCHAR *fb_wstr_Instr( const FB_WCHAR *s, const FB_WCHAR *patt )
 {
 	/*
-	   Some C libraries keep the historic C signature for wcsstr(), returning
-	   a non-const pointer even when the input is const. Others expose a
-	   const-preserving builtin. The runtime wrapper keeps FreeBASIC's older
-	   mutable return type, matching INSTR-style callers that only use the
-	   pointer position.
+	   The source is const and INSTR only uses the match position. Keep the
+	   result const so it is safe with both historical and const-preserving
+	   wcsstr() declarations.
 	 */
-	return (FB_WCHAR *)wcsstr( s, patt );
+	return wcsstr( s, patt );
 }
 
 static __inline__ size_t fb_wstr_InstrAny( const FB_WCHAR *s, const FB_WCHAR *sset )
@@ -261,8 +259,8 @@ static __inline__ size_t fb_wstr_InstrAny( const FB_WCHAR *s, const FB_WCHAR *ss
 
 static __inline__ int fb_wstr_Compare( const FB_WCHAR *str1, const FB_WCHAR *str2, ssize_t chars )
 {
-	if( ((uintptr_t)(const void *)str1 % sizeof( FB_WCHAR ) != 0) ||
-	    ((uintptr_t)(const void *)str2 % sizeof( FB_WCHAR ) != 0) ) {
+	if( ((uintptr_t)str1 % sizeof( FB_WCHAR ) != 0) ||
+	    ((uintptr_t)str2 % sizeof( FB_WCHAR ) != 0) ) {
 		const unsigned char *left = (const unsigned char *)str1;
 		const unsigned char *right = (const unsigned char *)str2;
 		while( chars > 0 ) {

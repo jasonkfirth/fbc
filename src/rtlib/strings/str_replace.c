@@ -71,7 +71,7 @@ FBCALL FBSTRING_ACCESS *fb_StrReplace( FBSTRING_ACCESS *src, FBSTRING_ACCESS *fi
 	while( matches > 0 ) {
 		if( fb_hStrCompareBytes( src->data + pos, find->data, find_len, compare ) == 0 ) {
 			if( repl_len > 0 )
-				memcpy( dst->data + written, replacement->data, repl_len );
+				memcpy( dst->data + written, replacement->data, (size_t)repl_len );
 			written += repl_len;
 			pos += find_len;
 			--matches;
@@ -80,7 +80,7 @@ FBCALL FBSTRING_ACCESS *fb_StrReplace( FBSTRING_ACCESS *src, FBSTRING_ACCESS *fi
 		}
 	}
 	if( pos < src_len )
-		memcpy( dst->data + written, src->data + pos, src_len - pos );
+		memcpy( dst->data + written, src->data + pos, (size_t)(src_len - pos) );
 	dst->data[length] = '\0';
 
 done:

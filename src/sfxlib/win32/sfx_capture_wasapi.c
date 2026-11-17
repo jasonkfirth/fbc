@@ -179,7 +179,7 @@ static void capture_convert_to_float(const BYTE *src,
 
             if (use_float && bytes_per_sample == (int)sizeof(float))
             {
-                sample = ((const float *)src)[(frame * in_channels) + ch];
+                memcpy(&sample, sample_ptr, sizeof(sample));
             }
             else if (!use_float && bytes_per_sample == 2)
             {

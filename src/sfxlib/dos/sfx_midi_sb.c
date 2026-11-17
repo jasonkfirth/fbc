@@ -22,9 +22,12 @@ static int fb_sfxMsdosMpuWaitWrite(int port)
 {
     int timeout = 65535;
 
+    if (port <= 0 || port >= 0xFFFF)
+        return 0;
+
     while (timeout-- > 0)
     {
-        if ((inportb(port + 1) & 0x40) == 0)
+        if ((inportb((unsigned short)(port + 1)) & 0x40) == 0)
             return 1;
     }
 
@@ -33,10 +36,12 @@ static int fb_sfxMsdosMpuWaitWrite(int port)
 
 static int fb_sfxMsdosMpuWrite(int port, unsigned char value)
 {
+    if (port <= 0 || port >= 0xFFFF)
+        return -1;
     if (!fb_sfxMsdosMpuWaitWrite(port))
         return -1;
 
-    outportb(port, value);
+    outportb((unsigned short)port, value);
     return 0;
 }
 

@@ -128,7 +128,7 @@ void fb_sfxSetMasterVolume(float volume)
 
     fb_sfx_context->master_volume = volume;
 
-    SFX_DEBUG("sfx_control: master volume set to %f", volume);
+    SFX_DEBUG("sfx_control: master volume set to %f", (double)volume);
 }
 
 
@@ -177,7 +177,7 @@ void fb_sfxSetChannelVolume(int channel, float volume)
 
     ch->volume = volume;
 
-    SFX_DEBUG("sfx_control: channel %d volume = %f", channel, volume);
+    SFX_DEBUG("sfx_control: channel %d volume = %f", channel, (double)volume);
 }
 
 
@@ -213,7 +213,7 @@ void fb_sfxSetChannelPan(int channel, float pan)
 
     ch->pan = pan;
 
-    SFX_DEBUG("sfx_control: channel %d pan = %f", channel, pan);
+    SFX_DEBUG("sfx_control: channel %d pan = %f", channel, (double)pan);
 }
 
 

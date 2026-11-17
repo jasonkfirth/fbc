@@ -25,6 +25,7 @@
 #include <dpmi.h>
 #include <go32.h>
 #include <limits.h>
+#include <math.h>
 #include <pc.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -81,6 +82,7 @@ static struct
     unsigned short busmaster;
     unsigned long global_control;
     unsigned short codec_saved[5];
+    unsigned short codec_alignment_padding;
     int codec_count;
     int pci_owned;
     int engine_owned;
@@ -144,6 +146,74 @@ static int ac97_pci_command(unsigned short value)
         (value & (AC97_PCI_IO | AC97_PCI_MASTER));
 }
 
+static int ac97_read8(unsigned short base, unsigned int offset,
+                      unsigned char *value)
+{
+    unsigned int port;
+    if (!value || offset > (unsigned int)USHRT_MAX - (unsigned int)base)
+        return 0;
+    port = (unsigned int)base + offset;
+    *value = (unsigned char)inportb((unsigned short)port);
+    return 1;
+}
+
+static int ac97_read16(unsigned short base, unsigned int offset,
+                       unsigned short *value)
+{
+    unsigned int port;
+    if (!value || offset > (unsigned int)USHRT_MAX - (unsigned int)base)
+        return 0;
+    port = (unsigned int)base + offset;
+    *value = inportw((unsigned short)port);
+    return 1;
+}
+
+static int ac97_read32(unsigned short base, unsigned int offset,
+                       unsigned long *value)
+{
+    unsigned int port;
+    if (!value || offset > (unsigned int)USHRT_MAX - (unsigned int)base)
+        return 0;
+    port = (unsigned int)base + offset;
+    *value = inportl((unsigned short)port);
+    return 1;
+}
+
+static int ac97_write8(unsigned short base, unsigned int offset,
+                       unsigned int value)
+{
+    unsigned int port;
+    if ((value > UCHAR_MAX) ||
+        (offset > (unsigned int)USHRT_MAX - (unsigned int)base))
+        return 0;
+    port = (unsigned int)base + offset;
+    outportb((unsigned short)port, (unsigned char)value);
+    return 1;
+}
+
+static int ac97_write16(unsigned short base, unsigned int offset,
+                        unsigned int value)
+{
+    unsigned int port;
+    if ((value > USHRT_MAX) ||
+        (offset > (unsigned int)USHRT_MAX - (unsigned int)base))
+        return 0;
+    port = (unsigned int)base + offset;
+    outportw((unsigned short)port, (unsigned short)value);
+    return 1;
+}
+
+static int ac97_write32(unsigned short base, unsigned int offset,
+                        unsigned long value)
+{
+    unsigned int port;
+    if (offset > (unsigned int)USHRT_MAX - (unsigned int)base)
+        return 0;
+    port = (unsigned int)base + offset;
+    outportl((unsigned short)port, value);
+    return 1;
+}
+
 static int ac97_supported(unsigned long identity)
 {
     if ((identity & 0xFFFF) != 0x8086)
@@ -179,7 +249,7 @@ static int ac97_find(void)
         memset(&regs, 0, sizeof(regs));
         regs.x.ax = 0xB103; /* Find PCI class: multimedia/audio, interface 0. */
         regs.d.ecx = 0x040100;
-        regs.x.si = index;
+        regs.x.si = (unsigned short)index;
         if (!ac97_pci_call(&regs))
             break;
         device = regs.x.bx;
@@ -224,10 +294,13 @@ static int ac97_codec_access(void)
     uclock_t start = uclock();
     do
     {
+        unsigned char status;
         /* Reading CAS claims the semaphore; the following mixer access
          * releases it. A permanently busy or absent controller times out.
          */
-        if (!(inportb(ac97.busmaster + AC97_CODEC_ACCESS) & 1))
+        if (!ac97_read8(ac97.busmaster, AC97_CODEC_ACCESS, &status))
+            return 0;
+        if (!(status & 1U))
             return 1;
         ac97_wait();
     } while (uclock() - start < UCLOCKS_PER_SEC / 10);
@@ -238,7 +311,8 @@ static int ac97_codec_read(unsigned int reg, unsigned short *value)
 {
     if (!ac97_codec_access())
         return 0;
-    *value = inportw(ac97.mixer + reg);
+    if (!ac97_read16(ac97.mixer, reg, value))
+        return 0;
     return *value != 0xFFFF;
 }
 
@@ -246,8 +320,7 @@ static int ac97_codec_write(unsigned int reg, unsigned short value)
 {
     if (!ac97_codec_access())
         return 0;
-    outportw(ac97.mixer + reg, value);
-    return 1;
+    return ac97_write16(ac97.mixer, reg, value);
 }
 
 static int ac97_wait_engine(unsigned int reg, unsigned int mask,
@@ -256,7 +329,10 @@ static int ac97_wait_engine(unsigned int reg, unsigned int mask,
     uclock_t start = uclock();
     do
     {
-        if ((inportb(ac97.busmaster + reg) & mask) == expected)
+        unsigned char status;
+        if (!ac97_read8(ac97.busmaster, reg, &status))
+            return 0;
+        if (((unsigned int)status & mask) == expected)
             return 1;
         ac97_wait();
     } while (uclock() - start < UCLOCKS_PER_SEC / 10);
@@ -274,13 +350,16 @@ static void msdos_ac97_exit(void)
         return;
     if (ac97.engine_owned)
     {
-        outportb(ac97.busmaster + AC97_PO_CR, 0);
-        stopped = ac97_wait_engine(AC97_PO_SR, AC97_SR_HALTED, AC97_SR_HALTED);
+        if (!ac97_write8(ac97.busmaster, AC97_PO_CR, 0))
+            stopped = 0;
+        else
+            stopped = ac97_wait_engine(AC97_PO_SR, AC97_SR_HALTED, AC97_SR_HALTED);
         /* Disable PCI bus mastering before releasing any physical memory,
          * even on a completion timeout. If BIOS refuses and DMA cannot be
          * stopped, retain the allocation rather than risk memory corruption.
          */
-        if (!ac97_pci_command((ac97.command | AC97_PCI_IO) & ~AC97_PCI_MASTER) && !stopped)
+        if (!ac97_pci_command((unsigned short)((ac97.command | AC97_PCI_IO) &
+                                   (unsigned short)~AC97_PCI_MASTER)) && !stopped)
         {
             SFX_DEBUG("msdos_ac97: cannot stop DMA; retaining DOS allocation");
             /* Keep the live descriptor address and allocation intact. This
@@ -292,11 +371,13 @@ static void msdos_ac97_exit(void)
             ac97.pcm = NULL;
             return;
         }
-        outportb(ac97.busmaster + AC97_PO_CR, AC97_CR_RESET);
-        if (!ac97_wait_engine(AC97_PO_CR, AC97_CR_RESET, 0))
+        if (!ac97_write8(ac97.busmaster, AC97_PO_CR, AC97_CR_RESET) ||
+            !ac97_wait_engine(AC97_PO_CR, AC97_CR_RESET, 0))
             stopped = 0;
-        outportl(ac97.busmaster + AC97_PO_BDBAR, 0);
-        outportw(ac97.busmaster + AC97_PO_SR, AC97_SR_CLEAR);
+        if (!ac97_write32(ac97.busmaster, AC97_PO_BDBAR, 0))
+            stopped = 0;
+        if (!ac97_write16(ac97.busmaster, AC97_PO_SR, AC97_SR_CLEAR))
+            stopped = 0;
         /* Restore rate before extended control, and power after volumes. */
         if (ac97.codec_count == 5)
         {
@@ -309,10 +390,12 @@ static void msdos_ac97_exit(void)
             ac97_codec_write(0x18, ac97.codec_saved[1]);
             ac97_codec_write(0x26, ac97.codec_saved[2]);
         }
-        outportl(ac97.busmaster + AC97_GLOBAL_CONTROL, ac97.global_control);
+        if (!ac97_write32(ac97.busmaster, AC97_GLOBAL_CONTROL, ac97.global_control))
+            stopped = 0;
     }
     if (ac97.pci_owned)
-        ac97_pci_command(stopped ? ac97.command : (ac97.command & ~AC97_PCI_MASTER));
+        ac97_pci_command(stopped ? ac97.command :
+            (unsigned short)(ac97.command & (unsigned short)~AC97_PCI_MASTER));
     if (ac97.selector)
         __dpmi_free_dos_memory(ac97.selector);
     free(ac97.pcm);
@@ -323,9 +406,13 @@ static int msdos_ac97_init(int rate, int channels, int buffer, int flags)
 {
     AC97_DESCRIPTOR descriptors[AC97_BDL_ENTRIES] = {{ 0, 0 }};
     unsigned short vendor1, vendor2, value;
+    unsigned char activity_input, activity_output, activity_mic;
     unsigned long command;
+    unsigned long global_status;
     uclock_t start;
-    int segment, bytes, i;
+    size_t descriptor_bytes, pcm_bytes, allocation_bytes;
+    int paragraphs;
+    int segment, i;
     (void)rate;
     (void)flags;
 
@@ -341,22 +428,29 @@ static int msdos_ac97_init(int rate, int channels, int buffer, int flags)
     /* Do not take a controller from another active DOS audio owner. The
      * three CR registers correspond to PCM input, PCM output and mic input.
      */
-    if ((inportb(ac97.busmaster + 0x0B) |
-         inportb(ac97.busmaster + AC97_PO_CR) |
-         inportb(ac97.busmaster + 0x2B)) & AC97_CR_RUN)
+    if (!ac97_read8(ac97.busmaster, 0x0B, &activity_input) ||
+        !ac97_read8(ac97.busmaster, AC97_PO_CR, &activity_output) ||
+        !ac97_read8(ac97.busmaster, 0x2B, &activity_mic) ||
+        (((unsigned int)activity_input | (unsigned int)activity_output |
+          (unsigned int)activity_mic) & AC97_CR_RUN))
         goto failed;
-    ac97.global_control = inportl(ac97.busmaster + AC97_GLOBAL_CONTROL);
-    if (ac97.global_control == 0xFFFFFFFFUL)
+    if (!ac97_read32(ac97.busmaster, AC97_GLOBAL_CONTROL, &ac97.global_control) ||
+        ac97.global_control == 0xFFFFFFFFUL)
         goto failed;
     ac97.engine_owned = 1;
     /* Release cold reset, select two-channel/16-bit PCM. Avoid a whole-link
      * reset when firmware has already brought up the codec.
      */
-    outportl(ac97.busmaster + AC97_GLOBAL_CONTROL,
-             (ac97.global_control & ~0x00700000UL) | AC97_COLD_RELEASE);
+    if (!ac97_write32(ac97.busmaster, AC97_GLOBAL_CONTROL,
+                      (ac97.global_control & ~0x00700000UL) | AC97_COLD_RELEASE))
+        goto failed;
     start = uclock();
-    while (!(inportl(ac97.busmaster + AC97_GLOBAL_STATUS) & AC97_CODEC_READY))
+    while (1)
     {
+        if (!ac97_read32(ac97.busmaster, AC97_GLOBAL_STATUS, &global_status))
+            goto failed;
+        if (global_status & AC97_CODEC_READY)
+            break;
         if (uclock() - start >= UCLOCKS_PER_SEC)
             goto failed;
         ac97_wait();
@@ -374,8 +468,9 @@ static int msdos_ac97_init(int rate, int channels, int buffer, int flags)
      * support. Disable VRA/DRA so pitch never depends on firmware settings.
      */
     if (!ac97_codec_write(0x26, 0) ||
-        !ac97_codec_write(0x2A, ac97.codec_saved[3] & ~3) ||
-        !ac97_codec_write(0x2C, AC97_RATE) ||
+        !ac97_codec_write(0x2A, (unsigned short)(ac97.codec_saved[3] &
+                                                  (unsigned short)~3U)) ||
+        !ac97_codec_write(0x2C, (unsigned short)AC97_RATE) ||
         !ac97_codec_read(0x2A, &value) || (value & 3))
         goto failed;
     start = uclock();
@@ -390,34 +485,47 @@ static int msdos_ac97_init(int rate, int channels, int buffer, int flags)
             goto failed;
         ac97_wait();
     } while (1);
-    if (!ac97_codec_write(0x02, 0) || !ac97_codec_write(0x18, 0x0808))
+    if (!ac97_codec_write(0x02, 0) ||
+        !ac97_codec_write(0x18, (unsigned short)0x0808))
         goto failed;
 
     ac97.frames = buffer > 0 ? buffer : 1024;
     if (ac97.frames > AC97_MAX_FRAMES)
         ac97.frames = AC97_MAX_FRAMES;
     ac97.channels = channels;
-    bytes = AC97_BDL_ENTRIES * sizeof(AC97_DESCRIPTOR) + ac97.frames * 4;
-    segment = __dpmi_allocate_dos_memory((bytes + 15) / 16, &ac97.selector);
-    if (segment < 0)
+    if (((size_t)AC97_BDL_ENTRIES > (size_t)-1 / sizeof(AC97_DESCRIPTOR)) ||
+        ((size_t)ac97.frames > (size_t)-1 / 4U))
+        goto failed;
+    descriptor_bytes = (size_t)AC97_BDL_ENTRIES * sizeof(AC97_DESCRIPTOR);
+    pcm_bytes = (size_t)ac97.frames * 4U;
+    if ((pcm_bytes > (size_t)-1 - descriptor_bytes) ||
+        (descriptor_bytes + pcm_bytes > 0xFFFF0U))
+        goto failed;
+    allocation_bytes = descriptor_bytes + pcm_bytes;
+    paragraphs = (int)((allocation_bytes + 15U) / 16U);
+    segment = __dpmi_allocate_dos_memory(paragraphs, &ac97.selector);
+    if ((segment < 0) || (ac97.selector <= 0))
     {
         ac97.selector = 0;
         goto failed;
     }
-    ac97.physical = (unsigned long)segment << 4;
-    ac97.pcm = malloc(ac97.frames * 4);
+    ac97.physical = (unsigned long)(unsigned int)segment << 4;
+    ac97.pcm = malloc(pcm_bytes);
     if (!ac97.pcm)
         goto failed;
     /* Inactive descriptors carry zero length rather than stale DOS memory,
      * including entries adjacent to the current hardware prefetch window.
      */
-    movedata(_go32_my_ds(), (unsigned)descriptors, ac97.selector, 0, sizeof(descriptors));
-    outportb(ac97.busmaster + AC97_PO_CR, AC97_CR_RESET);
+    movedata((unsigned int)_go32_my_ds(), (unsigned int)(uintptr_t)descriptors,
+             (unsigned int)ac97.selector, 0U, (unsigned int)descriptor_bytes);
+    if (!ac97_write8(ac97.busmaster, AC97_PO_CR, AC97_CR_RESET))
+        goto failed;
     if (!ac97_wait_engine(AC97_PO_CR, AC97_CR_RESET, 0))
         goto failed;
-    outportw(ac97.busmaster + AC97_PO_SR, AC97_SR_CLEAR);
-    outportl(ac97.busmaster + AC97_PO_BDBAR, ac97.physical);
-    if (!ac97_pci_command(ac97.command | AC97_PCI_IO | AC97_PCI_MASTER) ||
+    if (!ac97_write16(ac97.busmaster, AC97_PO_SR, AC97_SR_CLEAR) ||
+        !ac97_write32(ac97.busmaster, AC97_PO_BDBAR, ac97.physical))
+        goto failed;
+    if (!ac97_pci_command((unsigned short)(ac97.command | AC97_PCI_IO | AC97_PCI_MASTER)) ||
         !ac97_pci_read(ac97.pci, 4, &command) || !(command & AC97_PCI_MASTER))
         goto failed;
     ac97.active = 1;
@@ -439,7 +547,7 @@ failed:
 static short ac97_sample(float value)
 {
     /* Reject NaN before the float-to-integer conversion; clamp infinities. */
-    if (value != value)
+    if (isnan(value))
         return 0;
     if (value >= 1.0f)
         return 32767;
@@ -458,6 +566,7 @@ static int msdos_ac97_write(const float *samples, int frames)
         AC97_DESCRIPTOR descriptor;
         uclock_t start;
         int i, count = frames - written;
+        unsigned int descriptor_bytes;
         unsigned short status;
         if (count > ac97.frames)
             count = ac97.frames;
@@ -467,41 +576,65 @@ static int msdos_ac97_write(const float *samples, int frames)
             ac97.pcm[i * 2] = ac97_sample(source[0]);
             ac97.pcm[i * 2 + 1] = ac97_sample(source[ac97.channels - 1]);
         }
-        descriptor.address = ac97.physical + AC97_BDL_ENTRIES * sizeof(descriptor);
-        descriptor.samples = count * 2;
-        movedata(_go32_my_ds(), (unsigned)ac97.pcm, ac97.selector,
-                 AC97_BDL_ENTRIES * sizeof(descriptor), count * 4);
-        movedata(_go32_my_ds(), (unsigned)&descriptor, ac97.selector,
-                 ac97.descriptor * sizeof(descriptor), sizeof(descriptor));
+        descriptor_bytes = (unsigned int)AC97_BDL_ENTRIES *
+                           (unsigned int)sizeof(descriptor);
+        descriptor.address = (uint32_t)(ac97.physical + (unsigned long)descriptor_bytes);
+        descriptor.samples = (uint32_t)((unsigned int)count * 2U);
+        movedata((unsigned int)_go32_my_ds(), (unsigned int)(uintptr_t)ac97.pcm,
+                 (unsigned int)ac97.selector, descriptor_bytes,
+                 (unsigned int)count * 4U);
+        movedata((unsigned int)_go32_my_ds(), (unsigned int)(uintptr_t)&descriptor,
+                 (unsigned int)ac97.selector,
+                 (unsigned int)ac97.descriptor * (unsigned int)sizeof(descriptor),
+                 (unsigned int)sizeof(descriptor));
         /* LVI publishes the completed descriptor. Keep RUN set between
          * writes: extending LVI resumes an engine halted at its previous
          * last entry, without resetting the codec or DMA for every block.
          */
-        outportw(ac97.busmaster + AC97_PO_SR, AC97_SR_CLEAR);
-        outportb(ac97.busmaster + AC97_PO_LVI, ac97.descriptor);
+        if (!ac97_write16(ac97.busmaster, AC97_PO_SR, AC97_SR_CLEAR) ||
+            !ac97_write8(ac97.busmaster, AC97_PO_LVI, ac97.descriptor)) {
+            ac97.active = 0;
+            return -1;
+        }
         if (!ac97.started)
         {
-            outportb(ac97.busmaster + AC97_PO_CR, AC97_CR_RUN);
+            if (!ac97_write8(ac97.busmaster, AC97_PO_CR, AC97_CR_RUN)) {
+                ac97.active = 0;
+                return -1;
+            }
             ac97.started = 1;
         }
         start = uclock();
         do
         {
-            status = inportw(ac97.busmaster + AC97_PO_SR);
+            if (!ac97_read16(ac97.busmaster, AC97_PO_SR, &status)) {
+                ac97_write8(ac97.busmaster, AC97_PO_CR, 0);
+                ac97.active = 0;
+                return -1;
+            }
             if ((status & AC97_SR_FIFO_ERROR) || uclock() - start >= UCLOCKS_PER_SEC)
             {
                 /* Stop immediately; the core will detach us and run exit
                  * before selecting the next driver. No fictitious success.
                  */
-                outportb(ac97.busmaster + AC97_PO_CR, 0);
+                ac97_write8(ac97.busmaster, AC97_PO_CR, 0);
                 ac97.active = 0;
                 return -1;
             }
             if ((status & (AC97_SR_HALTED | AC97_SR_LAST_DONE)) ==
-                (AC97_SR_HALTED | AC97_SR_LAST_DONE) &&
-                inportb(ac97.busmaster + AC97_PO_CIV) == ac97.descriptor &&
-                inportw(ac97.busmaster + AC97_PO_PICB) == 0)
-                break;
+                (AC97_SR_HALTED | AC97_SR_LAST_DONE)) {
+                unsigned char current_index;
+                unsigned short samples_remaining;
+                if (!ac97_read8(ac97.busmaster, AC97_PO_CIV, &current_index) ||
+                    !ac97_read16(ac97.busmaster, AC97_PO_PICB, &samples_remaining)) {
+                    ac97_write8(ac97.busmaster, AC97_PO_CR, 0);
+                    ac97.active = 0;
+                    return -1;
+                }
+                if (((unsigned int)current_index == ac97.descriptor) &&
+                    (samples_remaining == 0))
+                    break;
+            }
             ac97_wait();
         } while (1);
         written += count;
@@ -515,7 +648,7 @@ static int msdos_ac97_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverAc97 =
 {
     "AC97",
-    FB_SFX_DRIVER_CAP_BLOCKING,
+    FB_SFX_DRIVER_CAP_BLOCKING FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     msdos_ac97_init,
     msdos_ac97_exit,
     msdos_ac97_write,

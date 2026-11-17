@@ -90,6 +90,10 @@ typedef struct FB_GFX3_GAMEPAD_STATE {
 	int device_id;
 	int seen;
 	int connected;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the native button state field's original offset. */
+	unsigned char buttons_alignment_padding[4];
+#endif
 	ssize_t buttons;
 	ssize_t dpad;
 	float axis[FB_GFX3_INPUT_GAMEPAD_AXIS_COUNT];
@@ -127,6 +131,10 @@ typedef struct FB_GFX3_INPUT_STATE {
 	int desktop_width;
 	int desktop_height;
 	FB_GFX3_TOUCH_CONTACT touch[FB_GFX3_INPUT_TOUCH_MAX];
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the gamepad array at its original pointer-aligned offset. */
+	unsigned char gamepad_alignment_padding[4];
+#endif
 	FB_GFX3_GAMEPAD_STATE gamepad[FB_GFX3_INPUT_GAMEPAD_MAX];
 	uint32_t touch_count;
 	int mouse_inside;

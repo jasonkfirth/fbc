@@ -35,6 +35,7 @@ private sub hWriteIntegerAbs(byval dtype as integer)
 	var identifier = *hCIntegerAbsName(dtype)
 	var size = typeGetSize(dtype)
 	var zero = iif(size = 8, "0ull", "0u")
+	var first = ctx.sections(0).bufferlen
 	hWriteLine("static inline " + typename + " " + identifier + "(" + typename + " value)", TRUE)
 	hWriteLine("{", TRUE)
 	if( typeIsSigned(dtype) ) then
@@ -55,6 +56,7 @@ private sub hWriteIntegerAbs(byval dtype as integer)
 		hWriteLine("return value;", TRUE)
 	end if
 	hWriteLine("}", TRUE)
+	hCLeafNativeSpan(identifier, TRUE, first, ctx.sections(0).bufferlen)
 end sub
 
 /' end of backend/c/c-integer-abs.bi '/

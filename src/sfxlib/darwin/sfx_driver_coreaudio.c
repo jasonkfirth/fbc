@@ -723,7 +723,7 @@ static int darwin_device_select(int device)
 const FB_SFX_DRIVER fb_sfxDriverCoreAudio =
 {
     "CoreAudio",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     darwin_init,
     darwin_exit,
     darwin_write,

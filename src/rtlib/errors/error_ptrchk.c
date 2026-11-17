@@ -6,12 +6,26 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <string.h>
+
+/* The null-check ABI returns BASIC handler addresses through void *. */
+typedef char FB_ERROR_HANDLER_ADDRESS_WIDTH[
+	(sizeof(FB_ERRHANDLER) == sizeof(void *)) ? 1 : -1];
+
+static void *hErrorHandlerAddress(FB_ERRHANDLER handler)
+{
+	void *address;
+
+	memcpy((void *)&address, (const void *)&handler, sizeof(address));
+	return address;
+}
 
 /*:::::*/
 FBCALL void *fb_NullPtrChk( void *ptr, int linenum, const char *fname )
 {
 	if( ptr == NULL )
-		return (void *)fb_ErrorThrowEx( FB_RTERROR_NULLPTR, linenum, fname, NULL, NULL );
+		return hErrorHandlerAddress(
+			fb_ErrorThrowEx(FB_RTERROR_NULLPTR, linenum, fname, NULL, NULL));
 	else
 		return NULL;
 }

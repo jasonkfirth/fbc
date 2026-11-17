@@ -117,6 +117,9 @@ typedef struct FB_GFX3_PLATFORM_X11 {
 	FB_X11_DROP drops;
 	Display *display;
 	int screen;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t window_alignment_padding;
+#endif
 	Window window;
 	Colormap colormap;
 	Cursor hidden_cursor;

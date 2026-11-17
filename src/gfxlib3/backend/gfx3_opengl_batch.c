@@ -30,7 +30,7 @@ uint32_t fb_gfx3_gl_points_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 		return 1;
-	first = (const FB_GFX3_POINTS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_POINTS_COMMAND);
 	if ((first->count == 0u) ||
 	    (fb_gfx3_size_multiply(first->count, sizeof(first->point[0]),
 	     &points_size) != FB_GFX3_OK) ||
@@ -54,7 +54,7 @@ uint32_t fb_gfx3_gl_points_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[count]) <
 		     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 			break;
-		candidate = (const FB_GFX3_POINTS_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_POINTS_COMMAND);
 		if ((candidate->count == 0u) ||
 		    (memcmp(&candidate->clip, &first->clip,
 		     sizeof(candidate->clip)) != 0) ||
@@ -104,7 +104,7 @@ int fb_gfx3_gl_points_batch(FB_GFX3_OPENGL_STATE *state,
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_POINTS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_POINTS_COMMAND);
 	result = fb_gfx3_gl_surface_retain(state, commands[0]->target,
 		commands[count - 1u]->sequence, &destination);
 	if (result != FB_GFX3_OK)
@@ -126,7 +126,7 @@ int fb_gfx3_gl_points_batch(FB_GFX3_OPENGL_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_POINTS_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_POINTS_COMMAND);
 		if ((payload->count == 0u) ||
 		    (memcmp(&payload->clip, &first->clip, sizeof(payload->clip)) != 0) ||
 		    (fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
@@ -155,7 +155,7 @@ int fb_gfx3_gl_points_batch(FB_GFX3_OPENGL_STATE *state,
 	}
 	for (index = 0; index < count; index++) {
 		const FB_GFX3_POINTS_COMMAND *payload =
-			(const FB_GFX3_POINTS_COMMAND *)commands[index]->payload;
+			FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_POINTS_COMMAND);
 		uint32_t point_index;
 
 		for (point_index = 0; point_index < payload->count; point_index++) {
@@ -269,7 +269,7 @@ uint32_t fb_gfx3_gl_glyph_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)))
 		return 1u;
-	first = (const FB_GFX3_GLYPHS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_GLYPHS_COMMAND);
 	if ((first->count == 0u) ||
 	    (fb_gfx3_size_multiply(first->count, sizeof(first->glyph[0]),
 	     &glyph_bytes) != FB_GFX3_OK) ||
@@ -288,7 +288,7 @@ uint32_t fb_gfx3_gl_glyph_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[count]) <
 		     offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)))
 			break;
-		candidate = (const FB_GFX3_GLYPHS_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_GLYPHS_COMMAND);
 		if ((candidate->count == 0u) ||
 		    (candidate->count > FB_GFX3_OPENGL_GLYPH_BATCH_LIMIT - total) ||
 		    (memcmp(&candidate->clip, &first->clip,
@@ -343,7 +343,7 @@ int fb_gfx3_gl_glyph_batch(FB_GFX3_OPENGL_STATE *state,
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_GLYPHS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_GLYPHS_COMMAND);
 	result = fb_gfx3_gl_surface_retain(state, commands[0]->target,
 		commands[command_count - 1u]->sequence, &destination);
 	if (result != FB_GFX3_OK)
@@ -363,8 +363,7 @@ int fb_gfx3_gl_glyph_batch(FB_GFX3_OPENGL_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_GLYPHS_COMMAND *)
-			commands[command_index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[command_index], const FB_GFX3_GLYPHS_COMMAND);
 		if ((payload->count == 0u) ||
 		    (payload->count > FB_GFX3_OPENGL_GLYPH_BATCH_LIMIT - total) ||
 		    (memcmp(&payload->clip, &first->clip, sizeof(payload->clip)) != 0) ||
@@ -392,7 +391,7 @@ int fb_gfx3_gl_glyph_batch(FB_GFX3_OPENGL_STATE *state,
 	}
 	for (command_index = 0u; command_index < command_count; ++command_index) {
 		const FB_GFX3_GLYPHS_COMMAND *payload =
-			(const FB_GFX3_GLYPHS_COMMAND *)commands[command_index]->payload;
+			FB_GFX3_COMMAND_PAYLOAD_AS(commands[command_index], const FB_GFX3_GLYPHS_COMMAND);
 		uint32_t item;
 
 		for (item = 0u; item < payload->count; ++item) {
@@ -620,7 +619,7 @@ uint32_t fb_gfx3_gl_line_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_LINE) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1;
-	first = (const FB_GFX3_LINE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_LINE_COMMAND);
 	if ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0)
 		return 1;
 	if ((llabs((long long)first->x2 - first->x1) > 32767) ||
@@ -637,7 +636,7 @@ uint32_t fb_gfx3_gl_line_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_LINE_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_LINE_COMMAND);
 		if (((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0) ||
 		    (candidate->style != first->style) ||
 		    (memcmp(&candidate->clip, &first->clip,
@@ -660,7 +659,7 @@ uint32_t fb_gfx3_gl_alpha_blit_batch_count(
 	    (commands[0]->type != FB_GFX3_COMMAND_BLIT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 	if (((first->mode != FB_GFX3_BLIT_TRANS) &&
 	    (first->mode != FB_GFX3_BLIT_PSET) &&
 	    (first->mode != FB_GFX3_BLIT_PRESET) &&
@@ -683,7 +682,7 @@ uint32_t fb_gfx3_gl_alpha_blit_batch_count(
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_BLIT_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_BLIT_COMMAND);
 		if ((candidate->mode != first->mode) ||
 		    (candidate->source != first->source) ||
 		    (((first->mode == FB_GFX3_BLIT_BLEND) ||
@@ -705,7 +704,7 @@ uint32_t fb_gfx3_gl_blit_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_BLIT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1;
-	first = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 	if (((first->mode != FB_GFX3_BLIT_TRANS) &&
 	     (first->mode != FB_GFX3_BLIT_PSET) &&
 	     (first->mode != FB_GFX3_BLIT_PRESET) &&
@@ -725,7 +724,7 @@ uint32_t fb_gfx3_gl_blit_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_BLIT_COMMAND *)commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_BLIT_COMMAND);
 		if ((candidate->source != first->source) ||
 		    (commands[index]->target != commands[0]->target) ||
 		    (candidate->mode != first->mode) ||
@@ -746,7 +745,7 @@ uint32_t fb_gfx3_gl_rectangle_batch_count(
 	    (commands[0]->type != FB_GFX3_COMMAND_RECTANGLE) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1;
-	first = (const FB_GFX3_RECTANGLE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_RECTANGLE_COMMAND);
 	if ((first->filled == 0) ||
 	    ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0))
 		return 1;
@@ -761,7 +760,7 @@ uint32_t fb_gfx3_gl_rectangle_batch_count(
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_RECTANGLE_COMMAND *)commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_RECTANGLE_COMMAND);
 		if ((candidate->filled == 0) ||
 		    ((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0))
 			break;
@@ -779,7 +778,7 @@ uint32_t fb_gfx3_gl_ellipse_batch_count(
 	    (commands[0]->type != FB_GFX3_COMMAND_ELLIPSE) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_ELLIPSE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_ELLIPSE_COMMAND);
 	if ((first->filled == 0u) ||
 	    ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u))
 		return 1u;
@@ -794,7 +793,7 @@ uint32_t fb_gfx3_gl_ellipse_batch_count(
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_ELLIPSE_COMMAND);
 		if ((candidate->filled == 0u) ||
 		    ((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u))
 			break;
@@ -870,7 +869,7 @@ uint32_t fb_gfx3_gl_primitive_batch_count(
 			if (fb_gfx3_command_payload_size(command) <
 			    offsetof(FB_GFX3_POINTS_COMMAND, point))
 				break;
-			points = (const FB_GFX3_POINTS_COMMAND *)command->payload;
+			points = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 			if ((points->count == 0u) ||
 			    (fb_gfx3_size_multiply(points->count,
 			     sizeof(points->point[0]), &point_bytes) != FB_GFX3_OK) ||
@@ -891,7 +890,7 @@ uint32_t fb_gfx3_gl_primitive_batch_count(
 
 			if (fb_gfx3_command_payload_size(command) != sizeof(*line))
 				break;
-			line = (const FB_GFX3_LINE_COMMAND *)command->payload;
+			line = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 			if (((line->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 			    (llabs((long long)line->x2 - line->x1) > 32767) ||
 			    (llabs((long long)line->y2 - line->y1) > 32767))
@@ -906,7 +905,7 @@ uint32_t fb_gfx3_gl_primitive_batch_count(
 			if (fb_gfx3_command_payload_size(command) <
 			    offsetof(FB_GFX3_LINES_COMMAND, line))
 				break;
-			lines = (const FB_GFX3_LINES_COMMAND *)command->payload;
+			lines = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 			if ((lines->count == 0u) ||
 			    (fb_gfx3_size_multiply(lines->count,
 			     sizeof(lines->line[0]), &line_bytes) != FB_GFX3_OK) ||
@@ -934,7 +933,7 @@ uint32_t fb_gfx3_gl_primitive_batch_count(
 			    sizeof(*rectangle))
 				break;
 			rectangle =
-				(const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 			if (!opengl_primitive_rectangle_coverage(rectangle, &coverage))
 				break;
 			added_count = 1u;
@@ -948,7 +947,7 @@ uint32_t fb_gfx3_gl_primitive_batch_count(
 			    offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle))
 				break;
 			rectangles =
-				(const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 			if ((rectangles->count == 0u) ||
 			    (rectangles->count >
 			     FB_GFX3_OPENGL_LINE_BATCH_LIMIT - primitive_count) ||
@@ -976,7 +975,7 @@ uint32_t fb_gfx3_gl_primitive_batch_count(
 
 			if (fb_gfx3_command_payload_size(command) != sizeof(*ellipse))
 				break;
-			ellipse = (const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+			ellipse = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 			if (((ellipse->flags &
 			      FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 			    !(ellipse->radius_x >= 0.0f) ||
@@ -1150,10 +1149,10 @@ static int opengl_primitive_batch_add_ellipse(
 	item->clip_y1 = clip.y1;
 	item->clip_x2 = clip.x2;
 	item->clip_y2 = clip.y2;
-	x1 = (double)ellipse->center_x - ellipse->radius_x;
-	y1 = (double)ellipse->center_y - ellipse->radius_y;
-	x2 = (double)ellipse->center_x + ellipse->radius_x;
-	y2 = (double)ellipse->center_y + ellipse->radius_y;
+	x1 = (double)ellipse->center_x - (double)ellipse->radius_x;
+	y1 = (double)ellipse->center_y - (double)ellipse->radius_y;
+	x2 = (double)ellipse->center_x + (double)ellipse->radius_x;
+	y2 = (double)ellipse->center_y + (double)ellipse->radius_y;
 	if ((x1 < INT32_MIN) || (y1 < INT32_MIN) ||
 	    (x2 > INT32_MAX) || (y2 > INT32_MAX))
 		return FB_GFX3_UNSUPPORTED;
@@ -1311,7 +1310,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 		}
 		if (command->type == FB_GFX3_COMMAND_POINTS) {
 			const FB_GFX3_POINTS_COMMAND *points =
-				(const FB_GFX3_POINTS_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 			uint32_t point_index;
 
 			result = FB_GFX3_OK;
@@ -1327,7 +1326,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 			}
 		} else if (command->type == FB_GFX3_COMMAND_LINE) {
 			const FB_GFX3_LINE_COMMAND *line =
-				(const FB_GFX3_LINE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 
 			result = opengl_primitive_batch_add_line(destination, line,
 				&items[item_index], item_index + 1u,
@@ -1336,7 +1335,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 			item_index++;
 		} else if (command->type == FB_GFX3_COMMAND_LINES) {
 			const FB_GFX3_LINES_COMMAND *lines =
-				(const FB_GFX3_LINES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 			uint32_t line_index;
 
 			result = FB_GFX3_OK;
@@ -1359,7 +1358,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 				goto done;
 			}
 			rectangle =
-				(const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 			result = opengl_primitive_batch_add_rectangle(destination, rectangle,
 				&items[item_index], item_index + 1u,
 				&maximum_coverage_count,
@@ -1377,7 +1376,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 				goto done;
 			}
 			rectangles =
-				(const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 			if ((rectangles->count == 0u) ||
 			    (fb_gfx3_size_multiply(rectangles->count,
 			     sizeof(rectangles->rectangle[0]), &rectangle_bytes) !=
@@ -1403,7 +1402,7 @@ int fb_gfx3_gl_primitive_batch(FB_GFX3_OPENGL_STATE *state,
 			}
 		} else if (command->type == FB_GFX3_COMMAND_ELLIPSE) {
 			const FB_GFX3_ELLIPSE_COMMAND *ellipse =
-				(const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 
 			result = opengl_primitive_batch_add_ellipse(destination, ellipse,
 				&items[item_index], item_index + 1u, &resolve_x1,
@@ -1517,7 +1516,7 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 		if ((commands[0] == NULL) ||
 		    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 			return FB_GFX3_INVALID;
-		first = (const FB_GFX3_LINE_COMMAND *)commands[0]->payload;
+		first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_LINE_COMMAND);
 	}
 	result = fb_gfx3_gl_surface_retain(state, target, sequence, &destination);
 	if (result != FB_GFX3_OK)
@@ -1569,7 +1568,7 @@ static int opengl_line_batch_common(FB_GFX3_OPENGL_STATE *state,
 				goto done;
 			}
 			payload =
-				(const FB_GFX3_LINE_COMMAND *)commands[index]->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_LINE_COMMAND);
 		}
 		if ((payload->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0 ||
 		    (payload->style != first->style) ||
@@ -1709,7 +1708,7 @@ int fb_gfx3_gl_lines(FB_GFX3_OPENGL_STATE *state,
 	    (fb_gfx3_command_payload_size(command) <
 	     offsetof(FB_GFX3_LINES_COMMAND, line)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_LINES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 	if ((payload->count == 0u) ||
 	    (payload->count > FB_GFX3_OPENGL_LINE_BATCH_LIMIT) ||
 	    (fb_gfx3_size_multiply(payload->count, sizeof(payload->line[0]),
@@ -1817,7 +1816,7 @@ int fb_gfx3_gl_ellipse_batch(FB_GFX3_OPENGL_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_ELLIPSE_COMMAND);
 		if ((payload->filled == 0u) ||
 		    ((payload->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 		    !(payload->radius_x >= 0.0f) ||
@@ -1844,10 +1843,10 @@ int fb_gfx3_gl_ellipse_batch(FB_GFX3_OPENGL_STATE *state,
 			items[index].reserved3 = 0u;
 			continue;
 		}
-		x1 = (double)payload->center_x - payload->radius_x;
-		y1 = (double)payload->center_y - payload->radius_y;
-		x2 = (double)payload->center_x + payload->radius_x;
-		y2 = (double)payload->center_y + payload->radius_y;
+		x1 = (double)payload->center_x - (double)payload->radius_x;
+		y1 = (double)payload->center_y - (double)payload->radius_y;
+		x2 = (double)payload->center_x + (double)payload->radius_x;
+		y2 = (double)payload->center_y + (double)payload->radius_y;
 		if ((x1 < INT32_MIN) || (y1 < INT32_MIN) ||
 		    (x2 > INT32_MAX) || (y2 > INT32_MAX)) {
 			result = FB_GFX3_UNSUPPORTED;
@@ -1976,7 +1975,7 @@ int fb_gfx3_gl_blit_batch(FB_GFX3_OPENGL_STATE *state,
 		    (fb_gfx3_command_payload_size(commands[index]) != sizeof(*payload)))
 			return FB_GFX3_INVALID;
 	}
-	payload = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 	/*
 		The coalescer accepts only one source and destination handle. Retaining
 		them at the batch tail protects every command in this FIFO run while
@@ -2002,10 +2001,9 @@ int fb_gfx3_gl_blit_batch(FB_GFX3_OPENGL_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_BLIT_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
-		    (payload->source != ((const FB_GFX3_BLIT_COMMAND *)
-			commands[0]->payload)->source) ||
+		    (payload->source != (FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND))->source) ||
 		    ((index > 0u) &&
 		     (commands[index]->sequence <= commands[index - 1u]->sequence)) ||
 		    (payload->source_rect.x1 < 0) ||
@@ -2044,7 +2042,7 @@ int fb_gfx3_gl_blit_batch(FB_GFX3_OPENGL_STATE *state,
 		item_count++;
 	}
 	if (item_count != 0u) {
-		payload = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 		switch (payload->mode) {
 		case FB_GFX3_BLIT_AND:
 			logic_operation = GL_AND;
@@ -2065,7 +2063,7 @@ int fb_gfx3_gl_blit_batch(FB_GFX3_OPENGL_STATE *state,
 done:
 	if (source != NULL)
 		fb_gfx3_resource_release(state->resources,
-			((const FB_GFX3_BLIT_COMMAND *)commands[0]->payload)->source);
+			(FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND))->source);
 	if (destination != NULL)
 		fb_gfx3_resource_release(state->resources, commands[0]->target);
 	return result;
@@ -2185,7 +2183,7 @@ int fb_gfx3_gl_blits(FB_GFX3_OPENGL_STATE *state,
 	    (fb_gfx3_command_payload_size(command) <
 	     offsetof(FB_GFX3_BLITS_COMMAND, blit)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_BLITS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLITS_COMMAND);
 	if ((payload->count == 0u) ||
 	    (payload->count > FB_GFX3_OPENGL_RASTER_BLIT_BATCH_LIMIT) ||
 	    (fb_gfx3_size_multiply(payload->count, sizeof(payload->blit[0]),
@@ -2279,7 +2277,7 @@ int fb_gfx3_gl_alpha_blit_batch(FB_GFX3_OPENGL_STATE *state,
 	    (commands[0] == NULL) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 	if (((first->mode != FB_GFX3_BLIT_TRANS) &&
 	     (first->mode != FB_GFX3_BLIT_PSET) &&
 	     (first->mode != FB_GFX3_BLIT_PRESET) &&
@@ -2341,7 +2339,7 @@ int fb_gfx3_gl_alpha_blit_batch(FB_GFX3_OPENGL_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_BLIT_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
 		    (payload->source != first->source) ||
 			(payload->mode != first->mode) ||
@@ -2434,11 +2432,27 @@ int fb_gfx3_gl_alpha_blit_batch(FB_GFX3_OPENGL_STATE *state,
 		const FB_GFX3_OPENGL_BLIT_BATCH_ITEM *item = &items[index];
 		int32_t left = (item->destination_x > item->clip_x1) ? item->destination_x : item->clip_x1;
 		int32_t top = (item->destination_y > item->clip_y1) ? item->destination_y : item->clip_y1;
-		int32_t right = ((int64_t)item->destination_x + item->width - 1 < item->clip_x2) ?
-			(int32_t)((int64_t)item->destination_x + item->width - 1) : item->clip_x2;
-		int32_t bottom = ((int64_t)item->destination_y + item->height - 1 < item->clip_y2) ?
-			(int32_t)((int64_t)item->destination_y + item->height - 1) : item->clip_y2;
+		int64_t right_offset;
+		int64_t bottom_offset;
+		int64_t right_available;
+		int64_t bottom_available;
+		int32_t right;
+		int32_t bottom;
 		uint32_t tile_y;
+		if ((item->width <= 0) || (item->height <= 0)) {
+			result = FB_GFX3_INVALID;
+			goto done;
+		}
+		right_offset = (int64_t)item->width - 1;
+		bottom_offset = (int64_t)item->height - 1;
+		right_available = (int64_t)item->clip_x2 - item->destination_x;
+		bottom_available = (int64_t)item->clip_y2 - item->destination_y;
+		right = item->clip_x2;
+		bottom = item->clip_y2;
+		if (right_offset < right_available)
+			right = (int32_t)((int64_t)item->destination_x + right_offset);
+		if (bottom_offset < bottom_available)
+			bottom = (int32_t)((int64_t)item->destination_y + bottom_offset);
 		for (tile_y = (uint32_t)top / FB_GFX3_OPENGL_LOCAL_SIZE_Y;
 		     tile_y <= (uint32_t)bottom / FB_GFX3_OPENGL_LOCAL_SIZE_Y; ++tile_y) {
 			uint32_t tile_x;
@@ -2546,7 +2560,7 @@ int fb_gfx3_gl_rectangles(FB_GFX3_OPENGL_STATE *state,
 	    (fb_gfx3_command_payload_size(command) <
 	     offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 	if ((payload->count == 0u) ||
 	    (payload->count > FB_GFX3_OPENGL_RECTANGLE_BATCH_LIMIT) ||
 	    (fb_gfx3_size_multiply(payload->count, sizeof(payload->rectangle[0]),
@@ -2645,7 +2659,7 @@ int fb_gfx3_gl_rectangle_batch(FB_GFX3_OPENGL_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_RECTANGLE_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_RECTANGLE_COMMAND);
 		if ((payload->filled == 0) ||
 		    ((payload->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0) ||
 		    (payload->x1 > payload->x2) || (payload->y1 > payload->y2)) {

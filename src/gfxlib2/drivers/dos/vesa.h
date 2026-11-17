@@ -94,7 +94,7 @@ typedef struct VesaModeInfo
 	unsigned char  LinRsvdFieldPosition;
 	unsigned long  MaxPixelClock;
 	
-	unsigned char  Reserved[189];
+	unsigned char  Reserved[190]; /* Complete the 256-byte VBE mode-info block. */
 }
 FBPACKED VesaModeInfo;
 
@@ -144,13 +144,14 @@ enum
 	VMI_DC_RSVD = 1 << 1  /* Bits in rsvd field are usable by the application */
 };
 
+/* The block is copied into malloc storage, so its word fields stay aligned. */
 typedef struct VesaPMInfo
 {
 	unsigned short setWindow;
 	unsigned short setDisplayStart;
 	unsigned short setPalette;
 	unsigned short IOPrivInfo;
-} FBPACKED VesaPMInfo;
+} VesaPMInfo;
 
 enum VBE_FUNCS
 {

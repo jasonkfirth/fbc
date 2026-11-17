@@ -12,6 +12,11 @@
 */
 
 #include "fb.h"
+#include <stdint.h>
+#include <string.h>
+
+typedef char FB_USTR_INPUT_POINTER_WIDTH[
+	(sizeof(char *) == sizeof(const void *)) ? 1 : -1];
 
 typedef struct {
 	FB_FILE *file;
@@ -19,8 +24,16 @@ typedef struct {
 	int pending;
 	int index_before;
 	char raw[4];
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep raw_size at its existing native alignment after four byte units. */
+	unsigned char raw_alignment_padding[4];
+#endif
 	size_t raw_size;
 	int status;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } USTR_READER;
 
 /* ------------------------------------------------------------------------- */
@@ -105,10 +118,12 @@ static int hReadScalar( USTR_READER *reader )
 			memcpy( &unit, file->putback_buffer, sizeof(unit) );
 			scalar = unit;
 			offset = sizeof(unit);
-			if( sizeof(FB_WCHAR) == 2 && scalar >= 0xD800 && scalar <= 0xDBFF && file->putback_size >= 4 ) {
+			if( sizeof(FB_WCHAR) == 2 && (uint16_t)scalar >= 0xD800 &&
+			    (uint16_t)scalar <= 0xDBFF && file->putback_size >= 4 ) {
 				memcpy( &unit, file->putback_buffer + 2, sizeof(unit) );
-				if( unit >= 0xDC00 && unit <= 0xDFFF ) {
-					scalar = 0x10000 + ((scalar - 0xD800) << 10) + unit - 0xDC00;
+				if( (uint16_t)unit >= 0xDC00 && (uint16_t)unit <= 0xDFFF ) {
+					scalar = 0x10000 + (((int)(uint16_t)scalar - 0xD800) << 10) +
+					         (int)(uint16_t)unit - 0xDC00;
 					offset = 4;
 				}
 			}
@@ -349,7 +364,9 @@ static int hWriteScreen( FB_FILE *file, const void *buffer, size_t length )
 	int result;
 	if( length > (size_t)FB_USTRING_MAX_BYTES )
 		return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
-	borrowed.data = (char *)buffer;
+	/* fb_UStrToWstr reads this stack view; its descriptor ABI is mutable. */
+	memcpy((void *)&borrowed.data, (const void *)&buffer,
+		sizeof(borrowed.data));
 	borrowed.len = borrowed.size = (ssize_t)length;
 	wide = fb_UStrToWstr(&borrowed);
 	if( wide == NULL && length != 0 ) return FB_RTERROR_OUTOFMEM;

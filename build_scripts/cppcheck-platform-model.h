@@ -31,6 +31,13 @@
 #define EM_JS(result, name, parameters, ...) result name parameters;
 #endif
 
+/* Console observers require a guest selection from their build controller.
+ * Use the Wii paths for generic analysis, while allowing an explicit Xbox
+ * selection to check the other branch. Native SDK builds retain their flags. */
+#if !defined(FBQUAL_WII) && !defined(FBQUAL_XBOX)
+#define FBQUAL_WII 1
+#endif
+
 /* These standalone fixtures normally receive record tags and character width
  * from their compiler test drivers. Give the lint-only configuration names. */
 #ifndef FB_TEST_RECORD

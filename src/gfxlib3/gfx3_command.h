@@ -33,6 +33,19 @@
 /* Bound queued command allocations; one oversized command fits alone. */
 #define FB_GFX3_QUEUE_BYTE_CAPACITY (32u * 1024u * 1024u)
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_GFX3_COMMAND_PAYLOAD_ALIGNAS(type) \
+	__attribute__((__aligned__(__alignof__(type))))
+#define FB_GFX3_COMMAND_PAYLOAD_AS(command, type) \
+	((type *)__builtin_assume_aligned((command)->payload, __alignof__(uint64_t)))
+#elif defined(_MSC_VER)
+#define FB_GFX3_COMMAND_PAYLOAD_ALIGNAS(type) __declspec(align(8))
+#define FB_GFX3_COMMAND_PAYLOAD_AS(command, type) ((type *)(command)->payload)
+#else
+#define FB_GFX3_COMMAND_PAYLOAD_ALIGNAS(type) _Alignas(type)
+#define FB_GFX3_COMMAND_PAYLOAD_AS(command, type) ((type *)(command)->payload)
+#endif
+
 enum FB_GFX3_COMMAND_TYPE {
 	FB_GFX3_COMMAND_INVALID = 0,
 	FB_GFX3_COMMAND_RENDERER_INIT,
@@ -96,7 +109,8 @@ typedef struct FB_GFX3_COMMAND {
 	uint64_t sequence;
 	FB_GFX3_HANDLE target;
 	FB_GFX3_COMPLETION *completion;
-	unsigned char payload[];
+	/* Protocol records require at most uint64_t alignment. */
+	FB_GFX3_COMMAND_PAYLOAD_ALIGNAS(uint64_t) unsigned char payload[];
 } FB_GFX3_COMMAND;
 
 typedef struct FB_GFX3_COMMAND_QUEUE {

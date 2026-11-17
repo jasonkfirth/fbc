@@ -10,21 +10,21 @@
 /*:::::*/
 FBCALL FBSTRING_ACCESS *fb_HEX ( int num )
 {
-	return fb_HEX_i ( num );
+	return fb_HEX_i ( (unsigned int)num );
 }
 
 
 /*:::::*/
 FBCALL FBSTRING_ACCESS *fb_OCT ( int num )
 {
-	return fb_OCT_i ( num );
+	return fb_OCT_i ( (unsigned int)num );
 }
 
 
 /*:::::*/
 FBCALL FBSTRING_ACCESS *fb_BIN ( int num )
 {
-	return fb_BIN_i ( num );
+	return fb_BIN_i ( (unsigned int)num );
 }
 
 /* end of strings/str_base.c */

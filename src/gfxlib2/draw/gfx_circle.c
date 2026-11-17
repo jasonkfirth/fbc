@@ -9,17 +9,25 @@
 
 #include "../fb_gfx.h"
 #include <math.h>
+#include <stdlib.h>
+#include <stddef.h>
 
 static void draw_scanline(FB_GFXCTX *ctx, int y, int x1, int x2, unsigned int color, int fill, char *filled)
 {
+	size_t scanline_width;
+
 	if ((y >= ctx->view_y) && (y < ctx->view_y + ctx->view_h)) {
 		if (fill) {
-			if ((x2 < ctx->view_x) || (x1 >= ctx->view_x + ctx->view_w) || (filled[y - ctx->view_y]))
+			if (!filled || (x2 < ctx->view_x) || (x1 >= ctx->view_x + ctx->view_w) ||
+			    (filled[y - ctx->view_y]))
 				return;
 			filled[y - ctx->view_y] = TRUE;
 			x1 = MAX(x1, ctx->view_x);
 			x2 = MIN(x2, ctx->view_x + ctx->view_w - 1);
-			ctx->pixel_set(ctx->line[y] + (x1 * ctx->target_bpp), color, x2 - x1 + 1);
+			if (x1 > x2)
+				return;
+			scanline_width = (size_t)x2 - (size_t)x1 + 1u;
+			ctx->pixel_set(ctx->line[y] + ((ptrdiff_t)x1 * (ptrdiff_t)ctx->target_bpp), (int)color, scanline_width);
 		}
 		else {
 			if ((x1 >= ctx->view_x) && (x1 < ctx->view_x + ctx->view_w))
@@ -44,31 +52,48 @@ static void draw_ellipse
 	)
 {
 	int d, x1, y1, x2, y2;
+	int b_is_zero;
 	long long dx, dy, aq, bq, r, rx, ry;
-	char filled[ctx->view_h];
+	char *filled = NULL;
+	b_is_zero = (fpclassify(b) == FP_ZERO);
 
-	x1 = x - a;
-	x2 = x + a;
+	x1 = (int)((float)x - a);
+	x2 = (int)((float)x + a);
 	y1 = y2 = y;
-	fb_hMemSet(filled, 0, ctx->view_h);
 
-	if (!b) {
+	/* Keep a large viewport fill guard off the stack. */
+	if (fill || b_is_zero) {
+		if (ctx->view_h <= 0) {
+			*top = y;
+			*bottom = y;
+			return;
+		}
+		filled = (char *)calloc((size_t)ctx->view_h, sizeof(*filled));
+		if (!filled) {
+			*top = y;
+			*bottom = y;
+			return;
+		}
+	}
+
+	if (b_is_zero) {
 		draw_scanline(ctx, y, x1, x2, color, TRUE, filled);
 		*top = y;
 		*bottom = y;
+		free(filled);
 		return;
 	}
 
 	draw_scanline(ctx, y, x1, x2, color, fill, filled);
 
-	aq = a * a;
-	bq = b * b;
+	aq = (long long)(a * a);
+	bq = (long long)(b * b);
 	dx = aq << 1;
 	dy = bq << 1;
-	r = a * bq;
+	r = (long long)(a * (float)bq);
 	rx = r << 1;
 	ry = 0;
-	d = a;
+	d = (int)a;
 
 	while (d > 0) {
 		if (r > 0) {
@@ -92,6 +117,7 @@ static void draw_ellipse
 	   correct */
 	*top = y2;
 	*bottom = y1;
+	free(filled);
 }
 
 static void get_arc_point(float angle, float a, float b, int *x, int *y)
@@ -104,6 +130,15 @@ static void get_arc_point(float angle, float a, float b, int *x, int *y)
 	*y = CINT(s);
 }
 
+/*
+	Arc endpoints use an exact full-circle sentinel. Keep that test exact
+	without treating nearby angles as a complete circle.
+*/
+static int gfx2_float_equal(float left, float right)
+{
+	return (left <= right) && (left >= right);
+}
+
 FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsigned int color, float aspect, float start, float end, int fill, int flags)
 {
 	FB_GFXCTX *context;
@@ -113,7 +148,7 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 
 	FB_GRAPHICS_LOCK( );
 
-	if (!fb_gfx || radius <= 0.0) {
+	if (!fb_gfx || radius <= 0.0f) {
 		FB_GRAPHICS_UNLOCK( );
 		return;
 	}
@@ -125,8 +160,8 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 	fb_hPrepareTarget(context, target);
 
 	orig_color = color;
-	if (flags & DEFAULT_COLOR_1)
-		color = context->fg_color;
+	if ((unsigned int)flags & DEFAULT_COLOR_1)
+		color = (unsigned int)context->fg_color;
 	else
 		color = fb_hFixColor(context->target_bpp, color);
 	
@@ -138,13 +173,13 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 
 	if (context->flags & CTX_WINDOW_ACTIVE) {
 		/* radius gets multiplied by the VIEW/WINDOW width ratio (aspect is unchanged) */
-		radius *= (context->view_w / context->win_w);
+		radius *= ((float)context->view_w / context->win_w);
 	}
 
-	if (aspect == 0.0)
+	if (fpclassify(aspect) == FP_ZERO)
 		aspect = fb_gfx->aspect;
 
-	if (aspect > 1.0) {
+	if (aspect > 1.0f) {
 		a = (radius / aspect);
 		b = radius;
 	} else {
@@ -152,28 +187,30 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 		b = (radius * aspect);
 	}
 
-	if ((start != 0.0) || (end != 3.141593f * 2.0)) {
+	if ((fpclassify(start) != FP_ZERO) ||
+	    !gfx2_float_equal(end, 3.141593f * 2.0f)) {
 		float increment;
+		const double full_turn = 2.0 * PI;
 
-		if (start < 0) {
+		if (start < 0.0f) {
 			start = -start;
 			get_arc_point(start, a, b, &x1, &y1);
-			x1 = orig_x + x1;
-			y1 = orig_y - y1;
-			fb_GfxLine(target, orig_x, orig_y, x1, y1, orig_color, LINE_TYPE_LINE, 0xFFFF, COORD_TYPE_AA | (flags & ~COORD_TYPE_MASK));
+			x1 = (int)(orig_x + (float)x1);
+			y1 = (int)(orig_y - (float)y1);
+			fb_GfxLine(target, orig_x, orig_y, (float)x1, (float)y1, orig_color, LINE_TYPE_LINE, 0xFFFF, COORD_TYPE_AA | (flags & ~COORD_TYPE_MASK));
 		}
-		if (end < 0) {
+		if (end < 0.0f) {
 			end = -end;
 			get_arc_point(end, a, b, &x1, &y1);
-			x1 = orig_x + x1;
-			y1 = orig_y - y1;
-			fb_GfxLine(target, orig_x, orig_y, x1, y1, orig_color, LINE_TYPE_LINE, 0xFFFF, COORD_TYPE_AA | (flags & ~COORD_TYPE_MASK));
+			x1 = (int)(orig_x + (float)x1);
+			y1 = (int)(orig_y - (float)y1);
+			fb_GfxLine(target, orig_x, orig_y, (float)x1, (float)y1, orig_color, LINE_TYPE_LINE, 0xFFFF, COORD_TYPE_AA | (flags & ~COORD_TYPE_MASK));
 		}
 		
 		while (end < start)
-			end += 2 * PI;
-		while (end - start > 2 * PI)
-			start += 2 * PI;
+			end = (float)((double)end + full_turn);
+		while ((double)(end - start) > full_turn)
+			start = (float)((double)start + full_turn);
 
 		increment = 1.0f / (sqrtf(a) * sqrtf(b) * 1.5f);
 
@@ -185,7 +222,7 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 			int steps = (int)((end - start) / increment + 0.5f);
 
 			for (i = 0; i <= steps; i++) {
-				float angle = start + (i * increment);
+				float angle = start + ((float)i * increment);
 
 				get_arc_point(angle, a, b, &x1, &y1);
 				x1 = x + x1;
@@ -210,7 +247,7 @@ FBCALL void fb_GfxEllipse(void *target, float fx, float fy, float radius, unsign
 	if( top > bottom )
 		SWAP( top, bottom );
 
-	SET_DIRTY(context, top, bottom - top + 1);
+	SET_DIRTY(context, top, (size_t)bottom - (size_t)top + 1u);
 
 	/* QuickBASIC leaves the graphics pen at the center of a circle or arc.
 	   Negative arc angles draw radial lines through fb_GfxLine(), which updates

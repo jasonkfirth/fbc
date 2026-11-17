@@ -9,11 +9,17 @@
 
 char *fb_hGetExeName( char *dst, ssize_t maxlen )
 {
-	const char *p = strrchr( fb_ctx.argv[0], '/' );
+	const char *p;
+	size_t capacity;
+	if( dst == NULL || maxlen <= 0 || fb_ctx.argv == NULL || fb_ctx.argv[0] == NULL )
+		return NULL;
+
+	capacity = (size_t)maxlen;
+	p = strrchr( fb_ctx.argv[0], '/' );
 	if( p )
-		strlcpy( dst, p + 1, maxlen );
+		strlcpy( dst, p + 1, capacity );
 	else
-		strlcpy( dst, fb_ctx.argv[0], maxlen );
+		strlcpy( dst, fb_ctx.argv[0], capacity );
 	return dst;
 }
 

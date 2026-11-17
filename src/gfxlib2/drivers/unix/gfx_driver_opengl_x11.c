@@ -100,8 +100,12 @@ static int opengl_window_init(void)
 			}
 			XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.fswindow, 0, 0);
 			fb_hX11RefreshLayout(fb_x11.w, fb_x11.h);
-			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0,0,fb_x11.view_w, fb_x11.view_h);
-			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0,0,fb_x11.view_w, fb_x11.view_h);
+			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0, 0,
+				fb_hX11Dimension(fb_x11.view_w),
+				fb_hX11Dimension(fb_x11.view_h));
+			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0,
+				fb_hX11Dimension(fb_x11.view_w),
+				fb_hX11Dimension(fb_x11.view_h));
 		}
 		else
 			return -1;
@@ -160,6 +164,10 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 	XVisualInfo *info;
 	int attribs[64] = { GLX_RGBA, GLX_DOUBLEBUFFER, 0 }, *attrib = &attribs[2], *samples_attrib = NULL;
 	int result;
+	unsigned int scaled_width, scaled_height;
+	size_t dirty_size;
+
+	(void)depth;
 	
 	fb_hMemSet(&fb_x11, 0, sizeof(fb_x11));
 	
@@ -224,7 +232,10 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 			XFree(info);
 			info = NULL;
 		}
-	} while ((samples_attrib) && ((*samples_attrib -= 2) >= 0));
+		if ((samples_attrib == NULL) || (*samples_attrib < 2))
+			break;
+		*samples_attrib -= 2;
+	} while (1);
 
 	if (!info) {
 		return -1;
@@ -235,12 +246,40 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 	if (fb_gl_params.init_scale>=1){
 		fb_gl_params.scale = fb_gl_params.init_scale;
 	}
+	scaled_width = fb_hX11ScaledDimension(w, fb_gl_params.scale);
+	scaled_height = fb_hX11ScaledDimension(h, fb_gl_params.scale);
+	if ((scaled_width == 0u) || (scaled_height == 0u)) {
+		XFree(info);
+		return -1;
+	}
 	if (fb_gl_params.scale>1){
+		if ((fb_gfx == NULL) || (fb_gfx->h <= 0) ||
+		    (fb_gfx->scanline_size <= 0)) {
+			XFree(info);
+			return -1;
+		}
+		dirty_size = (size_t)fb_gfx->h;
+		if (dirty_size > (size_t)-1 / (size_t)fb_gfx->scanline_size) {
+			XFree(info);
+			return -1;
+		}
+		dirty_size *= (size_t)fb_gfx->scanline_size;
+		if (dirty_size > (size_t)-1 / (size_t)fb_gl_params.scale) {
+			XFree(info);
+			return -1;
+		}
+		dirty_size *= (size_t)fb_gl_params.scale;
 		free(fb_gfx->dirty);
-		fb_gfx->dirty = (char *)calloc(1, fb_gfx->h * fb_gfx->scanline_size * fb_gl_params.scale);
+		fb_gfx->dirty = NULL;
+		fb_gfx->dirty = (char *)calloc(1, dirty_size);
+		if (!fb_gfx->dirty) {
+			XFree(info);
+			return -1;
+		}
 	}
 
-	result = fb_hX11Init(title, w * fb_gl_params.scale, h * fb_gl_params.scale, info->depth, refresh_rate, flags);
+	result = fb_hX11Init(title, (int)scaled_width, (int)scaled_height,
+		info->depth, refresh_rate, flags);
 
 	XFree(info);
 	info = NULL;

@@ -9,6 +9,7 @@
 
 int fb_ConsoleMultikey( int scancode )
 {
+	(void)scancode;
 	fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	return FB_FALSE;
 }

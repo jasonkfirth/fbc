@@ -27,6 +27,12 @@
 
 #include <math.h>
 
+/* Image arcs use an exact full-circle endpoint, not a tolerance. */
+static int gfx3_float_equal(float left, float right)
+{
+	return (left <= right) && (left >= right);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Header and pixel access                                                   */
 /* ------------------------------------------------------------------------- */
@@ -574,7 +580,7 @@ int fb_gfx3_image_ellipse(FB_GFX3_IMAGE_VIEW *view,
 	center_x = CINT(x);
 	center_y = CINT(y);
 	color = image_resolve_color(view, state, color, flags, FALSE);
-	if (aspect == 0.0f)
+	if (fpclassify(aspect) == FP_ZERO)
 		aspect = 1.0f;
 	if (!(aspect > 0.0f))
 		return FB_GFX3_INVALID;
@@ -585,7 +591,8 @@ int fb_gfx3_image_ellipse(FB_GFX3_IMAGE_VIEW *view,
 		radius_x = radius;
 		radius_y = radius * aspect;
 	}
-	if ((start == 0.0f) && (end == 6.283186f)) {
+	if ((fpclassify(start) == FP_ZERO) &&
+	    gfx3_float_equal(end, 6.283186f)) {
 		image_draw_full_ellipse(view, state, center_x, center_y, radius_x,
 			radius_y, color, filled);
 		return FB_GFX3_OK;
@@ -609,7 +616,7 @@ int fb_gfx3_image_ellipse(FB_GFX3_IMAGE_VIEW *view,
 	increment = 1.0f /
 		(sqrtf(radius_x) * sqrtf(radius_y) * 1.5f);
 	if (!isfinite(increment) || !(increment > 0.0f) ||
-	    (((double)(end - start) / increment) > INT_MAX - 1.0))
+	    (((double)(end - start) / (double)increment) > INT_MAX - 1.0))
 		return FB_GFX3_INVALID;
 	steps = (int)((end - start) / increment + 0.5f);
 	for (i = 0; i <= steps; i++) {

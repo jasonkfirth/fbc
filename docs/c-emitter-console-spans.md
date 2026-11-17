@@ -6,6 +6,61 @@ Responsibilities: Bind before/after behavior, native diagnostics and source deli
 This file intentionally does NOT claim device execution or whole-campaign completion.
 -->
 
+# Unix console counted spans, November 15
+
+The current repair removes 39 GCC and 42 Clang observations from the complete
+Linux MT runtime and startup build. Its 1,036 native object profiles now have
+GCC 108 / Clang 10,108 under unchanged unsuppressed diagnostic options.
+All 1,328 captured runtime and Make inputs retain their exact byte identities.
+
+The private console helpers validate positive dimensions, the signed cell-index
+limit and one-based cursor spans before forming size_t offsets. Resize allocates
+both replacement planes before publishing them and validates terminal query
+values before narrowing. PRINT and CLS retain BG_LOCK ownership while using the
+planes, including terminal output. CLS clips its view against current geometry.
+The FBCONSOLE declaration and native layout remain unchanged.
+
+Wide PRINT uses fixed short-call scratch and one checked heap allocation for
+longer calls. Its shadow conversion receives a bounded terminated copy. UTF-8
+output uses the returned byte count, including embedded zero bytes. Both LINE
+INPUT callbacks reject counts beyond FB_STRSIZEMSK before the signed bridge and
+reduce cursor movement modulo the console width before narrowing. UTF-16
+conversion combines pairs only when the second counted unit exists and is a low
+surrogate. Explicit UTF_32 conversions preserve existing code-unit bit patterns.
+
+Eight Linux component executions cover GCC/Clang, 32/64-bit and O0/O2 with
+134,560 checks. Fourteen original-body controls reproduce failures in counted
+output, resize queries, line-input counts, background resize ownership and long
+wide PRINT stack use. Two unchanged-layout span controls pass. These controls
+combine the original production bodies with the current private test helpers.
+
+Sixteen counted UTF executions across Linux and Windows, 32/64-bit, GCC/Clang
+and O0/O2 pass 231,735,424 checks. All eight Windows original-code controls fail.
+Eight ordinary BASIC runs pass through actual Linux pseudo-terminals using both
+C producers, both native tools and O0/O2. Twelve preceding date/serial public API
+executions also pass against the rebuilt archives. Source-only strict lint of
+the BASIC terminal fixture reports zero errors and zero warnings.
+
+The normal native Linux component entry point is
+`python3 -B build_scripts/test-unix-console-warning-fixes.py --cc gcc`.
+It accepts `--bits 32`, `--optimization 0`, and a JSON array through
+`--native-flags-json` for the recorded full diagnostics. The counted UTF fixture
+is also registered in `build_scripts/test-library-warning-fixes.py`. Compile
+`tests/rtlib/unix-console-runtime.bas` as a Linux MT executable, then pass it to
+`python3 -B tests/rtlib/unix-console-runtime.py --exe /path/to/program`
+for the terminal control.
+
+Evidence lives under `build/c-emitter-forward-views-20261105` in
+`runtime-current-packet-v20-20261115.json.zlib`,
+`runtime-current-linux-v20-20261115.json.zlib`,
+`console-size-controls-v5-20261115.json.zlib` and
+`console-size-utf-windows-v2-20261115.json.zlib`.
+The complete guest run peaks at 15,663,591 owned bytes and removes its scratch.
+The Windows matrix peaks at 286,756 bytes and removes its scratch. Installed
+products retain all ten protected hashes. Other platform runtime sources keep
+their separately recorded qualification. Earlier sections preserve older cuts.
+
+
 # Console writer spans
 
 The shared raw writer could repeatedly call its hook with zero characters when

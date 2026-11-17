@@ -10,6 +10,7 @@
 FBCALL ssize_t fb_WstrInstrAny( ssize_t start, const FB_WCHAR *src, const FB_WCHAR *patt )
 {
 	ssize_t r = 0;
+	size_t offset;
 
 	if( (src != NULL) && (patt != NULL) )
 	{
@@ -17,10 +18,10 @@ FBCALL ssize_t fb_WstrInstrAny( ssize_t start, const FB_WCHAR *src, const FB_WCH
 
 		if( (start > 0) && (start <= size_src) )
 		{
-			r = fb_wstr_InstrAny( &src[start-1], patt ) + start;
-
-			if( r > size_src )
-				r = 0;
+			/* wcscspn returns size_t; bound it before converting back to ssize_t. */
+			offset = fb_wstr_InstrAny( &src[start-1], patt );
+			if( offset <= (size_t)(size_src - start) )
+				r = start + (ssize_t)offset;
 		}
 	}
 

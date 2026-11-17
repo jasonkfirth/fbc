@@ -9,7 +9,10 @@
 
 char *fb_hGetExeName( char *dst, ssize_t maxlen )
 {
-	strncpy(dst, fb_ctx.argv[0], maxlen);
+	if( dst == NULL || maxlen <= 0 || fb_ctx.argv == NULL || fb_ctx.argv[0] == NULL )
+		return NULL;
+	strncpy(dst, fb_ctx.argv[0], (size_t)maxlen);
+	dst[maxlen - 1] = '\0';
 	char *p = strrchr( dst, '\\' );
 	if( p != NULL )
 		++p;

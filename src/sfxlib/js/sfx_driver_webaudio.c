@@ -244,7 +244,7 @@ static int webaudio_driver_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverWebAudio =
 {
     "webaudio",
-    0,
+    0 FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     webaudio_driver_init,
     webaudio_driver_exit,
     webaudio_driver_write,

@@ -27,14 +27,16 @@ int fb_ConsoleGetkey( void )
 	unsigned int k;
 
 	k = (unsigned int)getch( );
-	if( k == 0x00 || k == 0xE0 )
-		k = FB_MAKE_EXT_KEY( (unsigned int)getch( ) );
+	if( k == 0x00 || k == 0xE0 ) {
+		unsigned int ch = (unsigned int)(unsigned char)getch( );
+		k = (ch << 8) | (unsigned int)(unsigned char)FB_EXT_CHAR;
+	}
 
 	/* Reset the status for "key buffer changed" when a key
 	 * was removed from the input queue. */
 	fb_hConsoleInputBufferChanged( );
 
-	return k;
+	return (int)k;
 }
 
 int fb_ConsoleKeyHit( void )

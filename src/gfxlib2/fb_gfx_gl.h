@@ -34,6 +34,9 @@ typedef struct FB_GL_PARAMS {
 	int mode_2d;
 	int init_scale;
 	int scale;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char callback_alignment_padding[4];
+#endif
 	void (*callback)(void);
 } FB_GL_PARAMS;
 
@@ -129,6 +132,9 @@ typedef struct FB_GL {
 	GLPIXELTRANSFERI			PixelTransferi;
 	GLPIXELMAPFV				PixelMapfv;
 	int							state;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char reserved_tail_padding[4];
+#endif
 } FB_GL;
 
 extern FB_GL fb_gl FB_C_SYMBOL("__fb_gl");

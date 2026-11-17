@@ -102,7 +102,7 @@ int fb_sfxMidiNoteOn(unsigned char channel,
                      unsigned char note,
                      unsigned char velocity)
 {
-    unsigned char status = 0x90 | (channel & 0x0F);
+    unsigned char status = (unsigned char)(0x90u | ((unsigned int)channel & 0x0Fu));
 
     return fb_sfxMidiSend(status, note, velocity);
 }
@@ -116,7 +116,7 @@ int fb_sfxMidiNoteOff(unsigned char channel,
                       unsigned char note,
                       unsigned char velocity)
 {
-    unsigned char status = 0x80 | (channel & 0x0F);
+    unsigned char status = (unsigned char)(0x80u | ((unsigned int)channel & 0x0Fu));
 
     return fb_sfxMidiSend(status, note, velocity);
 }
@@ -129,14 +129,14 @@ int fb_sfxMidiNoteOff(unsigned char channel,
 int fb_sfxMidiProgramChange(unsigned char channel,
                             unsigned char program)
 {
-    unsigned char status = 0xC0 | (channel & 0x0F);
+    unsigned char status = (unsigned char)(0xC0u | ((unsigned int)channel & 0x0Fu));
     int result;
 
     if (!fb_sfxMidiIsOpen())
         return -1;
 
     fb_sfxRuntimeLock();
-    result = fb_sfxMidiOutputSend(status, program, 0);
+    result = fb_sfxMidiOutputSend(status, program, (unsigned char)0);
     fb_sfxRuntimeUnlock();
 
     return result;

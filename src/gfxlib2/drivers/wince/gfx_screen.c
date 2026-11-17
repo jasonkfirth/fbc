@@ -471,7 +471,11 @@ void fb_hClearCharCells( int x1, int y1, int x2, int y2,
                          int page,
                          FB_WCHAR ch, unsigned fg, unsigned bg )
 {
+#if !defined(DISABLE_WCHAR) && defined(__SIZEOF_WCHAR_T__) && (__SIZEOF_WCHAR_T__ == 2)
+    GFX_CHAR_CELL fill_cell = { ch, { 0, 0 }, fg, bg };
+#else
     GFX_CHAR_CELL fill_cell = { ch, fg, bg };
+#endif
     int clear_w = x2 - x1;
     int text_w = fb_gfx->text_w;
     int move_w = text_w - clear_w;

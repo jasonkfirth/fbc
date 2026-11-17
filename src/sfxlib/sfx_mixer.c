@@ -54,6 +54,12 @@
 #include "fb_sfx_mixer.h"
 #include "sfx_simd.h"
 
+/* Mixer fast paths require exact integer positions and a unity sample step. */
+static int fb_sfxMixerFloatEqual(float left, float right)
+{
+	return (left <= right) && (left >= right);
+}
+
 static float fb_sfxMixerVoiceSample(FB_SFXVOICE *voice)
 {
     if (!voice)
@@ -292,7 +298,7 @@ void fb_sfxMixerDiagnostics(const float *buffer, int frames)
                 block_count,
                 frames,
                 active,
-                peak,
+                (double)peak,
                 (samples > 0) ? sqrt(sum_squares / (double)samples) : 0.0);
     }
 
@@ -312,7 +318,7 @@ void fb_sfxMixerDiagnostics(const float *buffer, int frames)
             else
                 mono = buffer[i * channels];
 
-            fprintf(dump, "%0.9f\n", mono);
+            fprintf(dump, "%0.9f\n", (double)mono);
         }
 
         dumped_frames += dump_frames;
@@ -832,7 +838,8 @@ static int fb_sfxMixerRenderContiguousSample(
     int frame;
 
     if (!voice || !buffer || !gains || !voice->data ||
-        voice->length <= 0 || voice->sample_step != 1.0f ||
+        voice->length <= 0 ||
+        !fb_sfxMixerFloatEqual(voice->sample_step, 1.0f) ||
         voice->env_state != FB_SFX_ENV_SUSTAIN)
     {
         return first_frame;
@@ -872,7 +879,7 @@ static int fb_sfxMixerRenderContiguousSample(
         }
 
         position = (int)voice->sample_pos;
-        if (voice->sample_pos != (float)position)
+        if (!fb_sfxMixerFloatEqual(voice->sample_pos, (float)position))
             return frame;
 
         available = voice->length - position;
@@ -931,7 +938,7 @@ static int fb_sfxMixerRenderResampledVoice(
 
     if (!voice || !buffer || !gains || !voice->data ||
         voice->length <= 0 || voice->sample_step <= 0.0f ||
-        voice->sample_step == 1.0f ||
+        fb_sfxMixerFloatEqual(voice->sample_step, 1.0f) ||
         voice->env_state != FB_SFX_ENV_SUSTAIN ||
         voice->envelope < 0 || voice->envelope >= FB_SFX_MAX_ENVELOPES)
     {

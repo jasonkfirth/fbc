@@ -22,17 +22,10 @@
 */
 
 #include "../../fb_gfx.h"
+#include "gfx_joystick.h"
 
 #define OPENBSD_XPAD_MAX_DEVICES 16
 #define OPENBSD_XPAD_TRIGGER_BUTTON_THRESHOLD 0.20f
-
-extern int fb_hGfxOpenbsdGetJoystickState(int id,
-										  ssize_t *buttons,
-										  float *a1, float *a2,
-										  float *a3, float *a4,
-										  float *a5, float *a6,
-										  float *a7, float *a8,
-										  ssize_t *dpad);
 
 static void openbsd_xpad_clear_outputs(ssize_t *buttons,
 									   float *lstick_x, float *lstick_y,

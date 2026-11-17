@@ -16,7 +16,7 @@ static ssize_t fb_wstr_ConvFromA_nomultibyte(FB_WCHAR *dst, ssize_t dst_chars, c
 	FB_WCHAR *origdst = dst;
 	FB_WCHAR *dstlimit = dst + dst_chars;
 	while (dst < dstlimit) {
-		unsigned char c = *src++;
+		unsigned char c = (unsigned char)*src++;
 		if (c == 0)
 			break;
 		if (c > 127)
@@ -35,17 +35,34 @@ static ssize_t fb_wstr_ConvFromA_nomultibyte(FB_WCHAR *dst, ssize_t dst_chars, c
    result = number of chars written, excluding null terminator that is always written */
 ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 {
+	ssize_t chars;
+#if defined DISABLE_WCHAR
+	size_t source_chars;
+#elif !defined HOST_ANDROID && !defined HOST_JS
+	size_t max_chars, converted_chars;
+#endif
+
+	if (dst == NULL)
+		return 0;
+
 	if (src == NULL) {
+		*dst = FB_WCHAR_LITERAL('\0');
+		return 0;
+	}
+	if ((dst_chars < 0) || (dst_chars >= PTRDIFF_MAX))
+		return 0;
+	if (dst_chars == 0) {
 		*dst = FB_WCHAR_LITERAL('\0');
 		return 0;
 	}
 
 #if defined DISABLE_WCHAR
-	ssize_t chars = strlen(src);
-	if (chars > dst_chars) {
-		chars = dst_chars;
+	source_chars = strlen(src);
+	if (source_chars > (size_t)dst_chars) {
+		source_chars = (size_t)dst_chars;
 	}
-	memcpy(dst, src, chars + 1);
+	chars = (ssize_t)source_chars;
+	memcpy(dst, src, source_chars);
 
 	/* ensure that the null terminator is written, string may have been truncated */
 	dst[chars] = '\0';
@@ -57,7 +74,7 @@ ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 	 * and Node-based JavaScript tests can begin in the C locale before user
 	 * code has had any chance to adjust it.
 	 */
-	ssize_t chars = dst_chars + 1;
+	chars = dst_chars + 1;
 	fb_UTFToWChar( FB_FILE_ENCOD_UTF8, src, dst, &chars );
 	if (chars > dst_chars) {
 		dst[dst_chars] = FB_WCHAR_LITERAL('\0');
@@ -66,16 +83,18 @@ ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 	return chars;
 #else
 	/* plus the null-term (note: "n" in chars, not bytes!) */
-	ssize_t chars = mbstowcs(dst, src, dst_chars + 1);
+	max_chars = (size_t)dst_chars + 1;
+	converted_chars = mbstowcs(dst, src, max_chars);
 
 	/* worked? */
-	if (chars >= 0) {
+	if (converted_chars != (size_t)-1) {
+		chars = (ssize_t)converted_chars;
 		/* a null terminator won't be added if there was not
 		   enough space, so do it manually (this will cut off the last
 		   char, but what can you do) */
-		if (chars == (dst_chars + 1)) {
+		if (converted_chars == max_chars) {
 			dst[dst_chars] = FB_WCHAR_LITERAL('\0');
-			return dst_chars - 1;
+			return (dst_chars > 0) ? dst_chars - 1 : 0;
 		}
 		return chars;
 	}
@@ -92,6 +111,9 @@ FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
 {
 	FB_WCHAR *dst;
 	ssize_t chars;
+#if !defined HOST_ANDROID && !defined HOST_JS
+	size_t converted_chars;
+#endif
 
 	if( src == NULL )
 		return NULL;
@@ -110,13 +132,17 @@ FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
 	}
 	return dst;
 #else
-	chars = mbstowcs( NULL, src, 0 );
+	/* mbstowcs() returns size_t and uses (size_t)-1 for conversion errors. */
+	converted_chars = mbstowcs( NULL, src, 0 );
 
 	/* invalid multibyte characters? get the plain old NUL terminated 
 	** string length and allocate a buffer for at least the ASCII chars 
 	*/
-	if( chars < 0 ) {
-		chars = strlen( src );
+	if( converted_chars == (size_t)-1 ) {
+		converted_chars = strlen( src );
+		if( converted_chars >= (size_t)PTRDIFF_MAX )
+			return NULL;
+		chars = (ssize_t)converted_chars;
 		dst = fb_wstr_AllocTemp( chars );
 		if( dst == NULL ) {
 			return NULL;
@@ -125,6 +151,9 @@ FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
 		fb_wstr_ConvFromA_nomultibyte( dst, chars, src );
 		return dst;
 	}
+	if( converted_chars >= (size_t)PTRDIFF_MAX )
+		return NULL;
+	chars = (ssize_t)converted_chars;
 
 #endif
 	if( chars == 0 )

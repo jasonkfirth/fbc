@@ -395,6 +395,10 @@ typedef struct FB_LISTELEM_ {
 
 typedef struct FB_LIST_ {
     int                cnt;      /* Number of used elements */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Name the existing gap before the first pointer without moving it. */
+    unsigned char      head_alignment_padding[4];
+#endif
     FB_LISTELEM        *head;    /* First used element */
     FB_LISTELEM        *tail;    /* Last used element */
     FB_LISTELEM        *fhead;   /* First free element */

@@ -50,6 +50,9 @@ static int hCheckBOM( FILE *fp, FB_FILE_ENCOD encod )
 		return (bom[0] == 0xFF) && (bom[1] == 0xFE) &&
 		       (bom[2] == 0x00) && (bom[3] == 0x00);
 
+	case FB_FILE_ENCOD_ASCII:
+		return 0;
+
 	default:
 		return 0;
 	}
@@ -83,6 +86,9 @@ static int hWriteBOM( FILE *fp, FB_FILE_ENCOD encod )
 		}
 		break;
 
+	case FB_FILE_ENCOD_ASCII:
+		return 0;
+
 	default:
 		return 0;
 	}
@@ -102,9 +108,13 @@ int fb_DevFileOpenEncod
 	char *fname;
 	int effective_mode;
 
-	FB_LOCK();
+	if( fname_len >= (size_t)PTRDIFF_MAX )
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	fname = (char *)malloc(fname_len + 1);
+	if( fname == NULL )
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
-	fname = (char*) alloca(fname_len + 1);
+	FB_LOCK();
 	memcpy(fname, filename, fname_len);
 	fname[fname_len] = 0;
 
@@ -131,6 +141,7 @@ int fb_DevFileOpenEncod
 		break;
 
 	default:
+		free(fname);
 		FB_UNLOCK();
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
@@ -157,6 +168,7 @@ int fb_DevFileOpenEncod
 			if( !hCheckBOM( fp, handle->encod ) )
 			{
 				fclose( fp );
+				free(fname);
 				FB_UNLOCK();
 				return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 			}
@@ -172,6 +184,7 @@ int fb_DevFileOpenEncod
 	/* not opened? */
 	if( fp == NULL )
 	{
+		free(fname);
 		FB_UNLOCK();
 		return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
 	}
@@ -190,6 +203,7 @@ int fb_DevFileOpenEncod
 		if( !hCheckBOM( fp, handle->encod ) )
 		{
 			fclose( fp );
+			free(fname);
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
@@ -200,9 +214,12 @@ int fb_DevFileOpenEncod
 		if( !hWriteBOM( fp, handle->encod ) )
 		{
 			fclose( fp );
+			free(fname);
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
 		}
+		break;
+	default:
 		break;
 	}
 
@@ -211,10 +228,12 @@ int fb_DevFileOpenEncod
 	if( handle->size == -1 )
 	{
 		fclose( fp );
+		free(fname);
 		FB_UNLOCK();
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
+	free(fname);
 	FB_UNLOCK();
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );

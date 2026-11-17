@@ -10,7 +10,9 @@
 FBCALL FBSTRING_ACCESS *fb_Command ( int arg )
 {
 	FBSTRING_ACCESS *dst;
-	ssize_t i, len;
+	size_t argc, i, len;
+	size_t arg_index;
+	const size_t max_len = (size_t)FB_STRSIZEMSK;
 
 	/* return all arguments? */
 	if( arg < 0 )
@@ -22,22 +24,31 @@ FBCALL FBSTRING_ACCESS *fb_Command ( int arg )
 			return &fb_ctx.null_desc;
 
 		/* concatenate all args but 0 */
+		argc = (size_t)fb_ctx.argc;
 		len = 0;
-		for( i = 1; i < fb_ctx.argc; i++ )
-			len += strlen( fb_ctx.argv[i] );
+		for( i = 1; i < argc; i++ )
+		{
+			size_t arg_len = strlen( fb_ctx.argv[i] );
+			if( arg_len > max_len - len )
+				return &fb_ctx.null_desc;
+			len += arg_len;
+		}
+		if( argc - 2 > max_len - len )
+			return &fb_ctx.null_desc;
+		len += argc - 2;
 
-		dst = fb_hStrAllocTemp( NULL, len + fb_ctx.argc-2 );
+		dst = fb_hStrAllocTemp( NULL, (ssize_t)len );
 		if( dst == NULL )
 			return &fb_ctx.null_desc;
 
 		dst->data[0] = '\0';
 		p = dst->data;
-		for( i = 1; i < fb_ctx.argc; i++ )
+		for( i = 1; i < argc; i++ )
 		{
 			size_t arg_len = strlen( fb_ctx.argv[i] );
 			memcpy( p, fb_ctx.argv[i], arg_len );
 			p += arg_len;
-			if( i != fb_ctx.argc-1 )
+			if( i != argc-1 )
 				*p++ = ' ';
 		}
 		*p = '\0';
@@ -49,12 +60,15 @@ FBCALL FBSTRING_ACCESS *fb_Command ( int arg )
 	if( arg >= fb_ctx.argc )
 	    return &fb_ctx.null_desc;
 
-	len = strlen( fb_ctx.argv[arg] );
-	dst = fb_hStrAllocTemp( NULL, len );
+	arg_index = (size_t)arg;
+	len = strlen( fb_ctx.argv[arg_index] );
+	if( len > max_len )
+		return &fb_ctx.null_desc;
+	dst = fb_hStrAllocTemp( NULL, (ssize_t)len );
 	if( dst == NULL )
 		return &fb_ctx.null_desc;
 
-	memcpy( dst->data, fb_ctx.argv[arg], len + 1 );
+	memcpy( dst->data, fb_ctx.argv[arg_index], len + 1 );
 
 	return dst;
 }

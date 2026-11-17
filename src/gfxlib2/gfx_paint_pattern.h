@@ -29,7 +29,7 @@ static int fb_hGfxPackPattern(unsigned char *data, FBSTRING_ACCESS *pattern,
 	if (rows < 1 || rows > FB_GFX_PAINT_PACKED_MAX_ROWS)
 		return 0;
 	memcpy(data, colors, sizeof(colors));
-	memcpy(data + FB_GFX_PAINT_PACKED_HEADER, pattern->data, rows);
+	memcpy(data + FB_GFX_PAINT_PACKED_HEADER, pattern->data, (size_t)rows);
 	return FB_GFX_PAINT_PACKED_HEADER + (int)rows;
 }
 

@@ -48,7 +48,13 @@ FBCALL FB_WCHAR *fb_WstrAssignFromA
    In the worst case, we'll allocate too much. */
 /* 4 bytes per char - allowing for UTF8 multi-byte strings, happens on GNU/Linux.
    On Windows there can be double-byte encodings etc. too. */
-#define getALenForWLen(wlen) ((wlen) * 4)
+static ssize_t getALenForWLen( ssize_t wlen )
+{
+	if( (wlen < 0) || (wlen > FB_STRSIZEMSK / 4) )
+		return -1;
+
+	return wlen * 4;
+}
 
 FBCALL void *fb_WstrAssignToAEx
 	(
@@ -68,6 +74,10 @@ FBCALL void *fb_WstrAssignToAEx
 		src_chars = fb_wstr_Len( src );
 	else
 		src_chars = 0;
+	if( src_chars < 0 ) {
+		fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		return dst;
+	}
 
 	/* is dst var-len? */
 	if( dst_chars == FB_STRSIZEVARLEN )
@@ -89,7 +99,11 @@ FBCALL void *fb_WstrAssignToAEx
 		else
 		{
         	/* realloc dst if needed and copy src */
-			dst_chars = getALenForWLen(src_chars);
+			dst_chars = getALenForWLen( src_chars );
+			if( dst_chars < 0 ) {
+				fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				return dst;
+			}
 			if( is_init == FB_FALSE )
 			{
 				if( FB_STRSIZE( dst ) != dst_chars )
@@ -101,7 +115,11 @@ FBCALL void *fb_WstrAssignToAEx
 			}
 
 			ssize_t writtenchars = fb_wstr_ConvToA( ((FBSTRING_ACCESS *)dst)->data, dst_chars, src );
-			fb_hStrSetLength( dst, writtenchars );
+			if( writtenchars < 0 )
+				writtenchars = 0;
+			if( writtenchars > dst_chars )
+				writtenchars = dst_chars;
+			fb_hStrSetLength( dst, (size_t)writtenchars );
 		}
 	}
 	/* fixed-len string */
@@ -110,14 +128,18 @@ FBCALL void *fb_WstrAssignToAEx
 		ssize_t writtenchars = 0;
 		dst_chars &= FB_STRSIZEMSK;
 
-			if( src_chars > 0 )
-			{
-				writtenchars = fb_wstr_ConvToA( (char *)dst, dst_chars, src );
-			}
+		if( (src_chars > 0) && (dst_chars > 0) )
+			writtenchars = fb_wstr_ConvToA( (char *)dst, dst_chars, src );
 
-		if( dst_chars - writtenchars > 0 )
+		if( writtenchars < 0 )
+			writtenchars = 0;
+		if( writtenchars > dst_chars )
+			writtenchars = dst_chars;
+
+		if( dst_chars > writtenchars )
 		{
-			memset( ((char *)dst) + writtenchars, 32, dst_chars - writtenchars );
+			memset( ((char *)dst) + writtenchars, 32,
+			        (size_t)(dst_chars - writtenchars) );
 		}
 	}
 	/* fixed-len zstring or zstring ptr */
@@ -126,22 +148,34 @@ FBCALL void *fb_WstrAssignToAEx
 		/* src NULL? */
 		if( src_chars == 0 ) {
 			if( fill_rem && dst_chars > 0 ) {
-				memset( dst, 0, dst_chars );
+				memset( dst, 0, (size_t)dst_chars );
 			} else {
 				*(char *)dst = '\0';
 			}
 		/* byte ptr? as in C, assume dst is large enough */
 		} else if( dst_chars == 0 ) {
-			dst_chars = getALenForWLen(src_chars);
+			dst_chars = getALenForWLen( src_chars );
+			if( dst_chars < 0 ) {
+				fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				return dst;
+			}
 			fb_wstr_ConvToA( (char *)dst, dst_chars, src );
+		} else if( dst_chars < 0 ) {
+			fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+			return dst;
 		} else {
 			dst_chars -= 1; /* null terminator */
 			ssize_t writtenchars = fb_wstr_ConvToA( (char *)dst, dst_chars, src );
+			if( writtenchars < 0 )
+				writtenchars = 0;
+			if( writtenchars > dst_chars )
+				writtenchars = dst_chars;
 
 			/* fill remainder with null's */
 			if( fill_rem && writtenchars < dst_chars ) {
 				/* + 1 to fill behind null terminator. There is room for dst_chars + 1. */
-				memset( ((char *)dst) + writtenchars + 1, 0, dst_chars - writtenchars );
+				memset( ((char *)dst) + writtenchars + 1, 0,
+				        (size_t)(dst_chars - writtenchars) );
 			}
 		}
 	}

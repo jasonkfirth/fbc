@@ -14,16 +14,16 @@
 
 static LZW_ENTRY *find_match(unsigned short prefix, unsigned char value)
 {
-	unsigned short index, offset = 1;
+	unsigned int index, offset = 1u;
 
-	index = ((unsigned short)value << 4) ^ prefix;
+	index = ((unsigned int)value << 4) ^ prefix;
 	if (index)
 		offset = TABLE_SIZE - index;
 	while (1) {
 		if ((fb_lzw_entry[index].code == -1) ||
 		    ((fb_lzw_entry[index].prefix == prefix) && (fb_lzw_entry[index].value == value)))
 			return &fb_lzw_entry[index];
-		index = (index + offset) % TABLE_SIZE;
+		index = (index + offset) % (unsigned int)TABLE_SIZE;
 	}
 }
 
@@ -36,7 +36,8 @@ FBCALL int fb_hEncode
 	)
 {
 	LZW_ENTRY *e;
-	unsigned short string_code, next_code = 256;
+	unsigned short string_code;
+	unsigned int next_code = 256u;
 	unsigned char bit = 0;
 	ssize_t size;
 
@@ -52,8 +53,9 @@ FBCALL int fb_hEncode
 		if (e->code != -1)
 			string_code = (unsigned short)e->code;
 		else {
-			if (next_code < MAX_CODE) {
-				e->code = next_code++;
+			if (next_code < (unsigned int)MAX_CODE) {
+				e->code = (short)next_code;
+				next_code++;
 				e->prefix = string_code;
 				e->value = *in_buffer;
 			}

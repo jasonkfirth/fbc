@@ -14,6 +14,8 @@
 static int key_buffer[KEY_BUFFER_LEN], key_head = 0, key_tail = 0;
 static int key_buffer_changed = FALSE;
 
+void fb_hPostKey_End(void);
+
 static void poll_events(void)
 {
 	if ((fb_gfx) && (fb_gfx->driver->poll_events))

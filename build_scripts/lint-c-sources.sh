@@ -127,7 +127,8 @@ done
 # providers and the bounded, heap-fallback wide-file writer. The ISO-C portability
 # advice does not apply to those implementations; other checks remain enabled.
 # Cppcheck also cannot parse initialized objects with GNU asm labels in the
-# three ABI fixtures. Their labels are checked by native compiler/link tests.
+# three ABI fixtures, or the GNU asm label after the SFX driver array
+# declaration. Native GCC builds verify these ABI bindings.
 if ! cppcheck \
     --enable=warning,performance,portability \
     --error-exitcode=1 \
@@ -174,6 +175,7 @@ if ! cppcheck \
     --suppress='syntaxError:src/rtlib/drivers/wince/profile_cycles.c' \
     --suppress='syntaxError:src/rtlib/drivers/xbox/cxxabi.c' \
     --suppress='syntaxError:src/sfxlib/js/sfx_driver_webaudio.c' \
+    --suppress='syntaxError:src/sfxlib/fb_sfx_driver.h' \
     --suppress='syntaxError:build_scripts/wince/mips-toolchain/crt0.c' \
     --suppress='syntaxError:contrib/djgpp/libc/crt0/_main.c' \
     --suppress='syntaxError:tests/compiler-support/c23-keyword-helper.c' \

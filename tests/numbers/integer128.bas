@@ -90,6 +90,24 @@ SUITE( fbc_tests.numbers.integer128 )
 		#endif
 	END_TEST
 
+	#ifdef __FB_WII__
+	TEST( scoped_storage_alignment )
+		'' Wii's eight-byte stack ABI must still preserve the sixteen-byte
+		'' BASIC record alignment. Re-entering a scope must reuse bounded
+		'' storage, including when a jump bypasses its initialization.
+		for iteration as long = 1 to 4096
+			scope
+				goto storage_ready
+				dim value as Integer128Layout = any
+			storage_ready:
+				value.signedValue = iteration
+				CU_ASSERT_EQUAL( cuint(@value) and 15, 0 )
+				CU_ASSERT_EQUAL( value.signedValue, iteration )
+			end scope
+		next
+	END_TEST
+	#endif
+
 	TEST( add_subtract_multiply )
 		dim as uinteger<128> oneValue = 1
 		dim as uinteger<128> lowWordMaximum = (oneValue shl 64) - 1

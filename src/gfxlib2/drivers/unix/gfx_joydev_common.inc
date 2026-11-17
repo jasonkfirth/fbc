@@ -190,6 +190,10 @@ static int fb_joydev_poll(FB_JOYDEV_DEVICE *joy)
 					joy->buttons &= ~(1u << event.number);
 			}
 			break;
+
+		default:
+			/* Ignore event types added by newer joydev interfaces. */
+			break;
 		}
 	}
 

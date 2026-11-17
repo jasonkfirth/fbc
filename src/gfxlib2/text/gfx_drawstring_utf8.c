@@ -23,7 +23,7 @@ static FBSTRING_ACCESS *hGlyphs( FBSTRING_ACCESS *text )
 	if( result != NULL && count > 0 ) {
 		while( offset < length ) {
 			scalar = fb_hUtf8Decode(text->data, length, &offset);
-			result->data[written++] = scalar <= 0xFF ? scalar : '?';
+			result->data[written++] = (char)(unsigned char)(scalar <= 0xFF ? scalar : '?');
 		}
 	}
 	fb_hStrDelTemp_NoLock(text);

@@ -32,7 +32,7 @@
 
 typedef struct {
 	int in_use;
-	int attrib;
+	DWORD attrib;
 	int return_utf8;
 #ifdef HOST_CYGWIN
 	WIN32_FIND_DATA data;
@@ -138,6 +138,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 	FB_DIRCTX *ctx;
 	FBSTRING_ACCESS *res;
 	ssize_t len;
+	size_t name_len;
 	int tmp_attrib;
     char *name;
     int handle_ok;
@@ -199,7 +200,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 			ctx->in_use = TRUE;
 
 			/* Handle any other possible bits different Windows versions could return */
-			ctx->attrib = attrib | 0xFFFFFF00;
+			ctx->attrib = (DWORD)attrib | (DWORD)0xFFFFFF00u;
 
 			/* archive bit not set? set the dir bit at least.. */
 			if( (attrib & 0x10) == 0 )
@@ -235,18 +236,25 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 
 	/* store filename if found */
 	if( name ) {
-		len = strlen( name );
-		res = fb_hStrAllocTemp_NoLock( NULL, len );
-		if( res ) {
-			fb_hStrCopy( res->data, name, len );
-			#ifdef HOST_MINGW
-			free( name );
-			#endif
-		} else {
+		name_len = strlen( name );
+		if( name_len > (size_t)FB_STRSIZEMSK ) {
 			#ifdef HOST_MINGW
 			free( name );
 			#endif
 			res = &fb_ctx.null_desc;
+		} else {
+			res = fb_hStrAllocTemp_NoLock( NULL, (ssize_t)name_len );
+			if( res ) {
+				fb_hStrCopy( res->data, name, (ssize_t)name_len );
+				#ifdef HOST_MINGW
+				free( name );
+				#endif
+			} else {
+				#ifdef HOST_MINGW
+				free( name );
+				#endif
+				res = &fb_ctx.null_desc;
+			}
 		}
 	} else {
 		res = &fb_ctx.null_desc;

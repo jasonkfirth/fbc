@@ -13,7 +13,7 @@ FBCALL void fb_DataReadLongint( long long *dst )
 
 	if( fb_data_ptr ) {
 		if( fb_data_ptr->len == FB_DATATYPE_OFS ) {
-			*dst = (size_t)fb_data_ptr->ofs;
+			*dst = (long long)(size_t)fb_data_ptr->ofs;
 		} else if( fb_data_ptr->len & FB_DATATYPE_WSTR ) {
 			*dst = fb_WstrToLongint( fb_data_ptr->wstr, fb_data_ptr->len & 0x7FFF );
 		} else {

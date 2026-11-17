@@ -130,8 +130,8 @@ void fb_sfxNoisePitch(int channel, int frequency, float duration, float volume)
         "sfx_noise: channel=%d frequency=%d duration=%f volume=%f",
         channel,
         frequency,
-        duration,
-        volume
+        (double)duration,
+        (double)volume
     );
 }
 

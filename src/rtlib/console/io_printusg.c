@@ -10,12 +10,17 @@
 
 #include "fb.h"
 #include <math.h>
+#include <string.h>
 
 typedef struct {
 	ssize_t   chars;
 	char     *ptr;
 	FBSTRING  fmtstr;
 	int       utf8;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_PRINTUSGCTX;
 
 #define fb_PRINTUSGCTX_Destructor NULL
@@ -133,7 +138,9 @@ static void hPrintText( int fnum, const char *text, ssize_t length )
 {
 	FB_PRINTUSGCTX *ctx = FB_TLSGETCTX( PRINTUSG );
 	if( ctx->utf8 ) {
-		FBSTRING view = { (char *)text, length, length };
+		/* FBSTRING keeps its mutable ABI field, while this borrowed view is read-only. */
+		FBSTRING view = { NULL, length, length };
+		memcpy((void *)&view.data, (const void *)&text, sizeof(view.data));
 		fb_UStrPrint( fnum, &view, 0 );
 	} else fb_PrintFixString( fnum, text, 0 );
 }
@@ -141,18 +148,31 @@ static void hPrintText( int fnum, const char *text, ssize_t length )
 static void hPrintField( int fnum, FBSTRING_ACCESS *source, ssize_t columns, int unicode )
 {
 	ssize_t length = source && source->data ? FB_STRSIZE(source) : 0;
-	ssize_t count = unicode ? fb_hUtf8Count(source ? source->data : NULL, length) : length;
-	ssize_t bytes = unicode ? fb_hUtf8Offset(source ? source->data : NULL, length, columns) :
-		(length < columns ? length : columns);
-	ssize_t padding = count < columns ? columns - count : 0, i;
+	ssize_t count;
+	ssize_t bytes;
+	ssize_t padding;
+	ssize_t i;
 	FBSTRING_ACCESS *result;
+	if( source && source->data ) {
+		count = unicode ? fb_hUtf8Count(source->data, length) : length;
+		bytes = unicode ? fb_hUtf8Offset(source->data, length, columns) :
+			(length < columns ? length : columns);
+	} else {
+		count = 0;
+		bytes = 0;
+	}
+	padding = count < columns ? columns - count : 0;
 	FB_STRLOCK();
-	result = bytes <= FB_USTRING_MAX_BYTES - padding ? fb_hUStrAlloc_NoLock(bytes + padding) : NULL;
+	result = NULL;
+	if( (bytes >= 0) && (padding >= 0) &&
+	    (padding <= FB_USTRING_MAX_BYTES) &&
+	    (bytes <= FB_USTRING_MAX_BYTES - padding) )
+		result = fb_hUStrAlloc_NoLock(bytes + padding);
 	if( result != NULL && bytes + padding > 0 ) {
-		if( bytes ) memcpy(result->data, source->data, bytes);
+		if( bytes ) memcpy(result->data, source->data, (size_t)bytes);
 		/* Fixed fields retain BASIC's NUL-to-space convention. */
 		for( i = 0; i < bytes; ++i ) if( result->data[i] == 0 ) result->data[i] = ' ';
-		memset(result->data + bytes, ' ', padding);
+		memset(result->data + bytes, ' ', (size_t)padding);
 	}
 	FB_STRUNLOCK();
 	if( result != NULL ) {
@@ -226,32 +246,68 @@ static unsigned long long hPow10_ULL( int n )
 
 static int hLog10_ULL( unsigned long long a )
 {
-	int ret = 0;
-	int a32;
+	unsigned int ret = 0;
+	unsigned int a32;
 	unsigned long long a64;
 
 	a64 = a;
-	while( a64 >= (int)1.E+8 )
+	while( a64 >= (unsigned int)1.E+8 )
 	{
-		a64 /= (int)1.E+8;
-		ret += 8;
+		a64 /= (unsigned int)1.E+8;
+		ret += 8u;
 	}
-	a32 = a64;
-	if( a32 >= (int)1.E+4 ) ret += 4; else a32 *= (int)1.E+4;
-	if( a32 >= (int)1.E+6 ) ret += 2; else a32 *= (int)1.E+2;
-	if( a32 >= (int)1.E+7 ) ret += 1;
+	/* The loop leaves a64 below 100,000,000, which fits in a32. */
+	a32 = (unsigned int)a64;
+	if( a32 >= (unsigned int)1.E+4 ) ret += 4u; else a32 *= (unsigned int)1.E+4;
+	if( a32 >= (unsigned int)1.E+6 ) ret += 2u; else a32 *= (unsigned int)1.E+2;
+	if( a32 >= (unsigned int)1.E+7 ) ret += 1u;
 
 	if( a == 0 )
-		DBG_ASSERT( ret == 0 );
+		DBG_ASSERT( ret == 0u );
 	else
-		DBG_ASSERT( hPow10_ULL( ret ) <= a && hPow10_ULL( ret ) > a / 10 );
+		DBG_ASSERT( hPow10_ULL( (int)ret ) <= a && hPow10_ULL( (int)ret ) > a / 10 );
 
-	return ret;
+	return (int)ret;
 }
 
 static int hNumDigits( unsigned long long a )
 {
 	 return hLog10_ULL( a ) + 1;
+}
+
+/* Compare against a negative magnitude without signed negation. */
+static uint64_t hInt64Magnitude(int64_t value)
+{
+	return (value < 0) ? UINT64_C(0) - (uint64_t)value : (uint64_t)value;
+}
+
+static int hInt64GreaterThanNegativeMagnitude(int64_t value,
+	uint64_t magnitude)
+{
+	if (magnitude == 0u)
+		return value > 0;
+	if (value >= 0)
+		return TRUE;
+	return hInt64Magnitude(value) < magnitude;
+}
+
+static int hInt64LessThanNegativeMagnitude(int64_t value,
+	uint64_t magnitude)
+{
+	if (magnitude == 0u)
+		return value < 0;
+	if (value >= 0)
+		return FALSE;
+	return hInt64Magnitude(value) > magnitude;
+}
+
+static int64_t hIncrementDigitCount(int64_t digits)
+{
+	if (digits == -1)
+		return 0;
+	if ((digits < 0) || ((uint64_t)digits >= (uint64_t)INT64_MAX))
+		return digits;
+	return (int64_t)((uint64_t)digits + UINT64_C(1));
 }
 
 static unsigned long long hDivPow10_ULL( unsigned long long a, int n )
@@ -346,6 +402,10 @@ static int fb_PrintUsingFmtStr( int fnum )
 				++ctx->ptr;
 				--ctx->chars;
 			}
+			break;
+
+		default:
+			break;
 		}
 
 		if( doexit )
@@ -353,8 +413,11 @@ static int fb_PrintUsingFmtStr( int fnum )
 
 		if( ctx->utf8 && c >= 0x80 ) {
 			ssize_t consumed = 0;
+			ssize_t encoded;
 			unsigned int scalar = fb_hUtf8Decode(ctx->ptr, ctx->chars, &consumed);
-			len += fb_hUtf8Encode(buffer + len, scalar);
+			encoded = fb_hUtf8Encode(buffer + len, scalar);
+			DBG_ASSERT( (encoded >= 1) && (encoded <= 4) );
+			len += (int)encoded;
 			ctx->ptr += consumed;
 			ctx->chars -= consumed;
 		} else {
@@ -420,7 +483,7 @@ static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicod
 				buffer[0] = ' ';
 
 			buffer[1] = '\0';
-			hPrintText( fnum, buffer, strlen(buffer) );
+			hPrintText( fnum, buffer, (ssize_t)strlen(buffer) );
 
 			++ctx->ptr;
 			--ctx->chars;
@@ -459,6 +522,9 @@ static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicod
 				doexit = FALSE;
 			}
 			break;
+
+		default:
+			break;
 		}
 
 		if( doexit )
@@ -472,7 +538,7 @@ static int hPrintUsingString( int fnum, FBSTRING_ACCESS *s, int mask, int unicod
 	fb_PrintUsingFmtStr( fnum );
 
 	/**/
-	if( mask & FB_PRINT_ISLAST )
+	if( (unsigned int)mask & FB_PRINT_ISLAST )
 	{
 		if( mask & FB_PRINT_NEWLINE )
 			fb_PrintVoid( fnum, FB_PRINT_NEWLINE );
@@ -509,25 +575,31 @@ FBCALL int fb_PrintUsingWstr( int fnum, FB_WCHAR *source, int mask )
 static int hPrintNumber
 	(
 		int fnum,
-		unsigned long long val, int val_exp, int flags,
+		unsigned long long val, int64_t val_exp, int flags,
 		int mask
 	)
 {
 	FB_PRINTUSGCTX *ctx;
 	char buffer[BUFFERLEN+1], *p;
-	int val_digs, val_zdigs;
+	int val_digs;
+	int64_t val_zdigs;
+	uint64_t scientific_exp_magnitude;
 	unsigned long long val0;
-	int val_digs0, val_exp0;
+	int val_digs0;
+	int64_t val_exp0;
 	int val_isneg, val_isfloat, val_issng;
 	int c, lc;
 #ifdef DEBUG
 	int nc; /* used for sanity checks */
 #endif
-	int doexit, padchar, intdigs, decdigs, expdigs;
+	int doexit, padchar, expdigs;
+	int64_t intdigs, decdigs;
 	int adddollar, addcommas, signatend, signatstart, plussign, toobig;
-	int intdigs2, expsignchar, totdigs, decpoint;
+	int expsignchar, decpoint;
+	int64_t intdigs2, totdigs;
 	int isamp;
 	int i;
+	uint64_t total_digit_slots;
 	uint64_t chars = 0;
 
 	ctx = FB_TLSGETCTX( PRINTUSG );
@@ -589,7 +661,7 @@ static int hPrintNumber
 			}
 			else
 			{
-				++intdigs;
+				intdigs = hIncrementDigitCount(intdigs);
 			}
 			break;
 
@@ -611,11 +683,11 @@ static int hPrintNumber
 			{	/* first asterisk */
 				DBG_ASSERT( nc == '*' ); /* must be two at start, otherwise we're not parsing a format string and shouldn't have been brought here! */
 				padchar = CHAR_STAR;
-				++intdigs;
+				intdigs = hIncrementDigitCount(intdigs);
 			}
 			else if( intdigs == 1 && lc == '*' )
 			{	/* second asterisk */
-				++intdigs;
+				intdigs = hIncrementDigitCount(intdigs);
 			}
 			else
 				doexit = TRUE;
@@ -640,7 +712,7 @@ static int hPrintNumber
 				else
 				{	/* second dollar */
 					DBG_ASSERT( lc == '$' );
-					++intdigs;
+					intdigs = hIncrementDigitCount(intdigs);
 				}
 			}
 			else
@@ -658,7 +730,7 @@ static int hPrintNumber
 			else
 			{
 				addcommas = TRUE;
-				++intdigs;
+				intdigs = hIncrementDigitCount(intdigs);
 			}
 			break;
 
@@ -838,7 +910,8 @@ static int hPrintNumber
 		}
 
 		/* set digits for fixed-point */
-		if( val_digs + val_exp > 0 )
+		if( hInt64GreaterThanNegativeMagnitude(val_exp,
+			(uint64_t)val_digs) )
 		{
 			intdigs = val_digs + val_exp;
 		}
@@ -855,12 +928,41 @@ static int hPrintNumber
 		if( val_isfloat )
 		{	/* scientific notation? e.g. 3.1E+42 */
 			if( intdigs > 16 || (val_issng && intdigs > 7) ||
-			    val_digs + val_exp - 1 < -MIN_EXPDIGS )
+			    hInt64LessThanNegativeMagnitude(val_exp,
+				(uint64_t)(MIN_EXPDIGS - 1) + (uint64_t)val_digs) )
 			{
 				intdigs = 1;
 				decdigs = val_digs - 1;
 
-				expdigs = 2 + hNumDigits( abs(val_digs + val_exp - 1) );
+				{
+					uint64_t exponent_magnitude = hInt64Magnitude(val_exp);
+
+					if (val_digs == 0) {
+						if (val_exp > 0)
+							scientific_exp_magnitude =
+								(uint64_t)val_exp - 1u;
+						else
+							scientific_exp_magnitude =
+								exponent_magnitude + 1u;
+					} else {
+						uint64_t exponent_offset =
+							(uint64_t)(val_digs - 1);
+
+						if (val_exp < 0) {
+							if (exponent_magnitude > exponent_offset)
+								scientific_exp_magnitude =
+									exponent_magnitude - exponent_offset;
+							else
+								scientific_exp_magnitude =
+									exponent_offset - exponent_magnitude;
+						} else {
+							scientific_exp_magnitude =
+								(uint64_t)val_exp + exponent_offset;
+						}
+					}
+				}
+				expdigs = 2 + hNumDigits(
+					(unsigned long long)scientific_exp_magnitude);
 				if( expdigs < MIN_EXPDIGS + 1 )
 					expdigs = MIN_EXPDIGS;
 			}
@@ -873,10 +975,13 @@ static int hPrintNumber
 	}
 
 	/* crop number of digits */
-	if( intdigs + 1 + decdigs > MAX_DIGS )
+	total_digit_slots = (uint64_t)intdigs;
+	if( decdigs >= 0 )
+		total_digit_slots += (uint64_t)decdigs + 1u;
+	if( total_digit_slots > (uint64_t)MAX_DIGS )
 	{
-		decdigs -= ((intdigs + 1 + decdigs) - MAX_DIGS);
-		if( decdigs < -1 )
+		decdigs -= (int64_t)(total_digit_slots - (uint64_t)MAX_DIGS);
+		if( (decdigs < 0) && (decdigs != -1) )
 		{
 			intdigs -= (-1 - decdigs);
 			decdigs = -1;
@@ -884,7 +989,7 @@ static int hPrintNumber
 	}
 
 	/* decimal point if decdigs >= 0 */
-	if( decdigs <= -1 )
+	if( decdigs < 0 )
 	{
 		decpoint = FALSE;
 		decdigs = 0;
@@ -931,11 +1036,13 @@ static int hPrintNumber
 		val_exp0 = val_exp;
 
 		/* check range */
-		if( val_exp < -decdigs )
+		if( hInt64LessThanNegativeMagnitude(val_exp,
+			(uint64_t)decdigs) )
 		{	/* scale and round integer value to get val_exp equal to -decdigs */
-			val_exp += (-decdigs - val_exp0);
-			val_digs -= (-decdigs - val_exp0);
-			val = hDivPow10_ULL( val, -decdigs - val_exp0 );
+			int scale = (int)(-decdigs - val_exp0);
+			val_exp += scale;
+			val_digs -= scale;
+			val = hDivPow10_ULL( val, scale );
 
 			if( val == 0 )
 			{	/* val is/has been scaled down to zero */
@@ -951,16 +1058,32 @@ static int hPrintNumber
 			}
 		}
 
-		intdigs2 = val_digs + val_exp;
-		if( intdigs2 < 0 ) intdigs2 = 0;
-		if( addcommas )
-		{
-			intdigs2 += (intdigs2 - 1) / 3;
+		if (hInt64LessThanNegativeMagnitude(val_exp, (uint64_t)val_digs))
+			intdigs2 = 0;
+		else if ((val_exp >= 0) &&
+			((uint64_t)val_exp >
+			 (uint64_t)INT64_MAX - (uint64_t)val_digs))
+			intdigs2 = INT64_MAX;
+		else
+			intdigs2 = (int64_t)val_digs + val_exp;
+
+		if (addcommas && (intdigs2 > 0)) {
+			uint64_t digit_slots = (uint64_t)intdigs2;
+			uint64_t comma_slots = (digit_slots - 1u) / 3u;
+
+			if (comma_slots > (uint64_t)INT64_MAX - digit_slots)
+				intdigs2 = INT64_MAX;
+			else
+				intdigs2 = (int64_t)(digit_slots + comma_slots);
 		}
 
 		/* compare fixed/floating point representations,
 		   and use the one that needs fewest digits */
-		if( intdigs2 > intdigs + MIN_EXPDIGS )
+		if( (intdigs2 > intdigs) &&
+		    /* The order check keeps this mathematical difference nonnegative;
+	       unsigned arithmetic avoids signed overflow for large digit counts. */
+		    ((uint64_t)intdigs2 - (uint64_t)intdigs >
+		     (uint64_t)MIN_EXPDIGS) )
 		{	/* too many digits in number for fixed point:
 			   switch to floating-point */
 
@@ -983,7 +1106,8 @@ static int hPrintNumber
 				toobig = 1;         /* add '%' sign */
 			}
 
-			if( val_exp > -decdigs)
+			if( hInt64GreaterThanNegativeMagnitude(val_exp,
+				(uint64_t)decdigs) )
 			{	/* put excess trailing zeroes from val_exp into val_zdigs */
 				val_zdigs = val_exp - -decdigs;
 				val_exp = -decdigs;
@@ -999,7 +1123,7 @@ static int hPrintNumber
 
 		if( intdigs == -1 || (intdigs == 0 && decdigs == 0) )
 		{	/* add [another] '%' sign */
-			++intdigs;
+			intdigs = hIncrementDigitCount(intdigs);
 #if 0
 			++toobig;   /* QB could prepend two independent '%'s */
 #else
@@ -1034,9 +1158,10 @@ static int hPrintNumber
 		}
 		else if( val_digs > totdigs )
 		{	/* scale down value */
-			val = hDivPow10_ULL( val, val_digs - totdigs );
-			val_exp += (val_digs - totdigs);
-			val_digs = totdigs;
+			int scale = (int)((int64_t)val_digs - totdigs);
+			val = hDivPow10_ULL( val, scale );
+			val_exp += scale;
+			val_digs = (int)totdigs;
 			val_zdigs = 0;
 
 			if( val >= hPow10_ULL( val_digs ) )
@@ -1196,7 +1321,7 @@ static int hPrintNumber
 		}
 		DBG_ASSERT( intdigs > 0 );
 		++i;
-		--intdigs;
+		intdigs = (int64_t)((uint64_t)intdigs - UINT64_C(1));
 	}
 
 	DBG_ASSERT( val == 0 );
@@ -1241,7 +1366,7 @@ static int hPrintNumber
 
 	/**/
 	++p;
-	hPrintText( fnum, p, strlen(p) );
+	hPrintText( fnum, p, (ssize_t)strlen(p) );
 
 	/* ------------------------------------------------------ */
 
@@ -1254,7 +1379,7 @@ static int hPrintNumber
 		fb_PrintVoid( fnum, mask & (FB_PRINT_NEWLINE | FB_PRINT_PAD) );
 	}
 
-	if( mask & FB_PRINT_ISLAST )
+	if( (unsigned int)mask & FB_PRINT_ISLAST )
 	{
 		fb_StrDelete( &ctx->fmtstr );
 		/* The final value can leave an unmatched field. The following
@@ -1266,7 +1391,7 @@ static int hPrintNumber
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
 
-static unsigned long long hScaleDoubleToULL( double value, int *pval_exp )
+static unsigned long long hScaleDoubleToULL( double value, int64_t *pval_exp )
 {
 	DBG_ASSERT( value >= 0.0 );
 
@@ -1307,14 +1432,17 @@ static unsigned long long hScaleDoubleToULL( double value, int *pval_exp )
 	/*(assumes x86 endian, IEEE-754 floating-point format) */
 
 	unsigned long long val_ull;
-	int digs;
-	int pow2, pow10;
+	unsigned int exponent;
+	int64_t pow2, pow10;
+	unsigned int steps;
 
 	val_ull = hDoubleToLongBits( value );
-	pow2 = (val_ull >> 52) - 1023;
+	/* The exponent occupies bits 52 through 62; bit 63 is the sign. */
+	exponent = (unsigned int)((val_ull >> 52) & 0x7ffull);
+	pow2 = (int64_t)exponent - 1023;
 	val_ull &= (1ull << 52)-1;
 
-	if( pow2 > -1023 )
+	if( exponent != 0u )
 	{	/* normalized */
 		val_ull |= (1ull << 52);
 	}
@@ -1326,47 +1454,54 @@ static unsigned long long hScaleDoubleToULL( double value, int *pval_exp )
 
 	pow10 = 0;
 
-	while( pow2 > 0 )
+	if( pow2 > 0 )
 	{
-		/* essentially, val_ull*=2, --pow2,
-		 * dividing by 5 when necessary to keep within 64 bits) */
-		if( val_ull < (1ull << 63) )
+		steps = (unsigned int)pow2;
+		while( steps > 0u )
 		{
-			val_ull *= 2;
-			--pow2;
-		}
-		else
-		{
-			/* divide by 5, rounding to nearest
-			 * (val_ull will be much bigger than 3 so no underflow) */
-			val_ull = (val_ull - 3) / 5 + 1;
-			++pow10;
-			--pow2;
+			/* essentially, val_ull*=2, --pow2,
+			 * dividing by 5 when necessary to keep within 64 bits) */
+			if( val_ull < (1ull << 63) )
+			{
+				val_ull *= 2;
+				steps--;
+			}
+			else
+			{
+				/* divide by 5, rounding to nearest
+				 * (val_ull will be much bigger than 3 so no underflow) */
+				val_ull = (val_ull - 3) / 5 + 1;
+				++pow10;
+				steps--;
+			}
 		}
 	}
 
-	while( pow2 < 0 )
+	else if( pow2 < 0 )
 	{
-		/* essentially, val_ull/=2, ++pow2,
-		 * multiplying by 5 when possible to keep precision high */
-		if( val_ull <= 0x3333333333333333ull )
-		{	/* multiply by 5 (max 0xffffffffffffffff) */
-			val_ull *= 5;
-			--pow10;
-			++pow2;
-		}
-		else
-		{	/* divide by 2, rounding to even */
-			val_ull = val_ull / 2 + (val_ull & (val_ull / 2) & 1);
-			++pow2;
+		steps = 0u - (unsigned int)pow2;
+		while( steps > 0u )
+		{
+			/* essentially, val_ull/=2, ++pow2,
+			 * multiplying by 5 when possible to keep precision high */
+			if( val_ull <= 0x3333333333333333ull )
+			{	/* multiply by 5 (max 0xffffffffffffffff) */
+				val_ull *= 5;
+				--pow10;
+				steps--;
+			}
+			else
+			{	/* divide by 2, rounding to even */
+				val_ull = val_ull / 2 + (val_ull & (val_ull / 2) & 1);
+				steps--;
+			}
 		}
 	}
 
-	digs = hNumDigits( val_ull );
-	if( digs > DBL_MAXDIGS )
+	if( val_ull >= hPow10_ULL(DBL_MAXDIGS) )
 	{	/* scale to 16 digits */
 
-		int scale = digs - DBL_MAXDIGS;
+		int scale = hNumDigits(val_ull) - DBL_MAXDIGS;
 		val_ull = hDivPow10_ULL( val_ull, scale );
 		pow10 += scale;
 
@@ -1381,7 +1516,7 @@ static unsigned long long hScaleDoubleToULL( double value, int *pval_exp )
 
 FBCALL int fb_PrintUsingDouble( int fnum, double value, int mask )
 {
-	int val_exp = 0;
+	int64_t val_exp = 0;
 	int flags;
 	unsigned long long val_ull = 1;
 
@@ -1417,7 +1552,7 @@ FBCALL int fb_PrintUsingDouble( int fnum, double value, int mask )
 
 FBCALL int fb_PrintUsingSingle( int fnum, float value_f, int mask )
 {
-	int val_exp = 0;
+	int64_t val_exp = 0;
 	int flags;
 	unsigned long long val_ull = 1;
 
@@ -1464,12 +1599,13 @@ FBCALL int fb_PrintUsingLongint( int fnum, long long val_ll, int mask )
 	if( val_ll < 0 )
 	{
 		flags = VAL_ISNEG;
-		val_ull = -val_ll;
+		/* Unsigned subtraction gives LLONG_MIN its representable magnitude. */
+		val_ull = 0ull - (unsigned long long)val_ll;
 	}
 	else
 	{
 		flags = 0;
-		val_ull = val_ll;
+		val_ull = (unsigned long long)val_ll;
 	}
 
 	return hPrintNumber( fnum, val_ull, 0, flags, mask );

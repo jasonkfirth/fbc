@@ -79,6 +79,8 @@ void FBHaikuWindow::DispatchMessage(BMessage *msg, BHandler *target)
             msg->FindFloat("be:wheel_delta_y", &wheel_y);
             fb_hHaikuHandleMouseWheel(wheel_x, wheel_y);
             return;
+        default:
+            break;
     }
     BWindow::DispatchMessage(msg, target);
 }
@@ -143,6 +145,9 @@ void FBHaikuWindow::MessageReceived(BMessage *msg)
                 fb_hHaikuHandleMouseUp(g_view, x, y, buttons);
                 return;
             }
+            break;
+
+        default:
             break;
     }
 
@@ -309,11 +314,13 @@ void FBHaikuView::MouseMoved(BPoint where, uint32, const BMessage*)
 
     if (rel_x < 0) rel_x = 0;
     if (rel_y < 0) rel_y = 0;
-    if (rel_x >= draw_w) rel_x = (float)(draw_w - 1);
-    if (rel_y >= draw_h) rel_y = (float)(draw_h - 1);
+    if (rel_x >= static_cast<float>(draw_w)) rel_x = (float)(draw_w - 1);
+    if (rel_y >= static_cast<float>(draw_h)) rel_y = (float)(draw_h - 1);
 
-    fx = (int)((rel_x * fb_w) / draw_w);
-    fy = (int)((rel_y * fb_h) / draw_h);
+    fx = (int)((rel_x * static_cast<float>(fb_w)) /
+        static_cast<float>(draw_w));
+    fy = (int)((rel_y * static_cast<float>(fb_h)) /
+        static_cast<float>(draw_h));
 
     if (fx < 0) fx = 0;
     if (fy < 0) fy = 0;
@@ -349,11 +356,13 @@ void FBHaikuView::MouseDown(BPoint where)
 
     if (rel_x < 0) rel_x = 0;
     if (rel_y < 0) rel_y = 0;
-    if (rel_x >= draw_w) rel_x = (float)(draw_w - 1);
-    if (rel_y >= draw_h) rel_y = (float)(draw_h - 1);
+    if (rel_x >= static_cast<float>(draw_w)) rel_x = (float)(draw_w - 1);
+    if (rel_y >= static_cast<float>(draw_h)) rel_y = (float)(draw_h - 1);
 
-    fx = (int)((rel_x * fb_w) / draw_w);
-    fy = (int)((rel_y * fb_h) / draw_h);
+    fx = (int)((rel_x * static_cast<float>(fb_w)) /
+        static_cast<float>(draw_w));
+    fy = (int)((rel_y * static_cast<float>(fb_h)) /
+        static_cast<float>(draw_h));
 
     if (fx < 0) fx = 0;
     if (fy < 0) fy = 0;
@@ -389,11 +398,13 @@ void FBHaikuView::MouseUp(BPoint where)
 
     if (rel_x < 0) rel_x = 0;
     if (rel_y < 0) rel_y = 0;
-    if (rel_x >= draw_w) rel_x = (float)(draw_w - 1);
-    if (rel_y >= draw_h) rel_y = (float)(draw_h - 1);
+    if (rel_x >= static_cast<float>(draw_w)) rel_x = (float)(draw_w - 1);
+    if (rel_y >= static_cast<float>(draw_h)) rel_y = (float)(draw_h - 1);
 
-    fx = (int)((rel_x * fb_w) / draw_w);
-    fy = (int)((rel_y * fb_h) / draw_h);
+    fx = (int)((rel_x * static_cast<float>(fb_w)) /
+        static_cast<float>(draw_w));
+    fy = (int)((rel_y * static_cast<float>(fb_h)) /
+        static_cast<float>(draw_h));
 
     if (fx < 0) fx = 0;
     if (fy < 0) fy = 0;
@@ -462,10 +473,10 @@ void FBHaikuView::RefreshLayout()
     int offset_y = (win_h - draw_h) / 2;
 
     fDestRect = BRect(
-        offset_x,
-        offset_y,
-        offset_x + draw_w - 1,
-        offset_y + draw_h - 1
+        static_cast<float>(offset_x),
+        static_cast<float>(offset_y),
+        static_cast<float>(offset_x + draw_w - 1),
+        static_cast<float>(offset_y + draw_h - 1)
     );
 
     Invalidate();
@@ -531,7 +542,7 @@ int fb_hHaikuSetWindowPos(int x, int y)
 
     if (g_win->Lock())
     {
-        g_win->MoveTo(x, y);
+        g_win->MoveTo(static_cast<float>(x), static_cast<float>(y));
         g_win->Unlock();
     }
 

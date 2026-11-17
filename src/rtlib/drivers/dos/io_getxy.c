@@ -10,6 +10,7 @@
 #include <go32.h>
 #include <dpmi.h>
 #include <sys/farptr.h>
+#include <limits.h>
 
 void fb_ConsoleGetXY_BIOS( int *col, int *row )
 {
@@ -23,7 +24,18 @@ void fb_ConsoleGetXY_BIOS( int *col, int *row )
     if( row!=NULL )
         *row = regs.h.dh;
 #else
-    unsigned short usPos = _farpeekw( _dos_ds, 0x450 + fb_console_context.active * sizeof( short ) );
+    unsigned long address;
+    unsigned short usPos;
+    int active = fb_console_context.active;
+
+    if( active < 0 ||
+        (unsigned long)active > (ULONG_MAX - 0x450ul) / sizeof(short) ) {
+        if( col ) *col = -1;
+        if( row ) *row = -1;
+        return;
+    }
+    address = 0x450ul + (unsigned long)active * sizeof(short);
+    usPos = _farpeekw( _dos_ds, address );
     if( col )
         *col = usPos & 0xFF;
     if( row )

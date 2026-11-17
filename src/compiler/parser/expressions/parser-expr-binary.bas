@@ -55,6 +55,33 @@
 #include once "tooling/semantic-recovery.bi"
 #include once "parser/expressions/source-comparison-warnings.bi"
 
+private type EXPRESSION_SOURCE_LOCATIONS
+	source_start as LEX_LOCATION
+	source_end as LEX_LOCATION
+	operation_site as LEX_LOCATION
+end type
+
+'' Source locations include a complete filename. Keeping three of them in
+'' every recursive precedence frame exhausts the host stack for nested casts.
+'' Only semantic export needs distinct records. Each invocation releases its
+'' allocation before returning, including error recovery. Output-form lexer
+'' calls also keep aggregate return buffers out of recursive parser frames.
+'' The inactive record is shared read-only by the single-threaded parser.
+dim shared as EXPRESSION_SOURCE_LOCATIONS inactive_expression_sources
+
+private function hNewExpressionSources( ) as EXPRESSION_SOURCE_LOCATIONS ptr
+	if( fbSemanticModelEnabled( ) ) then
+		return xcallocate( len( EXPRESSION_SOURCE_LOCATIONS ) )
+	end if
+	return @inactive_expression_sources
+end function
+
+private sub hFreeExpressionSources( byval sites as EXPRESSION_SOURCE_LOCATIONS ptr )
+	if( sites <> @inactive_expression_sources ) then
+		deallocate( sites )
+	end if
+end sub
+
 '' Capture typed operands before astNewBOP folds, promotes, or consumes them.
 '' The parser still owns the actual operation and its source token; tooling
 '' observes these inputs without rebuilding or resolving the operation again.
@@ -155,7 +182,9 @@ function cExpression _
 
 	dim as integer last_isexpr = fbGetIsExpression( )
 	dim as ASTNODE ptr expr
-	dim as LEX_LOCATION source_start, source_end
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
 	dim as longint nonphysical_tokens_at_start, nonphysical_tokens_at_end
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer capture_source_range = export_semantics
@@ -175,7 +204,7 @@ function cExpression _
 
 	if( capture_source_range ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
@@ -184,7 +213,7 @@ function cExpression _
 	'' LogExpression
 	expr = cBoolExpression( )
 	if( capture_source_range andalso (expr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		nonphysical_tokens_at_end = lexGetNonphysicalTokenCount( )
 		if( semantic_source_range <> NULL ) then
 			semantic_source_range->source_file = source_start.source_file
@@ -211,6 +240,7 @@ function cExpression _
 	fbSetIsExpression( last_isexpr )
 	function = expr
 
+	hFreeExpressionSources( source_locations )
 end function
 
 function cExpressionWithNIDXARRAY( byval allow_nidxarray as integer ) as ASTNODE ptr
@@ -230,11 +260,14 @@ function cBoolExpression( ) as ASTNODE ptr
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
 	dim as integer semantic_operator_override = -1
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
@@ -242,6 +275,7 @@ function cBoolExpression( ) as ASTNODE ptr
 	'' The first operand expression will always be executed
 	logexpr = cLogExpression( )
 	if( logexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -265,7 +299,7 @@ function cBoolExpression( ) as ASTNODE ptr
 				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' LogExpression
@@ -315,11 +349,12 @@ function cBoolExpression( ) as ASTNODE ptr
 
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	end if
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -334,17 +369,21 @@ function cLogExpression _
 	dim as ASTNODE ptr expr = any, logexpr = any
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' LogOrExpression
 	logexpr = cLogOrExpression( )
 	if( logexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -371,7 +410,7 @@ function cLogExpression _
 				nonphysical_tokens_at_start)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' LogOrExpression
@@ -401,11 +440,12 @@ function cLogExpression _
 
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -419,17 +459,21 @@ function cLogOrExpression _
 	dim as ASTNODE ptr expr = any, logexpr = any
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' LogAndExpression
 	logexpr = cLogAndExpression( )
 	if( logexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -449,7 +493,7 @@ function cLogOrExpression _
 				nonphysical_tokens_at_start)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' LogAndExpression
@@ -479,11 +523,12 @@ function cLogOrExpression _
 
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -497,17 +542,21 @@ function cLogAndExpression _
 	dim as ASTNODE ptr expr = any, logexpr = any
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' RelExpression
 	logexpr = cRelExpression( )
 	if( logexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -527,7 +576,7 @@ function cLogAndExpression _
 				nonphysical_tokens_at_start)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' RelExpression
@@ -557,11 +606,12 @@ function cLogAndExpression _
 
 	function = logexpr
 	if( export_semantics andalso (logexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(logexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -578,17 +628,21 @@ function cRelExpression _
 	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
 	dim as integer semantic_operator_override = -1
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( semantic_model_enabled ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' IsExpression
 	relexpr = cIsExpression( @semantic_operator_override )
 	if( relexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -627,7 +681,7 @@ function cRelExpression _
 				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( )
 
 		'' IsExpression
@@ -658,17 +712,18 @@ function cRelExpression _
 
 	function = relexpr
 	if( export_semantics andalso (relexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(relexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (relexpr <> NULL) and _
 		(semantic_operator_override >= 0) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
 			semantic_operator_override)
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -776,17 +831,21 @@ function cCatExpression _
 	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
 	dim as integer semantic_operator_override = -1
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( semantic_model_enabled ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' AddExpression
 	catexpr = cAddExpression(  )
 	if( catexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -806,7 +865,7 @@ function cCatExpression _
 				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( )
 
 		'' AddExpression
@@ -837,17 +896,18 @@ function cCatExpression _
 
 	function = catexpr
 	if( export_semantics andalso (catexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(catexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (catexpr <> NULL) and _
 		(semantic_operator_override >= 0) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
 			semantic_operator_override)
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -864,17 +924,21 @@ function cAddExpression _
 	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
 	dim as integer semantic_operator_override = -1
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( semantic_model_enabled ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' ShiftExpression
 	addexpr = cShiftExpression(  )
 	if( addexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -899,7 +963,7 @@ function cAddExpression _
 				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( )
 
 		'' ShiftExpression
@@ -933,17 +997,18 @@ function cAddExpression _
 
 	function = addexpr
 	if( export_semantics andalso (addexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(addexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (addexpr <> NULL) and _
 		(semantic_operator_override >= 0) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
 			semantic_operator_override)
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -958,17 +1023,21 @@ function cShiftExpression _
 	dim as ASTNODE ptr expr = any, shiftexpr = any
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' ModExpression
 	shiftexpr = cModExpression(  )
 	if( shiftexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -993,7 +1062,7 @@ function cShiftExpression _
 				nonphysical_tokens_at_start)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' ModExpression
@@ -1022,11 +1091,12 @@ function cShiftExpression _
 
 	function = shiftexpr
 	if( export_semantics andalso (shiftexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(shiftexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -1040,17 +1110,21 @@ function cModExpression _
 	dim as ASTNODE ptr expr = any, modexpr = any
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' IntDivExpression
 	modexpr = cIntDivExpression( )
 	if( modexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -1070,7 +1144,7 @@ function cModExpression _
 				nonphysical_tokens_at_start)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( LEXCHECK_POST_SUFFIX )
 
 		'' IntDivExpression
@@ -1099,11 +1173,12 @@ function cModExpression _
 
 	function = modexpr
 	if( export_semantics andalso (modexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(modexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -1117,17 +1192,21 @@ function cIntDivExpression _
 	dim as ASTNODE ptr expr = any, idivexpr = any
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' MultExpression
 	idivexpr = cMultExpression( )
 	if( idivexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -1147,7 +1226,7 @@ function cIntDivExpression _
 				nonphysical_tokens_at_start)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( )
 
 		'' MultExpression
@@ -1176,11 +1255,12 @@ function cIntDivExpression _
 
 	function = idivexpr
 	if( export_semantics andalso (idivexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(idivexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -1195,17 +1275,21 @@ function cMultExpression _
 	dim as ASTNODE ptr expr = any, mulexpr = any
 	dim as integer export_semantics = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( export_semantics ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' ExpExpression
 	mulexpr = cExpExpression( )
 	if( mulexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -1230,7 +1314,7 @@ function cMultExpression _
 				nonphysical_tokens_at_start)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( )
 
 		'' ExpExpression
@@ -1259,11 +1343,12 @@ function cMultExpression _
 
 	function = mulexpr
 	if( export_semantics andalso (mulexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(mulexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ))
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '':::::
@@ -1279,17 +1364,21 @@ function cExpExpression _
 	dim as integer semantic_model_enabled = fbSemanticModelEnabled( )
 	dim as integer semantic_operator_count = 0
 	dim as integer semantic_operator_override = -1
-	dim as LEX_LOCATION source_start, source_end, semantic_operation_site
+	dim as EXPRESSION_SOURCE_LOCATIONS ptr source_locations = hNewExpressionSources( )
+	dim byref as LEX_LOCATION source_start = source_locations->source_start
+	dim byref as LEX_LOCATION source_end = source_locations->source_end
+	dim byref as LEX_LOCATION semantic_operation_site = source_locations->operation_site
 	dim as longint nonphysical_tokens_at_start
 	if( semantic_model_enabled ) then
 		lexGetToken( )
-		source_start = lexGetCurrentLocation( )
+		lexCopyCurrentLocation( source_start )
 		nonphysical_tokens_at_start = lexGetNonphysicalTokenCount( )
 	end if
 
 	'' NegNotExpression
 	expexpr = cNegNotExpression( )
 	if( expexpr = NULL ) then
+		hFreeExpressionSources( source_locations )
 		return NULL
 	end if
 
@@ -1308,7 +1397,7 @@ function cExpExpression _
 				nonphysical_tokens_at_start, semantic_operator_override)
 		end if
 
-		if( export_semantics ) then semantic_operation_site = lexGetCurrentLocation( )
+		if( export_semantics ) then lexCopyCurrentLocation( semantic_operation_site )
 		lexSkipToken( )
 
 		'' NegNotExpression
@@ -1338,17 +1427,18 @@ function cExpExpression _
 
 	function = expexpr
 	if( export_semantics andalso (expexpr <> NULL) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelExportParserExpression(expexpr, source_start, source_end, _
 			nonphysical_tokens_at_start, lexGetNonphysicalTokenCount( ), _
 			semantic_operator_override)
 	elseif( semantic_model_enabled andalso (expexpr <> NULL) and _
 		(semantic_operator_override >= 0) ) then
-		source_end = lexGetLastLocation( )
+		lexCopyLastLocation( source_end )
 		fbSemanticModelSetExpressionOperatorOverride(source_start, source_end, _
 			semantic_operator_override)
 	end if
 
+	hFreeExpressionSources( source_locations )
 end function
 
 '' end of parser/expressions/parser-expr-binary.bas

@@ -22,6 +22,15 @@ const FONT fb_font[FB_FONT_COUNT] =
 };
 
 /* must match the FB_PALETTE_* enum */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+const PALETTE fb_palette[FB_PALETTE_COUNT] =
+{
+	{   2, { 0, 0, 0, 0 }, &internal_data[DATA_PAL_2  ] },
+	{  16, { 0, 0, 0, 0 }, &internal_data[DATA_PAL_16 ] },
+	{  64, { 0, 0, 0, 0 }, &internal_data[DATA_PAL_64 ] },
+	{ 256, { 0, 0, 0, 0 }, &internal_data[DATA_PAL_256] }
+};
+#else
 const PALETTE fb_palette[FB_PALETTE_COUNT] =
 {
 	{   2, &internal_data[DATA_PAL_2  ] },
@@ -29,6 +38,7 @@ const PALETTE fb_palette[FB_PALETTE_COUNT] =
 	{  64, &internal_data[DATA_PAL_64 ] },
 	{ 256, &internal_data[DATA_PAL_256] }
 };
+#endif
 
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
 void fb_hSetupData(void)

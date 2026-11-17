@@ -13,6 +13,7 @@
 #ifndef DISABLE_UNIX
 #include "fb_sfx_unix.h"
 #endif
+#include "../fb_sfx_internal.h"
 
 void fb_sfxPlatformExit(void)
 {

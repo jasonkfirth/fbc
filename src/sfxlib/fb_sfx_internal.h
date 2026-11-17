@@ -373,6 +373,7 @@ void fb_sfxVoiceSetFrequency(FB_SFXVOICE *voice, int freq);
 void fb_sfxVoiceSetEnvelope(FB_SFXVOICE *voice, int id);
 void fb_sfxVoiceStopType(int voice_type);
 void fb_sfxVoiceStopTypeChannel(int voice_type, int channel);
+void fb_sfxGeneratedReleaseChannel(int channel);
 void fb_sfxVoicePauseType(int voice_type);
 void fb_sfxVoicePauseTypeChannel(int voice_type, int channel);
 void fb_sfxVoiceResumeType(int voice_type);

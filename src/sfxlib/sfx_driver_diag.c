@@ -45,6 +45,10 @@
 typedef struct FB_SFX_DRIVER_STATS_SLOT
 {
     int used;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Preserve the original pointer alignment without unnamed padding. */
+    unsigned int pointer_alignment_padding;
+#endif
     const char *driver_name;
     FB_SFX_DRIVER_STATS stats;
 
@@ -401,7 +405,7 @@ void fb_sfxDriverDiagnostics(const char *driver_name,
         int channel;
 
         for (channel = 0; channel < channels; channel++)
-            mixed += buffer[(frame * channels) + channel];
+            mixed += (double)buffer[(frame * channels) + channel];
 
         mixed /= (double)channels;
         fprintf(dump, "%.9g\n", mixed);

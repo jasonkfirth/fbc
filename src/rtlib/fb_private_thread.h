@@ -110,6 +110,10 @@ struct FBTHREAD_ {
 #error Unexpected target
 #endif
 	volatile FBTHREADFLAGS flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the four-byte Win64 tail padding after flags. */
+	unsigned char reserved_tail_padding[4];
+#endif
 };
 
 /* Info structure passed to our internal threadproc()s, so it can call the

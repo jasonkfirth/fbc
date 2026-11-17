@@ -12,6 +12,7 @@ FBCALL double fb_hStr2Double( char *src, ssize_t len )
 	char *p, *q, c;
 	int radix, i, skip;
 	double ret;
+	long long radix_value;
 
 	/* skip white spc */
 	p = fb_hStrSkipChar( src, len, 32 );
@@ -43,7 +44,8 @@ FBCALL double fb_hStr2Double( char *src, ssize_t len )
 				break;
 			}
 
-			return fb_hStrRadix2Longint( p + skip, len - skip, radix );
+			radix_value = fb_hStrRadix2Longint( p + skip, len - skip, radix );
+			return (double)radix_value;
 
 		} else if( p[0] == '0' ) {
 			if( p[1] == 'x' || p[1] == 'X' ) {
@@ -59,7 +61,7 @@ FBCALL double fb_hStr2Double( char *src, ssize_t len )
 	 * 'd's with 'e'.
 	 * This would be bad for hex strings, but those should be handled above already.
 	 */
-	q = malloc( len + 1 );
+	q = malloc( (size_t)len + 1 );
 	if( q == NULL )
 		return 0.0;
 	for( i = 0; i < len; i++ )

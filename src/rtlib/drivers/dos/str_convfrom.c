@@ -191,7 +191,10 @@ FBCALL double fb_hStr2Double( char *src, ssize_t len )
 				break;
 			}
 
-			return fb_hStrRadix2Longint( p + skip, len - skip, radix );
+			{
+				long long value = fb_hStrRadix2Longint( p + skip, len - skip, radix );
+				return (double)value;
+			}
 
 		} else if( p[0] == '0' ) {
 			if( (p[1] == 'x') || (p[1] == 'X') )

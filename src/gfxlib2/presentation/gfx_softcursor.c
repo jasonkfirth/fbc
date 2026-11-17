@@ -239,8 +239,8 @@ void fb_hSoftCursorPut(int x, int y)
 
 	source_x = (int)((int64_t)left - x);
 	source_y = (int)((int64_t)top - y);
-	w = right - left;
-	h = bottom - top;
+	w = (int)((int64_t)right - left);
+	h = (int)((int64_t)bottom - top);
 	destination_offset = (size_t)top * (size_t)fb_gfx->pitch +
 		(size_t)left * bytes_per_pixel;
 	dest = fb_gfx->framebuffer + destination_offset;

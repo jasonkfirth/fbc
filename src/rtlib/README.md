@@ -81,6 +81,12 @@ link inputs. A runtime archive cannot substitute for a missing `fbrt0.o`.
 
 ## ABI and include rules
 
+The Unix VT100 flag uses `fb_enable_vt100_escapes` in C and the existing
+`__fb_enable_vt100_escapes` ABI symbol through `FB_RTLIB_SYMBOL`. Keep its
+default definition in a separate archive member so an application object can
+supply the flag and update it at runtime. The public regression runner is
+`build_scripts/test-vt100-symbol.py`.
+
 Include `fb.h` before system headers unless the file has a documented reason
 to use a narrower contract. `fb_config.h` sets platform and CRT feature macros
 before libc headers are parsed. Adding a system header first can silently
@@ -199,5 +205,14 @@ they can change the host clock. `--run-all` also keeps them compile-only.
 The current restructuring receipts and native results belong in
 [`docs/rtlib-restructure-verification.md`](../../docs/rtlib-restructure-verification.md).
 This guide explains the design; that report identifies exactly what was tested.
+
+## Haiku executable-name ownership
+
+The Haiku archive selects `drivers/haiku/sys_getexename.c` for
+`fb_hGetExeName`. The older `drivers/haiku/fb_hGetExeName.c` remains available
+as source and is excluded from the archive. Both files export the same symbol.
+The source-graph check enforces the canonical selection across object variants.
+Native qualification includes a duplicate-definition link control and separate
+execution of both source implementations.
 
 <!-- end of README.md -->

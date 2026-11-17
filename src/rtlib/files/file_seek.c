@@ -6,6 +6,25 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
+#include <stdint.h>
+
+int fb_hFileOffsetFromLongLong( long long position, fb_off_t *offset )
+{
+	unsigned int shift;
+	fb_off_t max_offset;
+
+	if( offset == NULL || position < 0 )
+		return FALSE;
+
+	shift = (unsigned int)((sizeof(uintmax_t) - sizeof(fb_off_t)) * CHAR_BIT + 1);
+	max_offset = (fb_off_t)(UINTMAX_MAX >> shift);
+	if( (uintmax_t)position > (uintmax_t)max_offset )
+		return FALSE;
+
+	*offset = (fb_off_t)position;
+	return TRUE;
+}
 
 int fb_FileSeekEx( FB_FILE *handle, fb_off_t newpos )
 {
@@ -42,7 +61,12 @@ FBCALL int fb_FileSeek( int fnum, int newpos )
 
 FBCALL int fb_FileSeekLarge( int fnum, long long newpos )
 {
-    return fb_FileSeekEx( FB_FILE_TO_HANDLE(fnum), newpos );
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(newpos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FileSeekEx( FB_FILE_TO_HANDLE(fnum), offset );
 }
 
 /* end of files/file_seek.c */

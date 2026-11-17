@@ -46,6 +46,18 @@ SUITE( fbc_tests.datetime.c_format )
 		CU_ASSERT( valint(right(current_time, 2)) <= 60 )
 	END_TEST
 
+	#if defined(__FB_XBOX__) or defined(__FB_WII__)
+	TEST( timer_units )
+		'' TIMER's reference point varies by platform. Check elapsed seconds,
+		'' allowing scheduler delay without accepting raw millisecond/tick units.
+		dim started as double = timer
+		sleep 100, 1
+		dim elapsed as double = timer - started
+		CU_ASSERT( elapsed >= 0.01 )
+		CU_ASSERT( elapsed < 10.0 )
+	END_TEST
+	#endif
+
 END_SUITE
 
 '' end of c-format.bas

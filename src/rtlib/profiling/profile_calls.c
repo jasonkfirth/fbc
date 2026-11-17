@@ -24,6 +24,11 @@
 #include "fb.h"
 #include "fb_profile.h"
 
+#include <stdint.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+
 #ifdef HOST_WIN32
 	#include <windows.h>
 	#include <inttypes.h>
@@ -64,6 +69,10 @@ typedef struct FB_PROCINFO
 	struct FB_PROCINFO *child[PROC_MAX_CHILDREN];
 	struct FB_PROCINFO *next;
 	int flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_PROCINFO;
 
 /* block of memory to store procedure call information records */
@@ -105,6 +114,10 @@ typedef struct FB_PROFILER_THREAD
 	FB_PROCINFO_TB *proc_tb;
 	struct FB_PROFILER_THREAD *next;
 	int last_proc_id;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_PROFILER_THREAD;
 
 typedef struct FB_PROFILECTX
@@ -203,8 +216,8 @@ static void PROCARRAY_destructor( FB_PROCARRAY *list )
 
 static int PROCARRAY_name_sorter( const void *e1, const void *e2 )
 {
-	FB_PROCINFO *p1 = *(FB_PROCINFO **)e1;
-	FB_PROCINFO *p2 = *(FB_PROCINFO **)e2;
+	FB_PROCINFO *p1 = *(FB_PROCINFO * const *)e1;
+	FB_PROCINFO *p2 = *(FB_PROCINFO * const *)e2;
 
 	if( p1->parent && p2->parent ) {
 		return strcmp( p1->name, p2->name );
@@ -219,13 +232,15 @@ static int PROCARRAY_name_sorter( const void *e1, const void *e2 )
 
 static void PROCARRAY_sort_by_name( FB_PROCARRAY *list )
 {
-	qsort( (void *)list->array, list->length, sizeof(FB_PROCINFO *), PROCARRAY_name_sorter );
+	if( list && list->array && list->length > 1 ) {
+		qsort( (void *)list->array, (size_t)list->length, sizeof(FB_PROCINFO *), PROCARRAY_name_sorter );
+	}
 }
 
 static int PROCARRAY_time_sorter( const void *e1, const void *e2 )
 {
-	FB_PROCINFO *p1 = *(FB_PROCINFO **)e1;
-	FB_PROCINFO *p2 = *(FB_PROCINFO **)e2;
+	FB_PROCINFO *p1 = *(FB_PROCINFO * const *)e1;
+	FB_PROCINFO *p2 = *(FB_PROCINFO * const *)e2;
 
 	if ( p1->local_time > p2->local_time ) {
 		return -1;
@@ -238,26 +253,52 @@ static int PROCARRAY_time_sorter( const void *e1, const void *e2 )
 
 static void PROCARRAY_sort_by_time( FB_PROCARRAY *list )
 {
-	qsort( (void *)list->array, list->length, sizeof(FB_PROCINFO *), PROCARRAY_time_sorter );
+	if( list && list->array && list->length > 1 ) {
+		qsort( (void *)list->array, (size_t)list->length, sizeof(FB_PROCINFO *), PROCARRAY_time_sorter );
+	}
 }
 
 static void PROCARRAY_add( FB_PROCARRAY *list, FB_PROCINFO *proc )
 {
 	FB_PROCINFO **new_array = NULL;
-	int s = list->size;
+	int s;
+	size_t allocation_size;
+
+	if( !list || !proc || list->length < 0 || list->size < 0 || list->length > list->size ) {
+		return;
+	}
+	if( ((list->size == 0) != (list->array == NULL)) ||
+		((list->size == 0) && (list->length != 0)) ) {
+		return;
+	}
+
+	s = list->size;
 
 	if( s == 0 ) {
 		s = 16;
-		new_array = (FB_PROCINFO **)PROFILER_malloc( s * sizeof(FB_PROCINFO *) );
 	} else if ( list->length == s ) {
+		if( s > INT_MAX / 2 ) {
+			return;
+		}
 		s *= 2;
-		new_array = (FB_PROCINFO **)PROFILER_realloc( (void *)list->array, s * sizeof(FB_PROCINFO *) );
+	}
+
+	if( s != list->size ) {
+		if( (size_t)s > ((size_t)-1) / sizeof(FB_PROCINFO *) ) {
+			return;
+		}
+		allocation_size = (size_t)s * sizeof(FB_PROCINFO *);
+		if( list->array ) {
+			new_array = (FB_PROCINFO **)PROFILER_realloc( (void *)list->array, allocation_size );
+		} else {
+			new_array = (FB_PROCINFO **)PROFILER_malloc( allocation_size );
+		}
 	} else {
 		new_array = list->array;
 	}
 
 	if( new_array ) {
-		new_array[list->length] = proc;
+		new_array[(size_t)list->length] = proc;
 		list->array = new_array;
 		list->size = s;
 		list->length += 1;
@@ -364,7 +405,14 @@ static void fb_hPROFILER_METRICS_Procs( FB_PROFILER_METRICS *metrics, FB_PROCINF
 	if( metrics && proc_tb ) {
 		tb = proc_tb;
 		while( tb ) {
-			metrics->procs_bytes_allocated += sizeof( FB_PROCINFO_TB );
+			size_t block_size = sizeof( FB_PROCINFO_TB );
+			if( (metrics->procs_bytes_allocated < 0) ||
+				(block_size > (size_t)INT_MAX) ||
+				((size_t)metrics->procs_bytes_allocated > (size_t)INT_MAX - block_size) ) {
+				metrics->procs_bytes_allocated = INT_MAX;
+			} else {
+				metrics->procs_bytes_allocated += (int)block_size;
+			}
 			metrics->procs_count_blocks += 1;
 
 			for( i = 0; i < PROC_INFO_TB_SIZE; i++ )
@@ -583,13 +631,25 @@ static int hProcIsRecursive( FB_PROCINFO *proc )
 	return FALSE;
 }
 
+static int hProfilerColumnWidth(int max_len)
+{
+	int64_t column = (int64_t)max_len + 9;
+
+	/* Names come from the profiled program, so clamp before narrowing. */
+	if (column < 20)
+		return 20;
+	if (column > INT_MAX)
+		return INT_MAX;
+	return (int)column;
+}
+
 static void hProfilerReportCallsFunctions (
 	FB_PROFILER_CALLS *prof, FB_PROFILER_THREAD *ctx, FILE *f )
 {
 	FB_PROCARRAY list;
 	int i, len;
 	int max_len = STRING_TABLE_max_len( &ctx->strings );
-	int col = (max_len + 8 + 1 >= 20? max_len + 8 + 1: 20);
+	int col = hProfilerColumnWidth(max_len);
 
 	if( (prof->global->options & PROFILE_OPTION_HIDE_TITLES) == 0 )
 	{
@@ -630,7 +690,7 @@ static void hProfilerReportCallsGlobals (
 	FB_PROCINFO *last_p;
 	int i, len;
 	int max_len = STRING_TABLE_max_len( &ctx->strings );
-	int col = (max_len + 8 + 1 >= 20? max_len + 8 + 1: 20);
+	int col = hProfilerColumnWidth(max_len);
 
 	if( (prof->global->options & PROFILE_OPTION_HIDE_TITLES) == 0 )
 	{
@@ -701,27 +761,67 @@ static void hProfilerReportCallsGlobals (
 /* PROFILE_OPTION_REPORT_CALLTREE */
 static void hPushLeader( FB_PROFILER_CALLS *prof, int ch )
 {
-	if( (prof->calltree_leader.data == NULL) ||
-		(prof->calltree_leader.len + 4 > prof->calltree_leader.size) ) {
+	ssize_t len;
+	ssize_t size;
+	size_t used;
+	size_t capacity;
+	size_t max_capacity;
+	size_t required;
+	size_t new_capacity;
+	char *newbuffer;
 
-		ssize_t newsize = prof->calltree_leader.size ? prof->calltree_leader.size * 2 : 64;
-		char * newbuffer = (char *)realloc( prof->calltree_leader.data, newsize );
+	if( !prof ) {
+		return;
+	}
+
+	len = prof->calltree_leader.len;
+	size = prof->calltree_leader.size;
+	if( (len < 0) || (size < 0) || (len > size) ) {
+		return;
+	}
+	if( ((prof->calltree_leader.data == NULL) && ((len != 0) || (size != 0))) ||
+		((prof->calltree_leader.data != NULL) && (size == 0)) ) {
+		return;
+	}
+
+	used = (size_t)len;
+	capacity = (size_t)size;
+	/* FBSTRING stores its capacity in ssize_t, so keep growth in its positive range. */
+	max_capacity = ((size_t)-1) / 2;
+	if( (max_capacity < 4) || (used > max_capacity - 4) ) {
+		return;
+	}
+	required = used + 4;
+
+	if( (prof->calltree_leader.data == NULL) || (capacity < required) ) {
+		new_capacity = capacity ? capacity : 64;
+		if( new_capacity > max_capacity ) {
+			new_capacity = required;
+		}
+		while( new_capacity < required ) {
+			if( new_capacity > max_capacity / 2 ) {
+				new_capacity = required;
+				break;
+			}
+			new_capacity *= 2;
+		}
+		if( new_capacity > max_capacity ) {
+			return;
+		}
+		newbuffer = (char *)realloc( prof->calltree_leader.data, new_capacity );
 		if( !newbuffer ) {
 			return;
 		}
 		prof->calltree_leader.data = newbuffer;
-		prof->calltree_leader.size = newsize;
-	}
-
-	if( prof->calltree_leader.len + 4 > prof->calltree_leader.size ) {
-		return;
+		prof->calltree_leader.size = (ssize_t)new_capacity;
 	}
 
 	if( ch ) {
-		prof->calltree_leader.data[prof->calltree_leader.len] = ch;
-		++prof->calltree_leader.len;
+		prof->calltree_leader.data[used] = (char)ch;
+		++used;
 	}
-	prof->calltree_leader.data[prof->calltree_leader.len] = 0;
+	prof->calltree_leader.data[used] = 0;
+	prof->calltree_leader.len = (ssize_t)used;
 }
 
 static void hPopLeader( FB_PROFILER_CALLS *prof )
@@ -978,6 +1078,7 @@ static void hProfilerReportRawStrings (
 	FB_PROFILER_CALLS *prof, FB_PROFILER_THREAD *ctx, FILE *f )
 {
 	STRING_INFO_TB *tb = ctx->strings.tb;
+	const int header_size = (int)sizeof(STRING_INFO);
 
 	if( (prof->global->options & PROFILE_OPTION_HIDE_TITLES) == 0 )
 	{
@@ -989,14 +1090,33 @@ static void hProfilerReportRawStrings (
 	while( tb )
 	{
 		int index = 0;
+		if( (tb->bytes_used < 0) || (tb->bytes_used > STRING_INFO_TB_SIZE) ) {
+			break;
+		}
 		while( index < tb->bytes_used )
 		{
-			STRING_INFO *info = (STRING_INFO*)&tb->data[index];
-			fprintf( f, "%5d", info->size );
-			fprintf( f, "  %5d", info->length );
-			fprintf( f, "  %8x", info->hashkey );
-			fprintf( f, "  %s\n", (char *)(info + 1) );
-			index += info->size;
+			STRING_INFO info;
+			int bytes_remaining = tb->bytes_used - index;
+			const char *string;
+
+			if( bytes_remaining < header_size ) {
+				break;
+			}
+			memcpy( &info, &tb->data.bytes[index], sizeof(info) );
+			if( (info.size < header_size) || (info.size > bytes_remaining) ||
+				(info.length < 1) || ((size_t)info.length > (size_t)info.size - sizeof(info)) ) {
+				break;
+			}
+			string = (const char *)&tb->data.bytes[index + header_size];
+			if( string[info.length - 1] != '\0' ) {
+				break;
+			}
+
+			fprintf( f, "%5d", info.size );
+			fprintf( f, "  %5d", info.length );
+			fprintf( f, "  %8x", info.hashkey );
+			fprintf( f, "  %s\n", string );
+			index += info.size;
 		}
 		tb = tb->next;
 	}
@@ -1035,7 +1155,7 @@ static void hProfilerReportDebug (
 	fprintf( f, "        number of blocks   : %d\n", metrics->hash_count_blocks );
 	fprintf( f, "        number of items    : %d\n", metrics->hash_count_items );
 	fprintf( f, "        number of slots    : %d\n", metrics->hash_count_slots );
-	fprintf( f, "        density            : %-4.2f%%\n", (float)metrics->hash_count_items * 100 / (float)metrics->hash_count_slots );
+	fprintf( f, "        density            : %-4.2f%%\n", (double)((float)metrics->hash_count_items * 100.0f / (float)metrics->hash_count_slots) );
 	fprintf( f, "\n" );
 }
 
@@ -1150,7 +1270,7 @@ static FB_PROCINFO *hPushCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *parent_proc
 
 	orig_parent_proc = parent_proc;
 
-	hash_index = hashkey % PROC_MAX_CHILDREN;
+	hash_index = (int)(hashkey % (unsigned int)PROC_MAX_CHILDREN);
 	offset = hash_index ? (PROC_MAX_CHILDREN - hash_index) : 1;
 
 	for (;;) {

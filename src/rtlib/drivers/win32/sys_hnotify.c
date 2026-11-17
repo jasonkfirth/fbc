@@ -16,6 +16,10 @@ typedef struct FB_NOTIFY_WIN32 {
 	FB_SHELL_NOTIFY shell_notify;
 	NOTIFYICONDATAW icon;
 	int added;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_NOTIFY_WIN32;
 
 static int on_owner(FB_NOTIFY_WIN32 *context)
@@ -44,7 +48,7 @@ int fb_hNotifyCreate(const char *app_name, void **output)
 		goto unavailable;
 	_Static_assert(sizeof(address) == sizeof(context->shell_notify),
 		"Win32 function pointer width");
-	memcpy(&context->shell_notify, &address, sizeof(address));
+	memcpy((void *)&context->shell_notify, (const void *)&address, sizeof(address));
 	context->owner = GetCurrentThreadId();
 	context->icon.cbSize = sizeof(context->icon);
 	context->icon.uID = 1;

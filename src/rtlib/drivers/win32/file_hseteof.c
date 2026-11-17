@@ -48,7 +48,10 @@ int fb_hFileSetEofEx( FILE *f )
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 	}
 #else
-	if( SetEndOfFile( (HANDLE)get_osfhandle( fileno( f ) ) ) == 0 ) {
+	intptr_t os_handle;
+
+	os_handle = get_osfhandle( fileno( f ) );
+	if( SetEndOfFile( (HANDLE)os_handle ) == 0 ) {
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 	}
 #endif

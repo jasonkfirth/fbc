@@ -15,7 +15,7 @@ FBCALL FBSTRING_ACCESS *fb_ExePath ( void )
 	FBSTRING_ACCESS 	*dst;
 	char		*p;
 	char		tmp[MAX_PATH+1];
-	ssize_t len;
+	size_t len;
 
 	p = fb_hGetExePath( tmp, MAX_PATH );
 
@@ -23,10 +23,12 @@ FBCALL FBSTRING_ACCESS *fb_ExePath ( void )
 	{
 		/* alloc temp string */
         len = strlen( tmp );
-        dst = fb_hStrAllocTemp( NULL, len );
+		if( len > (size_t)FB_STRSIZEMSK )
+			return &fb_ctx.null_desc;
+		dst = fb_hStrAllocTemp( NULL, (ssize_t)len );
 		if( dst != NULL )
 		{
-			fb_hStrCopy( dst->data, tmp, len );
+			fb_hStrCopy( dst->data, tmp, (ssize_t)len );
 		}
 		else
 			dst = &fb_ctx.null_desc;

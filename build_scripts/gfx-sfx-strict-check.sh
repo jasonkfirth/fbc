@@ -31,6 +31,23 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
+
+case "$(uname -s)" in
+	MINGW*|MSYS*|CYGWIN*)
+		# Native Windows compilers may ignore the POSIX /tmp inherited from
+		# Bash.  Keep compiler scratch files in the audit workspace instead.
+		FBC_STRICT_TEMP_DIR="$ROOT/build/c-warning-audit/tmp"
+		mkdir -p "$FBC_STRICT_TEMP_DIR"
+		if command -v cygpath >/dev/null 2>&1; then
+			FBC_STRICT_TEMP_DIR="$(cygpath -m "$FBC_STRICT_TEMP_DIR")"
+		fi
+		TMP="$FBC_STRICT_TEMP_DIR"
+		TEMP="$FBC_STRICT_TEMP_DIR"
+		TMPDIR="$FBC_STRICT_TEMP_DIR"
+		export TMP TEMP TMPDIR
+		;;
+esac
+
 TARGET_TRIPLET=""
 STRICT_KEY=""
 USE_WERROR=1
@@ -208,6 +225,7 @@ target_platform() {
 
 collect_lint_paths() {
 	local platform="$1"
+	local architecture=""
 	local path
 	local -a native_paths=()
 
@@ -226,6 +244,30 @@ collect_lint_paths() {
 			native_paths+=("$path")
 		fi
 	done
+	if [ "$platform" = win32 ]; then
+		case "$TARGET_TRIPLET" in
+			*x86_64*|*amd64*) architecture=x86_64 ;;
+			'')
+				case "$(uname -m)" in
+					x86_64|amd64) architecture=x86_64 ;;
+				esac
+				;;
+		esac
+	fi
+	if [ -n "$architecture" ]; then
+		# A few platform backends keep the selected CPU implementation below
+		# the OS directory rather than beside its shared driver sources.
+		for path in \
+			"$ROOT/src/rtlib/drivers/$platform/$architecture" \
+			"$ROOT/src/gfxlib2/drivers/$platform/$architecture" \
+			"$ROOT/src/gfxlib3/drivers/$platform/$architecture" \
+			"$ROOT/src/sfxlib/$platform/$architecture"
+		do
+			if [ -d "$path" ]; then
+				native_paths+=("$path")
+			fi
+		done
+	fi
 	{
 	find "${native_paths[@]}" -maxdepth 1 -type f \( -name '*.c' -o -name '*.cpp' \)
 	# Shared implementations have subsystem owners. Prune native and generated
@@ -243,6 +285,19 @@ collect_clang_tidy_paths() {
 
 	collect_lint_paths "$platform" |
 	while IFS= read -r path; do
+		case "$path" in
+			"$ROOT/src/rtlib/files/file_hconvpath.c")
+				# Win32 selects its native path helper from drivers/win32.
+				case "$platform" in
+					android|darwin|dragonfly|freebsd|haiku|linux|netbsd|openbsd|solaris)
+						;;
+					*)
+						continue
+						;;
+				esac
+				;;
+		esac
+
 		case "$path" in
 			"$ROOT/src/rtlib/drivers/unix/"*|"$ROOT/src/gfxlib2/drivers/unix/"*|"$ROOT/src/sfxlib/unix/"*)
 				case "$platform" in
@@ -339,6 +394,9 @@ run_linters() {
 	local platform
 	local file
 	local output
+	local clang_tidy_failed=0
+	local clang_tidy_header_filter
+	local clang_tidy_exclude_header_filter
 
 	platform="$(target_platform)"
 	mapfile -t lint_paths < <(collect_lint_paths "$platform")
@@ -351,6 +409,8 @@ run_linters() {
 
 	if command -v cppcheck >/dev/null 2>&1; then
 		msg "Running cppcheck over rtlib, gfxlib2, gfxlib3, and sfxlib"
+		# Cppcheck cannot parse the GNU asm aliases in these headers; the native
+		# build and archive-symbol audit verify those ABI labels separately.
 		cppcheck_args=(
 			--enable="$cppcheck_enable"
 			--error-exitcode=1
@@ -364,12 +424,16 @@ run_linters() {
 			--suppress='syntaxError:*/src/rtlib/profiling/profile_cycles.c'
 			--suppress='subtractPointers:*/src/gfxlib2/drivers/dos/gfx_dos.c'
 			--suppress='syntaxError:*/src/gfxlib2/input/gfx_xpad.c'
+			--suppress='syntaxError:*fb_error.h'
+			--suppress='syntaxError:*fb_sfx_driver.h'
 			--suppress='*:*/src/sfxlib/third_party/*'
 			-I "$ROOT/src"
 			-I "$ROOT/src/gfxlib2"
 			-I "$ROOT/src/gfxlib3"
 			-I "$ROOT/src/sfxlib"
 			-I "$ROOT/src/rtlib"
+			-DFB_CPPCHECK_ANALYSIS=1
+			--include="$ROOT/build_scripts/cppcheck-platform-model.h"
 			-i "$ROOT/src/rtlib/obj"
 			-i "$ROOT/src/gfxlib2/obj"
 			-i "$ROOT/src/gfxlib2/drivers/js"
@@ -378,6 +442,16 @@ run_linters() {
 			-i "$ROOT/src/sfxlib/js"
 			-i "$ROOT/src/sfxlib/third_party"
 		)
+
+		if [ "$platform" = win32 ]; then
+			# Model the compiler built-ins that select fb_config.h's MinGW branch.
+			cppcheck_args+=(-D__MINGW32__=1)
+			case "$TARGET_TRIPLET:$CPPCHECK_PLATFORM:$(uname -m)" in
+				*x86_64*|*amd64*|*:win64:*)
+					cppcheck_args+=(-D__MINGW64__=1 -D__x86_64__=1)
+					;;
+			esac
+		fi
 
 		if [ "$RUN_CPPCHECK_RECOMMENDED_ADDONS" -ne 0 ]; then
 			CPPCHECK_ADDONS+=(misc threadsafety y2038)
@@ -410,9 +484,8 @@ run_linters() {
 
 		cppcheck_file_list="$(mktemp)"
 		if command -v cygpath >/dev/null 2>&1; then
-			for file in "${lint_paths[@]}"; do
-				cygpath -m "$file"
-			done > "$cppcheck_file_list"
+			printf '%s\n' "${lint_paths[@]}" |
+				cygpath -m -f - > "$cppcheck_file_list"
 		else
 			printf '%s\n' "${lint_paths[@]}" > "$cppcheck_file_list"
 		fi
@@ -431,33 +504,31 @@ run_linters() {
 
 	if command -v clang-tidy >/dev/null 2>&1; then
 		msg "Running clang-tidy over rtlib, gfxlib2, gfxlib3, and sfxlib source set for $platform"
+		clang_tidy_header_filter='^.*/src/(rtlib|gfxlib2|gfxlib3|sfxlib)/.*'
+		clang_tidy_exclude_header_filter='^.*/src/sfxlib/third_party/.*'
 
 		while IFS= read -r file; do
 			case "$file" in
-				"$ROOT/src/sfxlib/sfx_decode.c")
-					continue
-					;;
-			esac
-
-			case "$file" in
 				*.cpp)
 					output="$(clang-tidy --quiet "$file" \
+						--header-filter="$clang_tidy_header_filter" \
+						--exclude-header-filter="$clang_tidy_exclude_header_filter" \
 						--checks='clang-diagnostic-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-security.FloatLoopCounter,bugprone-*,-bugprone-assignment-in-if-condition,-bugprone-branch-clone,-bugprone-easily-swappable-parameters,-bugprone-reserved-identifier,-bugprone-switch-missing-default-case,-bugprone-implicit-widening-of-multiplication-result,-bugprone-narrowing-conversions,-bugprone-macro-parentheses,performance-*,-performance-no-int-to-ptr,portability-*' \
 						--warnings-as-errors='clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,portability-*' \
-						-- -std=gnu++17 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/gfxlib3" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" ||
-					{
+						-- -std=gnu++17 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/gfxlib3" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" || {
 						printf '%s\n' "$output"
-						return 1
+						clang_tidy_failed=1
 					}
 					;;
 				*.c)
 					output="$(clang-tidy --quiet "$file" \
+						--header-filter="$clang_tidy_header_filter" \
+						--exclude-header-filter="$clang_tidy_exclude_header_filter" \
 						--checks='clang-diagnostic-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-security.FloatLoopCounter,bugprone-*,-bugprone-assignment-in-if-condition,-bugprone-branch-clone,-bugprone-easily-swappable-parameters,-bugprone-reserved-identifier,-bugprone-switch-missing-default-case,-bugprone-implicit-widening-of-multiplication-result,-bugprone-narrowing-conversions,-bugprone-macro-parentheses,performance-*,-performance-no-int-to-ptr,portability-*' \
 						--warnings-as-errors='clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,portability-*' \
-						-- -std=gnu11 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/gfxlib3" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" ||
-					{
+						-- -std=gnu11 -I "$ROOT/src" -I "$ROOT/src/gfxlib2" -I "$ROOT/src/gfxlib3" -I "$ROOT/src/sfxlib" -I "$ROOT/src/rtlib" -I "$ROOT/inc" 2>&1)" || {
 						printf '%s\n' "$output"
-						return 1
+						clang_tidy_failed=1
 					}
 					;;
 			esac
@@ -467,6 +538,10 @@ run_linters() {
 				printf '%s\n' "$output"
 			fi
 		done < <(printf '%s\n' "${clang_tidy_paths[@]}")
+
+		if [ "$clang_tidy_failed" -ne 0 ]; then
+			return 1
+		fi
 	else
 		warn "clang-tidy not found; skipping optional clang-tidy pass"
 	fi
@@ -514,6 +589,18 @@ main() {
 		"CFLAGS=$cflags"
 		"CXXFLAGS=$cxxflags"
 	)
+	# MinGW tools launched through a different MSYS runtime may drop inherited
+	# temp-directory variables before running compiler recipes.  Pass configured
+	# paths as make variables so native tools use the same writable directory.
+	if [ -n "${TMP:-}" ]; then
+		make_args+=("TMP=$TMP")
+	fi
+	if [ -n "${TEMP:-}" ]; then
+		make_args+=("TEMP=$TEMP")
+	fi
+	if [ -n "${TMPDIR:-}" ]; then
+		make_args+=("TMPDIR=$TMPDIR")
+	fi
 
 	if [ -n "$TARGET_TRIPLET" ]; then
 		make_args+=("TARGET_TRIPLET=$TARGET_TRIPLET")

@@ -142,9 +142,9 @@ static void fb_sfxSfxStart(int channel, int id, float pitch, int loop)
         id,
         voice_index,
         channel,
-        pitch,
+        (double)pitch,
         loop ? 1 : 0,
-        voice->sample_step
+        (double)voice->sample_step
     );
 
     fb_sfxRuntimeUnlock();

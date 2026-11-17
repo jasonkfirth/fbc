@@ -20,6 +20,8 @@ Returns a [[ProPgDates|Date Serial]] from a string
 	
 	##**""DateValue""**( Date() )## will work correctly only if the regional settings specify the same short date format QB used (##mm-dd-yyyy##).  Consider using the ##[[KeyPgNow|Now]]## function in the expression ##Fix(Now())## to obtain the current date as a date serial.
 	
+	Numeric day, month and year fields are checked against the signed 32-bit ##[[KeyPgLong|Long]]## range while parsing. An out-of-range field returns zero and sets ##[[KeyPgErr|Err]]## to error 5.
+
 	The compiler will not recognize this function unless ##vbcompat.bi## or ##datetime.bi## is included.
 
 {{fbdoc item="ex"}}

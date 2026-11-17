@@ -6,6 +6,19 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <string.h>
+
+/* The legacy bounds-check ABI transports handler addresses through void *. */
+typedef char FB_ERROR_HANDLER_ADDRESS_WIDTH[
+	(sizeof(FB_ERRHANDLER) == sizeof(void *)) ? 1 : -1];
+
+static void *hErrorHandlerAddress(FB_ERRHANDLER handler)
+{
+	void *address;
+
+	memcpy((void *)&address, (const void *)&handler, sizeof(address));
+	return address;
+}
 
 #if defined(__GNUC__) || defined(__clang__)
 #define FB_ARRAY_PRINTF_FORMAT( format_index, first_arg ) \
@@ -40,7 +53,7 @@ static void hAppendMsg
 	remaining = FB_ERRMSG_SIZE - *pos;
 
 	va_start( args, fmt );
-	written = vsnprintf( &msg[*pos], remaining, fmt, args );
+	written = vsnprintf( &msg[*pos], (size_t)remaining, fmt, args );
 	va_end( args );
 
 	if( written < 0 )
@@ -92,7 +105,8 @@ static void *hThrowError
 	msg[FB_ERRMSG_SIZE-1] = '\0';
 
 	/* call user handler if any defined */
-	return (void *)fb_ErrorThrowMsg( errnum, linenum, filename, msg, NULL, NULL );
+	return hErrorHandlerAddress(
+		fb_ErrorThrowMsg(errnum, linenum, filename, msg, NULL, NULL));
 }
 
 FBCALL void *fb_ArrayDimensionChk
@@ -104,6 +118,8 @@ FBCALL void *fb_ArrayDimensionChk
 		const char *variablename
 	)
 {
+	ssize_t expected_dimensions;
+
 	/* Check physical storage, not the virtual zero-index address. */
 	if( (array == NULL) || (array->ptr == NULL) ) {
 		return hThrowError( FB_RTERROR_NOTDIMENSIONED,
@@ -111,9 +127,13 @@ FBCALL void *fb_ArrayDimensionChk
 	}
 
 	/* wrong number of dimensions? */
+	if( array->dimensions > (size_t)PTRDIFF_MAX )
+		expected_dimensions = (ssize_t)PTRDIFF_MAX;
+	else
+		expected_dimensions = (ssize_t)array->dimensions;
 	if( ((size_t)dimensions != array->dimensions) ) {
 		return hThrowError( FB_RTERROR_WRONGDIMENSIONS,
-			dimensions, 0, array->dimensions, linenum, filename, variablename );
+			dimensions, 0, expected_dimensions, linenum, filename, variablename );
 	}
 
 	return NULL;
@@ -151,7 +171,9 @@ FBCALL void *fb_ArraySngBoundChkEx
 	   unsigned comparison. */
 
 	if( idx > ubound ) {
-		return hThrowError( FB_RTERROR_OUTOFBOUNDS, idx, 0, ubound, linenum, filename, variablename );
+		/* The unsigned index preserves negative single-dimension indexes by wrapping. */
+		return hThrowError( FB_RTERROR_OUTOFBOUNDS, (ssize_t)idx, 0,
+			(ssize_t)ubound, linenum, filename, variablename );
 	} else {
 		return NULL;
 	}

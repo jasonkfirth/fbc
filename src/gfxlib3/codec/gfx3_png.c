@@ -141,6 +141,10 @@ typedef struct PNG_BYTE_BUFFER {
 	size_t size;
 	size_t capacity;
 	int failed;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } PNG_BYTE_BUFFER;
 
 typedef struct PNG_BIT_WRITER {
@@ -575,6 +579,10 @@ typedef struct PNG_BIT_READER {
 	unsigned int current;
 	unsigned int remaining_bits;
 	int failed;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } PNG_BIT_READER;
 
 typedef struct PNG_HUFFMAN {
@@ -1384,13 +1392,24 @@ exit:
 /* Scanline reconstruction and sample conversion                             */
 /* ------------------------------------------------------------------------- */
 
-static unsigned int png_paeth_predictor(unsigned int left, unsigned int above,
-	unsigned int upper_left)
+static unsigned int png_paeth_predictor(unsigned char left, unsigned char above,
+	unsigned char upper_left)
 {
-	int estimate = (int)left + (int)above - (int)upper_left;
-	int left_distance = abs(estimate - (int)left);
-	int above_distance = abs(estimate - (int)above);
-	int diagonal_distance = abs(estimate - (int)upper_left);
+	unsigned int estimate = 255u + left + above - upper_left;
+	unsigned int left_reference = 255u + left;
+	unsigned int above_reference = 255u + above;
+	unsigned int upper_left_reference = 255u + upper_left;
+	unsigned int left_distance;
+	unsigned int above_distance;
+	unsigned int diagonal_distance;
+
+	/* The bias keeps byte-derived distances nonnegative in unsigned math. */
+	left_distance = (estimate >= left_reference) ?
+		estimate - left_reference : left_reference - estimate;
+	above_distance = (estimate >= above_reference) ?
+		estimate - above_reference : above_reference - estimate;
+	diagonal_distance = (estimate >= upper_left_reference) ?
+		estimate - upper_left_reference : upper_left_reference - estimate;
 
 	if ((left_distance <= above_distance) &&
 	    (left_distance <= diagonal_distance))
@@ -1431,8 +1450,12 @@ static int png_unfilter_row(unsigned char *row, const unsigned char *previous,
 			break;
 		case 4:
 			row[i] = (unsigned char)(row[i] +
-				png_paeth_predictor(left, above, upper_left));
+				png_paeth_predictor((unsigned char)left,
+					(unsigned char)above,
+					(unsigned char)upper_left));
 			break;
+		default:
+			return FALSE;
 		}
 	}
 	return TRUE;
@@ -1631,6 +1654,8 @@ static int png_convert_passes(FB_GFX3_FILE_VIEW *view, PNG_IMAGE *image,
 {
 	static const unsigned char start_x[7] = { 0, 4, 0, 2, 0, 1, 0 };
 	static const unsigned char start_y[7] = { 0, 0, 4, 0, 2, 0, 1 };
+	if( (output_bpp == 0u) || (output_bpp > (uint32_t)INT_MAX) )
+		return FALSE;
 	static const unsigned char step_x[7] = { 8, 8, 4, 4, 2, 2, 1 };
 	static const unsigned char step_y[7] = { 8, 8, 8, 4, 4, 2, 2 };
 	unsigned char *stream = image->filtered;
@@ -1701,7 +1726,7 @@ static int png_convert_passes(FB_GFX3_FILE_VIEW *view, PNG_IMAGE *image,
 					png_store_pixel(destination_row +
 						((size_t)x *
 						 (unsigned int)output_bpp),
-						output_bpp, red, green, blue,
+						(int)output_bpp, red, green, blue,
 						alpha, index);
 				}
 			}
@@ -1797,6 +1822,10 @@ int fb_gfx3_png_load_pixels_locked(FILE *file, uint32_t depth,
 	result = png_load_chunks(file, &image);
 	if (result != FB_GFX3_OK)
 		goto exit;
+	if ((image.width == 0u) || (image.height == 0u)) {
+		result = FB_GFX3_INVALID;
+		goto exit;
+	}
 	bytes_per_pixel = (depth + 7u) / 8u;
 	if ((bytes_per_pixel == 1u) &&
 	    !((image.color_type == PNG_COLOR_INDEXED) ||
@@ -1808,6 +1837,10 @@ int fb_gfx3_png_load_pixels_locked(FILE *file, uint32_t depth,
 	    (fb_gfx3_size_multiply(
 	     (size_t)image.width * bytes_per_pixel, image.height,
 	     &allocation_size) != FB_GFX3_OK)) {
+		result = FB_GFX3_INVALID;
+		goto exit;
+	}
+	if (allocation_size == 0u) {
 		result = FB_GFX3_INVALID;
 		goto exit;
 	}
@@ -1992,7 +2025,9 @@ static unsigned char png_filter_byte(unsigned int filter,
 		return (unsigned char)(value - ((left + above) >> 1));
 	default:
 		return (unsigned char)(value -
-			png_paeth_predictor(left, above, upper_left));
+			png_paeth_predictor((unsigned char)left,
+				(unsigned char)above,
+				(unsigned char)upper_left));
 	}
 }
 

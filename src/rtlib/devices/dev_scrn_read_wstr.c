@@ -9,15 +9,22 @@
 
 int fb_DevScrnReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 {
-	size_t chars, copy_chars;
+	size_t chars, copy_chars, len;
 	DEV_SCRN_INFO *info;
 	FB_FILE *real_handle;
 
 	/* !!!FIXME!!! no unicode input supported */
-
-	FB_LOCK();
+	if( pchars == NULL )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
 	chars = *pchars;
+	if( (chars > (size_t)PTRDIFF_MAX / sizeof( FB_WCHAR )) ||
+	    ((chars != 0) && (dst == NULL)) ) {
+		*pchars = 0;
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	}
+
+	FB_LOCK();
 
 	real_handle = FB_HANDLE_DEREF( handle );
 	if( (real_handle == NULL) || (real_handle->opaque == NULL) ) {
@@ -30,7 +37,11 @@ int fb_DevScrnReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 
 	while( chars > 0 )
 	{
-		size_t len = info->length / sizeof( FB_WCHAR );
+		if( info->length >= sizeof(info->buffer) ) {
+			info->length = (unsigned)(sizeof(info->buffer) - 1);
+			info->buffer[info->length] = '\0';
+		}
+		len = info->length / sizeof( FB_WCHAR );
 		copy_chars = (chars > len) ? len : chars;
 		if( copy_chars == 0 )
 		{
@@ -44,9 +55,9 @@ int fb_DevScrnReadWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *pchars )
 			break;
 		}
 
-		fb_wstr_ConvFromA( dst, chars, info->buffer );
+		fb_wstr_ConvFromA( dst, (ssize_t)copy_chars, info->buffer );
 
-		info->length -= copy_chars * sizeof( FB_WCHAR );
+		info->length -= (unsigned int)(copy_chars * sizeof( FB_WCHAR ));
 		if( info->length != 0 )
 		{
 			memmove( info->buffer,

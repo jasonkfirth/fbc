@@ -41,11 +41,12 @@ static void *gfx_imagecreate(int width, int height, unsigned int color, int dept
 		bpp = fb_gfx->bpp;
 	}
 
-	if (flags & DEFAULT_COLOR_1) {
+	if ((unsigned int)flags & DEFAULT_COLOR_1) {
 		switch (bpp) {
 			case 1: color = 0; break;
 			case 2: color = MASK_COLOR_16; break;
 			case 4: color = MASK_COLOR_32 | MASK_A_32; break;
+			default: break;
 		}
 	} else {
 		if (bpp == 2)
@@ -90,25 +91,25 @@ static void *gfx_imagecreate(int width, int height, unsigned int color, int dept
 	}
 
 	image = (PUT_HEADER *)(((intptr_t)tmp + p_size + 0xF) & ~0xF);
-	((void **)image)[-1] = tmp;
+	memcpy((unsigned char *)image - sizeof(tmp), (const void *)&tmp, sizeof(tmp));
 
 	if (!usenewheader) {
 		/* use old-style header for compatibility */
-		image->old.bpp = bpp;
-		image->old.width = width;
-		image->old.height = height;
+		image->old.bpp = (unsigned short)((unsigned int)bpp & 0x7u);
+		image->old.width = (unsigned short)((unsigned int)width & 0x1FFFu);
+		image->old.height = (unsigned short)height;
 	} else {
 		image->type = PUT_HEADER_NEW;
 		image->bpp = bpp;
-		image->width = width;
-		image->height = height;
-		image->pitch = pitch;
+		image->width = (unsigned int)width;
+		image->height = (unsigned int)height;
+		image->pitch = (unsigned int)pitch;
 		fb_hMemSet(image->_reserved, 0, sizeof(image->_reserved));
 	}
 
 	fb_hPrepareTarget(context, (void *)image);
 	fb_hSetPixelTransfer(context, MASK_A_32);
-	context->pixel_set((unsigned char *)image + header_size, color,
+	context->pixel_set((unsigned char *)image + header_size, (int)color,
 		size / (size_t)bpp);
 
 	FB_GRAPHICS_UNLOCK( );
@@ -128,8 +129,11 @@ FBCALL void *fb_GfxImageCreateQB(int width, int height, unsigned int color, int 
 
 FBCALL void fb_GfxImageDestroy(void *image)
 {
+	void *allocation;
+
 	if( image == NULL ) return;
-	free(((void **)image)[-1]);
+	memcpy((void *)&allocation, (unsigned char *)image - sizeof(allocation), sizeof(allocation));
+	free(allocation);
 }
 
 /* end of gfx_image.c */

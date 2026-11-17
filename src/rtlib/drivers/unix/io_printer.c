@@ -67,6 +67,8 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 {
 	int result;
 	char *filename = NULL;
+	/* /dev/lp plus a signed 32-bit decimal port number and its terminator. */
+	char port_filename[7 + 11 + 1];
 	FILE *fp;
 
 	DEV_LPT_PROTOCOL *lpt_proto = NULL;
@@ -90,14 +92,18 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 			size_t title_len = strlen( lpt_proto->title );
 			size_t filename_len;
 
-			if( name_len > ((size_t)-1) - title_len - 128 )
+			if( title_len > SIZE_MAX - 128 || name_len > SIZE_MAX - title_len - 128 )
 			{
-				free(lpt_proto);
-				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				result = FB_RTERROR_OUTOFMEM;
+				goto done;
 			}
 
 			filename_len = name_len + title_len + 128;
-			filename = alloca( filename_len );
+			filename = malloc( filename_len );
+			if( filename == NULL ) {
+				result = FB_RTERROR_OUTOFMEM;
+				goto done;
+			}
 			filename[0] = '\0';
 
 			/* set destination, if not default */
@@ -107,13 +113,13 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 				if( !append_lp_cmd( filename, filename_len,
 					"lpstat -v \"%s\" 2>&1 ", lpt_proto->name ) )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+					result = FB_RTERROR_OUTOFMEM;
+					goto done;
 				}
 				if( exec_lp_cmd( filename, FALSE ) != 0 )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+					result = FB_RTERROR_FILENOTFOUND;
+					goto done;
 				}
 
 				/* build command for spooler */
@@ -121,8 +127,8 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 				if( !append_lp_cmd( filename, filename_len,
 					"lp -d \"%s\" ", lpt_proto->name ) )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+					result = FB_RTERROR_OUTOFMEM;
+					goto done;
 				}
 			}
 			else
@@ -130,20 +136,20 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 				/* is there a default printer */
 				if( !append_lp_cmd( filename, filename_len, "lpstat -d 2>&1" ) )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+					result = FB_RTERROR_OUTOFMEM;
+					goto done;
 				}
 				if( exec_lp_cmd( filename, TRUE ) != 0 )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+					result = FB_RTERROR_FILENOTFOUND;
+					goto done;
 				}
 				/* build command for spooler */
 				filename[0] = '\0';
 				if( !append_lp_cmd( filename, filename_len, "lp " ) )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+					result = FB_RTERROR_OUTOFMEM;
+					goto done;
 				}
 			}
 
@@ -153,24 +159,24 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 				if( !append_lp_cmd( filename, filename_len,
 					"-t \"%s\"", lpt_proto->title ) )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+					result = FB_RTERROR_OUTOFMEM;
+					goto done;
 				}
 			}
 			else
 			{
 				if( !append_lp_cmd( filename, filename_len, "-t \"FreeBASIC document\"" ) )
 				{
-					free(lpt_proto);
-					return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+					result = FB_RTERROR_OUTOFMEM;
+					goto done;
 				}
 			}
 
 			/* do not print job id */
 			if( !append_lp_cmd( filename, filename_len, " -s -" ) )
 			{
-				free(lpt_proto);
-				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				result = FB_RTERROR_OUTOFMEM;
+				goto done;
 			}
 
 			{
@@ -182,8 +188,8 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 			/* do not print error messages */
 			if( !append_lp_cmd( filename, filename_len, " &> /dev/null" ) )
 			{
-				free(lpt_proto);
-				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				result = FB_RTERROR_OUTOFMEM;
+				goto done;
 			}
 		}
 
@@ -191,43 +197,45 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDeviceRaw )
 		if(fp == NULL )
 		{
 			devInfo->driver_opaque = NULL;
-			result = fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+			result = FB_RTERROR_FILENOTFOUND;
 		}
 		else
 		{
 			devInfo->driver_opaque = fp;
-			result = fb_ErrorSetNum( FB_RTERROR_OK );
+			result = FB_RTERROR_OK;
 		}
 
 	} else {
 		/* use direct port io */
-		filename = alloca( 7 + 11 + 1 );
-		if( snprintf(filename, 7 + 11 + 1, "/dev/lp%d", (devInfo->iPort-1)) >= 7 + 11 + 1 )
+		if( devInfo->iPort < 1 ||
+		    snprintf(port_filename, sizeof(port_filename), "/dev/lp%d", (devInfo->iPort-1)) >= (int)sizeof(port_filename) )
 		{
-			free(lpt_proto);
-			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+			result = FB_RTERROR_ILLEGALFUNCTIONCALL;
+			goto done;
 		}
-		fp = fopen(filename, "wb");
+		fp = fopen(port_filename, "wb");
 
 		if( fp==NULL ) {
 			devInfo->driver_opaque = NULL;
-			result = fb_ErrorSetNum( FB_RTERROR_FILENOTFOUND );
+			result = FB_RTERROR_FILENOTFOUND;
 		} else {
 			devInfo->driver_opaque = fp;
-			result = fb_ErrorSetNum( FB_RTERROR_OK );
+			result = FB_RTERROR_OK;
 		}
 
 	}
 
-	if( lpt_proto!=NULL )
-		free(lpt_proto);
-
-	return result;
+done:
+	free(filename);
+	free(lpt_proto);
+	return fb_ErrorSetNum( result );
 }
 
 int fb_PrinterWrite( DEV_LPT_INFO *devInfo, const void *data, size_t length )
 {
 	FILE *fp = (FILE*)  devInfo->driver_opaque;
+	if( length == 0 )
+		return fb_ErrorSetNum( FB_RTERROR_OK );
 	if( fwrite( data, length, 1, fp ) != 1 ) {
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 	}
@@ -237,19 +245,36 @@ int fb_PrinterWrite( DEV_LPT_INFO *devInfo, const void *data, size_t length )
 int fb_PrinterWriteWstr( DEV_LPT_INFO *devInfo, const FB_WCHAR *buffer, size_t chars )
 {
 	FILE *fp = (FILE *) devInfo->driver_opaque;
+	char local_buffer[256], *temp = local_buffer;
+	size_t capacity;
+	ssize_t bytes = 0;
+	int result = FB_RTERROR_OK;
 
-	/* Convert WSTRING printer output to UTF-8 bytes for the pipe backend. */
-	ssize_t bytes;
-	char *temp = alloca( chars * 4 + 1 );
+	if( chars == 0 )
+		return fb_ErrorSetNum( FB_RTERROR_OK );
+	if( buffer == NULL )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	/* The converter's count and result are signed, with at most four UTF-8
+	   bytes per input unit and one byte of temporary terminator space. */
+	if( chars > (size_t)(FB_STRSIZEMSK - 1) / 4 )
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	capacity = chars * 4 + 1;
+	if( capacity > sizeof( local_buffer ) ) {
+		temp = malloc( capacity );
+		if( temp == NULL )
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
 
-	fb_WCharToUTF( FB_FILE_ENCOD_UTF8, buffer, chars, temp, &bytes );
-	/* add null-term */
-	temp[bytes] = '\0';
+	/* Write the converter's byte count, including embedded zero bytes. */
+	if( fb_WCharToUTF( FB_FILE_ENCOD_UTF8, buffer, (ssize_t)chars, temp, &bytes ) == NULL ||
+	    bytes < 0 || (size_t)bytes >= capacity )
+		result = FB_RTERROR_ILLEGALFUNCTIONCALL;
+	else if( bytes != 0 && fwrite( temp, 1, (size_t)bytes, fp ) != (size_t)bytes )
+		result = FB_RTERROR_FILEIO;
 
-	if( fwrite( temp, bytes, 1, fp ) != 1 )
-		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
-
-	return fb_ErrorSetNum( FB_RTERROR_OK );
+	if( temp != local_buffer )
+		free( temp );
+	return fb_ErrorSetNum( result );
 }
 
 

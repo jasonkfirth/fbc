@@ -9,6 +9,8 @@
         Provide Linux-specific shared backend teardown for sfxlib.
 */
 
+#include "../fb_sfx_internal.h"
+
 #ifndef DISABLE_LINUX
 #include "fb_sfx_linux.h"
 #endif

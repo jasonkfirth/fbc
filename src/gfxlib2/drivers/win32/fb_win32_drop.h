@@ -31,9 +31,9 @@ static int fb_hWin32DropReceive(HDROP drop, FB_WIN32_DROP_SUBMIT submit, void *u
 	library = LoadLibraryW(path);
 	if (library == NULL) goto done;
 	address = GetProcAddress(library, "DragFinish");
-	memcpy(&finish, &address, sizeof(finish));
+	memcpy((void *)&finish, (const void *)&address, sizeof(finish));
 	address = GetProcAddress(library, "DragQueryFileW");
-	memcpy(&query, &address, sizeof(query));
+	memcpy((void *)&query, (const void *)&address, sizeof(query));
 	if (query == NULL || finish == NULL) goto done;
 	count = query(drop, 0xffffffffu, NULL, 0);
 	if (count == 0 || count > FB_DROP_MAX_ITEMS) goto done;

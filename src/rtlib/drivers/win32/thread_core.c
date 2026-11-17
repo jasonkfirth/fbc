@@ -7,6 +7,8 @@
  */
 #include "../../fb.h"
 #include "../../fb_private_thread.h"
+#include <limits.h>
+#include <stdint.h>
 
 #ifdef HOST_CYGWIN
 
@@ -135,6 +137,13 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	FBTHREAD *thread;
 	FBTHREADINFO *info;
 
+	if( stack_size < 0 )
+		return NULL;
+#ifdef HOST_MINGW
+	if( (uint64_t)stack_size > (uint64_t)UINT_MAX )
+		return NULL;
+#endif
+
 	thread = (FBTHREAD *)malloc( sizeof( FBTHREAD ) );
 	if( thread == NULL ) {
 		return NULL;
@@ -154,8 +163,10 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 #ifdef HOST_MINGW
 	/* Note: _beginthreadex()'s last parameter cannot be NULL,
 	   or else the function fails on Windows 9x */
+	uintptr_t thread_handle;
 	unsigned int thrdaddr;
-	thread->id = (HANDLE)_beginthreadex( NULL, stack_size, threadproc, info, 0, &thrdaddr );
+	thread_handle = _beginthreadex( NULL, (unsigned int)stack_size, threadproc, info, 0, &thrdaddr );
+	thread->id = (HANDLE)thread_handle;
 #else
 	DWORD dwThreadId;
 	thread->id = CreateThread( NULL, stack_size, threadproc, info, 0, &dwThreadId );

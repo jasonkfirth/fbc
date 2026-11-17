@@ -28,7 +28,7 @@ unsigned int fb_GfxReadXY( int col, int row, int colorflag )
 	cell = fb_gfx->con_pages[context->work_page] +
 		((row - 1) * fb_gfx->text_w) + (col - 1);
 	if( colorflag == 0 ) {
-		result = cell->ch;
+		result = (unsigned int)cell->ch;
 	} else if( fb_gfx->depth <= 4 ) {
 		result = cell->fg + (cell->bg << 4);
 	} else if( fb_gfx->depth <= 8 ) {

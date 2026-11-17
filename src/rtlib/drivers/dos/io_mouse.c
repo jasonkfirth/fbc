@@ -54,17 +54,22 @@ int fb_ConsoleGetMouse( int *x, int *y, int *z, int *buttons, int *clip )
 int fb_ConsoleSetMouse( int x, int y, int cursor, int clip )
 {
 	int mx, my;
+	(void)cursor;
+	(void)clip;
 
 	fb_ConsoleGetMouse(&mx, &my, NULL, NULL, NULL);
 
 	if (inited == 0) return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 
-	if (x >= 0) mx = x * 8;
-	if (y >= 0) my = y * 8;
-
 	regs.x.ax = 0x4;
-	regs.x.cx = mx;
-	regs.x.dx = my;
+	if( x >= 0 )
+		regs.x.cx = (unsigned short)((unsigned int)x * 8u);
+	else
+		regs.x.cx = (unsigned short)((unsigned int)mx);
+	if( y >= 0 )
+		regs.x.dx = (unsigned short)((unsigned int)y * 8u);
+	else
+		regs.x.dx = (unsigned short)((unsigned int)my);
 	__dpmi_int(0x33, &regs);
 
 	return FB_RTERROR_OK;

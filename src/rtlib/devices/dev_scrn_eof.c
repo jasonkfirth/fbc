@@ -15,18 +15,21 @@ void fb_DevScrnFillInput( DEV_SCRN_INFO *info )
     str = fb_Inkey( );
     if( str != NULL )
     {
-    	len = FB_STRSIZE( str );
-	    if( (str->data != NULL) && (len > 0) )
-	    {
-	    	DBG_ASSERT(len < sizeof(info->buffer));
-    		/* copy null-term too */
-    		memcpy( info->buffer, str->data, len+1 );
-    	}
+		ssize_t string_len = FB_STRSIZE( str );
+		if( (str->data != NULL) && (string_len > 0) )
+		{
+			len = (size_t)string_len;
+			if( len >= sizeof(info->buffer) )
+				len = sizeof(info->buffer) - 1;
+			DBG_ASSERT(len < sizeof(info->buffer));
+			memcpy( info->buffer, str->data, len );
+			info->buffer[len] = '\0';
+		}
 
     	fb_hStrDelTemp( str );
     }
 
-    info->length = len;
+    info->length = (unsigned)len;
 }
 
 int fb_DevScrnEof( FB_FILE *handle )

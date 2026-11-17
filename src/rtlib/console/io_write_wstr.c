@@ -10,7 +10,8 @@
 FBCALL void fb_WriteWstr( int fnum, FB_WCHAR *s, int mask )
 {
     const FB_WCHAR *buff;
-	ssize_t len, bufflen;
+	ssize_t len;
+	size_t bufflen;
     FB_FILE *handle = FB_FILE_TO_HANDLE( fnum );
 
 	if( s == NULL )
@@ -28,12 +29,12 @@ FBCALL void fb_WriteWstr( int fnum, FB_WCHAR *s, int mask )
     if( mask & FB_PRINT_BIN_NEWLINE )
     {
 		buff = FB_WCHAR_LITERAL("\"" FB_BINARY_NEWLINE);
-		bufflen = fb_wstr_Len( FB_WCHAR_LITERAL("\"" FB_BINARY_NEWLINE) );
+		bufflen = (size_t)fb_wstr_Len( FB_WCHAR_LITERAL("\"" FB_BINARY_NEWLINE) );
 	}
     else if( mask & FB_PRINT_NEWLINE )
     {
 		buff = FB_WCHAR_LITERAL("\"" FB_NEWLINE);
-		bufflen = fb_wstr_Len( FB_WCHAR_LITERAL("\"" FB_NEWLINE) );
+		bufflen = (size_t)fb_wstr_Len( FB_WCHAR_LITERAL("\"" FB_NEWLINE) );
 	}
     else
     {
@@ -47,8 +48,8 @@ FBCALL void fb_WriteWstr( int fnum, FB_WCHAR *s, int mask )
     fb_hFilePrintBufferWstrEx( handle, FB_WCHAR_LITERAL("\""), 1 );
 
     len = fb_wstr_Len( s );
-    if( len != 0 )
-        FB_PRINTWSTR_EX( handle, s, len, 0 );
+	if( len > 0 )
+		FB_PRINTWSTR_EX( handle, s, (size_t)len, 0 );
 
     fb_hFilePrintBufferWstrEx( handle, buff, bufflen );
 

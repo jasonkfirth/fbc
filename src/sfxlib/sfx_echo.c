@@ -26,6 +26,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "fb_sfx.h"
 #include "fb_sfx_internal.h"
@@ -45,6 +46,10 @@ typedef struct FB_SFX_ECHO_STATE
     float wet;
     float feedback;
     int enabled;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Name the existing 64-bit tail padding without changing the layout. */
+    unsigned char tail_padding[4];
+#endif
 } FB_SFX_ECHO_STATE;
 
 static FB_SFX_ECHO_STATE g_echo;
@@ -76,7 +81,7 @@ int fb_sfxEchoCmd(float wet, float delay_seconds, float feedback)
     size_t delay_samples;
 
     /* Reject NaN without depending on a platform-specific isfinite macro. */
-    if (wet != wet || delay_seconds != delay_seconds || feedback != feedback)
+	if (isnan(wet) || isnan(delay_seconds) || isnan(feedback))
         return -1;
 
     if (wet < 0.0f || wet > 1.0f ||
@@ -97,7 +102,7 @@ int fb_sfxEchoCmd(float wet, float delay_seconds, float feedback)
         return -1;
     }
 
-    if (wet == 0.0f)
+	if (fpclassify(wet) == FP_ZERO)
     {
         fb_sfxEchoShutdown();
         fb_sfxRuntimeUnlock();

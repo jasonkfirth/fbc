@@ -27,27 +27,27 @@ FBCALL float fb_GfxPMap(float coord, int func)
 	switch (func) {
 		case 0:
 			if (context->flags & CTX_WINDOW_ACTIVE)
-				coord = ((coord - context->win_x) * context->view_w) / context->win_w;
+				coord = ((coord - context->win_x) * (float)context->view_w) / context->win_w;
 			break;
 
 		case 1:
 			if (context->flags & CTX_WINDOW_ACTIVE) {
-				coord = ((coord - context->win_y) * context->view_h) / context->win_h;
+				coord = ((coord - context->win_y) * (float)context->view_h) / context->win_h;
 				if ((context->flags & CTX_WINDOW_SCREEN) == 0)
-					coord = context->view_h - 1 - coord;
+					coord = (float)(context->view_h - 1) - coord;
 			}
 			break;
 
 		case 2:
 			if (context->flags & CTX_WINDOW_ACTIVE)
-				coord = ((coord * context->win_w) / context->view_w) + context->win_x;
+				coord = ((coord * context->win_w) / (float)context->view_w) + context->win_x;
 			break;
 
 		case 3:
 			if (context->flags & CTX_WINDOW_ACTIVE) {
 				if ((context->flags & CTX_WINDOW_SCREEN) == 0)
-					coord = context->view_h - 1 - coord;
-				coord = ((coord * context->win_h) / context->view_h) + context->win_y;
+					coord = (float)(context->view_h - 1) - coord;
+				coord = ((coord * context->win_h) / (float)context->view_h) + context->win_y;
 			}
 			break;
 

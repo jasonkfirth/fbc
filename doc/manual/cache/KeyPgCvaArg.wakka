@@ -15,6 +15,7 @@ Macro to obtain the next argument from a variadic argument list object.
 		- 	##**cva_arg**## returns the current argument in the list, ##//argument_list//##, with an expected data type of ##//datatype//##.
 		- 	Before first ##**cva_arg**## use, ##//argument_list//## must be initialized with the command ##[[KeyPgCvaStart|cva_start]]## or ##[[KeyPgCvaCopy|cva_copy]]##.
 		- 	##**cva_arg**## automatically increments ##//argument_list//## to the next argument within the list after obtaining the value of the current argument.
+		- 	Variadic arguments follow C default argument promotions. ##[[KeyPgByte|Byte]]##, ##[[KeyPgUbyte|UByte]]##, ##[[KeyPgShort|Short]]## and ##[[KeyPgUshort|UShort]]## values are passed as the 32-bit C ##int## type, represented by ##[[KeyPgLong|Long]]##. Read these arguments with ##cva_arg(argument_list, Long)##. ##[[KeyPgSingle|Single]]## values are passed as ##[[KeyPgDouble|Double]]##.
 
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/procs/cva_arg1.bas"}}%%(freebasic)

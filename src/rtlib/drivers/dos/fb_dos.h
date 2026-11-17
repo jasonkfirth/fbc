@@ -11,6 +11,8 @@
 #ifndef FB_DOS_H
 #define FB_DOS_H
 
+#include <stdint.h>
+
 #define FBCALL
 
 /* newline for console/file I/O */
@@ -75,22 +77,40 @@ FnIntHandler fb_isr_get( unsigned irq_number );
 /* To allow recursive CLI/STI */
 int fb_dos_cli( void );
 int fb_dos_sti( void );
-int fb_dos_lock_data(const void *address, size_t size);
-int fb_dos_lock_code(const void *address, size_t size);
-int fb_dos_unlock_data(const void *address, size_t size);
-int fb_dos_unlock_code(const void *address, size_t size);
+int fb_dos_lock_data(const volatile void *address, size_t size);
+int fb_dos_lock_code(uintptr_t address, size_t size);
+int fb_dos_unlock_data(const volatile void *address, size_t size);
+int fb_dos_unlock_code(uintptr_t address, size_t size);
 
-#define lock_var(var)           fb_dos_lock_data(   (void *)&(var), sizeof(var) )
-#define lock_array(array)       fb_dos_lock_data(   (void *)(array), sizeof(array) )
-#define lock_proc(proc)         fb_dos_lock_code(   proc, (unsigned) end_##proc - (unsigned) proc )
-#define lock_data(start, end)   fb_dos_lock_data(   (&start), (const char *)(&end) - (const char *)(&start) )
-#define lock_code(start, end)   fb_dos_lock_code(   (start), (const char *)(end) - (const char *)(start) )
+/* DPMI locks linear address ranges. Integer addresses let code labels and
+   data symbols share range checks without converting function pointers to
+   object pointers or subtracting unrelated C pointers. */
+static __inline__ size_t fb_dos_address_range_size(uintptr_t start, uintptr_t end)
+{
+	uintptr_t size;
 
-#define unlock_var(var)         fb_dos_unlock_data( (void *)&(var), sizeof(var) )
-#define unlock_array(array)     fb_dos_unlock_data( (void *)(array), sizeof(array) )
-#define unlock_proc(proc)       fb_dos_unlock_code( proc, (unsigned) end_##proc - (unsigned) proc )
-#define unlock_data(start, end) fb_dos_unlock_data( (&start), (const char *)(&end) - (const char *)(&start) )
-#define unlock_code(start, end) fb_dos_unlock_code( (start), (const char *)(end) - (const char *)(start) )
+	if( end < start )
+		return 0;
+
+	size = end - start;
+#if defined(SIZE_MAX) && defined(UINTPTR_MAX) && SIZE_MAX < UINTPTR_MAX
+	if( size > (uintptr_t)SIZE_MAX )
+		return 0;
+#endif
+	return (size_t)size;
+}
+
+#define lock_var(var)           fb_dos_lock_data( &(var), sizeof(var) )
+#define lock_array(array)       fb_dos_lock_data( (array), sizeof(array) )
+#define lock_proc(proc)         fb_dos_lock_code( (uintptr_t)(proc), fb_dos_address_range_size( (uintptr_t)(proc), (uintptr_t)end_##proc ) )
+#define lock_data(start, end)   fb_dos_lock_data( &(start), fb_dos_address_range_size( (uintptr_t)&(start), (uintptr_t)&(end) ) )
+#define lock_code(start, end)   fb_dos_lock_code( (uintptr_t)(start), fb_dos_address_range_size( (uintptr_t)(start), (uintptr_t)(end) ) )
+
+#define unlock_var(var)         fb_dos_unlock_data( &(var), sizeof(var) )
+#define unlock_array(array)     fb_dos_unlock_data( (array), sizeof(array) )
+#define unlock_proc(proc)       fb_dos_unlock_code( (uintptr_t)(proc), fb_dos_address_range_size( (uintptr_t)(proc), (uintptr_t)end_##proc ) )
+#define unlock_data(start, end) fb_dos_unlock_data( &(start), fb_dos_address_range_size( (uintptr_t)&(start), (uintptr_t)&(end) ) )
+#define unlock_code(start, end) fb_dos_unlock_code( (uintptr_t)(start), fb_dos_address_range_size( (uintptr_t)(start), (uintptr_t)(end) ) )
 
 /* multikey() declarations also used by gfxlib2 */
 #define END_OF_FUNCTION(proc)               void end_##proc (void) { }

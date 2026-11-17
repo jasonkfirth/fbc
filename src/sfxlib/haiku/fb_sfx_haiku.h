@@ -50,10 +50,17 @@ void fb_sfxHaikuExit(void);
 
 int fb_sfxHaikuWrite(const float *buffer, int frames);
 
+int fb_hHaikuAudioStreamInit(void);
+void fb_hHaikuAudioStreamShutdown(void);
+int fb_hHaikuAudioStreamRunning(void);
+
 int  fb_sfxHaikuCaptureInit(void);
 int  fb_sfxHaikuCaptureStart(void);
 void fb_sfxHaikuCaptureStop(void);
 int  fb_sfxHaikuCaptureRead(float *buffer, int frames);
+
+void fb_sfxHaikuCaptureInject(const float *buffer, int frames);
+void fb_sfxHaikuCaptureBackendShutdown(void);
 
 int fb_sfxHaikuRunning(void);
 

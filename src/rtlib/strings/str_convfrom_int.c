@@ -49,7 +49,7 @@ FBCALL int fb_hStr2Int( char *src, ssize_t len )
 
 	/* atoi() saturates values outside [-2^31, 2^31)
 	so use strtoul() instead */
-	return strtoul( p, NULL, 10 );
+	return (int)strtoul( p, NULL, 10 );
 }
 
 FBCALL int fb_VALINT ( FBSTRING_ACCESS *str )

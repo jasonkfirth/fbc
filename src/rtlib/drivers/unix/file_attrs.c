@@ -88,7 +88,7 @@ FBCALL int fb_FileSetAttr( const char *filename, int attributes )
 	   changes are needed. The caller owns synchronization with path changes. */
 	mode = info.st_mode & 07777;
 	if( attributes & FB_FILE_ATTR_READONLY )
-		mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
+		mode &= (mode_t)~(mode_t)(S_IWUSR | S_IWGRP | S_IWOTH);
 	else
 		mode |= S_IWUSR;
 	if( chmod( filename, mode ) != 0 )

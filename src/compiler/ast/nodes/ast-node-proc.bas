@@ -126,6 +126,43 @@ sub astCProcRecordAddress( byval proc as FBSYMBOL ptr )
 	if( entry <> NULL ) then entry->flags or= CPROC_ADDRESS_TAKEN
 end sub
 
+sub astCProcRecordAsmReference( byval proc as FBSYMBOL ptr )
+	dim as CPROCRECORD ptr entry = hCProcGet( proc, TRUE )
+	if( entry <> NULL ) then entry->flags or= (CPROC_ADDRESS_TAKEN or CPROC_ASM_REFERENCE)
+end sub
+
+sub astCProcRecordFieldCleanup( byval resource as FBSYMBOL ptr )
+	if( symbIsLocal(resource) = FALSE or symbIsStatic(resource) or symbIsParamVar(resource) or symbIsRef(resource) ) then exit sub
+	if( symbGetType(resource) <> FB_DATATYPE_STRUCT or symbGetArrayDimensions(resource) <> 0 ) then exit sub
+	var dtor = symbGetCompDtor1(symbGetSubtype(resource))
+	if( dtor = NULL orelse symbIsVirtual(dtor) ) then exit sub
+	if( (symbGetAttrib(dtor) and FB_SYMBATTRIB_INTERNAL) <> 0 ) then exit sub
+	'' A user destructor may live in another module. Its field calls are then
+	'' absent from this module's AST, but C ERROR retirement still needs the
+	'' generated child destructors if construction or destruction is interrupted.
+	'' Keep their AST bodies before flushing. The C dependency graph retains
+	'' only bodies actually referenced by emitted source or cleanup helpers.
+	var fld = symbGetCompSymbTb(symbGetSubtype(resource)).head
+	while( fld <> NULL )
+		if( symbIsField(fld) andalso symbIsDescriptor(fld) = FALSE andalso symbIsRef(fld) = FALSE andalso _
+		    symbGetType(fld) = FB_DATATYPE_STRUCT ) then
+			var child_dtor = symbGetCompDtor1(symbGetSubtype(fld))
+			if( child_dtor <> NULL andalso (symbGetAttrib(child_dtor) and FB_SYMBATTRIB_INTERNAL) <> 0 ) then
+				symbSetIsAccessed(child_dtor)
+				var entry = hCProcGet(child_dtor, TRUE)
+				if( entry <> NULL ) then entry->flags or= CPROC_CLEANUP_ROOT
+			end if
+		end if
+		fld = fld->next
+	wend
+end sub
+
+function astCProcHasAsmReference( byval proc as FBSYMBOL ptr ) as integer
+	dim as CPROCRECORD ptr entry = hCProcGet( proc, FALSE )
+	if( entry = NULL ) then return FALSE
+	return (entry->flags and CPROC_ASM_REFERENCE) <> 0
+end function
+
 ''::::
 sub astProcListInit( )
 
@@ -649,7 +686,7 @@ private function hCProcMarkReachable( ) as integer
 		sym = procnode->sym
 		if( symbGetIsParsed( sym ) ) then
 			entry = hCProcGet( sym, TRUE )
-			entry->flags and= (CPROC_ADDRESS_TAKEN or CPROC_STATIC_ROOT)
+			entry->flags and= (CPROC_ADDRESS_TAKEN or CPROC_STATIC_ROOT or CPROC_ASM_REFERENCE or CPROC_CLEANUP_ROOT)
 			entry->node = procnode
 			entry->next_pending = NULL
 			var allowed_pattrs = FB_PROCATTRIB_OVERLOADED or FB_PROCATTRIB_METHOD or _
@@ -695,7 +732,7 @@ private function hCProcMarkReachable( ) as integer
 			elseif( symbGetIsAccessed( sym ) ) then
 				if( ((entry->flags and CPROC_CANDIDATE) = 0) or _
 				    ((entry->flags and CPROC_DIRECT_CALL) = 0) or _
-				    ((entry->flags and (CPROC_ADDRESS_TAKEN or CPROC_STATIC_ROOT)) <> 0) ) then
+				    ((entry->flags and (CPROC_ADDRESS_TAKEN or CPROC_STATIC_ROOT or CPROC_CLEANUP_ROOT)) <> 0) ) then
 					hCProcQueue( entry, pending_first, pending_last )
 				end if
 			end if

@@ -64,14 +64,14 @@ typedef char FB_ERROR_HANDLER_ADDRESS_WIDTH[(sizeof( FB_ERRHANDLER ) == sizeof( 
 static FB_ERRHANDLER hLegacyAddress( void *address )
 {
 	FB_ERRHANDLER result;
-	memcpy( &result, &address, sizeof( result ) );
+	memcpy( (void *)&result, (const void *)&address, sizeof( result ) );
 	return result;
 }
 
 static void *hDataAddress( FB_ERRHANDLER address )
 {
 	void *result;
-	memcpy( &result, &address, sizeof( result ) );
+	memcpy( (void *)&result, (const void *)&address, sizeof( result ) );
 	return result;
 }
 

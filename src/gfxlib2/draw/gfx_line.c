@@ -11,12 +11,12 @@
 #include <limits.h>
 #include <math.h>
 
-static int reverse_mask(int mask)
+static unsigned int reverse_mask(unsigned int mask)
 {
-	mask = ((mask >> 1) & 0x5555) | ((mask & 0x5555) << 1);
-	mask = ((mask >> 2) & 0x3333) | ((mask & 0x3333) << 2);
-	mask = ((mask >> 4) & 0x0F0F) | ((mask & 0x0F0F) << 4);
-	mask = ((mask >> 8) & 0x00FF) | ((mask & 0x00FF) << 8);
+	mask = ((mask >> 1) & 0x5555u) | ((mask & 0x5555u) << 1);
+	mask = ((mask >> 2) & 0x3333u) | ((mask & 0x3333u) << 2);
+	mask = ((mask >> 4) & 0x0F0Fu) | ((mask & 0x0F0Fu) << 4);
+	mask = ((mask >> 8) & 0x00FFu) | ((mask & 0x00FFu) << 8);
 	return mask;
 }
 
@@ -26,7 +26,8 @@ static int reverse_mask(int mask)
 /* Caller is expected to hold FB_GRAPHICS_LOCK() */
 void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned int color, unsigned int style)
 {
-	int x, y, d, dx, dy, ax, ay, skip, rot, bit;
+	int x, y, d, dx, dy, ax, ay, skip, rot;
+	unsigned int bit;
 	int xmin = context->view_x, xmax = context->view_x + context->view_w - 1;
 	int ymin = context->view_y, ymax = context->view_y + context->view_h - 1;
 
@@ -94,7 +95,8 @@ void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned
 		bit = 0x8000 >> (rot & 0xF );
 
 		if (style == 0xFFFF)
-			context->pixel_set(context->line[y1] + (x1 * context->target_bpp), color, x2 - x1 + 1);
+			context->pixel_set(context->line[y1] + (x1 * context->target_bpp),
+				(int)color, (size_t)x2 - (size_t)x1 + 1u);
 		else {
 			for (x = x1; x <= x2; x++) {
 				if (style & bit)
@@ -204,7 +206,7 @@ void fb_GfxDrawLine(FB_GFXCTX *context, int x1, int y1, int x2, int y2, unsigned
 	}
 	if (y1 > y2)
 		SWAP(y1, y2);
-	SET_DIRTY(context, y1, y2 - y1 + 1);
+	SET_DIRTY(context, y1, (size_t)y2 - (size_t)y1 + 1u);
 	done:
 	DRIVER_UNLOCK();
 }
@@ -218,11 +220,11 @@ static int line_coord_is_valid(FB_GFXCTX *context, float fx, float fy)
 	   CINT or the subsequent int offsets can receive an invalid value. LINE
 	   has a void ABI; an unrepresentable endpoint leaves the target untouched. */
 	if (context->flags & CTX_WINDOW_ACTIVE) {
-		translated_x = ((fx - context->win_x) * (context->view_w - 1)) / context->win_w;
-		translated_y = ((fy - context->win_y) * (context->view_h - 1)) / context->win_h;
+		translated_x = ((fx - context->win_x) * (float)(context->view_w - 1)) / context->win_w;
+		translated_y = ((fy - context->win_y) * (float)(context->view_h - 1)) / context->win_h;
 	}
-	checked_x = translated_x;
-	checked_y = translated_y;
+	checked_x = (double)translated_x;
+	checked_y = (double)translated_y;
 	if ((context->flags & (CTX_WINDOW_ACTIVE | CTX_WINDOW_SCREEN)) == CTX_WINDOW_ACTIVE)
 		checked_y = (double)context->view_h - 1 - checked_y;
 	if ((context->flags & CTX_VIEW_SCREEN) == 0) {
@@ -251,14 +253,14 @@ FBCALL void fb_GfxLine(void *target, float fx1, float fy1, float fx2, float fy2,
 	context = fb_hGetContext( );
 	fb_hPrepareTarget(context, target);
 
-	if (flags & DEFAULT_COLOR_1)
+	if ((unsigned int)flags & DEFAULT_COLOR_1)
 		color = context->fg_color;
 	else
 		color = fb_hFixColor(context->target_bpp, color);
 
 	fb_hSetPixelTransfer(context,color);
 
-	style &= 0xFFFF;
+	style &= 0xFFFFu;
 	
 	fb_hFixRelative(context, flags, &fx1, &fy1, &fx2, &fy2);
 	if (!line_coord_is_valid(context, fx1, fy1) || !line_coord_is_valid(context, fx2, fy2)) {

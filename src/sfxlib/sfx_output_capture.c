@@ -47,6 +47,10 @@ typedef struct FB_SFX_OUTPUT_CAPTURE
     int channels;
     int frames;
     int capacity_frames;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Preserve the existing pointer alignment in the static capture state. */
+    unsigned int samples_alignment_padding;
+#endif
     float *samples;
 } FB_SFX_OUTPUT_CAPTURE;
 

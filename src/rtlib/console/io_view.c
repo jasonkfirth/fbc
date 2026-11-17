@@ -6,6 +6,8 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
+#include <stdint.h>
 
 /*:::::*/
 int fb_ConsoleViewEx( int toprow, int botrow, int set_cursor )
@@ -25,7 +27,9 @@ int fb_ConsoleViewEx( int toprow, int botrow, int set_cursor )
         do_update = TRUE;
         toprow = minrow;
     } else {
-        toprow = fb_ConsoleGetTopRow() + 1;
+        int current_row = fb_ConsoleGetTopRow();
+		int64_t next_row = (int64_t)current_row + 1;
+		toprow = next_row > INT_MAX ? 0 : (int)next_row;
     }
 
     if( botrow > 0 ) {
@@ -34,7 +38,9 @@ int fb_ConsoleViewEx( int toprow, int botrow, int set_cursor )
         do_update = TRUE;
         botrow = maxrow;
     } else {
-        botrow = fb_ConsoleGetBotRow() + 1;
+        int current_row = fb_ConsoleGetBotRow();
+		int64_t next_row = (int64_t)current_row + 1;
+		botrow = next_row > INT_MAX ? 0 : (int)next_row;
     }
 
     if( toprow > botrow
@@ -48,7 +54,7 @@ int fb_ConsoleViewEx( int toprow, int botrow, int set_cursor )
         botrow = toprow = 0;
     }
 
-    if( do_update ) {
+    if( do_update && toprow > 0 && botrow > 0 ) {
         fb_ConsoleSetTopBotRows( toprow - 1, botrow - 1 );
         fb_ViewUpdate( );
         if( set_cursor ) {
@@ -57,7 +63,8 @@ int fb_ConsoleViewEx( int toprow, int botrow, int set_cursor )
         }
     }
 
-    return toprow + (botrow << 16);
+    /* Preserve the legacy packed row result without shifting signed values. */
+    return (int)((uint32_t)toprow | ((uint32_t)botrow << 16));
 }
 
 /*:::::*/

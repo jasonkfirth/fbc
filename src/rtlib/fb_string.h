@@ -86,6 +86,43 @@ do {                                                        \
     }                                                       \
 } while (0)
 
+/* Use for input strings that are only read, so const input remains const. */
+#define FB_STRSETUP_FIX_CONST(s,size,ptr,len)                \
+do {                                                        \
+    if( s == NULL )                                         \
+    {                                                       \
+        ptr = NULL;                                         \
+        len = 0;                                            \
+    }                                                       \
+    else                                                    \
+    {                                                       \
+        if( size == FB_STRSIZEVARLEN )                      \
+        {                                                   \
+            /* var-len STRING, descriptor */                \
+            ptr = ((const FBSTRING_ACCESS *)s)->data;       \
+            len = FB_STRSIZE( s );                          \
+        }                                                   \
+        else if( size & FB_STRISFIXED )                     \
+        {                                                   \
+            /* fix-len STRING*N */                          \
+            ptr = (const char *)s;                          \
+            len = size & FB_STRSIZEMSK;                     \
+        }                                                   \
+        else if( size == 0 )                                \
+        {                                                   \
+            /* ZSTRING PTR, unknown length  */              \
+            ptr = (const char *)s;                          \
+            len = (ssize_t)strlen( ptr );                   \
+        }                                                   \
+        else                                                \
+        {                                                   \
+            /* fix-len ZSTRING*N */                         \
+            ptr = (const char *)s;                          \
+            len = (ssize_t)strlen( ptr );                   \
+        }                                                   \
+    }                                                       \
+} while (0)
+
 #define FB_STRSETUP_DYN(s,size,ptr,len)                     \
 do {                                                        \
     if( s == NULL )                                         \
@@ -113,11 +150,16 @@ do {                                                        \
             ptr = (char *) s;                               \
             len = (ssize_t)strlen( ptr );                            \
         }                                                   \
-        else                                                \
+        else if( size > 0 )                                \
         {                                                   \
             /* fix-len ZSTRING*N */                         \
             ptr = (char *) s;                               \
-            len = size - 1; /* without terminating NUL */   \
+            len = (ssize_t)((size_t)size - 1u); /* without terminating NUL */ \
+        }                                                   \
+        else                                                \
+        {                                                   \
+            ptr = NULL;                                     \
+            len = 0;                                        \
         }                                                   \
     }                                                       \
 } while (0)

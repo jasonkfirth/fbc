@@ -13,7 +13,7 @@ int fb_FilePutWstrEx( FB_FILE *handle, fb_off_t pos, FB_WCHAR *str, ssize_t len 
 
 	/* perform call ... but only if there's data ... */
     if( (str != NULL) && (len > 0) )
-        res = fb_FilePutDataEx( handle, pos, (void *)str, len, TRUE, TRUE, TRUE );
+        res = fb_FilePutDataEx( handle, pos, (void *)str, (size_t)len, TRUE, TRUE, TRUE );
     else
         res = fb_ErrorSetNum( FB_RTERROR_OK );
 
@@ -27,7 +27,12 @@ FBCALL int fb_FilePutWstr( int fnum, int pos, FB_WCHAR *str, ssize_t str_len )
 
 FBCALL int fb_FilePutWstrLarge( int fnum, long long pos, FB_WCHAR *str, ssize_t str_len )
 {
-	return fb_FilePutWstrEx(FB_FILE_TO_HANDLE(fnum), pos, str, str_len);
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FilePutWstrEx(FB_FILE_TO_HANDLE(fnum), offset, str, str_len);
 }
 
 /* end of files/file_put_wstr.c */

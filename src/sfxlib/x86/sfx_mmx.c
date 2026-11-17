@@ -31,12 +31,14 @@ void fb_sfxConvertS16ToFloatMMX(const short *src, float *dst, int samples)
     const __m128 scale = _mm_set1_ps(1.0f / 32768.0f);
     const __m128 positive_full_scale = _mm_set1_ps(32767.0f);
     const __m128 one = _mm_set1_ps(1.0f);
-    int i = 0;
+    size_t i = 0;
+    size_t sample_count;
 
     if (!src || !dst || samples <= 0)
         return;
 
-    for (; i <= samples - 4; i += 4)
+    sample_count = (size_t)samples;
+    for (; sample_count - i >= 4U; i += 4U)
     {
         unsigned long long packed;
         __m128 high;
@@ -79,7 +81,7 @@ void fb_sfxConvertS16ToFloatMMX(const short *src, float *dst, int samples)
     /* Scalar conversion may use x87 on 32-bit builds. */
     __asm__ volatile ("emms");
 
-    for (; i < samples; ++i)
+    for (; i < sample_count; ++i)
         dst[i] = fb_sfxS16ToFloat(src[i]);
 }
 

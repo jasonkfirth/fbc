@@ -130,6 +130,10 @@ typedef struct FB_GFX3_RENDER_PROFILE {
 	double execute_seconds;
 	double completion_wait_seconds;
 	int enabled;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_RENDER_PROFILE;
 
 /* ------------------------------------------------------------------------- */
@@ -184,7 +188,7 @@ static void fb_gfx3_renderer_profile_command(FB_GFX3_RENDER_PROFILE *profile,
 	case FB_GFX3_COMMAND_POINTS:
 		if (payload_size >= offsetof(FB_GFX3_POINTS_COMMAND, point)) {
 			const FB_GFX3_POINTS_COMMAND *payload =
-				(const FB_GFX3_POINTS_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 
 			profile->point_items += fb_gfx3_renderer_profile_payload_count(
 				command, offsetof(FB_GFX3_POINTS_COMMAND, point),
@@ -197,7 +201,7 @@ static void fb_gfx3_renderer_profile_command(FB_GFX3_RENDER_PROFILE *profile,
 	case FB_GFX3_COMMAND_LINES:
 		if (payload_size >= offsetof(FB_GFX3_LINES_COMMAND, line)) {
 			const FB_GFX3_LINES_COMMAND *payload =
-				(const FB_GFX3_LINES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 
 			profile->line_items += fb_gfx3_renderer_profile_payload_count(
 				command, offsetof(FB_GFX3_LINES_COMMAND, line),
@@ -210,7 +214,7 @@ static void fb_gfx3_renderer_profile_command(FB_GFX3_RENDER_PROFILE *profile,
 	case FB_GFX3_COMMAND_RECTANGLES:
 		if (payload_size >= offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle)) {
 			const FB_GFX3_RECTANGLES_COMMAND *payload =
-				(const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 
 			profile->rectangle_items +=
 				fb_gfx3_renderer_profile_payload_count(command,
@@ -225,7 +229,7 @@ static void fb_gfx3_renderer_profile_command(FB_GFX3_RENDER_PROFILE *profile,
 	case FB_GFX3_COMMAND_BLITS:
 		if (payload_size >= offsetof(FB_GFX3_BLITS_COMMAND, blit)) {
 			const FB_GFX3_BLITS_COMMAND *payload =
-				(const FB_GFX3_BLITS_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLITS_COMMAND);
 
 			profile->blit_items += fb_gfx3_renderer_profile_payload_count(
 				command, offsetof(FB_GFX3_BLITS_COMMAND, blit),
@@ -235,7 +239,7 @@ static void fb_gfx3_renderer_profile_command(FB_GFX3_RENDER_PROFILE *profile,
 	case FB_GFX3_COMMAND_GLYPHS:
 		if (payload_size >= offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)) {
 			const FB_GFX3_GLYPHS_COMMAND *payload =
-				(const FB_GFX3_GLYPHS_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_GLYPHS_COMMAND);
 
 			profile->glyph_items += fb_gfx3_renderer_profile_payload_count(
 				command, offsetof(FB_GFX3_GLYPHS_COMMAND, glyph),
@@ -245,7 +249,7 @@ static void fb_gfx3_renderer_profile_command(FB_GFX3_RENDER_PROFILE *profile,
 	case FB_GFX3_COMMAND_SURFACE_UPLOAD:
 		if (payload_size >= offsetof(FB_GFX3_SURFACE_UPLOAD_COMMAND, data)) {
 			const FB_GFX3_SURFACE_UPLOAD_COMMAND *payload =
-				(const FB_GFX3_SURFACE_UPLOAD_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_UPLOAD_COMMAND);
 			size_t available_bytes = payload_size -
 				offsetof(FB_GFX3_SURFACE_UPLOAD_COMMAND, data);
 
@@ -257,7 +261,7 @@ static void fb_gfx3_renderer_profile_command(FB_GFX3_RENDER_PROFILE *profile,
 	case FB_GFX3_COMMAND_SURFACE_DOWNLOAD:
 		if (payload_size == sizeof(FB_GFX3_SURFACE_DOWNLOAD_COMMAND)) {
 			const FB_GFX3_SURFACE_DOWNLOAD_COMMAND *payload =
-				(const FB_GFX3_SURFACE_DOWNLOAD_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_DOWNLOAD_COMMAND);
 
 			profile->download_bytes += payload->destination_size;
 		}
@@ -414,7 +418,7 @@ static int fb_gfx3_renderer_execute_interop_callback(
 	    (renderer->backend_vtable == NULL) ||
 	    (renderer->backend_vtable->get_opengl_proc == NULL))
 		return FB_GFX3_UNSUPPORTED;
-	payload = (const FB_GFX3_INTEROP_CALLBACK_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_INTEROP_CALLBACK_COMMAND);
 	callback = (FB_GFX3_INTEROP_CALLBACK)(uintptr_t)payload->callback;
 	if (callback == NULL)
 		return FB_GFX3_INVALID;

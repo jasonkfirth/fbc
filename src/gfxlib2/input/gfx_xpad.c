@@ -333,6 +333,7 @@ typedef struct FB_JOYDEV_XPAD_ {
 	uint8_t button_count;
 	uint8_t axis_map[ABS_CNT];
 	uint16_t button_map[KEY_MAX - BTN_MISC + 1];
+	uint16_t axis_map_valid_alignment_padding;
 	int axis_map_valid;
 	int button_map_valid;
 #endif

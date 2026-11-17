@@ -107,7 +107,18 @@ static HDC hdc;
 
 void *fb_hGL_GetProcAddress(const char *proc)
 {
-	return (void *)fb_wgl.GetProcAddress(proc);
+	PROC procedure;
+	void *address = NULL;
+
+	if (!proc || !fb_wgl.GetProcAddress)
+		return NULL;
+
+	procedure = fb_wgl.GetProcAddress(proc);
+	if (fb_hWin32CopyProcedure((void *)&address, sizeof(address),
+	                          (const void *)&procedure, sizeof(procedure)) != 0)
+		return NULL;
+
+	return address;
 }
 
 static int GL_init(PIXELFORMATDESCRIPTOR *pfd)
@@ -132,7 +143,7 @@ static int GL_init(PIXELFORMATDESCRIPTOR *pfd)
 	fb_wgl.MakeCurrent(setup_hdc, setup_hglrc);
 	
 	fb_wgl.GetProcAddress = NULL;
-	if (fb_hWin32LoadProcedure(library, "wglGetProcAddress",
+	if (fb_hWin32LoadProcedure((HMODULE)library, "wglGetProcAddress",
 	                           (void *)&fb_wgl.GetProcAddress,
 	                           sizeof(fb_wgl.GetProcAddress)) != 0) {
 		res = -1;
@@ -175,41 +186,42 @@ cleanup:
 
 static int *GL_setup_pixel_format(PIXELFORMATDESCRIPTOR *pfd, int *attrib, int **samples_attrib)
 {
+	/* PFD component widths are bytes; WGL attributes retain their full values. */
 	*attrib++ = WGL_COLOR_BITS_ARB;
-	pfd->cColorBits = *attrib++ = fb_gl_params.color_bits;
+	pfd->cColorBits = (BYTE)(*attrib++ = fb_gl_params.color_bits);
 	*attrib++ = WGL_RED_BITS_ARB;
-	pfd->cRedBits = *attrib++ = fb_gl_params.color_red_bits;
+	pfd->cRedBits = (BYTE)(*attrib++ = fb_gl_params.color_red_bits);
 	*attrib++ = WGL_GREEN_BITS_ARB;
-	pfd->cGreenBits = *attrib++ = fb_gl_params.color_green_bits;
+	pfd->cGreenBits = (BYTE)(*attrib++ = fb_gl_params.color_green_bits);
 	*attrib++ = WGL_BLUE_BITS_ARB;
-	pfd->cBlueBits = *attrib++ = fb_gl_params.color_blue_bits;
+	pfd->cBlueBits = (BYTE)(*attrib++ = fb_gl_params.color_blue_bits);
 	*attrib++ = WGL_ALPHA_BITS_ARB;
-	pfd->cAlphaBits = *attrib++ = fb_gl_params.color_alpha_bits;
+	pfd->cAlphaBits = (BYTE)(*attrib++ = fb_gl_params.color_alpha_bits);
 	*attrib++ = WGL_DEPTH_BITS_ARB;
-	pfd->cDepthBits = *attrib++ = fb_gl_params.depth_bits;
+	pfd->cDepthBits = (BYTE)(*attrib++ = fb_gl_params.depth_bits);
 	if (fb_gl_params.accum_bits) {
 		*attrib++ = WGL_ACCUM_BITS_ARB;
-		pfd->cAccumBits = *attrib++ = fb_gl_params.accum_bits;
+		pfd->cAccumBits = (BYTE)(*attrib++ = fb_gl_params.accum_bits);
 	}
 	if (fb_gl_params.accum_red_bits) {
 		*attrib++ = WGL_ACCUM_RED_BITS_ARB;
-		pfd->cAccumRedBits = *attrib++ = fb_gl_params.accum_red_bits;
+		pfd->cAccumRedBits = (BYTE)(*attrib++ = fb_gl_params.accum_red_bits);
 	}
 	if (fb_gl_params.accum_green_bits) {
 		*attrib++ = WGL_ACCUM_RED_BITS_ARB;
-		pfd->cAccumGreenBits = *attrib++ = fb_gl_params.accum_green_bits;
+		pfd->cAccumGreenBits = (BYTE)(*attrib++ = fb_gl_params.accum_green_bits);
 	}
 	if (fb_gl_params.accum_blue_bits) {
 		*attrib++ = WGL_ACCUM_BLUE_BITS_ARB;
-		pfd->cAccumBlueBits = *attrib++ = fb_gl_params.accum_blue_bits;
+		pfd->cAccumBlueBits = (BYTE)(*attrib++ = fb_gl_params.accum_blue_bits);
 	}
 	if (fb_gl_params.accum_alpha_bits) {
 		*attrib++ = WGL_ACCUM_ALPHA_BITS_ARB;
-		pfd->cAccumAlphaBits = *attrib++ = fb_gl_params.accum_alpha_bits;
+		pfd->cAccumAlphaBits = (BYTE)(*attrib++ = fb_gl_params.accum_alpha_bits);
 	}
 	if (fb_gl_params.stencil_bits) {
 		*attrib++ = WGL_STENCIL_BITS_ARB;
-		pfd->cStencilBits = *attrib++ = fb_gl_params.stencil_bits;
+		pfd->cStencilBits = (BYTE)(*attrib++ = fb_gl_params.stencil_bits);
 	}
 	if (fb_gl_params.num_samples) {
 		*attrib++ = WGL_SAMPLE_BUFFERS_ARB;

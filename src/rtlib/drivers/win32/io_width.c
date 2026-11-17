@@ -9,6 +9,7 @@
 
 #include "../../fb.h"
 #include "fb_private_console.h"
+#include <limits.h>
 
 int fb_ConsoleWidth( int cols, int rows )
 {
@@ -24,9 +25,18 @@ int fb_ConsoleWidth( int cols, int rows )
     max = GetLargestConsoleWindowSize( FB_CONSOLE_OUTPUT_HANDLE );
     fb_hConsoleGetWindow( NULL, NULL, &ncols, &nrows );
 
+    /* COORD uses signed SHORT fields, so dimensions must fit before they
+     * reach the Windows console APIs. Negative caller values still query. */
+    if( (cols > SHRT_MAX) || (rows > SHRT_MAX) ||
+        (ncols < 0) || (ncols > SHRT_MAX) ||
+        (nrows < 0) || (nrows > SHRT_MAX) )
+    {
+        return 0;
+    }
+
     if( cols > 0 )
     {
-        size.X = cols;
+        size.X = (SHORT)cols;
         do_change = TRUE;
     }
     else
@@ -36,7 +46,7 @@ int fb_ConsoleWidth( int cols, int rows )
 
     if( rows > 0 )
     {
-        size.Y = rows;
+        size.Y = (SHORT)rows;
         do_change = TRUE;
     }
     else
@@ -51,11 +61,11 @@ int fb_ConsoleWidth( int cols, int rows )
 
     SMALL_RECT rect;
     rect.Left = rect.Top = 0;
-    rect.Right = size.X - 1;
+    rect.Right = (SHORT)(size.X - 1);
     if( rect.Right > max.X )
         rect.Right = max.X;
 
-    rect.Bottom = rect.Top + size.Y - 1;
+    rect.Bottom = (SHORT)(rect.Top + size.Y - 1);
     if( rect.Bottom > max.Y )
         rect.Bottom = max.Y;
 
@@ -68,14 +78,14 @@ int fb_ConsoleWidth( int cols, int rows )
         do_resize = TRUE;
         memcpy( &rectRes, &rect, sizeof(SMALL_RECT) );
         if( rectRes.Right >= ncols )
-            rectRes.Right = ncols - 1;
+            rectRes.Right = (SHORT)(ncols - 1);
     }
     else if( rect.Right < (ncols-1) )
     {
         do_resize = TRUE;
         memcpy( &rectRes, &rect, sizeof(SMALL_RECT) );
         if( rectRes.Bottom >= nrows )
-            rectRes.Bottom = nrows - 1;
+            rectRes.Bottom = (SHORT)(nrows - 1);
     }
 
     if( do_resize )

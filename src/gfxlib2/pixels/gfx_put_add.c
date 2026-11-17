@@ -10,6 +10,16 @@
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
 
+/* Byte-pitched rows can leave packed pixels at unaligned addresses. */
+#if defined(__GNUC__) || defined(__clang__)
+typedef unsigned short fb_put_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef unsigned int fb_put_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef unsigned short fb_put_u16_unaligned;
+typedef unsigned int fb_put_u32_unaligned;
+#endif
 
 #ifdef HOST_X86
 #include "../drivers/x86/fb_gfx_mmx.h"
@@ -20,22 +30,24 @@ extern void fb_hPutAdd4MMX(unsigned char *src, unsigned char *dest, int w, int h
 
 static void fb_hPutAdd2C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	unsigned short *s = (unsigned short *)src, *d;
+	fb_put_u16_unaligned *s = (fb_put_u16_unaligned *)src, *d;
 	unsigned int sc, dc, overflow;
 	int x;
 	(void)blender;
 	(void)param;
+	if ((w <= 0) || (h <= 0))
+		return;
 
 	alpha = (alpha + 7) >> 3;
 	src_pitch = (src_pitch >> 1) - w;
 	for (; h; h--) {
-		d = (unsigned short *)dest;
+		d = (fb_put_u16_unaligned *)dest;
 		for (x = w; x; x--) {
 			sc = *s;
 			dc = *d;
 			if (sc != MASK_COLOR_16) {
 				sc = ((sc << 16) | sc) & 0x07C0F81F;
-				sc = ((sc * alpha) >> 5) & 0x07C0F81F;
+				sc = ((sc * (unsigned int)alpha) >> 5) & 0x07C0F81Fu;
 				dc = ((dc << 16) | dc) & 0x07C0F81F;
 				sc += dc;
 				overflow = sc & 0x08010020;
@@ -55,23 +67,25 @@ static void fb_hPutAdd2C(unsigned char *src, unsigned char *dest, int w, int h, 
 
 static void fb_hPutAdd4C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	unsigned int *s = (unsigned int *)src, *d;
+	fb_put_u32_unaligned *s = (fb_put_u32_unaligned *)src, *d;
 	unsigned int sc, dc, temp1, temp2;
 	int x;
 	(void)blender;
 	(void)param;
+	if ((w <= 0) || (h <= 0))
+		return;
 
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
-		d = (unsigned int *)dest;
+		d = (fb_put_u32_unaligned *)dest;
 		for (x = w; x; x--) {
 			sc = *s;
 			dc = *d;
 			if ((sc & 0xFFFFFF) != MASK_COLOR_32) {
 				temp1 = sc & 0xFF00FF;
 				temp2 = (sc >> 8) & 0xFF00FF;
-				temp1 = ((temp1 * alpha) >> 8) & 0xFF00FF;
-				temp2 = (temp2 * alpha) & 0xFF00FF00;
+				temp1 = ((temp1 * (unsigned int)alpha) >> 8) & 0x00FF00FFu;
+				temp2 = (temp2 * (unsigned int)alpha) & 0xFF00FF00u;
 				sc = temp1 | temp2;
 				temp1 = sc & 0x80808080;
 				temp2 = dc & 0x80808080;
@@ -110,6 +124,8 @@ void fb_hPutAdd(unsigned char *src, unsigned char *dest, int w, int h, int src_p
 #endif
 	PUTTER *putter;
 	FB_GFXCTX *context = fb_hGetContext();
+	if ((w <= 0) || (h <= 0))
+		return;
 	
 	if (!context->putter[PUT_MODE_ADD]) {
 #ifdef FB_GFX_HAS_SIMD

@@ -149,7 +149,7 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
 {
     int err;
     int quiet_errors;
-    snd_pcm_hw_params_t *params;
+    snd_pcm_hw_params_t *params = NULL;
     snd_lib_error_handler_t previous_error_handler = NULL;
     unsigned int actual_rate;
     snd_pcm_uframes_t actual_buffer_frames;
@@ -168,7 +168,12 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
     fb_sfx_linux.buffer_frames = (buffer_frames > 0) ? buffer_frames : FB_SFX_DEFAULT_BUFFER;
 
     actual_rate = (unsigned int)fb_sfx_linux.sample_rate;
-    actual_buffer_frames = (snd_pcm_uframes_t)fb_sfx_linux.buffer_frames * 4;
+    actual_buffer_frames = (snd_pcm_uframes_t)(unsigned int)fb_sfx_linux.buffer_frames;
+    if (actual_buffer_frames > (snd_pcm_uframes_t)-1 / 4u)
+        return -1;
+    actual_buffer_frames *= 4u;
+    if (actual_buffer_frames > INT_MAX)
+        return -1;
 
     ALSA_DBG("initializing ALSA driver\n");
 
@@ -188,7 +193,16 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
         return -1;
     }
 
-    snd_pcm_hw_params_alloca(&params);
+    err = snd_pcm_hw_params_malloc(&params);
+    if (err < 0)
+    {
+        if (quiet_errors)
+            snd_lib_error_set_handler(previous_error_handler);
+        ALSA_DBG("snd_pcm_hw_params_malloc failed: %s\n", snd_strerror(err));
+        snd_pcm_close(alsa_pcm);
+        alsa_pcm = NULL;
+        return -1;
+    }
 
     snd_pcm_hw_params_any(alsa_pcm, params);
     snd_pcm_hw_params_set_access(alsa_pcm, params, SND_PCM_ACCESS_RW_INTERLEAVED);
@@ -198,6 +212,8 @@ static int alsa_driver_init(int rate, int channels, int buffer_frames, int flags
     snd_pcm_hw_params_set_buffer_size_near(alsa_pcm, params, &actual_buffer_frames);
 
     err = snd_pcm_hw_params(alsa_pcm, params);
+    snd_pcm_hw_params_free(params);
+    params = NULL;
     if (err < 0)
     {
         if (quiet_errors)
@@ -282,7 +298,7 @@ static int alsa_driver_write(const float *buffer, int frames)
         ALSA_DBG("write frames=%d samples=%d peak=%0.5f\n",
                  frames,
                  samples,
-                 alsa_buffer_peak(buffer, samples));
+                 (double)alsa_buffer_peak(buffer, samples));
         alsa_debug_write_counter++;
     }
 
@@ -370,7 +386,7 @@ static int alsa_driver_write(const float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverAlsa =
 {
     "ALSA",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     alsa_driver_init,
     alsa_driver_exit,
     alsa_driver_write,

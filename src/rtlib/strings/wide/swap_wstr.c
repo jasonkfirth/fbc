@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <stdint.h>
 
 FBCALL void fb_WstrSwap( FB_WCHAR *str1, ssize_t size1, FB_WCHAR *str2, ssize_t size2 )
 {
@@ -14,6 +15,7 @@ FBCALL void fb_WstrSwap( FB_WCHAR *str1, ssize_t size1, FB_WCHAR *str2, ssize_t 
 
 	/* Retrieve lengths */
 	ssize_t len1, len2;
+	size_t swap_bytes;
 
 	/* user-allocated wstring? */
 	if( size1 <= 0 )
@@ -29,9 +31,12 @@ FBCALL void fb_WstrSwap( FB_WCHAR *str1, ssize_t size1, FB_WCHAR *str2, ssize_t 
 	/* Same length? Only need to do an fb_MemSwap() */
 	if( len1 == len2 ) {
 		if( len1 > 0 ) {
+			if( (size_t)len1 > (size_t)PTRDIFF_MAX / sizeof( FB_WCHAR ) )
+				return;
+			swap_bytes = (size_t)len1 * sizeof( FB_WCHAR );
 			fb_MemSwap( (unsigned char *)str1,
 			            (unsigned char *)str2,
-			            len1 * sizeof( FB_WCHAR ) );
+			            (ssize_t)swap_bytes );
 			/* null terminators don't need to change */
 		}
 		return;
@@ -56,9 +61,12 @@ FBCALL void fb_WstrSwap( FB_WCHAR *str1, ssize_t size1, FB_WCHAR *str2, ssize_t 
 
 	/* MemSwap as much as possible (i.e. the smaller length) */
 	if( len1 > 0 ) {
+		if( (size_t)len1 > (size_t)PTRDIFF_MAX / sizeof( FB_WCHAR ) )
+			return;
+		swap_bytes = (size_t)len1 * sizeof( FB_WCHAR );
 		fb_MemSwap( (unsigned char *)str1,
 			    (unsigned char *)str2,
-			    len1 * sizeof( FB_WCHAR ) );
+			    (ssize_t)swap_bytes );
 	}
 
 	/* and copy over the remainder from larger to smaller, unless it's

@@ -16,7 +16,6 @@ FBCALL void *fb_DylibLoad( FBSTRING_ACCESS *library )
 	void *res = NULL;
 
 	char libname[MAX_PATH];
-	char *libnameformat = "%s";
 
 	if( FirstDyLibCall == 0 ) {
 		#include "symb_reg.txt"
@@ -25,7 +24,7 @@ FBCALL void *fb_DylibLoad( FBSTRING_ACCESS *library )
 	}
 
 	if( (library) && (library->data) ) {
-		snprintf( libname, MAX_PATH-1, libnameformat, library->data );
+		snprintf( libname, MAX_PATH-1, "%s", library->data );
 		libname[MAX_PATH-1] = '\0';
 		fb_hConvertPath( libname );
 		res = dlopen( libname, RTLD_GLOBAL + RTLD_LAZY);
@@ -56,6 +55,8 @@ FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 FBCALL void *fb_DylibSymbolByOrd( void *library, short int symbol )
 {
 	/* Not applicable to DOS */
+	(void)library;
+	(void)symbol;
 	return NULL;
 }
 

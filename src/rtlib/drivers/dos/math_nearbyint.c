@@ -22,6 +22,9 @@
 
 #include <math.h>
 
+double nearbyint(double value);
+float nearbyintf(float value);
+
 double nearbyint(double value)
 {
     return rint(value);

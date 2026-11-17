@@ -50,7 +50,7 @@ FBCALL unsigned long long fb_WstrToULongint( const FB_WCHAR *src, ssize_t len )
 		if( radix != 10 )
 		{
 #ifdef HOST_MINGW
-			return fb_WstrRadix2Longint( r, len - fb_wstr_CalcDiff( p, r ), radix );
+			return (unsigned long long)fb_WstrRadix2Longint( r, len - fb_wstr_CalcDiff( p, r ), radix );
 #else
 			p = r;
 #endif

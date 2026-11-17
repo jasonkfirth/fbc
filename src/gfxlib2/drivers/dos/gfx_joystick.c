@@ -12,20 +12,22 @@
 #define JOY_AXIS4 0x8
 #define JOY_COUNT 100000
 
-#define CALCPOS(pos, min, max)	(((((float)(pos) - (float)(min)) * 2.0) / ((float)(max) - (float)(min) + 1.0)) - 1.0)
+#define CALCPOS(pos, min, max)	(((((float)(pos) - (float)(min)) * 2.0f) / ((float)(max) - (float)(min) + 1.0f)) - 1.0f)
 
 static int detected = TRUE;
 
 static int min_x1 = JOY_COUNT, min_y1 = JOY_COUNT, min_x2 = JOY_COUNT, min_y2 = JOY_COUNT;
 static int max_x1 = 0, max_y1 = 0, max_x2 = 0, max_y2 = 0;
 
-__dpmi_regs regs;
-
 FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)
 {
 	unsigned char status;
 	int count;
 	int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+
+	if ((id != 0) || !buttons || !a1 || !a2 || !a3 || !a4 ||
+	    !a5 || !a6 || !a7 || !a8)
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 
 	if (!detected) {
 		*buttons = -1;
@@ -35,10 +37,10 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 
 	fb_dos_cli();
 
-	outportb(0x201, 0);
+	fb_gfx_dos_outportb(0x201, 0);
 
 	for (count = 0; count < JOY_COUNT; count++) {
-		status = inportb(0x201);
+		status = (unsigned char)fb_gfx_dos_inportb(0x201);
 
 		if (status & JOY_AXIS1)
 			x1++;
@@ -58,7 +60,7 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 
 	fb_dos_sti();
 
-	if ((x1 >= JOY_COUNT) || (y1 >= JOY_COUNT)) {
+	if ((count == JOY_COUNT) && ((x1 == JOY_COUNT) || (y1 == JOY_COUNT))) {
 		detected = FALSE;
 		*buttons = -1;
 		*a1 = *a2 = *a3 = *a4 = *a5 = *a6 = -1000.0;
@@ -95,9 +97,9 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 	*a3 = CALCPOS(x2, min_x2, max_x2);
 	*a4 = CALCPOS(y2, min_y2, max_y2);
 
-	status = inportb(JOY_PORT);
+	status = (unsigned char)fb_gfx_dos_inportb(JOY_PORT);
 
-	*buttons = (~status >> 4) & 0xF;
+	*buttons = (ssize_t)((~(unsigned int)status >> 4) & 0xFU);
 
 	*a5 = *a6 = *a7 = *a8 = -1000.0;
 

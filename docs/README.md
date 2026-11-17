@@ -8,6 +8,152 @@ language reference.
 
 ## Start here
 
+- [Native procedure policy](c-emitter-noinline.md) records contextual NoInline,
+  preserved C2FB attributes and complete allocator comparisons.
+- [Call termination](c-emitter-call-termination.md) records conditional GNU
+  error contracts, native comparisons and the whoami warning repair.
+- [Process adapters](c-emitter-process-adapters.md) records native Windows
+  preprocessing, portable command arguments and registered DLL regressions.
+- [Volatile updates](c-emitter-volatile-updates.md) records scalar and pointer
+  writes, mapped storage widths and native access-event checks.
+- [Volatile read addresses](c-emitter-volatile-read-addresses.md) records
+  read-only load adapters, owning-module refresh and native value checks.
+- [Coreutils change-reporting formats](c-emitter-change-formats.md) records
+  original-C comparisons, private caller contracts and native type controls.
+- [Shared case/default lowering](c-emitter-shared-default-switches.md) records
+  direct converter dispatch, preserved fallthrough and native value checks.
+- [Coreutils borrowed slots](c-emitter-coreutils-readonly-slots.md) records
+  callback qualifiers, regeneration profiles and native value checks.
+- [SQLite insertion phases](c-emitter-sqlite-insertion-phases.md) records
+  the GCC-clean SQLite census, checked phase boundaries and native regressions.
+- [SQLite read-only vectors](c-emitter-sqlite-readonly-vectors.md) records
+  constructor qualifiers, schema rows, legacy callbacks and native ABI checks.
+- [SQLite constraint lookups](c-emitter-sqlite-constraints.md) records checked
+  WHERE terms, cached RHS values, cleanup and native regressions.
+- [VT100 runtime symbol](c-emitter-vt100-symbol.md) records the ordinary C name,
+  preserved application overrides and complete native warning reduction.
+- [Native platform owners](c-emitter-native-platform-owners.md) records Haiku
+  archive selection, native SDK execution and Windows UTF-16 qualification.
+- [SQLite DROP COLUMN boundaries](c-emitter-sqlite-drop-column.md) records
+  missing-token handling, cleanup ownership and native precision types.
+- [SQLite virtual-table transactions](c-emitter-sqlite-vtab-transactions.md)
+  records checked-instance ownership, transaction growth and reference checks.
+- [Coreutils forwarded formats](c-emitter-forwarded-formats.md) records complete
+  copy-output helper execution and the private `cp` format-call proof.
+- [Coreutils numeric formats](c-emitter-numfmt-formats.md) records both floating
+  builders, current runtime array cleanup and retained native type diagnostics.
+- [Coreutils sequence formats](c-emitter-sequence-formats.md) records floating
+  sequence normalization, native arguments, endpoint rounding and failure checks.
+- [Coreutils configured formats](c-emitter-configured-formats.md) records the
+  line-number and split-filename parser, output and retained-diagnostic checks.
+- [Object-pointer equality](c-emitter-pointer-equality.md) records differing
+  pointer views, single evaluation and retained source diagnostics.
+- [Coreutils idle-time ranges](c-emitter-idle-formats.md) resolves the two extra
+  GCC O0 format-overflow observations through actual helper executions.
+- [Coreutils time-format contracts](c-emitter-time-formats.md) records the four
+  completed native format, capacity, callback and timestamp-fallback checks.
+- [Typed union member selection](c-emitter-union-members.md) records overlapping
+  pointer-member recovery, retained const-removal diagnostics and native checks.
+- [Current native runtime replay](c-emitter-runtime-current-refresh.md) records
+  the complete MT/non-MT builds, individual execution outcomes and format owners.
+
+- [Obstack allocation callbacks](c-emitter-obstack-callbacks.md) records the
+  four-warning library repair, regeneration checks and native failure controls.
+
+- [SQLite error-path connection](c-emitter-sqlite-error-context.md) records the
+  three-warning library repair and exact before/after callback regression.
+
+- [Checked ASM register and stack effects](c-emitter-asm-register-effects.md) records
+  32-bit PIC operands, x86-64 spill protection, leaf CALL alignment and native controls.
+- [ASM storage ownership](c-emitter-asm-storage-ownership.md) records private global
+  retention, naked local-static aliases, initializer placement and native/LTO controls.
+
+- [Checked numeric parsers](c-emitter-numeric-parsers.md) records COM/date range
+  repairs, bounded date spans, native fault controls and public API checks.
+
+- [Terminal masks and escape bytes](c-emitter-terminal-masks.md) records the
+  native-width flag repair, exact runtime objects and OPEN COM execution checks.
+
+- [Runtime record alignment](c-emitter-runtime-alignment.md) records shared
+  layout guards, native warning reductions and exact runtime object comparisons.
+
+- [Native ABI observations](c-emitter-abi-observations.md) records layout guards,
+  native lifetime controls and the dominant Clang diagnostic contracts.
+
+- [Console coordinate initialization](c-emitter-console-initialization.md)
+  records Unix LOCATE's paired diagnostics and value/callback qualification.
+
+- [Native byte-memory arguments](c-emitter-byte-memory.md) records containing
+  object addresses, real-overrun controls and current production qualification.
+
+- [Conditional native formats](c-emitter-iif-formats.md) records IIF result
+  contracts, whole-port warning counts and native value/diagnostic qualification.
+
+- [Native character adapters](c-emitter-wide-adapters.md) records the shared
+  runtime conversion repair, full object comparisons and locale controls.
+
+- [Managed field cleanup dependencies](c-emitter-cleanup-dependencies.md) records
+  the selected compiler, complete Templari paired census and native cleanup checks.
+
+- [Private format pointers](c-emitter-local-formats.md) records the selected
+  compiler, native alias controls and complete production warning reconciliation.
+
+- [C2FB enum argument widths](c-emitter-enum-widths.md) records the shared
+  C-int correction, native type controls and all 43 remaining format-source owners.
+
+- [Qualified pointer typedefs](c-emitter-qualified-typedefs.md) records the C2FB
+  type and signed-byte repairs, GCC-clean converter and native value checks.
+
+- [Plural translation formats](c-emitter-plural-formats.md) records the selected
+  compiler, both source-format contracts, 64 native executions and current totals.
+
+- [Literal suffixes and native format checks](c-emitter-literal-offsets.md) records
+  the current development compiler, seven removed warnings per native tool and
+  the corrected C2FB ABS result width.
+
+- [Coreutils formatter ownership](c-emitter-coreutils-formatter.md) records the
+  shared-helper link repair and native checks for the largest remaining format cluster.
+- [Templari callback and GCC qualification](c-emitter-templari-callback.md) records
+  the worker signature repair, 651 production profiles and two qualified API casts.
+- [FBSound owning build contexts](c-emitter-fbsound-contexts.md) records 236
+  GCC-clean profiles and 52 newly qualified source paths.
+- [C2FB pointer qualifiers](c-emitter-pointer-qualifiers.md) records the
+  eight-warning library repair and exact native object comparisons.
+- [Evaluated translation results](c-emitter-format-results.md) records the
+  560-warning reduction per native tool and corrected CRT formatter signatures.
+- [SQLite native integer types](c-emitter-sqlite-native-types.md) records the
+  88-warning library repair, native ABI controls and complete production replays.
+- [External declarations](c-emitter-external-prototypes.md) records exact extern
+  coalescing, preserved conflicting declarations and the 135-warning reduction.
+- [Unused C parameters](c-emitter-unused-parameters.md) records GCC draft-C23
+  capability selection, the 343-warning port reduction and development promotion.
+- [Additional project GCC checks](c-emitter-additional-projects.md) records
+  Templari, Midisoft, Rotator3d, FS4, HART, SQLite and coreutils production queues.
+- [Recursive expression source locations](c-emitter-parser-source-locations.md)
+  records four recovered compiler crashes, stack use and the selected compiler.
+- [Library CRT constants](c-emitter-library-crt-constants.md) records the Linux
+  RAND_MAX guard, 940 unchanged Windows readers and explicit Linux port failures.
+- [Library providers and source coverage](c-emitter-library-providers.md) records
+  typed libpq handles, ST/MT build selection and complete library source accounting.
+- [Typed library sorting](c-emitter-library-sort.md) records corrected CRT
+  callback types, reentrant custom sorting and retained FBC diagnostics.
+- [C-long aliases and variadic anchors](c-emitter-c-long-varargs.md) records
+  corrected C++ scalar type codes, C23 builtin selection and native ABI values.
+- [Forward pointer results and private TLS names](c-emitter-forward-results.md)
+  records completed return types, native acceptance and internal TLS identifiers.
+
+- [Checked ASM procedure references](c-emitter-asm-reference-analysis.md) records
+  the 61 removed Win32 unused-function observations and current-source selection.
+
+- [Static locals and evaluated values](c-emitter-static-locals.md) records unread
+  debug storage, preserved floating evaluation and original-context GCC repairs.
+
+- [ASM procedure retention](c-emitter-asm-procedures.md) records native entry
+  preservation, inactive-reference controls and ordinary CRT/DJGPP C aliases.
+
+- [Canonical corpus contexts](c-emitter-census-reproducibility.md) records the
+  retired private include path, native reuse rules and reproduction requirements.
+
 - [Runtime-backed TLS arrays](c-emitter-runtime-tls-arrays.md) records computed
   storage, bounds checks, module initialization and terminating C epilogues.
 
@@ -76,7 +222,22 @@ language reference.
 - [String-capacity source-package replay](c-emitter-source-replay.md): cold source builds, exact relocated BASIC self-hosting and unchanged installed binaries.
 - [String storage capacity](c-emitter-string-capacity.md): checked growth, allocation-failure ownership, bounded heap tests and 34 fewer GCC/Clang observations each.
 - [UTF conversion spans](c-emitter-utf-spans.md): checked byte counts, supplementary scalars, caller-owned buffers and 104 GCC/96 Clang fewer runtime observations.
-- [Console writer spans](c-emitter-console-spans.md): zero-width progress, checked coordinates, narrow/wide values and matched runtime/compiler qualification.
+- [Console writer spans](c-emitter-console-spans.md) covers checked Unix geometry, counted wide output, resize ownership and cross-platform runtime controls.
+- [Unix process and printer buffers](c-emitter-unix-transient-buffers.md) records checked transient storage, native warning reductions and process/printer regression results.
+- [Filesystem and OS-query sizes](c-emitter-filesystem-sizes.md) records executable-path truncation checks, native count conversions and free-memory limits.
+- [Coreutils stat formats](c-emitter-stat-formats.md) records seven native format-builder contracts, output comparisons and format-type diagnostics.
+- [Coreutils word-count formats](c-emitter-wc-formats.md) records all selected fields, native argument checks, output failures and the current runtime replay.
+- [Coreutils shared formatter](c-emitter-coreutils-formatter.md) records all six provider identities, native value/allocation matrices and retained dynamic-format diagnostics.
+
+- [Stored translation formats](c-emitter-stored-translations.md) records saved literal contracts, pointer-copy proofs and retained native diagnostics.
+- [Unsigned string conversions](c-emitter-string-scalars.md) records native parser widths, raw wide-character values and cross-platform regression checks.
+- [Unix driver contracts](c-emitter-unix-driver-contracts.md) records callback signatures, shared focus ownership and legacy termcap arguments.
+- [Keyboard and line input](c-emitter-keyboard-input.md) records X11 callback types, scan-code mapping ownership and native input conversions.
+- [Formats across calls](c-emitter-call-formats.md) records private literal provenance, nonlocal-return boundaries and development-main promotion.
+- [Unsigned variadic arguments](c-emitter-vararg-promotions.md) records native promotions, argument-value checks, preserved diagnostics and the Coreutils source refresh.
+- [Linux native API boundaries](c-emitter-native-api-boundaries.md) records GCC-clean MT/non-MT runtime builds and public runtime executions.
+- [Native runtime padding](c-emitter-native-padding.md) records named alignment storage, native layout equivalence and rebuilt runtime regressions.
+- [Native I/O counts](c-emitter-native-io-counts.md) records bounded POSIX counts, socket-length types, pthread reserves and exact-binary qualification reuse.
 - [Runtime C declaration contracts](c-emitter-runtime-prototypes.md): 108 owned interfaces, unchanged object bytes, checked Win32 decorations and portable C/C++ clients.
 - [RND seed-vector ownership](c-emitter-rnd-state.md): private helper placement, preserved sequences, empty fills and 2,072 fewer native Clang observations.
 - [Little-endian word helpers](c-emitter-utf-words.md): fixed byte copies, 8,296 fewer native Clang observations and real encoded file I/O.

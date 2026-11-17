@@ -27,7 +27,7 @@
 #include "../gfx3_backend_null.h"
 #include "../gfx3_protocol.h"
 #include "../gfx3_resource.h"
-
+#include <limits.h>
 #include <math.h>
 
 typedef struct FB_GFX3_NULL_SURFACE {
@@ -95,11 +95,13 @@ static void null_put_pixel(FB_GFX3_NULL_SURFACE *surface, int x, int y,
 	case 1:
 		destination[0] = (unsigned char)color;
 		break;
-	case 2:
-		((uint16_t *)destination)[0] = (uint16_t)color;
+	case 2: {
+		uint16_t value = (uint16_t)color;
+		memcpy(destination, &value, sizeof(value));
 		break;
+	}
 	default:
-		((uint32_t *)destination)[0] = color;
+		memcpy(destination, &color, sizeof(color));
 		break;
 	}
 }
@@ -114,10 +116,16 @@ static uint32_t null_get_pixel(const FB_GFX3_NULL_SURFACE *surface,
 	switch (surface->bytes_per_pixel) {
 	case 1:
 		return source[0];
-	case 2:
-		return ((const uint16_t *)source)[0];
-	default:
-		return ((const uint32_t *)source)[0];
+	case 2: {
+		uint16_t value;
+		memcpy(&value, source, sizeof(value));
+		return value;
+	}
+	default: {
+		uint32_t value;
+		memcpy(&value, source, sizeof(value));
+		return value;
+	}
 	}
 }
 
@@ -167,7 +175,7 @@ static int null_surface_create(FB_GFX3_NULL_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_CREATE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_CREATE_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->width > 16384) || (payload->height > 16384))
 		return FB_GFX3_INVALID;
@@ -252,7 +260,7 @@ static int null_page_set(FB_GFX3_NULL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PAGE_SET_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAGE_SET_COMMAND);
 	result = null_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -291,7 +299,7 @@ static int null_surface_upload(FB_GFX3_NULL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) < header_size)
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_UPLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_UPLOAD_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->destination_x < 0) || (payload->destination_y < 0) ||
 	    (payload->data_size !=
@@ -342,7 +350,7 @@ static int null_surface_download(FB_GFX3_NULL_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_DOWNLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_DOWNLOAD_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->source_x < 0) || (payload->source_y < 0) ||
 	    (payload->destination_address == 0) ||
@@ -396,7 +404,7 @@ static int null_clear(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_CLEAR_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_CLEAR_COMMAND);
 	result = null_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -426,7 +434,7 @@ static int null_points(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 	if (fb_gfx3_command_payload_size(command) <
 	    offsetof(FB_GFX3_POINTS_COMMAND, point))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_POINTS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
 	     &points_size) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(offsetof(FB_GFX3_POINTS_COMMAND, point), points_size,
@@ -653,7 +661,7 @@ static int null_line(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_LINE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 	result = null_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -765,7 +773,7 @@ static int null_rectangle(FB_GFX3_NULL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 	if ((payload->x1 > payload->x2) || (payload->y1 > payload->y2))
 		return FB_GFX3_INVALID;
 
@@ -795,7 +803,7 @@ static int null_lines(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 	if (fb_gfx3_command_payload_size(command) <
 	    offsetof(FB_GFX3_LINES_COMMAND, line))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_LINES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->line[0]),
 	     &line_bytes) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(offsetof(FB_GFX3_LINES_COMMAND, line), line_bytes,
@@ -837,7 +845,7 @@ static int null_rectangles(FB_GFX3_NULL_STATE *state,
 	if (fb_gfx3_command_payload_size(command) <
 	    offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 	if ((fb_gfx3_size_multiply(payload->count,
 	     sizeof(payload->rectangle[0]), &rectangle_bytes) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle),
@@ -886,7 +894,7 @@ static int null_glyphs(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 	if (fb_gfx3_command_payload_size(command) <
 	    offsetof(FB_GFX3_GLYPHS_COMMAND, glyph))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_GLYPHS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_GLYPHS_COMMAND);
 	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->glyph[0]),
 	     &glyph_bytes) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(offsetof(FB_GFX3_GLYPHS_COMMAND, glyph), glyph_bytes,
@@ -990,7 +998,7 @@ static int null_ellipse(FB_GFX3_NULL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 	if (!(payload->radius_x >= 0.0f) ||
 	    !(payload->radius_x <= 32767.0f) ||
 	    !(payload->radius_y >= 0.0f) ||
@@ -1008,7 +1016,7 @@ static int null_ellipse(FB_GFX3_NULL_STATE *state,
 	x2 = (int)((float)payload->center_x + payload->radius_x);
 	y1 = payload->center_y;
 	y2 = payload->center_y;
-	if (payload->radius_y == 0.0f) {
+	if (fpclassify(payload->radius_y) == FP_ZERO) {
 		null_draw_ellipse_scanline(surface, &clip, y1, x1, x2,
 			payload->color, TRUE, payload->flags);
 		fb_gfx3_resource_release(state->resources, command->target);
@@ -1232,7 +1240,7 @@ static int null_blit(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 	switch (payload->mode) {
 	case FB_GFX3_BLIT_TRANS:
 	case FB_GFX3_BLIT_PSET:
@@ -1328,7 +1336,7 @@ static int null_blit(FB_GFX3_NULL_STATE *state, FB_GFX3_COMMAND *command)
 
 			if (snapshot != NULL) {
 				source_color = snapshot[(size_t)(y - start_y) *
-					(size_t)(end_x - start_x + 1) +
+					snapshot_width +
 					(size_t)(x - start_x)];
 			} else {
 				source_color = null_get_pixel(source,
@@ -1356,13 +1364,16 @@ done:
 	return result;
 }
 
-static int null_transform_wrap_coordinate(int value, int origin, int size)
+static int null_transform_wrap_coordinate(int value, int origin, int64_t size)
 {
-	int relative = (value - origin) % size;
+	int64_t relative;
 
+	if (size <= 0)
+		return origin;
+	relative = ((int64_t)value - origin) % size;
 	if (relative < 0)
 		relative += size;
-	return origin + relative;
+	return (int)((int64_t)origin + relative);
 }
 
 static uint32_t null_transform_source_pixel(
@@ -1371,9 +1382,9 @@ static uint32_t null_transform_source_pixel(
 {
 	if (wrap == FB_GFX3_TRANSFORM_WRAP_REPEAT) {
 		x = null_transform_wrap_coordinate(x, source_rect->x1,
-			source_rect->x2 - source_rect->x1 + 1);
+			(int64_t)source_rect->x2 - source_rect->x1 + 1);
 		y = null_transform_wrap_coordinate(y, source_rect->y1,
-			source_rect->y2 - source_rect->y1 + 1);
+			(int64_t)source_rect->y2 - source_rect->y1 + 1);
 	} else {
 		if (x < source_rect->x1)
 			x = source_rect->x1;
@@ -1455,27 +1466,48 @@ static uint32_t null_transform_interpolate(uint32_t depth,
 	return result;
 }
 
-static uint32_t null_transform_sample(const FB_GFX3_NULL_SURFACE *source,
+static int null_transform_floor_int(double value, int reserve_next, int *result)
+{
+	double floored;
+	double maximum = reserve_next ? (double)(INT_MAX - 1) : (double)INT_MAX;
+
+	if ((result == NULL) || !isfinite(value))
+		return FALSE;
+	floored = floor(value);
+	if ((floored < (double)INT_MIN) || (floored > maximum))
+		return FALSE;
+	*result = (int)floored;
+	return TRUE;
+}
+
+static int null_transform_sample(const FB_GFX3_NULL_SURFACE *source,
 	const uint32_t *snapshot, const FB_GFX3_TRANSFORM_BLIT_COMMAND *payload,
-	double source_x, double source_y)
+	double source_x, double source_y, uint32_t *color)
 {
 	int base_x;
 	int base_y;
 	double fraction_x;
 	double fraction_y;
 
+	if (color == NULL)
+		return FALSE;
 	if ((payload->filter == FB_GFX3_TRANSFORM_FILTER_NEAREST) ||
-	    (source->depth <= 8u))
-		return null_transform_source_pixel(source, snapshot,
-			&payload->source_rect, (int)floor(source_x),
-			(int)floor(source_y), payload->wrap);
+	    (source->depth <= 8u)) {
+		if (!null_transform_floor_int(source_x, FALSE, &base_x) ||
+		    !null_transform_floor_int(source_y, FALSE, &base_y))
+			return FALSE;
+		*color = null_transform_source_pixel(source, snapshot,
+			&payload->source_rect, base_x, base_y, payload->wrap);
+		return TRUE;
+	}
 	source_x -= 0.5;
 	source_y -= 0.5;
-	base_x = (int)floor(source_x);
-	base_y = (int)floor(source_y);
-	fraction_x = source_x - floor(source_x);
-	fraction_y = source_y - floor(source_y);
-	return null_transform_interpolate(source->depth,
+	if (!null_transform_floor_int(source_x, TRUE, &base_x) ||
+	    !null_transform_floor_int(source_y, TRUE, &base_y))
+		return FALSE;
+	fraction_x = source_x - (double)base_x;
+	fraction_y = source_y - (double)base_y;
+	*color = null_transform_interpolate(source->depth,
 		null_transform_source_pixel(source, snapshot, &payload->source_rect,
 			base_x, base_y, payload->wrap),
 		null_transform_source_pixel(source, snapshot, &payload->source_rect,
@@ -1485,6 +1517,7 @@ static uint32_t null_transform_sample(const FB_GFX3_NULL_SURFACE *source,
 		null_transform_source_pixel(source, snapshot, &payload->source_rect,
 			base_x + 1, base_y + 1, payload->wrap),
 		fraction_x, fraction_y);
+	return TRUE;
 }
 
 static int null_transform_blit(FB_GFX3_NULL_STATE *state,
@@ -1507,7 +1540,7 @@ static int null_transform_blit(FB_GFX3_NULL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	result = null_surface_retain(state, command, &destination);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1564,8 +1597,9 @@ static int null_transform_blit(FB_GFX3_NULL_STATE *state,
 		for (x = start_x; x <= end_x; ++x) {
 			double pixel_x = (double)x + 0.5;
 			double pixel_y = (double)y + 0.5;
-			double denominator = (payload->inverse[6] * pixel_x) +
-				(payload->inverse[7] * pixel_y) + payload->inverse[8];
+			double denominator = ((double)payload->inverse[6] * pixel_x) +
+				((double)payload->inverse[7] * pixel_y) +
+				(double)payload->inverse[8];
 			double source_x;
 			double source_y;
 			uint32_t source_color;
@@ -1575,11 +1609,13 @@ static int null_transform_blit(FB_GFX3_NULL_STATE *state,
 
 			if (denominator <= 0.000001)
 				continue;
-			source_x = ((payload->inverse[0] * pixel_x) +
-				(payload->inverse[1] * pixel_y) + payload->inverse[2]) /
+			source_x = (((double)payload->inverse[0] * pixel_x) +
+				((double)payload->inverse[1] * pixel_y) +
+				(double)payload->inverse[2]) /
 				denominator;
-			source_y = ((payload->inverse[3] * pixel_x) +
-				(payload->inverse[4] * pixel_y) + payload->inverse[5]) /
+			source_y = (((double)payload->inverse[3] * pixel_x) +
+				((double)payload->inverse[4] * pixel_y) +
+				(double)payload->inverse[5]) /
 				denominator;
 			if ((payload->wrap == FB_GFX3_TRANSFORM_WRAP_CLAMP) &&
 			    ((source_x < payload->source_rect.x1) ||
@@ -1587,8 +1623,9 @@ static int null_transform_blit(FB_GFX3_NULL_STATE *state,
 			     (source_x >= (double)payload->source_rect.x2 + 1.0) ||
 			     (source_y >= (double)payload->source_rect.y2 + 1.0)))
 				continue;
-			source_color = null_transform_sample(source, snapshot, payload,
-				source_x, source_y);
+			if (!null_transform_sample(source, snapshot, payload,
+			    source_x, source_y, &source_color))
+				continue;
 			destination_color = null_get_pixel(destination, x, y);
 			result = null_blit_pixel(destination->depth, payload->mode,
 				source_color, destination_color, payload->alpha, &output,
@@ -1619,7 +1656,7 @@ static int null_read_pixel(FB_GFX3_NULL_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_READ_PIXEL_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_READ_PIXEL_COMMAND);
 	result = null_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1747,8 +1784,7 @@ static int null_execute_one(FB_GFX3_NULL_STATE *state,
 
 			if (payload_size < sizeof(*payload))
 				return FB_GFX3_INVALID;
-			payload = (const FB_GFX3_WINDOW_TITLE_COMMAND *)
-				command->payload;
+			payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_WINDOW_TITLE_COMMAND);
 			if ((fb_gfx3_size_add(sizeof(*payload), payload->length,
 			     &expected_size) != FB_GFX3_OK) ||
 			    (fb_gfx3_size_add(expected_size, 1u, &expected_size) !=
@@ -1828,6 +1864,7 @@ static int null_wait_idle(FB_GFX3_BACKEND *backend)
 
 const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_null = {
 	FB_GFX3_BACKEND_ABI_VERSION,
+	FB_GFX3_BACKEND_ABI_ALIGNMENT_INITIALIZER
 	"Null",
 	null_probe,
 	null_init,

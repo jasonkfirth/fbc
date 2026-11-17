@@ -41,7 +41,7 @@ int fb_DevComTestProtocolEx
     i = 3;
     ch = filename[i];
     while( ch>='0' && ch<='9' ) {
-        digit = ch - '0';
+		digit = (size_t)(ch - '0');
         if( port > ((size_t)INT_MAX - digit) / 10 )
             return FALSE;
         port = port * 10 + digit;

@@ -195,6 +195,9 @@ int fb_DevPrinterSetWidth( const char *pszDevice, int width, int default_width )
     char *pszDev;
 		DEV_LPT_PROTOCOL *lpt_proto = NULL;
 
+	if( width < -1 )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
     if (!fb_DevLptParseProtocol( &lpt_proto, pszDevice, strlen(pszDevice), TRUE) )
 		{
 			if( lpt_proto )
@@ -216,8 +219,8 @@ int fb_DevPrinterSetWidth( const char *pszDevice, int width, int default_width )
 		if( tmp_handle )
 		{
       if( width!=-1 )
-          tmp_handle->width = width;
-      cur = tmp_handle->width;
+          tmp_handle->width = (unsigned int)width;
+      cur = (int)tmp_handle->width;
 		}
 
 		free( lpt_proto );
@@ -252,7 +255,7 @@ int fb_DevPrinterGetOffset( const char *pszDevice )
     /* Test all printers. */
 		tmp_handle = fb_DevLptFindDeviceByName( lpt_proto->iPort, pszDev, TRUE );
 		if( tmp_handle )
-      cur = tmp_handle->line_length;
+	      cur = (int)tmp_handle->line_length;
 
 		free( lpt_proto );
     free(pszDev);

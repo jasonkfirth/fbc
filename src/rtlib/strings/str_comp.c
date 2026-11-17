@@ -29,7 +29,7 @@ FBCALL int fb_StrCompare
 
 		cmp_len = ((str1_len < str2_len) ? str1_len : str2_len);
 		if( cmp_len > 0 )
-			res = FB_MEMCMP( str1_ptr, str2_ptr, cmp_len );
+			res = FB_MEMCMP( str1_ptr, str2_ptr, (size_t)cmp_len );
 		else
 			res = 0;
 

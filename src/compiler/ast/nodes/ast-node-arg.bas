@@ -618,6 +618,14 @@ private function hCheckVarargParam _
 			'' its values fit. These targets use a 32-bit C int, so both signed
 			'' and unsigned 8- and 16-bit arguments fit without changing value.
 			if( typeGetSize( arg_dtype ) < 4 ) then
+				'' Native C performs the unsigned byte/short promotion itself.
+				'' Keeping that operand type lets its format checker retain the
+				'' original unsigned range. Explicit source LONG casts already
+				'' have LONG type here and keep their own format diagnostics.
+				if( ((env.clopt.backend = FB_BACKEND_GCC) or (env.clopt.backend = FB_BACKEND_CLANG)) and _
+				    ((arg_dtype = FB_DATATYPE_UBYTE) or (arg_dtype = FB_DATATYPE_USHORT)) ) then
+					return TRUE
+				end if
 				n->l = astNewCONV( FB_DATATYPE_LONG, NULL, n->l )
 			end if
 		end select

@@ -7,9 +7,28 @@
  */
 #include "../../fb.h"
 #include "../../fb_private_hdynload.h"
+#include <string.h>
 
 #define hDylibFree( lib ) FreeLibrary( lib )
-#define hDylibSymbol( lib, sym ) GetProcAddress( lib, sym )
+
+/*
+    FreeBASIC stores the Win32 procedure address in its existing void* slots.
+    Keep that ABI representation while avoiding a C function/object-pointer
+    conversion at the GetProcAddress boundary.
+*/
+typedef char FB_WIN32_DYNLIB_POINTER_SIZE_CHECK[
+	(sizeof(FARPROC) == sizeof(void *)) ? 1 : -1];
+
+static void *hDylibSymbol(FB_DYLIB lib, const char *name)
+{
+	FARPROC procedure = GetProcAddress((HMODULE)lib, name);
+	void *address = NULL;
+
+	if (procedure != NULL)
+		memcpy((void *)&address, (const void *)&procedure, sizeof(address));
+
+	return address;
+}
 
 FB_DYLIB fb_hDynLoad(const char *libname, const char *const *funcname, void **funcptr)
 {

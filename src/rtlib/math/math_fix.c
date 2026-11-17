@@ -10,7 +10,8 @@
 /*:::::*/
 FBCALL float fb_FIXSingle( float x )
 {
-	return __builtin_floorf( __builtin_fabsf( x ) ) * fb_SGNSingle( x );
+	int sign = fb_SGNSingle( x );
+	return __builtin_floorf( __builtin_fabsf( x ) ) * (float)sign;
 }
 
 /*:::::*/

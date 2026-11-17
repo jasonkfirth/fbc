@@ -26,6 +26,7 @@
 #include once "core/fbint.bi"
 #include once "backend/ir.bi"
 #include once "ast/ast.bi"
+#include once "ast/nodes/c-procedure-reachability.bi"
 
 '':::::
 private function hCtorList _
@@ -134,6 +135,9 @@ function astNewDECL _
 
 	n->sym = sym
 	astWarnDeclareVariable(sym)
+	if( env.clopt.backend = FB_BACKEND_GCC or env.clopt.backend = FB_BACKEND_CLANG ) then
+		astCProcRecordFieldCleanup(sym)
+	end if
 	if( do_defaultinit ) then
 		n->l = hDefaultInit( sym )
 	end if

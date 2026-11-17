@@ -44,7 +44,8 @@ static int attribute_root( const char *filename )
 FBCALL int fb_FileGetAttr( const char *filename )
 {
 	unsigned int attributes;
-	int result, error;
+	unsigned int result;
+	int error;
 
 	if( !attribute_path_valid( filename ) ) {
 		fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -74,7 +75,8 @@ FBCALL int fb_FileGetAttr( const char *filename )
 FBCALL int fb_FileSetAttr( const char *filename, int attributes )
 {
 	unsigned int existing;
-	int result, error;
+	unsigned int result;
+	int error;
 
 	if( !attribute_path_valid( filename ) ||
 	    (attributes & ~FB_FILE_ATTR_SETTABLE) != 0 )
@@ -87,7 +89,7 @@ FBCALL int fb_FileSetAttr( const char *filename, int attributes )
 	result = _dos_getfileattr( filename, &existing );
 	if( result == 0 )
 		result = _dos_setfileattr( filename,
-			(existing & ~FB_FILE_ATTR_SETTABLE) | (unsigned int)attributes );
+			(existing & ~(unsigned int)FB_FILE_ATTR_SETTABLE) | (unsigned int)attributes );
 	error = result == 0 ? FB_RTERROR_OK : attribute_error();
 	FB_UNLOCK();
 	return fb_ErrorSetNum( error );

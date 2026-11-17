@@ -30,18 +30,15 @@ int fb_FilePutBackEx( FB_FILE *handle, const void *src, size_t chars )
 
 		/* UTF? */
 		if( handle->encod != FB_FILE_ENCOD_ASCII )
-		{
-			if( chars > bytes / sizeof( FB_WCHAR ) )
-				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
-			else
-				bytes = chars * sizeof( FB_WCHAR );
-		}
+			bytes /= sizeof( FB_WCHAR );
+
+		if( chars > bytes )
+			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		else
 		{
-			if( chars > bytes )
-				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
-			else
-				bytes = chars;
+			bytes = chars;
+			if( handle->encod != FB_FILE_ENCOD_ASCII )
+				bytes *= sizeof( FB_WCHAR );
 		}
 	}
 
@@ -66,7 +63,7 @@ int fb_FilePutBackEx( FB_FILE *handle, const void *src, size_t chars )
 			const unsigned char *patch = (const unsigned char *)src;
 			for( i = 0; i < chars; ++i )
 			{
-				FB_WCHAR wc = patch[i];
+				FB_WCHAR wc = (FB_WCHAR)patch[i];
 				memcpy( handle->putback_buffer + (i * sizeof( FB_WCHAR )),
 				        &wc,
 				        sizeof( wc ) );

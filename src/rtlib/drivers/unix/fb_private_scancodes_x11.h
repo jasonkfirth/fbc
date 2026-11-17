@@ -5,14 +5,17 @@
  * Responsibilities: Target-specific runtime support for unix.
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
+#ifndef FB_PRIVATE_SCANCODES_X11_H
+#define FB_PRIVATE_SCANCODES_X11_H
+
 #ifndef DISABLE_X11
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 
-typedef Display *(*XOPENDISPLAY)(char *);
+typedef Display *(*XOPENDISPLAY)(const char *);
 typedef int (*XCLOSEDISPLAY)(Display *);
-typedef void (*XQUERYKEYMAP)(Display *, unsigned char *);
+typedef int (*XQUERYKEYMAP)(Display *, char *);
 typedef int (*XDISPLAYKEYCODES)(Display *, int *, int *);
 #ifdef HOST_SOLARIS
 typedef KeySym* (*XGETKEYBOARDMAPPING)(Display *, unsigned int, int, int *);
@@ -30,6 +33,8 @@ void fb_hInitX11KeycodeToScancodeTb
 		XGETKEYBOARDMAPPING GetKeyboardMapping,
 		XFREE Free
 	);
+
+#endif
 
 #endif
 

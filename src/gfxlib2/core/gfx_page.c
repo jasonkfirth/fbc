@@ -9,6 +9,7 @@
 
 #include "../fb_gfx.h"
 #include "../fb_gfx_gl.h"
+#include <stdint.h>
 
 static void poll_events(void)
 {
@@ -39,7 +40,9 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 {
 	FB_GFXCTX *context;
 	unsigned char *dest, *src;
-	int i, size, text_size, lock = FALSE;
+	size_t size, text_size, text_cells, row_offset, column_offset;
+	size_t start_offset, text_width, text_height;
+	int i, lock = FALSE;
 	int src_page, dest_page;
 
 	FB_GRAPHICS_LOCK( );
@@ -66,6 +69,18 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 	context = fb_hGetContext( );
 	fb_hPrepareTarget(context, NULL);
 	fb_hSetPixelTransfer(context, MASK_A_32);
+	if ((context->view_x < 0) || (context->view_y < 0) ||
+	    (context->view_w < 0) || (context->view_h < 0) ||
+	    (fb_gfx->w < 0) || (fb_gfx->h < 0) ||
+	    (context->view_x > fb_gfx->w) ||
+	    (context->view_y > fb_gfx->h) ||
+	    (context->view_w > fb_gfx->w - context->view_x) ||
+	    (context->view_h > fb_gfx->h - context->view_y) ||
+	    (fb_gfx->pitch <= 0) || (fb_gfx->bpp <= 0) ||
+	    (fb_gfx->text_w < 0) || (fb_gfx->text_h < 0)) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
 
 	if (from_page < 0) {
 		src = context->line[0];
@@ -89,6 +104,10 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 		dest_page = to_page;
 	}
 
+	if (!src || !dest) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
 	if (src == dest) {
 		FB_GRAPHICS_UNLOCK( );
 		return fb_ErrorSetNum(FB_RTERROR_OK);
@@ -96,23 +115,71 @@ FBCALL int fb_GfxFlip(int from_page, int to_page)
 	if ((dest == fb_gfx->framebuffer) && (fb_gfx->lock_count==0))
 		lock = TRUE;
 
-	text_size = fb_gfx->text_w * fb_gfx->text_h * sizeof(GFX_CHAR_CELL);
+	text_width = (size_t)fb_gfx->text_w;
+	text_height = (size_t)fb_gfx->text_h;
+	if ((text_width != 0) && (text_height > SIZE_MAX / text_width)) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
+	text_cells = text_width * text_height;
+	if (text_cells > SIZE_MAX / sizeof(GFX_CHAR_CELL)) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
+	text_size = text_cells * sizeof(GFX_CHAR_CELL);
+	if ((text_size > 0) &&
+	    (!fb_gfx->con_pages || !fb_gfx->con_pages[dest_page] ||
+	     !fb_gfx->con_pages[src_page])) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
 
-	src += (context->view_y * fb_gfx->pitch) + (context->view_x * fb_gfx->bpp);
-	dest += (context->view_y * fb_gfx->pitch) + (context->view_x * fb_gfx->bpp);
-	size = context->view_w * fb_gfx->bpp;
+	if ((size_t)context->view_w > SIZE_MAX / (size_t)fb_gfx->bpp) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
+	size = (size_t)context->view_w * (size_t)fb_gfx->bpp;
+	if ((size_t)context->view_x > SIZE_MAX / (size_t)fb_gfx->bpp) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
+	column_offset = (size_t)context->view_x * (size_t)fb_gfx->bpp;
+	if ((column_offset > (size_t)fb_gfx->pitch) ||
+	    (size > (size_t)fb_gfx->pitch - column_offset)) {
+		FB_GRAPHICS_UNLOCK( );
+		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+	}
+	if ((size > 0) && (context->view_h > 0)) {
+		if ((size_t)context->view_y > SIZE_MAX / (size_t)fb_gfx->pitch) {
+			FB_GRAPHICS_UNLOCK( );
+			return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+		}
+		row_offset = (size_t)context->view_y * (size_t)fb_gfx->pitch;
+		if (column_offset > SIZE_MAX - row_offset) {
+			FB_GRAPHICS_UNLOCK( );
+			return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+		}
+		start_offset = row_offset + column_offset;
+		src += start_offset;
+		dest += start_offset;
+	}
 
 	if (lock)
 		DRIVER_LOCK();
-	for (i = context->view_h; i; i--) {
-		fb_hMemCpy(dest, src, size);
-		dest += fb_gfx->pitch;
-		src += fb_gfx->pitch;
+	if ((size > 0) && (context->view_h > 0)) {
+		for (i = context->view_h; i; i--) {
+			fb_hMemCpy(dest, src, size);
+			dest += fb_gfx->pitch;
+			src += fb_gfx->pitch;
+		}
 	}
 	/* Copy the character cell pages too */
-	fb_hMemCpy(fb_gfx->con_pages[dest_page], fb_gfx->con_pages[src_page], text_size);
+	if (text_size > 0)
+		fb_hMemCpy(fb_gfx->con_pages[dest_page], fb_gfx->con_pages[src_page], text_size);
 	if (lock) {
-		fb_hMemSet(fb_gfx->dirty + context->view_y, TRUE, context->view_h);
+		if (context->view_h > 0)
+			fb_hMemSet(fb_gfx->dirty + context->view_y, TRUE,
+			           (size_t)context->view_h);
 		DRIVER_UNLOCK();
 		update_driver();
 	}
@@ -160,7 +227,8 @@ int fb_GfxPageSet(int work_page, int visible_page)
 		DRIVER_LOCK();
 		fb_gfx->framebuffer = fb_gfx->page[visible_page];
 		fb_gfx->visible_page = visible_page;
-		fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h);
+		if (fb_gfx->h > 0)
+			fb_hMemSet(fb_gfx->dirty, TRUE, (size_t)fb_gfx->h);
 		DRIVER_UNLOCK();
 		update_driver();
 	}

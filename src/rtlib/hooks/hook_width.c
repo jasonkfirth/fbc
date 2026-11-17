@@ -23,7 +23,7 @@ FBCALL int fb_Width( int cols, int rows )
 	}
 
 	if( cols>0 ) {
-		FB_HANDLE_SCREEN->width = cols;
+		FB_HANDLE_SCREEN->width = (unsigned int)cols;
 	}
 
 	/* Reset VIEW PRINT */

@@ -23,6 +23,8 @@
         - file input for handles other than standard input
 */
 
+#include <stddef.h>
+
 #include "../gfx3_exports.h"
 #include "../gfx3_console.h"
 #include "../gfx3_line_input.h"
@@ -88,17 +90,18 @@ char *fb_GfxReadStr(char *buffer, ssize_t maximum_length)
 			}
 			continue;
 		}
-		if ((key == 7) || (length >= maximum_length - 1))
+		if ((key == 7) ||
+		    (((size_t)length + 1u) >= (size_t)maximum_length))
 			continue;
 		if (key == 13) {
 			fb_GfxPrintBufferEx(space, 1u, 0);
 			line_input_move_back();
 		}
-		buffer[length++] = (char)key;
+		buffer[(size_t)length++] = (char)key;
 		character[0] = (char)key;
 		fb_GfxPrintBufferEx(character, 1u, 0);
 	} while (key != 13);
-	buffer[length] = '\0';
+	buffer[(size_t)length] = '\0';
 	FB_GRAPHICS_UNLOCK();
 	return buffer;
 }

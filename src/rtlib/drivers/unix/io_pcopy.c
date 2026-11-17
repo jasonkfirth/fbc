@@ -10,6 +10,8 @@
 
 int fb_ConsolePageCopy( int src, int dst )
 {
+	(void)src;
+	(void)dst;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 }
 

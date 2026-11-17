@@ -25,7 +25,7 @@ int fb_hWriteControlCommand( unsigned char uchValue )
 	unsigned char uchStatus;
 	size_t count = 65535;
 	do {
-		uchStatus = inportb(0x64);         /* read keyboard status */
+		uchStatus = (unsigned char)inportb(0x64); /* read keyboard status */
 	} while( ((uchStatus & 0x02)!=0) && --count );
 	outportb( 0x64, uchValue );
 	return (uchStatus & 0x02)==0;
@@ -34,11 +34,12 @@ int fb_hWriteControlCommand( unsigned char uchValue )
 static int fb_MultikeyHandler(unsigned irq_number)
 {
 	unsigned char scancode_raw;
+	(void)irq_number;
 
 	fb_hWriteControlCommand( 0xAD );    /* Lock keyboard */
 
 	/* read the raw scancode from the keyboard */
-	scancode_raw = inportb(0x60);       /* read scancode */
+	scancode_raw = (unsigned char)inportb(0x60); /* read scancode */
 
 #if 0
 	printf(":%02x", scancode_raw);
@@ -52,19 +53,21 @@ static int fb_MultikeyHandler(unsigned irq_number)
 	 * the raw hardware scancode.
 	 */
 	{
-		size_t code = scancode_raw;
+		unsigned int code = (unsigned int)scancode_raw;
 		if( code==0xE0 )
 		{
 			got_extended_key = TRUE;
 		}
 		else
 		{
-			int release_code = (code & 0x80)!=0;
-			code &= 0x7F;
+			int release_code = (code & 0x80U)!=0;
+			code &= 0x7FU;
 			if( got_extended_key ) {
 				switch( code ) {
 				case 0x2A:
 					code = 0;
+					break;
+				default:
 					break;
 				}
 			}
@@ -95,7 +98,7 @@ static int fb_MultikeyHandler(unsigned irq_number)
 						{
 							nxt = beg;
 						}
-						_farnspokew( (0x40 << 4) | 0x1A, nxt);
+						_farnspokew( (0x40 << 4) | 0x1A, (unsigned short)nxt);
 					}
 
 					kbflags = _farnspeekb( (0x40 << 4) | 0x17 );
@@ -136,7 +139,7 @@ static int fb_MultikeyHandler(unsigned irq_number)
 						flags |= KB_EXTENDED;
 					}
 
-					__fb_dos_multikey_hook(code, flags);
+				__fb_dos_multikey_hook((int)code, flags);
 				}
 			}
 			got_extended_key = FALSE;
@@ -147,7 +150,7 @@ static int fb_MultikeyHandler(unsigned irq_number)
 
 	return FALSE;
 }
-END_OF_STATIC_FUNCTION(fb_MultikeyHandler);
+END_OF_STATIC_FUNCTION(fb_MultikeyHandler)
 
 static void fb_ConsoleMultikeyExit(void)
 {
@@ -162,11 +165,14 @@ static void fb_ConsoleMultikeyExit(void)
 
 void fb_ConsoleMultikeyInit( void )
 {
+	size_t i;
+
 	if (inited)
 		return;
 
 	inited = TRUE;
-	memset((void*)key, FALSE, sizeof(key));
+	for (i = 0; i < sizeof(key); i++)
+		key[i] = FALSE;
 
 	/* We have to lock the memory BEFORE we redirect the ISR! */
 	lock_array(key);
@@ -185,13 +191,13 @@ void fb_ConsoleMultikeyInit( void )
 
 int fb_ConsoleMultikey( int scancode )
 {
-	if( (scancode < 0) || ((unsigned int)scancode >= sizeof( key )) )
+	if( (scancode < 0) || ((size_t)scancode >= sizeof( key )) )
 		return FB_FALSE;
 
 	fb_ConsoleMultikeyInit( );
 
-	return (key[scancode]? FB_TRUE: FB_FALSE);
+	return (key[(size_t)scancode]? FB_TRUE: FB_FALSE);
 }
-END_OF_FUNCTION(fb_ConsoleMultikey);
+END_OF_FUNCTION(fb_ConsoleMultikey)
 
 /* end of drivers/dos/io_multikey.c */

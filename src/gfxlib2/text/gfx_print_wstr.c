@@ -19,7 +19,12 @@ void fb_GfxPrintBufferWstrEx(const FB_WCHAR *buffer, size_t len, int mask)
 
 void fb_GfxPrintBufferWstr(const FB_WCHAR *buffer, int mask)
 {
-	fb_GfxPrintBufferWstrEx( buffer, fb_wstr_Len(buffer), mask);
+	ssize_t length = fb_wstr_Len(buffer);
+	if (length < 0) {
+		fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+		return;
+	}
+	fb_GfxPrintBufferWstrEx(buffer, (size_t)length, mask);
 }
 
 /* end of gfx_print_wstr.c */

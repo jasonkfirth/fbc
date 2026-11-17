@@ -19,11 +19,11 @@ int fb_hArrayRealloc
 		va_list ap
 	)
 {
-	size_t i, elements, size;
-	ssize_t diff;
+	size_t i, elements, size, diff;
 	FBARRAYDIM_ACCESS *dim;
 	ssize_t lbTB[FB_MAXDIMENSIONS] = {0};
 	ssize_t ubTB[FB_MAXDIMENSIONS] = {0};
+	ssize_t lbound, ubound;
 	unsigned char *this_;
 	void *reallocTemp;
 
@@ -34,21 +34,31 @@ int fb_hArrayRealloc
 	/* fixed length? */
 	if( array->flags & FBARRAY_FLAGS_FIXED_LEN )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	if( (dimensions == 0) || (dimensions > FB_MAXDIMENSIONS) || (element_len == 0) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
 	/* load bounds */
 	for( i = 0; i < dimensions; i++ )
 	{
-		lbTB[i] = va_arg( ap, ssize_t );
-		ubTB[i] = va_arg( ap, ssize_t );
+		lbound = va_arg( ap, ssize_t );
+		ubound = va_arg( ap, ssize_t );
+		lbTB[i] = lbound;
+		ubTB[i] = ubound;
 
-		if( lbTB[i] > ubTB[i] )
+		if( lbound > ubound )
 			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		if( fb_hArrayCalcDimElements( lbound, ubound ) == 0 )
+			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 	}
 
 	/* calc size */
 	elements = fb_hArrayCalcElements( dimensions, &lbTB[0], &ubTB[0] );
-	diff = fb_hArrayCalcDiff( dimensions, &lbTB[0], &ubTB[0] ) * element_len;
+	if( (elements == 0) || (elements > SIZE_MAX / element_len) )
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 	size = elements * element_len;
+	if( size > (size_t)PTRDIFF_MAX )
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	diff = (size_t)fb_hArrayCalcDiff( dimensions, &lbTB[0], &ubTB[0] ) * element_len;
 
 	/* shrinking the array? free unused elements */
 	if( dtor_mult != NULL )
@@ -98,9 +108,11 @@ int fb_hArrayRealloc
 	dim = &array->dimTB[0];
 	for( i = 0; i < dimensions; i++, dim++ )
 	{
-		dim->elements = (ubTB[i] - lbTB[i]) + 1;
-		dim->lbound = lbTB[i];
-		dim->ubound = ubTB[i];
+		lbound = lbTB[i];
+		ubound = ubTB[i];
+		dim->elements = fb_hArrayCalcDimElements( lbound, ubound );
+		dim->lbound = lbound;
+		dim->ubound = ubound;
 	}
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );

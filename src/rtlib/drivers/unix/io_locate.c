@@ -10,7 +10,9 @@
 
 int fb_ConsoleLocate( int row, int col, int cursor )
 {
-	int x, y;
+	/* Initialize the fully specified path from the arguments. The later
+	   assignments also retain a single explicit coordinate after the query. */
+	int x = col, y = row;
 	static int visible = 0x10000;
 
 	if (!fb_console_context.inited)

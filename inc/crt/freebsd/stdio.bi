@@ -20,8 +20,8 @@ extern stderr alias "__stderrp" as FILE ptr
 type fpos_t as longint   'Equal to __off_t
 
 extern "c"
-declare function snprintf (byval s as zstring ptr, byval n as size_t, byval format as zstring ptr, ...) as long
-declare function vsnprintf (byval s as zstring ptr, byval n as size_t, byval format as zstring ptr, byval arg as va_list) as long
+declare function snprintf (byval s as zstring ptr, byval n as size_t, byval format as const zstring ptr, ...) as long
+declare function vsnprintf (byval s as zstring ptr, byval n as size_t, byval format as const zstring ptr, byval arg as va_list) as long
 declare function popen (byval as zstring ptr, byval as zstring ptr) as FILE ptr
 declare function pclose (byval as FILE ptr) as long
 declare function getw (byval as FILE ptr) as long

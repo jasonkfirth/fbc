@@ -26,7 +26,7 @@ FBCALL FBSTRING_ACCESS *fb_FloatToStrQB ( float num )
 		size_t tmp_len;
 
 		/* convert */
-		sprintf( dst->data, "% .7g", num );
+		sprintf( dst->data, "% .7g", (double)num );
 
 		tmp_len = strlen( dst->data );				/* fake len */
 

@@ -13,13 +13,16 @@ FBCALL int fb_InputUbyte( unsigned char *dst )
     char buffer[FB_INPUT_MAXNUMERICLEN+1];
 	ssize_t len;
 	int isfp;
+	double rounded_value;
 
 	len = fb_FileInputNextToken( buffer, FB_INPUT_MAXNUMERICLEN, FB_FALSE, &isfp );
 
 	if( isfp == FALSE )
 		*dst = (unsigned char)fb_hStr2UInt( buffer, len );
-	else
-		*dst = (unsigned char)rint( fb_hStr2Double( buffer, len ) );
+	else {
+		rounded_value = rint( fb_hStr2Double( buffer, len ) );
+		*dst = (unsigned char)rounded_value;
+	}
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }

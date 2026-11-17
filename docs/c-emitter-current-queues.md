@@ -6,7 +6,832 @@ Responsibilities: Separate compiler cuts, complete queues and classified blocker
 This file intentionally does NOT claim private promotion or zero warnings.
 -->
 
-# Current selected compiler: alternate-entry cleanup
+# Current native procedure-policy queues, November 17
+
+The [NoInline repair](c-emitter-noinline.md) removes the allocator owner's
+GCC return-local-address observation by preserving its original C attribute.
+Coreutils records GCC 153 / Clang 1,778. The disjoint qualified GCC total is
+169, comprising Coreutils 153, retained corpus 14 and Templari 2. SQLite,
+Midisoft, Rotator3d, FS4 and HART retain their qualified GCC-zero source cuts.
+The compiler, fbctests and Exampleageddon retain GCC zero. All 129 reviewed
+Coreutils nonliteral observations remain counted, along with nine qualifier,
+eight format-overflow, four format-truncation, two unused-function and one
+other format observation. Outstanding source versions and native platform
+checks retain their recorded dispositions.
+
+# Preceding call-termination queues, November 17
+
+The [call-termination repair](c-emitter-call-termination.md) removes Coreutils'
+final GCC null-dereference observation. Its 498-profile census records GCC
+154 / Clang 1,778, with one refreshed owner and 497 carried source cuts. The
+disjoint GCC total is 170, comprising Coreutils 154, retained corpus 14 and
+Templari 2. SQLite and the four additional E-drive queues retain GCC zero.
+All 129 reviewed nonliteral observations remain counted. The return-address,
+qualifier, format-bound and other retained GCC classes keep their source
+owners and follow-up.
+
+# Preceding process-adapter queues, November 17
+
+The [process-adapter repair](c-emitter-process-adapters.md) closes Windows
+preprocessing with 100 portable normal-entry checks. The production GCC census
+retains its qualified source cuts and total of 171, comprising Coreutils 155,
+retained corpus 14 and Templari 2. SQLite and the four additional E-drive
+queues retain GCC zero. Complete supplementary converter builds are GCC-clean
+on Windows and Linux. Their unsuppressed Clang observations remain recorded.
+
+# Preceding volatile-update queues, November 17
+
+The [volatile-update repair](c-emitter-volatile-updates.md) closes a reproduced
+converter defect with complete native fixtures. The production census retains
+its qualified source cuts and GCC total of 171. Coreutils records 155, retained
+corpus 14 and Templari 2. SQLite, Midisoft, Rotator3d, FS4 and HART retain GCC
+zero. All 129 nonliteral observations retain their reviewed dispositions.
+Mapped-field and scalar update regressions are complete. Windows preprocessing
+command quoting and whole converter integration remain open.
+
+# Preceding volatile-read queues, November 17
+
+The [volatile-read repair](c-emitter-volatile-read-addresses.md) refreshes 21
+owning Coreutils profiles and carries 477 other qualified profiles. Coreutils
+records GCC 155 / Clang 1,778. Its qualifier class records nine observations
+under each tool. The disjoint GCC total records 171, with retained corpus 14,
+Templari 2, SQLite zero and the additional E-drive queues zero. All 129
+nonliteral observations retain their reviewed diagnostic dispositions.
+Structural follow-up includes the reproduced scalar-volatile store gap and
+Windows preprocessing-command quoting failure.
+
+# Preceding change-reporting qualification, November 17
+
+The [change-reporting review](c-emitter-change-formats.md) closes the last two
+format contracts with complete function executions, original C references and
+native argument controls. All 129 nonliteral observations have reviewed
+contracts. The production GCC census records 172, including Coreutils 156,
+Templari 2 and retained corpus 14. SQLite and the additional project queues
+record GCC zero. Grouped-default regeneration and full integration remain open.
+
+# Preceding shared-default qualification, November 17
+
+The [shared-default converter repair](c-emitter-shared-default-switches.md)
+preserves the production GCC census at 172. Its complete converter build is
+GCC-clean, and 69 native runs pass 231,840 cases. The two finite-format owning
+applications retain their generated-source refresh and format-contract review.
+
+# Preceding Coreutils borrowed-slot queues, November 17
+
+The [borrowed-slot repair](c-emitter-coreutils-readonly-slots.md) reduces
+Coreutils to GCC 156 / Clang 1,779 across 498 measured profiles. Its qualifier
+class drops from thirteen to ten under each tool. SQLite retains GCC zero /
+Clang 7,693, Templari GCC 2 and the retained corpus GCC 14. Additional projects
+and measured runtime queues retain GCC zero. The disjoint GCC census reaches
+172. Four freshly compiled current native contexts and 992 unchanged native
+results retain the complete Coreutils census.
+
+# Preceding SQLite insertion-phase queues, November 17
+
+The [insertion-phase repair](c-emitter-sqlite-insertion-phases.md) closes
+SQLite's final two GCC observations. Its 555 measured profiles reach GCC zero
+and retain Clang 7,693, with four fresh native contexts and 1,106 exact unchanged
+native results. Coreutils retains GCC 159, Templari GCC 2 and the retained
+corpus GCC 14. Additional projects and measured runtime queues retain GCC zero.
+The disjoint GCC census reaches 175. Sixteen native phase executions pass 784
+cases. Whole-engine SQL execution, port publication and the other warning and
+platform queues remain open.
+
+# Preceding SQLite read-only vector queues, November 17
+
+The [read-only vector repair](c-emitter-sqlite-readonly-vectors.md) refreshes
+all 555 SQLite profiles through both producers and 1,110 native contexts.
+SQLite reaches GCC 2 / Clang 7,693. Its two remaining GCC observations are
+the B-tree insertion and recursive SELECT null paths. Coreutils retains GCC
+159, Templari GCC 2 and the retained corpus GCC 14. Additional projects and
+measured runtime queues retain GCC zero. The disjoint GCC census reaches 177.
+An intervening Templari browser-transport edit is freshly replayed, with all
+677 configured native profiles retaining GCC 2 / Clang 54,317.
+
+# Preceding SQLite constraint queues, November 17
+
+The [constraint repair](c-emitter-sqlite-constraints.md) removes four GCC null
+observations from two complete modules. SQLite reaches GCC 5 / Clang 7,696.
+Coreutils remains GCC 159, Templari GCC 2 and the retained corpus GCC 14.
+Midisoft, Rotator3d, FS4, HART and measured runtime queues retain GCC zero.
+The disjoint GCC census reaches 180. The other 1,051 port profiles retain their
+exact source/dependency cuts and native receipts.
+One intervening Templari client source context is freshly replayed, with all
+677 current profiles retaining GCC 2 / Clang 54,317.
+
+# Preceding VT100 runtime queues, November 17
+
+The [VT100 C identifier repair](c-emitter-vt100-symbol.md) removes 516 Clang
+observations from each complete Linux runtime mode. Packet v51 reaches GCC 0 /
+Clang 9,505 for MT and GCC 0 / Clang 9,503 for non-MT, with 518 objects per tool
+and mode. All objects match the preceding cut. The supplemental current Haiku
+Clang profiles remove another sixteen observations. The disjoint GCC census
+remains 184 and the ten pending platform source versions retain native replay.
+
+# Preceding native platform source queues, November 17
+
+The [Haiku and Windows checks](c-emitter-native-platform-owners.md) close seven
+pending Haiku versions and the Windows UTF-16 header context. Haiku's 24 GCC
+source profiles and the Win64 graphics owners are clean. The supplemental
+Win32 graphics profiles retain their existing tail-padding diagnostics.
+Ten captured platform versions retain native replay. Established queue totals
+remain at GCC 184, with the supplemental source diagnostics recorded separately.
+
+# Preceding SQLite DROP COLUMN queues, November 16
+
+The [DROP COLUMN repair](c-emitter-sqlite-drop-column.md) removes five GCC
+null observations from its complete owning module. SQLite reaches GCC 9 /
+Clang 7,696. The other 1,052 port contexts retain their current native results.
+Coreutils remains GCC 159, Templari GCC 2 and the retained corpus GCC 14.
+Additional projects and measured runtime queues retain GCC zero. The disjoint
+GCC total is 184.
+
+# Preceding SQLite virtual-table queues, November 16
+
+The [virtual-table repair](c-emitter-sqlite-vtab-transactions.md) removes four
+GCC null observations from the complete owning module. The complete port census
+retains 1,052 unchanged native contexts and replaces this module's result.
+SQLite reaches GCC 14 and retains Clang 7,696. Coreutils remains GCC 159 /
+Clang 1,782, Templari GCC 2 / Clang 54,317 and the retained corpus GCC 14 /
+Clang 16,433. Additional projects and the measured native runtime queues retain
+GCC zero. The disjoint GCC total is 189.
+Eight Templari server contexts are refreshed after intervening source edits,
+with all 677 contexts checked against current dependency hashes and build graphs.
+
+# Preceding forwarded-format queues, November 16
+
+The [forwarded-format review](c-emitter-forwarded-formats.md) resolves both
+private helper contracts. The reviewed count reaches 127 of 129 nonliteral
+observations, leaving two finite compiler branch-join cases. Native warnings
+retain their original counts and the disjoint GCC total remains 193.
+The `cp` review covers its format contract through complete caller and native
+guard proof. Filesystem operations retain application qualification.
+
+# Preceding numeric-format and runtime queues, November 16
+
+The [numeric-format checks](c-emitter-numfmt-formats.md) close two execution
+contracts, bringing the reviewed nonliteral count to 125 of 129. Two forwarded
+contracts and two finite compiler sites remain. Native warnings retain their
+original counts. The disjoint GCC total stays at 193. Complete current Linux
+MT/non-MT runtime replays remain GCC-clean, with Clang 10,021 / 10,019 after
+the EOF, integer-128 and parser source updates.
+
+# Preceding sequence-format queues, November 16
+
+The [sequence-format checks](c-emitter-sequence-formats.md) close one execution
+contract through four GCC/Clang O0/O2 runs with actual parsing providers. The
+reviewed count reaches 123 of 129 Coreutils nonliteral observations. Four dynamic
+contracts and two finite compiler sites remain, with all original warnings
+retained. The disjoint last-qualified GCC total stays at 193.
+
+# Preceding configured-format queues, November 16
+
+The [configured-format checks](c-emitter-configured-formats.md) close three
+execution contracts while preserving every native warning. The reviewed count
+reaches 122 of 129 Coreutils nonliteral observations, leaving five dynamic
+contracts and two finite compiler sites. The disjoint last-qualified GCC total
+stays at 193. Templari's latest 677-context paired replay retains GCC 2 /
+Clang 54,317 after the later compose-module version.
+
+# Preceding pointer-equality queues, November 16
+
+Development main selects `4a477330` after the complete
+[pointer-equality qualification](c-emitter-pointer-equality.md). Current
+completed cuts retain these native warning totals.
+
+| Queue | Profiles or entries | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 14 | 16,433 |
+| Templari client/server | 677 | 2 | 54,317 |
+| GNU coreutils local audited port | 498 | 159 | 1,782 |
+| FreeBASIC SQLite local audited port | 555 | 18 | 7,696 |
+| Linux MT runtime, packet v49 | 518 per tool | 0 | 10,021 |
+| Linux non-MT runtime, packet v49 | 518 per tool | 0 | 10,019 |
+| DOS native library audit | 705 | 0 | Pending |
+| Midisoft | 149 | 0 | Pending |
+| Rotator3d | 16 | 0 | Pending |
+| FS4 | 125 | 0 | Pending |
+| HART | 153 standalone | 0 | Pending |
+
+Compiler and fbctests belong to the retained total. HART also retains its
+included-provider reader checks. The disjoint GCC total remains 193. Both
+port C producers retain all preceding complete C identities. Templari's later
+UI input receives a same-compiler incremental replay. Midisoft's metadata-only
+recipe update preserves its existing compile contexts. All 46 PNG exclusions,
+six retained providers, two assembly dispositions and twenty existing frontend
+failures retain their recorded scope.
+
+# Preceding runtime source qualification, November 16
+
+The [current runtime cut](c-emitter-runtime-current-refresh.md) records Linux
+MT GCC 0 / Clang 10,021 and non-MT GCC 0 / Clang 10,019, with all 478 execution
+outcomes verified. The complete existing DOS 705-object native audit is also
+GCC-clean, with exact hashes for all 39 pending DOS inputs. This closes those
+warning-replay checks. Seventeen other captured platform versions retain native
+replay. The disjoint GCC total remains 193 against the last complete project
+cuts below. The pointer-equality candidate's owning queue refresh is running.
+
+# Preceding idle-time range qualification, November 16
+
+The [complete idle-time helper checks](c-emitter-idle-formats.md) resolve both
+extra O0 source-range observations. Their original diagnostics remain visible,
+and the last complete O2 queues retain the GCC total of 193. The object-pointer
+equality candidate retains its complete owning queue and selection checks.
+
+# Preceding time-format queue qualification, November 16
+
+The [four time-format contracts](c-emitter-time-formats.md) pass sixteen native
+executions through the complete current modules. All 129 Coreutils nonliteral
+observations remain counted. Eight dynamic execution contracts and two finite
+compiler sites retain their follow-up. The queue totals below bind their last
+complete source cuts and retain the disjoint GCC total of 193.
+The expanded O0 checks add two idle-time format-overflow observations, recorded
+separately for source-range review.
+
+# Preceding union-member queues, November 16
+
+Development main selects `ba3b0a98`. The
+[union-member qualification](c-emitter-union-members.md) binds complete owning
+queues and the unchanged native objects of all six affected port modules.
+
+| Queue | Profiles or entries | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 14 | 16,433 |
+| Templari current client/server graph | 677 | 2 | 54,317 |
+| GNU coreutils Linux | 498 | 159 | 1,782 |
+| FreeBASIC SQLite Linux | 555 | 18 | 7,696 |
+| Linux MT runtime, tested packet v48 | 518 per native tool | 0 | 10,023 |
+| Linux non-MT runtime, tested packet v48 | 518 per native tool | 0 | 10,021 |
+| Midisoft | 149 | 0 | Pending |
+| Rotator3d | 16 | 0 | Pending |
+| FS4 | 125 | 0 | Pending |
+| HART | 153 standalone | 0 | Pending |
+
+Compiler and fbctests are included in the retained queue. The disjoint
+last-qualified GCC total is 193. All 443 additional standalone contexts pass
+again, including the previously pending Midisoft UI versions. HART retains
+its additional included-provider context. Templari's new server module adds
+143 padding observations and one startup registration. Its C matches the
+preceding compiler under both producers.
+
+All 46 PNG exclusions, six retained providers, two assembly dispositions and
+twenty existing frontend failures retain their owners. Remaining checks include
+twelve dynamic-format contracts, two finite compiler sites and a newly captured
+nested-pointer comparison case. Nineteen later common/runtime input versions
+and 46 captured DOS, Haiku and BSD versions await owning native replay. One
+later gfxlib2 Unicode-header version also retains its native replay.
+
+# Preceding runtime and port queues, November 16
+
+Development main is `626a5305`. Fresh complete GCC compilation confirms all
+1,053 port profiles. The [formatter replay](c-emitter-coreutils-formatter.md)
+adds native boundary evidence. The subsequent
+[SQLite error-path repair](c-emitter-sqlite-error-context.md) removes three GCC
+observations from one changed module, reusing the other 1,052 exact native
+contexts. Its sixteen before/after execution contexts pass.
+The subsequent [obstack callback repair](c-emitter-obstack-callbacks.md) removes
+four Coreutils observations with unchanged Clang counts. Its allocation and
+callback matrix passes, including eight returning-callback controls.
+
+| Queue | Profiles or entries | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 14 | 16,433 |
+| Templari current client/server graph | 676 | 2 | 54,173 |
+| GNU coreutils Linux | 498 | 161 | 1,784 |
+| FreeBASIC SQLite Linux | 555 | 18 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 0 | 10,023 |
+| Linux non-MT runtime and startup | 518 per native tool | 0 | 10,021 |
+| Midisoft | 149 | 0 | Pending |
+| Rotator3d | 16 | 0 | Pending |
+| FS4 | 125 | 0 | Pending |
+| HART | 153 standalone | 0 | Pending |
+
+Compiler and fbctests appear within the retained queue. The disjoint GCC total
+is 195. Coreutils retains 129 nonliteral observations, twelve pending dynamic
+execution contracts and two finite-format propagation sites. The Linux runtime
+cut is packet v48. The 46 PNG exclusions, six included providers, two assembly
+dispositions and twenty existing frontend failures retain their recorded
+owners. HART also retains its additional included-provider entry. Application
+executions and remaining native-platform/Clang owners keep their separate scope.
+
+Both complete Linux runtime configurations and all existing control groups
+pass again. The receipts record 478 binary invocations, including 56
+expected failing original-source controls and sixteen console-view/focus
+boundary runs. Twenty-one captured DOS, Haiku and BSD source versions retain
+their native platform replay. The [runtime refresh](c-emitter-runtime-current-refresh.md)
+records the current packet and the exact execution accounting.
+The source-gate replay closes 113 retained and 35 existing additional-project
+contexts. Current Midisoft recipes add three further contexts, giving 443
+standalone additional-project profiles. Later runtime and Midisoft UI versions retain their
+separate source-hash/byte capture in
+`runtime-port-current-pending-v3-20261116.json.zlib`. Runtime totals above bind
+the completed packet-v47 checks. Midisoft's total binds its last complete
+149-profile source cut.
+The subsequent `sqlite-vdbe-qualification-v2-20261116.json.zlib` preserves one
+additional concurrent Unicode-header version, with thirteen runtime inputs and
+five Midisoft UI inputs pending their owning native replay.
+The later `obstack-qualification-v3-20261116.json.zlib` captures five additional
+runtime versions, retaining eighteen runtime inputs and five Midisoft UI inputs
+in its pending replay inventory.
+The current paired Templari replay also closes the later clock/caption source
+versions. Both C producers retain identical queue totals at 676 contexts.
+
+# Preceding word-count and runtime queues, November 16
+
+The [word-count and runtime qualification](c-emitter-wc-formats.md) closes five
+pending format execution contracts and both later runtime source versions.
+Development main is `0be13d79`.
+
+| Queue | Profiles or entries | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 14 | 16,433 |
+| Templari current client/server graph | 676 | 2 | 54,173 |
+| GNU coreutils Linux | 498 | 166 | 1,785 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 0 | 10,023 |
+| Linux non-MT runtime and startup | 518 per native tool | 0 | 10,021 |
+| Midisoft, Rotator3d, FS4 and HART | 440 standalone | 0 | Pending |
+
+Compiler and fbctests appear within the retained queue. The disjoint GCC total
+is 203. Five word-count nonliteral observations retain their native counts,
+with all five output contracts now exercised. Twelve dynamic-format contracts
+and three finite-format compiler sites remain open. The runtime source cut is
+packet v43, with all 352 preceding runtime executions and eight additional
+PRINT USING suite executions qualified. Existing frontend and exclusion
+entries retain their recorded dispositions. The goal remains active.
+
+# Preceding unsigned variadic queues, November 16
+
+Development main is `0be13d79`. The [unsigned variadic qualification](c-emitter-vararg-promotions.md)
+binds current sources and complete unsuppressed native options.
+
+| Queue | Profiles or entries | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 14 | 16,433 |
+| Templari Win64 client/server graph | 676 | 2 | 54,173 |
+| GNU coreutils Linux | 498 | 166 | 1,785 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup, last qualified | 518 per native tool | 0 | 10,023 |
+| Linux non-MT runtime and startup, last qualified | 518 per native tool | 0 | 10,021 |
+| Midisoft | 146 | 0 | Pending |
+| Rotator3d | 16 | 0 | Pending |
+| FS4 | 125 | 0 | Pending |
+| HART | 153 standalone | 0 | Pending |
+
+Compiler and fbctests appear within the retained queue. Templari's two C
+producers have identical native totals. The last-qualified disjoint GCC total is 203.
+Coreutils removes one observation from the preceding source cut and the
+refreshed GUI graph adds two unused private-helper observations. All 813
+previously pending synchronized GUI inputs are replayed through their owners.
+
+The retained entries include 46 PNG exclusions, six included-provider entries,
+two assembly dispositions and twenty existing frontend failures. Two newly
+exposed TurboTrek include failures close through its current release-build GUI
+include path. HART's additional included-provider entry retains its owning
+context. Exampleageddon's checked/default profiles each retain three deliberate
+GCC observations. Application execution retains its project-specific scope.
+
+Two later concurrent edits in `src/rtlib/console/io_printusg.c` and
+`src/rtlib/drivers/unix/io_readstr.c` await native replay. The runtime counts
+above bind the completed packet-v42 qualification. Both newer source versions
+are preserved in `vararg-promotions-runtime-pending-v1-20261116.json.zlib`.
+Compiler and project input checks are current.
+
+# Preceding ordinary-call and native API queues, November 16
+
+Development main is `52606515`. The [ordinary-call format repair](c-emitter-call-formats.md)
+and [native API qualification](c-emitter-native-api-boundaries.md) retain the
+complete unsuppressed native diagnostics.
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari last-qualified Win64 graph | 676 | 2 | 53,783 |
+| GNU coreutils Linux | 498 | 167 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 0 | 10,027 |
+| Linux non-MT runtime and startup | 518 per native tool | 0 | 10,025 |
+
+Compiler and fbctests appear within the retained corpus. The disjoint GCC total
+is 202, down from 218. Midisoft, Rotator3d, FS4 and HART retain GCC 0 across their
+refreshed 440 standalone profiles. Exampleageddon's checked/default profiles
+each retain three deliberate GCC observations. The 46 PNG exclusions keep their
+disposition. Templari's newer source/recipe inputs and two additional graph
+contexts are now qualified.
+
+A subsequent shared GUI synchronization changes 813 opened inputs in the
+project and retained-corpus copies. These totals describe their last-qualified
+cuts. Replay of the synchronized inputs remains pending. Compiler, fbctests
+and Linux runtime sources retain their qualified hashes.
+
+
+# Current native padding queues, November 15
+
+The selected compiler remains `dffcd9a1`. The complete runtime cut is
+`runtime-current-linux-v33-20261115.json.zlib`, qualified through the
+[native padding repair](c-emitter-native-padding.md).
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari last-qualified Win64 cut | 674 | 2 | 53,469 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 15 | 10,034 |
+
+Compiler and fbctests appear within the retained corpus. The last-qualified
+disjoint GCC total is 218, down from 238. Other projects retain their preceding
+source and native cuts. Templari's newer concurrent inputs await replay.
+Midisoft, Rotator3d, FS4 and HART retain GCC 0. Exampleageddon's checked/default
+profiles each retain three deliberate GCC null observations. The 46 PNG
+exclusions keep their disposition.
+
+
+# Current native I/O count queues, November 15
+
+The selected compiler remains `dffcd9a1`. The complete runtime cut is
+`runtime-current-linux-v30-20261115.json.zlib`, qualified through the
+[native I/O count repair](c-emitter-native-io-counts.md).
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari last-qualified Win64 cut | 674 | 2 | 53,469 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 35 | 10,047 |
+
+Compiler and fbctests appear within the retained corpus. The last-qualified
+disjoint GCC total is 238, down from 247. Other projects retain their preceding
+source and native cuts. Templari's newer concurrent inputs await replay.
+Midisoft, Rotator3d, FS4 and HART retain GCC 0. Exampleageddon's checked/default
+profiles each retain three deliberate GCC null observations. The 46 PNG
+exclusions keep their disposition.
+
+
+# Current keyboard/input queues, November 15
+
+The selected compiler remains `dffcd9a1`. The complete runtime cut is
+`runtime-current-linux-v29-20261115.json.zlib`, qualified through the
+[keyboard/input repair](c-emitter-keyboard-input.md).
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari last-qualified Win64 cut | 674 | 2 | 53,469 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 44 | 10,056 |
+
+Compiler and fbctests appear within the retained corpus. The last-qualified
+disjoint GCC total is 247, down from 255. Other project results retain their
+preceding source cuts and native contexts. Templari's newer concurrent inputs
+await replay. Midisoft, Rotator3d, FS4 and HART retain GCC 0. Exampleageddon's
+checked/default profiles each retain three deliberate GCC null observations.
+The 46 PNG exclusions keep their disposition.
+
+
+# Current Unix driver queues, November 15
+
+The selected compiler remains `dffcd9a1`. The full runtime cut is
+`runtime-current-linux-v27-20261115.json.zlib`, qualified through the
+[Unix driver contract repair](c-emitter-unix-driver-contracts.md).
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari last-qualified Win64 cut | 674 | 2 | 53,469 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 52 | 10,064 |
+
+Compiler and fbctests appear within the retained corpus. The last-qualified
+disjoint GCC total is 255, down from 275. Other project results retain their
+preceding source cuts and native contexts. Templari's newer concurrent inputs
+await replay. Midisoft, Rotator3d, FS4 and HART retain GCC 0. Exampleageddon's
+checked/default profiles each retain three deliberate GCC null observations.
+The 46 PNG exclusions keep their disposition.
+
+
+# Current string scalar queues, November 15
+
+The selected compiler remains `dffcd9a1`. The complete runtime cut is
+`runtime-current-linux-v26-20261115.json.zlib`, qualified through the
+[unsigned string conversion repair](c-emitter-string-scalars.md).
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari last-qualified Win64 cut | 674 | 2 | 53,469 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 72 | 10,078 |
+
+Compiler and fbctests appear within the retained corpus. The last-qualified
+disjoint GCC total is 275, down from 280. Other project/source cuts retain their
+preceding native contexts. Templari's newer concurrent source/recipe edits await
+replay. Midisoft 146, Rotator3d 16, FS4 125 and HART 153 standalone objects retain
+GCC 0. Exampleageddon checked/default each retain 1,775 profiles and three
+deliberate GCC null observations. The 46 PNG exclusions keep their disposition.
+
+
+# Current stat format checks, November 15
+
+The [stat format qualification](c-emitter-stat-formats.md) closes seven runtime
+contracts while retaining every production warning. Coreutils stays at
+GCC 168 / Clang 1,803. Its seven stat nonliteral-format warnings remain visible.
+The disjoint GCC total stays 280. Seventeen dynamic-format runtime contracts
+and four finite-format compiler sites remain open. The queue table below retains
+its preceding source cuts and native compilation contexts. Ten newer Templari
+source/recipe inputs await replay after concurrent project edits.
+
+
+# Current filesystem/count queues, November 15
+
+The selected compiler remains `dffcd9a1`. The fresh complete runtime cut is
+`runtime-current-linux-v24-20261115.json.zlib`.
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari Win64 client/server | 674 | 2 | 53,469 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 77 | 10,083 |
+
+Compiler and fbctests appear within the retained corpus. The disjoint GCC total
+is 280, down from 292. Exampleageddon checked/default each retain 1,775 profiles
+with three deliberate GCC null observations. Midisoft 146, Rotator3d 16, FS4 125
+and HART 153 standalone objects retain GCC 0. HART keeps its included provider's
+seven owning readers. The first completed Templari refresh covered 24 contexts, with 645
+unchanged contexts reused. The other project
+source pins and compiler/native context identities remain exact. The 46 PNG exclusions keep their disposition.
+Earlier tables preserve their recorded cuts.
+
+The latest Templari source replay qualifies 674 paired Win64 profiles at
+GCC 2 / Clang 53,469. It reuses 670 exact native contexts from the intermediate
+source replay and qualifies four additional contexts through both C producers.
+The intermediate 670-profile run observed a build-recipe update before its final
+graph check. The new 674-profile graph and current recipe hashes close that
+check. All other project and compiler inputs retain their preceding identities.
+
+
+# Current transient-buffer repair queues, November 15
+
+The selected compiler remains `dffcd9a1`. The full current runtime cut is
+`runtime-current-linux-v22-20261115.json.zlib`.
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari Win64 client/server | 668 | 2 | 53,213 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 89 | 10,095 |
+
+Compiler and fbctests are included in the retained corpus. The disjoint GCC
+total is 292, down from 311. Exampleageddon checked/default each retain 1,775
+profiles with three deliberate GCC null observations. Midisoft 146, Rotator3d
+16, FS4 125 and HART 153 standalone objects retain GCC 0. HART's included
+provider keeps seven owning readers. All preceding non-runtime source pins,
+compiler identities and native-context receipts remain exact. The 46 PNG
+exclusions keep their disposition. Earlier tables preserve their recorded cuts.
+
+
+# Current console-repair queues, November 15
+
+Selected compiler `dffcd9a1` retains its complete compiler and corpus receipts.
+The current Linux runtime uses the full `runtime-current-linux-v20` rebuild.
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari Win64 client/server | 668 | 2 | 53,213 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 108 | 10,108 |
+
+Compiler and fbctests are included in the retained corpus. The disjoint GCC
+total is 311, down from 350. Exampleageddon checked/default each retain 1,775
+profiles with three deliberate GCC null observations. Midisoft 146, Rotator3d
+16, FS4 125 and HART 153 standalone objects retain GCC 0. HART's included
+provider retains seven owning readers. The 46 PNG exclusions retain their
+disposition. A newer Templari external.bas edit receives paired re-emission,
+and all 668 current profiles and resolved graph flags are checked again.
+
+
+# Current private-storage repair queues, November 15
+
+Selected compiler `dffcd9a1` has complete `asm-global` receipts under
+`build/c-emitter-forward-views-20261105`.
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari Win64 client/server | 668 | 2 | 53,213 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 147 | 10,150 |
+
+Compiler and fbctests contexts are included in the retained corpus. Its
+Exampleageddon checked/default configurations each contain 1,775 profiles and
+three deliberate GCC null observations. The additional Win64 GCC queues contain
+Midisoft 146, Rotator3d 16, FS4 125 and HART 153 standalone objects, all at GCC 0.
+HART also has one included provider qualified through seven owning readers.
+The 46 PNG exclusions retain their disposition. Earlier tables preserve their
+recorded compiler and source cuts.
+
+
+# Current selected stack-repair queues, November 15
+
+The selected compiler is `bc2e5878`. Complete receipts use the `asm-stack64`
+prefix under `build/c-emitter-forward-views-20261105`.
+
+| Queue | Profiles | GCC | Clang |
+| --- | ---: | ---: | ---: |
+| Compiler | 224 | 0 | 1,340 |
+| fbctests | 703 | 0 | 771 |
+| Retained corpus | 6,419 | 12 | 15,862 |
+| Templari Win64 client/server | 668 | 2 | 53,213 |
+| GNU coreutils Linux | 498 | 168 | 1,803 |
+| FreeBASIC SQLite Linux | 555 | 21 | 7,696 |
+| Linux MT runtime and startup | 518 per native tool | 147 | 10,150 |
+
+The compiler and fbctests also appear within the retained corpus. Exampleageddon
+contributes 1,775 checked and 1,775 default contexts, with GCC 3 in each and
+Clang 2,712 / 2,591 respectively. The retained dispositions include 46 excluded
+PNG contexts, six included providers, two assembler contexts and twenty known
+frontend refusals. Accepted C contexts total 6,345.
+
+The additional Win64 GCC queues close at Midisoft 146 / GCC 0, Rotator3d 16 /
+GCC 0, FS4 125 / GCC 0 and HART 153 / GCC 0. HART also has one included provider
+whose seven owning readers retain qualification. Templari refreshes four profiles
+after one concurrent header edit. All 25 changed Linux coreutils modules receive
+paired native builds under the original unsuppressed diagnostic options.
+
+The fresh Linux runtime count includes thirty concurrent source updates and all
+1,328 current source inputs. Twelve date/serial API executions pass against its
+rebuilt archives. The complete runtime's two new Clang declaration-order
+observations remain counted. Other platform-native runtime results retain their
+recorded target cuts. Earlier references below retain their original cuts.
+
+
+# Current numeric parser source reference, November 15
+
+The [checked numeric parsers](c-emitter-numeric-parsers.md) bring the complete
+current Linux MT runtime to GCC 147 / Clang 10,148. All 1,328 canonical inputs
+are verified after the build. GCC loses fourteen conversion observations.
+Clang loses fourteen narrowings and retains eight additional generic cursor
+observations, with an overall reduction of six. Original/repaired parser and
+public API controls retain their full values and diagnostic output.
+
+# Current runtime source reference, November 15
+
+The [terminal mask and escape qualification](c-emitter-terminal-masks.md)
+removes 32 GCC and 32 Clang observations. Its complete current runtime cut has
+GCC 161 / Clang 10,154 after four additional native builds qualify two concurrent
+indentation edits. All 1,328 canonical inputs match the current receipt. The
+compiler and expanded-project references below retain their accepted cuts.
+
+# Selected queue reference, November 15
+
+Development main is `9c05c8a6` after the
+[ASM ownership qualification](c-emitter-asm-storage-ownership.md). Compiler and
+703 fbctests have GCC 0. The complete port counts are coreutils GCC 168 /
+Clang 1,803 and SQLite GCC 21 / Clang 7,696. Templari's current 668-profile
+paired graph has GCC 2 / Clang 53,213, with 1,185 coherent source inputs.
+The four additional Windows projects retain GCC 0 across 440 object profiles.
+
+The [runtime alignment cohort](c-emitter-runtime-alignment.md) has GCC 209 /
+Clang 10,195 after 1,602/47 removals. The subsequent coherent current-source
+refresh captures six concurrent inputs at GCC 200 / Clang 10,192. Seven later
+concurrent input changes remain outside that captured runtime result. The alignment
+repair preserves original member offsets, native object and archive identities.
+The later concurrent source delta changes four GCC objects and one Clang object.
+The selected-compiler retained replay completes 6,419 configured profiles at
+GCC 12 / Clang 15,862 with no stale inputs or new frontend regressions.
+The following references preserve earlier compiler cuts.
+
+# Earlier queue reference
+
+The complete retained replay through selected `6634540c` covers all 6,419
+configured profiles with GCC 12 / Clang 15,862, no stale inputs and no new
+frontend regressions. The [ABI observation ledger](c-emitter-abi-observations.md)
+records guard and registration contracts for the dominant Clang classes.
+The current Templari graph completes 664 paired profiles at GCC 2 / Clang 53,111.
+Its source cut and complete ABI ledger retain exact inputs and both producers.
+
+The [byte-memory qualification](c-emitter-byte-memory.md) on `6634540c`
+retains compiler/fbctests GCC 0. Current port totals are coreutils GCC 187 /
+Clang 1,830 and SQLite GCC 21 / Clang 7,696. Templari's refreshed 661-profile
+cut records GCC 2 / Clang 52,665. The broader retained refresh is running.
+The following paragraphs preserve their preceding source cuts.
+
+The [conditional-format qualification](c-emitter-iif-formats.md) selects
+`93d2c494`, retaining compiler/fbctests GCC 0 and reaching coreutils GCC 187 /
+Clang 1,831. SQLite retains GCC 23 / Clang 7,696. The current 659-profile
+Templari paired cut records GCC 2 / Clang 52,528 after independent project
+input changes. The wider retained census refresh is running. The counts and
+compiler identities below preserve their earlier source cuts.
+
+The preceding selected compiler was `409dc1ef`. The last completed retained cut on
+`987d6d9d` covers 6,419 profiles at 12 GCC and 15,861 Clang observations,
+including the recovered Optical contexts. Current compiler and fbctests
+generated C are GCC-clean. The additional Linux coreutils/SQLite queues now
+have 195/23 GCC warnings after the draft-C23, external-object,
+[SQLite native-type](c-emitter-sqlite-native-types.md) and
+[format-result](c-emitter-format-results.md) and
+[C2FB pointer-qualifier repairs](c-emitter-pointer-qualifiers.md). The
+completed omaGUI replay on `cd32db5b` has zero GCC warnings across 115
+profiles. The older JRPG refresh completes 241 profiles with zero GCC warnings. See
+[additional projects](c-emitter-additional-projects.md) for per-target counts
+and [current status](c-emitter-current-status.md) for the complete
+source cut, expanded queues and remaining qualification. Tables below retain
+their historical compiler identities. Templari's current 658-profile Win64
+paired replay has GCC 2 / Clang 52,408 after the
+[callback correction](c-emitter-templari-callback.md). Both remaining dynamic API
+conversions have native Win32/Win64 qualification and retain their warnings.
+
+A targeted replay through `409dc1ef` freshly recompiles the seven retained
+warning-bearing profiles. All complete with the same twelve GCC observations,
+comprising two array-bound, two format-truncation, six null-dereference and two
+pedantic diagnostics. The full 6,419-profile refresh remains open. The compact
+receipt is `remaining-gcc-owners-v2-20261114.json.zlib` under the shared audit
+directory, with every profile's current opened inputs and original GCC flags.
+
+The [coreutils formatter qualification](c-emitter-coreutils-formatter.md) fixes
+three duplicate library definitions and passes sixteen native executions.
+The subsequent [literal-offset and ABS repairs](c-emitter-literal-offsets.md)
+bring its complete 498-profile queue to GCC 201 / Clang 1,845. The subsequent
+[plural-format repair](c-emitter-plural-formats.md) reaches GCC 197 / Clang 1,841.
+All 703 fbctests and 1,040 port C files match exactly. The thirteen changed port
+units retain their original C after removing verified identity metadata.
+Every FBC warning line is preserved. The 99-site
+runtime-format cluster retains its warnings, with 90 sites reached by counters.
+
+The [FBSound expansion](c-emitter-fbsound-contexts.md) completes 236 Windows/Linux
+32/64-bit profiles with zero GCC and 405 Clang observations. Both native tools
+accept every object. Its 52 newly qualified paths bring the wider ledger to
+1,466 owning proofs and 1,471 pending contexts on their recorded compiler cuts.
+
+The [qualified-typedef converter audit](c-emitter-qualified-typedefs.md)
+adds the complete Win64 C2FB tool. Both producer profiles emit one identical C
+input with GCC 0 / Clang 158. Its type and signed-byte regression passes 32
+native executions. This standalone tool has its own coverage and count scope.
+The production port counts above retain verified current opened-input hashes.
+
+The [enum-width correction and source review](c-emitter-enum-widths.md)
+qualifies the complete converter at GCC 0 / Clang 158 and corrects one production
+version argument. Native production warning counts remain unchanged. All 43
+additional format owners are traced, with fifteen compiler propagation candidates,
+27 runtime qualification contracts and the repaired copyright contract recorded.
+
+The subsequent [private-format repair](c-emitter-local-formats.md) reaches
+GCC 195 / Clang 1,839 for coreutils. All 1,053 production emissions complete,
+with 1,051 exact C identities, two exact original-C reconstructions and four
+byte-identical native object pairs. Thirteen finite-format propagation
+candidates and 27 additional runtime contracts remain. SQLite retains
+GCC 23 / Clang 7,696. Compiler and fbctests remain GCC-clean on `f64ca95a`.
+
+The subsequent [cleanup dependency qualification](c-emitter-cleanup-dependencies.md)
+selects `409dc1ef`. Complete compiler/fbctests counts are GCC 0/0 and Clang
+1,340/771. Coreutils retains GCC 195 / Clang 1,839 and SQLite 23 / 7,696.
+All 1,756 fbctests/port C inputs match exactly. Templari's 658-profile paired
+census completes with GCC 2 / Clang 52,408. Its portable source snapshot records
+the actual opened inputs. Three floating runtime contracts close, leaving 24.
+The nine earlier formatter execution gaps now have explicit dispositions.
+
+# Historical selected compiler: alternate-entry cleanup
 
 `build/main-gcc/bin/fbc.exe` is BF344DD7, with B2827405 retained for rollback.
 Complete GCC results remain compiler 0, fbctests 0, Exampleageddon 6 deliberate

@@ -56,6 +56,10 @@ typedef struct FB_GFX3_VULKAN_RUNTIME {
 	uint32_t in_flight_submission_count;
 	/* High-water mark used by the standalone slot-ring regression test. */
 	uint32_t maximum_in_flight_submission_count;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the following 64-bit submission counter's native offset. */
+	uint32_t completed_submission_alignment_padding;
+#endif
 	/* Historical submission counter retained for existing bootstrap diagnostics. */
 	uint64_t completed_submission_count;
 	/*

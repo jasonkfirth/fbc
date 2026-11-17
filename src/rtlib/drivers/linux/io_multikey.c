@@ -122,7 +122,8 @@ static int keyboard_console_getch(void)
 static void keyboard_console_handler(void)
 {
 	unsigned char buffer[128], scancode;
-	int pressed, repeated, num_bytes, i, key, extended;
+	int pressed, repeated, key, extended;
+	ssize_t num_bytes, i;
 	int vt, orig_vt;
 	struct kbentry entry;
 	struct vt_stat vt_state;
@@ -133,7 +134,8 @@ static void keyboard_console_handler(void)
 			scancode = kernel_to_scancode[buffer[i] & 0x7F];
 			pressed = (buffer[i] & 0x80) ^ 0x80;
 			repeated = pressed && key_state[scancode];
-			key_state[scancode] = pressed;
+			/* Kernel press/release state is either 0 or the 0x80 bit. */
+			key_state[scancode] = (unsigned char)pressed;
 
 			/* Since we took over keyboard control, we have to map our keypresses to ascii
 			 * in order to report them in our own keyboard buffer */
@@ -159,7 +161,8 @@ static void keyboard_console_handler(void)
 			if (key_state[SC_ALT])
 				entry.kb_table |= 0x8;
 			entry.kb_index = scancode; /* keycode */
-			ioctl(key_fd, KDGKBENT, &entry);
+			if( ioctl(key_fd, KDGKBENT, &entry) < 0 )
+				entry.kb_value = K_NOSUCHMAP;
 
 			if (scancode == SC_BACKSPACE)
 				key = 8;
@@ -224,7 +227,8 @@ static void keyboard_console_handler(void)
 				key = extended;
 
 			if( pressed && key ) {
-				key_buffer[key_tail] = key;
+				/* Character bytes and packed extended keys fit the two-byte queue. */
+				key_buffer[key_tail] = (unsigned short)key;
 				if (((key_tail + 1) & (KEY_BUFFER_SIZE - 1)) == key_head)
 					key_head = (key_head + 1) & (KEY_BUFFER_SIZE - 1);
 				key_tail = (key_tail + 1) & (KEY_BUFFER_SIZE - 1);
@@ -243,7 +247,7 @@ static void keyboard_console_handler(void)
 #ifndef DISABLE_X11
 static void keyboard_x11_handler(void)
 {
-	unsigned char keymap[32];
+	char keymap[32];
 	int i;
 
 	if (!fb_hXTermHasFocus())
@@ -251,7 +255,7 @@ static void keyboard_x11_handler(void)
 	X.QueryKeymap(display, keymap);
 	memset(key_state, FALSE, 128);
 	for (i = 0; i < 256; i++) {
-		if (keymap[i / 8] & (1 << (i & 0x7)))
+		if ((unsigned char)keymap[i / 8] & (1 << (i & 0x7)))
 			key_state[fb_x11keycode_to_scancode[i]] = TRUE;
 	}
 }

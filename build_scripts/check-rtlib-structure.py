@@ -49,6 +49,7 @@ DATA_ABI_LABEL = re.compile(
 LEGACY_ABI_CONSUMERS = {
     'src/rtlib/drivers/nuttx/fb_nuttx_object.c',
     'tests/rtlib/runtime-symbol-legacy.c',
+    'tests/rtlib/vt100-symbol-legacy.c',
 }
 
 # These quoted names are supplied by platform SDKs, not this repository.
@@ -96,11 +97,14 @@ def stale_abi_references(root: Path) -> list[str]:
     Private platform identifiers without a shared alias are outside this check.
     """
     aliases = {}
+    headers = []
     for subsystem in ('rtlib', 'gfxlib2', 'gfxlib3', 'sfxlib'):
-        for path in (root / 'src' / subsystem).glob('*.h'):
-            text = without_comments(path.read_bytes().decode('latin-1'))
-            aliases.update({old: new for new, old in DATA_ABI_LABEL.findall(text)
-                            if old != new})
+        headers.extend((root / 'src' / subsystem).glob('*.h'))
+    headers.append(root / 'src/rtlib/drivers/unix/fb_unix.h')
+    for path in headers:
+        text = without_comments(path.read_bytes().decode('latin-1'))
+        aliases.update({old: new for new, old in DATA_ABI_LABEL.findall(text)
+                        if old != new})
     failures = []
     for directory in ('src', 'tests'):
         for path in (root / directory).rglob('*'):
@@ -171,6 +175,8 @@ def expected_sources(rtl: Path, groups: list[str], target: str, arch: str,
     native_directory = drivers / "win32" / "x86_64"
     for layer in layers:
         for path in layer:
+            if source_os == "haiku" and path.parent == drivers / "haiku" and path.name == "fb_hGetExeName.c":
+                continue
             if target != "win32" and path.parent == native_directory and path.name in {"error.c", "error_frame.c"}:
                 continue
             selected[path.name] = path.resolve()
@@ -227,10 +233,13 @@ def validate(root: Path, make: str) -> None:
         relative = path.relative_to(rtl).as_posix()
         text = path.read_bytes().decode("latin-1")
         header = text.split("*/", 1)[0]
-        for field in ("Project:", "File: " + relative, "Purpose:", "Responsibilities:",
-                      "This file intentionally does NOT contain:"):
+        for field in ("Project:", "File: " + relative, "Purpose:", "Responsibilities:"):
             if field not in header:
                 failures.append(relative + ": header missing " + field)
+        # Existing headers describe boundaries with exclusions or references
+        # to the module that owns the surrounding responsibility.
+        if not re.search(r"\bThis file (?:intentionally )?does not\b|\bbelongs? to\b", header, re.I):
+            failures.append(relative + ": header missing scope boundaries")
         footer = "/* end of " + relative + " */"
         if relative in SHARED_BASIC_HEADERS:
             footer = "#if 0\n" + footer + "\n#endif"

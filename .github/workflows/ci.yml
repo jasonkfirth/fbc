@@ -403,6 +403,19 @@ jobs:
           make clean-compiler clean-libs
           make -j"$JOBS" all BUILD_FBC="$PWD/.ci-host/fbc.exe" </dev/null
 
+      - name: Require zero GCC warnings in the runtime libraries
+        if: ${{ matrix.name == 'x86_64' && steps.runtime-build.outcome == 'success' }}
+        run: |
+          python3 build_scripts/audit-library-warnings.py \
+            --cc "$CC" \
+            --cxx "$CXX" \
+            --make make \
+            --target "$TARGET_TRIPLET" \
+            --jobs "$JOBS" \
+            --label ci-gcc-zero \
+            --rebuild \
+            --fail-on-warning
+
       - name: Run build-system and compiler smoke tests
         if: ${{ !cancelled() && steps.runtime-build.outcome == 'success' }}
         # quick-test shares one temporary directory across its prerequisites.
@@ -441,6 +454,8 @@ jobs:
           name: fbc-xl-windows-${{ matrix.name }}-diagnostics
           if-no-files-found: warn
           path: |
+            build/c-warning-audit/gcc/ci-gcc-zero.log
+            build/c-warning-audit/gcc/ci-gcc-zero.json
             out/exampleageddon/
             maketests-log/
             tests/**/*.log

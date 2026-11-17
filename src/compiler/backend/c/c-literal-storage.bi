@@ -66,6 +66,25 @@ private function hCLiteralStorageGet(byval sym as FBSYMBOL ptr) as CLITERALSTORA
 	return entry
 end function
 
+private function hCLiteralAddressSymbol(byval value as EXPRNODE ptr) as FBSYMBOL ptr
+	while( value <> NULL )
+		select case as const value->class
+		case EXPRCLASS_CAST
+			if( typeIsPtr(value->dtype) = FALSE ) then return NULL
+			value = value->l
+		case EXPRCLASS_UOP
+			if( value->op <> AST_OP_ADDROF ) then return NULL
+			value = value->l
+		case EXPRCLASS_SYM
+			if( symbGetIsLiteral(value->sym) andalso symbGetType(value->sym) = FB_DATATYPE_CHAR ) then return value->sym
+			return NULL
+		case else
+			return NULL
+		end select
+	wend
+	return NULL
+end function
+
 private sub hCLiteralMutableCast(byval dtype as integer, byval value as EXPRNODE ptr)
 	if( typeIsPtr(dtype) = FALSE orelse typeIsConstAt(dtype, 1) ) then exit sub
 	if( typeGetDtOnly(dtype) = FB_DATATYPE_FUNCTION ) then exit sub

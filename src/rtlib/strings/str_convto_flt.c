@@ -26,7 +26,7 @@ FBCALL FBSTRING_ACCESS *fb_FloatToStr ( float num )
 		size_t tmp_len;
 
 		/* convert */
-		if( snprintf( dst->data, (size_t)dst->size + 1, "%.7g", num ) < 0 )
+		if( snprintf( dst->data, (size_t)dst->size + 1, "%.7g", (double)num ) < 0 )
 			dst->data[0] = '\0';
 
 		tmp_len = strlen( dst->data );				/* fake len */

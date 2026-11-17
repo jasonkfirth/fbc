@@ -6,12 +6,16 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 /*:::::*/
 FBCALL int fb_WidthFile( int fnum, int width )
 {
     int cur = width;
     FB_FILE *handle;
+
+    if( width < -1 )
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
     FB_LOCK();
 
@@ -34,15 +38,23 @@ FBCALL int fb_WidthFile( int fnum, int width )
         if( width!=-1 ) {
             fb_Width( width, -1 );
         }
-        cur = FB_HANDLE_SCREEN->width;
+        if( FB_HANDLE_SCREEN->width > INT_MAX ) {
+            FB_UNLOCK();
+            return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+        }
+        cur = (int)FB_HANDLE_SCREEN->width;
 
     } else {
         if( width!=-1 ) {
-            handle->width = width;
+            handle->width = (unsigned int)width;
             if( handle->hooks->pfnSetWidth!=NULL )
                 handle->hooks->pfnSetWidth( handle, width );
         }
-        cur = handle->width;
+        if( handle->width > INT_MAX ) {
+            FB_UNLOCK();
+            return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+        }
+        cur = (int)handle->width;
     }
 
 	FB_UNLOCK();

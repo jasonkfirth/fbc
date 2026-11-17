@@ -92,14 +92,14 @@ Reports under `out/msdos/qualification` include the guest output, XML, and host
 receipt. Bounded output is essential: a failed assertion inside a broken loop
 can otherwise produce hundreds of megabytes without reaching a final report.
 
-## Remaining acceptance work
+## Acceptance scope
 
-The current-source full unit result below satisfies the fbctests requirement.
-Completion still requires a complete Exampleageddon run using its existing
-DOS applicability rules and a tested CI path that performs both checks and
-retains the DOS ZIP. Keep every manifest
-entry accounted for and preserve unsupported platform/library outcomes in the
-inventory. Do not reclassify a DOS-compatible failure to obtain a green gate.
+The frozen-source build below passes fbctests and the complete Exampleageddon
+gate using its existing DOS applicability rules. The CI job runs both checks
+and retains the DOS ZIP. Every manifest entry remains accounted for, including
+unsupported platform/library outcomes. A DOS-compatible failure must not be
+reclassified to obtain a green gate. These receipts qualify DOSBox-X with LFN
+support; they do not establish a physical-DOS or classic-DOSBox result.
 
 DOS WSTRING has a byte-wide compatibility ABI (`DISABLE_WCHAR`). USTRING remains
 UTF-8 and supports Unicode scalars. Unicode round-trip tests must check the
@@ -118,8 +118,8 @@ The emulator has SHA-256
 
 The four previously failing Exampleageddon entries, IDs 0414, 1166, 1480 and
 1481, passed bounded isolated replays with this setup. Their old sweep receipts
-remain unchanged. A new complete sweep, current-source DOS compiler rebuild
-and execution of the complete CI path are still required.
+remain unchanged. The rebuilt compiler and complete passing sweep recorded
+below supersede these focused diagnostic checks.
 
 The passing diagnostic run completed all 2,461 tests and 1,620,888 assertions, with a
 fresh XML report and zero failures. It includes IEEE libm startup behavior,
@@ -127,8 +127,8 @@ the tangent precision adapter, corrected byte-wide WSTRING expectations, and
 two additional tests for lossy wide conversions and Unicode-only paths. The
 test executable SHA-256 is
 `19f495e5e96ebc5cac237dc3a3f57186a1979b6109702842e03b49fef0005303`.
-This is still the earlier candidate tree with focused canonical fixes applied;
-the current-source rebuild and full Exampleageddon/CI gates remain required.
+This was the earlier candidate tree with focused canonical fixes applied;
+the qualified-source receipts below come from the subsequent rebuild.
 
 `tests/dos/math-control.c` additionally checks the exact binary64 tangent result
 and preservation of all twelve precision/rounding combinations. The adapter
@@ -141,13 +141,20 @@ constant folding and the other target runtimes.
 
 The November 13 source build and refreshed distribution pass the complete DOS
 unit manifest: 685 suites, 2,462 tests and 1,620,924 assertions, with no errors
-or failures. The normal and October dynamic cores both pass with executable
-SHA-256 `d9e824cc9b186e38d5f9096fe1839acb7d85726707bc0cb01dc5aeecdca1c7d4`.
-The three preflights also pass, including the assembly-address observer while
-the assembly block is active. The unit workflow retains its selected source
+or failures. The final runtime-TLS build passes on both the normal and October
+dynamic cores with executable SHA-256
+`e245c3dc3df1a1625128d8a76a5e3da21a3819b1eeb7ae2848853fed90b43adb`.
+All eight runtime preflights also pass on both cores, including the
+assembly-address observer while the assembly block is active, initialized TLS
+across C/GAS modules, private storage keys and checked array indexing.
+The unit workflow retains its selected source
 and object manifests, XML, guest output and parsed count summary.
 
-Local evidence is under `out/codex-dos-emitter-20261112/package/qualification`.
+Local normal-core evidence is under
+`out/codex-dos-emitter-20261112/package/qualification`; the final dynamic-core
+replay is under `package/qualification-dynamic` in that same task directory.
+Both have fresh guest output, XML and a parsed count summary for the same
+executable. The earlier `d9e824...` executable belongs to the pre-TLS-key build.
 `qualification-inputs-float-bits.json` records the canonical/private source hashes.
 Concurrent padding declarations confined to 64-bit targets produce identical
 DOS-preprocessed internal headers; their equivalence receipt avoids an
@@ -163,7 +170,7 @@ must not be presented as validation of those newer edits.
 The earlier native compiler reproduced the new floating-argument representation
 regression with exit status 9 at its signaling-NaN check. The current DOS compiler
 passes all eight floating representation checks and the existing address/alias
-checks. Its SHA-256 is
+checks. That pre-TLS-key compiler has SHA-256
 `5808be1f1733247b62407dc72d122110e3960cd0a5ca915963580d17273d6141`.
 The C observer uses Intel assembly and DJGPP's underscore-prefixed symbol names.
 
@@ -172,10 +179,10 @@ superseded. A second sweep under `float-bits-qualification/exampleageddon`
 found that the package omitted the existing optional thread provider; its
 required thread-pool example failed compilation rather than being excluded.
 All five required threaded examples passed a focused native DOS replay with
-the provider. The refreshed package and a complete fresh sweep under
-`out/codex-dos-emitter-20261112/provider-qualification/exampleageddon` are now
-being qualified. Earlier result rows are not reused for the refreshed package,
-and partial receipts are not final acceptance.
+the provider. The refreshed package's sweep under
+`out/codex-dos-emitter-20261112/provider-qualification/exampleageddon` then
+exposed the TLS defect described below and was superseded. Its result rows
+were not reused for the final compiler, and partial receipts are not acceptance.
 
 The packaged `fbdos.bat` also sets GCC to the DJGPP installation, where its
 private programs are available. The distribution smoke test calls this launcher
@@ -201,8 +208,41 @@ The DOS unit workflow checks ordinary TLS, worker isolation, initialized BASIC
 externs and private module identity through C and GAS, fixed-array indexing,
 the storage API independently of compiler lowering, and unsupported-form
 diagnostics before running the complete unit manifest. The earlier provider
-sweeps are diagnostic receipts and are marked superseded. A fresh complete
-1,775-entry run is required for the rebuilt compiler and archives; its output
-will be `runtime-tls-qualification/exampleageddon`.
+sweeps are diagnostic receipts and are marked superseded. The rebuilt compiler
+and archives passed a fresh complete 1,775-entry run under
+`runtime-tls-qualification/exampleageddon`. The qualified compiler has
+SHA-256 `bb5e8d4aba1516ba89926d6e340e7f614162f277f5d0b0202eb4adeaba3c8fa4`.
+`qualification-inputs-runtime-tls.json` records its frozen source snapshot.
+The final unit suite was rebuilt from all 695 selected objects before the
+normal-core run; the dynamic-core replay uses that exact executable. Unsupported
+managed TLS and native C TLS imports produce the expected two error 338
+diagnostics without a compiler crash.
+
+The distribution ZIP has SHA-256
+`5e564bd6c9d25e622d155d1ab99864ae07f0d112c460b7b422bcdf98ebf48dda`.
+`package/dos-package-receipt.json` records its 10339-file inventory, CRC check
+and byte-for-byte comparison with the staged package. The CI job is present in
+the canonical repository; these local receipts do not establish a hosted CI pass.
+
+## Final Exampleageddon receipt
+
+The official runner completed its full-inventory acceptance check with exit
+status 0 after all native DOS workers stopped. It recomputed the source,
+includes, package, SDK, emulator and runner fingerprints before accepting the
+collected batches. All 45 batches have strict result rows and DOS completion
+markers for 1,775 unique examples. Of these, 1,351 compiled and linked, and all
+654 required self-contained examples ran successfully. There were no required
+compile failures or attempted runtime failures. The other 424 compile failures
+remain visible under their existing platform, library or other classifications.
+
+The authoritative summary is
+`out/codex-dos-emitter-20261112/runtime-tls-qualification/exampleageddon/reports/summary.json`.
+The manifest, per-batch receipts, raw result rows, completion markers and logs
+remain beside that report. `canonical-dos-fix-retention.json` in the task
+directory records the source retention audit. The qualified snapshot is based
+on `e4341432091a3506ddb2386069c2478b3120651d` plus the DOS TLS and shared
+array-index fixes; these production fixes and the DOS CI job are captured in
+canonical commit `838154812`. Later unrelated callback and graphics edits are
+outside this compiler snapshot.
 
 <!-- end of dos-qualification.md -->

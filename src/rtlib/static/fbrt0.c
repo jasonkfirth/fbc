@@ -53,6 +53,18 @@
 
 	static void (*priorityhDoInit)( void ) __attribute__((section(".init_array.00100"), used)) = fb_hDoInit;
 	static void (*priorityhDoExit)( void ) __attribute__((section(".fini_array.00100"), used)) = fb_hDoExit;
+#elif defined(HOST_XBOX)
+	/* nxdk walks PE .CRT$XI initializers before C++/BASIC constructors.
+	   GNU .ctors sections are not part of that walk. Runtime initialization
+	   also registers cleanup before later user destructors register theirs. */
+	static int fb_hDoInit( void )
+	{
+		fb_hRtInit( );
+		return 0;
+	}
+
+	static int (*const priorityhDoInit)( void )
+		__attribute__((section(".CRT$XIC"), used)) = fb_hDoInit;
 #elif defined(HOST_DARWIN) || defined(HOST_ANDROID)
 	/* Darwin/MacOSX does not support ordered ctors/dtors across modules. */
 	__attribute__((constructor)) static void fb_hDoInit( void )
@@ -87,8 +99,8 @@
 	    __attribute__((constructor(priority))) now (instead of
 	   .ctors.<65535 - priority>). The .ctors.* sections still work here, so
 	   keep using them. */
-	static void * priorityhDoInit __attribute__((section(".ctors.65435"), used)) = fb_hDoInit;
-	static void * priorityhDoExit __attribute__((section(".dtors.65435"), used)) = fb_hDoExit;
+	static void (*priorityhDoInit)(void) __attribute__((section(".ctors.65435"), used)) = fb_hDoInit;
+	static void (*priorityhDoExit)(void) __attribute__((section(".dtors.65435"), used)) = fb_hDoExit;
 #endif
 
 /* end of static/fbrt0.c */

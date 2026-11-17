@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <go32.h>
 #include <dpmi.h>
+#include <limits.h>
+#include <stdint.h>
 #include <sys/farptr.h>
 
 typedef struct FB_PRINT_INFO {
@@ -45,8 +47,8 @@ static int fb_hHookConWrite_BIOS
         fb_hSetCursorPos( pos, -1 );
         ++pos;
         regs.h.ah = 0x09;
-        regs.h.al = *pachText++;
-        regs.h.bh = fb_console_context.active;
+        regs.h.al = (unsigned char)*pachText++;
+        regs.h.bh = (unsigned char)fb_console_context.active;
         regs.h.bl = uchAttr;
         regs.x.cx = 1;
         __dpmi_int(0x10, &regs);
@@ -65,22 +67,48 @@ static int fb_hHookConWrite_MEM
 {
     fb_PrintInfo *pInfo = (fb_PrintInfo*) handle->Opaque;
     const char *pachText = (const char *)buffer;
-    unsigned short usAttr = pInfo->usAttr << 8;
+    unsigned short usAttr = (unsigned short)(pInfo->usAttr << 8);
+    unsigned short words[128];
     int tmp_x = handle->Coord.X;
     int tmp_y = handle->Coord.Y;
-    unsigned char *puchBuffer = alloca( length * 2 );
-    unsigned short *pusBuffer = (unsigned short*) puchBuffer;
-    size_t i;
+    unsigned long row_offset, column_offset, destination_offset;
+    size_t written = 0;
 
-    i = length;
-    pusBuffer += length;
-    while( i-- ) {
-        *--pusBuffer = usAttr + (unsigned short) (unsigned char) pachText[i];
+    if ((!buffer && length) || (fb_console_context.w <= 0) ||
+        (fb_console_context.h <= 0) || (tmp_x < 0) || (tmp_x >= fb_console_context.w) ||
+        (tmp_y < 0) || (tmp_y >= fb_console_context.h))
+        return FALSE;
+
+    if ((tmp_y != 0) &&
+        ((unsigned long)(unsigned int)fb_console_context.w >
+         ULONG_MAX / 2UL / (unsigned long)(unsigned int)tmp_y))
+        return FALSE;
+    row_offset = (unsigned long)(unsigned int)fb_console_context.w * 2UL *
+                 (unsigned long)(unsigned int)tmp_y;
+    column_offset = (unsigned long)(unsigned int)tmp_x * 2UL;
+    if ((row_offset > ULONG_MAX - fb_console_context.phys_addr) ||
+        (column_offset > ULONG_MAX - fb_console_context.phys_addr - row_offset))
+        return FALSE;
+    destination_offset = fb_console_context.phys_addr + row_offset + column_offset;
+    if ((unsigned long)length > (ULONG_MAX - destination_offset) / 2UL)
+        return FALSE;
+
+    while (written < length) {
+        size_t count = length - written;
+        size_t i;
+        unsigned long chunk_offset = destination_offset + (unsigned long)(written * 2U);
+
+        if (count > sizeof(words) / sizeof(words[0]))
+            count = sizeof(words) / sizeof(words[0]);
+        for (i = 0; i < count; i++) {
+            words[i] = (unsigned short)(usAttr |
+                (unsigned short)(unsigned char)pachText[written + i]);
+        }
+
+        _movedataw((unsigned)_my_ds(), (unsigned)(uintptr_t)words,
+                   (unsigned)_dos_ds, (unsigned)chunk_offset, count);
+        written += count;
     }
-
-    _movedataw( _my_ds(), (int) puchBuffer,
-                _dos_ds, fb_console_context.phys_addr + (fb_console_context.w << 1) * tmp_y + (tmp_x << 1),
-                length );
 
     return TRUE;
 }
@@ -88,7 +116,11 @@ static int fb_hHookConWrite_MEM
 unsigned long fb_hGetPageAddr( int pg, int cols, int rows )
 {
 	unsigned long physAddr;
+	unsigned long col_count, row_count, page_size, page_index;
     unsigned char mode = _farpeekb( _dos_ds, 0x465 );
+
+    if (pg < 0)
+        return 0;
 
     if( mode & 0x02 )
 		return 0;
@@ -102,11 +134,22 @@ unsigned long fb_hGetPageAddr( int pg, int cols, int rows )
 		if( (cols == 0) || (rows == 0) )
 			fb_ConsoleGetSize( &cols, &rows );
 
-		int pageSize = cols * rows * (sizeof( char ) * 2);
-		if( rows == 25 )
-			pageSize += 96;
-
-		physAddr += pg * pageSize;
+		if ((cols <= 0) || (rows <= 0))
+			return 0;
+		col_count = (unsigned long)(unsigned int)cols;
+		row_count = (unsigned long)(unsigned int)rows;
+		if ((row_count != 0) && (col_count > ULONG_MAX / 2UL / row_count))
+			return 0;
+		page_size = col_count * row_count * 2UL;
+		if ((rows == 25) && (page_size > ULONG_MAX - 96UL))
+			return 0;
+		if (rows == 25)
+			page_size += 96UL;
+		page_index = (unsigned long)(unsigned int)pg;
+		if ((page_size != 0) &&
+		    (page_index > (ULONG_MAX - physAddr) / page_size))
+			return 0;
+		physAddr += page_index * page_size;
 	}
 
 	return physAddr;
@@ -191,6 +234,7 @@ static void fb_ConsolePrintBufferEx_STDIO
 		int mask
 	)
 {
+	(void)mask;
     fwrite(buffer, len, 1, stdout);
     fflush(stdout);
 }

@@ -9,13 +9,13 @@
 #include "fb_private_console.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork )
 {
-	char buffer[MAX_PATH], *arguments, **argv, *p;
-	char empty_arguments[] = "";
+	char buffer[MAX_PATH], *arguments = NULL, **argv = NULL, *p;
 	int i, argc = 0, res = -1, status;
 	ssize_t len_arguments;
 	pid_t pid;
@@ -32,15 +32,19 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 
 	fb_hConvertPath( buffer );
 
-	if( args==NULL ) {
-		arguments = empty_arguments;
-	} else {
+	if( args != NULL ) {
 		len_arguments = FB_STRSIZE( args );
-		arguments = alloca( len_arguments + 1 );
-		DBG_ASSERT( arguments!=NULL );
-		arguments[len_arguments] = 0;
-		if( len_arguments )
-			argc = fb_hParseArgs( arguments, args->data, len_arguments );
+		if( len_arguments > 0 ) {
+			/* The parsed bytes must survive temporary-string deletion and the
+			   child launch. Their size belongs on the heap, independently of
+			   the calling thread's stack limit. */
+			if( args->data != NULL )
+				arguments = malloc( (size_t)len_arguments + 1 );
+			if( arguments != NULL )
+				argc = fb_hParseArgs( arguments, args->data, len_arguments );
+			else
+				argc = -1;
+		}
 	}
 
 	FB_STRLOCK();
@@ -50,13 +54,15 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 
 	FB_STRUNLOCK();
 
-	if( argc == -1 )
-		return -1;
+	if( argc < 0 || argc == INT_MAX ||
+	    (size_t)argc + 2 > SIZE_MAX / sizeof( *argv ) )
+		goto done;
 
 	argc++; 			/* add 1 for program name */
 
-	argv = alloca( sizeof(char*) * (argc + 1 ));
-	DBG_ASSERT( argv!=NULL );
+	argv = malloc( sizeof( *argv ) * ((size_t)argc + 1) );
+	if( argv == NULL )
+		goto done;
 
 	argv[0] = buffer;
 
@@ -96,13 +102,13 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 
 				if( exec_status_pipe[1] != -1 ) {
 					int exec_errno = errno;
-					const char *p = (const char *)&exec_errno;
+					const char *error_cursor = (const char *)&exec_errno;
 					size_t bytes_left = sizeof( exec_errno );
 					while( bytes_left > 0 ) {
-						ssize_t bytes_written = write( exec_status_pipe[1], p, bytes_left );
+						ssize_t bytes_written = write( exec_status_pipe[1], error_cursor, bytes_left );
 						if( bytes_written > 0 ) {
-							p += bytes_written;
-							bytes_left -= bytes_written;
+							error_cursor += bytes_written;
+							bytes_left -= (size_t)bytes_written;
 						} else if( (bytes_written == -1) && (errno == EINTR) ) {
 							continue;
 						} else {
@@ -148,6 +154,9 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 	fb_hInitConsole();
 	FB_UNLOCK( );
 
+done:
+	free( argv );
+	free( arguments );
 	return res;
 }
 

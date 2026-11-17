@@ -49,6 +49,10 @@ typedef struct FB_GFX3_CONSOLE_STATE {
 	uint32_t cursor_x;
 	uint32_t cursor_y;
 	int initialized;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_CONSOLE_STATE;
 
 typedef struct FB_GFX3_CONSOLE_PRINT_INFO {
@@ -443,7 +447,10 @@ static int console_write(fb_ConHooks *hooks, const void *buffer,
 	start_y = (int64_t)hooks->Coord.Y * console_state.font_height;
 	end_x = start_x + ((int64_t)length * console_state.font_width) - 1;
 	if ((start_x < 0) || (start_y < 0) || (end_x > INT32_MAX) ||
-	    (start_y + (int64_t)console_state.font_height - 1 > INT32_MAX))
+	    (start_y > INT32_MAX))
+		return FALSE;
+	if (((uint64_t)console_state.font_height - 1u) >
+	    (uint64_t)((int64_t)INT32_MAX - start_y))
 		return FALSE;
 	console_full_clip(surface, &clip);
 	/*
@@ -538,8 +545,9 @@ static void console_scroll(fb_ConHooks *hooks, int x1, int y1, int x2,
 	FB_GFX3_CONSOLE_CELL *cells;
 	FB_GFX3_RECT clip;
 	FB_GFX3_RECT source_rect;
-	int region_width;
-	int region_height;
+	int64_t region_width;
+	int64_t region_height;
+	size_t region_bytes;
 	int destination_row;
 	int clear_y;
 
@@ -550,10 +558,16 @@ static void console_scroll(fb_ConHooks *hooks, int x1, int y1, int x2,
 	state = (info == NULL) ? NULL : info->state;
 	surface = console_page_surface(state);
 	cells = console_page_cells(state);
-	if ((surface == NULL) || (cells == NULL))
+	if ((surface == NULL) || (cells == NULL) ||
+	    ((uint32_t)x2 >= console_state.columns) ||
+	    ((uint32_t)y2 >= console_state.rows))
 		return;
-	region_width = x2 - x1 + 1;
-	region_height = y2 - y1 + 1;
+	region_width = (int64_t)x2 - x1 + 1;
+	region_height = (int64_t)y2 - y1 + 1;
+	if ((region_width <= 0) || (region_height <= 0) ||
+	    ((uint64_t)region_width > SIZE_MAX / sizeof(cells[0])))
+		return;
+	region_bytes = (size_t)region_width * sizeof(cells[0]);
 	console_full_clip(surface, &clip);
 	if (rows < region_height) {
 		source_rect.x1 = x1 * (int)console_state.font_width;
@@ -575,7 +589,7 @@ static void console_scroll(fb_ConHooks *hooks, int x1, int y1, int x2,
 				((size_t)destination_row * console_state.columns) + x1,
 				cells + ((size_t)(destination_row + rows) *
 				console_state.columns) + x1,
-				(size_t)region_width * sizeof(cells[0]));
+				region_bytes);
 		}
 		clear_y = y2 - rows + 1;
 	} else {

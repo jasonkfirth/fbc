@@ -7,10 +7,15 @@
  */
 #include "../../fb.h"
 #include <windows.h>
+#include <stdint.h>
 
 char *fb_hGetExeName( char *dst, ssize_t maxlen )
 {
-	GetModuleFileName( GetModuleHandle( NULL ), dst, maxlen );
+	if( (dst == NULL) || (maxlen <= 0) ||
+	    ((uint64_t)maxlen > (uint64_t)MAXDWORD) )
+		return NULL;
+
+	GetModuleFileName( GetModuleHandle( NULL ), dst, (DWORD)maxlen );
 
 	char *p = strrchr( dst, '\\' );
 	if( p != NULL )

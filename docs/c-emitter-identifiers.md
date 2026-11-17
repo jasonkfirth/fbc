@@ -76,6 +76,14 @@ the generated descriptor name. For otherwise valid GNU identifiers containing
 `$`, the C backend keeps the original TLS name directly. This preserves the
 descriptor name used by separately compiled modules without an asm label.
 
+The November 13 follow-up encodes module-private TLS names. Private storage has
+an internal descriptor identity, so the native compiler can derive that name
+from the encoded C identifier. Its declaration omits the object alias used by
+externally visible TLS. Public and external declarations retain their existing
+name policy. The retained corpus contains twelve Clang dollar-sign observations
+in this private-storage class. Candidate qualification and promotion are tracked
+in [current status](c-emitter-current-status.md).
+
 ## Qualification
 
 The November 1 source-built compiler was checked against the current compiler

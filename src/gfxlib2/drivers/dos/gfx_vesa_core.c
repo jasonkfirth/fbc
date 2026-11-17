@@ -5,6 +5,10 @@
 #include "../../fb_gfx.h"
 #include "fb_gfx_dos.h"
 #include <go32.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/farptr.h>
 
 VesaPMInfo *fb_dos_vesa_pm_info = NULL;
@@ -13,12 +17,45 @@ intptr_t fb_dos_vesa_pm_set_palette = 0;
 
 static int detected = FALSE;
 
+static int vesa_read_u16(const unsigned char *data, size_t data_size,
+                         size_t offset, unsigned short *value)
+{
+	if (!data || !value || offset > data_size ||
+	    sizeof(*value) > data_size - offset)
+		return 0;
+	memcpy(value, data + offset, sizeof(*value));
+	return 1;
+}
+
+static int vesa_read_u32(const unsigned char *data, size_t data_size,
+                         size_t offset, unsigned long *value)
+{
+	uint32_t wire_value;
+	if (!data || !value || offset > data_size ||
+	    sizeof(wire_value) > data_size - offset)
+		return 0;
+	memcpy(&wire_value, data + offset, sizeof(wire_value));
+	*value = (unsigned long)wire_value;
+	return 1;
+}
+
 void vesa_get_pm_functions( void )
 {
-	unsigned short *p;
+	VesaPMInfo *pm_info;
+	unsigned char *pm_bytes;
+	unsigned short table_size;
+	size_t io_offset, offset;
+	unsigned short entry;
+	unsigned long mmio_address;
+	unsigned short mmio_limit;
 	__dpmi_meminfo meminfo;
 	
+	if (fb_dos.vesa_use_pm && fb_dos_vesa_pm_info)
+		return;
 	fb_dos.vesa_use_pm = FALSE;
+	fb_dos_vesa_pm_info = NULL;
+	fb_dos_vesa_pm_bank_switcher = 0;
+	fb_dos_vesa_pm_set_palette = 0;
 	
 	if( fb_dos.vesa_info.vbe_version < 0x200 )
 		return;
@@ -28,62 +65,100 @@ void vesa_get_pm_functions( void )
 	__dpmi_int( 0x10, &fb_dos.regs );
 	if( fb_dos.regs.x.ax != VBE_STATUS_OK )
 		return;
-	
-	fb_dos_vesa_pm_info = malloc( fb_dos.regs.x.cx );
-	
-	dosmemget( SEGOFF_TO_RM( fb_dos.regs.x.es, fb_dos.regs.x.di ), fb_dos.regs.x.cx, fb_dos_vesa_pm_info );
-	
-	if( fb_dos_vesa_pm_info->IOPrivInfo )
+	table_size = fb_dos.regs.x.cx;
+	if (table_size < sizeof(*pm_info))
+		return;
+
+	pm_info = malloc((size_t)table_size);
+	if (!pm_info)
+		return;
+	dosmemget(SEGOFF_TO_RM(fb_dos.regs.x.es, fb_dos.regs.x.di),
+	          (unsigned int)table_size, pm_info);
+	pm_bytes = (unsigned char *)pm_info;
+	if ((pm_info->setWindow >= table_size) ||
+	    (pm_info->setPalette >= table_size))
+		goto invalid_table;
+	io_offset = (size_t)pm_info->IOPrivInfo;
+
+	if (io_offset)
 	{
-		/* ports are always accessible; skip to memory */
-		p = (unsigned short *)((intptr_t)fb_dos_vesa_pm_info + fb_dos_vesa_pm_info->IOPrivInfo);
-		while( *p++ != 0xFFFF )
-			;
-		if( *++p != 0xFFFF ) /* need to map memory? */
+		/* The VBE table stores port words before its optional MMIO record. */
+		offset = io_offset;
+		for (;;)
 		{
-			meminfo.address = *(intptr_t *)p;
-			meminfo.size = *(p + 2);
-			
-			if( __dpmi_physical_address_mapping( &meminfo ) != 0 )
-				return;
-			
+			if (!vesa_read_u16(pm_bytes, (size_t)table_size, offset, &entry))
+				goto invalid_table;
+			offset += sizeof(entry);
+			if (entry == 0xFFFFU)
+				break;
+		}
+
+		if (!vesa_read_u32(pm_bytes, (size_t)table_size, offset,
+		                   &mmio_address) ||
+		    !vesa_read_u16(pm_bytes, (size_t)table_size,
+		                   offset + sizeof(uint32_t), &mmio_limit) ||
+		    !vesa_read_u16(pm_bytes, (size_t)table_size,
+		                   offset + sizeof(uint32_t) + sizeof(mmio_limit),
+		                   &entry) || entry != 0xFFFFU)
+			goto invalid_table;
+
+		if (mmio_address)
+		{
+			meminfo.address = mmio_address;
+			meminfo.size = (unsigned long)mmio_limit + 1UL;
+			if (__dpmi_physical_address_mapping(&meminfo) != 0)
+				goto invalid_table;
+			if (__dpmi_lock_linear_region(&meminfo) != 0)
+			{
+				__dpmi_free_physical_address_mapping(&meminfo);
+				goto invalid_table;
+			}
+
 			fb_dos.vesa_mmio_linear = meminfo.address;
-			
-			__dpmi_lock_linear_region( &meminfo );
-			
-			fb_dos.vesa_mmio_sel = __dpmi_allocate_ldt_descriptors( 1 );
-			if( fb_dos.vesa_mmio_sel == -1 )
+			fb_dos.vesa_mmio_sel = __dpmi_allocate_ldt_descriptors(1);
+			if (fb_dos.vesa_mmio_sel <= 0)
 			{
 				fb_dos.vesa_mmio_sel = 0;
-				return;
+				__dpmi_unlock_linear_region(&meminfo);
+				__dpmi_free_physical_address_mapping(&meminfo);
+				goto invalid_table;
 			}
-			
-			if( __dpmi_set_segment_base_address( fb_dos.vesa_mmio_sel, meminfo.address ) == -1 )
+			if (__dpmi_set_segment_base_address(fb_dos.vesa_mmio_sel,
+			                                    meminfo.address) == -1 ||
+			    __dpmi_set_segment_limit(fb_dos.vesa_mmio_sel,
+			                             meminfo.size - 1UL) != 0)
 			{
-				return;
-			}
-			
-			if( __dpmi_set_segment_limit( fb_dos.vesa_mmio_sel, MAX( meminfo.size - 1, 0xFFFF ) ) )
-			{
-				return;
+				__dpmi_free_ldt_descriptor(fb_dos.vesa_mmio_sel);
+				fb_dos.vesa_mmio_sel = 0;
+				__dpmi_unlock_linear_region(&meminfo);
+				__dpmi_free_physical_address_mapping(&meminfo);
+				goto invalid_table;
 			}
 		}
 	}
-	
-	fb_dos_vesa_pm_bank_switcher = (intptr_t)fb_dos_vesa_pm_info + fb_dos_vesa_pm_info->setWindow;
-	fb_dos_vesa_pm_set_palette = (intptr_t)fb_dos_vesa_pm_info + fb_dos_vesa_pm_info->setPalette;
+	fb_dos_vesa_pm_info = pm_info;
+	fb_dos_vesa_pm_bank_switcher = (intptr_t)((uintptr_t)pm_info +
+	                                             (uintptr_t)pm_info->setWindow);
+	fb_dos_vesa_pm_set_palette = (intptr_t)((uintptr_t)pm_info +
+	                                        (uintptr_t)pm_info->setPalette);
 	
 	fb_dos.vesa_use_pm = TRUE;
+	return;
+
+invalid_table:
+	free(pm_info);
 }
 
 static int vesa_get_mode_info( int mode )
 {
+	if ((mode < 0) || (mode > USHRT_MAX))
+		return -1;
 	fb_hFarMemSet( _dos_ds, MASK_LINEAR( __tb ), 0, sizeof( VesaModeInfo ) );
 	
 	fb_dos.regs.x.ax = VBE_MODEINFO;
 	fb_dos.regs.x.di = RM_OFFSET( __tb );
 	fb_dos.regs.x.es = RM_SEGMENT( __tb );
-	fb_dos.regs.x.cx = mode;
+	fb_dos.regs.x.cx = (unsigned short)mode;
 	__dpmi_int( 0x10, &fb_dos.regs );
 	if( fb_dos.regs.x.ax != VBE_STATUS_OK )
 		return -1;
@@ -96,7 +171,7 @@ void fb_dos_vesa_detect(void)
 {
 	int mode_list[256];
 	int number_of_modes;
-	long mode_ptr;
+	unsigned long mode_ptr;
 	int c;
 	int attribs = VMI_MA_SUPPORTED | VMI_MA_COLOR | VMI_MA_GRAPHICS;
 	
@@ -134,16 +209,27 @@ void fb_dos_vesa_detect(void)
 	
 	number_of_modes = 0;
 	
-	while( _farpeekw( _dos_ds, mode_ptr ) != 0xFFFF )
+	while( (number_of_modes < (int)(sizeof(mode_list) / sizeof(mode_list[0]))) &&
+	       (_farpeekw( _dos_ds, mode_ptr ) != 0xFFFF ) )
 	{
-		mode_list[number_of_modes] = _farpeekw( _dos_ds, mode_ptr );
+		mode_list[number_of_modes] = (int)_farpeekw( _dos_ds, mode_ptr );
 		number_of_modes++;
 		mode_ptr += 2;
 	}
 	
 	fb_dos.num_vesa_modes = number_of_modes;
-	
-	fb_dos.vesa_modes = malloc( number_of_modes * sizeof(VesaModeInfo) );
+	if (number_of_modes == 0)
+	{
+		fb_dos.vesa_modes = NULL;
+		return;
+	}
+	fb_dos.vesa_modes = calloc((size_t)number_of_modes,
+	                            sizeof(*fb_dos.vesa_modes));
+	if (!fb_dos.vesa_modes)
+	{
+		fb_dos.num_vesa_modes = 0;
+		return;
+	}
 	
 	for( c = 0; c < number_of_modes; c++ )
 	{
@@ -153,11 +239,12 @@ void fb_dos_vesa_detect(void)
 		     ((fb_dos.vesa_mode_info.MemoryModel == VMI_MM_PACK) ||
 		      (fb_dos.vesa_mode_info.MemoryModel == VMI_MM_DIR)) &&
 			 ((fb_dos.vesa_info.vbe_version < 0x200) ||
-			  ((unsigned int)fb_dos.vesa_info.total_memory << 16 >=
-			   (unsigned int)(fb_dos.vesa_mode_info.BytesPerScanLine * fb_dos.vesa_mode_info.YResolution))) )
+			 ((unsigned long)fb_dos.vesa_info.total_memory << 16 >=
+			  (unsigned long)fb_dos.vesa_mode_info.BytesPerScanLine *
+			  (unsigned long)fb_dos.vesa_mode_info.YResolution)) )
 		{
 			/* clobber WinFuncPtr to hold mode number */
-			fb_dos.vesa_mode_info.WinFuncPtr = mode_list[c];
+			fb_dos.vesa_mode_info.WinFuncPtr = (unsigned long)mode_list[c];
 			
 			/* add to list */
 			memcpy( &fb_dos.vesa_modes[c], &fb_dos.vesa_mode_info, sizeof(VesaModeInfo) );
@@ -167,7 +254,8 @@ void fb_dos_vesa_detect(void)
 
 int fb_dos_vesa_set_mode( int w, int h, int depth, int linear )
 {
-	int i, mode = 0;
+	int i;
+	unsigned short mode = 0;
 	int bpp;
 	int tries;
 	int good_bpp;
@@ -205,7 +293,9 @@ int fb_dos_vesa_set_mode( int w, int h, int depth, int linear )
 					if ( !linear || (fb_dos.vesa_modes[i].ModeAttributes & VMI_MA_LFB) )
 					{
 						memcpy( &fb_dos.vesa_mode_info, &fb_dos.vesa_modes[i], sizeof(VesaModeInfo) );
-						mode = fb_dos.vesa_modes[i].WinFuncPtr;
+						if (fb_dos.vesa_modes[i].WinFuncPtr > USHRT_MAX)
+							continue;
+						mode = (unsigned short)fb_dos.vesa_modes[i].WinFuncPtr;
 						break;
 					}
 				}
@@ -220,7 +310,7 @@ int fb_dos_vesa_set_mode( int w, int h, int depth, int linear )
 		
 		if( linear )
 		{
-			fb_dos.regs.x.bx |= 0x4000;
+			fb_dos.regs.x.bx = (unsigned short)(fb_dos.regs.x.bx | 0x4000U);
 		}
 		
 		__dpmi_int( 0x10, &fb_dos.regs );
@@ -253,12 +343,15 @@ int *fb_dos_vesa_fetch_modes(int depth, int *size)
 	int count, i;
 	int bpp;
 
+	if (!size)
+		return NULL;
+	*size = 0;
 	if (!fb_dos.detected) fb_dos_detect();
 	if (!detected) fb_dos_vesa_detect();
+	if (!fb_dos.vesa_modes || (fb_dos.num_vesa_modes <= 0))
+		return NULL;
 
-	modes = malloc(sizeof(VesaModeInfo) * fb_dos.num_vesa_modes);
-
-	for( i = 0, count = 0; i < fb_dos.num_vesa_modes; i++ )
+	for (i = 0, count = 0; i < fb_dos.num_vesa_modes; i++)
 	{
 		if( fb_dos.vesa_modes[i].XResolution != 0 )
 		{
@@ -269,7 +362,28 @@ int *fb_dos_vesa_fetch_modes(int depth, int *size)
 			    (bpp == 24 && depth == 32) ||
 			    (bpp == 32 && depth == 24) )
 			{
-				modes[count++] = SCREENLIST( fb_dos.vesa_modes[i].XResolution, fb_dos.vesa_modes[i].YResolution );
+				count++;
+			}
+		}
+	}
+	if (count == 0)
+		return NULL;
+	modes = malloc((size_t)count * sizeof(*modes));
+	if (!modes)
+		return NULL;
+	for (i = 0, count = 0; i < fb_dos.num_vesa_modes; i++)
+	{
+		if (fb_dos.vesa_modes[i].XResolution != 0)
+		{
+			bpp = fb_dos.vesa_modes[i].BitsPerPixel;
+			if ((bpp == depth) ||
+			    (bpp == 15 && depth == 16) ||
+			    (bpp == 16 && depth == 15) ||
+			    (bpp == 24 && depth == 32) ||
+			    (bpp == 32 && depth == 24))
+			{
+				modes[count++] = SCREENLIST(fb_dos.vesa_modes[i].XResolution,
+				                            fb_dos.vesa_modes[i].YResolution);
 			}
 		}
 	}
@@ -279,20 +393,39 @@ int *fb_dos_vesa_fetch_modes(int depth, int *size)
 
 static void fb_dos_vesa_set_palette_int10(void)
 {
-	int color_count;
+	unsigned int color_count;
+	unsigned int palette_count;
+	unsigned int first;
+	unsigned int last;
+
+	if ((fb_dos.depth < 0) ||
+	    (fb_dos.pal_first < 0) || (fb_dos.pal_first > 255) ||
+	    (fb_dos.pal_last < fb_dos.pal_first) || (fb_dos.pal_last > 255) ||
+	    (fb_dos.palbuf_seg < 0) || (fb_dos.palbuf_seg > USHRT_MAX) ||
+	    (fb_dos.palbuf_sel <= 0))
+		return;
+	first = (unsigned int)fb_dos.pal_first;
+	last = (unsigned int)fb_dos.pal_last;
+	palette_count = fb_dos.depth >= 8 ? 256U : (1U << (unsigned int)fb_dos.depth);
+	if (first >= palette_count)
+		return;
+	color_count = last - first + 1U;
+	if (color_count > palette_count - first)
+		color_count = palette_count - first;
+	if (color_count == 0)
+		return;
 	
-	color_count = MIN( (1 << fb_dos.depth), fb_dos.pal_last - fb_dos.pal_first + 1 );
-	
-	movedata( _my_ds( ), (unsigned)fb_dos.pal, fb_dos.palbuf_sel, fb_dos.pal_first * 4, color_count * 4 );
+	movedata((unsigned int)_my_ds(), (unsigned int)(uintptr_t)fb_dos.pal,
+	         (unsigned int)fb_dos.palbuf_sel, first * 4U, color_count * 4U);
 	
 	fb_dos.regs.x.ax = VBE_SETGETPAL;
 	fb_dos.regs.x.bx = (fb_dos.vesa_info.capabilities & VIB_BLANK
 	                    ? VBE_SETGETPAL_SET_BLANK
 	                    : VBE_SETGETPAL_SET);
-	fb_dos.regs.x.cx = color_count;
-	fb_dos.regs.x.dx = fb_dos.pal_first;
+	fb_dos.regs.x.cx = (unsigned short)color_count;
+	fb_dos.regs.x.dx = (unsigned short)first;
 	
-	fb_dos.regs.x.es = fb_dos.palbuf_seg;
+	fb_dos.regs.x.es = (unsigned short)fb_dos.palbuf_seg;
 	fb_dos.regs.x.di = 0;
 	
 	__dpmi_int( 0x10, &fb_dos.regs );

@@ -702,6 +702,9 @@ declare sub fbCompile _
 		byval ismain as integer _
 	)
 
+'' Query emitted C requirements before fbEnd() releases the backend context.
+declare function fbCAsmNeedsNoRedZone() as integer
+
 declare function fbShouldRestart() as integer
 declare function fbShouldContinue() as integer
 declare sub fbRestartBeginRequest( byval flags as FB_RESTART_FLAGS )

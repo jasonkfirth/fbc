@@ -10,6 +10,7 @@
 */
 
 #ifndef DISABLE_OPENBSD
+#include "../fb_sfx_internal.h"
 #include "fb_sfx_openbsd.h"
 #endif
 

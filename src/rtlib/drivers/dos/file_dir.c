@@ -8,12 +8,13 @@
 #include "../../fb.h"
 #include <dir.h>
 
-#define FB_ATTRIB_MASK ~0xFFFFFF00
+#define FB_ATTRIB_MASK 0xFF
 
 typedef struct {
 	int in_use;
 	int attrib;
 	struct ffblk f;
+	unsigned char alignment_padding[sizeof(int) - (sizeof(struct ffblk) % sizeof(int))];
 } FB_DIRCTX;
 
 #define fb_DIRCTX_Destructor NULL
@@ -51,7 +52,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 
 	if( len > 0 ) {
 		/* filespec specified (return first result) */
-		ctx->attrib = attrib | 0xFFFFFF00;
+		ctx->attrib = attrib | ~0xFF;
 
 		/* archive bit not set? set the dir bit at least.. */
 		if( (attrib & 0x10) == 0 )
@@ -80,7 +81,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 	/* store filename if found */
 	if( name ) {
 		ctx->in_use = TRUE;
-		len = strlen( name );
+		len = (ssize_t)strlen( name );
 		res = fb_hStrAllocTemp( NULL, len );
 		if( res ) {
 			fb_hStrCopy( res->data, name, len );

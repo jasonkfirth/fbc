@@ -10,6 +10,7 @@
 #define FB_GFX_LINUX_H
 
 #include "fb_wayland_display.h"
+#include "fb_wayland_client.h"
 
 #ifndef DISABLE_FBDEV
 
@@ -21,9 +22,6 @@ extern const GFXDRIVER fb_gfxDriverWayland;
 extern int fb_hFBDevInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh);
 
 #endif
-
-int fb_hWaylandDisplayInfo(FB_WAYLAND_DISPLAY_INFO *info);
-int fb_hWaylandShouldUse(void);
 
 #endif
 

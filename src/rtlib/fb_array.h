@@ -11,6 +11,35 @@ typedef struct FBARRAYDIM_ {
 	ssize_t ubound;
 } FBARRAYDIM;
 
+/* A zero result marks invalid or unrepresentable bounds. */
+static __inline__ size_t fb_hArrayCalcDimElements( ssize_t lbound, ssize_t ubound )
+{
+	uintmax_t count;
+
+	if( lbound > ubound )
+		return 0;
+
+	if( (lbound < 0) && (ubound >= 0) )
+	{
+		uintmax_t negative = (uintmax_t)(-(lbound + 1)) + 1;
+		uintmax_t positive = (uintmax_t)ubound;
+
+		if( negative > UINTMAX_MAX - positive - 1 )
+			return 0;
+
+		count = negative + positive + 1;
+	}
+	else
+	{
+		count = (uintmax_t)(ubound - lbound) + 1;
+	}
+
+	if( count > SIZE_MAX )
+		return 0;
+
+	return (size_t)count;
+}
+
 /* Keep the reserved mask out of the enum because it does not fit in int. */
 typedef uint32_t FBARRAY_FLAGS;
 #define FBARRAY_FLAGS_DIMENSIONS ((FBARRAY_FLAGS)0x0000000fu)

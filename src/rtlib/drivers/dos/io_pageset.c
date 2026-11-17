@@ -24,7 +24,7 @@ int fb_ConsolePageSet ( int active, int visible )
 		{
         	__dpmi_regs regs;
         	regs.h.ah = 0x05;
-        	regs.h.al = visible;
+			regs.h.al = (unsigned char)visible;
         	__dpmi_int(0x10, &regs);
 
 			fb_console_context.visible = visible;

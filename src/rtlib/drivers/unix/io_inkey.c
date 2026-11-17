@@ -8,13 +8,7 @@
 #include "../../fb.h"
 #include "fb_private_console.h"
 #ifndef DISABLE_NCURSES
-#include <termcap.h>
-
-/*
- * Some termcap headers, including Apple's ncurses 6.0 termcap.h, declare
- * capability id arguments as char * even though the functions only read them.
- */
-#define FB_TERMCAP_ID( id ) ((char *)(id))
+#include "../../fb_private_termcap.h"
 #endif
 
 /*#define DEBUG_TGETSTR*/
@@ -29,7 +23,12 @@
 typedef struct NODE
 {
 	char key;
+	/* Preserve the short code and pointer offsets in the native node layout. */
+	unsigned char key_alignment_padding;
 	short code;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char pointer_alignment_padding[4];
+#endif
 	struct NODE *next, *child;
 } NODE;
 
@@ -37,36 +36,38 @@ typedef struct NODE
 typedef struct KEY_DATA
 {
 	const char *cap;
-	int code;
+	short code;
+	/* Complete the original pointer-aligned table entry. */
+	unsigned char tail_padding[sizeof(void *) - sizeof(short)];
 } KEY_DATA;
 
 /* see also termcap(5) man page */
 static const KEY_DATA key_data[] = {
-	{ "kb", KEY_BACKSPACE },
-	{ "kT", KEY_TAB       },
-	{ "k1", KEY_F1        },
-	{ "k2", KEY_F2        },
-	{ "k3", KEY_F3        },
-	{ "k4", KEY_F4        },
-	{ "k5", KEY_F5        },
-	{ "k6", KEY_F6        },
-	{ "k7", KEY_F7        },
-	{ "k8", KEY_F8        },
-	{ "k9", KEY_F9        },
-	{ "k;", KEY_F10       },
-	{ "F1", KEY_F11       },
-	{ "F2", KEY_F12       },
-	{ "kh", KEY_HOME      },
-	{ "ku", KEY_UP        },
-	{ "kP", KEY_PAGE_UP   },
-	{ "kl", KEY_LEFT      },
-	{ "kr", KEY_RIGHT     },
-	{ "@7", KEY_END       },
-	{ "kd", KEY_DOWN      },
-	{ "kN", KEY_PAGE_DOWN },
-	{ "kI", KEY_INS       },
-	{ "kD", KEY_DEL       },
-	{ NULL, 0 }
+	{ .cap = "kb", .code = KEY_BACKSPACE },
+	{ .cap = "kT", .code = KEY_TAB },
+	{ .cap = "k1", .code = KEY_F1 },
+	{ .cap = "k2", .code = KEY_F2 },
+	{ .cap = "k3", .code = KEY_F3 },
+	{ .cap = "k4", .code = KEY_F4 },
+	{ .cap = "k5", .code = KEY_F5 },
+	{ .cap = "k6", .code = KEY_F6 },
+	{ .cap = "k7", .code = KEY_F7 },
+	{ .cap = "k8", .code = KEY_F8 },
+	{ .cap = "k9", .code = KEY_F9 },
+	{ .cap = "k;", .code = KEY_F10 },
+	{ .cap = "F1", .code = KEY_F11 },
+	{ .cap = "F2", .code = KEY_F12 },
+	{ .cap = "kh", .code = KEY_HOME },
+	{ .cap = "ku", .code = KEY_UP },
+	{ .cap = "kP", .code = KEY_PAGE_UP },
+	{ .cap = "kl", .code = KEY_LEFT },
+	{ .cap = "kr", .code = KEY_RIGHT },
+	{ .cap = "@7", .code = KEY_END },
+	{ .cap = "kd", .code = KEY_DOWN },
+	{ .cap = "kN", .code = KEY_PAGE_DOWN },
+	{ .cap = "kI", .code = KEY_INS },
+	{ .cap = "kD", .code = KEY_DEL },
+	{ .cap = NULL, .code = 0 }
 };
 #endif
 
@@ -101,7 +102,7 @@ static void add_key(NODE **node, const char *key, short code)
 			return;
 		}
 	}
-	n = malloc(sizeof(NODE));
+	n = calloc(1, sizeof(NODE));
 	if( n == NULL )
 		return;
 	n->child = NULL;
@@ -137,7 +138,7 @@ static void init_keys(void)
 		 * TERM=xterm vs. TERM=linux) and perhaps depend on other
 		 * factors aswell.
 		 */
-		key = tgetstr(FB_TERMCAP_ID( data->cap ), NULL);
+		key = fb_hTermcapGetStr( data->cap, NULL );
 
 #ifdef DEBUG_TGETSTR
 		fprintf(stderr, "tgetstr( %s ) =", data->cap);
@@ -170,7 +171,7 @@ static int get_input(void)
 	int k, cb, cx, cy;
 
 	k = fb_console_context.keyboard_getch();
-	if (k == '\e') {
+	if (k == '\033') {
 		k = fb_console_context.keyboard_getch();
 		if (k == EOF)
 			return 27;

@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <math.h>
 
 static int w_cmp( const FB_WCHAR *a, ssize_t len, const FB_WCHAR *z )
 {
@@ -46,7 +47,7 @@ FBCALL char fb_WstrToBool( const FB_WCHAR *src, ssize_t len )
 
 	val = fb_WstrToDouble( src, len );
 
-	if( (val != (double)(0.0) ) && (val != (double)(-0.0)) )
+	if( fpclassify(val) != FP_ZERO )
 		return 1;
 
 	return 0;

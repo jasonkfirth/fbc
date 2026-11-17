@@ -50,7 +50,11 @@ int fb_GfxWidth(int w, int h)
 		case 16:
 			font = &fb_font[FB_FONT_16];
 			break;
+		default:
+			break;
 		}
+		break;
+	default:
 		break;
 	}
 
@@ -66,7 +70,7 @@ int fb_GfxWidth(int w, int h)
 		fb_GfxView( -32768, -32768,
 		            -32768, -32768,
 		            0, 0,
-		            DEFAULT_COLOR_1 | DEFAULT_COLOR_2 );
+		            (int)(DEFAULT_COLOR_1 | DEFAULT_COLOR_2) );
 
 		/* Reset VIEW PRINT */
 		fb_ConsoleView( 0, 0 );

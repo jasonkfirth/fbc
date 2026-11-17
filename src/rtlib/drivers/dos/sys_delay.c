@@ -24,6 +24,7 @@
 #include "../../fb.h"
 #include <unistd.h>
 #include <time.h>
+#include <limits.h>
 #include <dpmi.h>
 #include "fb_dos_thread.h"
 
@@ -55,17 +56,21 @@ unsigned int __fb_dos_no_dpmi_yield = 1;
 /* usleep() copied from djgpp libc implementation */
 static unsigned int usleep_private(unsigned int _useconds)
 {
-	clock_t cl_time;
-	clock_t start_time = clock();
+	unsigned int cl_time;
+	unsigned int start_time = (unsigned int)clock();
+	unsigned int shifted_useconds = _useconds >> 10;
+	unsigned int clock_rate = (unsigned int)CLOCKS_PER_SEC;
 
 	/* 977 * 1024 is about 1e6.  The funny logic keeps the math from
-	   overflowing for large _useconds */
-	_useconds >>= 10;
-	cl_time = _useconds * CLOCKS_PER_SEC / 977;
+	   overflowing for large _useconds. Clamp before multiplying so the
+	   tick count also fits DJGPP's signed clock_t. */
+	if( clock_rate != 0 && shifted_useconds > (unsigned int)INT_MAX / clock_rate )
+		shifted_useconds = (unsigned int)INT_MAX / clock_rate;
+	cl_time = (shifted_useconds * clock_rate) / 977u;
 
 	while (1)
 	{
-		clock_t elapsed = clock() - start_time;
+		unsigned int elapsed = (unsigned int)clock() - start_time;
 		if (elapsed >= cl_time)
 		{
 			break;
@@ -76,6 +81,9 @@ static unsigned int usleep_private(unsigned int _useconds)
 
 FBCALL void fb_Delay( int msecs )
 {
+	if( msecs < 0 )
+		return;
+
 	if( msecs > 0 && fb_ctx.idle_sfxlib && fb_ctx.idle_sfxlib( msecs ) )
 		return;
 
@@ -100,13 +108,16 @@ FBCALL void fb_Delay( int msecs )
 		return;
 	}
 
-	if( __fb_dos_no_dpmi_yield )
-	{
-		usleep_private(msecs * 1000);
-	}
-	else
-	{
-		usleep(msecs * 1000);
+	while( msecs > 0 ) {
+		unsigned int chunk_msecs = (msecs > 1000) ? 1000u : (unsigned int)msecs;
+		unsigned int chunk_useconds = chunk_msecs * 1000u;
+
+		if( __fb_dos_no_dpmi_yield )
+			usleep_private( chunk_useconds );
+		else
+			usleep( chunk_useconds );
+
+		msecs -= (int)chunk_msecs;
 	}
 }
 

@@ -9,46 +9,56 @@
 
 char *fb_hGetExePath( char *dst, ssize_t maxlen )
 {
-	char *p;
-	ssize_t argv_len, len;
+	char *p, *program;
+	size_t argv_len, cwd_len, len, capacity;
 
-	argv_len = strlen( fb_ctx.argv[0] );
+	if( dst == NULL || maxlen <= 0 || fb_ctx.argv == NULL ||
+	    fb_ctx.argv[0] == NULL || __fb_startup_cwd == NULL )
+		return NULL;
+
+	program = fb_ctx.argv[0];
+	argv_len = strlen( program );
+	capacity = (size_t)maxlen;
 
 	/* check for drive letter - if there, get full path from argv[0] */
-	if( isalpha(fb_ctx.argv[0][0]) && fb_ctx.argv[0][1] == ':' )
+	if( isalpha((unsigned char)program[0]) && program[1] == ':' )
 	{
 		len = argv_len;
-		if( len >= maxlen)
+		if( len >= capacity )
 			return NULL;
 
-		memcpy( dst, fb_ctx.argv[0], len );
+		memcpy( dst, program, len );
 		dst[len] = '\0';
 	}
 	/* check for \ at beginning - get drive letter from cwd */
-	else if( fb_ctx.argv[0][0] == '\\' || fb_ctx.argv[0][0] == '/' )
+	else if( program[0] == '\\' || program[0] == '/' )
 	{
-		len = 1 + argv_len;
-		if( len >= maxlen )
+		if( argv_len > (size_t)-1 - 2 )
+			return NULL;
+		len = 2 + argv_len;
+		if( len >= capacity )
 			return NULL;
 
 		dst[0] = __fb_startup_cwd[0];
 		dst[1] = ':';
-		memcpy( dst + 2, fb_ctx.argv[0], argv_len );
+		memcpy( dst + 2, program, argv_len );
 		dst[len] = '\0';
 	}
 	/* no drive letter, no \, so relative path - get cur dir from startup */
 	else
 	{
-		ssize_t cwd_len;
 		cwd_len = strlen(__fb_startup_cwd);
+		if( (cwd_len > (size_t)-1 - 1) ||
+		    (argv_len > (size_t)-1 - cwd_len - 1) )
+			return NULL;
 
 		len = cwd_len + 1 + argv_len;
-		if( len >= maxlen )
+		if( len >= capacity )
 			return NULL;
 
 		memcpy( dst, __fb_startup_cwd, cwd_len );
 		dst[cwd_len] = '\\';
-		memcpy( dst + cwd_len + 1, fb_ctx.argv[0], argv_len );
+		memcpy( dst + cwd_len + 1, program, argv_len );
 		dst[len] = '\0';
 	}
 
@@ -59,10 +69,11 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 		*p = '\0';
 
 	/* upcase drive letter to be consistent with win32 port */
-	dst[0] = toupper( dst[0] );
+	dst[0] = (char)toupper((unsigned char)dst[0]);
 
 	/* just a drive letter? make sure \ follows to prevent using relative path */
-	if( maxlen > 3 && dst[2] == '\0' && dst[1] == ':' && isalpha(dst[0]) )
+	if( capacity > 3 && dst[2] == '\0' && dst[1] == ':' &&
+	    isalpha((unsigned char)dst[0]) )
 	{
 		dst[2] = '\\';
 		dst[3] = '\0';

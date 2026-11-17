@@ -18,7 +18,7 @@ int fb_FilePutStrEx( FB_FILE *handle, fb_off_t pos, void *str, ssize_t str_len )
 
 	/* perform call ... but only if there's data ... */
     if( (data != NULL) && (len > 0) )
-        res = fb_FilePutDataEx( handle, pos, data, len, TRUE, TRUE, FALSE );
+        res = fb_FilePutDataEx( handle, pos, data, (size_t)len, TRUE, TRUE, FALSE );
     else
     	res = fb_ErrorSetNum( FB_RTERROR_OK );
 
@@ -36,7 +36,12 @@ FBCALL int fb_FilePutStr( int fnum, int pos, void *str, ssize_t str_len )
 
 FBCALL int fb_FilePutStrLarge( int fnum, long long pos, void *str, ssize_t str_len )
 {
-	return fb_FilePutStrEx(FB_FILE_TO_HANDLE(fnum), pos, str, str_len);
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FilePutStrEx(FB_FILE_TO_HANDLE(fnum), offset, str, str_len);
 }
 
 /* end of files/file_putstr.c */

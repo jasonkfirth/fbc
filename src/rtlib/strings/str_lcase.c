@@ -37,14 +37,14 @@ FBCALL FBSTRING_ACCESS *fb_StrLcase2( FBSTRING_ACCESS *src, int mode )
 				c = FB_CHAR_TO_INT( *s++ );
 				if( (c >= 65) && (c <= 90) )
 					c += 97 - 65;
-				*d++ = c;
+				*d++ = (char)c;
 			}
 		} else {
 			for( i = 0; i < len; i++ ) {
 				c = FB_CHAR_TO_INT( *s++ );
 				if( isupper( c ) )
 					c = tolower( c );
-				*d++ = c;
+				*d++ = (char)c;
 			}
 		}
 

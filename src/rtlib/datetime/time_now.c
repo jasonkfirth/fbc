@@ -22,8 +22,12 @@ FBCALL double fb_Now( void )
 
 	/* Note: localtime() can return NULL due to weird value from time() */
 	ptm = localtime( &rawtime );
-	if (ptm == NULL)
+	if (ptm == NULL) {
+		/* A failed calendar conversion must not retain the runtime lock:
+		   later worker threads also need it for ordinary runtime calls. */
+		FB_UNLOCK();
 		return 0.0;
+	}
 
 	dblDate = fb_DateSerial( 1900 + ptm->tm_year, 1 + ptm->tm_mon, ptm->tm_mday );
 	dblTime = fb_TimeSerial( ptm->tm_hour, ptm->tm_min, ptm->tm_sec );

@@ -19,6 +19,8 @@ Temporarily transfers execution to an external program
 {{fbdoc item="desc"}}
 	Transfers control over to an external program. When the program exits, execution resumes immediately after the call to ##**Exec**##.
 
+	On Unix targets, parsed arguments and the argument-pointer array use checked temporary heap storage. Allocation or argument-count failure returns ##-1## and releases the temporary input strings.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/system/exec.bas"}}%%(freebasic)
 'A Windows based example but the same idea applies to Linux

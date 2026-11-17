@@ -42,7 +42,7 @@ int fb_DevScrnRead( FB_FILE *handle, void* value, size_t *pLength )
             break;
         }
         memcpy(pachBuffer, info->buffer, copy_length);
-        info->length -= copy_length;
+        info->length -= (unsigned int)copy_length;
         if (info->length!=0) {
             memmove(info->buffer,
                     info->buffer + copy_length,

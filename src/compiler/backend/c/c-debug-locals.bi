@@ -63,7 +63,7 @@ private function hCDebugLocalAcknowledgement _
 	( byval sym as FBSYMBOL ptr, byref identifier as const string ) as string
 
 	if( env.clopt.debuginfo = FALSE or ctx.computedgotoopaque ) then return ""
-	if( symbIsLocal(sym) = FALSE or symbIsParamVar(sym) or symbIsStatic(sym) ) then return ""
+	if( symbIsLocal(sym) = FALSE or symbIsParamVar(sym) ) then return ""
 	if( symbIsTemp(sym) or symbGetIsImplicit(sym) or symbIsDescriptor(sym) ) then return ""
 	if( symbIsRef(sym) or symbGetArrayDimensions(sym) <> 0 ) then return ""
 	if( (sym->attrib and (FB_SYMBATTRIB_SHARED or FB_SYMBATTRIB_COMMON or _
@@ -75,6 +75,8 @@ private function hCDebugLocalAcknowledgement _
 	end if
 	'' Keep the declaration and every assignment for source debugging. sizeof
 	'' a storage address is constant and never evaluates an uninitialized value.
+	'' Static locals need the same description; initialization and lifetime
+	'' remain owned by the existing static-storage lowering.
 	'' An enum remains a declaration in GNU11 as well as C23, and adds no line
 	'' to the existing source mapping. No native diagnostic option is changed.
 	c_debug_local_id += 1

@@ -262,7 +262,8 @@ FBCALL unsigned int fb_UStrAsc( FBSTRING_ACCESS *src, ssize_t position )
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) && (position > 0) ) {
 		length = FB_STRSIZE(src);
-		offset = fb_hUtf8Offset( src->data, length, position - 1 );
+		offset = fb_hUtf8Offset( src->data, length,
+			(ssize_t)((size_t)position - 1u) );
 		if( offset < length ) result = fb_hUtf8Decode( src->data, length, &offset );
 	}
 	fb_hStrDelTemp_NoLock( src );
@@ -350,10 +351,12 @@ static unsigned int hWideDecode( const FB_WCHAR *src, ssize_t *offset )
 {
 	unsigned int scalar, low;
 	if( sizeof(FB_WCHAR) == 1 ) scalar = (unsigned char)src[(*offset)++];
-	else scalar = src[(*offset)++];
+	/* Preserve signed wchar_t code units for the scalar encoder, which
+	   replaces values outside the Unicode scalar range. */
+	else scalar = (unsigned int)src[(*offset)++];
 	if( sizeof(FB_WCHAR) == 2 ) {
 		if( (scalar >= 0xD800) && (scalar <= 0xDBFF) ) {
-			low = src[*offset];
+			low = (unsigned int)src[*offset];
 			if( (low >= 0xDC00) && (low <= 0xDFFF) ) {
 				++*offset;
 				scalar = 0x10000 + ((scalar - 0xD800) << 10) + low - 0xDC00;
@@ -397,34 +400,50 @@ FBCALL FBSTRING_ACCESS *fb_UStrFromWstr( const FB_WCHAR *src )
 
 FBCALL FB_WCHAR *fb_UStrToWstr( FBSTRING_ACCESS *src )
 {
-	ssize_t offset = 0, length, units = 0;
+	ssize_t offset = 0, length, units = 0, capacity;
+	size_t maximum_units;
 	unsigned int scalar;
 	FB_WCHAR *result = NULL;
 	FB_STRLOCK();
 	if( (src != NULL) && (src->data != NULL) ) {
+		maximum_units = (size_t)FB_USTRING_MAX_BYTES / sizeof(FB_WCHAR);
 		length = FB_STRSIZE(src);
 		while( offset < length ) {
 			scalar = fb_hUtf8Decode( src->data, length, &offset );
 			units += (sizeof(FB_WCHAR) == 2 && scalar > 0xFFFF) ? 2 : 1;
 		}
-		if( units <= (FB_USTRING_MAX_BYTES / (ssize_t)sizeof(FB_WCHAR)) - 1 )
-			result = fb_wstr_AllocTemp( units );
+		capacity = units;
+		if( (capacity >= 0) && ((size_t)capacity < maximum_units) )
+			result = fb_wstr_AllocTemp( capacity );
 		if( result == NULL ) fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		else {
 			offset = units = 0;
 			while( offset < length ) {
 				scalar = fb_hUtf8Decode( src->data, length, &offset );
 				if( (sizeof(FB_WCHAR) == 2) && (scalar > 0xFFFF) ) {
+				if( (capacity < 2) || ((size_t)units > (size_t)capacity - 2u) ) {
+						fb_wstr_Del( result );
+						result = NULL;
+						fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+						break;
+					}
 					scalar -= 0x10000;
 					result[units++] = (FB_WCHAR)(0xD800 + (scalar >> 10));
 					result[units++] = (FB_WCHAR)(0xDC00 + (scalar & 0x3FF));
 				} else {
+					if( units >= capacity ) {
+						fb_wstr_Del( result );
+						result = NULL;
+						fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+						break;
+					}
 					/* Byte-wide targets cannot represent non-Latin-1 scalars. */
 					if( (sizeof(FB_WCHAR) == 1) && (scalar > 0xFF) ) scalar = '?';
 					result[units++] = (FB_WCHAR)scalar;
 				}
 			}
-			result[units] = 0;
+			if( result != NULL )
+				result[units] = 0;
 		}
 	}
 	fb_hStrDelTemp_NoLock( src );

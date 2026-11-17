@@ -3,7 +3,7 @@
 '' Purpose: Check shared STRING, WSTRING, and USTRING language/runtime paths.
 '' Responsibilities: Validate overloads, Unicode preservation, and text APIs.
 '' This file intentionally does NOT exercise external C library declarations.
-'' Temporary files use a process-specific name and are removed after each test.
+'' Temporary files use a process-specific name where the CRT exposes one.
 '' File ownership stays within each test; every opened handle is closed locally.
 
 #include "fbcunit.bi"
@@ -13,7 +13,19 @@
 #include "dir.bi"
 #include "fbc-int/string.bi"
 #include "fbnetwire.bi"
-#include once "crt/unistd.bi"
+#ifndef __FB_XBOX__
+	#include once "crt/unistd.bi"
+#endif
+
+private function textTypesTempFileTag() as string
+	#ifdef __FB_XBOX__
+		'' Xbox runs one title at a time and nxdk has no process-ID API.
+		'' The runner owns this title's writable test directory.
+		return "xbox"
+	#else
+		return str(getpid())
+	#endif
+end function
 
 '' Keep the temporary-file extension separate from each process-specific name.
 private function textTypesTempFileExtension() as string
@@ -75,7 +87,7 @@ SUITE( fbc_tests.string_.text_types )
 	END_TEST
 
 	TEST( unicode_wire_strings )
-		dim as string filename = "text-types-wire-" + str(getpid())
+		dim as string filename = "text-types-wire-" + textTypesTempFileTag()
 		filename += textTypesTempFileExtension()
 		dim as integer h = freefile()
 		dim as ustring utf8 = uchr(&hE9, &h1F600, 65)
@@ -218,7 +230,7 @@ SUITE( fbc_tests.string_.text_types )
 	END_TEST
 
 	TEST( paths_and_file_helpers )
-		dim as string filenameStem = "text-types-" + str(getpid())
+		dim as string filenameStem = "text-types-" + textTypesTempFileTag()
 		dim as string tempExtension = textTypesTempFileExtension()
 		#if sizeof(wstring) = 1
 			'' A byte-wide DOS path and a UTF-8 path share the same spelling only
@@ -272,7 +284,7 @@ SUITE( fbc_tests.string_.text_types )
 	END_TEST
 
 	TEST( formatted_output )
-		dim as string filename = "text-types-using-" + str(getpid())
+		dim as string filename = "text-types-using-" + textTypesTempFileTag()
 		filename += textTypesTempFileExtension()
 		dim as ustring utf8 = uchr(&hE9, &h4E2D, &h1F600)
 		dim as ustring lineText
@@ -306,7 +318,7 @@ SUITE( fbc_tests.string_.text_types )
 
 	TEST( unicode_paths )
 		'' Exercise Unicode paths independently of the range of WSTRING.
-		dim as ustring original = "text-types-unicode-" + str(getpid()) + uchr(&h4E2D, &h1F600)
+		dim as ustring original = "text-types-unicode-" + textTypesTempFileTag() + uchr(&h4E2D, &h1F600)
 		original += textTypesTempFileExtension()
 		dim as ustring copied = "copy-" + original
 		dim as ustring renamed = "renamed-" + original
@@ -326,7 +338,7 @@ SUITE( fbc_tests.string_.text_types )
 	END_TEST
 
 	TEST( long_unicode_formats )
-		dim as string filename = "text-types-long-using-" + str(getpid())
+		dim as string filename = "text-types-long-using-" + textTypesTempFileTag()
 		filename += textTypesTempFileExtension()
 		dim as integer h = freefile()
 		dim as ustring prefix = ustring(800, &h4E2D)

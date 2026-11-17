@@ -10,8 +10,8 @@ This file intentionally does NOT equate successful compilation with correct code
 
 The [ranked findings](c-emitter-findings.md) summarize open compiler/runtime work,
 scoped repairs and the evidence needed for follow-up.
-The [current continuation](c-emitter-current-status.md) records the November 1
-compiler/unit checks, UDP handle repair, structure guard and remaining coverage.
+The [current continuation](c-emitter-current-status.md) records the selected
+compiler, compiler/unit checks, completed corpus counts and remaining coverage.
 
 The recorded inventories and audits cover only their named inputs. Additional
 projects, targets and unselected sources, warning cleanup, and structural

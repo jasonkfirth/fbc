@@ -32,6 +32,7 @@
 #include <pc.h>
 #include <go32.h>
 #include <dpmi.h>
+#include <limits.h>
 
 /* PIC port addresses. */
 #define ICU1_BASE	0x20
@@ -96,6 +97,21 @@
 #define COMM_PROPS( n ) &comm_props[n-1]
 #define IRQ_PROPS( n ) &irq_props[n-FIRST_IRQ]
 
+/* DOS port I/O is limited to a 16-bit address and an 8-bit data value. */
+static inline int dos_inportb( unsigned int port )
+{
+	if( port > USHRT_MAX )
+		return -1;
+	return inportb( (unsigned short)port );
+}
+
+static inline void dos_outportb( unsigned int port, int value )
+{
+	if( (port > USHRT_MAX) || (value < 0) || (value > UCHAR_MAX) )
+		return;
+	outportb( (unsigned short)port, (unsigned char)value );
+}
+
 /*
 	This define will make this source use the "built-in" 
 	DOS-ISR	management routines. My tests failed under 
@@ -135,7 +151,7 @@ typedef struct
 
 typedef struct
 {
-	int baseaddr;	/* base port address */
+	unsigned int baseaddr;	/* base port address */
 	int def_irq;	/* default irq number */
 	int irq;		/* actual irq number in use */
 	int initflags;	/* initialization flags */
@@ -255,8 +271,8 @@ static void BUFFER_reset( buffer_t * buf )
 {
 	if( buf )
 	{
-		if( buf->data && buf->size )
-			memset( buf->data, 0, buf->size);
+		if( buf->data && (buf->size > 0) )
+			memset( buf->data, 0, (size_t)buf->size);
 		buf->head = buf->tail = buf->length = 0;
 	}
 }
@@ -273,7 +289,7 @@ static int BUFFER_alloc( buffer_t * buf, int size )
 {
 	unsigned int buffer_size;
 
-	if( (buf == NULL) || (size <= 0) )
+	if( (buf == NULL) || (size <= 0) || (size > MAX_BUFFERSIZE) )
 		return FALSE;
 
 	buffer_size = next_pow2( (unsigned int)size );
@@ -282,14 +298,14 @@ static int BUFFER_alloc( buffer_t * buf, int size )
 	buf->size = 0;
 	BUFFER_reset( buf );
 
-	buf->data = malloc( buffer_size );
+	buf->data = malloc( (size_t)buffer_size );
 	if( buf->data == NULL )
 		return FALSE;
 
-	buf->size = buffer_size;
+	buf->size = (int)buffer_size;
 	BUFFER_reset( buf );
 
-	if( fb_dos_lock_data( buf->data, buf->size ) != 0 )
+	if( fb_dos_lock_data( buf->data, (size_t)buf->size ) != 0 )
 	{
 		free( buf->data );
 		buf->data = NULL;
@@ -305,8 +321,10 @@ static void BUFFER_free( buffer_t * buf )
 {
 	if( buf->data )
 	{
-		memset( buf->data, 0, buf->size);
-		fb_dos_unlock_data( buf->data, buf->size);
+		if( buf->size > 0 )
+			memset( buf->data, 0, (size_t)buf->size);
+		if( buf->size > 0 )
+			fb_dos_unlock_data( buf->data, (size_t)buf->size);
 		free( buf->data );
 		buf->data = NULL;
 	}
@@ -315,10 +333,11 @@ static void BUFFER_free( buffer_t * buf )
 
 static int BUFFER_putc( buffer_t * buf, int ch )
 {
-	if( buf->length == buf->size )
+	if( (buf == NULL) || (buf->data == NULL) || (ch < 0) || (ch > UCHAR_MAX) ||
+	    (buf->length == buf->size) )
 		return -1;
 
-	buf->data[ buf->tail ] = ch;
+	buf->data[ buf->tail ] = (unsigned char)ch;
 	buf->tail = (buf->tail + 1) & ( buf->size - 1 );
 	buf->length++;
 
@@ -344,26 +363,26 @@ static int UART_detect_chiptype( unsigned int baseaddr )
 	int tmp;
 
 	/* test for LCR */
-	outportb( baseaddr + UART_LCR ,0x1b );
-	if ( inportb( baseaddr + UART_LCR ) != 0x1b )
+	dos_outportb( baseaddr + UART_LCR ,0x1b );
+	if ( dos_inportb( baseaddr + UART_LCR ) != 0x1b )
 		return UART_IS_NONE;
 
-	outportb( baseaddr + UART_LCR, 0x3 );
-	if ( inportb( baseaddr + UART_LCR ) != UART_LCR )
+	dos_outportb( baseaddr + UART_LCR, 0x3 );
+	if ( dos_inportb( baseaddr + UART_LCR ) != UART_LCR )
 		return UART_IS_NONE;
 
 	/* test for scratch register */
-	outportb( baseaddr + UART_SCR, 0x55 );
-	if ( inportb( baseaddr + UART_SCR ) != 0x55 )
+	dos_outportb( baseaddr + UART_SCR, 0x55 );
+	if ( dos_inportb( baseaddr + UART_SCR ) != 0x55 )
 		return UART_IS_8250;
 
-	outportb( baseaddr + UART_SCR, 0xAA );
-	if ( inportb( baseaddr + UART_SCR ) != 0xAA )
+	dos_outportb( baseaddr + UART_SCR, 0xAA );
+	if ( dos_inportb( baseaddr + UART_SCR ) != 0xAA )
 		return UART_IS_8250;
 
 	/* check for FIFO */
-	outportb(baseaddr + UART_FCR, 1);
-	tmp = inportb( baseaddr + UART_IIR);
+	dos_outportb(baseaddr + UART_FCR, 1);
+	tmp = dos_inportb( baseaddr + UART_IIR);
 
 	if ( ( tmp & 0x80 ) == 0 )
 		return UART_IS_16450;
@@ -371,7 +390,7 @@ static int UART_detect_chiptype( unsigned int baseaddr )
 		return UART_IS_16550;
 
 	/* clear FCR */
-	outportb( baseaddr + UART_FCR, 0x0 );
+	dos_outportb( baseaddr + UART_FCR, 0x0 );
 
 	return UART_IS_16550A;
 }
@@ -387,16 +406,16 @@ static int UART_set_baud( unsigned int baseaddr, int baud )
 	lsb = divisor & 0xff;
 	msb = divisor >> 8;
 
-	tmp = inportb( baseaddr + UART_LCR );
+	tmp = dos_inportb( baseaddr + UART_LCR );
 	tmp |= LCR_DLAB;
-	outportb( baseaddr + UART_LCR, tmp );
+	dos_outportb( baseaddr + UART_LCR, tmp );
 
-	outportb( baseaddr + UART_DL_LSB, lsb );
-	outportb( baseaddr + UART_DL_MSB, msb );
+	dos_outportb( baseaddr + UART_DL_LSB, lsb );
+	dos_outportb( baseaddr + UART_DL_MSB, msb );
 
-	tmp = inportb( baseaddr + UART_LCR );
+	tmp = dos_inportb( baseaddr + UART_LCR );
 	tmp &= ~LCR_DLAB;
-	outportb( baseaddr + UART_LCR, tmp );
+	dos_outportb( baseaddr + UART_LCR, tmp );
 
 	return( TRUE );
 }
@@ -459,7 +478,7 @@ static int UART_set_data_format( unsigned int baseaddr,
 	}
 
 	/* set data format - assumes DLAB is clear */
-	outportb( baseaddr + UART_LCR, fmt );
+	dos_outportb( baseaddr + UART_LCR, fmt );
 
 	return TRUE;
 }
@@ -491,10 +510,10 @@ static int comm_isr( unsigned irq )
 	if( irq >= 8 )
 	{
 		/* end-of-interrupt */
-		outportb( ICU2_OCW2, 0x20 );
+		dos_outportb( ICU2_OCW2, 0x20 );
 	}
 	/* end-of-interrupt */
-	outportb( ICU1_OCW2, 0x20 );
+	dos_outportb( ICU1_OCW2, 0x20 );
 
 #if 0
 	ENABLE();
@@ -515,7 +534,7 @@ static int comm_isr( unsigned irq )
 
 		while(1)
 		{
-			ret = inportb( cp->baseaddr + UART_IIR ) & 0xf;
+			ret = dos_inportb( cp->baseaddr + UART_IIR ) & 0xf;
 
 			if( ret == 1)
 				break;
@@ -524,7 +543,7 @@ static int comm_isr( unsigned irq )
 			{
 			case 4:
 				/* receive data */
-				ch = inportb( cp->baseaddr + UART_RBR );
+				ch = dos_inportb( cp->baseaddr + UART_RBR );
 				BUFFER_putc( &cp->rxbuf, ch );
 				break;
 
@@ -534,21 +553,21 @@ static int comm_isr( unsigned irq )
 				if( ch >= 0 )
 				{
 					cp->txclear = FALSE;
-					outportb( cp->baseaddr + UART_THR, ch );
+					dos_outportb( cp->baseaddr + UART_THR, ch );
 
 					/* TODO: check CTS if CS option set and start timer */
 
 				}
 				else
 				{
-					ret = inportb( cp->baseaddr + UART_IIR );
+					ret = dos_inportb( cp->baseaddr + UART_IIR );
 					cp->txclear = TRUE;
 				}
 				break;
 
 			case 0:
 				/* change in input signal */
-				ret = inportb( cp->baseaddr + UART_MSR );
+				ret = dos_inportb( cp->baseaddr + UART_MSR );
 
 				/* TODO: start DSR low timer if DS option set  */
 				/* TODO: start DCD low timer if CD option set  */
@@ -558,7 +577,7 @@ static int comm_isr( unsigned irq )
 
 			case 6:
 				/* reception error or break */
-				ret = inportb( cp->baseaddr + UART_LSR );
+				ret = dos_inportb( cp->baseaddr + UART_LSR );
 
 				/* TODO: check errors */
 
@@ -575,7 +594,7 @@ static int comm_isr( unsigned irq )
 	}
 	return 0;
 }
-static void end_comm_isr( void ) { };
+static void end_comm_isr( void ) { }
 
 static void comm_init_addref( void )
 {
@@ -651,7 +670,7 @@ static int comm_init_irq( irq_props_t *ip )
 	/* setup real mode handler */
 	_go32_dpmi_get_real_mode_interrupt_vector (ip->intnum, &ip->old_rmhandler);
 
-	ip->new_rmhandler.pm_selector = _go32_my_cs ();
+	ip->new_rmhandler.pm_selector = (unsigned short)_go32_my_cs ();
 	ip->new_rmhandler.pm_offset = (unsigned long ) ip->irq_handler;
 
 	if( _go32_dpmi_allocate_real_mode_callback_iret (&ip->new_rmhandler, &ip->regs) )
@@ -670,7 +689,7 @@ static int comm_init_irq( irq_props_t *ip )
 	/* setup protected mode handler */
 	_go32_dpmi_get_protected_mode_interrupt_vector (ip->intnum, &ip->old_pmhandler);
 
-	ip->new_pmhandler.pm_selector = _go32_my_cs ();
+	ip->new_pmhandler.pm_selector = (unsigned short)_go32_my_cs ();
 	ip->new_pmhandler.pm_offset = (unsigned long) ip->irq_handler;
 	_go32_dpmi_allocate_iret_wrapper( &ip->new_pmhandler );
 
@@ -724,28 +743,28 @@ static int comm_init( int com_num, unsigned int baseaddr, int irq )
 		return FALSE;
 	}
 
-	outportb( cp->baseaddr + UART_FCR, 0 );
+	dos_outportb( cp->baseaddr + UART_FCR, 0 );
 
 	/* TODO: FIFO setup on UARTs that support it */
 
 	/* flush ints pending */
 	for( i = 0; i < 17; i++ )
 	{
-		tmp = inportb( cp->baseaddr + UART_IIR );
+		tmp = dos_inportb( cp->baseaddr + UART_IIR );
 		if( (tmp & 0x38) == 0 )
 			break;
-		tmp = inportb( cp->baseaddr + UART_RBR );
+		tmp = dos_inportb( cp->baseaddr + UART_RBR );
 	}
 
 	/* disable interrupts on the UART */
-	outportb( cp->baseaddr + UART_IER, 0 );
+	dos_outportb( cp->baseaddr + UART_IER, 0 );
 
 	/* clear status ints */
-	tmp = inportb( cp->baseaddr + UART_LSR );
-	tmp = inportb( cp->baseaddr + UART_MSR );
+	tmp = dos_inportb( cp->baseaddr + UART_LSR );
+	tmp = dos_inportb( cp->baseaddr + UART_MSR );
 
 	/* enable interrupt gate */
-	outportb( cp->baseaddr + UART_MCR, MCR_OUT2 );
+	dos_outportb( cp->baseaddr + UART_MCR, MCR_OUT2 );
 
 
 	/* setup the irq for comm handling */
@@ -773,23 +792,23 @@ static int comm_init( int com_num, unsigned int baseaddr, int irq )
 		{
 			/* enable irq on slave */
 			
-			ip->old_pic2_mask = inportb( ICU2_MASK );
-			outportb( ICU2_MASK, ip->old_pic2_mask & ~(1 << (cp->irq - 8)) );
+			ip->old_pic2_mask = dos_inportb( ICU2_MASK );
+			dos_outportb( ICU2_MASK, ip->old_pic2_mask & ~(1 << (cp->irq - 8)) );
 
 /* assume that the host OS already set this up */
 #if 1
 			/* TODO: chain pic2 to pic1 irq 2 */
 
 			/* enable irq 2 on master */
-			ip->old_pic1_mask = inportb( ICU1_MASK );
-			outportb( ICU1_MASK, ip->old_pic1_mask & ~(1 << 2) );
+			ip->old_pic1_mask = dos_inportb( ICU1_MASK );
+			dos_outportb( ICU1_MASK, ip->old_pic1_mask & ~(1 << 2) );
 #endif
 		}
 		else
 		{
 			/* enable irq on master */
-			ip->old_pic1_mask = inportb( ICU1_MASK );
-			outportb( ICU1_MASK, ip->old_pic1_mask & ~(1 << cp->irq) );
+			ip->old_pic1_mask = dos_inportb( ICU1_MASK );
+			dos_outportb( ICU1_MASK, ip->old_pic1_mask & ~(1 << cp->irq) );
 		}
 
 		ENABLE();
@@ -803,16 +822,16 @@ static int comm_init( int com_num, unsigned int baseaddr, int irq )
 	ip->first = com_num;
 
 	/* enable the UART's interrupts */
-	tmp = inportb( cp->baseaddr + UART_IER );
+	tmp = dos_inportb( cp->baseaddr + UART_IER );
 	tmp |= IER_SINP | IER_EBRK | IER_TBE | IER_RXRD;
-	outportb( cp->baseaddr + UART_IER, tmp );
+	dos_outportb( cp->baseaddr + UART_IER, tmp );
 
 	/* TODO: MCR_RTS should be set only after waiting for DSR if the OP/CS protocol option is set */
-	tmp = inportb( cp->baseaddr + UART_MCR );
+	tmp = dos_inportb( cp->baseaddr + UART_MCR );
 	tmp |= MCR_OUT2 | MCR_RTS | MCR_DTR;
 	if( cp->flags & FLAG_SUPPRESS_RTS )
 		tmp ^= MCR_RTS;
-	outportb( cp->baseaddr + UART_MCR, tmp );
+	dos_outportb( cp->baseaddr + UART_MCR, tmp );
 
 
 	ENABLE();
@@ -831,18 +850,18 @@ static void comm_exit( int com_num )
 	cp = COMM_PROPS(com_num);
 
 	/* disable interrupt gate on the UART */
-	tmp = inportb( cp->baseaddr + UART_MCR );
+	tmp = dos_inportb( cp->baseaddr + UART_MCR );
 	if( cp->flags & FLAG_KEEP_DTR )
 		tmp &= ~( MCR_OUT2 | MCR_OUT1 | MCR_RTS );
 	else
 		tmp &= ~( MCR_OUT2 | MCR_OUT1 | MCR_RTS | MCR_DTR );
 	
-	outportb( cp->baseaddr + UART_MCR, tmp );
+	dos_outportb( cp->baseaddr + UART_MCR, tmp );
 
 	/* disable interrupts on the UART */
-	tmp = inportb( cp->baseaddr + UART_IER );
+	tmp = dos_inportb( cp->baseaddr + UART_IER );
 	tmp &= ~( IER_SINP | IER_EBRK | IER_TBE | IER_RXRD );
-	outportb( cp->baseaddr + UART_IER, tmp );
+	dos_outportb( cp->baseaddr + UART_IER, tmp );
 
 	ip = IRQ_PROPS(cp->irq);
 
@@ -871,17 +890,17 @@ static void comm_exit( int com_num )
 	{
 		DISABLE();
 
-		outportb( ICU1_MASK, inportb( ICU1_MASK ) | (ip->old_pic1_mask & (1 << cp->irq)) );
+		dos_outportb( ICU1_MASK, dos_inportb( ICU1_MASK ) | (ip->old_pic1_mask & (1 << cp->irq)) );
 
 		if( cp->irq >= 8 )
 		{
 			/* disable irq on slave */
-			outportb( ICU2_MASK, inportb( ICU2_MASK ) | (ip->old_pic2_mask & (1 << (cp->irq - 8))) );
+			dos_outportb( ICU2_MASK, dos_inportb( ICU2_MASK ) | (ip->old_pic2_mask & (1 << (cp->irq - 8))) );
 
 /* assume that the host OS already set this up */
 #if 1
 			/* disable irq 2 on master */
-			outportb( ICU1_MASK, inportb( ICU1_MASK ) | (ip->old_pic1_mask & (1 << 2)) );
+			dos_outportb( ICU1_MASK, dos_inportb( ICU1_MASK ) | (ip->old_pic1_mask & (1 << 2)) );
 
 			/* TODO: also unchain slave from master */
 #endif
@@ -889,7 +908,7 @@ static void comm_exit( int com_num )
 		else
 		{
 			/* disable irq on master */
-			outportb( ICU1_MASK, inportb( ICU1_MASK ) | (ip->old_pic1_mask & (1 << cp->irq)) );
+			dos_outportb( ICU1_MASK, dos_inportb( ICU1_MASK ) | (ip->old_pic1_mask & (1 << cp->irq)) );
 		}
 
 		ENABLE();
@@ -996,13 +1015,15 @@ int comm_close( int com_num )
 int comm_putc( int com_num, int ch )
 {
 	comm_props_t *cp;
+	if( (com_num < 1) || (com_num > MAX_COMM) || (ch < 0) || (ch > UCHAR_MAX) )
+		return -1;
 	cp = COMM_PROPS(com_num);
 
 	DISABLE();
 	if( cp->txclear )
 	{
 		cp->txclear = FALSE;
-		outportb( cp->baseaddr + UART_THR, ch );
+		dos_outportb( cp->baseaddr + UART_THR, ch );
 	}
 	else
 	{
@@ -1016,6 +1037,8 @@ int comm_getc( int com_num )
 {
 	int ch;
 	comm_props_t *cp;
+	if( (com_num < 1) || (com_num > MAX_COMM) )
+		return -1;
 	cp = COMM_PROPS(com_num);
 	DISABLE();
 	ch = BUFFER_getc( &cp->rxbuf );
@@ -1027,6 +1050,8 @@ int comm_bytes_remaining( int com_num )
 {
 	int bytes;
 	comm_props_t *cp;
+	if( (com_num < 1) || (com_num > MAX_COMM) )
+		return -1;
 	cp = COMM_PROPS(com_num);
 	DISABLE();
 	bytes = cp->rxbuf.length;
@@ -1061,9 +1086,9 @@ int fb_dos_SerialGetStatus( int com_num, FB_COM_STATUS *status )
 
 	DISABLE();
 
-	modem_control = inportb( cp->baseaddr + UART_MCR );
-	modem_status = inportb( cp->baseaddr + UART_MSR );
-	line_status = inportb( cp->baseaddr + UART_LSR );
+	modem_control = dos_inportb( cp->baseaddr + UART_MCR );
+	modem_status = dos_inportb( cp->baseaddr + UART_MSR );
+	line_status = dos_inportb( cp->baseaddr + UART_LSR );
 
 	if( (modem_status & 0x10) != 0 )
 		status->lines |= FB_COM_LINE_CTS;
@@ -1111,7 +1136,7 @@ int fb_dos_SerialSetLines( int com_num, unsigned int mask,
 		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 
 	DISABLE();
-	modem_control = inportb( cp->baseaddr + UART_MCR );
+	modem_control = dos_inportb( cp->baseaddr + UART_MCR );
 
 	if( (mask & FB_COM_LINE_RTS) != 0 ) {
 		if( (values & FB_COM_LINE_RTS) != 0 )
@@ -1127,7 +1152,7 @@ int fb_dos_SerialSetLines( int com_num, unsigned int mask,
 			modem_control &= ~MCR_DTR;
 	}
 
-	outportb( cp->baseaddr + UART_MCR, modem_control );
+	dos_outportb( cp->baseaddr + UART_MCR, modem_control );
 	ENABLE();
 
 	return FB_RTERROR_OK;
@@ -1146,12 +1171,12 @@ int fb_dos_SerialSetBreak( int com_num, int enabled )
 		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 
 	DISABLE();
-	line_control = inportb( cp->baseaddr + UART_LCR );
+	line_control = dos_inportb( cp->baseaddr + UART_LCR );
 	if( enabled )
 		line_control |= LCR_BREAK;
 	else
 		line_control &= ~LCR_BREAK;
-	outportb( cp->baseaddr + UART_LCR, line_control );
+	dos_outportb( cp->baseaddr + UART_LCR, line_control );
 	ENABLE();
 
 	return FB_RTERROR_OK;
@@ -1183,8 +1208,8 @@ int fb_dos_SerialPurge( int com_num, unsigned int queues )
 	}
 
 	if( fifo_control != 0 ) {
-		outportb( cp->baseaddr + UART_FCR, 0x01 | fifo_control );
-		outportb( cp->baseaddr + UART_FCR, 0x00 );
+		dos_outportb( cp->baseaddr + UART_FCR, 0x01 | fifo_control );
+		dos_outportb( cp->baseaddr + UART_FCR, 0x00 );
 	}
 
 	ENABLE();
@@ -1202,6 +1227,14 @@ int fb_SerialOpen
 	)
 {
 	int ret, flags = 0;
+	(void)handle;
+	(void)pszDevice;
+
+	if( (options == NULL) || (ppvHandle == NULL) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	if( (options->uiSpeed > INT_MAX) || (options->uiDataBits > INT_MAX) ||
+	    (options->IRQNumber > INT_MAX) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
 	if( options->TransmitBuffer == 0 )
 		options->TransmitBuffer = DEFAULT_BUFFERSIZE;
@@ -1221,14 +1254,14 @@ int fb_SerialOpen
 
 	ret = comm_open( 
 		iPort, 
-		options->uiSpeed, 
+		(int)options->uiSpeed,
 		options->Parity, 
-		options->uiDataBits, 
+		(int)options->uiDataBits,
 		options->StopBits, 
-		options->TransmitBuffer,
-		options->ReceiveBuffer,
+		(int)options->TransmitBuffer,
+		(int)options->ReceiveBuffer,
 		flags, 
-		options->IRQNumber
+		(int)options->IRQNumber
 		);
 
 	if( ret )
@@ -1275,6 +1308,7 @@ int fb_SerialGetRemaining( FB_FILE *handle, void *pvHandle, fb_off_t *pLength )
 {
 	int bytes;
 	DOS_SERIAL_INFO *pInfo = (DOS_SERIAL_INFO *) pvHandle;
+	(void)handle;
 
 	bytes = comm_bytes_remaining( pInfo->com_num );
 	if( bytes < 0 )
@@ -1295,9 +1329,10 @@ int fb_SerialWrite
 	)
 {
 	DOS_SERIAL_INFO *pInfo = (DOS_SERIAL_INFO *) pvHandle;
-	unsigned char * p = (unsigned char *)data;
+	const unsigned char *p = (const unsigned char *)data;
 	int ch;
 	size_t i;
+	(void)handle;
 
 	/* TODO: Support for ASC/LF options */
 
@@ -1323,6 +1358,7 @@ int fb_SerialRead
 	int ch;
 	unsigned char * p = (unsigned char *)data;
 	int res = FB_RTERROR_OK;
+	(void)handle;
 
 	for( i = 0; i < n; i++ )
 	{
@@ -1332,7 +1368,7 @@ int fb_SerialRead
 			res = FB_RTERROR_FILEIO;
 			break;
 		}
-		p[i] = ch;
+		p[i] = (unsigned char)ch;
 		count++;
 	}
 
@@ -1344,6 +1380,7 @@ int fb_SerialRead
 int fb_SerialClose( FB_FILE *handle, void *pvHandle )
 {
 	DOS_SERIAL_INFO *pInfo = (DOS_SERIAL_INFO *) pvHandle;
+	(void)handle;
 	comm_close( pInfo->com_num );
 	free(pInfo);
 	return fb_ErrorSetNum( FB_RTERROR_OK );

@@ -86,6 +86,8 @@ typedef struct FB_SFX_MIDI_FM_CHANNEL
     unsigned char expression;
     unsigned char pan;
     unsigned char sustain;
+    /* Preserve pitch_bend's existing two-byte alignment explicitly. */
+    unsigned char pitch_bend_alignment_padding;
     unsigned short pitch_bend;
 } FB_SFX_MIDI_FM_CHANNEL;
 
@@ -101,6 +103,10 @@ typedef struct FB_SFX_MIDI_FM_VOICE
     int program;
     int drum_frames;
 
+#if defined(__SIZEOF_LONG__) && (__SIZEOF_LONG__ == 8)
+    /* Keep the existing eight-byte alignment of age without implicit padding. */
+    uint32_t age_alignment_padding;
+#endif
     unsigned long age;
     uint32_t noise_state;
 
@@ -118,6 +124,10 @@ typedef struct FB_SFX_MIDI_FM_VOICE
     float output_gain;
     float drum_decay;
     float noise_mix;
+#if defined(__SIZEOF_LONG__) && (__SIZEOF_LONG__ == 8)
+    /* The original structure has four bytes of tail padding on LP64. */
+    uint32_t tail_padding;
+#endif
 } FB_SFX_MIDI_FM_VOICE;
 
 typedef struct FB_SFX_MIDI_FM_STATE
@@ -126,11 +136,19 @@ typedef struct FB_SFX_MIDI_FM_STATE
     int paused;
     int sine_table_ready;
 
+#if defined(__SIZEOF_LONG__) && (__SIZEOF_LONG__ == 8)
+    /* Preserve next_age's original eight-byte alignment. */
+    uint32_t next_age_alignment_padding;
+#endif
     unsigned long next_age;
 
     float sine_table[FB_SFX_MIDI_FM_SINE_SAMPLES];
     float normalizer[FB_SFX_MIDI_FM_VOICES + 1];
     FB_SFX_MIDI_FM_CHANNEL channels[FB_SFX_MIDI_FM_CHANNELS];
+#if defined(__SIZEOF_LONG__) && (__SIZEOF_LONG__ == 8)
+    /* Keep the voice array at its original eight-byte boundary. */
+    uint32_t voices_alignment_padding;
+#endif
     FB_SFX_MIDI_FM_VOICE voices[FB_SFX_MIDI_FM_VOICES];
 } FB_SFX_MIDI_FM_STATE;
 
@@ -536,6 +554,12 @@ static int fb_sfxMidiFmSampleRate(void)
     return fb_sfx_context->samplerate;
 }
 
+static float fb_sfxMidiFmSampleRateFloat(void)
+{
+    int sample_rate = fb_sfxMidiFmSampleRate();
+    return (float)sample_rate;
+}
+
 static void fb_sfxMidiFmUpdateIncrements(FB_SFX_MIDI_FM_VOICE *voice)
 {
     float sample_rate;
@@ -543,7 +567,7 @@ static void fb_sfxMidiFmUpdateIncrements(FB_SFX_MIDI_FM_VOICE *voice)
     if (!voice)
         return;
 
-    sample_rate = (float)fb_sfxMidiFmSampleRate();
+    sample_rate = fb_sfxMidiFmSampleRateFloat();
     if (sample_rate <= 0.0f || voice->frequency <= 0.0f)
     {
         voice->carrier_increment = 0.0f;
@@ -608,7 +632,7 @@ static void fb_sfxMidiFmLimitModulation(FB_SFX_MIDI_FM_VOICE *voice)
     if (!voice)
         return;
 
-    highest_frequency = (float)fb_sfxMidiFmSampleRate() * 0.45f;
+    highest_frequency = fb_sfxMidiFmSampleRateFloat() * 0.45f;
 
     /*
         A preset which is clean in the middle of the keyboard can alias
@@ -683,7 +707,7 @@ static void fb_sfxMidiFmReleaseVoice(FB_SFX_MIDI_FM_VOICE *voice)
 
     timbre = fb_sfxMidiFmVoiceTimbre(voice);
     release_frames = timbre->release_seconds *
-                     (float)fb_sfxMidiFmSampleRate();
+                     fb_sfxMidiFmSampleRateFloat();
 
     if (release_frames < 1.0f)
         release_frames = 1.0f;
@@ -706,7 +730,7 @@ static void fb_sfxMidiFmAdvanceEnvelope(FB_SFX_MIDI_FM_VOICE *voice,
     if (!voice || !timbre)
         return;
 
-    sample_rate = (float)fb_sfxMidiFmSampleRate();
+    sample_rate = fb_sfxMidiFmSampleRateFloat();
 
     switch (voice->envelope_state)
     {
@@ -1482,9 +1506,16 @@ static float fb_sfxMidiFmRenderVoice(FB_SFX_MIDI_FM_VOICE *voice)
     if (voice->percussion)
     {
         voice->envelope_level *= voice->drum_decay;
-        voice->drum_frames--;
 
-        if (voice->drum_frames <= 0 || voice->envelope_level < 0.0005f)
+        /* Expire short or stale timers without a signed decrement. */
+        if (voice->drum_frames <= 1) {
+            voice->drum_frames = 0;
+            voice->active = 0;
+        } else {
+            voice->drum_frames--;
+        }
+
+        if (voice->envelope_level < 0.0005f)
             voice->active = 0;
     }
     else
@@ -1537,7 +1568,8 @@ void fb_sfxMidiSoftwareMixBlock(float *buffer, int frames)
 {
     float master_volume;
     float balance;
-    int block_start;
+    size_t block_start;
+    size_t total_frames;
     int use_simd;
 
     if (!buffer || frames <= 0 || !g_fb_sfx_midi_fm.active ||
@@ -1546,22 +1578,25 @@ void fb_sfxMidiSoftwareMixBlock(float *buffer, int frames)
         return;
     }
 
+    if ((size_t)frames > SIZE_MAX / (2u * sizeof(*buffer)))
+        return;
+    total_frames = (size_t)frames;
     master_volume = (fb_sfx_context) ? fb_sfx_context->master_volume : 1.0f;
     balance = (fb_sfx_context) ? fb_sfx_context->balance : 0.0f;
     use_simd = fb_sfxMidiFmUseSimd();
 
-    for (block_start = 0; block_start < frames;
+    for (block_start = 0; block_start < total_frames;
          block_start += FB_SFX_MIDI_FM_BLOCK_FRAMES)
     {
         float mixed[FB_SFX_MIDI_FM_BLOCK_FRAMES * 2];
         float voice_samples[FB_SFX_MIDI_FM_BLOCK_FRAMES];
         unsigned char active_voices[FB_SFX_MIDI_FM_BLOCK_FRAMES];
-        int block_frames = frames - block_start;
+        size_t remaining_frames = total_frames - block_start;
+        int block_frames = (remaining_frames > FB_SFX_MIDI_FM_BLOCK_FRAMES)
+            ? FB_SFX_MIDI_FM_BLOCK_FRAMES
+            : (int)remaining_frames;
         int frame;
         int index;
-
-        if (block_frames > FB_SFX_MIDI_FM_BLOCK_FRAMES)
-            block_frames = FB_SFX_MIDI_FM_BLOCK_FRAMES;
 
         memset(mixed, 0, (size_t)block_frames * 2u * sizeof(float));
         memset(active_voices, 0, (size_t)block_frames);
@@ -1629,7 +1664,7 @@ void fb_sfxMidiSoftwareMixBlock(float *buffer, int frames)
             {
                 float gain = g_fb_sfx_midi_fm.normalizer[voices] *
                              master_volume;
-                int destination = (block_start + frame) * 2;
+                size_t destination = (block_start + (size_t)frame) * 2u;
 
                 buffer[destination] += mixed[frame * 2] * gain;
                 buffer[destination + 1] += mixed[frame * 2 + 1] * gain;

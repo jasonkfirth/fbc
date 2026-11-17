@@ -122,6 +122,10 @@ typedef struct FB_HAIKU_STATE
 
     sem_id gui_ready_sem;
     sem_id gui_exit_sem;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the state record size without implicit tail padding. */
+	unsigned char tail_alignment_padding[4];
+#endif
 
 } FB_HAIKU_STATE;
 
@@ -191,6 +195,8 @@ int  fb_hHaikuGetMouse(int *x, int *y, int *z, int *buttons, int *clip);
 int  fb_hHaikuGetTouchCount(void);
 int  fb_hHaikuGetTouch(int index, int *x, int *y, int *id);
 void fb_hHaikuSetMouse(int x, int y, int cursor, int clip);
+void fb_hHaikuMouseUpdateButtons(int buttons);
+void fb_hHaikuMouseUpdatePosition(int wx, int wy);
 
 int *fb_hHaikuFetchModes(int depth, int *size);
 
@@ -213,6 +219,21 @@ void fb_hHaikuHandleMouseWheel(float x, float y);
 void fb_hHaikuHandleFocus(int active);
 
 void fb_hHaikuPostQuitEvent(void);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int fb_hConsoleHasFocus(void);
+int fb_hGfxHaikuGetXPad(int id, ssize_t *buttons,
+	float *lstick_x, float *lstick_y,
+	float *rstick_x, float *rstick_y,
+	float *ltrigger, float *rtrigger,
+	ssize_t *dpad);
+
+#ifdef __cplusplus
+}
+#endif
 
 /* ------------------------------------------------------------------------- */
 /* Scancode translation                                                      */

@@ -29,6 +29,9 @@ Reads one line of input from the keyboard
 		- The first syntax is only allowed when the string buffer size (provided by ##//stringvariable1//##) is either variable or fixed (and known). For this first syntax, the ##//promptstring//## parameter is optional.
 		- The second syntax with ##//maxlength//## parameter is only allowed when the string buffer size (provided by ##//stringvariable2//##) is unknown. This happens for dereferenced ##[[KeyPgZstring|Zstring]]##/##[[KeyPgWstring|Wstring]]## pointers, or ##[[KeyPgZstring|Zstring]]##/##[[KeyPgWstring|Wstring]]## variables passed by reference. This can used to truncate the text line to be read, or avoid overflowing beyond allocated data of the provided string buffer. For this second syntax, the ##//promptstring//## parameter is mandatory even if it is empty (use ##//""//##).
 
+	On Unix text consoles, input counts are checked against the runtime string-size limit before assignment and cursor bookkeeping. Counts exceeding that limit are refused.
+	The Unix byte-input service validates its destination and capacity, bounds libc input capacities to ##INT_MAX##, and waits past negative or extended key-service results before storing a byte-valued character.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/console/lineinput.bas"}}%%(freebasic)
 Dim s As String

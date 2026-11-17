@@ -3016,7 +3016,7 @@ DRWAV_PRIVATE drwav_uint32 drwav_get_bytes_per_pcm_frame(drwav* pWav)
     */
     if ((pWav->bitsPerSample & 0x7) == 0) {
         /* Bits per sample is a multiple of 8. */
-        bytesPerFrame = (pWav->bitsPerSample * pWav->fmt.channels) >> 3;
+        bytesPerFrame = ((drwav_uint32)pWav->bitsPerSample * pWav->fmt.channels) >> 3;
     } else {
         bytesPerFrame = pWav->fmt.blockAlign;
     }
@@ -5189,6 +5189,8 @@ DRWAV_PRIVATE drwav_result drwav_wfopen(FILE** ppFile, const wchar_t* pFilePath,
     if (pFilePath == NULL || pOpenMode == NULL || ppFile == NULL) {
         return DRWAV_INVALID_ARGS;
     }
+
+    (void)pAllocationCallbacks;
 
 #if defined(DRWAV_HAS_WFOPEN)
     {

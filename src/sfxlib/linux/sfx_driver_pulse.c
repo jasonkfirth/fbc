@@ -194,7 +194,7 @@ static int pulse_driver_write(const float *buffer, int frames)
         PULSE_DBG("write frames=%d samples=%d peak=%0.5f\n",
                   frames,
                   samples,
-                  pulse_buffer_peak(buffer, samples));
+                  (double)pulse_buffer_peak(buffer, samples));
         pulse_debug_write_counter++;
     }
 
@@ -221,7 +221,7 @@ static int pulse_driver_write(const float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverPulse =
 {
     "PulseAudio",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     pulse_driver_init,
     pulse_driver_exit,
     pulse_driver_write,

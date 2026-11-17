@@ -125,8 +125,18 @@ typedef struct FB_GFX3_BACKEND {
 	FB_GFX3_BACKEND_GL_INFO gl_info;
 } FB_GFX3_BACKEND;
 
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+#define FB_GFX3_BACKEND_ABI_ALIGNMENT_INITIALIZER 0,
+#else
+#define FB_GFX3_BACKEND_ABI_ALIGNMENT_INITIALIZER
+#endif
+
 typedef struct FB_GFX3_BACKEND_VTABLE {
 	uint32_t abi_version;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing pointer offsets while naming the ABI gap. */
+	uint32_t abi_alignment_padding;
+#endif
 	const char *name;
 	int (*probe)(FB_GFX3_BACKEND_CAPS *caps);
 	int (*init)(FB_GFX3_BACKEND *backend,

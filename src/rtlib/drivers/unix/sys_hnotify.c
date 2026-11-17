@@ -28,7 +28,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* GNU unistd.h already declares the environment vector with _GNU_SOURCE. */
+#ifndef __GLIBC__
 extern char **environ;
+#endif
 
 /* Use libnotify/GLib's actual opaque tags in dynamic function signatures.
  * Their object layouts stay private; calling through a differently typed
@@ -129,6 +132,7 @@ static int html_escaped_size(const char *text, size_t *output_size)
 		case '\'': amount = 5; break;
 		case '<':
 		case '>': amount = 4; break;
+		default: break;
 		}
 		if (!add_size(&size, amount))
 			return FALSE;
@@ -176,6 +180,7 @@ static int append_html_text(char *buffer, size_t capacity, size_t *position,
 		case '\'': replacement = "&#39;"; length = 5; break;
 		case '<': replacement = "&lt;"; length = 4; break;
 		case '>': replacement = "&gt;"; length = 4; break;
+		default: break;
 		}
 		if (replacement != NULL) {
 			if (!append_bytes(buffer, capacity, position, replacement, length))
@@ -412,12 +417,15 @@ static int run_luna_send(FB_NOTIFY_UNIX *context, const char *method,
 	size_t used = 0;
 	char bytes[256];
 	posix_spawn_file_actions_t actions;
-	char *arguments[] = {
+	const char *const input_arguments[] = {
 		FB_NOTIFY_LUNA_SEND_PATH, "-n", "1", "-w",
 		FB_NOTIFY_LUNA_WAIT_MSEC, "-a", context->app_id,
-		(char *)method, (char *)payload, NULL
+		method, payload, NULL
 	};
+	char *arguments[sizeof(input_arguments) / sizeof(input_arguments[0])];
 	int spawn_result;
+	/* spawn reads the borrowed strings through its mutable-pointer ABI. */
+	memcpy(arguments, input_arguments, sizeof(arguments));
 	if (response == NULL || response_size == 0 || !create_luna_pipe(output_pipe))
 		return FB_SERVICE_FAILED;
 	if (!create_luna_pipe(input_pipe)) {

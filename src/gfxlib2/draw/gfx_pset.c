@@ -24,7 +24,7 @@ FBCALL void fb_GfxPset(void *target, float fx, float fy, unsigned int color, int
 	context = fb_hGetContext( );
 	fb_hPrepareTarget(context, target);
 
-	if (flags & DEFAULT_COLOR_1) {
+	if ((unsigned int)flags & DEFAULT_COLOR_1) {
 		if (ispreset)
 			color = context->bg_color;
 		else

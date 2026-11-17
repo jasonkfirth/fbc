@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <math.h>
 #include <strings.h>
 
 /** convert string to boolean value
@@ -25,7 +26,7 @@ FBCALL char fb_hStr2Bool( char *src, ssize_t len )
 
 	val = fb_hStr2Double( src, len );
 
-	if( (val != (double)(0.0) ) && (val != (double)(-0.0)) )
+	if( fpclassify(val) != FP_ZERO )
 		return 1;
 
 	return 0;

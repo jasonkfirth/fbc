@@ -13,30 +13,50 @@
    result = number of chars written, excluding null terminator that is always written */
 ssize_t fb_wstr_ConvToA(char *dst, ssize_t dst_chars, const FB_WCHAR *src)
 {
+	ssize_t chars;
+#if defined DISABLE_WCHAR
+	size_t source_chars;
+#else
+	size_t max_chars, converted_chars;
+#endif
+
+	if (dst == NULL)
+		return 0;
+
 	if (src == NULL) {
+		*dst = '\0';
+		return 0;
+	}
+	if ((dst_chars < 0) || (dst_chars >= PTRDIFF_MAX))
+		return 0;
+	if (dst_chars == 0) {
 		*dst = '\0';
 		return 0;
 	}
 
 #if defined DISABLE_WCHAR
-	ssize_t chars = strlen(src);
-	if (chars > dst_chars)
-		chars = dst_chars;
+	source_chars = strlen(src);
+	if (source_chars > (size_t)dst_chars)
+		source_chars = (size_t)dst_chars;
 
-	memcpy(dst, src, chars + 1);
+	chars = (ssize_t)source_chars;
+	memcpy(dst, src, source_chars);
+	dst[chars] = '\0';
 	return chars;
 #else
 	/* plus the null-term */
-	ssize_t chars = wcstombs(dst, src, dst_chars + 1);
+	max_chars = (size_t)dst_chars + 1;
+	converted_chars = wcstombs(dst, src, max_chars);
 
 	/* worked? */
-	if (chars >= 0) {
+	if (converted_chars != (size_t)-1) {
+		chars = (ssize_t)converted_chars;
 		/* a null terminator won't be added if there was not
 		   enough space, so do it manually (this will cut off the last
 		   char, but what can you do) */
-		if (chars == (dst_chars + 1)) {
+		if (converted_chars == max_chars) {
 			dst[dst_chars] = '\0';
-			return dst_chars - 1;
+			return (dst_chars > 0) ? dst_chars - 1 : 0;
 		}
 		return chars;
 	}
@@ -56,13 +76,13 @@ ssize_t fb_wstr_ConvToA(char *dst, ssize_t dst_chars, const FB_WCHAR *src)
 			c = '?';
 		}
 #else
-		UTF_32 c = *src++;
+		UTF_32 c = (UTF_32)*src++;
 		if (c == 0)
 			break;
 		if (c > 127)
 			c = '?';
 #endif
-		*dst++ = c;
+		*dst++ = (char)c;
 	}
 	*dst = '\0';
 	return dst - origdst;
@@ -73,12 +93,14 @@ FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )
 {
 	FBSTRING_ACCESS *dst;
 	ssize_t chars;
+	size_t converted_chars;
 
 	if( src == NULL )
 		return &fb_ctx.null_desc;
 
-	chars = wcstombs( NULL, src, 0 );
-	if( chars < 0 )
+	/* wcstombs() returns size_t and uses (size_t)-1 for conversion errors. */
+	converted_chars = wcstombs( NULL, src, 0 );
+	if( converted_chars == (size_t)-1 )
 	{
 		/*
 		   If the active C locale cannot represent a WSTRING character,
@@ -88,6 +110,14 @@ FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )
 		   wide character and let fb_wstr_ConvToA() do the conversion.
 		 */
 		chars = fb_wstr_Len( src );
+		if( chars <= 0 )
+			return &fb_ctx.null_desc;
+	}
+	else
+	{
+		if( converted_chars >= (size_t)PTRDIFF_MAX )
+			return &fb_ctx.null_desc;
+		chars = (ssize_t)converted_chars;
 	}
 	if( chars == 0 )
 		return &fb_ctx.null_desc;

@@ -24,7 +24,7 @@ FBCALL FBSTRING_ACCESS *fb_CurDir( void )
 	if( len > 0 ) {
         dst = fb_hStrAllocTemp( NULL, len );
 		if( dst != NULL ) {
-			memcpy( dst->data, tmp, len + 1 );
+			memcpy( dst->data, tmp, (size_t)len + 1 );
 		} else {
 			dst = &fb_ctx.null_desc;
 		}

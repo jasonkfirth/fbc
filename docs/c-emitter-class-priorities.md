@@ -6,14 +6,628 @@ Responsibilities: Separate accepted totals, class-wide candidates and required c
 This file intentionally does NOT equate warning counts with independent source defects.
 -->
 
+# Current native procedure-policy priorities, November 17
+
+The [NoInline repair](c-emitter-noinline.md) closes the allocator-return
+observation through its original optimization contract. The qualified GCC
+census reaches 169. The remaining Coreutils classes comprise 129 reviewed
+dynamic-format observations, twelve format-bound observations, nine
+qualifier observations, two unused functions and one other format observation.
+Source review continues with the format-bound and qualifier families, the
+fourteen retained-corpus observations and Templari's two procedure-pointer
+casts. Broader Clang, converter integration, port publication and native
+platform checks retain their existing scope.
+
+# Preceding call-termination priorities, November 17
+
+The [call-termination repair](c-emitter-call-termination.md) closes the last
+Coreutils GCC null-dereference observation through the existing GNU error
+contract. The disjoint GCC census reaches 170. Next source reviews retain
+the allocator-return paths, nine Coreutils qualifier observations, format
+bounds, retained corpus owners and Templari's two procedure-pointer casts.
+The long-path import-library finding, native platform replay, broader Clang
+classes and complete converter integration retain their recorded scope.
+
+# Preceding process-adapter priorities, November 17
+
+The [process-adapter repair](c-emitter-process-adapters.md) closes Windows
+preprocessing quoting and validates native record contracts. The next GCC
+review covers the remaining Coreutils qualifier, format-bound and pointer
+observations, retained corpus owners and Templari's two procedure-pointer
+casts. The `dlltool` long-path finding retains driver/toolchain follow-up.
+Full converter integration, native platform replay and broader Clang classes
+retain their recorded scope. The production GCC census is 171.
+
+# Preceding volatile-update priorities, November 17
+
+The [volatile-update repair](c-emitter-volatile-updates.md) closes scalar
+assignment barriers, update result sequencing and mapped-field access widths.
+The production GCC census remains 171. Windows generic-C preprocessing quoting
+is the next captured converter blocker. Coreutils qualifier, format-bound and
+pointer observations retain source review, alongside Templari's two GCC
+observations, native platform replay and broader Clang classes.
+
+# Preceding volatile-read priorities, November 17
+
+The [volatile-read repair](c-emitter-volatile-read-addresses.md) closes an
+unnecessary mutable-address contract across the shared load adapters. The
+Coreutils qualifier class records nine observations and the disjoint GCC
+census records 171. The captured scalar-volatile assignment gap requires
+barrier lowering, and Windows C2FB preprocessing requires native command
+quoting. The other qualifier owners, format-bound and pointer observations,
+platform checks and broader Clang classes retain their follow-up.
+
+# Preceding change-reporting priorities, November 17
+
+The [change-reporting review](c-emitter-change-formats.md) closes the two
+remaining format contracts. All 129 nonliteral observations have source and
+native diagnostic dispositions. The disjoint GCC census records 172. The next
+source review targets the ten Coreutils qualifier observations and the
+remaining format-bound, local-address and null observations. Grouped-default
+production regeneration, full C2FB integration and broader Clang/platform
+owners retain their existing checks.
+
+# Preceding shared-default priorities, November 17
+
+The [shared-default repair](c-emitter-shared-default-switches.md) removes
+artificial dispatch loops from C2FB's grouped case/default lowering. Native
+before/after value checks preserve genuine fallthrough and named entries.
+The two finite Coreutils format sites retain owner refresh, original-source
+diagnostic controls and format-contract review. The largest GCC class retains its 129
+nonliteral observations, with 127 reviewed runtime contracts. The disjoint
+GCC total stays at 172 through this structural repair.
+
+# Preceding borrowed-slot priorities, November 17
+
+The [Coreutils slot repair](c-emitter-coreutils-readonly-slots.md) removes three
+GCC and three Clang qualifier observations, leaving ten in that Coreutils class.
+SQLite's measured GCC queue is closed. The disjoint GCC census reaches 172.
+The largest remaining GCC class retains 129 nonliteral-format observations,
+with 127 reviewed runtime contracts and two finite compiler branch-join cases.
+Other GCC source owners, broader Clang classes and native platform checks
+retain their follow-up scope.
+
+# Preceding native platform source priorities, November 17
+
+The [native source checks](c-emitter-native-platform-owners.md) resolve the
+duplicate Haiku executable-name owner and close eight source-context checks.
+FreeBSD five, OpenBSD four and RISC OS one retain native replay. The remaining
+GCC source faults, two finite compiler format cases and broader Clang classes
+retain their owners. Supplemental Win32 record padding remains visible.
+
+# Preceding SQLite DROP COLUMN priorities, November 16
+
+The [DROP COLUMN repair](c-emitter-sqlite-drop-column.md) removes five repeated
+null observations and corrects the native precision argument type. SQLite's
+remaining GCC classes contain six null observations and three qualifier
+observations. The disjoint GCC total reaches 184. Other source contracts,
+the two finite compiler format cases and native platform checks remain open.
+
+# Preceding SQLite virtual-table priorities, November 16
+
+The [transaction-pointer repair](c-emitter-sqlite-vtab-transactions.md) removes
+four repeated GCC observations by retaining the checked library instance.
+SQLite's remaining GCC class counts are eleven null observations and three
+qualifier observations. The disjoint GCC total reaches 189. Other source
+contracts and the two finite compiler format cases retain their follow-up.
+
+# Preceding forwarded-format priorities, November 16
+
+The [forwarded-format review](c-emitter-forwarded-formats.md) closes the two
+remaining dynamic-format contracts with copy-helper execution and complete
+private-caller and native guard proof for `cp`. All 129 nonliteral observations
+remain counted, with 127 reviewed. Two finite compiler branch-join cases remain
+the compiler follow-up for this class. Other GCC source faults retain their
+owners. The disjoint GCC total stays at 193.
+
+# Preceding numeric-format priorities, November 16
+
+The [numeric-format matrix](c-emitter-numfmt-formats.md) closes both floating
+builders with current runtime allocation and cleanup. All 129 nonliteral
+observations remain counted, with 125 reviewed. The two forwarded-format
+contracts and two finite compiler branch-join sites retain their follow-up.
+The pending EOF and integer-128 versions pass their complete Linux runtime
+replay. Separate direct and native Windows entry checks qualify the shared
+parser version and exercise its selected fallback. Seventeen captured platform
+versions and the Windows Unicode header view retain native checks. The disjoint
+GCC total stays at 193.
+
+# Preceding sequence-format priorities, November 16
+
+The [sequence-format matrix](c-emitter-sequence-formats.md) closes the configured
+sequence contract through actual output and parsing helpers. All 129 nonliteral
+observations remain counted, with 123 reviewed. The four remaining dynamic
+owners are the two forwarded formats and two numfmt floating formats. Two finite
+compiler branch-join sites retain their follow-up. The disjoint GCC total stays
+at 193.
+
+# Preceding configured-format priorities, November 16
+
+The [configured-format matrix](c-emitter-configured-formats.md) closes the
+line-number and two split-filename contracts under both native tools and
+optimizations. All 129 nonliteral observations remain counted, with 122 reviewed.
+The remaining dynamic owners are the two forwarded formats, sequence formatting
+and two numfmt floating formats. Two finite compiler branch-join sites retain
+their follow-up. The disjoint GCC total stays at 193 and Templari's latest
+paired source replay retains its two Windows procedure-lookup observations.
+
+# Preceding pointer-equality and runtime priorities, November 16
+
+The [pointer-equality lowering repair](c-emitter-pointer-equality.md) closes the
+captured nested-qualifier comparison defect and retains the existing source
+diagnostics. Development main selects `4a477330` after complete compiler,
+retained, Templari and additional-project checks. The disjoint GCC total stays
+at 193. The 129 Coreutils nonliteral-format observations remain the largest
+class, with eight dynamic execution contracts and two finite compiler sites
+pending. Templari's two Windows procedure-lookup casts retain their compiler
+review. Seventeen other platform input versions and four later/remaining native
+contexts retain owning checks after the runtime and DOS source-cut refresh.
+The latter cover file EOF, integer-128 arithmetic, the conditional long-double
+parser and the Windows Unicode-header view. Platform versions also represented
+in later-source records count once in the final source-cut ledger.
+
+# Preceding runtime and project priorities, November 16
+
+The [current runtime replay](c-emitter-runtime-current-refresh.md) qualifies
+23 common/runtime source updates and retains zero GCC warnings in both Linux
+configurations. Reusing the exact complete DOS audit closes 39 platform input
+checks across 705 GCC-clean native objects. Seventeen captured Haiku, BSD and
+RISC OS versions retain their native checks. A later EOF version and the
+Windows Unicode-header view retain their owning replay.
+
+The largest remaining GCC class still has 129 Coreutils nonliteral-format
+observations, with eight dynamic execution contracts and two finite compiler
+sites pending. Templari's two GCC observations are typed Windows procedure
+lookup conversions in `message_local_platform.bas`. Their source API signatures
+and the existing erased-callback representation helper retain the next compiler
+review. The pointer-equality candidate is completing its owning queue refresh.
+The last complete disjoint GCC total remains 193.
+
+# Preceding idle-time range qualification, November 16
+
+The [idle-time range matrix](c-emitter-idle-formats.md) resolves both additional
+O0 observations with actual production helpers, seven clock settings and
+exhaustive sub-day intervals. The last complete O2 GCC total stays at 193.
+The pointer-equality lowering repair has passed its native value and diagnostic
+matrix and is running its owning project queues before selection.
+The eight dynamic-format contracts and two finite compiler sites retain their
+follow-up in the largest GCC class.
+
+# Preceding time-format priorities, November 16
+
+The [time-format qualification](c-emitter-time-formats.md) closes four execution
+contracts in the largest remaining GCC class. All 129 Coreutils nonliteral
+observations remain visible. Eight dynamic execution contracts remain, comprising
+two forwarded sites, four configured sites and two numfmt floating sites. Two
+finite-format compiler sites retain their follow-up. The last-qualified GCC
+total stays at 193.
+Two additional GCC O0 `IDLE_STRING` format-overflow observations retain their
+hour/minute range review outside that preceding O2 production census.
+
+# Preceding union-member priorities, November 16
+
+The [typed union-member repair](c-emitter-union-members.md) removes two GCC and
+two Clang cast-qualifier observations from Coreutils with unchanged native
+objects. Coreutils reaches GCC 159 / Clang 1,782, SQLite remains GCC 18 /
+Clang 7,696, and the disjoint last-qualified GCC total is 193. The port queues
+retain sixteen GCC cast-qualifier and sixteen null-dereference observations.
+
+Coreutils' 129 nonliteral-format observations remain the largest GCC class.
+Twelve dynamic execution contracts and two finite-format compiler sites retain
+their follow-up. The captured standalone smoke preimage adds a distinct
+nested-pointer qualifier comparison lowering case. Its native warning remains
+recorded outside the production census.
+
+The complete retained queue and all additional project contexts pass again.
+Templari's current 677-context graph remains at GCC 2, with Clang 54,317 after
+its added server module. The source-growth contribution reproduces with the
+preceding compiler. Nineteen later common/runtime inputs and 46 platform versions
+retain owning native replay against the completed Linux packet-v48 source cut.
+
+# Preceding runtime and port priorities, November 16
+
+The fresh independent 1,053-profile GCC port census confirms Coreutils at 165
+and SQLite at 21. The subsequent
+[SQLite connection-lifetime repair](c-emitter-sqlite-error-context.md) removes
+three observations, bringing SQLite to 18. The subsequent
+[obstack callback repair](c-emitter-obstack-callbacks.md) removes four more,
+bringing Coreutils to 161 and the disjoint GCC total to 195.
+All 129 Coreutils
+nonliteral observations remain visible. The 99-site formatter already has a
+reviewed dynamic-format disposition. Its strengthened native replay reaches
+93 calls, retains six bypassed string fallbacks and checks all six actual
+translated providers. It leaves the twelve other dynamic execution contracts
+and two finite-format compiler sites open.
+
+The next source-contract review retains the sixteen port null-dereference
+observations and eighteen cast-qual observations as distinct owners.
+
+The whoami null branch calls GNU error with status 1. GNU documents process
+termination for nonzero status. The translated declaration models an ordinary
+returning call. [GNU error reporting](https://sourceware.org/glibc/manual/latest/html_node/Error-Messages.html)
+
+SQLite observations include unchecked results from planner/token
+helpers. Their caller invariants and error paths need direct validation before
+any further compiler metadata or library change. Their observations remain
+counted. The three resolved VDBE observations preserve the validated
+connection across callbacks, with unchanged Clang counts and sixteen passing
+before/after native execution contexts.
+
+The careadlinkat return-address observation involves its 1,024-byte stack
+scratch buffer. The helper's explicit stack-result branch allocates and copies
+the result before returning. Allocator failures, buffer growth and callback
+boundaries retain their native execution follow-up.
+
+Packet v48's complete Linux MT/non-MT builds remain GCC-clean, and all existing
+control groups pass their expected outcomes. The 478 recorded binary
+invocations include 56 original negative controls and sixteen direct
+boundary runs. Twenty-one captured DOS, Haiku and BSD source versions retain
+native replay. The [current format ledger](c-emitter-runtime-current-refresh.md)
+binds every remaining nonliteral observation to its source owner. The overall
+cleanup goal remains active.
+The retained source-gate refresh closes 113 contexts with GCC 14 / Clang
+16,433. Thirty-five existing additional-project contexts and three newly
+selected Midisoft test contexts pass at GCC 0. The four project groups now
+contain 443 standalone profiles. Newer runtime and Midisoft UI versions retain
+their separate pending-source capture against the completed source cuts.
+Templari's current paired replay closes the later clock/caption source versions
+across all 676 contexts, preserving GCC 2 / Clang 54,173 with both C producers.
+
+# Preceding stored-translation priorities, November 16
+
+The [stored-translation repair](c-emitter-stored-translations.md) closes one
+finite-format site and removes one GCC and one Clang observation from Coreutils
+with identical native objects. The disjoint GCC total is 202. Current compiler,
+fbctests, Linux MT/non-MT runtime and the four additional project queues remain
+GCC-clean. Templari retains its two native callback-cast observations.
+
+Coreutils' 129 nonliteral observations remain the largest GCC class. Twelve
+dynamic execution contracts and two finite-format compiler sites retain their
+owners. The port queues also contain 23 null-dereference observations and
+eighteen cast-qual observations. Review their shared lowering and source
+contracts before changing working library code. Other GCC classes, equivalent
+FBC diagnostic review, GUI helper reachability and the remaining Clang/platform
+owners keep their recorded follow-up scope.
+
+The current runtime source refresh includes the concurrent radix, profiler and
+Unicode changes, with complete Make builds, existing suite execution and direct
+profiler-width boundaries. The overall cleanup goal remains active.
+
+Later concurrent runtime changes await direct native replay. Their source bytes
+are preserved separately from the tested packet-v44 cut.
+
+# Preceding word-count and runtime priorities, November 16
+
+The [word-count output matrix](c-emitter-wc-formats.md) closes five of seventeen
+pending dynamic-format execution contracts. Twelve remain. The complete Linux
+MT and non-MT runtime source refresh is GCC-clean, including direct narrow/wide
+PRINT USING and cleanup execution. The disjoint GCC total remains 203.
+
+Coreutils' 130 nonliteral-format observations remain the largest GCC class.
+Five word-count sites now have complete selected-field, native type, integer
+boundary and output-callback coverage. Their native diagnostics remain counted.
+The remaining twelve dynamic-format contracts, three finite-format compiler
+sites and the other GCC source owners retain their follow-up scope. The new
+GUI unused-helper observations and equivalent FBC diagnostic review remain open.
+Remaining Clang and native-platform owners keep their separate qualification.
+
+# Preceding unsigned variadic priorities, November 16
+
+The [unsigned variadic repair](c-emitter-vararg-promotions.md) removes one GCC
+and eighteen Clang format-type observations from Coreutils. All compiler and
+fbctests profiles remain GCC-clean. Both fresh complete Linux runtime
+configurations and the four added Windows project queues are GCC-clean.
+Templari retains two GCC observations. The last-qualified disjoint total is 203.
+
+Coreutils owns the largest remaining GCC class with 130 nonliteral-format
+observations. Seventeen dynamic-format contracts and three finite-format
+compiler sites retain their follow-up scope. Its other GCC classes comprise
+fifteen cast-qual, eight format-overflow, five null-dereference, four
+format-truncation, two unused-function, one return-local-address and one POSIX
+format grouping observation. SQLite retains eighteen null-dereference and
+three cast-qual observations.
+
+The refreshed retained corpus adds two unused static GUI helpers in the
+navigation-profile smoke program. Their emitted C contains declarations and
+definitions without surviving callers. Equivalent FBC unused-procedure
+diagnostics and the procedure-reachability investigation remain open.
+Both native diagnostics remain counted. The twenty existing frontend failures
+keep their recorded dispositions. All 813 previously pending GUI inputs now
+have replayed owners, and the two new include-path failures are closed.
+
+The remaining Clang source and ABI classes, other runtime platforms, graphics
+libraries and application executions retain their separate qualification.
+The overall cleanup goal remains active.
+
+Two later concurrent edits in `src/rtlib/console/io_printusg.c` and
+`src/rtlib/drivers/unix/io_readstr.c` await native replay. The runtime counts
+above bind the completed packet-v42 qualification. Both newer source versions
+are preserved in `vararg-promotions-runtime-pending-v1-20261116.json.zlib`.
+Compiler and project input checks are current.
+
+# Preceding ordinary-call and native API priorities, November 16
+
+The [native API repair](c-emitter-native-api-boundaries.md) closes all remaining
+GCC classes in the complete Linux MT runtime build. The ordinary non-MT build
+is also GCC-clean. The [ordinary-call format repair](c-emitter-call-formats.md)
+removes one coreutils GCC observation while retaining native wrong-type and
+dynamic-format diagnostics. Coreutils retains 130 nonliteral-format
+observations, seventeen pending dynamic-format contracts and three finite-format
+compiler sites. Other GCC source faults and Clang source/ABI classes retain
+their measured owners. The last-qualified disjoint GCC total is 202.
+
+Replay of 813 subsequently synchronized GUI inputs remains pending across the
+project and retained-corpus cuts. Compiler, fbctests and Linux runtime inputs
+retain their qualified source hashes.
+
+
+# Current native padding priorities, November 15
+
+The [native padding repair](c-emitter-native-padding.md) closes all twenty GCC
+padding observations in the complete Linux runtime build, reaching GCC 15 /
+Clang 10,034. Remaining GCC owners are five switch-default observations, one
+terminal-speed conversion, one redundant declaration, six discarded qualifiers
+and two cast-qual observations. Coreutils retains its 131 nonliteral-format
+observations, seventeen pending runtime contracts and four finite-format
+compiler sites. The last-qualified disjoint GCC total is 218. Clang source/ABI
+classes retain their measured owners.
+
+
+# Current native I/O count priorities, November 15
+
+The [native count repair](c-emitter-native-io-counts.md) closes all five remaining
+GCC sign conversions and four narrowing observations. The complete Linux runtime
+reaches GCC 35 / Clang 10,047. Remaining GCC owners are twenty padding
+observations, five switch-default, one terminal-speed conversion, one redundant
+declaration, six discarded qualifiers and two cast-qual observations. Coreutils
+retains its 131 nonliteral format observations, seventeen pending runtime
+contracts and four finite-format compiler sites. The last-qualified disjoint
+GCC total is 238. Clang source/ABI classes retain their measured owners.
+
+
+# Current keyboard/input priorities, November 15
+
+The [keyboard/input repair](c-emitter-keyboard-input.md) closes eight native
+conversion observations under each tool and fixes Xlib callback and mapping
+ownership defects. The complete Linux runtime reaches GCC 44 / Clang 10,056.
+Remaining GCC owners are twenty padding observations, five conversions, five
+sign conversions, five switch-default, six discarded qualifiers, two cast-qual
+and one redundant declaration. Terminal speed, thread stack size and TCP counts
+own the remaining numeric conversions. Coreutils retains its 131 nonliteral
+format observations, seventeen pending runtime contracts and four finite-format
+compiler sites. The last-qualified disjoint GCC total is 247.
+
+
+# Current Unix driver priorities, November 15
+
+The [Unix driver contract repair](c-emitter-unix-driver-contracts.md) closes all
+thirteen unused-parameter and three missing-prototype observations, together
+with four GCC qualifier observations. The complete Linux runtime reaches
+GCC 52 / Clang 10,064. Remaining GCC owners are twenty padding observations,
+thirteen conversions, five sign conversions, five switch-default, six discarded
+qualifiers, two cast-qual and one redundant declaration. The shared keyboard
+X11 signatures still need review against the installed API. Coreutils retains
+its 131 nonliteral-format observations, seventeen pending runtime contracts
+and four finite-format compiler sites. The last-qualified disjoint GCC total
+is 255. Clang source/ABI owners retain their measured dispositions.
+
+
+# Current unsigned conversion priorities, November 15
+
+The [string scalar repair](c-emitter-string-scalars.md) removes two GCC narrowing
+and three sign-conversion observations through explicit public-result contracts.
+The complete Linux runtime has GCC 72 / Clang 10,078. Its remaining GCC classes
+include thirteen conversions, five sign conversions, twenty padding observations,
+thirteen unused parameters, six cast-qual, six discarded qualifiers, five
+switch-default, three missing prototypes and one redundant declaration.
+The disjoint GCC total is 275. Coreutils retains its 131 nonliteral-format
+observations, seventeen pending dynamic-format runtime contracts and four
+finite-format compiler sites. Clang source/ABI classes retain their measured
+owners.
+
+
+# Current format-contract priorities, November 15
+
+Coreutils' 131 GCC nonliteral-format observations remain its largest warning
+class. The [stat native checks](c-emitter-stat-formats.md) close seven pending
+runtime contracts, bringing the unqualified dynamic-format contract count from
+24 to 17. Four finite-format compiler sites remain open. Production warning
+counts stay at coreutils GCC 168 and disjoint GCC 280. Native qualification
+retains every baseline warning and verifies variadic argument types with
+28 expected diagnostic failures.
+
+
+# Current filesystem/count warning classes, November 15
+
+The [filesystem/count repair](c-emitter-filesystem-sizes.md) closes eleven GCC
+sign conversions and one unused-parameter observation. The complete Linux MT
+runtime reaches GCC 77 / Clang 10,083. Remaining GCC classes comprise twenty
+padding observations, fifteen conversions, thirteen unused parameters, eight
+sign conversions, six cast-qual, six discarded qualifiers, five switch-default,
+three missing prototypes and one redundant declaration. Four finite-format
+compiler sites, twenty-four dynamic-format runtime contracts and the remaining
+Clang source/ABI classes retain their complete cleanup scope. The disjoint GCC
+total is 280.
+
+
+# Current transient-buffer warning classes, November 15
+
+The [process/printer repair](c-emitter-unix-transient-buffers.md) closes all twelve
+remaining GCC alloca observations and removes six sign conversions and one
+shadow observation. The current complete Linux MT runtime has GCC 89 /
+Clang 10,095. Remaining GCC conversions contribute nineteen sign conversions
+and fifteen other conversions. Native padding, parameters, qualifier contracts,
+switch coverage and declarations retain their measured owners. Four finite-format
+compiler sites, twenty-four dynamic-format runtime contracts and the remaining
+Clang classes stay in the complete cleanup scope. The disjoint GCC total is 292.
+
+
+# Current GCC class priorities, November 15
+
+The [Unix console repair](c-emitter-console-spans.md) removes 39 GCC warnings
+and 42 Clang warnings through shared checked spans and counted conversions.
+The complete current Linux MT runtime has 108 GCC observations, including
+25 sign conversions, 15 other conversions, 20 padding observations, 14 unused
+parameters, 12 alloca uses, six cast-qual and six discarded-qualifier warnings.
+Its remaining classes are five switch-default, three missing prototypes, one
+shadow and one redundant declaration. These are counted native observations.
+
+Four finite-format compiler sites remain in chmod, chown-core and ls. Their
+review identifies control-flow and reaching-definition requirements. Chmod
+joins formats of different arity, chown has nested choices beyond the current
+finite-set limit, and ls crosses an intervening call. Branch-specific format
+and argument correlation needs qualification before extending propagation.
+Twenty-four dynamic-format runtime contracts and the larger Clang source/ABI
+classes retain their existing ownership. The disjoint GCC queue total is 311.
+
+
+The [private ASM storage repair](c-emitter-asm-storage-ownership.md) selects
+`dffcd9a1` after 504 passing native executions. It closes private object retention,
+local-static aliases and initializer placement at naked function entries.
+Compiler and fbctests are GCC-clean. The complete current corpus and project
+replays retain their separately counted native contracts. The next GCC owners
+are native conversions, four finite-format propagation candidates and twenty-four
+dynamic-format runtime contracts. Clang source and ABI classes retain their
+measured class-level dispositions.
+
+
+The [x86-64 ASM stack qualification](c-emitter-asm-register-effects.md) selects
+`bc2e5878`. It closes native red-zone spill corruption and leaf CALL alignment
+through per-module options and memory-only frame/alignment operands. All 288
+expanded native executions pass, while the preceding compiler fails 48 controls.
+Compiler and fbctests remain GCC-clean across their complete contexts. The full
+retained replay has GCC 12 / Clang 15,862, and the fresh current Linux MT runtime
+has GCC 147 / Clang 10,150. Remaining owners include native conversions, four
+finite-format propagation candidates, twenty-four dynamic-format runtime
+contracts and the pre-existing naked-procedure private-global effects fault.
+Earlier qualification cuts below retain their measured counts.
+
+
+The [checked ASM register repair](c-emitter-asm-register-effects.md) closes the
+recorded 32-bit PIC operand-allocation and stack-local controls. Development
+main selects `8f51b482` with GCC 0 in the complete compiler and fbctests graphs.
+The original controls produce 24 compile failures and 96 execution failures;
+all 288 repaired native executions pass.
+
+The [checked numeric parser class](c-emitter-numeric-parsers.md) removes all
+fourteen narrowing observations from COM options and date fields. The current
+runtime has GCC 147 / Clang 10,148. Its GCC conversion class falls from 33 to
+nineteen, while fifty sign conversions remain. Eight new guarded-cursor Clang
+observations stay counted alongside their explicit span/value controls.
+
+The [terminal mask class](c-emitter-terminal-masks.md) removes a further
+32 observations per native tool. The complete current runtime source cut has
+GCC 161 / Clang 10,154, including the separately recorded concurrent indentation
+repairs. Its largest GCC classes are fifty sign conversions, 33 other
+conversions, twenty padding observations and sixteen each for unused parameters
+and dynamic stack allocation. Coreutils retains its separate 131 nonliteral
+format observations and pending native format contracts.
+
+The selected `9c05c8a6` closes the
+[ASM storage ownership](c-emitter-asm-storage-ownership.md) qualification and
+removes nineteen coreutils GCC and 27 Clang observations. The
+[runtime alignment class](c-emitter-runtime-alignment.md) removes 1,602 GCC and
+47 Clang observations, retaining all 1,036 native objects and both archives.
+The alignment cohort remainder is GCC 209 / Clang 10,195. A subsequent
+six-input concurrent source refresh records GCC 200 / Clang 10,192. GCC conversion classes
+contribute 64 sign conversions and 33 other conversions. Coreutils retains 131
+nonliteral format observations, including four finite-format compiler candidates
+and the separately recorded runtime contracts. The selected compiler and
+fbctests retain GCC 0. Historical tables below keep their recorded source cuts.
+
 For the current selected compiler and queue counts, see
 [current status](c-emitter-current-status.md). Compiler identities and count
 tables below preserve earlier qualification cuts.
 
-# Last completed retained census: November 13
+The [ABI observation ledger](c-emitter-abi-observations.md) verifies 55,217
+layout/registration observations through exact compiled C and explicit contracts.
+Sixty-four native lifetime/layout runs and 128 rejected layout controls pass.
+The selected compiler's complete 6,419-profile retained replay is GCC 12 /
+Clang 15,862 with no source drift or new frontend regressions. The remaining
+GCC class dispositions below still apply. The
+[Unix LOCATE repair](c-emitter-console-initialization.md) also clears two
+conditional-initialization observations under paired full-runtime flags.
+Templari's current 664-profile graph has GCC 2 / Clang 53,111. Its 52,428 padding
+and 681 registration observations have complete current ledger associations.
 
-The selected Intel assembly-storage compiler is `c3f2b1e6`. The completed
-6,419-profile retained cut reports GCC 14 / Clang 15,824. Expansions and the
+The [native byte-memory repair](c-emitter-byte-memory.md) closes two SQLite
+GCC bounds observations and one coreutils Clang byte-address observation.
+Current port totals are GCC 187/21 and Clang 1,830/7,696. Genuine overruns
+retain native rejection controls. Templari's 661-profile cut remains at GCC 2.
+
+The [conditional-format repair](c-emitter-iif-formats.md) closes nine further
+finite-format sites through complete-body IIF result-slot analysis. Coreutils
+reaches GCC 187 / Clang 1,831. Four finite-format compiler candidates and 24
+runtime format contracts remain, alongside the newly exposed Clang promotion
+observation. The [native character adapters](c-emitter-wide-adapters.md) also
+remove 3,096 sign conversions per tool from the pinned Linux MT runtime cut.
+
+The [C2FB typedef and byte-value repair](c-emitter-qualified-typedefs.md)
+closes a shared source-model fault. The complete converter's one distinct C
+input is emitted through both producers and has GCC 0 / Clang 158. Removing its
+redundant static-bound guard closes the GCC type-limits observation while FBC's
+other source diagnostics remain available. Production coreutils and SQLite
+counts retain their existing 197/23 GCC totals and pending format contracts.
+
+The subsequent [private-format repair](c-emitter-local-formats.md) selects
+`f64ca95a`. Coreutils reaches GCC 195 / Clang 1,839. Its nonliteral class
+falls from 142 to 140. Both changed modules retain exact native objects.
+Thirteen finite-format compiler candidates and 27 runtime contracts remain.
+The earlier count explanations below retain their original qualification cuts.
+
+The subsequent [cleanup dependency qualification](c-emitter-cleanup-dependencies.md)
+selects `409dc1ef` and closes Templari's complete paired census at 658 profiles.
+Its Clang classes are padding 51,731, startup registrations 675 and strict API
+conversions 2. GCC retains its two qualified API conversions. The compiler's
+Clang total is 1,340, including one additional padding observation. Three
+floating runtime contracts now have 261,120 native value comparisons, leaving
+24 contracts. The earlier formatter's nine unexecuted sites have explicit
+reachability and precision-diagnostic dispositions. The Linux native MT runtime
+snapshot used by cleanup tests records GCC 5,059, including 3,239 sign conversions
+and 1,628 padding observations under the retained build flags.
+
+# Historical retained-census summary, November 14
+
+The preceding source review used compiler `9c1ebb28`. The shared draft-C23 capability repair
+removes 343 GCC observations from the newly added Linux ports. The subsequent
+external-object repair removes all 135 redundant declarations with 270 exact
+before/after GCC and Clang object identities. The
+[SQLite native-type repair](c-emitter-sqlite-native-types.md) removes all 88
+builtin-declaration mismatches and retains all 555 GCC object identities.
+The [evaluated-format repair](c-emitter-format-results.md) removes a further
+560 observations from each native coreutils tool. Its remaining GCC nonliteral
+formats number 153. The subsequent
+[C2FB pointer-qualifier repair](c-emitter-pointer-qualifiers.md) removes eight
+GCC builtin declaration mismatches with fourteen exact native object identities.
+Coreutils has 55 observations in other GCC classes. The
+[formatter qualification](c-emitter-coreutils-formatter.md) fixes duplicate
+shared-helper ownership and checks 90 of vasnprintf's 99 dynamic-format sites
+through native values. The subsequent
+[literal-offset and ABS repairs](c-emitter-literal-offsets.md) reduce the
+nonliteral class to 146, totaling 201 GCC warnings. The subsequent
+[plural-format repair](c-emitter-plural-formats.md) brings that class to 142 and
+the GCC total to 197. The subsequent
+[enum-width review](c-emitter-enum-widths.md) traces all 43 additional source
+contracts and repairs the copyright-year C-int fault. Fifteen finite-format
+sites need compiler propagation qualification, and 27 additional runtime
+contracts need native execution coverage. All 142 nonliteral warnings remain
+counted.
+SQLite retains
+23 GCC observations on each target. The
+[Templari callback repair](c-emitter-templari-callback.md) leaves two qualified
+Windows API conversions across its current 651-profile Win64 production graph.
+Both observations remain explicitly counted.
+See [additional project checks](c-emitter-additional-projects.md).
+
+The completed [FBSound build-context expansion](c-emitter-fbsound-contexts.md)
+adds 236 Windows/Linux 32/64-bit profiles with zero GCC warnings and 405 Clang
+observations. All 52 previously unqualified test entries now have owning
+profiles. Padding and startup registration account for 366 of its Clang
+observations. These overlapping library profiles retain separate totals.
+
+The completed C-long/variadic-anchor cut is `987d6d9d`. Its
+6,419-profile retained view reports GCC 12 / Clang 15,861, including thirty-two
+recovered Optical contexts and the reconciled fb-ext-lib corrections. Expansions and the
 Make-selected native runtime-library audit have separate totals and overlap
 this body; they must not be added to it.
 
@@ -22,20 +636,21 @@ this body; they must not be added to it.
 | Null dereference | 6 | Deliberate signal-handler inputs; FBC warning 57 remains |
 | Bounds | 2 | [Containing-copy optimizer reproduction](c-emitter-bulk-copy-diagnostic.md) and [guarded wrong-widget test](c-emitter-label-guard.md) |
 | Format truncation | 2 | Checked helper returns; standalone native C controls reproduce the warning |
-| Unread static | 2 | Named persistent source storage; FBC warning 55 remains; preserve the RNG side effect |
 | GNU label addresses | 2 | Legacy Minesweeper computed dispatch; retain label interoperability |
 
-Compiler and fbctests generated C have zero GCC warnings. The separate Win32
-RotoZoom qualification retains 65 opaque-assembly unused-code observations per
-native compiler; these are not in the retained Win64 counts.
+Compiler and fbctests generated C have zero GCC warnings. Checked assembly
+references and the library's unread-binding cleanup also leave the separate
+Win32 RotoZoom qualification GCC-clean, with one Clang padding observation.
+Its sixteen native executions preserve pixel results across 500 transforms
+per execution.
 
 | Remaining Clang class | Occurrences |
 | --- | ---: |
-| Record padding | 14,571 |
-| Global constructors | 1,190 |
-| All other classes | 63 |
+| Record padding | 14,645 |
+| Global constructors | 1,192 |
+| All other classes | 24 |
 
-Padding and startup registration account for 99.6% of the retained Clang
+Padding and startup registration account for 99.8% of the retained Clang
 observations. Natural C padding is intentional where it already places fields
 correctly: adding named padding can change compatible aggregate declarations
 under LTO. The explicit-record writer therefore adds bytes only when C's
@@ -43,19 +658,25 @@ natural layout cannot supply the required offset. Size and named-field offset
 assertions remain enabled. Any class-wide layout change needs native aggregate
 ABI, initializer, anonymous-member and debugger qualification.
 
-The [terminating-callback repair](c-emitter-noreturn-callbacks.md) addresses a
-concrete strict-cast defect without changing examples or record layouts. Its
-candidate qualification remains separate from the completed counts above.
+The [terminating-callback repair](c-emitter-noreturn-callbacks.md), completed
+pointer results and private TLS identifiers are included in these counts.
+The callback source correction removes one further strict-cast observation.
+The narrow-anchor repair replaces two varargs observations with two C23
+compatibility observations under the original Clang flags. In the separate
+fb-ext-lib expansion, the typed sorting repair removes all three callback casts,
+leaving GCC zero and 156 Clang padding/startup observations across 194 profiles.
 
 Startup registrations preserve priority, module ordering and finalizer behavior.
 The current MinGW grouping already combines compatible callbacks; singletons
 and non-returning callbacks retain their original registration attributes.
 These two classes remain counted under unsuppressed diagnostics. They are not
-14,571 independent layout faults or 1,190 missing BASIC initializers.
+14,645 independent layout faults or 1,192 missing BASIC initializers.
 
-The class receipt is `asm-address-class-review-v1-20261113.json.zlib` in the
-existing `build/c-emitter-forward-views-20261105` work area. It binds the whole
-retained database and all fourteen GCC occurrences. The older JRPG cut still
+The current view is `c-abi-retained-optical-view-v1-20261114.json.zlib`, composing
+the immutable retained and recovered-context databases in the existing
+`build/c-emitter-forward-views-20261105` work area. The earlier class
+receipt `asm-address-class-review-v1-20261113.json.zlib` binds its historical
+database and fourteen GCC occurrences. The older JRPG cut still
 needs a refresh with the selected compiler; partial new results do not replace
 its completed GCC 0 / Clang 10,018 census.
 

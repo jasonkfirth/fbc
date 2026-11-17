@@ -89,7 +89,9 @@ FBCALL void *fb_DylibSymbol( void *library, FBSTRING_ACCESS *symbol )
 
 FBCALL void *fb_DylibSymbolByOrd( void *library, short int symbol )
 {
-	/* Not applicable to Linux */
+	/* Unix shared objects use symbol names rather than ordinal exports. */
+	(void)library;
+	(void)symbol;
 	return NULL;
 }
 

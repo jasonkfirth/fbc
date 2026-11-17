@@ -488,6 +488,9 @@ function hMangleBuiltInType _
 	'' dtype should be a FB_DATATYPE by now
 	assert( dtype = typeGetDtOnly( dtype ) )
 
+	'' Explicit long aliases can reach this table after remapping to Integer
+	'' or UInteger on 32-bit targets. The target-specific INTEGER vendor case
+	'' has already been resolved above.
 	static as const zstring ptr typecodes(0 to FB_DATATYPES-1) => _
 	{ _
 		@"v", _ '' void
@@ -498,8 +501,8 @@ function hMangleBuiltInType _
 		@"s", _ '' short
 		@"t", _ '' ushort
 		@"w", _ '' wchar
-		NULL, _ '' Integer
-		NULL, _ '' UInteger
+		@"l", _ '' Integer: long
+		@"m", _ '' UInteger: unsigned long
 		NULL, _ '' enum
 		@"i", _ '' Long: int
 		@"j", _ '' ULong: unsigned int

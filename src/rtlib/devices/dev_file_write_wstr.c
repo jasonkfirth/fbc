@@ -13,8 +13,14 @@ int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR* src, size_t chars )
     char *buffer;
     ssize_t bytes;
     int res;
+    char local_buffer[FB_LOCALBUFF_MAXLEN];
 
     FB_LOCK();
+
+	if( chars >= (size_t)PTRDIFF_MAX ) {
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
 
     fp = (FILE*) handle->opaque;
 
@@ -25,12 +31,11 @@ int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR* src, size_t chars )
 
 	if( chars < FB_LOCALBUFF_MAXLEN )
 	{
-		buffer = alloca( chars + 1 );
-		/* note: if out of memory on alloca, it's a stack exception */
+		buffer = local_buffer;
 	}
 	else
 	{
-		buffer = malloc( chars + 1 );
+		buffer = (char *)malloc( chars + 1 );
 		if( buffer == NULL )
 		{
 			FB_UNLOCK();
@@ -40,10 +45,16 @@ int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR* src, size_t chars )
 
 	/* convert to ascii, file should be opened with the ENCODING option
 	   to allow UTF characters to be written */
-	bytes = fb_wstr_ConvToA( buffer, chars, src );
+	bytes = fb_wstr_ConvToA( buffer, (ssize_t)chars, src );
+	if( bytes < 0 ) {
+		if( chars >= FB_LOCALBUFF_MAXLEN )
+			free( buffer );
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	}
 
 	/* do write */
-	res = fwrite( (void *)buffer, 1, bytes, fp ) == (size_t)bytes;
+	res = fwrite( (void *)buffer, 1, (size_t)bytes, fp ) == (size_t)bytes;
 
 	if( chars >= FB_LOCALBUFF_MAXLEN )
 		free( buffer );

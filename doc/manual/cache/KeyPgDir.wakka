@@ -93,6 +93,8 @@ Searches for and returns information about an item in the filesystem; performs a
 	In general it is not possible to use ##//attrib_mask//## to include a file/folder with one set of attributes while excluding a file/folder with a different set. For example, it is not possible to scan for read-only directories while excluding read-only files (unless the files also have other attributes).
 	Finer control can be gained by checking the ##//out_attrib//## value for the desired set of attributes.
 
+	On Unix targets, native filename lengths are checked against the runtime string-size limit before allocating the returned name. An unrepresentable name returns an empty string.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/system/dirnbfiles.bas"}}%%(freebasic)
 ' Number of files in the current directory.

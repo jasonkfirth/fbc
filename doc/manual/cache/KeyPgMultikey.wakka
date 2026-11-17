@@ -25,6 +25,8 @@ While Inkey <> "": Wend  '' loop until the keyboard input buffer is empty
 	
 	Keeping ##[[KeyPgInkey|Inkey]]## to work while you use ##**Multikey**## allows more flexibility and can be useful to detect ##[[KeyPgChr|Chr]](255)+"k"## combo returned on window close button click, if a windowed graphics mode has been set via the ##[[KeyPgScreengraphics|Screen (Graphics)]]## statement. For a list of accepted scancodes, see [[GfxScancodes|DOS keyboard scancodes]]; these are guaranteed to be valid for all ""FreeBASIC"" supported platforms.
 	##**Multikey**## should always work in graphics mode, as long as the screen is [[KeyPgScreenunlock|unlocked]]. Support in the console depends on the platform the program is run on though, and cannot be guaranteed.
+	In Unix X11 console mode, keyboard polling requires an available focus-query connection. If its library or display cannot be opened, polling is skipped safely. A later input initialization can retry the connection.
+	X11 scan-code tables are rebuilt from available keyboard mappings. Missing mappings remain unmapped, and entries from an earlier keyboard layout are cleared during rebuilding.
 
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/input/multikey.bas"}}%%(freebasic)

@@ -10,6 +10,17 @@
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
 
+/* Byte-pitched rows can leave packed pixels at unaligned addresses. */
+#if defined(__GNUC__) || defined(__clang__)
+typedef unsigned short fb_put_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef unsigned int fb_put_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef unsigned short fb_put_u16_unaligned;
+typedef unsigned int fb_put_u32_unaligned;
+#endif
+
 #ifdef HOST_X86
 #include "../drivers/x86/fb_gfx_mmx.h"
 extern void fb_hPutOrMMX(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param);
@@ -30,12 +41,12 @@ void fb_hPutOrC(unsigned char *src, unsigned char *dest, int w, int h, int src_p
 		if (w & 1)
 			*dest++ |= *src++;
 		if (w & 2) {
-			*(unsigned short *)dest |= *(unsigned short *)src;
+			*(fb_put_u16_unaligned *)dest |= *(fb_put_u16_unaligned *)src;
 			dest += 2;
 			src += 2;
 		}
 		for (x = w >> 2; x; x--) {
-			*(unsigned int *)dest |= *(unsigned int *)src;
+			*(fb_put_u32_unaligned *)dest |= *(fb_put_u32_unaligned *)src;
 			dest += 4;
 			src += 4;
 		}

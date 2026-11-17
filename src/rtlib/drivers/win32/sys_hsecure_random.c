@@ -53,7 +53,7 @@ int fb_hSecureRandom( void *destination, size_t byte_count )
 		 * representation without an incompatible function-pointer cast.
 		 */
 		STATIC_ASSERT( sizeof( generate ) == sizeof( address ) );
-		memcpy( &generate, &address, sizeof( generate ) );
+		memcpy( (void *)&generate, (const void *)&address, sizeof( generate ) );
 		status = generate( NULL, destination, (ULONG)byte_count,
 		                   BCRYPT_USE_SYSTEM_PREFERRED_RNG ) == 0 ?
 		         FB_SECURE_RANDOM_OK : FB_SECURE_RANDOM_IO_ERROR;

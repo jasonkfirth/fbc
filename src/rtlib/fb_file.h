@@ -189,6 +189,7 @@ static __inline__ FB_FILE *FB_HANDLE_DEREF( FB_FILE *handle )
        int          fb_FileGetDataEx    ( FB_FILE *handle, fb_off_t pos, void *data,
                                           size_t length, size_t *bytesread,
                                           int adjust_rec_pos, int isunicode );
+       int          fb_hFileOffsetFromLongLong( long long position, fb_off_t *offset );
 
        int          fb_FileOpenVfsRawEx ( FB_FILE *handle, const char *filename,
                                           size_t filename_length,

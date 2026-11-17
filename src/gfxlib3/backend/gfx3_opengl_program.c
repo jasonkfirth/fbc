@@ -184,17 +184,21 @@ static void opengl_report_shader_log(FB_GFX3_OPENGL_STATE *state,
 			"OpenGL %s: %s", description, log);
 }
 
-static int opengl_create_compute_program(FB_GFX3_OPENGL_STATE *state,
-	const char *source, const char *description, GLuint *program_result)
+static int opengl_create_compute_program_parts(FB_GFX3_OPENGL_STATE *state,
+	const char *const *source_parts, GLsizei source_count,
+	const char *description, GLuint *program_result)
 {
 	GLuint shader;
 	GLuint program;
 	GLint status;
 
+	if ((state == NULL) || (source_parts == NULL) || (source_count <= 0) ||
+	    (program_result == NULL))
+		return FB_GFX3_INVALID;
 	shader = state->gl.create_shader(GL_COMPUTE_SHADER);
 	if (shader == 0)
 		return FB_GFX3_FAILED;
-	state->gl.shader_source(shader, 1, &source, NULL);
+	state->gl.shader_source(shader, source_count, source_parts, NULL);
 	state->gl.compile_shader(shader);
 	state->gl.get_shader_i(shader, GL_COMPILE_STATUS, &status);
 	if (status != GL_TRUE) {
@@ -220,6 +224,14 @@ static int opengl_create_compute_program(FB_GFX3_OPENGL_STATE *state,
 
 	*program_result = program;
 	return FB_GFX3_OK;
+}
+
+static int opengl_create_compute_program(FB_GFX3_OPENGL_STATE *state,
+	const char *source, const char *description, GLuint *program_result)
+{
+	const char *const source_parts[] = { source };
+	return opengl_create_compute_program_parts(state, source_parts, 1,
+		description, program_result);
 }
 
 static int opengl_create_graphics_program(FB_GFX3_OPENGL_STATE *state,
@@ -317,7 +329,8 @@ int fb_gfx3_gl_create_programs(FB_GFX3_OPENGL_STATE *state)
 		"rectangle compute shader", &state->rectangle_program);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = opengl_create_compute_program(state, opengl_ellipse_shader,
+	result = opengl_create_compute_program_parts(state, opengl_ellipse_shader,
+		(GLsizei)(sizeof(opengl_ellipse_shader) / sizeof(opengl_ellipse_shader[0])),
 		"ellipse compute shader", &state->ellipse_program);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -331,8 +344,10 @@ int fb_gfx3_gl_create_programs(FB_GFX3_OPENGL_STATE *state)
 		&state->ellipse_batch_resolve_program);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = opengl_create_compute_program(state,
+	result = opengl_create_compute_program_parts(state,
 		opengl_primitive_batch_shader,
+		(GLsizei)(sizeof(opengl_primitive_batch_shader) /
+			sizeof(opengl_primitive_batch_shader[0])),
 		"mixed primitive selection compute shader",
 		&state->primitive_batch_program);
 	if (result != FB_GFX3_OK)
@@ -343,19 +358,27 @@ int fb_gfx3_gl_create_programs(FB_GFX3_OPENGL_STATE *state)
 		&state->primitive_batch_resolve_program);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = opengl_create_compute_program(state, opengl_paint_shader,
+	result = opengl_create_compute_program_parts(state, opengl_paint_shader,
+		(GLsizei)(sizeof(opengl_paint_shader) / sizeof(opengl_paint_shader[0])),
 		"scanline paint compute shader", &state->paint_program);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = opengl_create_compute_program(state, opengl_blit_shader,
+	result = opengl_create_compute_program_parts(state, opengl_blit_shader,
+		(GLsizei)(sizeof(opengl_blit_shader) / sizeof(opengl_blit_shader[0])),
 		"blit compute shader", &state->blit_program);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = opengl_create_compute_program(state, opengl_transform_blit_shader,
+	result = opengl_create_compute_program_parts(state,
+		opengl_transform_blit_shader,
+		(GLsizei)(sizeof(opengl_transform_blit_shader) /
+			sizeof(opengl_transform_blit_shader[0])),
 		"transform blit compute shader", &state->transform_blit_program);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = opengl_create_compute_program(state, opengl_blit_alpha_tile_shader,
+	result = opengl_create_compute_program_parts(state,
+		opengl_blit_alpha_tile_shader,
+		(GLsizei)(sizeof(opengl_blit_alpha_tile_shader) /
+			sizeof(opengl_blit_alpha_tile_shader[0])),
 		"alpha tile blit compute shader", &state->blit_alpha_tile_program);
 	if (result != FB_GFX3_OK)
 		return result;

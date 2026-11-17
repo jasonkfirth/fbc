@@ -21,6 +21,8 @@ Writes text to the screen
 	
 	NOTE: In graphics mode, ##[[KeyPgDrawString|Draw String]]## provides a flexible alternative to ##**Print**##: it prints a string to the screen with pixel positioning, transparent background, and can use a user-supplied font.
 
+	On Unix text consoles, wide-character output is converted using its counted length. Embedded zero characters retain their position in the emitted UTF-8 byte stream. Longer output uses checked temporary storage, and console shadow updates remain synchronized with terminal resizing.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/console/print.bas"}}%%(freebasic)
 '' print "Hello World!", and a new-line

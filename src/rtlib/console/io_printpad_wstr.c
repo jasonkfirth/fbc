@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 static void fb_hPrintPadWstrEx
 	(
@@ -32,7 +33,9 @@ static void fb_hPrintPadWstrEx
     }
     else
     {
-        size_t i, count = new_x - current_x;
+        size_t i, count = (size_t)(new_x - current_x);
+		if( count > FB_TAB_WIDTH )
+			count = FB_TAB_WIDTH;
 
         for( i = 0; i < count; i++ )
         	tab_char_buffer[i] = FB_WCHAR_LITERAL(' ');
@@ -64,10 +67,15 @@ void fb_PrintPadWstrEx
     fb_DevScrnInit_WriteWstr( );
 
     tmp_handle = FB_HANDLE_DEREF(handle);
-    if( tmp_handle == NULL )
+    if( tmp_handle == NULL ) {
         return;
+    }
+    if( tmp_handle->line_length > (unsigned int)(INT_MAX - FB_TAB_WIDTH) ) {
+        fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+        return;
+    }
 
-    old_x = tmp_handle->line_length + 1;
+    old_x = (int)tmp_handle->line_length + 1;
     new_x = old_x + FB_TAB_WIDTH - 1;
     new_x /= FB_TAB_WIDTH;
     new_x *= FB_TAB_WIDTH;
@@ -75,7 +83,9 @@ void fb_PrintPadWstrEx
     if (tmp_handle->width!=0)
     {
         unsigned dev_width = tmp_handle->width;
-        if (new_x > (int)(dev_width - FB_TAB_WIDTH))
+        if ((dev_width <= FB_TAB_WIDTH) ||
+            ((dev_width - FB_TAB_WIDTH <= INT_MAX) &&
+             (new_x > (int)(dev_width - FB_TAB_WIDTH))))
         {
             new_x = 1;
         }

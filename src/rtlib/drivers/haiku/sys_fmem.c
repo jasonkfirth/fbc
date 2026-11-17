@@ -40,10 +40,6 @@ FBCALL size_t fb_GetMemAvail( int mode )
         return 0;
     }
 
-    if (info.free_memory < 0) {
-        return 0;
-    }
-
     return (size_t)info.free_memory;
 }
 

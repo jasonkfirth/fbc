@@ -73,8 +73,8 @@ static int file_attributes( const char *filename, int requested )
 
 	/* Keep metadata outside VB's writable mask, including directory and
 	   reparse-point identity. NORMAL is used only when no bits remain. */
-	attributes &= ~(FB_FILE_ATTR_SETTABLE | FILE_ATTRIBUTE_NORMAL);
-	attributes |= requested;
+	attributes &= ~((DWORD)FB_FILE_ATTR_SETTABLE | (DWORD)FILE_ATTRIBUTE_NORMAL);
+	attributes |= (DWORD)requested;
 	if( attributes == 0 )
 		attributes = FILE_ATTRIBUTE_NORMAL;
 	success = wide_path ? SetFileAttributesW( wide_path, attributes ) :

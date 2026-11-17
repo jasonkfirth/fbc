@@ -18,7 +18,7 @@ FBCALL FBSTRING_ACCESS *fb_SPACE( ssize_t len )
 		if( dst != NULL )
 		{
 			/* fill it */
-			memset( dst->data, 32, len );
+			memset( dst->data, 32, (size_t)len );
 
 			/* null char */
 			dst->data[len] = '\0';

@@ -35,8 +35,10 @@ FBCALL void fb_GfxUnlock(int start_line, int end_line)
 		start_line = 0;
 	if (end_line < 0)
 		end_line = fb_gfx->h - 1;
-	if ((fb_gfx->visible_page == context->work_page) && (start_line <= end_line) && (end_line < fb_gfx->h))
-		fb_hMemSet(fb_gfx->dirty + start_line, TRUE, end_line - start_line + 1);
+	if ((fb_gfx->visible_page == context->work_page) && (start_line <= end_line) && (end_line < fb_gfx->h)) {
+		size_t lines = (size_t)(end_line - start_line) + 1;
+		fb_hMemSet(fb_gfx->dirty + start_line, TRUE, lines);
+	}
 
 	if (fb_gfx->lock_count != 0) {
 		--fb_gfx->lock_count;

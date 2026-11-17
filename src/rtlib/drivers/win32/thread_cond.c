@@ -31,6 +31,10 @@ struct FBCOND_ {
 			HANDLE sema; /* semaphore for waiters */
 			HANDLE waiters_done; /* event */
 			BOOL was_broadcast;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+			/* Name the existing 64-bit tail padding without changing the layout. */
+			unsigned char tail_padding[4];
+#endif
 		} nt;
 	};
 };
@@ -269,7 +273,7 @@ static FBCALL void fb_CondWait_9x( FBCOND *cond, FBMUTEX *mutex )
 	/* unlock mutex - WARNING: this is not atomic with the wait */
 	ReleaseSemaphore( mutex->id, 1, NULL );
 
-	result = WaitForMultipleObjects( 2, cond->w9x.event, FALSE, INFINITE );
+	result = (int)WaitForMultipleObjects( 2, cond->w9x.event, FALSE, INFINITE );
 
 	EnterCriticalSection( &cond->waiters_count_lock );
 	cond->waiters_count--;

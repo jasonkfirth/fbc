@@ -39,6 +39,10 @@ typedef struct FB_FORMAT_MASK_INFO {
 	int exp_digits;
 
 	int has_ampm;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* The native length fields begin on their original eight-byte boundary. */
+	unsigned char length_alignment_padding[4];
+#endif
 
 	ssize_t length_min;
 	ssize_t length_opt;
@@ -352,7 +356,7 @@ static double hRound
 	{
 		/* remove the fraction of the fraction to be compatible with
 		   VBDOS (ie: 2.55 -> 2.5, not 2.6 as in VB6) */
-		if( frac != 0.0 )
+	if( fpclassify(frac) != FP_ZERO )
 		{
 			double p10 = pow( 10.0, pInfo->num_digits_frac );
 
@@ -401,6 +405,7 @@ int fb_hProcessMask
 		char chTimeSep
 	)
 {
+	double dblExponent, dblMagnitude;
 	char FixPart[128], FracPart[128], ExpPart[128], chSign = 0;
 	/* Date and literal masks have no numeric parts. The numeric output pass
 	   replaces these empty lengths after splitting the value. */
@@ -437,8 +442,9 @@ int fb_hProcessMask
 #endif
 	}
 
-	if( value != 0.0 ) {
-		ExpValue = (int)floor( log10( fabs( value ) ) ) + 1;
+	if( fpclassify(value) != FP_ZERO ) {
+		dblExponent = floor( log10( fabs( value ) ) );
+		ExpValue = (int)dblExponent + 1;
 		NonZero = 1;
 	} else {
 		ExpValue = 0;
@@ -466,12 +472,12 @@ int fb_hProcessMask
 				{
 					if( -ExpValue <= 308 )
 					{
-						value *= pow( 10.0, -ExpValue );
+						value *= pow( 10.0, (double)(-ExpValue) );
 					}
 					else
 					{
-						value *= pow( 5.0, -ExpValue );
-						value *= pow( 2.0, -ExpValue );
+						value *= pow( 5.0, (double)(-ExpValue) );
+						value *= pow( 2.0, (double)(-ExpValue) );
 					}
 				}
 
@@ -518,7 +524,7 @@ int fb_hProcessMask
 				if( ExpValue > FB_MAXFIXLEN )
 				{
 					ExpValue -= FB_MAXFIXLEN;
-					value *= pow( 10.0, -ExpValue );
+					value *= pow( 10.0, (double)(-ExpValue) );
 				}
 				else
 					ExpValue = 0;
@@ -544,17 +550,20 @@ int fb_hProcessMask
 #endif
 
 			/* value rounded up to next power of 10? */
-			if( pInfo->has_exponent && (fb_IntLog10_64( (unsigned long long)fabs( value ) ) == pInfo->num_digits_fix) )
-			{
-				value /= 10.0;
-				ExpValue += 1;
-				LenExp = hSnprintf( ExpPart, sizeof( ExpPart ), "%d", (int)ExpValue );
-				if( ExpValue < 0 )
-					IndexExp = ExpAdjust = 1;
-				else
-					IndexExp = ExpAdjust = 0;
+			if( pInfo->has_exponent ) {
+				dblMagnitude = fabs( value );
+				if( fb_IntLog10_64( (unsigned long long)dblMagnitude ) == pInfo->num_digits_fix )
+				{
+					value /= 10.0;
+					ExpValue += 1;
+					LenExp = hSnprintf( ExpPart, sizeof( ExpPart ), "%d", (int)ExpValue );
+					if( ExpValue < 0 )
+						IndexExp = ExpAdjust = 1;
+					else
+						IndexExp = ExpAdjust = 0;
 
-				NumSkipExp = pInfo->exp_digits - ( LenExp - ExpAdjust );
+					NumSkipExp = pInfo->exp_digits - ( LenExp - ExpAdjust );
+				}
 			}
 
 			fb_hGetNumberParts( value,

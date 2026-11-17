@@ -55,7 +55,9 @@ int fb_ConsoleLineInputWstr
 
 static char *hWrapper( char *buffer, size_t count, FILE *fp )
 {
-    return fb_ReadString( buffer, count, fp );
+    if( count > (size_t)FB_STRSIZEMSK )
+        return NULL;
+    return fb_ReadString( buffer, (ssize_t)count, fp );
 }
 
 int fb_ConsoleLineInputWstr
@@ -68,12 +70,12 @@ int fb_ConsoleLineInputWstr
 	)
 {
 	size_t len;
-	int res, old_x, old_y;
+	int res, old_x;
 
     /* !!!FIXME!!! no support for unicode input */
 
     fb_PrintBufferEx( NULL, 0, FB_PRINT_FORCE_ADJUST );
-    fb_GetXY( &old_x, &old_y );
+    fb_GetXY( &old_x, NULL );
 
 	FB_LOCK();
 
@@ -99,12 +101,12 @@ int fb_ConsoleLineInputWstr
             fb_GetSize( &cols, &rows );
             fb_GetXY( NULL, &old_y );
 
-            old_x += len - 1;
-            old_x %= cols;
-            old_x += 1;
-            old_y -= 1;
-
-            fb_Locate( old_y, old_x, -1, 0, 0 );
+            if( cols > 0 && old_x > 0 && old_y > 0 ) {
+                size_t columns = (size_t)cols;
+                size_t column = (size_t)(old_x - 1) % columns;
+                column = (column + len % columns) % columns;
+                fb_Locate( old_y - 1, (int)column + 1, -1, 0, 0 );
+            }
         }
 
         fb_WstrAssignFromA( dst, max_chars, (void *)&str_result, -1 );

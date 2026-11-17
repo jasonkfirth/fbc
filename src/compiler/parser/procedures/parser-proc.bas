@@ -1991,6 +1991,13 @@ function cProcHeader _
 		exit function
 	end if
 
+	'' Keep this modifier contextual so existing NoInline identifiers remain valid.
+	'' It controls native optimization without changing the procedure's call ABI.
+	if( hMatchIdOrKw( "NOINLINE", LEXCHECK_POST_SUFFIX ) ) then
+		pattrib or= FB_PROCATTRIB_NOINLINE
+		proc->pattrib or= FB_PROCATTRIB_NOINLINE
+	end if
+
 	'' Inspect the parsed signature before a repeated prototype merges symbols.
 	'' Managed STRING remains an ABI boundary type through aliases and pointer
 	'' forms. The count bounds traversal of the compiler's parameter list.

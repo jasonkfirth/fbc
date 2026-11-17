@@ -271,7 +271,7 @@ static void wasapi_convert_float_to_device(const float *src,
 
             if (use_float && bytes_per_sample == (int)sizeof(float))
             {
-                ((float *)dst)[(frame * dst_channels) + ch] = sample;
+                memcpy(out, &sample, sizeof(sample));
             }
             else if (!use_float && bytes_per_sample == 2)
             {
@@ -581,7 +581,7 @@ static int wasapi_write(const float *buffer, int frames)
 static const FB_SFX_DRIVER fb_sfxDriverWASAPI =
 {
     "WASAPI",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     wasapi_init,
     wasapi_exit,
     wasapi_write,

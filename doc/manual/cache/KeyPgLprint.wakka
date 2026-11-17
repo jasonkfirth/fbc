@@ -21,6 +21,8 @@ Writes text to the default printer.
 	
 	Internally, ""FreeBASIC"" uses the special file number ##-1## for printing using **##Lprint##**.  This file number may be safely closed using ##[[KeyPgClose|Close]] -1##.  The next use of **##Lprint##** will automatically reopen it as needed.
 
+	On Unix targets, wide printer output uses counted UTF-8 conversion with checked temporary storage. Empty output buffers complete successfully, and conversion or write failures are returned through the runtime error status.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/hardware/lprint.bas"}}%%(freebasic)
 '' Compile with -lang fblite or qb

@@ -11,9 +11,13 @@
 int fb_hSetDate( int y, int m, int d )
 {
 	struct date dt;
-	dt.da_year = y;
-	dt.da_mon = m;
-	dt.da_day = d;
+
+	if( y < 1980 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31 )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	dt.da_year = (short)y;
+	dt.da_mon = (char)m;
+	dt.da_day = (char)d;
 	setdate(&dt);
 	return 0;
 }

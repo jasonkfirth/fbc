@@ -19,6 +19,6 @@
    This way, FB programs can override this one with their own implementation.
    They can then set the variable to TRUE/FALSE at runtime as needed. */
 
-int __fb_enable_vt100_escapes = -1;
+int fb_enable_vt100_escapes = -1;
 
 /* end of drivers/unix/hinit_enable_vt100_escapes.c */

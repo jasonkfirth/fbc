@@ -56,7 +56,9 @@ private function hCEmittedFieldAlignment( byval fld as FBSYMBOL ptr ) as integer
 	var alignment = typeCalcNaturalAlign( dtype, subtype )
 	if( typeGetDtAndPtrOnly( dtype ) = FB_DATATYPE_STRUCT ) then
 		alignment = hCRecordAlignment( subtype )
-		if( symbGetUdtHasBitfield( subtype ) andalso env.clopt.target <> FB_COMPTARGET_RISCOS ) then
+		if( symbGetUdtHasBitfield( subtype ) andalso _
+		    env.clopt.target <> FB_COMPTARGET_RISCOS andalso _
+		    env.clopt.target <> FB_COMPTARGET_XBOX ) then
 			'' Bitfield records use a byte-array C body.
 			alignment = 1
 		end if

@@ -41,7 +41,8 @@ FBCALL int fb_GfxStickQB( int n )
 				{
 					stick_posn[i*2] = (int)(x * 100 + 101);
 					stick_posn[i*2+1] = (int)(y * 100 + 101);
-					stick_btns[i] = buttons;
+					/* QuickBASIC STRIG exposes only the first two button flags. */
+					stick_btns[i] = (int)(buttons & 0x3);
 				}
 				else
 				{
@@ -91,7 +92,7 @@ FBCALL int fb_GfxStrigQB( int n )
 			ssize_t buttons;
 			if( FB_RTERROR_OK == fb_GfxGetJoystick( i, &buttons, &a, &a, &a, &a, &a, &a, &a, &a ))
 			{
-				stick_btns[i] |= buttons;
+				stick_btns[i] |= (int)(buttons & 0x3);
 				result = ( buttons & bmask) ? -1 : 0;
 			} else {
 				result = 0;

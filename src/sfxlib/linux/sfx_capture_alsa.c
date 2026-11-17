@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <stdint.h>
 
 
 /* ------------------------------------------------------------------------- */
@@ -69,8 +71,9 @@ static int capture_debug_enabled(void)
 int fb_sfxCaptureAlsaInit(void)
 {
     int err;
-    snd_pcm_hw_params_t *params;
+    snd_pcm_hw_params_t *params = NULL;
     unsigned int rate;
+    snd_pcm_uframes_t buffer_size;
     int dir = 0;
 
     if (capture_initialized)
@@ -78,7 +81,16 @@ int fb_sfxCaptureAlsaInit(void)
 
     CAPTURE_DBG("initializing ALSA capture device\n");
 
-    rate = fb_sfx_linux.sample_rate;
+    if ((fb_sfx_linux.sample_rate <= 0) ||
+        (fb_sfx_linux.channels <= 0) ||
+        (fb_sfx_linux.buffer_frames <= 0))
+        return -1;
+
+    rate = (unsigned int)fb_sfx_linux.sample_rate;
+    buffer_size = (snd_pcm_uframes_t)(unsigned int)fb_sfx_linux.buffer_frames;
+    if (buffer_size > (snd_pcm_uframes_t)-1 / 4u)
+        return -1;
+    buffer_size *= 4u;
 
     err = snd_pcm_open(
         &capture_pcm,
@@ -94,7 +106,13 @@ int fb_sfxCaptureAlsaInit(void)
         return -1;
     }
 
-    snd_pcm_hw_params_alloca(&params);
+    err = snd_pcm_hw_params_malloc(&params);
+    if (err < 0)
+    {
+        CAPTURE_DBG("snd_pcm_hw_params_malloc failed: %s\n",
+                    snd_strerror(err));
+        goto fail;
+    }
 
     snd_pcm_hw_params_any(capture_pcm, params);
 
@@ -113,7 +131,7 @@ int fb_sfxCaptureAlsaInit(void)
     snd_pcm_hw_params_set_channels(
         capture_pcm,
         params,
-        fb_sfx_linux.channels
+        (unsigned int)fb_sfx_linux.channels
     );
 
     snd_pcm_hw_params_set_rate_near(
@@ -126,23 +144,28 @@ int fb_sfxCaptureAlsaInit(void)
     snd_pcm_hw_params_set_buffer_size(
         capture_pcm,
         params,
-        fb_sfx_linux.buffer_frames * 4
+        buffer_size
     );
 
     err = snd_pcm_hw_params(capture_pcm, params);
+
+    snd_pcm_hw_params_free(params);
+    params = NULL;
 
     if (err < 0)
     {
         CAPTURE_DBG("hw_params failed: %s\n",
                     snd_strerror(err));
 
-        snd_pcm_close(capture_pcm);
-        capture_pcm = NULL;
-
-        return -1;
+        goto fail;
     }
 
-    snd_pcm_prepare(capture_pcm);
+    err = snd_pcm_prepare(capture_pcm);
+    if (err < 0)
+    {
+        CAPTURE_DBG("snd_pcm_prepare failed: %s\n", snd_strerror(err));
+        goto fail;
+    }
 
     capture_initialized = 1;
 
@@ -151,6 +174,16 @@ int fb_sfxCaptureAlsaInit(void)
                 fb_sfx_linux.channels);
 
     return 0;
+
+fail:
+    if (params != NULL)
+        snd_pcm_hw_params_free(params);
+    if (capture_pcm != NULL)
+    {
+        snd_pcm_close(capture_pcm);
+        capture_pcm = NULL;
+    }
+    return -1;
 }
 
 
@@ -218,40 +251,57 @@ void fb_sfxCaptureAlsaShutdown(void)
 int fb_sfxCaptureAlsaRead(float *buffer, int frames)
 {
     short *pcm;
-    int err;
-    int samples;
+    snd_pcm_sframes_t frames_read;
+    size_t samples;
+    size_t samples_read;
+    int channels;
 
     if (!capture_running || !capture_pcm)
         return 0;
 
-    samples = frames * fb_sfx_linux.channels;
+    channels = fb_sfx_linux.channels;
+    if ((buffer == NULL) || (frames <= 0) || (channels <= 0) ||
+        (frames > INT_MAX / channels))
+        return -1;
 
-    pcm = (short*)malloc(samples * sizeof(short));
+    samples = (size_t)(unsigned int)frames * (size_t)(unsigned int)channels;
+    if (samples > SIZE_MAX / sizeof(*pcm))
+        return -1;
+
+    pcm = (short *)malloc(samples * sizeof(*pcm));
     if (!pcm)
         return -1;
 
-    err = snd_pcm_readi(capture_pcm, pcm, frames);
+    frames_read = snd_pcm_readi(capture_pcm, pcm,
+        (snd_pcm_uframes_t)(unsigned int)frames);
 
-    if (err == -EPIPE)
+    if (frames_read == -EPIPE)
     {
         CAPTURE_DBG("capture overrun\n");
         snd_pcm_prepare(capture_pcm);
         free(pcm);
         return 0;
     }
-    else if (err < 0)
+    else if (frames_read < 0)
     {
         CAPTURE_DBG("read error: %s\n",
-                    snd_strerror(err));
+                    snd_strerror((int)frames_read));
         free(pcm);
         return -1;
     }
 
-    fb_sfxConvertS16ToFloat(pcm, buffer, samples);
+    if (frames_read > frames)
+    {
+        free(pcm);
+        return -1;
+    }
+
+    samples_read = (size_t)frames_read * (size_t)(unsigned int)channels;
+    fb_sfxConvertS16ToFloat(pcm, buffer, (int)samples_read);
 
     free(pcm);
 
-    return err;
+    return (int)frames_read;
 }
 
 #endif

@@ -29,8 +29,9 @@ FBCALL FBSTRING_ACCESS *fb_BoolToStr ( char num )
 	if( dst != NULL )
 	{
 		char *src = fb_hBoolToStr( num );
-		fb_hStrCopy( dst->data, src, strlen(src) );
-		fb_hStrSetLength( dst, strlen(src) );
+		size_t len = strlen( src );
+		fb_hStrCopy( dst->data, src, (ssize_t)len );
+		fb_hStrSetLength( dst, len );
 	}
 	else
 	{

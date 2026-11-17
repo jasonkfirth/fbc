@@ -403,7 +403,8 @@ static const char opengl_rectangle_shader[] =
 	must preserve destination-read order. Double values hold integer intermediates
 	exactly without making GL_ARB_gpu_shader_int64 a backend requirement.
 */
-static const char opengl_ellipse_shader[] =
+/* Keep C literals short; OpenGL joins these shader parts in order. */
+static const char opengl_ellipse_shader_part_1[] =
 	"#version 430 core\n"
 	"layout(local_size_x = 64) in;\n"
 	"layout(r32ui, binding = 0) uniform uimage2D target_image;\n"
@@ -473,7 +474,8 @@ static const char opengl_ellipse_shader[] =
 	"            parallel_x1 = x1; parallel_x2 = x2;\n"
 	"            parallel_y1 = y1; parallel_y2 = y2;\n"
 	"            parallel_d = int(operation_radii.x);\n"
-	"            parallel_aq = trunc(double(operation_radii.x * operation_radii.x));\n"
+	"            parallel_aq = trunc(double(operation_radii.x * operation_radii.x));\n";
+static const char opengl_ellipse_shader_part_2[] =
 	"            parallel_bq = trunc(double(operation_radii.y * operation_radii.y));\n"
 	"            parallel_dx = parallel_aq * 2.0; parallel_dy = parallel_bq * 2.0;\n"
 	"            parallel_r = trunc(double(operation_radii.x * float(parallel_bq)));\n"
@@ -526,6 +528,10 @@ static const char opengl_ellipse_shader[] =
 	"        draw_scanline(y2, x1, x2, filled);\n"
 	"    }\n"
 	"}\n";
+static const char *const opengl_ellipse_shader[] = {
+	opengl_ellipse_shader_part_1,
+	opengl_ellipse_shader_part_2,
+};
 
 /*
 	Filled CIRCLE and ELLIPSE calls often arrive in long opaque runs. One compute
@@ -617,7 +623,8 @@ static const char opengl_ellipse_batch_resolve_shader[] =
 	per-invocation GPU decision, and the CPU computes only a conservative resolve
 	rectangle so workgroups which cannot contain a result are not launched.
 */
-static const char opengl_primitive_batch_shader[] =
+/* Keep C literals short; OpenGL joins these shader parts in order. */
+static const char opengl_primitive_batch_shader_part_1[] =
 	"#version 430 core\n"
 	"layout(local_size_x = 64) in;\n"
 	"layout(r32ui, binding = 0) uniform uimage2D winner_image;\n"
@@ -679,7 +686,8 @@ static const char opengl_primitive_batch_shader[] =
 	"void select_ellipse(ivec4 geometry, ivec4 clip, ivec4 metadata)\n"
 	"{\n"
 	"    if (gl_WorkGroupID.x != 0u) return;\n"
-	"    float radius_x = uintBitsToFloat(uint(geometry.z));\n"
+	"    float radius_x = uintBitsToFloat(uint(geometry.z));\n";
+static const char opengl_primitive_batch_shader_part_2[] =
 	"    float radius_y = uintBitsToFloat(uint(geometry.w));\n"
 	"    bool filled = metadata.z != 0;\n"
 	"    if (gl_LocalInvocationID.x == 0u) {\n"
@@ -746,7 +754,8 @@ static const char opengl_primitive_batch_shader[] =
 	"    } else if (index < width) {\n"
 	"        position = ivec2(geometry.x + int(index), geometry.w);\n"
 	"    } else if (index < width * 2u) {\n"
-	"        position = ivec2(geometry.x + int(index - width), geometry.y);\n"
+	"        position = ivec2(geometry.x + int(index - width), geometry.y);\n";
+static const char opengl_primitive_batch_shader_part_3[] =
 	"    } else if (index < width * 2u + height) {\n"
 	"        position = ivec2(geometry.z, geometry.y +\n"
 	"            int(index - width * 2u));\n"
@@ -772,6 +781,11 @@ static const char opengl_primitive_batch_shader[] =
 	"    else if (metadata.y == 3) select_point(geometry, clip, metadata);\n"
 	"    else if (metadata.y == 4) select_rectangle(geometry, clip, metadata);\n"
 	"}\n";
+static const char *const opengl_primitive_batch_shader[] = {
+	opengl_primitive_batch_shader_part_1,
+	opengl_primitive_batch_shader_part_2,
+	opengl_primitive_batch_shader_part_3,
+};
 
 static const char opengl_primitive_batch_resolve_shader[] =
 	"#version 430 core\n"
@@ -807,7 +821,8 @@ static const char opengl_primitive_batch_resolve_shader[] =
 	Scratch states distinguish queued pixels from completed spans, preventing the
 	old per-pixel queue expansion without making the result scheduling-dependent.
 */
-static const char opengl_paint_shader[] =
+/* Keep C literals short; OpenGL joins these shader parts in order. */
+static const char opengl_paint_shader_part_1[] =
 	"#version 430 core\n"
 	"layout(local_size_x = 16, local_size_y = 16) in;\n"
 	"layout(r32ui, binding = 0) uniform uimage2D target_image;\n"
@@ -843,7 +858,8 @@ static const char opengl_paint_shader[] =
 	"        if ((operation_seed.x >= operation_clip.x) && (operation_seed.y >= operation_clip.y) &&\n"
 	"            (operation_seed.x <= operation_clip.z) && (operation_seed.y <= operation_clip.w) &&\n"
 	"            (operation_seed.x >= 0) && (operation_seed.y >= 0) &&\n"
-	"            (operation_seed.x < dimensions.x) && (operation_seed.y < dimensions.y) &&\n"
+	"            (operation_seed.x < dimensions.x) && (operation_seed.y < dimensions.y) &&\n";
+static const char opengl_paint_shader_part_2[] =
 	"            (imageLoad(target_image, operation_seed.xy).r != operation_border)) {\n"
 	"            int left = operation_seed.x; int right = operation_seed.x;\n"
 	"            int top = operation_seed.y; int bottom = operation_seed.y;\n"
@@ -887,7 +903,8 @@ static const char opengl_paint_shader[] =
 	"        return;\n"
 	"    }\n"
 	"    if ((operation_phase != 4u) || (entries[metadata] != 0u)) return;\n"
-	"    for (uint offset = lane; offset < clip_total; offset += lanes) {\n"
+	"    for (uint offset = lane; offset < clip_total; offset += lanes) {\n";
+static const char opengl_paint_shader_part_3[] =
 	"        uint x = uint(operation_clip.x) + (offset % clip_width);\n"
 	"        uint y = uint(operation_clip.y) + (offset / clip_width);\n"
 	"        entries[y * uint(width) + x] = 0u;\n"
@@ -935,7 +952,8 @@ static const char opengl_paint_shader[] =
 	"            for (int direction = -1; direction <= 1; direction += 2) {\n"
 	"                int scan_y = span_y + direction; bool in_run = false;\n"
 	"                if ((scan_y < operation_clip.y) || (scan_y > operation_clip.w)) continue;\n"
-	"                for (int scan_x = span_left; scan_x <= span_right; ++scan_x) {\n"
+	"                for (int scan_x = span_left; scan_x <= span_right; ++scan_x) {\n";
+static const char opengl_paint_shader_part_4[] =
 	"                    uint candidate = uint(scan_y * width + scan_x); uint state = entries[candidate];\n"
 	"                    bool fillable = (state != 2u) &&\n"
 	"                        (imageLoad(target_image, ivec2(scan_x, scan_y)).r != operation_border);\n"
@@ -948,8 +966,15 @@ static const char opengl_paint_shader[] =
 	"        memoryBarrierBuffer(); barrier();\n"
 	"    }\n"
 	"}\n";
+static const char *const opengl_paint_shader[] = {
+	opengl_paint_shader_part_1,
+	opengl_paint_shader_part_2,
+	opengl_paint_shader_part_3,
+	opengl_paint_shader_part_4,
+};
 
-static const char opengl_blit_shader[] =
+/* Keep C literals short; OpenGL joins these shader parts in order. */
+static const char opengl_blit_shader_part_1[] =
 	"#version 430 core\n"
 	"layout(local_size_x = 16, local_size_y = 16) in;\n"
 	"layout(r32ui, binding = 0) uniform uimage2D destination_image;\n"
@@ -1011,7 +1036,8 @@ static const char opengl_blit_shader[] =
 	"            source += destination; overflow = source & 0x08010020u;\n"
 	"            overflow -= overflow >> 5; source |= overflow;\n"
 	"            source &= 0x07C0F81Fu; source |= source >> 16;\n"
-	"            result_color = source & 0xFFFFu;\n"
+	"            result_color = source & 0xFFFFu;\n";
+static const char opengl_blit_shader_part_2[] =
 	"        } else {\n"
 	"            if ((source & 0x00FFFFFFu) == 0x00FF00FFu) return false;\n"
 	"            temporary1 = source & 0x00FF00FFu;\n"
@@ -1073,17 +1099,24 @@ static const char opengl_blit_shader[] =
 	"        operation_source_rect.xy + offset).r;\n"
 	"    uint old_destination = imageLoad(destination_image, destination).r;\n"
 	"    uint result_color;\n"
-	"    if (blend_pixel(source, old_destination, result_color))\n"
+	"    if (blend_pixel(source, old_destination, result_color))\n";
+static const char opengl_blit_shader_part_3[] =
 	"        imageStore(destination_image, destination,\n"
 	"            uvec4(result_color, 0u, 0u, 0u));\n"
 	"}\n";
+static const char *const opengl_blit_shader[] = {
+	opengl_blit_shader_part_1,
+	opengl_blit_shader_part_2,
+	opengl_blit_shader_part_3,
+};
 
 /*
 	Scaling, rotation, and Mode 7 share one inverse-mapped compute shader. Each
 	destination pixel is independent, so coverage and sampling scale across the
 	GPU without generating transformed geometry or source pixels on the CPU.
 */
-static const char opengl_transform_blit_shader[] =
+/* Keep C literals short; OpenGL joins these shader parts in order. */
+static const char opengl_transform_blit_shader_part_1[] =
 	"#version 430 core\n"
 	"layout(local_size_x = 16, local_size_y = 16) in;\n"
 	"layout(r32ui, binding = 0) uniform uimage2D destination_image;\n"
@@ -1139,7 +1172,8 @@ static const char opengl_transform_blit_shader[] =
 	"    else if (operation_mode == 3u) result_color = (source & destination) & operation_mask;\n"
 	"    else if (operation_mode == 4u) result_color = (source | destination) & operation_mask;\n"
 	"    else if (operation_mode == 5u) result_color = (source ^ destination) & operation_mask;\n"
-	"    else if (operation_mode == 0u) { result_color = source & operation_mask;\n"
+	"    else if (operation_mode == 0u) { result_color = source & operation_mask;\n";
+static const char opengl_transform_blit_shader_part_2[] =
 	"        if (operation_depth <= 8u) return result_color != 0u;\n"
 	"        if (operation_depth == 16u) return result_color != 0xF81Fu;\n"
 	"        return (result_color & 0x00FFFFFFu) != 0x00FF00FFu;\n"
@@ -1180,7 +1214,8 @@ static const char opengl_transform_blit_shader[] =
 	"            dga = destination & 0x07E0u; srb = ((srb - drb) * alpha) >> 5;\n"
 	"            sga = ((sga - dga) * alpha) >> 5; result_color = ((drb + srb) & 0xF81Fu) |\n"
 	"                ((dga + sga) & 0x07E0u);\n"
-	"        } else {\n"
+	"        } else {\n";
+static const char opengl_transform_blit_shader_part_3[] =
 	"            if ((source & 0x00FFFFFFu) == 0x00FF00FFu) return false; alpha++;\n"
 	"            srb = source & 0x00FF00FFu; sga = source & 0xFF00FF00u;\n"
 	"            drb = destination & 0x00FF00FFu; dga = destination & 0xFF00FF00u;\n"
@@ -1208,13 +1243,19 @@ static const char opengl_transform_blit_shader[] =
 	"    if (blend_pixel(source, old_destination, result_color))\n"
 	"        imageStore(destination_image, destination, uvec4(result_color & operation_mask, 0u, 0u, 0u));\n"
 	"}\n";
+static const char *const opengl_transform_blit_shader[] = {
+	opengl_transform_blit_shader_part_1,
+	opengl_transform_blit_shader_part_2,
+	opengl_transform_blit_shader_part_3,
+};
 
 /*
 	One workgroup owns one destination tile. The CPU bins each PUT into
 	the tiles it touches in command order, so each invocation can replay only
 	the operations affecting its pixel without racing a neighbouring tile.
 */
-static const char opengl_blit_alpha_tile_shader[] =
+/* Keep C literals short; OpenGL joins these shader parts in order. */
+static const char opengl_blit_alpha_tile_shader_part_1[] =
 	"#version 430 core\n"
 	"layout(local_size_x = 16, local_size_y = 16) in;\n"
 	"layout(r32ui, binding = 0) uniform uimage2D destination_image;\n"
@@ -1257,7 +1298,8 @@ static const char opengl_blit_alpha_tile_shader[] =
 	"            source &= 0x07C0F81Fu; source |= source >> 16; result_color = source & 0xFFFFu;\n"
 	"        } else {\n"
 	"            if ((source & 0x00FFFFFFu) == 0x00FF00FFu) return false;\n"
-	"            temporary1 = source & 0x00FF00FFu; temporary2 = (source >> 8) & 0x00FF00FFu;\n"
+	"            temporary1 = source & 0x00FF00FFu; temporary2 = (source >> 8) & 0x00FF00FFu;\n";
+static const char opengl_blit_alpha_tile_shader_part_2[] =
 	"            temporary1 = ((temporary1 * alpha) >> 8) & 0x00FF00FFu; temporary2 = (temporary2 * alpha) & 0xFF00FF00u;\n"
 	"            source = temporary1 | temporary2; temporary1 = source & 0x80808080u; temporary2 = destination & 0x80808080u;\n"
 	"            source = (source & 0x7F7F7F7Fu) + (destination & 0x7F7F7F7Fu); destination = temporary1; temporary1 |= temporary2;\n"
@@ -1302,9 +1344,15 @@ static const char opengl_blit_alpha_tile_shader[] =
 	"        uint result_color; if (blend_operation(source, destination, result_color)) {\n"
 	"            destination = result_color; wrote = true;\n"
 	"        }\n"
-	"    }\n"
+	"    }\n";
+static const char opengl_blit_alpha_tile_shader_part_3[] =
 	"    if (wrote) imageStore(destination_image, position, uvec4(destination, 0u, 0u, 0u));\n"
 	"}\n";
+static const char *const opengl_blit_alpha_tile_shader[] = {
+	opengl_blit_alpha_tile_shader_part_1,
+	opengl_blit_alpha_tile_shader_part_2,
+	opengl_blit_alpha_tile_shader_part_3,
+};
 
 /*
 	The first batch pass records the highest ordered PSET or TRANS command for

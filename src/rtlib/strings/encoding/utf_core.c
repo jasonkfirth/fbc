@@ -58,16 +58,16 @@ void fb_hCharToUTF8( const char *src, ssize_t chars, char *dst, ssize_t *total_b
 	*total_bytes = 0;
 	while( chars > 0 )
 	{
-		c = *src++;
+		c = (UTF_8)(unsigned char)*src++;
 		if( c < 0x80 )
 		{
-			*dst++ = c;
+			*dst++ = (char)c;
 			*total_bytes += 1;
 		}
 		else
 		{
-			*dst++ = 0xC0 | (c >> 6);
-			*dst++ = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
+			*dst++ = (char)(0xC0 | (c >> 6));
+			*dst++ = (char)((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			*total_bytes += 2;
 		}
 

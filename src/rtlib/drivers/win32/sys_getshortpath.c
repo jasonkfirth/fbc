@@ -10,11 +10,16 @@
 
 char *fb_hGetShortPath( char *src, char *dst, ssize_t maxlen )
 {
+	if( (src == NULL) || (dst == NULL) || (maxlen <= 0) )
+		return dst;
+
 	if( strchr( src, 32 ) == NULL ) {
-		strncpy( dst, src, maxlen );
+		strncpy( dst, src, (size_t)maxlen );
 		dst[maxlen-1] = '\0';
 	} else {
-	 	GetShortPathName( src, dst, maxlen );
+		size_t capacity_size = (size_t)maxlen;
+		DWORD capacity = (capacity_size > (size_t)MAXDWORD) ? MAXDWORD : (DWORD)capacity_size;
+		GetShortPathName( src, dst, capacity );
 	}
 
 	return dst;

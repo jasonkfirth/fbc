@@ -26,6 +26,9 @@ class AbiNames(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.write('src/sfxlib/state.h',
                    'extern void *fb_state FB_C_SYMBOL("__fb_state");\n')
+        self.write('src/rtlib/drivers/unix/fb_unix.h',
+                   'extern int fb_enable_vt100_escapes '
+                   'FB_RTLIB_SYMBOL("__fb_enable_vt100_escapes");\n')
 
     def write(self, name, text):
         path = self.root / name
@@ -38,9 +41,13 @@ class AbiNames(unittest.TestCase):
                      'src/gfxlib2/drivers/haiku/event.cpp',
                      'tests/sfx/helper.c'):
             self.write(name, 'void *read_state(void) { return __fb_state; }\n')
+        self.write('tests/rtlib/console.c',
+                   'int read_console(void) { return __fb_enable_vt100_escapes; }\n')
         failures = structure.stale_abi_references(self.root)
-        self.assertEqual(len(failures), 3)
-        self.assertTrue(all('use fb_state' in failure for failure in failures))
+        self.assertEqual(len(failures), 4)
+        self.assertEqual(sum('use fb_state' in failure for failure in failures), 3)
+        self.assertTrue(any('use fb_enable_vt100_escapes' in failure
+                            for failure in failures))
 
     def test_linker_labels_assembly_and_notes_keep_their_spelling(self):
         self.write('src/sfxlib/state.c',
@@ -70,7 +77,7 @@ class AbiNames(unittest.TestCase):
         self.assertNotEqual(missing.returncode, 0)
         self.assertIn('fb_abi.h', missing.stderr)
         destination = self.root / 'src/rtlib/fb_abi.h'
-        destination.parent.mkdir(parents=True)
+        destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / 'src/rtlib/fb_abi.h', destination)
         complete = subprocess.run(command, capture_output=True, text=True, timeout=30)
         self.assertEqual(complete.returncode, 0, complete.stdout + complete.stderr)

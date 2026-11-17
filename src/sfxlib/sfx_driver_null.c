@@ -298,7 +298,7 @@ static int null_driver_write(const float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverNull_internal =
 {
     "null",
-    0,
+    0 FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     null_driver_init,
     null_driver_shutdown,
     null_driver_write,
@@ -315,7 +315,7 @@ const FB_SFX_DRIVER fb_sfxDriverNull_internal =
 const FB_SFX_DRIVER fb_sfxDriverNull =
 {
     "null",
-    0,
+    0 FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     null_driver_init,
     null_driver_shutdown,
     null_driver_write,

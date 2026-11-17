@@ -62,6 +62,7 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#elif defined(HOST_WII)
 		#include <errno.h>
 		#include <network.h>
+		#include <unistd.h>
 	#elif defined(HOST_AMIGA)
 		#include "drivers/amiga/dev_tcp_socket.h"
 	#else
@@ -138,15 +139,19 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
 	#define FB_TCP_CAN_QUERY_BYTES TRUE
 #elif defined(HOST_WII)
-	#define FB_TCP_CLOSESOCKET(s) net_close( s )
+	/* socket()/accept() return newlib POSIX descriptors in current libogc.
+	 * Raw net_* descriptor operations belong to a different IOS namespace.
+	 * Mixing them can poll or close an unrelated socket and leak this one.
+	 */
+	#define FB_TCP_CLOSESOCKET(s) close( s )
 	#define FB_TCP_SOCKET_ERROR(s) ((s) < 0)
 	#define FB_TCP_ERRNO() errno
 	#define FB_TCP_WOULDBLOCK(err) \
 		((err) == EAGAIN || (err) == EWOULDBLOCK || \
 		 (err) == -EAGAIN || (err) == -EWOULDBLOCK)
 	#define FB_TCP_SHUT_WR SHUT_WR
-	#define FB_TCP_SELECT(n, r, w, e, t) net_select( n, r, w, e, t )
-	#define FB_TCP_IOCTL(s, cmd, argp) net_ioctl( s, cmd, argp )
+	#define FB_TCP_SELECT(n, r, w, e, t) select( n, r, w, e, t )
+	#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, cmd, argp )
 	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )
 	#define FB_TCP_SEND(s, b, l, f) send( s, b, l, f )
 	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
@@ -177,10 +182,19 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_SHUT_WR SHUT_WR
 	#define FB_TCP_SELECT(n, r, w, e, t) select( n, r, w, e, t )
 	#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, cmd, argp )
-	#define FB_TCP_RECV(s, b, l, f) recv( s, b, l, f )
-	#define FB_TCP_SEND(s, b, l, f) send( s, b, l, f )
+	/* Shared callers cap requests at INT_MAX or use smaller fixed buffers.
+	   POSIX returns -1 or a count within that requested range. */
+	#define FB_TCP_RECV(s, b, l, f) ((int)recv( s, b, (size_t)(l), f ))
+	#define FB_TCP_SEND(s, b, l, f) ((int)send( s, b, (size_t)(l), f ))
 	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
 	#define FB_TCP_CAN_QUERY_BYTES TRUE
+#endif
+
+/* Winsock uses int address lengths. POSIX addrinfo already owns socklen_t. */
+#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
+	#define FB_TCP_ADDRESS_LENGTH(length) ((int)(length))
+#else
+	#define FB_TCP_ADDRESS_LENGTH(length) (length)
 #endif
 
 #define FB_TCP_SOCKET_CLIENT 0
@@ -197,6 +211,30 @@ static int fb_DevTcpWriteWstr( FB_FILE *handle, const FB_WCHAR *value, size_t va
 static int fb_DevTcpTell( FB_FILE *handle, fb_off_t *pOffset );
 static int fb_DevTcpEof( FB_FILE *handle );
 static int fb_DevTcpServerEof( FB_FILE *handle );
+#if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS)
+/* select() fd_set indexes are bounded; Windows stores socket handles instead. */
+static int fb_hDevTcpSetFd(FB_TCP_SOCKET socket, fd_set *set)
+{
+	if (set == NULL)
+		return FALSE;
+#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
+	FD_SET(socket, set);
+#elif defined(HOST_AMIGA)
+	FD_SET((unsigned int)socket, set);
+#else
+	if ((unsigned int)socket >= (unsigned int)FD_SETSIZE)
+		return FALSE;
+#if defined(HOST_OPENBSD)
+	/* OpenBSD's FD_SET helper takes a signed descriptor after this check. */
+	FD_SET((int)socket, set);
+#else
+	FD_SET((unsigned int)socket, set);
+#endif
+#endif
+	return TRUE;
+}
+#endif
+
 #if (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII) && !defined(HOST_AMIGA)
 static void fb_hDevTcpFormatService( char *service, size_t service_len, unsigned int port );
 #endif
@@ -523,7 +561,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 			struct timeval value;
 
 			value.tv_sec = timeout / 1000;
-			value.tv_usec = (timeout % 1000) * 1000;
+			value.tv_usec = (int)((timeout % 1000u) * 1000u);
 
 			#if !defined(HOST_WII)
 			FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
@@ -789,7 +827,8 @@ static void fb_hDevTcpSetConnectedNonBlocking( FB_TCP_SOCKET hSocket )
 	*/
 #if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
 	u_long mode = 1;
-	FB_TCP_IOCTL( hSocket, FIONBIO, &mode );
+	/* Winsock encodes this ioctl request with its sign bit set. */
+	FB_TCP_IOCTL( hSocket, (long)FIONBIO, &mode );
 #elif (!defined(HOST_DOS) || defined(FB_DOS_WATT32)) && !defined(HOST_JS) && !defined(HOST_WII)
 	int mode = 1;
 	FB_TCP_IOCTL( hSocket, FIONBIO, &mode );
@@ -857,7 +896,7 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 
 		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_CLIENT );
 
-		if( connect( hSocket, it->ai_addr, (int)it->ai_addrlen ) == 0 ) {
+		if( connect( hSocket, it->ai_addr, FB_TCP_ADDRESS_LENGTH( it->ai_addrlen ) ) == 0 ) {
 			fb_hDevTcpSetConnectedNonBlocking( hSocket );
 			fb_hDevTcpSetNoDelay( hSocket );
 			*hSocketOut = hSocket;
@@ -952,7 +991,7 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 		FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
 		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_LISTENER );
 
-		if( bind( hSocket, it->ai_addr, (int)it->ai_addrlen ) != 0 ) {
+		if( bind( hSocket, it->ai_addr, FB_TCP_ADDRESS_LENGTH( it->ai_addrlen ) ) != 0 ) {
 			FB_TCP_CLOSESOCKET( hSocket );
 			continue;
 		}
@@ -1021,7 +1060,10 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 		return -1;
 
 	FD_ZERO( &set );
-	FD_SET( info->hSocket, &set );
+	if (!fb_hDevTcpSetFd(info->hSocket, &set)) {
+		info->is_closed = TRUE;
+		return -1;
+	}
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 
@@ -1111,7 +1153,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 	size_t total = 0;
 
 	while( total < length ) {
-		int chunk = (int)MIN( length - total, (size_t)INT_MAX );
+		size_t chunk = MIN( length - total, (size_t)INT_MAX );
 		int sent;
 		int err;
 		int flags = 0;
@@ -1146,7 +1188,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 
-		total += sent;
+		total += (size_t)sent;
 	}
 
 	return FB_RTERROR_OK;
@@ -1183,9 +1225,12 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 		int res;
 
 		FD_ZERO( &set );
-		FD_SET( info->hSocket, &set );
-		tv.tv_sec = slice / 1000;
-		tv.tv_usec = (slice % 1000) * 1000;
+		if (!fb_hDevTcpSetFd(info->hSocket, &set)) {
+			info->is_closed = TRUE;
+			break;
+		}
+		tv.tv_sec = (long)(slice / 1000u);
+		tv.tv_usec = (int)((slice % 1000u) * 1000u);
 
 		FB_UNLOCK();
 		res = FB_TCP_SELECT( info->hSocket + 1, &set, NULL, NULL, &tv );
@@ -1280,6 +1325,18 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 	length = *pValuelen;
 	buffered = fb_hDevTcpReadPeekByte( info, (char *)value, length );
 
+#if defined(HOST_WII)
+	/* The Wii helper consumes currently buffered bytes, rather than peeking
+	 * at one byte. Return that partial read immediately. Waiting again here
+	 * stalls request/reply protocols when the peer needs these bytes handled
+	 * before it can send anything else (for example, a TLS flight or CAP ACK).
+	 */
+	if( buffered != 0 ) {
+		*pValuelen = buffered;
+		return FB_RTERROR_OK;
+	}
+#endif
+
 	if( buffered == length ) {
 		*pValuelen = buffered;
 		return FB_RTERROR_OK;
@@ -1322,7 +1379,7 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 		                                    0,
 		                                    &err );
 		if( bytes > 0 ) {
-			*pValuelen = buffered + bytes;
+			*pValuelen = buffered + (size_t)bytes;
 		} else if( bytes == 0 ) {
 			info->is_closed = TRUE;
 			*pValuelen = buffered;
@@ -1494,7 +1551,7 @@ static void fb_hDevTcpAppendChunk( FBSTRING_ACCESS *dst, const char *buffer, ssi
 	if( len <= 0 )
 		return;
 
-	src = fb_StrAllocTempDescF( (void *)buffer, len + 1 );
+	src = fb_StrAllocTempDescF( buffer, len + 1 );
 	if( dst->data == NULL ) {
 		fb_StrAssign( dst, -1, src, -1, FALSE );
 	} else {
@@ -1672,9 +1729,10 @@ int fb_DevTcpAcceptHandle( FB_FILE *server_handle, FB_FILE *client_handle )
 		int ready;
 
 		FD_ZERO( &set );
-		FD_SET( server_info->hSocket, &set );
-		tv.tv_sec = server_info->timeout / 1000;
-		tv.tv_usec = (server_info->timeout % 1000) * 1000;
+		if (!fb_hDevTcpSetFd(server_info->hSocket, &set))
+			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+		tv.tv_sec = (long)(server_info->timeout / 1000u);
+		tv.tv_usec = (int)((server_info->timeout % 1000u) * 1000u);
 
 		/* Watt-32 treats a zero-timeout select as an immediate poll. Its
 		   listener must instead block when OPEN TCP SERVER omitted TIMEOUT. */

@@ -120,6 +120,8 @@ static int fb_hFileLineInputEx
     case eIM_Invalid:
         FB_UNLOCK();
         return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+    default:
+        break;
     }
 
     FB_UNLOCK();

@@ -106,11 +106,13 @@ void fb_gfx3_linux_display_metrics(ssize_t *dpi, ssize_t *rotation)
 				    density < FB_GFX3_LINUX_MIN_DPI ||
 				    density > FB_GFX3_LINUX_MAX_DPI) {
 					int millimeters = XDisplayWidthMM(display, screen);
-					if (millimeters > 0)
-						density = ((double)XDisplayWidth(display, screen) *
+					if (millimeters > 0) {
+						int pixel_width = XDisplayWidth(display, screen);
+						density = ((double)pixel_width *
 							25.4) / (double)millimeters;
-					else
+					} else {
 						density = 96.0;
+					}
 				}
 				if (!isfinite(density) ||
 				    density < FB_GFX3_LINUX_MIN_DPI ||

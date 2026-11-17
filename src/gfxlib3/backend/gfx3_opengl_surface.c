@@ -142,7 +142,7 @@ int fb_gfx3_gl_palette(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PALETTE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PALETTE_COMMAND);
 	memcpy(state->palette, payload->color, sizeof(state->palette));
 	if (state->visible_surface != 0)
 		state->presentation_dirty = TRUE;
@@ -158,7 +158,7 @@ int fb_gfx3_gl_page_set(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PAGE_SET_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAGE_SET_COMMAND);
 	result = fb_gfx3_gl_surface_retain(state, command->target,
 		command->sequence, &surface);
 	if (result != FB_GFX3_OK)
@@ -258,7 +258,7 @@ int fb_gfx3_gl_window_title(FB_GFX3_OPENGL_STATE *state,
 
 	if (payload_size < sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_WINDOW_TITLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_WINDOW_TITLE_COMMAND);
 	if ((fb_gfx3_size_add(sizeof(*payload), payload->length,
 	     &expected_size) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(expected_size, 1u, &expected_size) !=
@@ -317,7 +317,7 @@ int fb_gfx3_gl_surface_create(FB_GFX3_OPENGL_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_CREATE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_CREATE_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->width > state->maximum_compute_groups_x *
 		FB_GFX3_OPENGL_LOCAL_SIZE_X) ||
@@ -415,7 +415,7 @@ int fb_gfx3_gl_surface_upload(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) < header_size)
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_UPLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_UPLOAD_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->destination_x < 0) || (payload->destination_y < 0) ||
 	    (payload->data_size !=
@@ -477,7 +477,7 @@ int fb_gfx3_gl_surface_download(FB_GFX3_OPENGL_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_DOWNLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_DOWNLOAD_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->source_x < 0) || (payload->source_y < 0) ||
 	    (payload->destination_address == 0) ||
@@ -547,7 +547,7 @@ int fb_gfx3_gl_clear(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_CLEAR_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_CLEAR_COMMAND);
 	result = fb_gfx3_gl_surface_retain(state, command->target,
 		command->sequence, &surface);
 	if (result != FB_GFX3_OK)

@@ -33,7 +33,7 @@ static char *hToUTF8( const char *src, ssize_t chars, char *dst, ssize_t *bytes 
 
 static char *hToUTF16( const char *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
-	UTF_16 *p;
+	unsigned char *p;
 
 	/* UTF16/UTF32 conversion APIs expose native typed code units.
 	   Encoded file output normalizes these units to little endian. */
@@ -54,10 +54,12 @@ static char *hToUTF16( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 		}
 	}
 
-	p = (UTF_16 *)dst;
+	p = (unsigned char *)dst;
 	while( chars > 0 )
 	{
-		*p++ = (unsigned char)*src++;
+		UTF_16 value = (UTF_16)(unsigned char)*src++;
+		memcpy(p, &value, sizeof(value));
+		p += sizeof(value);
 		--chars;
 	}
 
@@ -66,7 +68,7 @@ static char *hToUTF16( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 
 static char *hToUTF32( const char *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
-	UTF_32 *p;
+	unsigned char *p;
 
 	/* UTF16/UTF32 conversion APIs expose native typed code units.
 	   Encoded file output normalizes these units to little endian. */
@@ -87,10 +89,12 @@ static char *hToUTF32( const char *src, ssize_t chars, char *dst, ssize_t *bytes
 		}
 	}
 
-	p = (UTF_32 *)dst;
+	p = (unsigned char *)dst;
 	while( chars > 0 )
 	{
-		*p++ = (unsigned char)*src++;
+		UTF_32 value = (UTF_32)(unsigned char)*src++;
+		memcpy(p, &value, sizeof(value));
+		p += sizeof(value);
 		--chars;
 	}
 
@@ -121,6 +125,9 @@ char *fb_CharToUTF
 
 	case FB_FILE_ENCOD_UTF32:
 		return hToUTF32( src, chars, dst, bytes );
+
+	case FB_FILE_ENCOD_ASCII:
+		return NULL;
 
 	default:
 		return NULL;

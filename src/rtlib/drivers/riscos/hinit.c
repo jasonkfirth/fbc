@@ -256,13 +256,13 @@ int fb_hTermOut( int code, int param1, int param2 )
 	   Thus, we provide the __fb_enable_vt100_escapes global variable, which
 	   FB programs can set to TRUE or FALSE as needed at runtime. */
 	const char *extra_seq[] = {
-		"\e(U",               /* SEQ_INIT_CHARSET */
-		"\e(B",               /* SEQ_EXIT_CHARSET */
-		"\e[6n",              /* SEQ_QUERY_CURSOR */
-		"\e[18t",             /* SEQ_QUERY_WINDOW */
-		"\e[?1000h\e[?1003h", /* SEQ_INIT_XMOUSE */
-		"\e[?1003l\e[?1000l", /* SEQ_EXIT_XMOUSE */
-		"\e[H\e[J\e[0m",      /* SEQ_EXIT_GFX_MODE */
+		"\033(U",               /* SEQ_INIT_CHARSET */
+		"\033(B",               /* SEQ_EXIT_CHARSET */
+		"\033[6n",              /* SEQ_QUERY_CURSOR */
+		"\033[18t",             /* SEQ_QUERY_WINDOW */
+		"\033[?1000h\033[?1003h", /* SEQ_INIT_XMOUSE */
+		"\033[?1003l\033[?1000l", /* SEQ_EXIT_XMOUSE */
+		"\033[H\033[J\033[0m",      /* SEQ_EXIT_GFX_MODE */
 	};
 
 	if (!fb_console_context.inited)
@@ -272,12 +272,12 @@ int fb_hTermOut( int code, int param1, int param2 )
 		int extra_index = code - SEQ_EXTRA;
 
 		/* Is use of the VT100 escape sequences disallowed? */
-		if (!__fb_enable_vt100_escapes)
+		if (!fb_enable_vt100_escapes)
 			return FALSE;
 
 		switch (code) {
 		case SEQ_SET_COLOR_EX:
-			if( fprintf( stdout, "\e[%dm", param1 ) < 4 )
+			if( fprintf( stdout, "\033[%dm", param1 ) < 4 )
 				return FALSE;
 			break;
 		default:
@@ -407,9 +407,9 @@ int fb_hInitConsole(void)
 	/* Send SIGINT on control-C */
 	term_in.c_iflag |= BRKINT;
 	/* Disable Xon/off and input BREAK condition ignoring */
-	term_in.c_iflag &= ~(IXOFF | IXON | IGNBRK);
+	term_in.c_iflag &= ~(tcflag_t)(IXOFF | IXON | IGNBRK);
 	/* Character oriented, no echo */
-	term_in.c_lflag &= ~(ICANON | ECHO);
+	term_in.c_lflag &= ~(tcflag_t)(ICANON | ECHO);
 	/* No timeout, just don't block */
 	term_in.c_cc[VMIN] = 1;
 	term_in.c_cc[VTIME] = 0;

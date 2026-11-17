@@ -51,8 +51,10 @@ static void haiku_gl_map_point(BGLView *view, BPoint where, int *x, int *y)
     if (where.y > bounds.bottom)
         where.y = bounds.bottom;
 
-    *x = (int)(((where.x - bounds.left) * fb_haiku.width) / view_width);
-    *y = (int)(((where.y - bounds.top) * fb_haiku.height) / view_height);
+    *x = (int)(((where.x - bounds.left) * static_cast<float>(fb_haiku.width)) /
+        static_cast<float>(view_width));
+    *y = (int)(((where.y - bounds.top) * static_cast<float>(fb_haiku.height)) /
+        static_cast<float>(view_height));
 
     if (*x >= fb_haiku.width)
         *x = fb_haiku.width - 1;

@@ -9,8 +9,11 @@
 
 FBCALL int fb_SetPos( FB_FILE *handle, int line_length )
 {
+    if( (handle == NULL) || (line_length < 0) )
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
     FB_LOCK();
-    handle->line_length = line_length;
+    handle->line_length = (unsigned int)line_length;
 	FB_UNLOCK();
 
     return fb_ErrorSetNum( FB_RTERROR_OK );

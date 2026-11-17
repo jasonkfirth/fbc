@@ -52,6 +52,7 @@
 #ifndef DISABLE_HAIKU
 
 #include "../../fb_gfx.h"
+#include "fb_gfx_haiku.h"
 
 #include <stdint.h>
 #include <Joystick.h>

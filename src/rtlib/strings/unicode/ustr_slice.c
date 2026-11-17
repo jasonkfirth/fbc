@@ -7,6 +7,7 @@
 */
 
 #include "fb.h"
+#include <stdint.h>
 
 /* ------------------------------------------------------------------------- */
 /* Slices and scalar construction                                             */
@@ -56,8 +57,9 @@ FBCALL void fb_WstrLeftSelf( FB_WCHAR *dst, ssize_t count )
 	/* Truncation cannot extend the caller's buffer. Treat a UTF-16 pair
 	   as one scalar so the new terminator never separates the pair. */
 	while( remaining > 0 && dst[offset] != 0 ) {
-		if( sizeof(FB_WCHAR) == 2 && dst[offset] >= 0xD800 && dst[offset] <= 0xDBFF &&
-		    dst[offset + 1] >= 0xDC00 && dst[offset + 1] <= 0xDFFF ) ++offset;
+		if( sizeof(FB_WCHAR) == 2 && (uint16_t)dst[offset] >= 0xD800 &&
+		    (uint16_t)dst[offset] <= 0xDBFF && (uint16_t)dst[offset + 1] >= 0xDC00 &&
+		    (uint16_t)dst[offset + 1] <= 0xDFFF ) ++offset;
 		++offset;
 		--remaining;
 	}
@@ -188,6 +190,7 @@ FBCALL void fb_UStrAssignMid( FBSTRING_ACCESS *dst, ssize_t start, ssize_t count
 static void hAlign( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src, int right )
 {
 	ssize_t capacity, count, copied, padding;
+	size_t total_bytes;
 	FBSTRING_ACCESS *result;
 	FB_STRLOCK();
 	if( dst != NULL ) {
@@ -196,9 +199,14 @@ static void hAlign( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src, int right )
 		if( count > capacity ) count = capacity;
 		copied = src ? fb_hUtf8Offset( src->data, FB_STRSIZE(src), count ) : 0;
 		padding = capacity - count;
-		if( copied <= FB_USTRING_MAX_BYTES - padding ) {
-			result = fb_hUStrAlloc_NoLock( copied + padding );
-			if( (result != NULL) && (copied + padding > 0) ) {
+		if( copied < 0 || padding < 0 ||
+		    (size_t)copied > (size_t)FB_USTRING_MAX_BYTES ||
+		    (size_t)padding > (size_t)FB_USTRING_MAX_BYTES - (size_t)copied ) {
+			fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		} else {
+			total_bytes = (size_t)copied + (size_t)padding;
+			result = fb_hUStrAlloc_NoLock( (ssize_t)total_bytes );
+			if( (result != NULL) && (total_bytes > 0u) ) {
 				if( right ) {
 					memset( result->data, ' ', (size_t)(padding) );
 					if( copied ) memcpy( result->data + padding, src->data, (size_t)(copied) );
@@ -208,7 +216,7 @@ static void hAlign( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src, int right )
 				}
 			}
 			fb_hUStrMove_NoLock( dst, result, FB_FALSE );
-		} else fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+		}
 	}
 	if( src != dst ) fb_hStrDelTemp_NoLock( src );
 	FB_STRUNLOCK();

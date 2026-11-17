@@ -33,6 +33,8 @@
 #include "../../gfx3_resource.h"
 #include "gfx3_android_viewport.h"
 
+#include <math.h>
+
 #if (defined(HOST_ANDROID) || defined(HOST_LINUX)) && \
 	!defined(DISABLE_OPENGL)
 
@@ -125,8 +127,14 @@ typedef struct FB_GFX3_GLES_STATE {
 	GLint line_batch_size_location;
 	GLuint palette_texture;
 	uint32_t palette[256];
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t visible_surface_alignment_padding;
+#endif
 	FB_GFX3_HANDLE visible_surface;
 	uint32_t maximum_texture_size;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t submitted_sequence_alignment_padding;
+#endif
 	uint64_t submitted_sequence;
 	uint64_t completed_sequence;
 	FB_GFX3_ANDROID_KEYBOARD_OVERLAY keyboard_overlay;
@@ -134,6 +142,9 @@ typedef struct FB_GFX3_GLES_STATE {
 	int keyboard_overlay_known;
 	int presentation_dirty;
 	int synchronous_fence_fallback;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t first_fence_alignment_padding;
+#endif
 	FB_GFX3_GLES_FENCE *first_fence;
 	FB_GFX3_GLES_FENCE *last_fence;
 } FB_GFX3_GLES_STATE;
@@ -536,7 +547,7 @@ static const char gles_line_batch_fragment_shader[] =
 	"void main(void)\n"
 	"{ output_pixel = pack_pixel(raster_color); }\n";
 
-static const char gles_primitive_fragment_shader[] =
+static const char gles_primitive_fragment_shader_part1[] =
 	"#version 300 es\n"
 	"precision highp float;\n"
 	"precision highp int;\n"
@@ -604,7 +615,9 @@ static const char gles_primitive_fragment_shader[] =
 	"    if (operation_filled != 0u)\n"
 	"        return (pixel.x >= operation_data.x) &&\n"
 	"            (pixel.x <= operation_data.z) &&\n"
-	"            (pixel.y >= operation_data.y) && (pixel.y <= operation_data.w);\n"
+	"            (pixel.y >= operation_data.y) && (pixel.y <= operation_data.w);\n";
+
+static const char gles_primitive_fragment_shader_part2[] =
 	"    if ((pixel.y == operation_data.w) && (pixel.x >= operation_data.x) &&\n"
 	"        (pixel.x <= operation_data.z)) index = pixel.x - operation_data.x;\n"
 	"    if ((pixel.y == operation_data.y) && (pixel.x >= operation_data.x) &&\n"
@@ -653,6 +666,11 @@ static const char gles_primitive_fragment_shader[] =
 	"    }\n"
 	"    output_pixel = pack_pixel(result_color);\n"
 	"}\n";
+
+static const char *const gles_primitive_fragment_shader[] = {
+	gles_primitive_fragment_shader_part1,
+	gles_primitive_fragment_shader_part2
+};
 
 /*
 	ES 3.0 cannot use the desktop storage-image FIFO. This shader therefore
@@ -748,7 +766,7 @@ static const char gles_paint_fragment_shader[] =
 	"    output_pixel = pack_pixel(destination);\n"
 	"}\n";
 
-static const char gles_blit_fragment_shader[] =
+static const char gles_blit_fragment_shader_part1[] =
 	"#version 300 es\n"
 	"precision highp float;\n"
 	"precision highp int;\n"
@@ -796,7 +814,9 @@ static const char gles_blit_fragment_shader[] =
 	"            alpha = (alpha + 7u) >> 3; source = ((source << 16) | source) & 0x07C0F81Fu;\n"
 	"            source = ((source * alpha) >> 5) & 0x07C0F81Fu;\n"
 	"            destination = ((destination << 16) | destination) & 0x07C0F81Fu;\n"
-	"            source += destination; overflow = source & 0x08010020u;\n"
+	"            source += destination; overflow = source & 0x08010020u;\n";
+
+static const char gles_blit_fragment_shader_part2[] =
 	"            overflow -= overflow >> 5; source |= overflow; source &= 0x07C0F81Fu;\n"
 	"            result_color = (source | (source >> 16)) & 0xFFFFu;\n"
 	"        } else {\n"
@@ -842,13 +862,18 @@ static const char gles_blit_fragment_shader[] =
 	"    output_pixel = pack_pixel(result_color & operation_mask);\n"
 	"}\n";
 
+static const char *const gles_blit_fragment_shader[] = {
+	gles_blit_fragment_shader_part1,
+	gles_blit_fragment_shader_part2
+};
+
 /*
 	ES 3.0 has no compute shaders, but inverse mapping is still pure GPU work.
 	A scissored fullscreen draw launches one fragment per destination pixel and
 	the fragment shader performs all scaling, rotation, projection, sampling,
 	and PUT blending. The CPU submits one matrix instead of rasterizing spans.
 */
-static const char gles_transform_blit_fragment_shader[] =
+static const char gles_transform_blit_fragment_shader_part1[] =
 	"#version 300 es\n"
 	"precision highp float;\n"
 	"precision highp int;\n"
@@ -927,7 +952,9 @@ static const char gles_transform_blit_fragment_shader[] =
 	"        sga = ((sga >> 8) - (dga >> 8)) * alpha;\n"
 	"        result_color = ((drb + srb) & 0x00FF00FFu) | ((dga + sga) & 0xFF00FF00u);\n"
 	"    } else if (operation_mode == 7u) {\n"
-	"        alpha = operation_alpha & 255u;\n"
+	"        alpha = operation_alpha & 255u;\n";
+
+static const char gles_transform_blit_fragment_shader_part2[] =
 	"        if (operation_depth <= 8u) result_color = (source | destination) & operation_mask;\n"
 	"        else if (operation_depth == 16u) {\n"
 	"            if ((source & 0xFFFFu) == 0xF81Fu) return false;\n"
@@ -985,6 +1012,11 @@ static const char gles_transform_blit_fragment_shader[] =
 	"    if (!blend_pixel(source, destination, result_color)) discard;\n"
 	"    output_pixel = pack_pixel(result_color & operation_mask);\n"
 	"}\n";
+
+static const char *const gles_transform_blit_fragment_shader[] = {
+	gles_transform_blit_fragment_shader_part1,
+	gles_transform_blit_fragment_shader_part2
+};
 
 /*
 	Destination-independent transforms retain ordinary raster ordering when
@@ -1201,15 +1233,18 @@ static void gles_report_shader_log(FB_GFX3_GLES_STATE *state, GLuint object,
 		description, (length > 0) ? log : "no GLES diagnostic");
 }
 
-static int gles_compile_shader(FB_GFX3_GLES_STATE *state, GLenum type,
-	const char *source, const char *description, GLuint *shader)
+static int gles_compile_shader_sources(FB_GFX3_GLES_STATE *state, GLenum type,
+	const char *const *sources, GLsizei source_count,
+	const char *description, GLuint *shader)
 {
 	GLint compiled = GL_FALSE;
 
+	if ((sources == NULL) || (source_count <= 0) || (shader == NULL))
+		return FB_GFX3_INVALID;
 	*shader = glCreateShader(type);
 	if (*shader == 0)
 		return FB_GFX3_FAILED;
-	glShaderSource(*shader, 1, &source, NULL);
+	glShaderSource(*shader, source_count, sources, NULL);
 	glCompileShader(*shader);
 	glGetShaderiv(*shader, GL_COMPILE_STATUS, &compiled);
 	if (compiled == GL_TRUE)
@@ -1220,8 +1255,21 @@ static int gles_compile_shader(FB_GFX3_GLES_STATE *state, GLenum type,
 	return FB_GFX3_FAILED;
 }
 
-static int gles_create_program(FB_GFX3_GLES_STATE *state,
-	const char *fragment_source, const char *description, GLuint *program)
+static int gles_compile_shader(FB_GFX3_GLES_STATE *state, GLenum type,
+	const char *source, const char *description, GLuint *shader)
+{
+	const char *sources[1];
+
+	if (source == NULL)
+		return FB_GFX3_INVALID;
+	sources[0] = source;
+	return gles_compile_shader_sources(state, type, sources, 1,
+		description, shader);
+}
+
+static int gles_create_program_sources(FB_GFX3_GLES_STATE *state,
+	const char *const *fragment_sources, GLsizei fragment_source_count,
+	const char *description, GLuint *program)
 {
 	GLuint vertex_shader = 0;
 	GLuint fragment_shader = 0;
@@ -1232,8 +1280,8 @@ static int gles_create_program(FB_GFX3_GLES_STATE *state,
 		"GLES vertex shader", &vertex_shader);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = gles_compile_shader(state, GL_FRAGMENT_SHADER, fragment_source,
-		description, &fragment_shader);
+	result = gles_compile_shader_sources(state, GL_FRAGMENT_SHADER,
+		fragment_sources, fragment_source_count, description, &fragment_shader);
 	if (result != FB_GFX3_OK) {
 		glDeleteShader(vertex_shader);
 		return result;
@@ -1255,6 +1303,18 @@ static int gles_create_program(FB_GFX3_GLES_STATE *state,
 		*program = 0;
 	}
 	return FB_GFX3_FAILED;
+}
+
+static int gles_create_program(FB_GFX3_GLES_STATE *state,
+	const char *fragment_source, const char *description, GLuint *program)
+{
+	const char *fragment_sources[1];
+
+	if (fragment_source == NULL)
+		return FB_GFX3_INVALID;
+	fragment_sources[0] = fragment_source;
+	return gles_create_program_sources(state, fragment_sources, 1,
+		description, program);
 }
 
 static int gles_create_program_with_vertex(FB_GFX3_GLES_STATE *state,
@@ -1534,7 +1594,7 @@ static int gles_surface_create(FB_GFX3_GLES_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_CREATE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_CREATE_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->width > state->maximum_texture_size) ||
 	    (payload->height > state->maximum_texture_size) ||
@@ -1617,7 +1677,7 @@ static int gles_surface_upload(FB_GFX3_GLES_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) < header_size)
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_UPLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_UPLOAD_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->destination_x < 0) || (payload->destination_y < 0) ||
 	    (payload->data_size != fb_gfx3_command_payload_size(command) -
@@ -1742,7 +1802,7 @@ static int gles_surface_download(FB_GFX3_GLES_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_DOWNLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_DOWNLOAD_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->source_x < 0) || (payload->source_y < 0) ||
 	    (payload->destination_address == 0) ||
@@ -1804,7 +1864,7 @@ static int gles_clear(FB_GFX3_GLES_STATE *state, FB_GFX3_COMMAND *command)
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_CLEAR_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_CLEAR_COMMAND);
 	result = gles_surface_retain(state, command->target, command->sequence,
 		&surface);
 	if (result != FB_GFX3_OK)
@@ -1835,7 +1895,7 @@ static int gles_points(FB_GFX3_GLES_STATE *state, FB_GFX3_COMMAND *command)
 	if (fb_gfx3_command_payload_size(command) <
 	    offsetof(FB_GFX3_POINTS_COMMAND, point))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_POINTS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
 	     &points_size) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(offsetof(FB_GFX3_POINTS_COMMAND, point), points_size,
@@ -1964,7 +2024,7 @@ static size_t gles_points_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 		return 1u;
-	first = (const FB_GFX3_POINTS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_POINTS_COMMAND);
 	if (available > FB_GFX3_GLES_POINTS_BATCH_LIMIT)
 		available = FB_GFX3_GLES_POINTS_BATCH_LIMIT;
 	for (index = 0; index < available; ++index) {
@@ -1979,7 +2039,7 @@ static size_t gles_points_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[index]) <
 		     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 			break;
-		payload = (const FB_GFX3_POINTS_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_POINTS_COMMAND);
 		if ((payload->count == 0u) ||
 		    (memcmp(&payload->clip, &first->clip, sizeof(payload->clip)) != 0) ||
 		    (fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
@@ -2028,7 +2088,7 @@ static int gles_points_batch(FB_GFX3_GLES_STATE *state,
 		    (fb_gfx3_command_payload_size(commands[index]) <
 		     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 			return FB_GFX3_INVALID;
-		payload = (const FB_GFX3_POINTS_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_POINTS_COMMAND);
 		if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
 		     &source_points_size) != FB_GFX3_OK) ||
 		    (fb_gfx3_size_add(offsetof(FB_GFX3_POINTS_COMMAND, point),
@@ -2050,13 +2110,13 @@ static int gles_points_batch(FB_GFX3_GLES_STATE *state,
 		return FB_GFX3_OUT_OF_MEMORY;
 	batch_command->target = commands[0]->target;
 	batch_command->sequence = commands[count - 1u]->sequence;
-	batch = (FB_GFX3_POINTS_COMMAND *)batch_command->payload;
-	batch->clip = ((const FB_GFX3_POINTS_COMMAND *)commands[0]->payload)->clip;
+	batch = FB_GFX3_COMMAND_PAYLOAD_AS(batch_command, FB_GFX3_POINTS_COMMAND);
+	batch->clip = (FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_POINTS_COMMAND))->clip;
 	batch->count = (uint32_t)total_points;
 	points_size = 0u;
 	for (index = 0; index < count; ++index) {
 		const FB_GFX3_POINTS_COMMAND *payload =
-			(const FB_GFX3_POINTS_COMMAND *)commands[index]->payload;
+			FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_POINTS_COMMAND);
 		size_t source_points_size = (size_t)payload->count *
 			sizeof(payload->point[0]);
 
@@ -2102,7 +2162,7 @@ static size_t gles_line_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_LINE) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_LINE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_LINE_COMMAND);
 	if ((first->flags != 0u) || !gles_line_batch_steps(first, &steps))
 		return 1u;
 	if (available > FB_GFX3_GLES_LINE_BATCH_LIMIT)
@@ -2116,7 +2176,7 @@ static size_t gles_line_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_LINE_COMMAND *)commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_LINE_COMMAND);
 		if ((candidate->flags != 0u) ||
 		    !gles_line_batch_steps(candidate, &steps) ||
 		    (memcmp(&candidate->clip, &first->clip,
@@ -2143,7 +2203,7 @@ static int gles_line_batch(FB_GFX3_GLES_STATE *state,
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)) ||
 	    (state->line_batch_program == 0))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_LINE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_LINE_COMMAND);
 	result = gles_surface_retain(state, commands[0]->target,
 		commands[count - 1u]->sequence, &surface);
 	if (result != FB_GFX3_OK)
@@ -2154,7 +2214,7 @@ static int gles_line_batch(FB_GFX3_GLES_STATE *state,
 	}
 	for (index = 0u; index < count; index++) {
 		const FB_GFX3_LINE_COMMAND *payload =
-			(const FB_GFX3_LINE_COMMAND *)commands[index]->payload;
+			FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_LINE_COMMAND);
 
 		items[index].x1 = payload->x1;
 		items[index].y1 = payload->y1;
@@ -2222,7 +2282,7 @@ static int gles_line(FB_GFX3_GLES_STATE *state, FB_GFX3_COMMAND *command)
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_LINE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 	result = gles_surface_retain(state, command->target, command->sequence,
 		&surface);
 	if (result != FB_GFX3_OK)
@@ -2258,7 +2318,7 @@ static size_t gles_rectangle_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_RECTANGLE) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_RECTANGLE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_RECTANGLE_COMMAND);
 	if ((first->filled == 0u) || (first->flags != 0u) ||
 	    (first->x1 > first->x2) || (first->y1 > first->y2))
 		return 1u;
@@ -2273,7 +2333,7 @@ static size_t gles_rectangle_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_RECTANGLE_COMMAND *)commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_RECTANGLE_COMMAND);
 		if ((candidate->filled == 0u) || (candidate->flags != 0u) ||
 		    (candidate->x1 > candidate->x2) || (candidate->y1 > candidate->y2) ||
 		    (memcmp(&candidate->clip, &first->clip,
@@ -2298,7 +2358,7 @@ static int gles_rectangle_batch(FB_GFX3_GLES_STATE *state,
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)) ||
 	    (state->rectangle_batch_program == 0))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_RECTANGLE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_RECTANGLE_COMMAND);
 	result = gles_surface_retain(state, commands[0]->target,
 		commands[count - 1u]->sequence, &surface);
 	if (result != FB_GFX3_OK)
@@ -2309,7 +2369,7 @@ static int gles_rectangle_batch(FB_GFX3_GLES_STATE *state,
 	}
 	for (index = 0u; index < count; index++) {
 		const FB_GFX3_RECTANGLE_COMMAND *payload =
-			(const FB_GFX3_RECTANGLE_COMMAND *)commands[index]->payload;
+			FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_RECTANGLE_COMMAND);
 
 		items[index].x1 = payload->x1;
 		items[index].y1 = payload->y1;
@@ -2364,7 +2424,7 @@ static int gles_rectangle(FB_GFX3_GLES_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 	if ((payload->x1 > payload->x2) || (payload->y1 > payload->y2))
 		return FB_GFX3_INVALID;
 	result = gles_surface_retain(state, command->target, command->sequence,
@@ -2557,7 +2617,7 @@ static void gles_append_ellipse_spans(
 	else
 		gles_append_ellipse_outline_row(clip, items, count, y1, x1, x2,
 			color, limit);
-	if (payload->radius_y == 0.0f)
+	if (fpclassify(payload->radius_y) == FP_ZERO)
 		return;
 	aq = (int64_t)(payload->radius_x * payload->radius_x);
 	bq = (int64_t)(payload->radius_y * payload->radius_y);
@@ -2622,7 +2682,7 @@ static size_t gles_ellipse_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_ELLIPSE) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_ELLIPSE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_ELLIPSE_COMMAND);
 	if (!gles_ellipse_batchable(first))
 		return 1u;
 	if (available > FB_GFX3_GLES_ELLIPSE_BATCH_LIMIT)
@@ -2636,7 +2696,7 @@ static size_t gles_ellipse_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_ELLIPSE_COMMAND);
 		if (!gles_ellipse_batchable(candidate) ||
 		    (memcmp(&candidate->clip, &first->clip,
 		     sizeof(candidate->clip)) != 0))
@@ -2661,7 +2721,7 @@ static int gles_ellipse_batch(FB_GFX3_GLES_STATE *state,
 	    (count > FB_GFX3_GLES_ELLIPSE_BATCH_LIMIT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_ELLIPSE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_ELLIPSE_COMMAND);
 	result = gles_surface_retain(state, commands[0]->target,
 		commands[count - 1u]->sequence, &surface);
 	if (result != FB_GFX3_OK)
@@ -2672,7 +2732,7 @@ static int gles_ellipse_batch(FB_GFX3_GLES_STATE *state,
 	}
 	for (index = 0u; index < count; ++index) {
 		const FB_GFX3_ELLIPSE_COMMAND *payload =
-			(const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
+			FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_ELLIPSE_COMMAND);
 
 		gles_append_ellipse_spans(payload, &clip, surface->depth, NULL,
 			&span_count, FB_GFX3_GLES_ELLIPSE_BATCH_SPAN_LIMIT);
@@ -2694,7 +2754,7 @@ static int gles_ellipse_batch(FB_GFX3_GLES_STATE *state,
 	span_count = 0u;
 	for (index = 0u; index < count; ++index) {
 		const FB_GFX3_ELLIPSE_COMMAND *payload =
-			(const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
+			FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_ELLIPSE_COMMAND);
 
 		gles_append_ellipse_spans(payload, &clip, surface->depth, items,
 			&span_count, FB_GFX3_GLES_ELLIPSE_BATCH_SPAN_LIMIT);
@@ -2729,7 +2789,7 @@ static int gles_ellipse(FB_GFX3_GLES_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 	if (!(payload->radius_x >= 0.0f) || !(payload->radius_x <= 32767.0f) ||
 	    !(payload->radius_y >= 0.0f) || !(payload->radius_y <= 32767.0f))
 		return FB_GFX3_INVALID;
@@ -2766,7 +2826,7 @@ static int gles_ellipse(FB_GFX3_GLES_STATE *state,
 		result = gles_draw_ellipse_span_batch(state, surface, items, count);
 		goto done;
 	}
-	if (payload->radius_y == 0.0f) {
+	if (fpclassify(payload->radius_y) == FP_ZERO) {
 		result = gles_draw_ellipse_scanline(state, surface, &clip,
 			payload->center_y, x1, x2,
 			payload->color, TRUE, payload->flags);
@@ -3031,7 +3091,7 @@ static int gles_paint(FB_GFX3_GLES_STATE *state, FB_GFX3_COMMAND *command)
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PAINT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAINT_COMMAND);
 
 	result = gles_surface_retain(state, command->target, command->sequence,
 		&surface);
@@ -3171,7 +3231,7 @@ static size_t gles_paint_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_PAINT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_PAINT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_PAINT_COMMAND);
 	if ((first->paint_mode != 0u) || (first->pattern_size != 0u) ||
 	    ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 	    (first->color == first->border_color))
@@ -3186,7 +3246,7 @@ static size_t gles_paint_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_PAINT_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_PAINT_COMMAND);
 		if ((candidate->paint_mode != 0u) ||
 		    (candidate->pattern_size != 0u) ||
 		    ((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
@@ -3223,7 +3283,7 @@ static int gles_blit(FB_GFX3_GLES_STATE *state, FB_GFX3_COMMAND *command)
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 	if (payload->mode == FB_GFX3_BLIT_CUSTOM)
 		return FB_GFX3_UNSUPPORTED;
 	if (payload->mode > FB_GFX3_BLIT_BLEND)
@@ -3383,7 +3443,7 @@ static int gles_transform_blit(FB_GFX3_GLES_STATE *state,
 	if ((state == NULL) || (command == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	if ((payload->mode == FB_GFX3_BLIT_CUSTOM) ||
 	    (payload->mode > FB_GFX3_BLIT_BLEND) ||
 	    (payload->filter > FB_GFX3_TRANSFORM_FILTER_LINEAR) ||
@@ -3514,7 +3574,7 @@ static uint32_t gles_blit_batch_count(FB_GFX3_COMMAND *const *commands,
 	    (commands[0]->type != FB_GFX3_COMMAND_BLIT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 	if (((first->mode != FB_GFX3_BLIT_TRANS) &&
 	     (first->mode != FB_GFX3_BLIT_PSET) &&
 	     (first->mode != FB_GFX3_BLIT_PRESET)) ||
@@ -3530,7 +3590,7 @@ static uint32_t gles_blit_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_BLIT_COMMAND *)commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
 		    (candidate->source != first->source) ||
 		    (candidate->mode != first->mode) ||
@@ -3550,7 +3610,7 @@ static uint32_t gles_transform_blit_batch_count(
 	    (commands[0]->type != FB_GFX3_COMMAND_TRANSFORM_BLIT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	if ((first->source == commands[0]->target) ||
 	    (first->mode > FB_GFX3_BLIT_PRESET))
 		return 1u;
@@ -3564,8 +3624,7 @@ static uint32_t gles_transform_blit_batch_count(
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)
-			commands[index]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
 		    (candidate->source != first->source) ||
 		    (candidate->mode > FB_GFX3_BLIT_PRESET))
@@ -3684,7 +3743,7 @@ static int gles_blit_batch(FB_GFX3_GLES_STATE *state,
 	    (count > FB_GFX3_GLES_BLIT_BATCH_LIMIT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 	result = gles_surface_retain(state, commands[0]->target,
 		commands[count - 1u]->sequence, &destination);
 	if (result != FB_GFX3_OK)
@@ -3710,7 +3769,7 @@ static int gles_blit_batch(FB_GFX3_GLES_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_BLIT_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
 		    (payload->source != first->source) ||
 		    (payload->mode != first->mode) ||
@@ -3768,7 +3827,7 @@ static int gles_blits(FB_GFX3_GLES_STATE *state, FB_GFX3_COMMAND *command)
 	    (fb_gfx3_command_payload_size(command) <
 	     offsetof(FB_GFX3_BLITS_COMMAND, blit)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_BLITS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLITS_COMMAND);
 	if ((payload->count == 0u) ||
 	    (payload->count > FB_GFX3_GLES_BLIT_BATCH_LIMIT) ||
 	    (payload->source == command->target) ||
@@ -3874,7 +3933,7 @@ static int gles_transform_blit_batch(FB_GFX3_GLES_STATE *state,
 	    (commands[0] == NULL) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	result = gles_surface_retain(state, commands[0]->target,
 		commands[count - 1u]->sequence, &destination);
 	if (result != FB_GFX3_OK)
@@ -3902,8 +3961,7 @@ static int gles_transform_blit_batch(FB_GFX3_GLES_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto done;
 		}
-		payload = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)
-			commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
 		    (payload->source != first->source) ||
 		    (payload->mode > FB_GFX3_BLIT_PRESET) ||
@@ -4023,7 +4081,7 @@ static int gles_read_pixel(FB_GFX3_GLES_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_READ_PIXEL_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_READ_PIXEL_COMMAND);
 	result = gles_surface_retain(state, command->target, command->sequence,
 		&surface);
 	if (result != FB_GFX3_OK)
@@ -4054,7 +4112,7 @@ static int gles_palette(FB_GFX3_GLES_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PALETTE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PALETTE_COMMAND);
 	memcpy(state->palette, payload->color, sizeof(state->palette));
 	for (index = 0; index < 256; index++) {
 		packed[index * 4u] = (unsigned char)payload->color[index];
@@ -4079,7 +4137,7 @@ static int gles_page_set(FB_GFX3_GLES_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PAGE_SET_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAGE_SET_COMMAND);
 	result = gles_surface_retain(state, command->target, command->sequence,
 		&surface);
 	if (result != FB_GFX3_OK)
@@ -4192,7 +4250,7 @@ static int gles_window_title(FB_GFX3_GLES_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) < sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_WINDOW_TITLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_WINDOW_TITLE_COMMAND);
 	if ((fb_gfx3_size_add(sizeof(*payload), payload->length,
 	     &expected_size) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(expected_size, 1u, &expected_size) != FB_GFX3_OK) ||
@@ -4453,7 +4511,8 @@ static int gles_init(FB_GFX3_BACKEND *backend,
 	backend->caps.max_surface_width = state->maximum_texture_size;
 	backend->caps.max_surface_height = state->maximum_texture_size;
 	gles_capture_gl_info(backend);
-	result = gles_create_program(state, gles_primitive_fragment_shader,
+	result = gles_create_program_sources(state,
+		gles_primitive_fragment_shader, 2,
 		"GLES primitive fragment shader", &state->primitive_program);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -4461,7 +4520,7 @@ static int gles_init(FB_GFX3_BACKEND *backend,
 		"GLES PAINT fragment shader", &state->paint_program);
 	if (result != FB_GFX3_OK)
 		return result;
-	result = gles_create_program(state, gles_blit_fragment_shader,
+	result = gles_create_program_sources(state, gles_blit_fragment_shader, 2,
 		"GLES blit fragment shader", &state->blit_program);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -4499,7 +4558,8 @@ static int gles_init(FB_GFX3_BACKEND *backend,
 	    (state->blit_depth_location < 0) ||
 	    (state->blit_mask_location < 0))
 		return FB_GFX3_FAILED;
-	result = gles_create_program(state, gles_transform_blit_fragment_shader,
+	result = gles_create_program_sources(state,
+		gles_transform_blit_fragment_shader, 2,
 		"GLES transform blit fragment shader",
 		&state->transform_blit_program);
 	if (result != FB_GFX3_OK)
@@ -4765,7 +4825,7 @@ static int gles_command_is_deferred_full_page(
 	if (command->type == FB_GFX3_COMMAND_BLIT) {
 		if (fb_gfx3_command_payload_size(command) != sizeof(*blit))
 			return FALSE;
-		blit = (const FB_GFX3_BLIT_COMMAND *)command->payload;
+		blit = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 	} else if (command->type == FB_GFX3_COMMAND_BLITS) {
 		const FB_GFX3_BLITS_COMMAND *blits;
 		size_t expected_size;
@@ -4773,7 +4833,7 @@ static int gles_command_is_deferred_full_page(
 		if (fb_gfx3_command_payload_size(command) <
 		    offsetof(FB_GFX3_BLITS_COMMAND, blit))
 			return FALSE;
-		blits = (const FB_GFX3_BLITS_COMMAND *)command->payload;
+		blits = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLITS_COMMAND);
 		if ((blits->count != 1u) ||
 		    (fb_gfx3_size_add(offsetof(FB_GFX3_BLITS_COMMAND, blit),
 		     sizeof(blits->blit[0]), &expected_size) != FB_GFX3_OK) ||
@@ -5129,6 +5189,7 @@ static void *gles_get_opengl_proc(FB_GFX3_BACKEND *backend,
 
 const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_gles = {
 	FB_GFX3_BACKEND_ABI_VERSION,
+	FB_GFX3_BACKEND_ABI_ALIGNMENT_INITIALIZER
 	"OpenGL ES 3.0",
 	gles_probe,
 	gles_init,

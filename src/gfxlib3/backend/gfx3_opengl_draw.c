@@ -23,7 +23,7 @@ int fb_gfx3_gl_points(FB_GFX3_OPENGL_STATE *state,
 	if (fb_gfx3_command_payload_size(command) <
 	    offsetof(FB_GFX3_POINTS_COMMAND, point))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_POINTS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
 	     &points_size) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(offsetof(FB_GFX3_POINTS_COMMAND, point), points_size,
@@ -82,7 +82,7 @@ int fb_gfx3_gl_line(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_LINE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 	difference_x = (int64_t)payload->x2 - payload->x1;
 	difference_y = (int64_t)payload->y2 - payload->y1;
 	if (difference_x < 0)
@@ -154,7 +154,7 @@ int fb_gfx3_gl_rectangle(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 	if ((payload->x1 > payload->x2) || (payload->y1 > payload->y2))
 		return FB_GFX3_INVALID;
 	result = fb_gfx3_gl_surface_retain(state, command->target,
@@ -248,7 +248,7 @@ int fb_gfx3_gl_ellipse(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 	if (!(payload->radius_x >= 0.0f) ||
 	    !(payload->radius_x <= 32767.0f) ||
 	    !(payload->radius_y >= 0.0f) ||
@@ -334,7 +334,7 @@ int fb_gfx3_gl_paint(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PAINT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAINT_COMMAND);
 	result = fb_gfx3_gl_surface_retain(state, command->target,
 		command->sequence, &surface);
 	if (result != FB_GFX3_OK)

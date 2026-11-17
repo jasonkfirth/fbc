@@ -38,6 +38,8 @@ static __stdcall LONG exception_filter( LPEXCEPTION_POINTERS info )
 	case EXCEPTION_INT_OVERFLOW:
 		raise( SIGFPE );
 		break;
+	default:
+		break;
 	}
 
 	return old_excpfilter( info );
@@ -46,6 +48,10 @@ static __stdcall LONG exception_filter( LPEXCEPTION_POINTERS info )
 
 typedef struct FB_SIGHANDLER {
 	int		errnum;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the native alignment of the saved handler pointer. */
+	unsigned char handler_alignment_padding[4];
+#endif
 	void 	(*oldhnd)(int);
 } FB_SIGHANDLER;
 

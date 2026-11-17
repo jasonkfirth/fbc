@@ -25,7 +25,12 @@
 ** temp string descriptors (string lock is assumed to be held in the thread-safe rlib version)
 **********/
 
-static FB_LIST tmpdsList = { 0, NULL, NULL, NULL };
+static FB_LIST tmpdsList = {
+	.cnt = 0,
+	.head = NULL,
+	.tail = NULL,
+	.fhead = NULL
+};
 
 static FB_STR_TMPDESC fb_tmpdsTB[FB_STR_TMPDESCRIPTORS];
 

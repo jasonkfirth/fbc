@@ -83,9 +83,7 @@ void fb_hRecheckConsoleSize( int requery_cursorpos );
 int fb_hTermOut(int code, int param1, int param2);
 void fb_hAddCh( int k );
 int fb_hGetCh(int remove);
-int fb_hXTermInitFocus(void);
-void fb_hXTermExitFocus(void);
-int fb_hXTermHasFocus(void);
+#include "../../fb_private_xfocus.h"
 int fb_hConsoleGfxMode
 	(
 		void (*gfx_exit)(void),

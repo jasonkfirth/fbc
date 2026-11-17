@@ -26,8 +26,12 @@ int fb_hFilePrintBufferWstr
 		const FB_WCHAR *buffer
 	)
 {
+    ssize_t length = fb_wstr_Len( buffer );
+    if( length < 0 )
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
     return fb_hFilePrintBufferWstrEx( FB_FILE_TO_HANDLE(fnum),
-                                  	  buffer, fb_wstr_Len( buffer ) );
+                                      buffer, (size_t)length );
 }
 
 /* end of files/file_print_wstr.c */

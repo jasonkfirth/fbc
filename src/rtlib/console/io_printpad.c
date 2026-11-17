@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 static void fb_hPrintPadEx ( FB_FILE *handle, int mask, int current_x, int new_x )
 {
@@ -19,7 +20,9 @@ static void fb_hPrintPadEx ( FB_FILE *handle, int mask, int current_x, int new_x
     if (new_x <= current_x) {
         FB_PRINT_EX(handle, FB_NEWLINE, sizeof(FB_NEWLINE)-1, mask);
     } else {
-        size_t count = new_x - current_x;
+        size_t count = (size_t)(new_x - current_x);
+		if( count > FB_TAB_WIDTH )
+			count = FB_TAB_WIDTH;
         memset(tab_char_buffer, 32, count);
         /* the terminating NUL shouldn't be required but it makes
          * debugging easier */
@@ -43,17 +46,22 @@ void fb_PrintPadEx ( FB_FILE *handle, int mask )
     fb_DevScrnInit_Write( );
 
     tmp_handle = FB_HANDLE_DEREF(handle);
-    if( tmp_handle == NULL )
+    if( tmp_handle == NULL ) {
         return;
+    }
+    if( tmp_handle->line_length > (unsigned int)(INT_MAX - FB_TAB_WIDTH) ) {
+        fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+        return;
+    }
 
-    old_x = tmp_handle->line_length + 1;
+    old_x = (int)tmp_handle->line_length + 1;
     new_x = old_x + FB_TAB_WIDTH - 1;
     new_x /= FB_TAB_WIDTH;
     new_x *= FB_TAB_WIDTH;
     new_x += 1;
     if (tmp_handle->width!=0) {
         /* If padding moved us beyond EOL, move to beginning of next line */
-        if (new_x > (int)tmp_handle->width) {
+        if ((unsigned int)new_x > tmp_handle->width) {
             new_x = 1;
         }
     }

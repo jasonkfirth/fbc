@@ -67,8 +67,6 @@ void fb_hHaikuFramebufferToWindow(int x, int y, int *outx, int *outy);
     Reset renderer/platform-side shared state.
 */
 
-void fb_hHaikuResetState(void);
-
 #ifdef __cplusplus
 
 /* ------------------------------------------------------------------------- */

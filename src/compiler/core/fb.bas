@@ -918,6 +918,10 @@ sub fbSetOption( byval opt as integer, byval value as integer )
 	end select
 end sub
 
+function fbCAsmNeedsNoRedZone() as integer
+	return irGetOption( IR_OPT_C_ASM_NO_RED_ZONE )
+end function
+
 '' Keep this table parallel with fbSetOption() so missing cases are apparent.
 ''
 function fbGetOption( byval opt as integer ) as integer

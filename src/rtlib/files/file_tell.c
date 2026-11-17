@@ -27,11 +27,21 @@ fb_off_t fb_FileTellEx( FB_FILE *handle )
 
     if (pos != -1) {
         /* Adjust real position by number of characters in put back buffer */
-        pos -= handle->putback_size;
+        if( pos < 0 ||
+            handle->putback_size > sizeof( handle->putback_buffer ) ||
+            handle->putback_size > (size_t)pos ) {
+            pos = -1;
+        } else {
+            pos -= (fb_off_t)handle->putback_size;
 
-        /* if in random mode, divide by reclen */
-        if( handle->mode == FB_FILE_MODE_RANDOM )
-            pos /= handle->len;
+            /* if in random mode, divide by reclen */
+            if( handle->mode == FB_FILE_MODE_RANDOM ) {
+                if( handle->len <= 0 )
+                    pos = -1;
+                else
+                    pos /= handle->len;
+            }
+        }
 
     }
 

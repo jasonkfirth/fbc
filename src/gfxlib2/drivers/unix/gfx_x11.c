@@ -748,7 +748,8 @@ static void *window_thread(void *arg)
 					/* fallthrough */
 
 				case Expose:
-					fb_hMemSet(fb_gfx->dirty, TRUE, fb_x11.h);
+					if (fb_x11.h > 0)
+						fb_hMemSet(fb_gfx->dirty, TRUE, (size_t)fb_x11.h);
 					break;
 
 				case FocusOut:
@@ -811,6 +812,7 @@ static void *window_thread(void *arg)
 					case Button5: e.z = mouse_wheel--; break;
 					case Button6: e.w = mouse_hwheel--; break;
 					case Button7: e.w = mouse_hwheel++; break;
+					default: break;
 					}
 
 					switch (event.xbutton.button) {
@@ -849,7 +851,8 @@ static void *window_thread(void *arg)
 					    !(fb_x11.flags & DRIVER_NO_FRAME) &&
 					    (event.xconfigure.window == fb_x11.wmwindow)) {
 						XResizeWindow(fb_x11.display, fb_x11.window,
-						              event.xconfigure.width, event.xconfigure.height);
+							fb_hX11Dimension(event.xconfigure.width),
+							fb_hX11Dimension(event.xconfigure.height));
 					}
 					if (event.xconfigure.window == fb_x11.window) {
 						if (fb_x11.flags & DRIVER_RESIZABLE) {
@@ -864,7 +867,8 @@ static void *window_thread(void *arg)
 							fb_hX11RefreshLayout(event.xconfigure.width,
 								event.xconfigure.height);
 						}
-						fb_hMemSet(fb_gfx->dirty, TRUE, fb_x11.h);
+						if (fb_x11.h > 0)
+							fb_hMemSet(fb_gfx->dirty, TRUE, (size_t)fb_x11.h);
 						XClearWindow(fb_x11.display, fb_x11.window);
 					}
 					break;
@@ -922,6 +926,9 @@ static void *window_thread(void *arg)
 				case GenericEvent:
 					fb_hX11TouchEvent(&event);
 					break;
+
+				default:
+					break;
 			}
 			if (lock_mouse_state)
 				pthread_mutex_unlock(&mouse_state_mutex);
@@ -953,7 +960,7 @@ int fb_hX11EnterFullscreen(int *h)
 		if (XRRSetScreenConfig(fb_x11.display, fb_x11.config, root_window, target_size, orig_rotation, CurrentTime) == BadValue)
 			return -1;
 	} else {
-		if (XRRSetScreenConfigAndRate(fb_x11.display, fb_x11.config, root_window, target_size, orig_rotation, target_rate, CurrentTime) == BadValue)
+		if (XRRSetScreenConfigAndRate(fb_x11.display, fb_x11.config, root_window, target_size, orig_rotation, (short)target_rate, CurrentTime) == BadValue)
 			return -1;
 		fb_gfx->refresh_rate = fb_x11.refresh_rate = target_rate;
 	}
@@ -983,7 +990,7 @@ void fb_hX11LeaveFullscreen(void)
 		return;
 
 	if (current_size != orig_size) {
-		if ((target_rate <= 0) || (XRRSetScreenConfigAndRate(fb_x11.display, fb_x11.config, root_window, orig_size, orig_rotation, orig_rate, CurrentTime) == BadValue))
+		if ((target_rate <= 0) || (XRRSetScreenConfigAndRate(fb_x11.display, fb_x11.config, root_window, orig_size, orig_rotation, (short)orig_rate, CurrentTime) == BadValue))
 			XRRSetScreenConfig(fb_x11.display, fb_x11.config, root_window, orig_size, orig_rotation, CurrentTime);
 		XUngrabPointer(fb_x11.display, CurrentTime);
 		current_size = orig_size;
@@ -993,11 +1000,14 @@ void fb_hX11LeaveFullscreen(void)
 
 static Bool hMappedEvent(Display *display, XEvent *event, XPointer target)
 {
+	Window target_window;
+
 	(void)display;
-	return event->type == MapNotify && event->xmap.event == *(Window *)target;
+	memcpy(&target_window, target, sizeof(target_window));
+	return event->type == MapNotify && event->xmap.event == target_window;
 }
 
-void WaitMapped(Window w)
+static void WaitMapped(Window w)
 {
 	XEvent e;
 	/* Hildon can configure the usable client size before mapping finishes.
@@ -1013,8 +1023,12 @@ void fb_hX11InitWindow(int x, int y)
 	if (!(fb_x11.flags & DRIVER_FULLSCREEN)){
 		/* windowed */
 		fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
-		XResizeWindow(fb_x11.display, fb_x11.wmwindow, fb_x11.view_w, fb_x11.view_h);
-		XResizeWindow(fb_x11.display, fb_x11.window, fb_x11.view_w, fb_x11.view_h);
+		XResizeWindow(fb_x11.display, fb_x11.wmwindow,
+			fb_hX11Dimension(fb_x11.view_w),
+			fb_hX11Dimension(fb_x11.view_h));
+		XResizeWindow(fb_x11.display, fb_x11.window,
+			fb_hX11Dimension(fb_x11.view_w),
+			fb_hX11Dimension(fb_x11.view_h));
 
 		if (!(fb_x11.flags & DRIVER_NO_FRAME)) {
 			XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.wmwindow, 0, 0);
@@ -1029,8 +1043,12 @@ void fb_hX11InitWindow(int x, int y)
 	} else {
 		/* fullscreen */
 		fb_hX11RefreshLayout(fb_x11.view_w, fb_x11.view_h);
-		XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0, 0, fb_x11.view_w, fb_x11.view_h);
-		XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0, fb_x11.view_w, fb_x11.view_h);
+		XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0, 0,
+			fb_hX11Dimension(fb_x11.view_w),
+			fb_hX11Dimension(fb_x11.view_h));
+		XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0,
+			fb_hX11Dimension(fb_x11.view_w),
+			fb_hX11Dimension(fb_x11.view_h));
 		XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.fswindow, 0, 0);
 		XMapRaised(fb_x11.display, fb_x11.fswindow);
 		/* use XSync instead of WaitMapped for unmanaged windows */
@@ -1057,7 +1075,7 @@ void fb_hX11InitWindow(int x, int y)
 		event.xclient.window = fb_x11.wmwindow;
 		event.xclient.format = 32;
 		event.xclient.data.l[0] = 1;
-		event.xclient.data.l[1] = XInternAtom(fb_x11.display, "_NET_WM_STATE_ABOVE", False);
+		event.xclient.data.l[1] = (long)XInternAtom(fb_x11.display, "_NET_WM_STATE_ABOVE", False);
 		XSendEvent(fb_x11.display, root_window, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
 	}
 }
@@ -1086,7 +1104,7 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	short *rates;
 	int version, dummy;
 	int i, num_formats, num_sizes, num_rates, supersized_h;
-	int gc_mask;
+	unsigned long gc_mask;
 	const char *intern_atoms[] = { "_MOTIF_WM_HINTS", "KWM_WIN_DECORATION", "_WIN_HINTS" };
 	int intern_hints[] = { 0x2, 0, 0, 0, 0 };
 
@@ -1140,14 +1158,17 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 			     PointerMotionMask | FocusChangeMask | EnterWindowMask | LeaveWindowMask | ExposureMask | StructureNotifyMask;
 	attribs.backing_store = NotUseful;
 	attribs.colormap = XCreateColormap( fb_x11.display, root_window, fb_x11.visual, AllocNone);
-	fb_x11.window = XCreateWindow(fb_x11.display, root_window, 0, 0, fb_x11.w, fb_x11.h,
+	fb_x11.window = XCreateWindow(fb_x11.display, root_window, 0, 0,
+					fb_hX11Dimension(fb_x11.w), fb_hX11Dimension(fb_x11.h),
 					0, fb_x11.depth, InputOutput, fb_x11.visual,
 					CWBackPixel | CWBorderPixel | CWEventMask | CWBackingStore | CWColormap, &attribs);
-	fb_x11.wmwindow = XCreateWindow(fb_x11.display, root_window, 0, 0, fb_x11.w, fb_x11.h,
+	fb_x11.wmwindow = XCreateWindow(fb_x11.display, root_window, 0, 0,
+						 fb_hX11Dimension(fb_x11.w), fb_hX11Dimension(fb_x11.h),
 					0, fb_x11.depth, InputOutput, fb_x11.visual,
 					CWBackPixel | CWBorderPixel | CWEventMask | CWBackingStore | CWColormap, &attribs);
 	attribs.override_redirect = True;
-	fb_x11.fswindow = XCreateWindow(fb_x11.display, root_window, 0, 0, fb_x11.w, fb_x11.h,
+	fb_x11.fswindow = XCreateWindow(fb_x11.display, root_window, 0, 0,
+					fb_hX11Dimension(fb_x11.w), fb_hX11Dimension(fb_x11.h),
 					0, fb_x11.depth, InputOutput, fb_x11.visual,
 					CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWEventMask | CWBackingStore | CWColormap, &attribs);
 
@@ -1244,7 +1265,8 @@ int fb_hX11Init(char *title, int w, int h, int depth, int refresh_rate, int flag
 	XClearWindow(fb_x11.display, fb_x11.window);
 
 	pixmap = XCreatePixmap(fb_x11.display, fb_x11.window, 1, 1, 1);
-	gc_mask = GCFunction | GCForeground | GCBackground;
+	gc_mask = (unsigned long)GCFunction | (unsigned long)GCForeground |
+		(unsigned long)GCBackground;
 	gc_values.function = GXcopy;
 	gc_values.foreground = gc_values.background = 0;
 	fb_x11.gc = XCreateGC(fb_x11.display, pixmap, gc_mask, &gc_values);
@@ -1409,11 +1431,25 @@ void fb_hX11SetPalette(int index, int r, int g, int b)
 {
 	XColor color;
 
-	if (fb_x11.visual->class == PseudoColor) {
-		color.pixel = index;
-		color.red = (r << 8) | r;
-		color.green = (g << 8) | g;
-		color.blue = (b << 8) | b;
+	if ((fb_x11.visual->class == PseudoColor) && (index >= 0) &&
+	    (index < fb_x11.visual->map_entries)) {
+		if (r < 0)
+			r = 0;
+		else if (r > 255)
+			r = 255;
+		if (g < 0)
+			g = 0;
+		else if (g > 255)
+			g = 255;
+		if (b < 0)
+			b = 0;
+		else if (b > 255)
+			b = 255;
+
+		color.pixel = (unsigned long)index;
+		color.red = (unsigned short)(r * 257);
+		color.green = (unsigned short)(g * 257);
+		color.blue = (unsigned short)(b * 257);
 		color.flags = DoRed | DoGreen | DoBlue;
 		XStoreColors(fb_x11.display, color_map, &color, 1);
 	}
@@ -1421,7 +1457,11 @@ void fb_hX11SetPalette(int index, int r, int g, int b)
 
 void fb_hX11WaitVSync(void)
 {
-	usleep(1000000 / ((fb_x11.refresh_rate > 0) ? fb_x11.refresh_rate : 60));
+	unsigned int refresh_rate = (fb_x11.refresh_rate > 0)
+		? (unsigned int)fb_x11.refresh_rate
+		: 60u;
+
+	usleep(1000000u / refresh_rate);
 }
 
 int fb_hX11GetMouseFast(int *x, int *y, int *z, int *buttons, int *clip)
@@ -1696,8 +1736,11 @@ int *fb_hX11FetchModes(int depth, int *size)
 	XRRScreenConfiguration *cfg;
 	XRRScreenSize *rr_sizes;
 	int i, *sizes = NULL;
+	size_t allocation_size;
 
 	if ((depth != 8) && (depth != 15) && (depth != 16) && (depth != 24) && (depth != 32))
+		return NULL;
+	if (!size)
 		return NULL;
 
 	if (fb_x11.display)
@@ -1716,10 +1759,25 @@ int *fb_hX11FetchModes(int depth, int *size)
 
 	rr_sizes = XRRConfigSizes(cfg, size);
 	if ((rr_sizes) && (*size > 0)) {
-		sizes = (int *)malloc(*size * sizeof(int));
+		if ((size_t)*size > ((size_t)-1 / sizeof(*sizes))) {
+			*size = 0;
+		} else {
+			allocation_size = (size_t)*size * sizeof(*sizes);
+			sizes = (int *)malloc(allocation_size);
+		}
 		if (sizes) {
-			for (i = 0; i < *size; i++)
-				sizes[i] = (rr_sizes[i].width << 16) | (rr_sizes[i].height);
+			for (i = 0; i < *size; i++) {
+				if ((rr_sizes[i].width <= 0) || (rr_sizes[i].height <= 0) ||
+				    ((unsigned int)rr_sizes[i].width > 0xFFFFu) ||
+				    ((unsigned int)rr_sizes[i].height > 0xFFFFu)) {
+					free(sizes);
+					sizes = NULL;
+					*size = 0;
+					break;
+				}
+				sizes[i] = (int)(((uint32_t)rr_sizes[i].width << 16) |
+					(uint32_t)rr_sizes[i].height);
+			}
 		} else {
 			*size = 0;
 		}
@@ -1766,7 +1824,7 @@ int fb_hX11ScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *
 
 ssize_t fb_hGetWindowHandle(void)
 {
-	return (fb_x11.display ? fb_x11.window : 0);
+	return fb_x11.display ? (ssize_t)(intptr_t)fb_x11.window : (ssize_t)0;
 }
 
 ssize_t fb_hGetDisplayHandle(void)

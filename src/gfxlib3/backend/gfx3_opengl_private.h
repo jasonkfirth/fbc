@@ -356,6 +356,10 @@ typedef struct FB_GFX3_OPENGL_STATE {
 	uint32_t blit_batch_winner_width;
 	uint32_t blit_batch_winner_height;
 	uint32_t blit_batch_generation;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the conversion storage pointer at its original ABI offset. */
+	uint32_t line_batch_items_alignment_padding;
+#endif
 	/* Renderer-thread-owned conversion storage for ordered line batches. */
 	FB_GFX3_OPENGL_LINE_BATCH_ITEM *line_batch_items;
 	uint32_t line_batch_items_capacity;
@@ -500,6 +504,10 @@ typedef struct FB_GFX3_OPENGL_STATE {
 	uint32_t maximum_compute_groups_y;
 	uint32_t maximum_compute_groups_z;
 	uint32_t palette[256];
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the 64-bit surface handle at its original offset. */
+	uint32_t visible_surface_alignment_padding;
+#endif
 	FB_GFX3_HANDLE visible_surface;
 	FB_GFX3_HANDLE page_content_handle[FB_GFX3_OPENGL_PAGE_CONTENT_LIMIT];
 	uint64_t page_content_token[FB_GFX3_OPENGL_PAGE_CONTENT_LIMIT];

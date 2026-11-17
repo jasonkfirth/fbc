@@ -21,9 +21,16 @@
 */
 
 #include <stdint.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "extended_math.h"
+
+/* Ties-to-even rounding only treats an exactly representable half as a tie. */
+static int fb_Int128LongDoubleEqual(long double left, long double right)
+{
+	return (left <= right) && (left >= right);
+}
 
 typedef struct FB_INT128_VALUE {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ && \
@@ -91,7 +98,8 @@ static FB_INT128_VALUE int128_negate(FB_INT128_VALUE value)
 {
 	FB_INT128_VALUE result;
 	result.low = (uint64_t)0 - value.low;
-	result.high = ~value.high + (result.low == 0);
+	/* The high word needs a carry only when the low word was zero. */
+	result.high = ~value.high + (value.low == 0);
 	return result;
 }
 
@@ -208,7 +216,6 @@ void *fb_Int128FromDouble(void *destination, double source, int is_signed)
 	FB_INT128_VALUE result;
 	int negative;
 	long double magnitude;
-	long double high_part;
 
 	if (source_value < 0.0L) {
 		negative = 1;
@@ -217,7 +224,7 @@ void *fb_Int128FromDouble(void *destination, double source, int is_signed)
 		negative = 0;
 		magnitude = source_value;
 	}
-	if (!(source_value == source_value)) abort();
+	if (isnan(source_value)) abort();
 
 	if (is_signed) {
 		if ((negative && magnitude > signed_limit) ||
@@ -242,7 +249,8 @@ void *fb_Int128FromDouble(void *destination, double source, int is_signed)
 		result.low = (uint64_t)magnitude;
 		fraction = magnitude - (long double)result.low;
 		round_up = (fraction > 0.5L) ||
-			((fraction == 0.5L) && ((result.low & 1) != 0));
+			(fb_Int128LongDoubleEqual(fraction, 0.5L) &&
+			 ((result.low & 1) != 0));
 		result.high = 0;
 		if (round_up) {
 			if (result.low == UINT64_MAX) {
@@ -253,7 +261,7 @@ void *fb_Int128FromDouble(void *destination, double source, int is_signed)
 			}
 		}
 	} else {
-		high_part = magnitude / word_size;
+		long double high_part = magnitude / word_size;
 		result.high = (uint64_t)high_part;
 		result.low = (uint64_t)(magnitude - (long double)result.high * word_size);
 	}
@@ -428,6 +436,8 @@ void *fb_Int128Bop(void *destination, const void *left_address,
 			case FB_INT128_BOP_LT: value = comparison < 0; break;
 			case FB_INT128_BOP_LE: value = comparison <= 0; break;
 			case FB_INT128_BOP_GE: value = comparison >= 0; break;
+			default:
+				break;
 			}
 			memcpy(destination, &value, sizeof(value));
 		}

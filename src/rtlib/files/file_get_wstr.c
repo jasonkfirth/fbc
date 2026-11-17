@@ -33,20 +33,27 @@ int fb_FileGetWstrEx
 	if( dst_chars < 2 )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
+    size_t requested_chars = (size_t)(dst_chars - 1);
+    if( requested_chars > (size_t)-1 / sizeof(FB_WCHAR) )
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+    size_t requested_bytes = requested_chars * sizeof(FB_WCHAR);
+
 	/* Fill wchar buffer with raw bytes from the file. */
 	/* We request to read in multiples of sizeof(wchar), but EOF can be
 	   reached at an odd number of bytes - fb_DevFileRead() will fill the
 	   remainder with zeroes at least. */
 	size_t rawbytesread;
-	int res = fb_FileGetDataEx( handle, pos, (void *)dst, (dst_chars - 1) * sizeof(FB_WCHAR), &rawbytesread, TRUE, FALSE );
+	int res = fb_FileGetDataEx( handle, pos, (void *)dst, requested_bytes, &rawbytesread, TRUE, FALSE );
 	if( res != FB_RTERROR_OK )
 		return res;
+	if( rawbytesread > requested_bytes )
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
 	if (bytesread)
 		*bytesread = rawbytesread;
 
 	/* Add null-terminator */
-	int extra = rawbytesread % sizeof(FB_WCHAR);
+	size_t extra = rawbytesread % sizeof(FB_WCHAR);
 	if (extra > 0) {
 		rawbytesread += sizeof(FB_WCHAR) - extra; /* round up */
 	}
@@ -63,7 +70,12 @@ FBCALL int fb_FileGetWstr( int fnum, int pos, FB_WCHAR *dst, ssize_t dst_chars )
 
 FBCALL int fb_FileGetWstrLarge( int fnum, long long pos, FB_WCHAR *dst, ssize_t dst_chars )
 {
-	return fb_FileGetWstrEx( FB_FILE_TO_HANDLE(fnum), pos, dst, dst_chars, NULL );
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FileGetWstrEx( FB_FILE_TO_HANDLE(fnum), offset, dst, dst_chars, NULL );
 }
 
 FBCALL int fb_FileGetWstrIOB( int fnum, int pos, FB_WCHAR *dst, ssize_t dst_chars, size_t *bytesread )
@@ -73,7 +85,12 @@ FBCALL int fb_FileGetWstrIOB( int fnum, int pos, FB_WCHAR *dst, ssize_t dst_char
 
 FBCALL int fb_FileGetWstrLargeIOB( int fnum, long long pos, FB_WCHAR *dst, ssize_t dst_chars, size_t *bytesread )
 {
-	return fb_FileGetWstrEx( FB_FILE_TO_HANDLE(fnum), pos, dst, dst_chars, bytesread );
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FileGetWstrEx( FB_FILE_TO_HANDLE(fnum), offset, dst, dst_chars, bytesread );
 }
 
 /* end of files/file_get_wstr.c */

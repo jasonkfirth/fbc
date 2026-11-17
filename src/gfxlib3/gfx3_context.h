@@ -126,6 +126,10 @@ typedef struct FB_GFX3_IMAGE_CACHE_ENTRY {
 	/* Full-image native colour cached with the exact mutation snapshot. */
 	uint32_t uniform_color;
 	int uniform_full_image;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the snapshot pointer's existing offset. */
+	unsigned char snapshot_alignment_padding[4];
+#endif
 	unsigned char *snapshot;
 	size_t snapshot_size;
 	FB_GFX3_SURFACE surface;
@@ -195,6 +199,10 @@ struct FB_GFX3_CONTEXT {
 	uint32_t image_cache_atlas_next_y;
 	uint32_t image_cache_atlas_row_height;
 	int image_cache_atlas_dynamic;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep cached entries at their original pointer-aligned offset. */
+	unsigned char image_cache_alignment_padding[4];
+#endif
 	FB_GFX3_IMAGE_CACHE_ENTRY image_cache[FB_GFX3_IMAGE_CACHE_CAPACITY];
 	/*
 		Direct pointer lookup is advisory. Every hit is verified against the
@@ -216,6 +224,10 @@ struct FB_GFX3_CONTEXT {
 		can deliver an ordered batch. A synchronous command always drains this
 		array first, preserving public request/response ordering.
 	*/
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the native mutex pointer's existing offset. */
+	unsigned char submission_mutex_alignment_padding[4];
+#endif
 	FBMUTEX *submission_mutex;
 	FB_GFX3_COMMAND *pending_commands[FB_GFX3_CONTEXT_PENDING_COMMAND_LIMIT];
 	size_t pending_command_count;

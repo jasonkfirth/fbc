@@ -60,7 +60,12 @@ FBCALL int fb_FileGetStr( int fnum, int pos, void *str, ssize_t str_len )
 
 FBCALL int fb_FileGetStrLarge( int fnum, long long pos, void *str, ssize_t str_len )
 {
-	return fb_FileGetStrEx(FB_FILE_TO_HANDLE(fnum), pos, str, str_len, NULL);
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FileGetStrEx(FB_FILE_TO_HANDLE(fnum), offset, str, str_len, NULL);
 }
 
 FBCALL int fb_FileGetStrIOB( int fnum, int pos, void *str, ssize_t str_len, size_t *bytesread )
@@ -70,7 +75,12 @@ FBCALL int fb_FileGetStrIOB( int fnum, int pos, void *str, ssize_t str_len, size
 
 FBCALL int fb_FileGetStrLargeIOB( int fnum, long long pos, void *str, ssize_t str_len, size_t *bytesread )
 {
-	return fb_FileGetStrEx(FB_FILE_TO_HANDLE(fnum), pos, str, str_len, bytesread);
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FileGetStrEx(FB_FILE_TO_HANDLE(fnum), offset, str, str_len, bytesread);
 }
 
 /* end of files/file_getstr.c */

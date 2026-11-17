@@ -8,6 +8,7 @@
 #include "../../fb.h"
 #include "fb_private_console.h"
 #include <ctype.h>
+#include <limits.h>
 
 #define KEY_BUFFER_LEN 512
 static int key_buffer[KEY_BUFFER_LEN];
@@ -256,9 +257,10 @@ void fb_hConsolePutBackEvents( void )
         DWORD dwEventsWritten = 0;
         size_t count = (key_idx > key_tail) ? (KEY_BUFFER_LEN - key_idx) : (key_tail - key_idx);
 
+        /* The ring buffer limits each API write to KEY_BUFFER_LEN records. */
         WriteConsoleInput( FB_CONSOLE_INPUT_HANDLE,
                            input_events + key_idx,
-                           count,
+                           (DWORD)count,
                            &dwEventsWritten );
 
         key_idx += count;
@@ -315,7 +317,7 @@ static void fb_hConsoleProcessKeyEvent( const KEY_EVENT_RECORD *event )
             number = event->wVirtualKeyCode - VK_NUMPAD0;
 #endif
             key_scratch_pad *= 10;
-            key_scratch_pad += number;
+            key_scratch_pad += (unsigned int)number;
         }
     } else if( KeyCode!=-1 ) {
         key_scratch_pad = 0;
@@ -336,11 +338,11 @@ static void fb_hConsoleProcessKeyEvent( const KEY_EVENT_RECORD *event )
         SHORT wVkCode = VkKeyScan(chAsciiCode);
         memset( &rec, 0, sizeof(KEY_EVENT_RECORD) );
         rec.uChar.AsciiChar = chAsciiCode;
-        rec.wVirtualKeyCode = wVkCode & 0xFF;
+        rec.wVirtualKeyCode = (WORD)((unsigned short)wVkCode & 0xFFu);
         rec.dwControlKeyState |= (((wVkCode & 0x100)!=0) ? SHIFT_PRESSED : 0);
         rec.dwControlKeyState |= (((wVkCode & 0x200)!=0) ? LEFT_CTRL_PRESSED : 0);
         rec.dwControlKeyState |= (((wVkCode & 0x400)!=0) ? LEFT_ALT_PRESSED : 0);
-        rec.wVirtualScanCode = MapVirtualKey( rec.wVirtualKeyCode, 0 );
+        rec.wVirtualScanCode = (WORD)MapVirtualKey( rec.wVirtualKeyCode, 0 );
         fb_hConsolePostKey( key_scratch_pad & 0xFF, &rec );
         key_scratch_pad = 0;
     }
@@ -361,10 +363,12 @@ static BOOL WINAPI fb_hConsoleHandlerRoutine( DWORD dwCtrlType )
             memset( &rec, 0, sizeof(KEY_EVENT_RECORD) );
             rec.wVirtualKeyCode = VK_F4;
             rec.dwControlKeyState = LEFT_ALT_PRESSED;
-            rec.wVirtualScanCode = MapVirtualKey( rec.wVirtualKeyCode, 0 );
+            rec.wVirtualScanCode = (WORD)MapVirtualKey( rec.wVirtualKeyCode, 0 );
             fb_hConsolePostKey( KEY_QUIT, &rec );
         }
         return TRUE;
+    default:
+        break;
     }
     return FALSE;
 }
@@ -432,6 +436,8 @@ int fb_ConsoleProcessEvents( void )
             case FOCUS_EVENT:
                 console_has_focus = ir.Event.FocusEvent.bSetFocus;
                 break;
+            default:
+                break;
             }
 
             FB_UNLOCK();
@@ -491,10 +497,15 @@ int fb_hConsoleTranslateKey
             const FB_KEY_CODES *codes = fb_asc_key_codes + wVsCode;
 
             uiNormalKey = MapVirtualKey( wVkCode, 2 ) & 0xFFFF;
-            if( isupper( (int) uiNormalKey ) ) {
-                uiNormalKeyOtherCase = tolower( (int) uiNormalKey );
-            } else if( islower( (int) uiNormalKey ) ) {
-                uiNormalKeyOtherCase = toupper( (int) uiNormalKey );
+            /* The C classification functions only accept byte values or EOF. */
+            if( uiNormalKey <= (unsigned int)UCHAR_MAX ) {
+                if( isupper( (int)(unsigned char)uiNormalKey ) ) {
+                    uiNormalKeyOtherCase = (unsigned int)tolower( (int)(unsigned char)uiNormalKey );
+                } else if( islower( (int)(unsigned char)uiNormalKey ) ) {
+                    uiNormalKeyOtherCase = (unsigned int)toupper( (int)(unsigned char)uiNormalKey );
+                } else {
+                    uiNormalKeyOtherCase = uiNormalKey;
+                }
             } else {
                 uiNormalKeyOtherCase = uiNormalKey;
             }
@@ -509,7 +520,7 @@ int fb_hConsoleTranslateKey
                 if( uiAsciiChar==0 ) {
                     KeyCode = codes->value_normal;
                 } else {
-                    KeyCode = uiNormalKey;
+                    KeyCode = (int)uiNormalKey;
                 }
             }
             /* Add the found key code only when the following conditions are
@@ -526,7 +537,7 @@ int fb_hConsoleTranslateKey
         if( !AddKeyCode && !bEnhancedKeysOnly) {
             if( !is_ext_code ) {
                 /* The key code is simply the returned ASCII character */
-                KeyCode = uiAsciiChar;
+                KeyCode = (int)uiAsciiChar;
                 AddKeyCode = TRUE;
             }
         }

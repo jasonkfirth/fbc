@@ -20,7 +20,8 @@
 
 #define PI			3.1415926535897932384626
 
-#define BYTES_PER_PIXEL(d)		(((d) + 7) / 8)
+/* Use a wide intermediate because the depth can come from a native mode. */
+#define BYTES_PER_PIXEL(d)		((int)(((int64_t)(d) + 7) / 8))
 #define BPP_MASK(b)				((int)((1LL << ((b) << 3)) - 1))
 
 #define DRIVER_LOCK()		do { fb_GfxLock(); } while (0)
@@ -241,6 +242,13 @@ typedef void (BLITTER)(unsigned char *, int);
 
 typedef struct FB_GFX_CHAR_CELL {
 	FB_WCHAR ch;
+#if defined(DISABLE_WCHAR) && defined(__DJGPP__)
+	/* Keep the DOS foreground color at its existing 4-byte offset. */
+	unsigned char color_alignment_padding[3];
+#elif !defined(DISABLE_WCHAR) && defined(__SIZEOF_WCHAR_T__) && (__SIZEOF_WCHAR_T__ == 2)
+	/* Windows wchar_t is 16-bit; preserve the existing color field offset. */
+	unsigned char color_alignment_padding[2];
+#endif
 	unsigned fg, bg;
 } GFX_CHAR_CELL;
 
@@ -256,20 +264,36 @@ typedef struct FBGFX
 	int depth;                              /**< Current mode depth in bits per pixel */
 	int bpp;                                /**< Bytes per pixel */
 	int pitch;                              /**< Width of a framebuffer line in bytes */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing Win64 gaps before pointer fields to keep offsets fixed. */
+	unsigned char palette_alignment_padding[4];
+#endif
 	unsigned int *palette;                  /**< Current RGB color values for each palette index */
 	unsigned int *device_palette;           /**< Current RGB color values of visible device palette */
 	unsigned char *color_association;       /**< Palette color index associations for CGA/EGA emulation */
 	char *dirty;                            /**< Dirty lines buffer */
 	const struct GFXDRIVER *driver;         /**< Gfx driver in use */
 	int color_mask;                         /**< Color bit mask for colordepth emulation */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char default_palette_alignment_padding[4];
+#endif
 	const struct PALETTE *default_palette;  /**< Default palette for current mode */
 	int scanline_size;                      /**< Vertical size of a single scanline in pixels */
 	int cursor_x, cursor_y;                 /**< Current graphical text cursor position (in chars, 0 based) */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char font_alignment_padding[4];
+#endif
 	const struct FONT *font;                /**< Current font */
 	int text_w, text_h;                     /**< Graphical text console size in characters */
 	float aspect;                           /**< Aspect ratio (used in CIRCLE) */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char key_alignment_padding[4];
+#endif
 	char *key;                              /**< Keyboard states */
 	int refresh_rate;                       /**< Driver refresh rate */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char con_pages_alignment_padding[4];
+#endif
 	GFX_CHAR_CELL **con_pages;              /**< Character information for all pages */
 	EVENT *event_queue;                     /**< The OS events queue array */
 	int event_head, event_tail;             /**< Indices for the head and tail event in the array */
@@ -490,6 +514,9 @@ typedef struct GFXDRIVER
 typedef struct PALETTE
 {
 	const int colors;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char data_alignment_padding[4];
+#endif
 	const unsigned char *data;
 } PALETTE;
 
@@ -531,7 +558,16 @@ struct FB_PUT_HEADER {
 	unsigned int pitch;
 	unsigned int tex;
 	char _reserved[8];
+	/* Keep the legacy zero-length spelling for C++ consumers. */
+#if defined(__cplusplus)
+	#if defined(__GNUC__)
+		__extension__ unsigned char data[0];
+	#else
 	unsigned char data[0];
+	#endif
+#else
+	unsigned char data[];
+#endif
 } FB_GFX_GCC_STRUCT;
 #pragma pack(pop)
 #undef FB_GFX_GCC_STRUCT

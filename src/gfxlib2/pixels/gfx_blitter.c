@@ -9,6 +9,20 @@
 
 #include "../fb_gfx.h"
 
+/*
+    Odd-width 16-bit rows can start halfway through a 32-bit word. Keep the
+    packed scalar views valid for those byte-addressed scanline positions.
+*/
+#if defined(__GNUC__) || defined(__clang__)
+typedef unsigned short fb_blit_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef unsigned int fb_blit_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef unsigned short fb_blit_u16_unaligned;
+typedef unsigned int fb_blit_u32_unaligned;
+#endif
+
 #ifdef HOST_X86
 /* MMX functions declarations */
 extern void fb_hBlit8to15RGBMMX(unsigned char *dest, int pitch);
@@ -40,11 +54,16 @@ static void fb_hBlitCopy(unsigned char *dest, int pitch)
 {
 	unsigned char *src = fb_gfx->framebuffer;
 	char *dirty = fb_gfx->dirty;
+	size_t copy_size;
 	int y, z = 0;
+
+	if (fb_gfx->pitch < 0)
+		return;
+	copy_size = (size_t)fb_gfx->pitch;
 
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty)
-			fb_hMemCpy(dest, src, fb_gfx->pitch);
+			fb_hMemCpy(dest, src, copy_size);
 		z++;
 		if (z >= fb_gfx->scanline_size) {
 			z = 0;
@@ -61,14 +80,15 @@ static void fb_hBlit8to15RGB(unsigned char *dest, int pitch)
 {
 	unsigned int *pal = fb_gfx->device_palette;
 	unsigned char *s, *src = fb_gfx->framebuffer;
-	unsigned int c1, c2, *d;
+	unsigned int c1, c2;
+	fb_blit_u32_unaligned *d;
 	char *dirty = fb_gfx->dirty;
 	int x, y, z = 0;
 
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
 			s = src;
-			d = (unsigned int *)dest;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = pal[*s];
 				c2 = pal[*(s + 1)];
@@ -79,7 +99,7 @@ static void fb_hBlit8to15RGB(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = pal[*s];
-				*(unsigned short *)d = ((c1 >> 3) & 0x001F) | ((c1 >> 6) & 0x03E0) | ((c1 >> 6) & 0x7C00);
+				*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 >> 3) & 0x001F) | ((c1 >> 6) & 0x03E0) | ((c1 >> 6) & 0x7C00));
 			}
 		}
 		z++;
@@ -98,14 +118,15 @@ static void fb_hBlit8to15BGR(unsigned char *dest, int pitch)
 {
 	unsigned int *pal = fb_gfx->device_palette;
 	unsigned char *s, *src = fb_gfx->framebuffer;
-	unsigned int c1, c2, *d;
+	unsigned int c1, c2;
+	fb_blit_u32_unaligned *d;
 	char *dirty = fb_gfx->dirty;
 	int x, y, z = 0;
 
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
 			s = src;
-			d = (unsigned int *)dest;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = pal[*s];
 				c2 = pal[*(s + 1)];
@@ -116,7 +137,7 @@ static void fb_hBlit8to15BGR(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = pal[*s];
-				*(unsigned short *)d = ((c1 << 7) & 0x7C00) | ((c1 >> 6) & 0x03E0) | ((c1 >> 19) & 0x001F);
+				*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 << 7) & 0x7C00) | ((c1 >> 6) & 0x03E0) | ((c1 >> 19) & 0x001F));
 			}
 		}
 		z++;
@@ -135,14 +156,15 @@ static void fb_hBlit8to16RGB(unsigned char *dest, int pitch)
 {
 	unsigned int *pal = fb_gfx->device_palette;
 	unsigned char *s, *src = fb_gfx->framebuffer;
-	unsigned int c1, c2, *d;
+	unsigned int c1, c2;
+	fb_blit_u32_unaligned *d;
 	char *dirty = fb_gfx->dirty;
 	int x, y, z = 0;
 
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
 			s = src;
-			d = (unsigned int *)dest;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = pal[*s];
 				c2 = pal[*(s + 1)];
@@ -153,7 +175,7 @@ static void fb_hBlit8to16RGB(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = pal[*s];
-				*(unsigned short *)d = ((c1 >> 3) & 0x001F) | ((c1 >> 5) & 0x07E0) | ((c1 >> 5) & 0xF800);
+				*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 >> 3) & 0x001F) | ((c1 >> 5) & 0x07E0) | ((c1 >> 5) & 0xF800));
 			}
 		}
 		z++;
@@ -172,14 +194,15 @@ static void fb_hBlit8to16BGR(unsigned char *dest, int pitch)
 {
 	unsigned int *pal = fb_gfx->device_palette;
 	unsigned char *s, *src = fb_gfx->framebuffer;
-	unsigned int c1, c2, *d;
+	unsigned int c1, c2;
+	fb_blit_u32_unaligned *d;
 	char *dirty = fb_gfx->dirty;
 	int x, y, z = 0;
 
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
 			s = src;
-			d = (unsigned int *)dest;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = pal[*s];
 				c2 = pal[*(s + 1)];
@@ -190,7 +213,7 @@ static void fb_hBlit8to16BGR(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = pal[*s];
-				*(unsigned short *)d = ((c1 << 8) & 0xF800) | ((c1 >> 5) & 0x07E0) | ((c1 >> 19) & 0x001F);
+				*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 << 8) & 0xF800) | ((c1 >> 5) & 0x07E0) | ((c1 >> 19) & 0x001F));
 			}
 		}
 		z++;
@@ -276,7 +299,7 @@ static void fb_hBlit8to24BGR(unsigned char *dest, int pitch)
 static void fb_hBlit8to32RGB(unsigned char *dest, int pitch)
 {
 	unsigned int *pal = fb_gfx->device_palette;
-	unsigned int *d;
+	fb_blit_u32_unaligned *d;
 	unsigned char *s, *src = fb_gfx->framebuffer;
 	char *dirty = fb_gfx->dirty;
 	int x, y, z = 0;
@@ -284,7 +307,7 @@ static void fb_hBlit8to32RGB(unsigned char *dest, int pitch)
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
 			s = src;
-			d = (unsigned int *)dest;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w; x; x--) {
 				*d = pal[*s];
 				s++;
@@ -306,7 +329,7 @@ static void fb_hBlit8to32RGB(unsigned char *dest, int pitch)
 static void fb_hBlit8to32BGR(unsigned char *dest, int pitch)
 {
 	unsigned int *pal = fb_gfx->device_palette;
-	unsigned int *d;
+	fb_blit_u32_unaligned *d;
 	unsigned char *s, *src = fb_gfx->framebuffer;
 	unsigned int c;
 	char *dirty = fb_gfx->dirty;
@@ -315,7 +338,7 @@ static void fb_hBlit8to32BGR(unsigned char *dest, int pitch)
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
 			s = src;
-			d = (unsigned int *)dest;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w; x; x--) {
 				c = pal[*s];
 				*d = ((c << 16) & 0xFF0000) | (c & 0xFF00) | (c >> 16);
@@ -337,8 +360,8 @@ static void fb_hBlit8to32BGR(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit16to15RGB(unsigned char *dest, int pitch)
 {
-	unsigned int *d;
-	unsigned short *s;
+	fb_blit_u32_unaligned *d;
+	fb_blit_u16_unaligned *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c1, c2;
 	char *dirty = fb_gfx->dirty;
@@ -346,8 +369,8 @@ static void fb_hBlit16to15RGB(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned short *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u16_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = *s;
 				c2 = *(s + 1);
@@ -358,7 +381,7 @@ static void fb_hBlit16to15RGB(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = *s;
-				*(unsigned short *)d = ((c1 << 10) & 0x7C00) | ((c1 >> 1) & 0x03E0) | (c1 >> 11);
+		*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 << 10) & 0x7C00) | ((c1 >> 1) & 0x03E0) | (c1 >> 11));
 			}
 		}
 		z++;
@@ -375,8 +398,8 @@ static void fb_hBlit16to15RGB(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit16to15BGR(unsigned char *dest, int pitch)
 {
-	unsigned int *d;
-	unsigned short *s;
+	fb_blit_u32_unaligned *d;
+	fb_blit_u16_unaligned *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c1, c2;
 	char *dirty = fb_gfx->dirty;
@@ -384,8 +407,8 @@ static void fb_hBlit16to15BGR(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned short *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u16_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = *s;
 				c2 = *(s + 1);
@@ -396,7 +419,7 @@ static void fb_hBlit16to15BGR(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = *s;
-				*(unsigned short *)d = (c1 & 0x001F) | ((c1 >> 1) & 0x7FE0);
+				*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)((c1 & 0x001F) | ((c1 >> 1) & 0x7FE0));
 			}
 		}
 		z++;
@@ -413,8 +436,8 @@ static void fb_hBlit16to15BGR(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit16to16RGB(unsigned char *dest, int pitch)
 {
-	unsigned int *d;
-	unsigned short *s;
+	fb_blit_u32_unaligned *d;
+	fb_blit_u16_unaligned *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c1, c2;
 	char *dirty = fb_gfx->dirty;
@@ -422,8 +445,8 @@ static void fb_hBlit16to16RGB(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned short *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u16_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = *s;
 				c2 = *(s + 1);
@@ -434,7 +457,7 @@ static void fb_hBlit16to16RGB(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = *s;
-				*(unsigned short *)d = ((c1 << 11) & 0xF800) | (c1 & 0x07E0) | (c1 >> 11);
+		*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 << 11) & 0xF800) | (c1 & 0x07E0) | (c1 >> 11));
 			}
 		}
 		z++;
@@ -452,16 +475,17 @@ static void fb_hBlit16to16RGB(unsigned char *dest, int pitch)
 static void fb_hBlit16to24(unsigned char *dest, int pitch)
 {
 	unsigned char *src = fb_gfx->framebuffer;
-	unsigned int *s, *d, c1, c2, c3, temp;
-	unsigned short *ss;
+	fb_blit_u32_unaligned *s, *d;
+	unsigned int c1, c2, c3, temp;
+	fb_blit_u16_unaligned *ss;
 	unsigned char *dc;
 	char *dirty = fb_gfx->dirty;
 	int x, y, z = 0;
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u32_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 2; x; x--) {
 				c1 = fb_color_conv_16to32[*s & 0xFF] | fb_color_conv_16to32[256 + ((*s >> 8) & 0xFF)];
 				temp = fb_color_conv_16to32[(*s >> 16) & 0xFF] | fb_color_conv_16to32[256 + ((*s >> 24) & 0xFF)];
@@ -488,7 +512,7 @@ static void fb_hBlit16to24(unsigned char *dest, int pitch)
 				s++;
 			}
 			if (fb_gfx->w & 0x1) {
-				ss = (unsigned short *)s;
+				ss = (fb_blit_u16_unaligned *)s;
 				c1 = fb_color_conv_16to32[*ss & 0xFF] | fb_color_conv_16to32[256 + ((*ss >> 8) & 0xFF)];
 				dc[0] = (c1 >> 16) & 0xFF;
 				dc[1] = (c1 >> 8) & 0xFF;
@@ -509,7 +533,7 @@ static void fb_hBlit16to24(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit16to32(unsigned char *dest, int pitch)
 {
-	unsigned int *d, *s;
+	fb_blit_u32_unaligned *d, *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c;
 	char *dirty = fb_gfx->dirty;
@@ -517,15 +541,15 @@ static void fb_hBlit16to32(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u32_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c = *s++;
 				*d++ = fb_color_conv_16to32[c & 0xFF] | fb_color_conv_16to32[256 + ((c >> 8) & 0xFF)];
 				*d++ = fb_color_conv_16to32[(c >> 16) & 0xFF] | fb_color_conv_16to32[256 + ((c >> 24) & 0xFF)];
 			}
 			if (fb_gfx->w & 0x1) {
-				c = *(unsigned short *)s;
+				c = *(fb_blit_u16_unaligned *)s;
 				*d = fb_color_conv_16to32[c & 0xFF] | fb_color_conv_16to32[256 + ((c >> 8) & 0xFF)];
 			}
 		}
@@ -543,7 +567,7 @@ static void fb_hBlit16to32(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit32to15RGB(unsigned char *dest, int pitch)
 {
-	unsigned int *d, *s;
+	fb_blit_u32_unaligned *d, *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c1, c2;
 	char *dirty = fb_gfx->dirty;
@@ -551,8 +575,8 @@ static void fb_hBlit32to15RGB(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u32_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = *s;
 				c2 = *(s + 1);
@@ -563,7 +587,7 @@ static void fb_hBlit32to15RGB(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = *s;
-				*(unsigned short *)d = (c1 >> 19) | ((c1 >> 6) & 0x03E0) | ((c1 << 7) & 0x7C00);
+		*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)((c1 >> 19) | ((c1 >> 6) & 0x03E0) | ((c1 << 7) & 0x7C00));
 			}
 		}
 		z++;
@@ -580,7 +604,7 @@ static void fb_hBlit32to15RGB(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit32to15BGR(unsigned char *dest, int pitch)
 {
-	unsigned int *d, *s;
+	fb_blit_u32_unaligned *d, *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c1, c2;
 	char *dirty = fb_gfx->dirty;
@@ -588,8 +612,8 @@ static void fb_hBlit32to15BGR(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u32_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = *s;
 				c2 = *(s + 1);
@@ -600,7 +624,7 @@ static void fb_hBlit32to15BGR(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = *s;
-				*(unsigned short *)d = ((c1 >> 3) & 0x001F) | ((c1 >> 6) & 0x03E0) | ((c1 >> 9) & 0x7C00);
+				*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 >> 3) & 0x001F) | ((c1 >> 6) & 0x03E0) | ((c1 >> 9) & 0x7C00));
 			}
 		}
 		z++;
@@ -617,7 +641,7 @@ static void fb_hBlit32to15BGR(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit32to16RGB(unsigned char *dest, int pitch)
 {
-	unsigned int *d, *s;
+	fb_blit_u32_unaligned *d, *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c1, c2;
 	char *dirty = fb_gfx->dirty;
@@ -625,8 +649,8 @@ static void fb_hBlit32to16RGB(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u32_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = *s;
 				c2 = *(s + 1);
@@ -637,7 +661,7 @@ static void fb_hBlit32to16RGB(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = *s;
-				*(unsigned short *)d = (c1 >> 19) | ((c1 >> 5) & 0x07E0) | ((c1 << 8) & 0xF800);
+		*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)((c1 >> 19) | ((c1 >> 5) & 0x07E0) | ((c1 << 8) & 0xF800));
 			}
 		}
 		z++;
@@ -654,7 +678,7 @@ static void fb_hBlit32to16RGB(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit32to16BGR(unsigned char *dest, int pitch)
 {
-	unsigned int *d, *s;
+	fb_blit_u32_unaligned *d, *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c1, c2;
 	char *dirty = fb_gfx->dirty;
@@ -662,8 +686,8 @@ static void fb_hBlit32to16BGR(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u32_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w >> 1; x; x--) {
 				c1 = *s;
 				c2 = *(s + 1);
@@ -674,7 +698,7 @@ static void fb_hBlit32to16BGR(unsigned char *dest, int pitch)
 			}
 			if (fb_gfx->w & 0x1) {
 				c1 = *s;
-				*(unsigned short *)d = ((c1 >> 3) & 0x001F) | ((c1 >> 5) & 0x07E0) | ((c1 >> 8) & 0xF800);
+				*(fb_blit_u16_unaligned *)d = (fb_blit_u16_unaligned)(((c1 >> 3) & 0x001F) | ((c1 >> 5) & 0x07E0) | ((c1 >> 8) & 0xF800));
 			}
 		}
 		z++;
@@ -691,7 +715,7 @@ static void fb_hBlit32to16BGR(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit32to24RGB(unsigned char *dest, int pitch)
 {
-	unsigned int *s;
+	fb_blit_u32_unaligned *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c;
 	unsigned char *d;
@@ -700,7 +724,7 @@ static void fb_hBlit32to24RGB(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
+			s = (fb_blit_u32_unaligned *)src;
 			d = (unsigned char *)dest;
 			for (x = fb_gfx->w; x; x--) {
 				c = *s;
@@ -725,7 +749,7 @@ static void fb_hBlit32to24RGB(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit32to24BGR(unsigned char *dest, int pitch)
 {
-	unsigned int *s;
+	fb_blit_u32_unaligned *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c;
 	unsigned char *d;
@@ -734,7 +758,7 @@ static void fb_hBlit32to24BGR(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
+			s = (fb_blit_u32_unaligned *)src;
 			d = (unsigned char *)dest;
 			for (x = fb_gfx->w; x; x--) {
 				c = *s;
@@ -759,7 +783,7 @@ static void fb_hBlit32to24BGR(unsigned char *dest, int pitch)
 /*:::::*/
 static void fb_hBlit32to32RGB(unsigned char *dest, int pitch)
 {
-	unsigned int *d, *s;
+	fb_blit_u32_unaligned *d, *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c;
 	char *dirty = fb_gfx->dirty;
@@ -767,8 +791,8 @@ static void fb_hBlit32to32RGB(unsigned char *dest, int pitch)
 	
 	for (y = fb_gfx->h * fb_gfx->scanline_size; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = (fb_blit_u32_unaligned *)src;
+			d = (fb_blit_u32_unaligned *)dest;
 			for (x = fb_gfx->w; x; x--) {
 				c = (*s++) & 0xFFFFFF;
 				*d++ = (c >> 16) | (c & 0xFF00) | (c << 16);
@@ -808,9 +832,9 @@ BLITTER *fb_hGetBlitter(int device_depth, int is_rgb)
 		fb_hBlit32to15BGRMMX, fb_hBlit32to16BGRMMX, fb_hBlit32to24BGRMMX, fb_hBlitCopy,
 #endif
 	}, **blitter = &all_blitters[0];
-	int i;
+	unsigned int i;
 	
-	for (i = 0; i < 256; i++) {
+	for (i = 0u; i < 256u; i++) {
 		if (is_rgb) {
 			fb_color_conv_16to32[i] = ((i & 0x1F) << 19) | ((i & 0xE0) << 5);
 			fb_color_conv_16to32[256+i] = ((i & 0x07) << 13) | (i & 0xF8);
@@ -840,6 +864,7 @@ BLITTER *fb_hGetBlitter(int device_depth, int is_rgb)
 				case 16:	return blitter[1];
 				case 24:	return blitter[2];
 				case 32:	return blitter[3];
+				default:	break;
 			}
 			break;
 		
@@ -850,6 +875,7 @@ BLITTER *fb_hGetBlitter(int device_depth, int is_rgb)
 				case 16:	return blitter[5];
 				case 24:	return blitter[6];
 				case 32:	return blitter[7];
+				default:	break;
 			}
 			break;
 		
@@ -860,8 +886,10 @@ BLITTER *fb_hGetBlitter(int device_depth, int is_rgb)
 				case 16:	return blitter[9];
 				case 24:	return blitter[10];
 				case 32:	return blitter[11];
+				default:	break;
 			}
 			break;
+		default:	break;
 	}
 	return NULL;
 }

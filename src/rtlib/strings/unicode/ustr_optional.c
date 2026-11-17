@@ -33,9 +33,14 @@ static FBSTRING_ACCESS *hFold_NoLock( FBSTRING_ACCESS *src )
 
 static int hMatch( FBSTRING_ACCESS *src, ssize_t position, FBSTRING_ACCESS *pattern, int compare, ssize_t *end )
 {
-	ssize_t length = FB_STRSIZE(src), wanted = FB_STRSIZE(pattern), offset = position, matched = 0, width;
+	ssize_t length, wanted, offset = position, matched = 0, width;
 	char folded[12];
-	if( wanted == 0 ) return FALSE;
+	if( src == NULL || pattern == NULL || end == NULL ) return FALSE;
+	length = FB_STRSIZE(src);
+	wanted = FB_STRSIZE(pattern);
+	if( src->data == NULL || pattern->data == NULL || length < 0 ||
+	    wanted <= 0 || position < 0 || position > length )
+		return FALSE;
 	if( compare == 0 ) {
 		if( wanted > length - position || memcmp(src->data + position, pattern->data, (size_t)(wanted)) != 0 ) return FALSE;
 		*end = position + wanted;
@@ -105,11 +110,13 @@ FBCALL FBSTRING_ACCESS *fb_UStrReverse( FBSTRING_ACCESS *src )
 FBCALL FBSTRING_ACCESS *fb_UStrReplace( FBSTRING_ACCESS *src, FBSTRING_ACCESS *find, FBSTRING_ACCESS *replacement, ssize_t start, ssize_t count, int compare )
 {
 	FBSTRING_ACCESS *result = &fb_ctx.null_desc, *pattern = find;
-	ssize_t length = src && src->data ? FB_STRSIZE(src) : 0;
-	ssize_t replacement_length = replacement && replacement->data ? FB_STRSIZE(replacement) : 0;
+	ssize_t length = 0;
+	ssize_t replacement_length = 0;
 	ssize_t offset, position, end, size, matches = 0, left, output = 0;
 	int error = FB_RTERROR_OK;
 	FB_STRLOCK();
+	if( src != NULL && src->data != NULL ) length = FB_STRSIZE(src);
+	if( replacement != NULL && replacement->data != NULL ) replacement_length = FB_STRSIZE(replacement);
 	if( start < 1 || count < -1 || (compare != 0 && compare != 1) ) {
 		error = FB_RTERROR_ILLEGALFUNCTIONCALL;
 		goto done;
@@ -120,7 +127,7 @@ FBCALL FBSTRING_ACCESS *fb_UStrReplace( FBSTRING_ACCESS *src, FBSTRING_ACCESS *f
 	if( pattern == NULL ) { error = FB_RTERROR_OUTOFMEM; goto done; }
 	size = length - offset;
 	position = offset;
-	while( position < length && (count < 0 || matches < count) ) {
+	while( position < length && src->data != NULL && (count < 0 || matches < count) ) {
 		if( hMatch(src, position, pattern, compare, &end) ) {
 			size -= end - position;
 			if( replacement_length > FB_USTRING_MAX_BYTES - size ) { error = FB_RTERROR_OUTOFMEM; goto done; }
@@ -147,7 +154,8 @@ FBCALL FBSTRING_ACCESS *fb_UStrReplace( FBSTRING_ACCESS *src, FBSTRING_ACCESS *f
 			position = end;
 		}
 	}
-	if( position < length ) memcpy(result->data + output, src->data + position, (size_t)(length - position));
+	if( position < length && src->data != NULL )
+		memcpy(result->data + output, src->data + position, (size_t)(length - position));
 done:
 	if( compare == 1 && pattern != find ) fb_hStrDelTemp_NoLock(pattern);
 	fb_hUStrDeletePair_NoLock(src, find);

@@ -41,7 +41,7 @@ FBCALL void fb_StrAssignMid( FBSTRING_ACCESS *dst, ssize_t start, ssize_t len, F
         if( start + len > dst_len )
             len = (dst_len - start);
 
-        memcpy( dst->data + start, src->data, len );
+        memcpy( dst->data + start, src->data, (size_t)len );
     }
 
 	/* del if temp */

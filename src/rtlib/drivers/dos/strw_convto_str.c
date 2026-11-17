@@ -22,17 +22,25 @@
    result = number of chars written, excluding null terminator that is always written */
 ssize_t fb_wstr_ConvToA(char *dst, ssize_t dst_chars, const FB_WCHAR *src)
 {
+	size_t source_chars, copy_chars, capacity;
+
+	if( dst == NULL || dst_chars < 0 )
+		return 0;
 	if (src == NULL) {
 		*dst = '\0';
 		return 0;
 	}
 
-	ssize_t chars = strlen(src);
-	if (chars > dst_chars)
-		chars = dst_chars;
+	capacity = (size_t)dst_chars;
+	source_chars = strlen(src);
+	copy_chars = source_chars;
+	if( copy_chars > capacity )
+		copy_chars = capacity;
 
-	memcpy(dst, src, chars + 1);
-	return chars;
+	if( copy_chars > 0 )
+		memcpy( dst, src, copy_chars );
+	dst[copy_chars] = '\0';
+	return (ssize_t)copy_chars;
 }
 
 FBCALL FBSTRING_ACCESS *fb_WstrToStr( const FB_WCHAR *src )

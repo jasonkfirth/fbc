@@ -139,10 +139,14 @@ struct keyconvinfo {
 		char *a;
 	};
 	int size;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 };
 typedef struct keyconvinfo KEYCONVINFO;
-static KEYCONVINFO keyconv1 = {{NULL}, 0};
-static KEYCONVINFO keyconv2 = {{NULL}, 0};
+static KEYCONVINFO keyconv1 = { .v = NULL, .size = 0 };
+static KEYCONVINFO keyconv2 = { .v = NULL, .size = 0 };
 
 static void keyconv_clear( KEYCONVINFO *k );
 static int keyconv_grow( KEYCONVINFO *k, int nchars, size_t charsize );
@@ -382,7 +386,7 @@ static VOID CALLBACK fb_hTrackMouseTimerProc(
 static BOOL WINAPI fb_hTrackMouseEvent(TRACKMOUSEEVENT *e)
 {
 	if (e->dwFlags == TME_LEAVE)
-		return SetTimer(e->hwndTrack, e->dwFlags, 100, fb_hTrackMouseTimerProc);
+		return SetTimer(e->hwndTrack, e->dwFlags, 100, fb_hTrackMouseTimerProc) != 0;
 	return FALSE;
 }
 
@@ -541,7 +545,7 @@ static LRESULT handle_touch_message(WPARAM wParam, LPARAM lParam)
 		the public API boundary.
 	*/
 	if (input_count > FB_WIN32_TOUCH_MAX)
-		inputs = calloc(input_count, sizeof(*inputs));
+		inputs = (FB_WIN32_TOUCHINPUT *)calloc(input_count, sizeof(*inputs));
 	if (!inputs)
 	{
 		fb_win32.CloseTouchInputHandle((HANDLE)lParam);
@@ -1002,6 +1006,8 @@ LRESULT CALLBACK fb_hWin32WinProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM
 				mmi->ptMaxTrackSize.y = fb_win32.fullh;
 			}
 			return 0;
+		default:
+			break;
 	}
 
 	if ((message == WM_MOUSEMOVE) || (message == WM_MOUSEENTER)) {
@@ -1144,6 +1150,12 @@ int fb_hWin32Init(char *title, int w, int h, int depth, int refresh_rate, int fl
 	keyconv_clear( &keyconv2 );
 
 	if (fb_win32.thread != NULL) {
+#ifdef HOST_MINGW
+		unsigned int thrdaddr;
+		uintptr_t threadHandle;
+#else
+		DWORD dwThreadId;
+#endif
 		InitializeCriticalSection(&update_lock);
 
 		events[0] = CreateEvent( NULL, FALSE, FALSE, NULL );
@@ -1154,10 +1166,9 @@ int fb_hWin32Init(char *title, int w, int h, int depth, int refresh_rate, int fl
 #ifdef HOST_MINGW
 		/* Note: _beginthreadex()'s last parameter cannot be NULL,
 		   or else the function fails on Windows 9x */
-		unsigned int thrdaddr;
-		events[1] = (HANDLE)_beginthreadex( NULL, 0, fb_win32.thread, events[0], 0, &thrdaddr );
+		threadHandle = _beginthreadex( NULL, 0, fb_win32.thread, events[0], 0, &thrdaddr );
+		events[1] = (HANDLE)threadHandle;
 #else
-		DWORD dwThreadId;
 		events[1] = CreateThread( NULL, 0, fb_win32.thread, events[0], 0, &dwThreadId );
 #endif
 		if( events[1] == NULL ) {
@@ -1236,9 +1247,9 @@ void fb_hWin32Unlock(void)
 
 void fb_hWin32SetPalette(int index, int r, int g, int b)
 {
-	fb_win32.palette[index].peRed = r;
-	fb_win32.palette[index].peGreen = g;
-	fb_win32.palette[index].peBlue = b;
+	fb_win32.palette[index].peRed = (BYTE)r;
+	fb_win32.palette[index].peGreen = (BYTE)g;
+	fb_win32.palette[index].peBlue = (BYTE)b;
 	fb_win32.palette[index].peFlags = PC_NOCOLLAPSE;
 	fb_win32.is_palette_changed = TRUE;
 }

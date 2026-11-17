@@ -594,6 +594,20 @@ function lexGetLastLocation( ) as LEX_LOCATION
 	function = lex.ctx->last_source
 end function
 
+sub lexCopyCurrentLocation( byref destination as LEX_LOCATION )
+	fbSemanticModelCaptureIdentifierHint(lex.ctx->head)
+	destination = lex.ctx->head->source
+end sub
+
+sub lexCopyLastLocation( byref destination as LEX_LOCATION )
+	if( lex.ctx = NULL ) then
+		dim as LEX_LOCATION no_location
+		destination = no_location
+	else
+		destination = lex.ctx->last_source
+	end if
+end sub
+
 function lexGetNonphysicalTokenCount( ) as longint
 	function = lex.ctx->nonphysical_token_count
 end function

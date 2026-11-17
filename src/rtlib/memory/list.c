@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <stdint.h>
 
 /** Initializes a list.
  *
@@ -19,22 +20,43 @@
 void fb_hListInit( FB_LIST *list, void *table, size_t elem_size, size_t size )
 {
 	size_t i;
+#if defined(_MSC_VER)
+	size_t alignment = (size_t)__alignof( FB_LISTELEM );
+	#else
+	size_t alignment = (size_t)__alignof__( FB_LISTELEM );
+	#endif
 	FB_LISTELEM *next;
-    unsigned char *elem = (unsigned char *)table;
+	FB_LISTELEM *entry;
+	void *element_storage;
+	unsigned char *elem = (unsigned char *)table;
 
-    fb_hListDynInit( list );
-	
-	list->fhead = (FB_LISTELEM *)elem;
-	
+	if( list == NULL )
+		return;
+	fb_hListDynInit( list );
+
+	/* Each free-list node stores pointers, so its pool and stride must stay aligned. */
+	if( size == 0 || table == NULL || elem_size < sizeof( FB_LISTELEM ) ||
+		((uintptr_t)table % alignment) != 0 || (elem_size % alignment) != 0 ||
+		(size > SIZE_MAX / elem_size) )
+		return;
+
+	element_storage = elem;
+	list->fhead = element_storage;
+
 	for( i = 0; i < size; i++ )
 	{
 		if( i < size-1 )
-			next = (FB_LISTELEM *)(elem + elem_size);
+		{
+			element_storage = elem + elem_size;
+			next = element_storage;
+		}
 		else
 			next = NULL;
-		((FB_LISTELEM *)elem)->prev = NULL;
-		((FB_LISTELEM *)elem)->next = next;
-		
+		element_storage = elem;
+		entry = element_storage;
+		entry->prev = NULL;
+		entry->next = next;
+
 		elem += elem_size;
 	}
 }

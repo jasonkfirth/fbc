@@ -21,6 +21,7 @@
 
 typedef struct FB_WAYLAND_TEXT_V3_PENDING {
 	char text[FB_WAYLAND_TEXT_V3_COMMIT_BYTES + 1u];
+	unsigned char before_alignment_padding[3];
 	uint32_t before;
 	uint32_t after;
 } FB_WAYLAND_TEXT_V3_PENDING;

@@ -14,7 +14,12 @@ FBCALL int fb_FileGetArray( int fnum, int pos, FBARRAY_ACCESS *dst )
 
 FBCALL int fb_FileGetArrayLarge( int fnum, long long pos, FBARRAY_ACCESS *dst )
 {
-	return fb_FileGetDataEx( FB_FILE_TO_HANDLE(fnum), pos, dst->ptr, dst->size, NULL, TRUE, FALSE );
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FileGetDataEx( FB_FILE_TO_HANDLE(fnum), offset, dst->ptr, dst->size, NULL, TRUE, FALSE );
 }
 
 FBCALL int fb_FileGetArrayIOB( int fnum, int pos, FBARRAY_ACCESS *dst, size_t *bytesread )
@@ -24,7 +29,12 @@ FBCALL int fb_FileGetArrayIOB( int fnum, int pos, FBARRAY_ACCESS *dst, size_t *b
 
 FBCALL int fb_FileGetArrayLargeIOB( int fnum, long long pos, FBARRAY_ACCESS *dst, size_t *bytesread )
 {
-	return fb_FileGetDataEx( FB_FILE_TO_HANDLE(fnum), pos, dst->ptr, dst->size, bytesread, TRUE, FALSE );
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	return fb_FileGetDataEx( FB_FILE_TO_HANDLE(fnum), offset, dst->ptr, dst->size, bytesread, TRUE, FALSE );
 }
 
 /* end of files/file_getarray.c */

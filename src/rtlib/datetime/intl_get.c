@@ -26,6 +26,8 @@ const char *fb_IntlGet( eFbIntlIndex Index, int disallow_localized )
         return ".";
     case eFIL_NumThousandsSeparator:
         return ",";
+    default:
+        break;
     }
 
     return NULL;

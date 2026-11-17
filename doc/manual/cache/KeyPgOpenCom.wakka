@@ -43,6 +43,8 @@ Opens a serial port for input and output, using it as if it were file operations
 	
 	All items except for the COM port are optional. The order of ##//baudrate//##, ##//parity//##, ##//data_bits//##, ##//stop_bits//## is fixed. Any skipped fixed item ( ##//baudrate//##, etc...) must be empty.
 	
+	Baud rate, data-bit and numeric extended-option values must fit an unsigned 32-bit integer (0 through 4294967295). An out-of-range field returns error 5 before the serial device is opened. The platform backend also checks supported baud rates, data bits and device options.
+
 	The error code returned by ##**Open Com**## can be checked using ##[[KeyPgErr|Err]]## in the next line. The function version of  ##**Open Com**## returns directly the error code as a 32 bit ##[[KeyPgLong|Long]]##.
 
 {{fbdoc item="ex"}}

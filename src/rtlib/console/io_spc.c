@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 FBCALL void fb_PrintTab( int fnum, int newcol )
 {
@@ -57,8 +58,9 @@ FBCALL void fb_PrintTab( int fnum, int newcol )
         } else {
 
             if( (newcol >= 0) && ((unsigned int)newcol > handle->line_length) ) {
+				unsigned int pad_width = (unsigned int)newcol - handle->line_length - 1u;
                 fb_PrintStringEx( handle,
-                                  fb_StrFill1( newcol - handle->line_length - 1, ' ' ),
+				                  fb_StrFill1( (ssize_t)pad_width, ' ' ),
                                   0 );
             } else {
 
@@ -117,9 +119,21 @@ FBCALL void fb_PrintSPC( int fnum, ssize_t n )
         fb_PrintBufferEx( NULL, 0, FB_PRINT_FORCE_ADJUST );
 		fb_GetXY( &col, &row );
 		fb_GetSize( &cols, &rows );
+		if( cols <= 0 ) {
+			FB_UNLOCK();
+			fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+			return;
+		}
+		if( (n > INT_MAX) || (n < INT_MIN) ||
+		    ((n > 0) && (col > INT_MAX - (int)n)) ||
+		    ((n < 0) && (col < INT_MIN - (int)n)) ) {
+			FB_UNLOCK();
+			fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+			return;
+		}
 
         /* Skip as many spaces as requested. We may even skip entire lines. */
-    	newcol = col + n;
+		newcol = col + (int)n;
         while( newcol > cols ) {
             fb_PrintVoidEx ( handle, FB_PRINT_NEWLINE );
             newcol -= cols;

@@ -47,6 +47,12 @@ typedef struct FB_WAYLAND_API {
 int fb_hWaylandGetApi(const FB_WAYLAND_API **api);
 int fb_hWaylandLoadSymbols(const char *const *names, void **addresses,
 	size_t count);
+void fb_hWaylandInitXdgProtocol(const struct wl_interface *output,
+	const struct wl_interface *seat, const struct wl_interface *surface);
+void fb_hWaylandInitTextInputProtocol(const struct wl_interface *seat,
+	const struct wl_interface *surface);
+void fb_hWaylandInitTextInputV2Protocol(const struct wl_interface *seat,
+	const struct wl_interface *surface);
 int fb_hWaylandInitProtocols(void);
 int fb_hWaylandShouldUse(void);
 const char *fb_hWaylandAppId(char *buffer, size_t capacity, const char *fallback);

@@ -21,7 +21,7 @@ unsigned int fb_ConsoleColor( unsigned int fc, unsigned int bc, int flags )
 	if( !( flags & FB_COLOR_BG_DEFAULT ) )
 		last_bc = bc & 15;
 
-	ScreenAttrib = last_fc | (last_bc << 4);
+	ScreenAttrib = (unsigned char)(last_fc | (last_bc << 4));
 
 	return cur;
 }

@@ -18,8 +18,9 @@ FBCALL long long fb_WstrRadix2Longint( const FB_WCHAR *src, ssize_t len, int rad
 	{
 		/* hex */
 		case 16:
-			while( --len >= 0 )
+			while( len > 0 )
 			{
+				--len;
 				c = *src++;
 				if( (c >= 97) && (c <= 102) )
 					c -= 87;
@@ -36,7 +37,8 @@ FBCALL long long fb_WstrRadix2Longint( const FB_WCHAR *src, ssize_t len, int rad
 
 		/* oct */
 		case 8:
-			while( --len >= 0 ) {
+			while( len > 0 ) {
+				--len;
 				c = *src++;
 				if( (c >= 48) && (c <= 55) )
 					v = (v * 8) + (c - 48);
@@ -47,13 +49,16 @@ FBCALL long long fb_WstrRadix2Longint( const FB_WCHAR *src, ssize_t len, int rad
 
 		/* bin */
 		case 2:
-			while( --len >= 0 ) {
+			while( len > 0 ) {
+				--len;
 				c = *src++;
 				if( (c >= 48) && (c <= 49) )
 					v = (v * 2) + (c - 48);
 				else
 					break;
 			}
+			break;
+		default:
 			break;
 	}
 

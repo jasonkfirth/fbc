@@ -17,6 +17,8 @@ type CPROCLEAF
 	'' Native roots exclude bodies retained only for source debugging.
 	native_referenced as integer
 	native_abi_referenced as integer
+	asm_candidate as integer
+	native_asm_referenced as integer
 	debug_attribute_first as uinteger
 	debug_attribute_last as uinteger
 	separate_abi as integer
@@ -29,6 +31,7 @@ end type
 type CPROCLEAFEDGE_
 	target as CPROCLEAF ptr
 	needs_abi as integer
+	asm_reference as integer
 	next_edge as CPROCLEAFEDGE ptr
 end type
 
@@ -47,6 +50,16 @@ dim shared as CPROCLEAF ptr c_leaf_current
 dim shared as CPROCLEAFSPAN ptr c_leaf_bodies, c_leaf_body_tail
 dim shared as CPROCLEAFSPAN ptr c_leaf_protos, c_leaf_proto_tail
 
+'' Storage initializers can lead back to procedures and their ASM operands.
+'' Both kinds of node share this closure before global declarations are emitted.
+declare function hCLeafGetName(byref identifier as string) as CPROCLEAF ptr
+declare function hCLeafGet(byval proc as FBSYMBOL ptr) as CPROCLEAF ptr
+declare function hCLeafExternal(byval proc as FBSYMBOL ptr) as CPROCLEAF ptr
+declare sub hCLeafLink(byval owner as CPROCLEAF ptr, byval target as CPROCLEAF ptr, _
+	byval needs_abi as integer = TRUE, byval asm_reference as integer = FALSE)
+declare sub hCLeafReachable(byval native_only as integer = FALSE)
+
+#include once "backend/c/c-asm-procedure-references.bi"
 #include once "backend/c/c-generated-storage.bi"
 
 private sub hCLeafFinish( )
@@ -77,6 +90,7 @@ private sub hCLeafInit( )
 	hashInit(@c_leaf_names, 128, FALSE) '' Chained buckets do not limit procedure count.
 	c_leaf_ready = TRUE
 	c_leaf_opaque = FALSE
+	c_asm_procedure_refs_complete = FALSE
 	hCGlobalStorageInit()
 end sub
 
@@ -97,6 +111,7 @@ private function hCLeafGet( byval proc as FBSYMBOL ptr ) as CPROCLEAF ptr
 	var identifier = hGetCId(proc)
 	var entry = hCLeafGetName(identifier)
 	if( entry = NULL ) then return NULL
+	entry->asm_candidate or= astCProcHasAsmReference(proc)
 	'' Private visibility supplies no external C entry point. Startup,
 	'' exported and virtual entries still have callers outside this graph.
 	var required_entry = symbGetIsGlobalCtor(proc) or symbGetIsGlobalDtor(proc) or _
@@ -131,7 +146,7 @@ private function hCLeafExternal(byval proc as FBSYMBOL ptr) as CPROCLEAF ptr
 end function
 
 private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF ptr, _
-	byval needs_abi as integer = TRUE )
+	byval needs_abi as integer, byval asm_reference as integer )
 	if( target = NULL ) then exit sub
 	if( owner = NULL ) then
 		'' Public bodies and global initializers are roots outside private spans.
@@ -139,6 +154,7 @@ private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF 
 		target->abi_referenced or= needs_abi
 		target->native_referenced = TRUE
 		target->native_abi_referenced or= needs_abi
+		target->native_asm_referenced or= asm_reference
 		exit sub
 	end if
 	'' A redirected recursive call needs only the implementation. An address
@@ -148,6 +164,7 @@ private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF 
 	while( edge <> NULL )
 		if( edge->target = target ) then
 			edge->needs_abi or= needs_abi
+			edge->asm_reference or= asm_reference
 			exit sub
 		end if
 		edge = edge->next_edge
@@ -155,6 +172,7 @@ private sub hCLeafLink( byval owner as CPROCLEAF ptr, byval target as CPROCLEAF 
 	edge = listNewNode(@c_leaf_edges)
 	edge->target = target
 	edge->needs_abi = needs_abi
+	edge->asm_reference = asm_reference
 	edge->next_edge = owner->dependencies
 	owner->dependencies = edge
 end sub
@@ -165,7 +183,7 @@ end sub
 
 '' The output owns every node and edge until pruning finishes. Edges borrow
 '' pooled nodes, never FBSYMBOL pointers that may expire during IR flushing.
-private sub hCLeafReachable( byval native_only as integer = FALSE )
+private sub hCLeafReachable( byval native_only as integer )
 	dim as CPROCLEAF ptr first = NULL, last = NULL
 	var entry = cptr(CPROCLEAF ptr, listGetHead(@c_leaf_nodes))
 	while( entry <> NULL )
@@ -192,6 +210,7 @@ private sub hCLeafReachable( byval native_only as integer = FALSE )
 		var edge = entry->dependencies
 		while( edge <> NULL )
 			var target = edge->target
+			if( native_only ) then target->native_asm_referenced or= edge->asm_reference
 			'' Address and adapter edges require the original C entry even if a
 			'' direct-call edge has already made its implementation reachable.
 			var abi_referenced = iif(native_only, @target->native_abi_referenced, @target->abi_referenced)
@@ -213,6 +232,7 @@ private sub hCLeafReachable( byval native_only as integer = FALSE )
 end sub
 
 private function hCLeafNativeEntryNeeded(byval proc as FBSYMBOL ptr) as integer
+	if( astCProcHasAsmReference(proc) ) then return TRUE
 	var entry = hCLeafGet(proc)
 	if( entry = NULL ) then return TRUE
 	return entry->native_abi_referenced
@@ -242,6 +262,7 @@ private function hCLeafNeeded(byval proc as FBSYMBOL ptr) as integer
 end function
 
 private function hCLeafEntryNeeded(byval proc as FBSYMBOL ptr) as integer
+	if( astCProcHasAsmReference(proc) ) then return TRUE
 	if( c_leaf_ready = FALSE or c_leaf_opaque ) then return TRUE
 	var entry = hCLeafGet(proc)
 	if( entry = NULL ) then return TRUE
@@ -267,6 +288,14 @@ private sub hCLeafReference( byval sym as FBSYMBOL ptr, byval needs_abi as integ
 			if( c_leaf_current <> NULL ) then c_leaf_current->must_keep = TRUE
 		end if
 	end if
+end sub
+
+private sub hCLeafAsmReference( byval proc as FBSYMBOL ptr )
+	var entry = hCLeafGet(proc)
+	if( entry = NULL ) then entry = hCLeafExternal(proc)
+	'' Only an emitted, reachable ASM user requires native code retention.
+	'' A parsed reference in a discarded caller must not add link dependencies.
+	hCLeafLink(c_leaf_current, entry, TRUE, TRUE)
 end sub
 
 private sub hCLeafNativeReference( byref identifier as string )
@@ -322,10 +351,12 @@ end sub
 
 private sub hCLeafBegin( byval proc as FBSYMBOL ptr )
 	c_leaf_current = NULL
+	c_asm_procedure_refs_complete = FALSE
 	if( symbIsNaked(proc) ) then
 		c_leaf_opaque = TRUE
 		exit sub
 	end if
+	c_asm_procedure_refs_complete = hCAsmProcedureReferencesComplete(astGetProc()->l)
 	var entry = hCLeafGet(proc)
 	if( entry = NULL ) then exit sub
 	assert(entry->body_span = NULL)
@@ -346,6 +377,7 @@ private sub hCLeafEnd( )
 		c_leaf_current->body_span->last = ctx.sections(1).bufferlen
 	end if
 	c_leaf_current = NULL
+	c_asm_procedure_refs_complete = FALSE
 end sub
 
 private sub hCLeafAuxPrototype(byval proc as FBSYMBOL ptr, byval first as uinteger)
@@ -387,15 +419,19 @@ private function hCLeafRangesValid( byval is_header as integer, byref section_en
 	return TRUE
 end function
 
-private sub hCLeafCompact( byval is_header as integer, byref section_entry as SECTIONENTRY )
+private sub hCLeafCompact( byval is_header as integer, byref section_entry as SECTIONENTRY, _
+	byval attributes_only as integer = FALSE )
 	var span = iif(is_header, c_leaf_protos, c_leaf_bodies)
 	dim as uinteger read_position = 0, write_position = 0
 	while( span <> NULL )
 		var entry = span->owner
-		var omit_span = ((entry->referenced = FALSE) and (entry->must_keep = FALSE)) or _
-		    (span->needs_abi andalso entry->separate_abi andalso (entry->abi_referenced = FALSE))
+		var omit_span = (attributes_only = FALSE) andalso _
+		    (((entry->referenced = FALSE) and (entry->must_keep = FALSE)) or _
+		     (span->needs_abi andalso entry->separate_abi andalso (entry->abi_referenced = FALSE)))
+		var inactive_asm_attribute = entry->asm_candidate and (entry->must_keep = FALSE)
 		var omit_attribute = ((is_header = FALSE) andalso (span = entry->body_span) andalso _
-		    entry->native_referenced andalso _
+		    (entry->native_asm_referenced = FALSE) andalso _
+		    (inactive_asm_attribute or ((attributes_only = FALSE) and entry->native_referenced)) andalso _
 		    (entry->debug_attribute_last > entry->debug_attribute_first))
 		if( omit_span or omit_attribute ) then
 			if( omit_attribute andalso (omit_span = FALSE) ) then hCAbiRemoveDebugRetention(entry->name)
@@ -422,9 +458,14 @@ private sub hCLeafPrune( )
 	'' hWriteLine emits an explicit #line before each mapped C line. Removing
 	'' a complete generated body preserves the mappings of retained lines.
 	'' Source-defined debug bodies remain roots in hCLeafGet.
-	if( c_leaf_opaque ) then exit sub
 	if( (hCLeafRangesValid(TRUE, ctx.sections(0)) = FALSE) or (hCLeafRangesValid(FALSE, ctx.sections(1)) = FALSE) ) then
 		errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
+		exit sub
+	end if
+	if( c_leaf_opaque ) then
+		'' Keep the existing opaque-body policy. Removing an inactive ASM
+		'' retention attribute does not discard a procedure or declaration.
+		hCLeafCompact(FALSE, ctx.sections(1), TRUE)
 		exit sub
 	end if
 	'' Reachability was closed after global initializers and before deferred

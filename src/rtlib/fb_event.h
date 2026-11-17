@@ -7,22 +7,27 @@
  */
 
 /* SCREENEVENT is a byte-packed public payload, including aggregate alignment. */
+#if defined(__GNUC__)
+	#define FB_EVENT_EXTENSION __extension__
+#else
+	#define FB_EVENT_EXTENSION
+#endif
 #pragma pack(push, 1)
 struct FB_EVENT_ {
 	int type;
 	union {
-		struct {			/* keyboard events */
+		FB_EVENT_EXTENSION struct {			/* keyboard events */
 			int scancode;
 			int ascii;
 		};
-		struct {			/* mouse events */
+		FB_EVENT_EXTENSION struct {			/* mouse events */
 			int x, y;
 			int dx, dy;
 		};
-		struct {			/* window resize events */
+		FB_EVENT_EXTENSION struct {			/* window resize events */
 			int width, height;
 		};
-		struct {            /* copied drop payload, retrieved by identifier */
+		FB_EVENT_EXTENSION struct {            /* copied drop payload, retrieved by identifier */
 			int drop_id, drop_count, drop_kind;
 		};
 		int button;
@@ -31,6 +36,7 @@ struct FB_EVENT_ {
 	};
 };
 #pragma pack(pop)
+#undef FB_EVENT_EXTENSION
 
 typedef struct FB_EVENT_ EVENT;
 

@@ -26,8 +26,14 @@
 	typedef struct FB_W32_SERIAL_INFO_ {
 		HANDLE hDevice;
 		int iPort;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+		unsigned char options_alignment_padding[4];
+#endif
 		FB_SERIAL_OPTIONS *pOptions;
 		unsigned int output_lines;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+		unsigned char reserved_tail_padding[4];
+#endif
 	} W32_SERIAL_INFO;
 #elif defined HOST_LINUX || defined HOST_ANDROID || defined HOST_SOLARIS || \
       defined HOST_FREEBSD || defined HOST_NETBSD || defined HOST_OPENBSD || \
@@ -43,6 +49,10 @@
 			pid_t pplckid;
 		#endif
 		int iPort;
+		#if defined(HOST_HAIKU) && defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+			/* Keep the Haiku options pointer at its existing ABI offset. */
+			unsigned char options_alignment_padding[4];
+		#endif
 		FB_SERIAL_OPTIONS *pOptions;
 	} LINUX_SERIAL_INFO;
 #elif defined HOST_DOS
@@ -50,6 +60,11 @@
 		int com_num;
 		FB_SERIAL_OPTIONS *pOptions;
 	} DOS_SERIAL_INFO;
+	int fb_dos_SerialGetStatus( int com_num, FB_COM_STATUS *status );
+	int fb_dos_SerialSetLines( int com_num, unsigned int mask,
+		unsigned int values );
+	int fb_dos_SerialSetBreak( int com_num, int enabled );
+	int fb_dos_SerialPurge( int com_num, unsigned int queues );
 #elif defined HOST_AROS || defined HOST_AMIGA
 	struct MsgPort;
 	struct IOExtSer;

@@ -6,18 +6,29 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include "../../fb.h"
+#include <limits.h>
 #include <windows.h>
 
 int fb_hSetDate( int y, int m, int d )
 {
-	/* get current local time and date */
 	SYSTEMTIME st;
+
+	/* SYSTEMTIME stores these fields in WORDs. Do not allow a narrowing
+	 * conversion to wrap an invalid input into a different date. */
+	if( (y < 0) || (y > USHRT_MAX) ||
+		(m < 0) || (m > USHRT_MAX) ||
+		(d < 0) || (d > USHRT_MAX) )
+	{
+		return -1;
+	}
+
+	/* get current local time and date */
 	GetLocalTime( &st );
 
 	/* set time fields */
-	st.wYear = y;
-	st.wMonth = m;
-	st.wDay = d;
+	st.wYear = (WORD)y;
+	st.wMonth = (WORD)m;
+	st.wDay = (WORD)d;
 
 	/* set system time relative to local time zone */
 	if( SetLocalTime( &st ) == 0) {

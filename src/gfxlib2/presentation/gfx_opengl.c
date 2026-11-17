@@ -10,6 +10,8 @@
 #include "../fb_gfx.h"
 #include "../fb_gfx_gl.h"
 
+#include <limits.h>
+
 #if defined HOST_UNIX && !defined DISABLE_X11
 #include "../drivers/unix/fb_gfx_x11.h"
 #endif
@@ -22,12 +24,17 @@
 FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
 {
 	/* Stub function in case OpenGL support is disabled at compile time */
+	(void)proc;
 	return NULL;
 }
 
 #else /* DISABLE_OPENGL */
 
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+FB_GL_PARAMS fb_gl_params = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, { 0, 0, 0, 0 }, NULL };
+#else
 FB_GL_PARAMS fb_gl_params = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, NULL };
+#endif
 char fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE];
 
 FBCALL void *fb_GfxGetGLProcAddress(const char *proc)
@@ -82,7 +89,7 @@ static int next_pow2(int n)
 
 int fb_hGL_ExtensionSupported(const char *extension)
 {
-	ssize_t len;
+	size_t len;
 	char *string = fb_gl_extensions;
 
 	len = strlen(extension);
@@ -115,13 +122,28 @@ void fb_hGL_SetState(int state)
 GLuint fb_hGL_ImageCreate(PUT_HEADER *image, unsigned int color)
 {
 	int w, h;
+	size_t pixel_count, data_size;
 	GLuint id;
 	unsigned char *data;
 
-	w = next_pow2(image->width);
-	h = next_pow2(image->height);
-	data = (unsigned char *)calloc(1, w * h * 4);
-	fb_hPixelSet(data, color, w * h);
+	if (!image || !image->width || !image->height ||
+	    image->width > (unsigned int)(INT_MAX / 2 + 1) ||
+	    image->height > (unsigned int)(INT_MAX / 2 + 1))
+		return 0;
+
+	w = next_pow2((int)image->width);
+	h = next_pow2((int)image->height);
+	if ((size_t)w > (size_t)-1 / (size_t)h)
+		return 0;
+	pixel_count = (size_t)w * (size_t)h;
+	if (pixel_count > (size_t)-1 / 4)
+		return 0;
+	data_size = pixel_count * 4;
+
+	data = (unsigned char *)calloc(1, data_size);
+	if (!data)
+		return 0;
+	fb_hPixelSet(data, (int)color, pixel_count);
 	fb_gl.GenTextures(1, &id);
 	fb_gl.BindTexture(GL_TEXTURE_2D, id);
 	fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, data);
@@ -134,6 +156,11 @@ void fb_hGL_ScreenCreate(void)
 {
 	int w, h;
 	GLuint id;
+	GLfloat ratio_w, ratio_h;
+
+	if (!fb_gfx || fb_gfx->w <= 0 || fb_gfx->h <= 0 ||
+	    fb_gfx->w > INT_MAX / 2 + 1 || fb_gfx->h > INT_MAX / 2 + 1)
+		return;
 
 	w = next_pow2(fb_gfx->w);
 	h = next_pow2(fb_gfx->h);
@@ -157,9 +184,13 @@ void fb_hGL_ScreenCreate(void)
 	case 2:
 	case 1:
 		fb_gl.TexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, 0);
+		break;
+	default:
+		break;
 	}
 
-	GLfloat ratio_w = (GLfloat)fb_gfx->w / w, ratio_h = (GLfloat)fb_gfx->h / h;
+	ratio_w = (GLfloat)fb_gfx->w / (GLfloat)w;
+	ratio_h = (GLfloat)fb_gfx->h / (GLfloat)h;
 	texcoords[0] = 0	; texcoords[1] = ratio_h;
 	texcoords[2] = 0	; texcoords[3] = 0;
 	texcoords[4] = ratio_w	; texcoords[5] = 0;
@@ -249,7 +280,8 @@ int fb_hGL_Init(FB_DYLIB lib, char *os_extensions)
 	FB_GL *funcs = &fb_gl;
 	void **funcs_ptr = (void **)funcs;
 	const char *extensions;
-	int res = 0, size = FBGL_EXTENSIONS_STRING_SIZE - 1;
+	int res = 0;
+	size_t remaining = sizeof(fb_gl_extensions) - 1;
 
 	fb_hMemSet(&fb_gl, 0, sizeof(FB_GL));
 	fb_gl_extensions[0] = '\0';
@@ -261,12 +293,12 @@ int fb_hGL_Init(FB_DYLIB lib, char *os_extensions)
 	if (!extensions)
 		return -1;
 
-	strncpy(fb_gl_extensions, extensions, size);
-	fb_gl_extensions[size] = '\0';
-	size -= strlen(fb_gl_extensions);
+	strncpy(fb_gl_extensions, extensions, remaining);
+	fb_gl_extensions[remaining] = '\0';
+	remaining -= strlen(fb_gl_extensions);
 	if (os_extensions)
-		strncat(fb_gl_extensions, os_extensions, size);
-	fb_gl_extensions[FBGL_EXTENSIONS_STRING_SIZE - 1] = '\0';
+		strncat(fb_gl_extensions, os_extensions, remaining);
+	fb_gl_extensions[sizeof(fb_gl_extensions) - 1] = '\0';
 
 	res |= !fb_hGL_ExtensionSupported("GL_EXT_bgra");
 
@@ -275,9 +307,16 @@ int fb_hGL_Init(FB_DYLIB lib, char *os_extensions)
 
 
 void fb_hGL_SetPalette(int index, int r, int g, int b){
-	map_r[index]=(float)r/256.0;
-	map_g[index]=(float)g/256.0;
-	map_b[index]=(float)b/256.0;
+	size_t palette_index;
+
+	if (index < 0 || index >= (int)(sizeof(map_r) / sizeof(map_r[0])))
+		return;
+	palette_index = (size_t)index;
+
+	/* Preserve the float-to-double division and final float rounding. */
+	map_r[palette_index] = (GLfloat)((double)(GLfloat)r / 256.0);
+	map_g[palette_index] = (GLfloat)((double)(GLfloat)g / 256.0);
+	map_b[palette_index] = (GLfloat)((double)(GLfloat)b / 256.0);
 }
 
 #ifdef HOST_WIN32
@@ -415,7 +454,9 @@ void fb_hGL_SetupProjection(void)
 		fb_gl.PixelMapfv(GL_PIXEL_MAP_I_TO_B,256, map_b);
 
 		fb_gl.TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fb_gfx->w, fb_gfx->h, GL_COLOR_INDEX, GL_UNSIGNED_BYTE, (unsigned char *)fb_gfx->framebuffer);
-
+		break;
+	default:
+		break;
 	}
 
 	fb_gl.Enable(GL_TEXTURE_2D);

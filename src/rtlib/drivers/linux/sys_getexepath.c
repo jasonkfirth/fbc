@@ -12,15 +12,19 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 {
 	char *p;
 	struct stat finfo;
+	ssize_t length;
 
-	if( maxlen <= 0 )
+	if( dst == NULL || maxlen <= 0 )
 		return NULL;
 
 	memset( dst, 0, (size_t)maxlen );
 	if( maxlen == 1 )
 		return NULL;
 
-	if ((stat("/proc/self/exe", &finfo) == 0) && (readlink("/proc/self/exe", dst, maxlen - 1) > -1)) {
+	/* A full readlink buffer is truncated. A shorter result retains the
+	   terminator supplied by the initial zeroing. */
+	length = stat("/proc/self/exe", &finfo) == 0 ? readlink("/proc/self/exe", dst, (size_t)maxlen) : -1;
+	if( length >= 0 && length < maxlen ) {
 		/* Linux-like proc fs is available */
 		p = strrchr(dst, '/');
 		if (p == dst) /* keep the "/" rather than returning "" */
@@ -30,6 +34,7 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 		else
 			dst[0] = '\0';
 	} else {
+		dst[0] = '\0';
 		p = NULL;
 	}
 

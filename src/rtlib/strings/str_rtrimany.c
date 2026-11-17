@@ -31,7 +31,7 @@ FBCALL FBSTRING_ACCESS *fb_RTrimAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patt
 			while ( len != 0 )
 			{
 				--len;
-				if( FB_MEMCHR( pattern->data, pachText[len], len_pattern ) == NULL )
+				if( FB_MEMCHR( pattern->data, pachText[len], (size_t)len_pattern ) == NULL )
 				{
 					++len;
 					break;

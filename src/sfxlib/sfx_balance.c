@@ -79,7 +79,7 @@ void fb_sfxBalance(float position)
     fb_sfxRuntimeUnlock();
     SFX_DEBUG(
         "sfx_balance: balance set to %f",
-        position
+        (double)position
     );
 }
 

@@ -14,7 +14,8 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 ROOT = next(path for path in HERE.parents if (path / 'mk/compiler-sources.mk').is_file())
-CONDITION = '#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L'
+CONDITION = ('#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L || '
+             '(__STDC_VERSION__ >= 202000L && defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 11))')
 
 
 def run(command, cwd, environment):

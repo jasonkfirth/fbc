@@ -22,6 +22,9 @@
 typedef struct SPAN
 {
 	int y, x1, x2;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	int row_next_alignment_padding;
+#endif
 	struct SPAN *row_next;
 	struct SPAN *next;
 } SPAN;
@@ -78,7 +81,7 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 	context = fb_hGetContext( );
 	fb_hPrepareTarget(context, target);
 
-	if (flags & DEFAULT_COLOR_1)
+	if ((unsigned int)flags & DEFAULT_COLOR_1)
 		color = context->fg_color;
 	else
 		color = fb_hFixColor(context->target_bpp, color);
@@ -94,11 +97,11 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 	translated_x = fx;
 	translated_y = fy;
 	if (context->flags & CTX_WINDOW_ACTIVE) {
-		translated_x = ((fx - context->win_x) * (context->view_w - 1)) / context->win_w;
-		translated_y = ((fy - context->win_y) * (context->view_h - 1)) / context->win_h;
+		translated_x = ((fx - context->win_x) * (float)(context->view_w - 1)) / context->win_w;
+		translated_y = ((fy - context->win_y) * (float)(context->view_h - 1)) / context->win_h;
 	}
-	checked_x = translated_x;
-	checked_y = translated_y;
+	checked_x = (double)translated_x;
+	checked_y = (double)translated_y;
 	if ((context->flags & (CTX_WINDOW_ACTIVE | CTX_WINDOW_SCREEN)) == CTX_WINDOW_ACTIVE)
 		checked_y = (double)context->view_h - 1 - checked_y;
 	if ((context->flags & CTX_VIEW_SCREEN) == 0) {
@@ -127,11 +130,15 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 		goto done;
 	}
 
-	if (context->view_h <= 0 || (size_t)context->view_h > SIZE_MAX / sizeof(*span)) {
+	if (context->view_h <= 0) {
 		result = FB_RTERROR_ILLEGALFUNCTIONCALL;
 		goto done;
 	}
-	span = (SPAN **)calloc(context->view_h, sizeof(*span));
+	if ((size_t)context->view_h > SIZE_MAX / sizeof(*span)) {
+		result = FB_RTERROR_ILLEGALFUNCTIONCALL;
+		goto done;
+	}
+	span = (SPAN **)calloc((size_t)context->view_h, sizeof(*span));
 	if (!span) {
 		result = FB_RTERROR_OUTOFMEM;
 		goto done;
@@ -141,7 +148,7 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 
 	/* Find all spans to paint */
 	while (tail && result == FB_RTERROR_OK) {
-		if (tail->y - 1 >= context->view_y) {
+		if (tail->y > context->view_y) {
 			for (x = tail->x1; x <= tail->x2; x++) {
 				if (context->get_pixel(context, x, tail->y - 1) != border_color) {
 					s = add_span(context, span, &x, tail->y - 1, border_color, &result);
@@ -175,13 +182,18 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 
 			dest = context->line[s->y] + (s->x1 * context->target_bpp);
 
-			if (mode == PAINT_TYPE_FILL)
-				context->pixel_set(dest, color, s->x2 - s->x1 + 1);
+			if (mode == PAINT_TYPE_FILL) {
+				/* The pixel callback's int parameter carries raw pixel bits. */
+				context->pixel_set(dest, (int)color,
+					(size_t)s->x2 - (size_t)s->x1 + 1u);
+			}
 			else if (mode == FB_GFX_PAINT_PACKED) {
 				for (x = s->x1; x <= s->x2; x++) {
-					unsigned int pixel = fb_hGfxPackedPatternColor(data, pattern_size, x, s->y);
+					unsigned int pixel = fb_hGfxPackedPatternColor(data, pattern_size,
+					                                             (unsigned int)x,
+					                                             (unsigned int)s->y);
 					pixel = fb_hFixColor(context->target_bpp, pixel);
-					context->pixel_set(dest, pixel, 1);
+					context->pixel_set(dest, (int)pixel, (size_t)1);
 					dest += context->target_bpp;
 				}
 			} else {
@@ -191,16 +203,16 @@ static int paint(void *target, float fx, float fy, unsigned int color,
 						size = s->x2 - s->x1 + 1;
 					else
 						size = 8 - (s->x1 & 0x7);
-					fb_hPixelCpy(dest, src + ((s->x1 & 0x7) * context->target_bpp), size);
+					fb_hPixelCpy(dest, src + ((s->x1 & 0x7) * context->target_bpp), (size_t)size);
 					dest += size * context->target_bpp;
 				}
 				s->x2++;
 				for (x = (s->x1 + 7) >> 3; x < (s->x2 & ~0x7) >> 3; x++) {
-					fb_hPixelCpy(dest, src, 8);
+					fb_hPixelCpy(dest, src, (size_t)8);
 					dest += 8 * context->target_bpp;
 				}
 				if ((s->x2 & 0x7) && ((s->x1 & ~0x7) != (s->x2 & ~0x7)))
-					fb_hPixelCpy(dest, src, s->x2 & 0x7);
+					fb_hPixelCpy(dest, src, (size_t)(s->x2 & 0x7));
 			}
 
 			if (fb_gfx->framebuffer == context->line[0])
@@ -215,7 +227,7 @@ done:
 				free(s);
 			}
 		}
-		free(span);
+		free((void *)span);
 	}
 	DRIVER_UNLOCK();
 	FB_GRAPHICS_UNLOCK( );
@@ -243,7 +255,7 @@ FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING_ACCESS *p
 	fb_hStrDelTemp(pattern);
 	if (!size || !isfinite(x) || !isfinite(y))
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
-	return fb_ErrorSetNum(paint(target, x, y, foreground, border, data, size,
+	return fb_ErrorSetNum(paint(target, x, y, foreground, border, data, (size_t)size,
 		FB_GFX_PAINT_PACKED, relative ? COORD_TYPE_R : COORD_TYPE_A));
 }
 

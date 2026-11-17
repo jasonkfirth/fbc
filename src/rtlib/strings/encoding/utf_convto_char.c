@@ -106,6 +106,8 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			}
 			else switch( extbytes )
 			{
+				default:
+					break;
 				case 5:
 					c += *src++; c <<= 6;
 					FB_FALLTHROUGH;
@@ -174,6 +176,8 @@ char *fb_hUTF8ToChar( const UTF_8 *src, char *dst, ssize_t *chars )
 			}
 			else switch( extbytes )
 			{
+				default:
+					break;
 				case 5:
 					c += *src++; c <<= 6;
 					FB_FALLTHROUGH;
@@ -373,6 +377,9 @@ char *fb_UTFToChar( FB_FILE_ENCOD encod, const void *src, char *dst, ssize_t *ch
 
 	case FB_FILE_ENCOD_UTF32:
 		return fb_hUTF32ToChar( src, dst, chars );
+
+	case FB_FILE_ENCOD_ASCII:
+		return NULL;
 
 	default:
 		return NULL;

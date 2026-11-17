@@ -41,6 +41,10 @@ typedef struct FB_GFX3_PLATFORM_WINDOW_CONFIG {
 	uint32_t width;
 	uint32_t height;
 	uint32_t flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the title pointer at its existing ABI offset. */
+	uint32_t title_alignment_padding;
+#endif
 	const char *title;
 } FB_GFX3_PLATFORM_WINDOW_CONFIG;
 
@@ -51,6 +55,10 @@ typedef struct FB_GFX3_PLATFORM_OPENGL_CONFIG {
 	uint32_t major_version;
 	uint32_t minor_version;
 	uint32_t flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the title pointer at its existing ABI offset. */
+	uint32_t title_alignment_padding;
+#endif
 	const char *title;
 } FB_GFX3_PLATFORM_OPENGL_CONFIG;
 

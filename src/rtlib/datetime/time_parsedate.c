@@ -7,6 +7,45 @@
  */
 #include "fb.h"
 #include <ctype.h>
+#include <limits.h>
+
+/* Date fields have a C-int result and must stay inside the caller's span.
+   Accumulate only after checking the next decimal digit against that range. */
+static int fb_hDateNumber( const char *text, const char *text_end,
+                          const char **end_text, int *number )
+{
+    const char *p = text, *digits;
+    unsigned int value = 0, maximum, digit;
+    int negative = FALSE;
+
+    while( p < text_end && isspace( FB_CHAR_TO_INT( *p ) ) )
+        ++p;
+    if( p < text_end && (*p == '-' || *p == '+') ) {
+        negative = (*p == '-');
+        ++p;
+    }
+    maximum = (unsigned int)INT_MAX + (unsigned int)negative;
+    digits = p;
+    while( p < text_end && *p >= '0' && *p <= '9' ) {
+        digit = (unsigned int)(*p - '0');
+        if( value > (maximum - digit) / 10 )
+            return FALSE;
+        value = value * 10 + digit;
+        ++p;
+    }
+    if( p == digits )
+        return FALSE;
+    if( negative ) {
+        if( value > (unsigned int)INT_MAX )
+            *number = INT_MIN;
+        else
+            *number = -(int)value;
+    } else {
+        *number = (int)value;
+    }
+    *end_text = p;
+    return TRUE;
+}
 
 /*:::::*/
 static int fb_hIsMonth( const char *text, size_t text_len, const char **end_text, int short_name, int localized )
@@ -38,7 +77,7 @@ static int fb_hIsMonth( const char *text, size_t text_len, const char **end_text
         if( short_name ) {
             /* There might follow a dot directly after the
              * abbreviated month name */
-            if( *txt_end=='.' )
+            if( txt_end < text + text_len && *txt_end=='.' )
                 ++txt_end;
         }
     } else {
@@ -133,16 +172,34 @@ int InlineSelect( int index, int num1, int num2, int num3 )
 }
 
 /*:::::*/
+static __inline__
+size_t InlineSelectSize( int index, size_t num1, size_t num2, size_t num3 )
+{
+    if( index==0 )
+        return num1;
+    if( index==1 )
+        return num2;
+    if( index==2 )
+        return num3;
+    return 0;
+}
+
+/*:::::*/
 int fb_hDateParse( const char *text, size_t text_len,
                    int *pDay, int *pMonth, int *pYear,
                    size_t *pLength )
 {
     size_t length = 0, len = text_len;
     const char *text_start = text;
+    const char *text_end;
     int result = FALSE;
     int year = 1899, month = 12, day = 30;
     int order_year, order_month, order_day;
     const char *end_month;
+
+    if( text == NULL || text_len == 0 || text_len > (size_t)PTRDIFF_MAX )
+        return FALSE;
+    text_end = text + text_len;
 
     if( !fb_hDateOrder( &order_day, &order_month, &order_year ) ) {
         /* switch to US date format */
@@ -152,27 +209,30 @@ int fb_hDateParse( const char *text, size_t text_len,
     }
 
     /* skip white spaces */
-    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+    while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
         ++text;
-    len = text_len - (text - text_start);
+    len = text_len - (size_t)(text - text_start);
 
     month = fb_hFindMonth( text, len, &end_month );
     if( month != 0 ) {
         /* The string has the form: (MMMM|MMM) (d|dd)"," (yy|yyyy)  */
-        char *endptr;
+        const char *endptr;
         text = end_month;
-        day = strtol( text, &endptr, 10 );
+        if( !fb_hDateNumber( text, text_end, &endptr, &day ) )
+            return FALSE;
         if( day>0 ) {
 
             /* skip white spaces */
             text = endptr;
-            while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+            while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                 ++text;
 
-            if( *text==',' ) {
+            if( text < text_end && *text==',' ) {
                 size_t year_size;
-                year = strtol( ++text, &endptr, 10 );
-                year_size = endptr - text;
+                ++text;
+                if( !fb_hDateNumber( text, text_end, &endptr, &year ) )
+                    return FALSE;
+                year_size = (size_t)(endptr - text);
                 if( year_size > 0 ) {
                     if( year_size==2 )
                         year += 1900;
@@ -193,10 +253,11 @@ int fb_hDateParse( const char *text, size_t text_len,
          * (d|dd) (MMMM|MM)"," (yy|yyyy)
          */
         size_t day_size;
-        char *endptr;
+        const char *endptr;
         int valid_divider;
-        day = strtol( text, &endptr, 10 );
-        day_size = endptr - text;
+        if( !fb_hDateNumber( text, text_end, &endptr, &day ) )
+            return FALSE;
+        day_size = (size_t)(endptr - text);
         if( day_size ) {
             size_t month_size = 0;
             char chDivider;
@@ -204,18 +265,20 @@ int fb_hDateParse( const char *text, size_t text_len,
 
             /* skip white spaces */
             text = endptr;
-            while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+            while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                 ++text;
 
             /* read month and additional dividers */
+            if( text == text_end )
+                return FALSE;
             chDivider = *text;
             valid_divider = chDivider=='-' || chDivider=='/' || chDivider=='.';
             if( chDivider=='.' ) {
                 ++text;
                 /* skip white spaces */
-                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+                while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
-                len = text_len - (text - text_start);
+                len = text_len - (size_t)(text - text_start);
                 month = fb_hFindMonth( text, len, &end_month );
                 /* We found a dot but a month name ... so this date
                  * is in LONG format. */
@@ -229,31 +292,32 @@ int fb_hDateParse( const char *text, size_t text_len,
             if( is_short_form ) {
                 /* short date */
                 /* skip white spaces */
-                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+                while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
-                month = strtol( text, &endptr, 10 );
-                month_size = endptr - text;
+                if( !fb_hDateNumber( text, text_end, &endptr, &month ) )
+                    return FALSE;
+                month_size = (size_t)(endptr - text);
                 if( month_size ) {
                     text = endptr;
                     /* skip white spaces */
-                    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+                    while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                         ++text;
-                    if( *text==chDivider ) {
+                    if( text < text_end && *text==chDivider ) {
                         ++text;
                         result = TRUE;
                     }
                 }
             } else {
                 /* long date */
-                len = text_len - (text - text_start);
+                len = text_len - (size_t)(text - text_start);
                 month = fb_hFindMonth( text, len, &end_month );
                 if( month != 0 ) {
                     text = end_month;
                     /* skip white spaces */
-                    while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+                    while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                         ++text;
                     /* this comma is optional */
-                    if( *text==',' ) {
+                    if( text < text_end && *text==',' ) {
                         ++text;
                     }
                     result = TRUE;
@@ -263,17 +327,19 @@ int fb_hDateParse( const char *text, size_t text_len,
             if( result ) {
                 size_t year_size;
                 /* skip white spaces */
-                while ( isspace( FB_CHAR_TO_INT( *text ) ) )
+                while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
                     ++text;
-                year = strtol( text, &endptr, 10 );
-                year_size = endptr - text;
+                if( !fb_hDateNumber( text, text_end, &endptr, &year ) )
+                    return FALSE;
+                year_size = (size_t)(endptr - text);
                 if( year_size > 0 ) {
                     /* adjust short form according to the date format */
                     if( is_short_form ) {
                         int tmp_day = InlineSelect( order_day, day, month, year );
                         int tmp_month = InlineSelect( order_month, day, month, year );
                         int tmp_year = InlineSelect( order_year, day, month, year );
-                        year_size = InlineSelect( order_year, day_size, month_size, year_size );
+                        year_size = InlineSelectSize( order_year, day_size,
+                                                     month_size, year_size );
                         day = tmp_day;
                         month = tmp_month;
                         year = tmp_year;
@@ -296,7 +362,7 @@ int fb_hDateParse( const char *text, size_t text_len,
 
     if( result ) {
         /* Update used length */
-        length = text - text_start;
+        length = (size_t)(text - text_start);
     }
 
     if( result ) {

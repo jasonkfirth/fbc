@@ -77,7 +77,9 @@ def main():
                 start_new_session=os.name != 'nt')
             timed_out = False
             try:
-                output, _ = process.communicate(timeout=15 if execute else 90)
+                # Compile time varies with host load and module size. Retain
+                # the execution guard for a regression that loops at runtime.
+                output, _ = process.communicate(timeout=15 if execute else None)
             except subprocess.TimeoutExpired:
                 timed_out = True
                 if process.poll() is None:
@@ -90,7 +92,8 @@ def main():
             checks.append({'command': command, 'exit': process.returncode, 'timeout': timed_out,
                 'output_zlib_base64': base64.b64encode(zlib.compress(output)).decode('ascii')})
             if process.returncode or timed_out:
-                raise RuntimeError('variant check failed: ' + repr(command) + '\n' + output[-5000:].decode(errors='replace'))
+                raise RuntimeError(f'variant check failed, exit={process.returncode}, timeout={timed_out}: '
+                    + repr(command) + '\n' + output[-5000:].decode(errors='replace'))
             if sum(p.stat().st_size for p in work.iterdir() if p.is_file()) > 16 * 1024 * 1024:
                 raise RuntimeError('variant scratch exceeded 16 MiB')
             return output

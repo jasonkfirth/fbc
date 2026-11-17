@@ -8,7 +8,7 @@
 #include "../../fb.h"
 #include "fb_private_console.h"
 
-static int colorlut[16] = { FB_COLOR_BLACK, FB_COLOR_BLUE,
+static unsigned int colorlut[16] = { FB_COLOR_BLACK, FB_COLOR_BLUE,
 	FB_COLOR_GREEN, FB_COLOR_CYAN,
 	FB_COLOR_RED, FB_COLOR_MAGENTA,
 	FB_COLOR_BROWN, FB_COLOR_WHITE,
@@ -37,7 +37,7 @@ unsigned int fb_ConsoleColor( unsigned int fc, unsigned int bc, int flags )
 		bc = last_bc;
 	}
 
-	SetConsoleTextAttribute( FB_CONSOLE_OUTPUT_HANDLE, fc + (bc << 4) );
+	SetConsoleTextAttribute( FB_CONSOLE_OUTPUT_HANDLE, (WORD)(fc + (bc << 4)) );
 
 	return cur;
 }

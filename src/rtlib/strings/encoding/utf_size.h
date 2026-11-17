@@ -23,16 +23,16 @@ static __inline__ int fb_hUTFBytes( ssize_t chars, size_t width, size_t *bytes )
 static __inline__ int fb_hUTFGrow( ssize_t *capacity, ssize_t remaining,
                                  size_t width, size_t *bytes )
 {
-	ssize_t used;
+	size_t used;
 	size_t limit;
 
 	if( width == 0 || remaining < 0 || *capacity < remaining )
 		return FALSE;
-	used = *capacity - remaining;
+	used = (size_t)(*capacity - remaining);
 	limit = (size_t)FB_STRSIZEMSK / width;
-	if( (size_t)used > limit || limit - (size_t)used < 8 )
+	if( used > limit || limit - used < 8u )
 		return FALSE;
-	*capacity = used + 8;
+	*capacity = (ssize_t)(used + 8u);
 	return fb_hUTFBytes( *capacity, width, bytes );
 }
 

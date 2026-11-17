@@ -10,8 +10,8 @@
  *
  * Responsibilities:
  *
- *     - use word transfers when both regions are naturally aligned
- *     - preserve byte-accurate behavior for unaligned regions
+ *     - use word-sized copies without requiring aligned regions
+ *     - preserve byte-accurate behavior for the final remainder
  *     - serialize the exchange through the runtime lock
  *
  * This file intentionally does NOT contain: *
@@ -23,44 +23,37 @@
 
 FBCALL void fb_MemSwap( unsigned char *dst, unsigned char *src, ssize_t bytes )
 {
-	ssize_t i;
-	ssize_t words = 0;
-	unsigned int ti;
+	size_t words, remainder;
+	unsigned int src_word, dst_word;
 	unsigned char tb;
 
 	if( (dst == NULL) || (src == NULL) || (bytes <= 0) )
 		return;
 
 	FB_LOCK();
-	
-	/*
-	 * Fixed WSTRING buffers may be aligned to two bytes rather than four.
-	 * MIPS traps unaligned word accesses, so the word path is valid only when
-	 * both addresses satisfy the alignment required by unsigned int.
-	 */
-	if( ((((uintptr_t)src) | ((uintptr_t)dst)) &
-	     (sizeof(unsigned int) - 1)) == 0 ) {
-		words = bytes / sizeof(unsigned int);
-		for( i = 0; i < words; i++ )
-		{
-			ti = *(unsigned int *)src;
-			*(unsigned int *)src = *(unsigned int *)dst;
-			*(unsigned int *)dst = ti;
 
-			src += sizeof(unsigned int);
-			dst += sizeof(unsigned int);
-		}
+	/* memcpy preserves byte order without requiring word alignment. */
+	words = (size_t)bytes / sizeof( src_word );
+	for( ; words > 0; --words )
+	{
+		memcpy( &src_word, src, sizeof( src_word ) );
+		memcpy( &dst_word, dst, sizeof( dst_word ) );
+		memcpy( src, &dst_word, sizeof( dst_word ) );
+		memcpy( dst, &src_word, sizeof( src_word ) );
+
+		src += sizeof( src_word );
+		dst += sizeof( dst_word );
 	}
 
-	/* remainder, or the complete unaligned exchange */
-	bytes -= words * sizeof(unsigned int);
-	for( i = 0; i < bytes; i++ )
+	remainder = (size_t)bytes % sizeof( src_word );
+	while( remainder > 0 )
 	{
 		tb = *src;
 		*src++ = *dst;
 		*dst++ = tb;
+		--remainder;
 	}
-	
+
 	FB_UNLOCK();
 }
 

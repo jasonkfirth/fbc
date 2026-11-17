@@ -61,6 +61,7 @@ static void mouse_update(int cb, int cx, int cy)
 				case 0x21:	mouse_buttons |= 0x4; break;
 				case 0x22:	mouse_buttons |= 0x2; break;
 				case 0x23:	mouse_buttons = 0; break;
+				default:	break;
 			}
 		}
 		mouse_x = cx - 0x21;
@@ -151,9 +152,10 @@ static int mouse_init(void)
 			return -1;
 		}
 
-		conn.eventMask = ~0;
-		conn.defaultMask = ~GPM_HARD;
-		conn.maxMod = ~0;
+		/* GPM uses unsigned short fields for these event/modifier masks. */
+		conn.eventMask = (unsigned short)~0U;
+		conn.defaultMask = (unsigned short)~(unsigned int)GPM_HARD;
+		conn.maxMod = (unsigned short)~0U;
 		conn.minMod = 0;
 		if (gpm.Open(&conn, 0) < 0) {
 			fb_hDynUnload(&gpm_lib);
@@ -237,6 +239,11 @@ int fb_ConsoleGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 
 int fb_ConsoleSetMouse( int x, int y, int cursor, int clip )
 {
+	/* This backend reports mouse events through its input callbacks. */
+	(void)x;
+	(void)y;
+	(void)cursor;
+	(void)clip;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 }
 

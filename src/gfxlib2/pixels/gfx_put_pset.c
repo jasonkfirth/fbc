@@ -19,8 +19,10 @@ void fb_hPutPSetC(unsigned char *src, unsigned char *dest, int w, int h, int src
 	(void)alpha;
 	(void)blender;
 	(void)param;
+	if ((w <= 0) || (h <= 0))
+		return;
 	for (; h; h--) {
-		fb_hPixelCpy(dest, src, w);
+		fb_hPixelCpy(dest, src, (size_t)w);
 		src += src_pitch;
 		dest += dest_pitch;
 	}

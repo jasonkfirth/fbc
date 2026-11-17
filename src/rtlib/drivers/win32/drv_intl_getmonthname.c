@@ -31,11 +31,15 @@ FBSTRING_ACCESS *fb_DrvIntlGetMonthName( int month, int short_names )
     }
 
     name_len = strlen(pszName);
+	if( name_len > (size_t)FB_STRSIZEMSK ) {
+		free( pszName );
+		return NULL;
+	}
 
-    result = fb_hStrAllocTemp( NULL, name_len );
+    result = fb_hStrAllocTemp( NULL, (ssize_t)name_len );
     if( result!=NULL ) {
         /* Use the process locale codepage selected by the Windows runtime. */
-        int target_cp = /*( FB_GFX_ACTIVE() ? FB_GFX_GET_CODEPAGE() : GetConsoleCP() );*/ GetConsoleCP();
+        int target_cp = (int)GetConsoleCP();
         if( target_cp!=-1 ) {
             FB_MEMCPY( result->data, pszName, name_len + 1 );
             result = fb_hIntlConvertString( result,

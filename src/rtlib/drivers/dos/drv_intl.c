@@ -32,14 +32,14 @@ int fb_hIntlGetInfo( DOS_COUNTRY_INFO_GENERAL *pInfo )
     r.x.ax = 0x6501;
     r.x.bx = 0xFFFF;
     r.x.dx = 0xFFFF;
-    r.x.es = arg_seg;
+	    r.x.es = (unsigned short)arg_seg;
     r.x.di = 0x0000;
-    r.x.cx = sizeof(DOS_COUNTRY_INFO_GENERAL);
+	    r.x.cx = (unsigned short)sizeof(DOS_COUNTRY_INFO_GENERAL);
 
     if( __dpmi_int( 0x21, &r )==0 ) {
         if( (r.x.flags & 0x01)==0 ) {
-            movedata( arg_sel, 0,
-                      _my_ds(), (unsigned) pInfo,
+	    movedata( (unsigned)arg_sel, 0u,
+	              (unsigned)_my_ds(), (unsigned)pInfo,
                       sizeof(DOS_COUNTRY_INFO_GENERAL) );
             result = TRUE;
         }

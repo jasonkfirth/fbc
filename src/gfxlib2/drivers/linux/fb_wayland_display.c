@@ -192,7 +192,7 @@ static void *fb_wayland_registry_bind(struct wl_registry *registry,
 		name, interface->name, version, NULL);
 }
 
-static int fb_wayland_add_listener(void *proxy, const void *listener, void *data)
+static int fb_wayland_add_listener(void *proxy, void *listener, void *data)
 {
 	return fb_wayland_api->proxy_add_listener((struct wl_proxy *)proxy,
 		(void (**)(void))listener, data);
@@ -284,7 +284,7 @@ static void fb_wayland_output_description(void *data, struct wl_output *output,
 	(void)description;
 }
 
-static const FB_WAYLAND_OUTPUT_LISTENER fb_wayland_output_listener = {
+static FB_WAYLAND_OUTPUT_LISTENER fb_wayland_output_listener = {
 	fb_wayland_output_geometry,
 	fb_wayland_output_mode,
 	fb_wayland_output_done,
@@ -327,7 +327,7 @@ static void fb_wayland_xdg_output_done(void *data, struct zxdg_output_v1 *output
 	}
 }
 
-static const FB_WAYLAND_XDG_OUTPUT_LISTENER fb_wayland_xdg_output_listener = {
+static FB_WAYLAND_XDG_OUTPUT_LISTENER fb_wayland_xdg_output_listener = {
 	fb_wayland_xdg_output_position,
 	fb_wayland_xdg_output_size,
 	fb_wayland_xdg_output_done
@@ -364,7 +364,7 @@ static void fb_wayland_seat_name(void *data, struct wl_seat *seat,
 	(void)name;
 }
 
-static const FB_WAYLAND_SEAT_LISTENER fb_wayland_seat_listener = {
+static FB_WAYLAND_SEAT_LISTENER fb_wayland_seat_listener = {
 	fb_wayland_seat_capabilities,
 	fb_wayland_seat_name
 };
@@ -437,7 +437,7 @@ static void fb_wayland_registry_remove(void *data, struct wl_registry *registry,
 		fb_wayland_destroy_xdg_output(probe, 1);
 }
 
-static const FB_WAYLAND_REGISTRY_LISTENER fb_wayland_registry_listener = {
+static FB_WAYLAND_REGISTRY_LISTENER fb_wayland_registry_listener = {
 	fb_wayland_registry_global,
 	fb_wayland_registry_remove
 };

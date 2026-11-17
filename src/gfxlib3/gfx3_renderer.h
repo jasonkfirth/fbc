@@ -60,6 +60,10 @@ typedef struct FB_GFX3_RENDERER {
 		already processes platform events, so a changed counter suppresses the
 		redundant periodic PLATFORM_POLL command for that interval.
 	*/
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the native atomic sequence field's original offset. */
+	unsigned char activity_epoch_alignment_padding[4];
+#endif
 	_Atomic uint64_t activity_epoch;
 	uint32_t idle_poll_milliseconds;
 	int backend_initialized;

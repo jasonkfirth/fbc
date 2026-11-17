@@ -57,6 +57,10 @@ typedef struct MODESLIST {
 	int size;
 	int *data;
 	int failed;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } MODESLIST;
 
 typedef struct DEVENUMDATA {
@@ -273,6 +277,8 @@ static int directx_init(void)
 				case 16: depth = 15; break;
 				case 24: depth = 32; break;
 				case 32: depth = 24; break;
+				default:
+					break;
 			}
 
 			if ((depth == fb_win32.depth) ||
@@ -580,7 +586,12 @@ static HRESULT CALLBACK fetch_modes_callback(LPDDSURFACEDESC desc, LPVOID data)
 
 static int *driver_fetch_modes(int depth, int *size)
 {
-	MODESLIST modes = { depth, 0, NULL, FALSE };
+	MODESLIST modes = {
+		.depth = depth,
+		.size = 0,
+		.data = NULL,
+		.failed = FALSE
+	};
 	LPDIRECTDRAW dd1;
 	LPDIRECTDRAW2 dd2;
 	DIRECTDRAWCREATE DirectDrawCreate = NULL;

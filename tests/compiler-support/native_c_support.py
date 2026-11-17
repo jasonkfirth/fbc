@@ -3,7 +3,7 @@ File: native_c_support.py
 Purpose: Select native C dialects, diagnostic spellings and ABI machine modes.
 Responsibilities: Probe capabilities without assuming that a command named gcc
 is GNU GCC, match BASIC pointer widths and assembler identities, and keep
-GNU LTO checks separate.
+GNU LTO checks separate. Honor native options published in emitted C.
 This file intentionally does NOT suppress warnings or weaken language modes.
 """
 from functools import lru_cache
@@ -65,8 +65,36 @@ def c23_standard(compiler):
     raise RuntimeError('Native C compiler has no supported C23 mode: ' + str(compiler))
 
 
+def native_source_flags(source):
+    # The C emitter and normal driver share this stack contract. Read bounded
+    # line fragments so a large generated initializer needs no extra full copy.
+    marker = b'/* Compile x86-64 inline ASM with -mno-red-zone. */'
+    continued = False
+    with native_path(str(source)).open('rb') as stream:
+        while True:
+            line = stream.readline(65536)
+            if not line:
+                return ()
+            if not continued and line.strip() == marker:
+                return ('-mno-red-zone',)
+            continued = not line.endswith(b'\n')
+
+
 def native_command(command):
     command = list(map(str, command))
+    source_flags = []
+    compiling = any(flag.startswith('-std=') or flag in ('-c', '-S', '-E', '-fsyntax-only') for flag in command)
+    if compiling:
+        for index, argument in enumerate(command[1:], 1):
+            if argument.startswith('-') or command[index - 1] == '-o' or Path(argument).suffix.lower() != '.c':
+                continue
+            source = native_path(argument)
+            if source.is_file():
+                for flag in native_source_flags(source):
+                    if flag not in source_flags and flag not in command:
+                        source_flags.append(flag)
+    # Explicit caller options retain their normal last-option precedence.
+    command = command[:1] + source_flags + command[1:]
     if '-std=gnu23' in command:
         command = ['-std=' + c23_standard(command[0]) if flag == '-std=gnu23' else flag
                    for flag in command]

@@ -11,6 +11,7 @@
 #include "../../fb_gfx.h"
 #include "fb_gfx_x11.h"
 #include <limits.h>
+#include <string.h>
 #include <sys/shm.h>
 
 static int driver_init(char *title, int w, int h, int depth, int refresh_rate, int flags);
@@ -48,6 +49,34 @@ static BLITTER *blitter;
 static int is_shm;
 static int needs_byte_swap;
 static void (*update_mask)(unsigned char *src, unsigned char *mask, int w, int h);
+
+static unsigned int x11_default_depth(void)
+{
+	int depth = XDefaultDepth(fb_x11.display, fb_x11.screen);
+
+	if (depth <= 0)
+		return 0;
+
+	return (unsigned int)depth;
+}
+
+static int x11_image_data_size(const XImage *ximage, size_t *data_size)
+{
+	size_t bytes_per_line;
+	size_t height;
+
+	if (!ximage || !data_size || (ximage->bytes_per_line <= 0) ||
+	    (ximage->height <= 0))
+		return -1;
+
+	bytes_per_line = (size_t)ximage->bytes_per_line;
+	height = (size_t)ximage->height;
+	if (height > ((size_t)-1 / bytes_per_line))
+		return -1;
+
+	*data_size = bytes_per_line * height;
+	return 0;
+}
 
 static int host_byte_order(void)
 {
@@ -110,7 +139,8 @@ static void byte_swap_image_region(int y, int h)
 
 static void update_mask_8(unsigned char *pixel, unsigned char *mask, int w, int h)
 {
-	int x, b;
+	int x;
+	unsigned int b;
 	unsigned char *p = pixel;
 	
 	for(; h; h--) {
@@ -119,52 +149,60 @@ static void update_mask_8(unsigned char *pixel, unsigned char *mask, int w, int 
 			if (*p++ != 0)
 				b |= 1 << (x & 0x7);
 			if ((x & 0x7) == 0x7) {
-				*mask++ = b;
+				*mask++ = (unsigned char)b;
 				b = 0;
 			}
 		}
 		if (w & 0x7)
-			*mask++ = b;
+			*mask++ = (unsigned char)b;
 	}
 }
 
 static void update_mask_16(unsigned char *pixel, unsigned char *mask, int w, int h)
 {
-	int x, b;
-	unsigned short *p = (unsigned short *)pixel;
+	int x;
+	unsigned int b;
+	unsigned char *p = pixel;
+	unsigned short pixel_value;
 	
 	for(; h; h--) {
 		b = 0;
 		for (x = 0; x < w; x++) {
-			if (*p++ != MASK_COLOR_16)
+			memcpy(&pixel_value, p, sizeof(pixel_value));
+			p += sizeof(pixel_value);
+			if (pixel_value != MASK_COLOR_16)
 				b |= 1 << (x & 0x7);
 			if ((x & 0x7) == 0x7) {
-				*mask++ = b;
+				*mask++ = (unsigned char)b;
 				b = 0;
 			}
 		}
 		if (w & 0x7)
-			*mask++ = b;
+			*mask++ = (unsigned char)b;
 	}
 }
 
 static void update_mask_32(unsigned char *pixel, unsigned char *mask, int w, int h)
 {
-	int x, b;
-	unsigned int *p = (unsigned int *)pixel;
+	int x;
+	unsigned int b;
+	unsigned char *p = pixel;
+	unsigned int pixel_value;
 	
 	for(; h; h--) {
 		b = 0;
 		for (x = 0; x < w; x++) {
-			if (((*p++) & ~MASK_A_32) != MASK_COLOR_32)
+			memcpy(&pixel_value, p, sizeof(pixel_value));
+			p += sizeof(pixel_value);
+			if ((pixel_value & ~MASK_A_32) != MASK_COLOR_32)
 				b |= 1 << (x & 0x7);
 			if ((x & 0x7) == 0x7) {
-				*mask++ = b;
+				*mask++ = (unsigned char)b;
 				b = 0;
 			}
 		}
 		if (w & 0x7)
-			*mask++ = b;
+			*mask++ = (unsigned char)b;
 	}
 }
 
@@ -173,6 +211,8 @@ static int x11_init(void)
 	XGCValues values;
 	int x = 0, y = 0, h, is_rgb = FALSE;
 	char *display_name;
+	unsigned int depth;
+	size_t image_size;
 	
 	image = NULL;
 	scaled_image = NULL;
@@ -187,6 +227,9 @@ static int x11_init(void)
 	blitter = fb_hGetBlitter(fb_x11.visual_depth, is_rgb);
 	if (!blitter)
 		return -1;
+	depth = x11_default_depth();
+	if (depth == 0)
+		return -1;
 	
 	if (!(fb_x11.flags & DRIVER_FULLSCREEN)) {
 		x = (XDisplayWidth(fb_x11.display, fb_x11.screen) - fb_x11.w) >> 1;
@@ -195,10 +238,21 @@ static int x11_init(void)
 	fb_hX11InitWindow(x, y);
 	
 	if (fb_x11.flags & DRIVER_SHAPED_WINDOW) {
-		shape_image = XCreateImage(fb_x11.display, fb_x11.visual, 1, XYBitmap, 0, NULL, fb_x11.w, fb_x11.h, 8, 0);
-		shape_image->data = calloc(1, shape_image->bytes_per_line * shape_image->height);
+		shape_image = XCreateImage(fb_x11.display, fb_x11.visual, 1, XYBitmap,
+			0, NULL, fb_hX11Dimension(fb_x11.w),
+			fb_hX11Dimension(fb_x11.h), 8, 0);
+		if (x11_image_data_size(shape_image, &image_size) != 0)
+			return -1;
+		shape_image->data = calloc(1, image_size);
+		if (!shape_image->data) {
+			XDestroyImage(shape_image);
+			shape_image = NULL;
+			return -1;
+		}
 		shape_pixmap = XCreateBitmapFromData(fb_x11.display, fb_x11.window,
-											 shape_image->data, fb_x11.w, fb_x11.h);
+												 shape_image->data,
+												 fb_hX11Dimension(fb_x11.w),
+												 fb_hX11Dimension(fb_x11.h));
 		values.foreground = 1;
 		values.background = 0;											 
 		shape_gc = XCreateGC(fb_x11.display, shape_pixmap, GCForeground | GCBackground, &values);
@@ -222,19 +276,38 @@ static int x11_init(void)
 			}
 			XReparentWindow(fb_x11.display, fb_x11.window, fb_x11.fswindow, 0, 0);
 			fb_hX11RefreshLayout(fb_x11.w, h);
-			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0,0,fb_x11.view_w, fb_x11.view_h);
-			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0, fb_x11.view_w, fb_x11.view_h);
+			XMoveResizeWindow(fb_x11.display, fb_x11.fswindow, 0, 0,
+				fb_hX11Dimension(fb_x11.view_w),
+				fb_hX11Dimension(fb_x11.view_h));
+			XMoveResizeWindow(fb_x11.display, fb_x11.window, 0, 0,
+				fb_hX11Dimension(fb_x11.view_w),
+				fb_hX11Dimension(fb_x11.view_h));
 		}
-		is_shm = TRUE;
-		image = XShmCreateImage(fb_x11.display, fb_x11.visual, XDefaultDepth(fb_x11.display, fb_x11.screen),
-					ZPixmap, 0, &shm_info, fb_x11.w, fb_x11.h);
+		image = XShmCreateImage(fb_x11.display, fb_x11.visual, depth,
+					ZPixmap, 0, &shm_info,
+					fb_hX11Dimension(fb_x11.w),
+					fb_hX11Dimension(fb_x11.h));
 		if (image) {
-			shm_info.shmid = shmget(IPC_PRIVATE, image->bytes_per_line * image->height, IPC_CREAT | 0777);
-			shm_info.shmaddr = image->data = shmat(shm_info.shmid, 0, 0);
-			shm_info.readOnly = False;
-			if (!XShmAttach(fb_x11.display, &shm_info)) {
-				shmdt(shm_info.shmaddr);
-				shmctl(shm_info.shmid, IPC_RMID, 0);
+			shm_info.shmid = -1;
+			shm_info.shmaddr = (char *)-1;
+			if ((x11_image_data_size(image, &image_size) == 0) &&
+			    ((shm_info.shmid = shmget(IPC_PRIVATE, image_size,
+			     IPC_CREAT | 0777)) >= 0)) {
+				shm_info.shmaddr = shmat(shm_info.shmid, 0, 0);
+				if (shm_info.shmaddr != (char *)-1) {
+					image->data = shm_info.shmaddr;
+					shm_info.readOnly = False;
+					is_shm = XShmAttach(fb_x11.display, &shm_info);
+					if (!is_shm) {
+						shmdt(shm_info.shmaddr);
+						shm_info.shmaddr = (char *)-1;
+					}
+				}
+				if (!is_shm)
+					shmctl(shm_info.shmid, IPC_RMID, 0);
+			}
+			if (!is_shm) {
+				image->data = NULL;
 				XDestroyImage(image);
 				image = NULL;
 			}
@@ -244,10 +317,17 @@ static int x11_init(void)
 		return -1;
 	if (!image) {
 		is_shm = FALSE;
-		image = XCreateImage(fb_x11.display, fb_x11.visual, XDefaultDepth(fb_x11.display, fb_x11.screen),
-				     ZPixmap, 0, NULL, fb_x11.w, fb_x11.h, 32, 0);
-		image->data = malloc(image->bytes_per_line * image->height);
-		if (!image->data) {
+		image = XCreateImage(fb_x11.display, fb_x11.visual, depth,
+				     ZPixmap, 0, NULL, fb_hX11Dimension(fb_x11.w),
+				     fb_hX11Dimension(fb_x11.h), 32, 0);
+		if (x11_image_data_size(image, &image_size) != 0) {
+			if (image)
+				XDestroyImage(image);
+			image = NULL;
+		} else {
+			image->data = malloc(image_size);
+		}
+		if (image && !image->data) {
 			XDestroyImage(image);
 			image = NULL;
 		}
@@ -263,6 +343,9 @@ static int x11_init(void)
 
 static int ensure_scaled_image(void)
 {
+	unsigned int depth;
+	size_t image_size;
+
 	if (fb_x11.scale <= 1)
 		return 0;
 
@@ -276,13 +359,24 @@ static int ensure_scaled_image(void)
 		scaled_image = NULL;
 	}
 
+	depth = x11_default_depth();
+	if (depth == 0)
+		return -1;
+
 	scaled_image = XCreateImage(fb_x11.display, fb_x11.visual,
-	                            XDefaultDepth(fb_x11.display, fb_x11.screen),
-	                            ZPixmap, 0, NULL, fb_x11.draw_w, fb_x11.draw_h, 32, 0);
+	                            depth,
+	                            ZPixmap, 0, NULL,
+	                            fb_hX11Dimension(fb_x11.draw_w),
+	                            fb_hX11Dimension(fb_x11.draw_h), 32, 0);
 	if (!scaled_image)
 		return -1;
 
-	scaled_image->data = malloc(scaled_image->bytes_per_line * scaled_image->height);
+	if (x11_image_data_size(scaled_image, &image_size) != 0) {
+		XDestroyImage(scaled_image);
+		scaled_image = NULL;
+		return -1;
+	}
+	scaled_image->data = malloc(image_size);
 	if (!scaled_image->data) {
 		XDestroyImage(scaled_image);
 		scaled_image = NULL;
@@ -313,7 +407,7 @@ static void scale_image_region(int y, int h)
 				src_pixel = src_line + (x * bytes_per_pixel);
 				for (sx = 0; sx < fb_x11.scale; sx++) {
 					dst_pixel = dst_line + (((x * fb_x11.scale) + sx) * bytes_per_pixel);
-					fb_hMemCpy(dst_pixel, src_pixel, bytes_per_pixel);
+					fb_hMemCpy(dst_pixel, src_pixel, (size_t)bytes_per_pixel);
 				}
 			}
 		}
@@ -386,7 +480,9 @@ static void x11_update(void)
 			if (shape_image) {
 				update_mask((unsigned char *)fb_gfx->framebuffer + (y * fb_gfx->pitch),
 							(unsigned char *)shape_image->data + (y * shape_image->bytes_per_line), fb_x11.w, h);
-				XPutImage(fb_x11.display, shape_pixmap, shape_gc, shape_image, 0, y, 0, y, fb_x11.w, h);
+				XPutImage(fb_x11.display, shape_pixmap, shape_gc, shape_image,
+					0, y, 0, y, fb_hX11Dimension(fb_x11.w),
+					fb_hX11Dimension(h));
 				XShapeCombineMask(fb_x11.display, fb_x11.window, ShapeBounding, 0, 0, shape_pixmap, ShapeSet);
 			}
 			if (fb_x11.scale > 1) {
@@ -394,21 +490,28 @@ static void x11_update(void)
 					scale_image_region(y, h);
 					XPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, scaled_image,
 					          0, y * fb_x11.scale,
-					          fb_x11.draw_offset_x, fb_x11.draw_offset_y + (y * fb_x11.scale),
-					          fb_x11.draw_w, h * fb_x11.scale);
+					          fb_x11.draw_offset_x,
+						  fb_x11.draw_offset_y + (y * fb_x11.scale),
+						  fb_hX11Dimension(fb_x11.draw_w),
+						  fb_hX11ScaledDimension(h, fb_x11.scale));
 				}
 			}
 			else {
 				if (is_shm)
 					XShmPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, image, 0, y,
-					             fb_x11.draw_offset_x, y + fb_x11.draw_offset_y, fb_x11.w, h, False);
+				             fb_x11.draw_offset_x, y + fb_x11.draw_offset_y,
+				             fb_hX11Dimension(fb_x11.w),
+				             fb_hX11Dimension(h), False);
 				else
 					XPutImage(fb_x11.display, fb_x11.window, fb_x11.gc, image, 0, y,
-					          fb_x11.draw_offset_x, y + fb_x11.draw_offset_y, fb_x11.w, h);
+					          fb_x11.draw_offset_x, y + fb_x11.draw_offset_y,
+					          fb_hX11Dimension(fb_x11.w),
+					          fb_hX11Dimension(h));
 			}
 		}
 	}
-	fb_hMemSet(fb_gfx->dirty, FALSE, fb_x11.h);
+	if (fb_x11.h > 0)
+		fb_hMemSet(fb_gfx->dirty, FALSE, (size_t)fb_x11.h);
 }
 
 static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rate, int flags)
@@ -434,6 +537,10 @@ static XImage *create_replacement_image(int width, int height,
 {
 	XImage *replacement = NULL;
 	size_t data_size;
+	unsigned int depth = x11_default_depth();
+
+	if (depth == 0)
+		return NULL;
 
 	memset(replacement_shm, 0, sizeof(*replacement_shm));
 	replacement_shm->shmid = -1;
@@ -442,8 +549,9 @@ static XImage *create_replacement_image(int width, int height,
 
 	if (is_shm) {
 		replacement = XShmCreateImage(fb_x11.display, fb_x11.visual,
-			XDefaultDepth(fb_x11.display, fb_x11.screen), ZPixmap, 0,
-			replacement_shm, width, height);
+			depth, ZPixmap, 0,
+			replacement_shm, fb_hX11Dimension(width),
+			fb_hX11Dimension(height));
 		if (replacement && (replacement->bytes_per_line > 0) &&
 		    (replacement->height > 0) &&
 		    ((size_t)replacement->height <= ((size_t)-1 /
@@ -479,8 +587,8 @@ static XImage *create_replacement_image(int width, int height,
 	}
 
 	replacement = XCreateImage(fb_x11.display, fb_x11.visual,
-		XDefaultDepth(fb_x11.display, fb_x11.screen), ZPixmap, 0, NULL,
-		width, height, 32, 0);
+		depth, ZPixmap, 0, NULL,
+		fb_hX11Dimension(width), fb_hX11Dimension(height), 32, 0);
 	if (!replacement)
 		return NULL;
 	if ((replacement->bytes_per_line <= 0) || (replacement->height <= 0) ||

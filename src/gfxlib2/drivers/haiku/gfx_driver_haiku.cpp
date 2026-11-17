@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static char haiku_driver_name[] = "Haiku";
+
 
 /* ------------------------------------------------------------------------- */
 /* Debug helper                                                              */
@@ -71,7 +73,7 @@ static int driver_init(char *title,
 
 extern "C" const GFXDRIVER fb_gfxDriverHaiku =
 {
-    (char*)"Haiku",
+	haiku_driver_name,
 
     driver_init,
     fb_hHaikuExit,

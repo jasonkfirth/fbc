@@ -218,14 +218,14 @@ typedef struct FB_GFX3_PLATFORM_WAYLAND {
 	struct wl_proxy *wm_base;
 	struct wl_proxy *xdg_surface;
 	struct wl_proxy *toplevel;
-	struct wl_interface *registry_interface;
-	struct wl_interface *compositor_interface;
-	struct wl_interface *surface_interface;
-	struct wl_interface *seat_interface;
-	struct wl_interface *output_interface;
-	struct wl_interface *pointer_interface;
-	struct wl_interface *keyboard_interface;
-	struct wl_interface *touch_interface;
+	const struct wl_interface *registry_interface;
+	const struct wl_interface *compositor_interface;
+	const struct wl_interface *surface_interface;
+	const struct wl_interface *seat_interface;
+	const struct wl_interface *output_interface;
+	const struct wl_interface *pointer_interface;
+	const struct wl_interface *keyboard_interface;
+	const struct wl_interface *touch_interface;
 	FB_GFX3_WAYLAND_EGL egl;
 	FB_GFX3_INPUT_STATE *input;
 	void *egl_display;
@@ -271,6 +271,9 @@ typedef struct FB_GFX3_PLATFORM_WAYLAND {
 	char repeat_text[16];
 	uint32_t repeat_delay_ms;
 	uint32_t repeat_interval_ms;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t repeat_deadline_alignment_padding;
+#endif
 	uint64_t repeat_deadline_ms;
 	uint32_t last_click_time;
 	uint32_t text_input_serial;
@@ -376,7 +379,7 @@ static int platform_wayland_registry_bind(void *state, uint32_t name,
 {
 	FB_GFX3_PLATFORM_WAYLAND *platform =
 		(FB_GFX3_PLATFORM_WAYLAND *)state;
-	struct wl_interface *interface = NULL;
+	const struct wl_interface *interface = NULL;
 	uint32_t version;
 
 	if ((platform == NULL) || (interface_name == NULL) ||
@@ -390,11 +393,11 @@ static int platform_wayland_registry_bind(void *state, uint32_t name,
 	else if (strcmp(interface_name, "wl_output") == 0)
 		interface = platform->output_interface;
 	else if (strcmp(interface_name, "xdg_wm_base") == 0)
-		interface = (struct wl_interface *)&xdg_wm_base_interface;
+		interface = &xdg_wm_base_interface;
 	else if (strcmp(interface_name, "zwp_text_input_manager_v3") == 0)
-		interface = (struct wl_interface *)&zwp_text_input_manager_v3_interface;
+		interface = &zwp_text_input_manager_v3_interface;
 	else if (strcmp(interface_name, "zwp_text_input_manager_v2") == 0)
-		interface = (struct wl_interface *)&zwp_text_input_manager_v2_interface;
+		interface = &zwp_text_input_manager_v2_interface;
 	if (interface == NULL)
 		return FB_GFX3_UNSUPPORTED;
 	if (interface->version < 1)
@@ -931,7 +934,7 @@ static void platform_wayland_keyboard_repeat_info(void *data,
 		platform->repeat_interval_ms = 1u;
 }
 
-static const FB_GFX3_WAYLAND_KEYBOARD_LISTENER
+static FB_GFX3_WAYLAND_KEYBOARD_LISTENER
 	platform_wayland_keyboard_listener = {
 	platform_wayland_keyboard_keymap_cb,
 	platform_wayland_keyboard_enter,
@@ -1055,7 +1058,7 @@ static void platform_wayland_pointer_axis(void *data,
 			(value < 0) ? 1 : -1);
 }
 
-static const FB_GFX3_WAYLAND_POINTER_LISTENER
+static FB_GFX3_WAYLAND_POINTER_LISTENER
 	platform_wayland_pointer_listener = {
 	platform_wayland_pointer_enter,
 	platform_wayland_pointer_leave,
@@ -1187,7 +1190,7 @@ static void platform_wayland_touch_cancel(void *data, struct wl_proxy *touch)
 	}
 }
 
-static const FB_GFX3_WAYLAND_TOUCH_LISTENER
+static FB_GFX3_WAYLAND_TOUCH_LISTENER
 	platform_wayland_touch_listener = {
 	platform_wayland_touch_down,
 	platform_wayland_touch_up,
@@ -1284,7 +1287,7 @@ static void platform_wayland_text_v3_done(void *data,
 	fb_hWaylandTextV3Reset(&platform->text_v3_pending);
 }
 
-static const FB_GFX3_WAYLAND_TEXT_INPUT_V3_LISTENER
+static FB_GFX3_WAYLAND_TEXT_INPUT_V3_LISTENER
 	platform_wayland_text_v3_listener = {
 	platform_wayland_text_v3_enter,
 	platform_wayland_text_v3_leave,
@@ -1468,7 +1471,7 @@ static void platform_wayland_text_v2_method_changed(void *data,
 		platform_wayland_apply_keyboard(platform);
 }
 
-static const FB_GFX3_WAYLAND_TEXT_INPUT_V2_LISTENER
+static FB_GFX3_WAYLAND_TEXT_INPUT_V2_LISTENER
 	platform_wayland_text_v2_listener = {
 	platform_wayland_text_v2_enter,
 	platform_wayland_text_v2_leave,
@@ -1603,7 +1606,7 @@ static void platform_wayland_seat_capabilities(void *data,
 	}
 }
 
-static const FB_GFX3_WAYLAND_SEAT_LISTENER platform_wayland_seat_listener = {
+static FB_GFX3_WAYLAND_SEAT_LISTENER platform_wayland_seat_listener = {
 	platform_wayland_seat_capabilities,
 	platform_wayland_seat_name
 };
@@ -1928,25 +1931,21 @@ static int platform_wayland_load_egl(FB_GFX3_PLATFORM_WAYLAND *platform)
 	return result;
 }
 
-/*
-	wl_proxy_add_listener retains each listener table pointer. These tables
-	therefore need static storage because the proxies remain active after the
-	connection setup function returns.
-*/
-static const FB_GFX3_WAYLAND_REGISTRY_LISTENER registry_listener = {
+/* libwayland retains these static callback tables and declares them mutable. */
+static FB_GFX3_WAYLAND_REGISTRY_LISTENER registry_listener = {
 	platform_wayland_registry_global,
 	platform_wayland_registry_global_remove
 };
 
-static const FB_GFX3_WAYLAND_WM_LISTENER wm_listener = {
+static FB_GFX3_WAYLAND_WM_LISTENER wm_listener = {
 	platform_wayland_wm_ping
 };
 
-static const FB_GFX3_WAYLAND_SURFACE_LISTENER surface_listener = {
+static FB_GFX3_WAYLAND_SURFACE_LISTENER surface_listener = {
 	platform_wayland_surface_configure
 };
 
-static const FB_GFX3_WAYLAND_TOPLEVEL_LISTENER toplevel_listener = {
+static FB_GFX3_WAYLAND_TOPLEVEL_LISTENER toplevel_listener = {
 	platform_wayland_toplevel_configure,
 	platform_wayland_toplevel_close,
 	platform_wayland_toplevel_configure_bounds,

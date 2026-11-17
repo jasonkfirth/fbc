@@ -24,6 +24,34 @@ spec.loader.exec_module(runner)
 
 
 class ResultContracts(unittest.TestCase):
+    def test_console_products_use_emulator_formats(self):
+        self.assertEqual(runner.executable_name("example", "wii"), "example.dol")
+        self.assertEqual(runner.executable_name("example", "xbox"), "example.xbe")
+
+    def test_guest_prefix_preserves_program_arguments_and_working_directory(self):
+        self.compiler.write_text(
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[sys.argv.index('-x') + 1]).write_bytes(b'guest product')\n",
+            encoding="ascii")
+        self.source = self.root / "examples/manual/fileio/serialization.bas"
+        self.source.parent.mkdir(parents=True)
+        self.source.write_text("print 1\n", encoding="ascii")
+        guest = self.root / "guest.py"
+        guest.write_text(
+            "import pathlib, sys\n"
+            "assert pathlib.Path(sys.argv[1]).is_file()\n"
+            "assert sys.argv[2:] == ['saved-state.bin']\n"
+            "assert pathlib.Path.cwd().name == 'r'\n", encoding="ascii")
+        args = runner.parse_args([
+            "--root", str(self.root), "--outdir", str(self.output),
+            "--fbc", sys.executable, "--no-prefix", "--target-os", "wii",
+            "--run-prefix=" + sys.executable, "--run-prefix=" + str(guest),
+        ])
+        args.fbc = [sys.executable, str(self.compiler)]
+        result = runner.compile_one(self.source, self.root, args)
+        self.assertEqual(result.compile_status, "pass")
+        self.assertEqual(result.run_status, "pass")
+
     def test_cpp_runtime_matches_native_and_explicit_drivers(self):
         for target, compiler, library in (
             ("freebsd", "c++", "c++"),

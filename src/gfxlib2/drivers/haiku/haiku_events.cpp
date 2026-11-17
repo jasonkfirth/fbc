@@ -64,6 +64,7 @@ static int haiku_legacy_key(int scancode, int ascii)
         case SC_PAGEDOWN: return KEY_PAGE_DOWN;
         case SC_INSERT: return KEY_INS;
         case SC_DELETE: return KEY_DEL;
+        default: break;
     }
     return 0;
 }
@@ -216,7 +217,7 @@ static void haiku_wheel(float delta, int horizontal)
     fb_hHaikuLockState();
     fraction = horizontal ? &fb_haiku.wheel_x : &fb_haiku.wheel_y;
     position = horizontal ? &fb_haiku.mouse_w : &fb_haiku.mouse_z;
-    *fraction += delta;
+    *fraction += (double)delta;
     steps = (int)*fraction;
     *fraction -= steps;
     /* Haiku positive vertical deltas scroll down; BASIC's Z increases up. */

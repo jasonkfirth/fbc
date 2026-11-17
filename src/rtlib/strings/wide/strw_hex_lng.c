@@ -15,7 +15,7 @@ static FB_WCHAR hex_table[16] = {FB_WCHAR_LITERAL('0'),FB_WCHAR_LITERAL('1'),FB_
 FBCALL FB_WCHAR *fb_WstrHexEx_l ( unsigned long long num, int digits )
 {
 	FB_WCHAR *s;
-	int i;
+	unsigned int i;
 	unsigned long long num2;
 
 	if( digits <= 0 ) {
@@ -36,11 +36,11 @@ FBCALL FB_WCHAR *fb_WstrHexEx_l ( unsigned long long num, int digits )
 	if( s == NULL )
 		return NULL;
 
-	i = digits - 1;
-	while( i >= 0 ) {
+	i = (unsigned int)digits;
+	while( i > 0 ) {
+		i -= 1;
 		s[i] = hex_table[num & 0xF];
 		num >>= 4;
-		i -= 1;
 	}
 
 	s[digits] = FB_WCHAR_LITERAL('\0');

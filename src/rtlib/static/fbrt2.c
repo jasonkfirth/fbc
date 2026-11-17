@@ -81,8 +81,8 @@
 	    __attribute__((constructor(priority))) now (instead of
 	   .ctors.<65535 - priority>). The .ctors.* sections still work here, so
 	   keep using them. */
-	static void * priorityhDoInit __attribute__((section(".ctors.65435"), used)) = fb_hDoInit;
-	static void * priorityhDoExit __attribute__((section(".dtors.65435"), used)) = fb_hDoExit;
+	static void (*priorityhDoInit)(void) __attribute__((section(".ctors.65435"), used)) = fb_hDoInit;
+	static void (*priorityhDoExit)(void) __attribute__((section(".dtors.65435"), used)) = fb_hDoExit;
 #endif
 
 /* end of static/fbrt2.c */

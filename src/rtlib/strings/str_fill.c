@@ -18,7 +18,7 @@ FBCALL FBSTRING_ACCESS *fb_StrFill1( ssize_t cnt, int fchar )
 		if( dst != NULL )
 		{
 			/* fill it */
-			memset( dst->data, fchar, cnt );
+			memset( dst->data, fchar, (size_t)cnt );
 			/* null char */
 			dst->data[cnt] = '\0';
 		}

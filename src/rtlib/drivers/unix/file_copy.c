@@ -56,7 +56,8 @@ FBCALL int fb_FileCopy( const char *source, const char *destination )
 		if (count == 0)
 			break;
 		for (offset = 0; offset < count; offset += written) {
-			written = write(dst, buffer + offset, count - offset);
+			/* Both counts are nonnegative here and offset is below count. */
+			written = write(dst, buffer + offset, (size_t)(count - offset));
 			if (written < 0 && errno == EINTR) {
 				written = 0;
 				continue;

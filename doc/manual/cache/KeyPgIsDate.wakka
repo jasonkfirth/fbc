@@ -20,6 +20,8 @@ Tests if a string can be converted to a [[ProPgDates|Date Serial]]
 	
 	##**""IsDate""([[KeyPgDate|Date]])**## will return non-zero (-1) only if the regional settings specify the same date format that QB used.
 	
+	The result is zero when a numeric day, month or year field is outside the signed 32-bit ##[[KeyPgLong|Long]]## range.
+
 	The compiler will not recognize this function unless ##vbcompat.bi## or ##datetime.bi## is included.
 
 {{fbdoc item="ex"}}

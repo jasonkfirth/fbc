@@ -34,6 +34,8 @@
 #ifndef FB_LONGDOUBLE_PARSE_H
 #define FB_LONGDOUBLE_PARSE_H
 #include <stddef.h>
+#include <limits.h>
+#include <stdint.h>
 #include <string.h>
 
 typedef struct FB_LONGDOUBLE_INPUT {
@@ -126,12 +128,12 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 	static const uint32_t th[] = { LD_B1B_MAX };
 	int i, j, k, a, z;
 	long long lrp=0, dc=0;
-	long long e10=0;
-	int lnz = 0;
+	long long e10;
+	long long lnz = 0;
 	int gotdig = 0, gotrad = 0;
-	int rp;
+	long long rp;
 	int e2;
-	int emax = -emin-bits+3;
+	long long emax = -(long long)emin - bits + 3;
 	int denormal = 0;
 	long double y;
 	long double frac=0;
@@ -158,8 +160,8 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 		} else if (k < KMAX-3) {
 			dc++;
 			if (c!='0') lnz = dc;
-			if (j) x[k] = x[k]*10 + c-'0';
-			else x[k] = c-'0';
+			if (j) x[k] = x[k]*10 + (uint32_t)(c-'0');
+			else x[k] = (uint32_t)(c-'0');
 			if (++j==9) {
 				k++;
 				j=0;
@@ -186,6 +188,18 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 			}
 			e10 = 0;
 		}
+		if (e10 > 0 && lrp > LLONG_MAX - e10) {
+			if (!x[0])
+				return sign * 0.0;
+			errno = ERANGE;
+			return sign * LDBL_MAX * LDBL_MAX;
+		}
+		if (e10 < 0 && lrp < LLONG_MIN - e10) {
+			if (!x[0])
+				return sign * 0.0;
+			errno = ERANGE;
+			return sign * LDBL_MIN * LDBL_MIN;
+		}
 		lrp += e10;
 	} else if (c>=0) {
 		fb_ld_unget(f);
@@ -202,11 +216,11 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 	/* Optimize small integers (w/no exponent) and over/under-flow */
 	if (lrp==dc && dc<10 && (bits>30 || x[0]>>bits==0))
 		return sign * (long double)x[0];
-	if (lrp > -emin/2) {
+	if (lrp > -((long long)emin/2)) {
 		errno = ERANGE;
 		return sign * LDBL_MAX * LDBL_MAX;
 	}
-	if (lrp < emin-2*LDBL_MANT_DIG) {
+	if (lrp < (long long)emin-2LL*LDBL_MANT_DIG) {
 		errno = ERANGE;
 		return sign * LDBL_MIN * LDBL_MIN;
 	}
@@ -215,7 +229,6 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 	if (j) {
 		for (; j<9; j++) x[k]*=10;
 		k++;
-		j=0;
 	}
 
 	a = 0;
@@ -237,13 +250,14 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 
 	/* Align radix point to B1B digit boundary */
 	if (rp % 9) {
-		int rpm9 = rp>=0 ? rp%9 : rp%9+9;
-		int p10 = p10s[8-rpm9];
+		int rpm9 = (int)(rp>=0 ? rp%9 : rp%9+9);
+		int p10_index = 8-rpm9;
+		uint32_t p10 = (uint32_t)p10s[p10_index];
 		uint32_t carry = 0;
 		for (k=a; k!=z; k++) {
 			uint32_t tmp = x[k] % p10;
 			x[k] = x[k]/p10 + carry;
-			carry = 1000000000/p10 * tmp;
+			carry = UINT32_C(1000000000)/p10 * tmp;
 			if (k==a && !x[k]) {
 				a = ((a+1) & MASK);
 				rp -= 9;
@@ -260,11 +274,11 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 		for (k=((z-1) & MASK); ; k=((k-1) & MASK)) {
 			uint64_t tmp = ((uint64_t)x[k] << 29) + carry;
 			if (tmp > 1000000000) {
-				carry = tmp / 1000000000;
-				x[k] = tmp % 1000000000;
+			carry = (uint32_t)(tmp / UINT64_C(1000000000));
+				x[k] = (uint32_t)(tmp % UINT64_C(1000000000));
 			} else {
 				carry = 0;
-				x[k] = tmp;
+				x[k] = (uint32_t)tmp;
 			}
 			if (k==((z-1) & MASK) && k!=a && !x[k]) z = k;
 			if (k==a) break;
@@ -297,7 +311,7 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 		if (rp > 9+9*LD_B1B_DIG) sh = 9;
 		e2 += sh;
 		for (k=a; k!=z; k=((k+1) & MASK)) {
-			uint32_t tmp = x[k] & ((1<<sh)-1);
+			uint32_t tmp = x[k] & ((UINT32_C(1)<<sh)-UINT32_C(1));
 			x[k] = (x[k]>>sh) + carry;
 			carry = (1000000000>>sh) * tmp;
 			if (k==a && !x[k]) {
@@ -323,8 +337,8 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 	y *= sign;
 
 	/* Limit precision for denormal results */
-	if (bits > LDBL_MANT_DIG+e2-emin) {
-		bits = LDBL_MANT_DIG+e2-emin;
+	if ((long long)bits > (long long)LDBL_MANT_DIG+e2-emin) {
+		bits = (int)((long long)LDBL_MANT_DIG+e2-emin);
 		if (bits<0) bits=0;
 		denormal = 1;
 	}
@@ -350,21 +364,26 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 			else
 				frac += 0.75*sign;
 		}
-		if (LDBL_MANT_DIG-bits >= 2 && !fmodl(frac, 1))
+		if (LDBL_MANT_DIG-bits >= 2 &&
+		    fpclassify(fmodl(frac, 1.0L)) == FP_ZERO)
 			frac++;
 	}
 
 	y += frac;
 	y -= bias;
 
-	if (((e2+LDBL_MANT_DIG) & INT_MAX) > emax-5) {
+	long long adjusted_e2 = (long long)e2 + LDBL_MANT_DIG;
+	long long safety_limit = emax - 5;
+	if ((adjusted_e2 & INT_MAX) > safety_limit) {
 		if (fabsl(y) >= 2/LDBL_EPSILON) {
-			if (denormal && bits==LDBL_MANT_DIG+e2-emin)
+			if (denormal && (long long)bits==(long long)LDBL_MANT_DIG+e2-emin)
 				denormal = 0;
 			y *= 0.5;
 			e2++;
+			adjusted_e2++;
 		}
-		if (e2+LDBL_MANT_DIG>emax || (denormal && frac))
+		if (adjusted_e2 > emax ||
+		    (denormal && fpclassify(frac) != FP_ZERO))
 			errno = ERANGE;
 	}
 
@@ -406,7 +425,7 @@ static long double fb_ld_hexfloat(FB_LONGDOUBLE_INPUT *f, int bits, int emin, in
 			if (c > '9') d = (c|32)+10-'a';
 			else d = c-'0';
 			if (dc<8) {
-				x = x*16 + d;
+				x = x*16 + (uint32_t)d;
 			} else if (dc < LDBL_MANT_DIG/4+1) {
 				y += d*(scale/=16);
 			} else if (d && !gottail) {
@@ -442,7 +461,30 @@ static long double fb_ld_hexfloat(FB_LONGDOUBLE_INPUT *f, int bits, int emin, in
 	} else {
 		fb_ld_unget(f);
 	}
-	e2 += 4*rp - 32;
+	long long radix_scale;
+	if (rp > LLONG_MAX / 4) {
+		errno = ERANGE;
+		return !x ? sign * 0.0 : sign * LDBL_MAX * LDBL_MAX;
+	}
+	if (rp < LLONG_MIN / 4) {
+		errno = ERANGE;
+		return !x ? sign * 0.0 : sign * LDBL_MIN * LDBL_MIN;
+	}
+	radix_scale = rp * 4;
+	if (radix_scale < LLONG_MIN + 32) {
+		errno = ERANGE;
+		return !x ? sign * 0.0 : sign * LDBL_MIN * LDBL_MIN;
+	}
+	radix_scale -= 32;
+	if (radix_scale > 0 && e2 > LLONG_MAX - radix_scale) {
+		errno = ERANGE;
+		return !x ? sign * 0.0 : sign * LDBL_MAX * LDBL_MAX;
+	}
+	if (radix_scale < 0 && e2 < LLONG_MIN - radix_scale) {
+		errno = ERANGE;
+		return !x ? sign * 0.0 : sign * LDBL_MIN * LDBL_MIN;
+	}
+	e2 += radix_scale;
 
 	if (!x) return sign * 0.0;
 	if (e2 > -emin) {
@@ -465,22 +507,25 @@ static long double fb_ld_hexfloat(FB_LONGDOUBLE_INPUT *f, int bits, int emin, in
 		e2--;
 	}
 
-	if (bits > 32+e2-emin) {
-		bits = 32+e2-emin;
-		if (bits<0) bits=0;
+	long long precision_limit = 32+e2-emin;
+	if (bits > precision_limit) {
+		if (precision_limit < 0)
+			bits = 0;
+		else
+			bits = (int)precision_limit;
 	}
 
 	if (bits < LDBL_MANT_DIG)
 		bias = copysignl(scalbn(1, 32+LDBL_MANT_DIG-bits-1), sign);
 
-	if (bits<32 && y && !(x&1)) x++, y=0;
+	if (bits<32 && fpclassify(y) != FP_ZERO && !(x&1)) x++, y=0;
 
 	y = bias + sign*(long double)x + sign*y;
 	y -= bias;
 
-	if (!y) errno = ERANGE;
+	if (fpclassify(y) == FP_ZERO) errno = ERANGE;
 
-	return scalbnl(y, e2);
+	return scalbnl(y, (int)e2);
 }
 
 static long double fb_ld_scan(FB_LONGDOUBLE_INPUT *f, int prec, int pok)
@@ -522,7 +567,7 @@ static long double fb_ld_scan(FB_LONGDOUBLE_INPUT *f, int prec, int pok)
 			fb_ld_unget(f);
 			if (pok) for (; i>3; i--) fb_ld_unget(f);
 		}
-		return sign * INFINITY;
+		return (float)sign * INFINITY;
 	}
 	if (!i) for (i=0; i<3 && (c|32)=="nan"[i]; i++)
 		if (i<2) c = fb_ld_get(f);

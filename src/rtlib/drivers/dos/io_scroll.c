@@ -9,69 +9,113 @@
 #include "fb_private_console.h"
 #include <dpmi.h>
 #include <go32.h>
+#include <limits.h>
+#include <stdint.h>
+
+static int hGetScreenSize( int *cols, int *rows )
+{
+	fb_ConsoleGetSize( cols, rows );
+	return (*cols > 0) && (*rows > 0) &&
+	       (*cols <= UCHAR_MAX + 1) && (*rows <= UCHAR_MAX + 1);
+}
+
+static int hRectIsValid( int x1, int y1, int x2, int y2,
+	                     int cols, int rows )
+{
+	return (x1 >= 0) && (y1 >= 0) && (x2 >= x1) && (y2 >= y1) &&
+	       (x2 < cols) && (y2 < rows);
+}
+
+static int hGetPageWordAddress( unsigned long page_addr, int cols,
+	                            int x, int y, unsigned long *address )
+{
+	unsigned long word_offset;
+	unsigned long byte_offset;
+
+	word_offset = (unsigned long)(unsigned int)y * (unsigned long)(unsigned int)cols +
+	              (unsigned long)(unsigned int)x;
+	byte_offset = word_offset * (unsigned long)sizeof( unsigned short );
+	if( page_addr > ULONG_MAX - byte_offset )
+		return FALSE;
+
+	*address = page_addr + byte_offset;
+	return TRUE;
+}
 
 static void hFillRect( int x1, int y1, int x2, int y2 )
 {
-	int cols, rows;
-	fb_ConsoleGetSize( &cols, &rows );
+	int cols, rows, row;
+	unsigned int color;
+	unsigned int width, i;
+	unsigned long page_addr;
+	unsigned short buffer[UCHAR_MAX + 1];
+	unsigned short attr;
 
-	int chars = (x2 - x1 + 1) * (y2 - y1 + 1);
+	if( !hGetScreenSize( &cols, &rows ) ||
+	    !hRectIsValid( x1, y1, x2, y2, cols, rows ) )
+		return;
 
-	unsigned long physAddr = fb_hGetPageAddr( fb_console_context.active, cols, rows );
-	if( physAddr == 0 )
+	width = (unsigned int)(x2 - x1 + 1);
+	color = fb_ConsoleGetColorAtt();
+	if( color > UCHAR_MAX )
+		return;
+	attr = (unsigned short)(color << 8);
+
+	page_addr = fb_hGetPageAddr( fb_console_context.active, cols, rows );
+	if( page_addr == 0 )
 	{
-    	/* change the cursor pos (faster than using LOCATE) */
-    	unsigned short oldPos = fb_hSetCursorPos( x1, y1 );
+		/* BIOS character output is limited to one row's 16-bit count. */
+		unsigned short old_pos = fb_hSetCursorPos( x1, y1 );
 
 		__dpmi_regs regs;
-		regs.x.ax = 0x0920;
-		regs.h.bh = fb_console_context.active;
-		regs.h.bl = fb_ConsoleGetColorAtt();
-		regs.x.cx = chars;
-		__dpmi_int(0x10, &regs);
+		for( row = y1; row <= y2; row++ ) {
+			if( row != y1 )
+				fb_hSetCursorPos( x1, row );
+			regs.x.ax = 0x0920;
+			regs.h.bh = (unsigned char)fb_console_context.active;
+			regs.h.bl = (unsigned char)color;
+			regs.x.cx = (unsigned short)width;
+			__dpmi_int(0x10, &regs);
+		}
 
-		/* restore old pos */
-		fb_hSetCursorPos( oldPos, -1 );
+		fb_hSetCursorPos( old_pos, -1 );
 	}
 	else
 	{
-    	unsigned short attr = fb_ConsoleGetColorAtt() << 8;
-    	if( (x2 - x1 + 1) == cols )
-    	{
-    		unsigned short *buffer = alloca( chars * sizeof( short ) );
-    		int i;
-    		for( i = 0, buffer += chars; i < chars; ++i )
-        		*--buffer = attr | 0x20;
+		for( i = 0; i < width; i++ )
+			buffer[i] = attr | 0x20;
 
-    		_movedataw( _my_ds(), (int)buffer,
-                		_dos_ds, physAddr + (cols << 1) * y1,
-                		chars );
+		for( row = y1; row <= y2; row++ ) {
+			unsigned long dest_addr;
+			if( !hGetPageWordAddress( page_addr, cols, x1, row, &dest_addr ) )
+				return;
+			_movedataw( (unsigned int)_my_ds(), (unsigned int)(uintptr_t)buffer,
+			            _dos_ds, dest_addr, (unsigned long)width );
 		}
-		else
-		{
-    		chars = x2 - x1 + 1;
-    		unsigned short *buffer = alloca( chars * sizeof( short ) );
-    		int i;
-    		for( i = 0, buffer += chars; i < chars; ++i )
-        		*--buffer = attr | 0x20;
-
-    		for( i = y1; i < y2; i++ )
-    			_movedataw( _my_ds(), (int)buffer,
-                			_dos_ds, physAddr + (cols << 1) * i + (x1 << 1),
-                			chars );
-		}
-    }
+	}
 }
 
 static void hMoveRect( int x1, int y1, int x2, int y2, int nrows )
 {
 	int cols, rows;
-	fb_ConsoleGetSize( &cols, &rows );
+	unsigned int width, height, move_rows, rows_to_move, i;
+	unsigned long page_addr;
 
-	int chars = (x2 - x1 + 1) * (y2 - y1 + 1 - nrows);
+	if( !hGetScreenSize( &cols, &rows ) ||
+	    !hRectIsValid( x1, y1, x2, y2, cols, rows ) || (nrows == 0) )
+		return;
 
-	unsigned long physAddr = fb_hGetPageAddr( fb_console_context.active, cols, rows );
-	if( physAddr == 0 )
+	width = (unsigned int)(x2 - x1 + 1);
+	height = (unsigned int)(y2 - y1 + 1);
+	if( nrows < 0 )
+		rows_to_move = (unsigned int)(-(nrows + 1)) + 1U;
+	else
+		rows_to_move = (unsigned int)nrows;
+	if( rows_to_move >= height )
+		return;
+
+	page_addr = fb_hGetPageAddr( fb_console_context.active, cols, rows );
+	if( page_addr == 0 )
 	{
 		/*
 			This is an off-screen page without a direct segment address.  The BIOS
@@ -81,32 +125,62 @@ static void hMoveRect( int x1, int y1, int x2, int y2, int nrows )
 	}
 	else
 	{
-    	if( (x2 - x1 + 1) == cols )
-    	{
-    		_movedataw( _dos_ds, physAddr + (cols << 1) * (y1+nrows),
-                		_dos_ds, physAddr + (cols << 1) * y1,
-                		chars );
+		move_rows = height - rows_to_move;
+		if( nrows > 0 ) {
+			for( i = 0; i < move_rows; i++ ) {
+				unsigned long src_addr, dest_addr;
+				int src_row = y1 + (int)rows_to_move + (int)i;
+				int dest_row = y1 + (int)i;
+				if( !hGetPageWordAddress( page_addr, cols, x1, src_row, &src_addr ) ||
+				    !hGetPageWordAddress( page_addr, cols, x1, dest_row, &dest_addr ) )
+					return;
+				_movedataw( _dos_ds, src_addr, _dos_ds, dest_addr,
+				            (unsigned long)width );
+			}
 		}
-		else
-		{
-    		chars = x2 - x1 + 1;
-    		int i;
-    		for( i = y1; i < y2 - nrows; i++ )
-    			_movedataw( _dos_ds, physAddr + (cols << 1) * (i+1) + (x1 << 1),
-                			_dos_ds, physAddr + (cols << 1) * i + (x1 << 1),
-                			chars );
-        }
+		else {
+			for( i = move_rows; i > 0; i-- ) {
+				unsigned long src_addr, dest_addr;
+				int src_row = y1 + (int)(i - 1U);
+				int dest_row = src_row + (int)rows_to_move;
+				if( !hGetPageWordAddress( page_addr, cols, x1, src_row, &src_addr ) ||
+				    !hGetPageWordAddress( page_addr, cols, x1, dest_row, &dest_addr ) )
+					return;
+				_movedataw( _dos_ds, src_addr, _dos_ds, dest_addr,
+				            (unsigned long)width );
+			}
+		}
 	}
-
 }
 
 void fb_ConsoleScroll_BIOS( int x1, int y1, int x2, int y2, int nrows )
 {
-    __dpmi_regs regs;
+	int cols, rows;
+	unsigned int color;
+	unsigned int scroll_rows;
+	unsigned int rect_height;
+	__dpmi_regs regs;
 
-    /* stupid BIOS can't scroll a specific page */
+	if( !hGetScreenSize( &cols, &rows ) ||
+	    !hRectIsValid( x1, y1, x2, y2, cols, rows ) )
+		return;
+	if( nrows < 0 )
+		scroll_rows = (unsigned int)(-(nrows + 1)) + 1U;
+	else
+		scroll_rows = (unsigned int)nrows;
+	if( scroll_rows > UCHAR_MAX )
+		return;
+	rect_height = (unsigned int)(y2 - y1 + 1);
+	if( scroll_rows >= rect_height ) {
+		nrows = 0;
+		scroll_rows = 0;
+	}
+
+	/* The BIOS cannot scroll a non-visible page. */
 	if( fb_console_context.active != fb_console_context.visible )
 	{
+		if( fb_hGetPageAddr( fb_console_context.active, cols, rows ) == 0 )
+			return;
 		if( nrows == 0 )
 		{
 			hFillRect( x1, y1, x2, y2 );
@@ -114,40 +188,51 @@ void fb_ConsoleScroll_BIOS( int x1, int y1, int x2, int y2, int nrows )
 		else
 		{
 			hMoveRect( x1, y1, x2, y2, nrows );
-			hFillRect( x1, y2-(nrows-1), x2, y2 );
+			if( nrows > 0 )
+				hFillRect( x1, y2 - (int)scroll_rows + 1, x2, y2 );
+			else
+				hFillRect( x1, y1, x2, y1 + (int)scroll_rows - 1 );
 		}
 
 		return;
 	}
 
-    regs.h.bl = 0;
-    regs.h.bh = (unsigned char) fb_ConsoleGetColorAtt();
-    regs.h.cl = (unsigned char) x1;
-    regs.h.ch = (unsigned char) y1;
-    regs.h.dl = (unsigned char) x2;
-    regs.h.dh = (unsigned char) y2;
-
-    if( nrows >= 0 ) {
-        regs.x.ax = (unsigned short) (0x0600 + nrows);
-    } else {
-        regs.x.ax = (unsigned short) (0x0700 + -nrows);
-    }
-    __dpmi_int(0x10, &regs);
+	color = fb_ConsoleGetColorAtt();
+	if( color > UCHAR_MAX )
+		return;
+	regs.h.bl = 0;
+	regs.h.bh = (unsigned char)color;
+	regs.h.cl = (unsigned char)x1;
+	regs.h.ch = (unsigned char)y1;
+	regs.h.dl = (unsigned char)x2;
+	regs.h.dh = (unsigned char)y2;
+	if( nrows >= 0 )
+		regs.x.ax = (unsigned short)(0x0600U | scroll_rows);
+	else
+		regs.x.ax = (unsigned short)(0x0700U | scroll_rows);
+	__dpmi_int(0x10, &regs);
 }
 
 void fb_ConsoleScrollEx( int x1, int y1, int x2, int y2, int nrows )
 {
-    int rows;
+	int cols, rows;
+	unsigned int scroll_rows;
 
-	if( nrows == 0 )
-        return;
+	if( !hGetScreenSize( &cols, &rows ) ||
+	    (x1 < 1) || (y1 < 1) || (x2 < x1) || (y2 < y1) ||
+	    (x2 > cols) || (y2 > rows) )
+		return;
 
-	fb_ConsoleGetSize( NULL, &rows );
-
-    if( nrows <= -rows || nrows >= rows )
+	if( nrows < 0 )
+		scroll_rows = (unsigned int)(-(nrows + 1)) + 1U;
+	else
+		scroll_rows = (unsigned int)nrows;
+	if( scroll_rows >= (unsigned int)rows )
         nrows = 0;
+	if( (nrows == 0) && (scroll_rows == 0) )
+		return;
 
-    fb_ConsoleScroll_BIOS( x1-1, y1-1, x2-1, y2-1, nrows );
+	fb_ConsoleScroll_BIOS( x1 - 1, y1 - 1, x2 - 1, y2 - 1, nrows );
 
 #if 0
     if( nrows > 0 ) {
@@ -171,7 +256,7 @@ void fb_ConsoleScroll( int nrows )
 	fb_ConsoleGetSize( &cols, NULL );
     fb_ConsoleGetView( &toprow, &botrow );
 
-    return fb_ConsoleScrollEx( 1, toprow, cols, botrow, nrows );
+	fb_ConsoleScrollEx( 1, toprow, cols, botrow, nrows );
 }
 
 /* end of drivers/dos/io_scroll.c */

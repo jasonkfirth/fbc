@@ -8,6 +8,40 @@
 #include "fb.h"
 #include "devices/dev_com_private.h"
 #include <strings.h>
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+
+/* OPEN COM stores numeric options as unsigned int on every target. Check
+   strtoul's full result before narrowing, including targets with 32-bit long.
+   Empty extended values and signed zero retain their existing zero value. */
+static int fb_hDevComParseUInt( const char *text, unsigned int *value )
+{
+    const char *number = text;
+    char *end;
+    unsigned long parsed;
+    int previous_errno = errno;
+    int range_error;
+
+    while( isspace( FB_CHAR_TO_INT( *number ) ) )
+        ++number;
+    errno = 0;
+    parsed = strtoul( text, &end, 10 );
+    range_error = (errno == ERANGE);
+    errno = previous_errno;
+    if( range_error || *end != '\0' || parsed > UINT_MAX ||
+        (*number == '-' && parsed != 0) )
+        return FALSE;
+
+    *value = (unsigned int)parsed;
+    return TRUE;
+}
+
+/* The serial API accepts only these exact stop-bit values. */
+static int fb_DevComDoubleEqual(double left, double right)
+{
+	return (left <= right) && (left >= right);
+}
 
 static int fb_DevComClose( FB_FILE *handle )
 {
@@ -45,7 +79,7 @@ static int fb_DevComWrite( FB_FILE *handle, const void* value, size_t valuelen )
 
 static int fb_DevComWriteWstr( FB_FILE *handle, const FB_WCHAR* value, size_t valuelen )
 {
-	return fb_DevComWrite( handle, (void*)value, valuelen * sizeof( FB_WCHAR ) );
+	return fb_DevComWrite( handle, value, valuelen * sizeof( FB_WCHAR ) );
 }
 
 static int fb_DevComRead( FB_FILE *handle, void* value, size_t *pValuelen )
@@ -147,7 +181,7 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
     }
     else
     {
-    	i = (strchr( filename, ':' ) - filename);
+		i = (size_t)(strchr( filename, ':' ) - filename);
         if( i >= sizeof( achDev ) )
             return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     	strncpy( achDev, filename, i );
@@ -224,8 +258,8 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         ++pchPosEnd;
 
         /* copy option to temporary buffer */
-        uiOptionLength = pchPosEnd - pchPos;
-        pszOption = malloc( uiOptionLength + 1 );
+        uiOptionLength = (size_t)(pchPosEnd - pchPos);
+        pszOption = (char *)malloc( uiOptionLength + 1 );
         if( pszOption==NULL ) {
             res = fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
             break;
@@ -237,8 +271,7 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         switch ( uiOption ) {
         case 0:
             /* baud rate */
-            info->Options.uiSpeed = strtoul( pszOption, &pchPosTmp, 10 );
-            if( *pchPosTmp!=0 ) {
+            if( !fb_hDevComParseUInt( pszOption, &info->Options.uiSpeed ) ) {
                 res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
             }
             break;
@@ -266,8 +299,7 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 
         case 2:
             /* data bits */
-            info->Options.uiDataBits = strtoul( pszOption, &pchPosTmp, 10 );
-            if( *pchPosTmp!=0 ) {
+            if( !fb_hDevComParseUInt( pszOption, &info->Options.uiDataBits ) ) {
                 res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
             }
             break;
@@ -279,11 +311,11 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
                 if( *pchPosTmp!=0 ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 } else {
-                    if( dblStopBits==1.0 ) {
+                    if( fb_DevComDoubleEqual(dblStopBits, 1.0) ) {
                         iStopBits = FB_SERIAL_STOP_BITS_1;
-                    } else if( dblStopBits==1.5 ) {
+                    } else if( fb_DevComDoubleEqual(dblStopBits, 1.5) ) {
                         iStopBits = FB_SERIAL_STOP_BITS_1_5;
-                    } else if( dblStopBits==2.0 ) {
+                    } else if( fb_DevComDoubleEqual(dblStopBits, 2.0) ) {
                         iStopBits = FB_SERIAL_STOP_BITS_2;
                     } else {
                         res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -295,33 +327,27 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
         default:
             /* extended options */
             if( strncasecmp( pszOption, "CS", 2 )==0 ) {
-                info->Options.DurationCTS = strtoul( pszOption+2, &pchPosTmp, 10 );
-                if( *pchPosTmp!=0 ) {
+                if( !fb_hDevComParseUInt( pszOption+2, &info->Options.DurationCTS ) ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 }
             } else if( strncasecmp( pszOption, "DS", 2 )==0 ) {
-                info->Options.DurationDSR = strtoul( pszOption+2, &pchPosTmp, 10 );
-                if( *pchPosTmp!=0 ) {
+                if( !fb_hDevComParseUInt( pszOption+2, &info->Options.DurationDSR ) ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 }
             } else if( strncasecmp( pszOption, "CD", 2 )==0 ) {
-                info->Options.DurationCD = strtoul( pszOption+2, &pchPosTmp, 10 );
-                if( *pchPosTmp!=0 ) {
+                if( !fb_hDevComParseUInt( pszOption+2, &info->Options.DurationCD ) ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 }
             } else if( strncasecmp( pszOption, "OP", 2 )==0 ) {
-                info->Options.OpenTimeout = strtoul( pszOption+2, &pchPosTmp, 10 );
-                if( *pchPosTmp!=0 ) {
+                if( !fb_hDevComParseUInt( pszOption+2, &info->Options.OpenTimeout ) ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 }
             } else if( strncasecmp( pszOption, "TB", 2 )==0 ) {
-                info->Options.TransmitBuffer = strtoul( pszOption+2, &pchPosTmp, 10 );
-                if( *pchPosTmp!=0 ) {
+                if( !fb_hDevComParseUInt( pszOption+2, &info->Options.TransmitBuffer ) ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 }
             } else if( strncasecmp( pszOption, "RB", 2 )==0 ) {
-                info->Options.ReceiveBuffer = strtoul( pszOption+2, &pchPosTmp, 10 );
-                if( *pchPosTmp!=0 ) {
+                if( !fb_hDevComParseUInt( pszOption+2, &info->Options.ReceiveBuffer ) ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 }
             } else if( strcasecmp( pszOption, "RS" )==0 ) {
@@ -342,8 +368,7 @@ int fb_DevComOpen( FB_FILE *handle, const char *filename, size_t filename_len )
             } else if( strcasecmp( pszOption, "ME" )==0 ) {
                 info->Options.IgnoreAllErrors = TRUE;
             } else if( strncasecmp( pszOption, "IR", 2 )==0 ) {
-                info->Options.IRQNumber = strtoul( pszOption+2, &pchPosTmp, 10 );
-                if( *pchPosTmp!=0 ) {
+                if( !fb_hDevComParseUInt( pszOption+2, &info->Options.IRQNumber ) ) {
                     res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
                 }
             } else {
@@ -419,8 +444,8 @@ int fb_DevSerialSetWidth( const char *pszDevice, int width, int default_width )
             DEV_COM_INFO *tmp_info = (DEV_COM_INFO*) tmp_handle->opaque;
             if( strcmp(tmp_info->pszDevice, achDev)==0 ) {
                 if( width!=-1 )
-                    tmp_handle->width = width;
-                cur = tmp_handle->width;
+                    tmp_handle->width = (unsigned)width;
+                cur = (int)tmp_handle->width;
                 break;
             }
         }

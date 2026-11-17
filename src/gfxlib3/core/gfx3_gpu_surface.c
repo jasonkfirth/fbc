@@ -33,6 +33,36 @@
 
 #include <math.h>
 
+/*
+	GPU surface transforms use exact zero and full-circle sentinels. Keep those
+	checks exact while avoiding a tolerance that could alter edge coverage.
+*/
+static int gpu_surface_float_equal(float left, float right)
+{
+	return (left <= right) && (left >= right);
+}
+
+static int gpu_surface_int32_fits(int64_t value)
+{
+	return (value >= (int64_t)INT32_MIN) &&
+	       (value <= (int64_t)INT32_MAX);
+}
+
+static int gpu_surface_int32_extent_fits(int32_t origin, int32_t extent)
+{
+	return (extent > 0) && (origin <= INT32_MAX - (extent - 1));
+}
+
+/* Check a positive rectangle extent before forming its final signed pixel. */
+static int gpu_surface_int32_extent_end(int32_t origin, int32_t extent,
+	int32_t *end)
+{
+	if (!gpu_surface_int32_extent_fits(origin, extent))
+		return 0;
+	*end = (int32_t)((int64_t)origin + (int64_t)extent - 1);
+	return 1;
+}
+
 typedef struct FB_GFX3_GPU_SURFACE_NODE {
 	struct FB_GFX3_GPU_SURFACE_NODE *next;
 	FB_GFX3_MODE *mode;
@@ -541,12 +571,10 @@ FBCALL int fb_Gfx3SurfaceBlit(void *destination_pointer,
 	FB_GRAPHICS_LOCK();
 	state = fb_gfx3_api_get_draw_state_locked();
 	if ((state != NULL) && (width > 0) && (height > 0) &&
-	    (source_x2 >= INT32_MIN) && (source_x2 <= INT32_MAX) &&
-	    (source_y2 >= INT32_MIN) && (source_y2 <= INT32_MAX) &&
-	    (destination_x2 >= INT32_MIN) &&
-	    (destination_x2 <= INT32_MAX) &&
-	    (destination_y2 >= INT32_MIN) &&
-	    (destination_y2 <= INT32_MAX) &&
+	    gpu_surface_int32_fits(source_x2) &&
+	    gpu_surface_int32_fits(source_y2) &&
+	    gpu_surface_int32_fits(destination_x2) &&
+	    gpu_surface_int32_fits(destination_y2) &&
 	    (mode >= FB_GFX3_BLIT_TRANS) && (mode <= FB_GFX3_BLIT_BLEND) &&
 	    (mode != FB_GFX3_BLIT_CUSTOM)) {
 		if (destination_pointer == NULL) {
@@ -833,6 +861,10 @@ FBCALL int fb_Gfx3SurfaceBlitRotated(void *destination_pointer,
 	double maximum_y = -HUGE_VAL;
 	double corner_x[2];
 	double corner_y[2];
+	double floor_minimum_x;
+	double floor_minimum_y;
+	double ceil_maximum_x;
+	double ceil_maximum_y;
 	int ix;
 	int iy;
 	int result = FB_GFX3_INVALID;
@@ -841,28 +873,32 @@ FBCALL int fb_Gfx3SurfaceBlitRotated(void *destination_pointer,
 	    !isfinite(destination_x) || !isfinite(destination_y) ||
 	    !isfinite(angle_degrees) || !isfinite(scale_x) ||
 	    !isfinite(scale_y) || !isfinite(pivot_x) || !isfinite(pivot_y) ||
-	    (scale_x == 0.0f) || (scale_y == 0.0f) ||
-	    ((int64_t)source_x + source_width - 1 > INT32_MAX) ||
-	    ((int64_t)source_y + source_height - 1 > INT32_MAX))
+	    gpu_surface_float_equal(scale_x, 0.0f) ||
+	    gpu_surface_float_equal(scale_y, 0.0f) ||
+	    !gpu_surface_int32_extent_end(source_x, source_width,
+		&source_rect.x2) ||
+	    !gpu_surface_int32_extent_end(source_y, source_height,
+		&source_rect.y2))
 		goto done;
 	if (pivot_x < 0.0f)
 		pivot_x = (float)source_width * 0.5f;
 	if (pivot_y < 0.0f)
 		pivot_y = (float)source_height * 0.5f;
+	/* Keep transform bounds and inverse terms in double until matrix storage. */
 	angle = (double)angle_degrees * (3.14159265358979323846 / 180.0);
 	cosine = cos(angle);
 	sine = sin(angle);
 	corner_x[0] = -(double)pivot_x;
-	corner_x[1] = (double)source_width - pivot_x;
+	corner_x[1] = (double)source_width - (double)pivot_x;
 	corner_y[0] = -(double)pivot_y;
-	corner_y[1] = (double)source_height - pivot_y;
+	corner_y[1] = (double)source_height - (double)pivot_y;
 	for (iy = 0; iy < 2; ++iy) {
 		for (ix = 0; ix < 2; ++ix) {
-			double local_x = corner_x[ix] * scale_x;
-			double local_y = corner_y[iy] * scale_y;
-			double transformed_x = destination_x +
+			double local_x = corner_x[ix] * (double)scale_x;
+			double local_y = corner_y[iy] * (double)scale_y;
+			double transformed_x = (double)destination_x +
 				(cosine * local_x) - (sine * local_y);
-			double transformed_y = destination_y +
+			double transformed_y = (double)destination_y +
 				(sine * local_x) + (cosine * local_y);
 
 			if (transformed_x < minimum_x)
@@ -879,20 +915,22 @@ FBCALL int fb_Gfx3SurfaceBlitRotated(void *destination_pointer,
 	    (maximum_x > (double)INT32_MAX + 1.0) ||
 	    (maximum_y > (double)INT32_MAX + 1.0))
 		goto done;
+	floor_minimum_x = floor(minimum_x);
+	floor_minimum_y = floor(minimum_y);
+	ceil_maximum_x = ceil(maximum_x);
+	ceil_maximum_y = ceil(maximum_y);
 	source_rect.x1 = source_x;
 	source_rect.y1 = source_y;
-	source_rect.x2 = source_x + source_width - 1;
-	source_rect.y2 = source_y + source_height - 1;
-	destination_bounds.x1 = (int32_t)floor(minimum_x);
-	destination_bounds.y1 = (int32_t)floor(minimum_y);
-	destination_bounds.x2 = (int32_t)ceil(maximum_x) - 1;
-	destination_bounds.y2 = (int32_t)ceil(maximum_y) - 1;
-	inverse[0] = (float)(cosine / scale_x);
-	inverse[1] = (float)(sine / scale_x);
+	destination_bounds.x1 = (int32_t)floor_minimum_x;
+	destination_bounds.y1 = (int32_t)floor_minimum_y;
+	destination_bounds.x2 = (int32_t)ceil_maximum_x - 1;
+	destination_bounds.y2 = (int32_t)ceil_maximum_y - 1;
+	inverse[0] = (float)(cosine / (double)scale_x);
+	inverse[1] = (float)(sine / (double)scale_x);
 	inverse[2] = (float)source_x + pivot_x -
 		(inverse[0] * destination_x) - (inverse[1] * destination_y);
-	inverse[3] = (float)(-sine / scale_y);
-	inverse[4] = (float)(cosine / scale_y);
+	inverse[3] = (float)(-sine / (double)scale_y);
+	inverse[4] = (float)(cosine / (double)scale_y);
 	inverse[5] = (float)source_y + pivot_y -
 		(inverse[3] * destination_x) - (inverse[4] * destination_y);
 	inverse[8] = 1.0f;
@@ -935,41 +973,41 @@ FBCALL int fb_Gfx3SurfaceMode7(void *destination_pointer,
 	    !isfinite(camera_height) || !isfinite(camera_angle_degrees) ||
 	    !isfinite(horizon_y) || !isfinite(focal_length) ||
 	    (camera_height <= 0.0f) || (focal_length <= 0.0f) ||
-	    ((int64_t)source_x + source_width - 1 > INT32_MAX) ||
-	    ((int64_t)source_y + source_height - 1 > INT32_MAX) ||
-	    ((int64_t)destination_x + destination_width - 1 > INT32_MAX) ||
-	    ((int64_t)destination_y + destination_height - 1 > INT32_MAX))
+	    !gpu_surface_int32_extent_end(source_x, source_width,
+		&source_rect.x2) ||
+	    !gpu_surface_int32_extent_end(source_y, source_height,
+		&source_rect.y2) ||
+	    !gpu_surface_int32_extent_end(destination_x, destination_width,
+		&destination_bounds.x2) ||
+	    !gpu_surface_int32_extent_end(destination_y, destination_height,
+		&destination_bounds.y2))
 		goto done;
 	source_rect.x1 = source_x;
 	source_rect.y1 = source_y;
-	source_rect.x2 = source_x + source_width - 1;
-	source_rect.y2 = source_y + source_height - 1;
 	destination_bounds.x1 = destination_x;
 	destination_bounds.y1 = destination_y;
-	destination_bounds.x2 = destination_x + destination_width - 1;
-	destination_bounds.y2 = destination_y + destination_height - 1;
 	angle = (double)camera_angle_degrees *
 		(3.14159265358979323846 / 180.0);
 	cosine = cos(angle);
 	sine = sin(angle);
 	centre_x = (double)destination_x + ((double)destination_width * 0.5);
-	absolute_camera_x = (double)source_x + camera_x;
-	absolute_camera_y = (double)source_y + camera_y;
+	absolute_camera_x = (double)source_x + (double)camera_x;
+	absolute_camera_y = (double)source_y + (double)camera_y;
 	/*
 		Divide both source numerators by destination y minus the horizon.
 		This is the classic scanline Mode 7 projection expressed as one inverse
 		projective matrix, so each output pixel remains an independent GPU job.
 	*/
-	inverse[0] = (float)(-sine * camera_height);
+	inverse[0] = (float)(-sine * (double)camera_height);
 	inverse[1] = (float)absolute_camera_x;
-	inverse[2] = (float)((sine * camera_height * centre_x) -
-		(absolute_camera_x * horizon_y) +
-		(cosine * camera_height * focal_length));
-	inverse[3] = (float)(cosine * camera_height);
+	inverse[2] = (float)((sine * (double)camera_height * centre_x) -
+		(absolute_camera_x * (double)horizon_y) +
+		(cosine * (double)camera_height * (double)focal_length));
+	inverse[3] = (float)(cosine * (double)camera_height);
 	inverse[4] = (float)absolute_camera_y;
-	inverse[5] = (float)((-cosine * camera_height * centre_x) -
-		(absolute_camera_y * horizon_y) +
-		(sine * camera_height * focal_length));
+	inverse[5] = (float)((-cosine * (double)camera_height * centre_x) -
+		(absolute_camera_y * (double)horizon_y) +
+		(sine * (double)camera_height * (double)focal_length));
 	inverse[7] = 1.0f;
 	inverse[8] = -horizon_y;
 	FB_GRAPHICS_LOCK();
@@ -1238,14 +1276,12 @@ FBCALL int fb_Gfx3DrawGlyphs(const FB_GFX3_GLYPH *glyphs, int count)
 		goto unlock;
 	}
 	for (index = 0u; index < (uint32_t)count; ++index) {
-		int64_t last_x = (int64_t)glyphs[index].x +
-			(int64_t)glyphs[index].width - 1;
-		int64_t last_y = (int64_t)glyphs[index].y +
-			(int64_t)glyphs[index].height - 1;
-
 		if ((glyphs[index].width == 0u) || (glyphs[index].width > 8u) ||
 		    (glyphs[index].height == 0u) || (glyphs[index].height > 16u) ||
-		    (last_x > INT32_MAX) || (last_y > INT32_MAX) ||
+		    !gpu_surface_int32_extent_fits(glyphs[index].x,
+			(int32_t)glyphs[index].width) ||
+		    !gpu_surface_int32_extent_fits(glyphs[index].y,
+			(int32_t)glyphs[index].height) ||
 		    ((glyphs[index].flags &
 		      ~(uint32_t)FB_GFX3_GLYPH_BACKGROUND) != 0u))
 			goto unlock;
@@ -1523,7 +1559,8 @@ static int gpu_surface_arc(FB_GFX3_SURFACE *surface,
 	span = end - start;
 	increment = 1.0f / (sqrtf(radius_x) * sqrtf(radius_y) * 1.5f);
 	if (!isfinite(increment) || !(increment > 0.0f) || !isfinite(span) ||
-	    (span < 0.0f) || ((double)span / increment + 1.5 > UINT32_MAX))
+	    (span < 0.0f) ||
+	    ((double)span / (double)increment + 1.5 > UINT32_MAX))
 		return FB_GFX3_INVALID;
 	count = (uint32_t)(span / increment + 0.5f) + 1u;
 	if ((count == 0u) ||
@@ -1596,7 +1633,7 @@ int fb_gfx3_gpu_surface_ellipse(FB_GFX3_SURFACE *surface,
 	result = gpu_surface_coordinates(x, y, &center_x, &center_y);
 	if (result != FB_GFX3_OK)
 		return result;
-	if (aspect == 0.0f)
+	if (gpu_surface_float_equal(aspect, 0.0f))
 		aspect = 1.0f;
 	if (!(aspect > 0.0f))
 		return FB_GFX3_INVALID;
@@ -1608,7 +1645,8 @@ int fb_gfx3_gpu_surface_ellipse(FB_GFX3_SURFACE *surface,
 		radius_y = radius * aspect;
 	}
 	color = gpu_surface_color(surface, state, color, flags, FALSE);
-	if ((start != 0.0f) || (end != 6.283186f))
+	if (!gpu_surface_float_equal(start, 0.0f) ||
+	    !gpu_surface_float_equal(end, 6.283186f))
 		return gpu_surface_arc(surface, state, center_x, center_y, radius_x,
 			radius_y, color, start, end);
 	gpu_surface_full_clip(surface, &clip);

@@ -30,6 +30,8 @@ Keywords that work with procedures.
 		Specifies that the procedure name can be used in other procedure declarations.
 	=={{fbdoc item="keyword" value="KeyPgStatic|Static"}}==
 		Specifies static storage for all variables and objects in the procedure body.
+	=={{fbdoc item="keyword" value="KeyPgNoInline|NoInline"}}==
+		Disables native procedure inlining in the C backends.
 	=={{fbdoc item="keyword" value="KeyPgConstMember|Const (Member)"}}==
 		Specifies a const member procedure in user-defined type definitions.
 	=={{fbdoc item="keyword" value="KeyPgStaticMember|Static (Member)"}}==

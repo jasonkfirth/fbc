@@ -28,6 +28,7 @@
 #include <dlfcn.h>
 #include <limits.h>
 
+static char haiku_opengl_driver_name[] = "HaikuOpenGL";
 static FB_DYLIB gl_library = NULL;
 
 extern "C" void *fb_hGL_GetProcAddress(const char *proc)
@@ -126,7 +127,7 @@ static void driver_flip(void)
 
 extern "C" const GFXDRIVER fb_gfxDriverHaikuOpenGL =
 {
-    (char*)"HaikuOpenGL",
+	haiku_opengl_driver_name,
     driver_init,
     driver_exit,
     driver_lock,

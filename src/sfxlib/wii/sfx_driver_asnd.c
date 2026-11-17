@@ -486,7 +486,7 @@ static int wii_driver_write(const float *samples, int frames)
 static const FB_SFX_DRIVER fb_sfxDriverWiiAsnd =
 {
     "asnd",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     wii_driver_init,
     wii_driver_exit,
     wii_driver_write,

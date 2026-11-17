@@ -210,7 +210,7 @@ static int amiga_ahiDeviceList(void)
 const FB_SFX_DRIVER fb_sfxDriverAmigaAhi =
 {
     "AMIGA AHI",
-    FB_SFX_DRIVER_CAP_BACKGROUND | FB_SFX_DRIVER_CAP_BLOCKING,
+    FB_SFX_DRIVER_CAP_BACKGROUND | FB_SFX_DRIVER_CAP_BLOCKING FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     amiga_ahiInit,
     amiga_ahiExit,
     amiga_ahiWrite,

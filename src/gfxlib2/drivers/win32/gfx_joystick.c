@@ -1,16 +1,35 @@
-/* joystick handling, win32 */
+/*
+	FreeBASIC gfxlib2 Win32 joystick input
+	--------------------------------------
+
+	File: gfx_joystick.c
+
+	Purpose:
+		Read WinMM joystick state and map its axes to the gfxlib2 range.
+
+	Responsibilities:
+		- cache device capabilities by joystick id
+		- return axis, POV and button state
+
+	This file intentionally does NOT contain:
+		- graphics drawing or window event handling
+*/
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_win32.h"
 #include <mmsystem.h>
 
-#define CALCPOS(pos, min, max)	(((((float)(pos) - (float)(min)) * 2.0) / ((float)(max) - (float)(min) + 1.0)) - 1.0)
+/* Keep the float subtractions before explicit double math to preserve rounding. */
+#define CALCPOS(pos, min, max) \
+	((float)((((double)((float)(pos) - (float)(min)) * 2.0) / \
+		  ((double)((float)(max) - (float)(min)) + 1.0)) - 1.0))
 
 typedef struct FB_JOYDATA {
 	int detected, available;
 	JOYCAPS caps;
 } JOYDATA;
 
+/* Shared device state is accessed while holding FB_GRAPHICS_LOCK(). */
 static JOYDATA joy[16];
 static int inited = FALSE;
 
@@ -20,6 +39,7 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 {
 	JOYINFOEX info;
 	JOYDATA *j;
+	UINT_PTR device_id;
 
 	FB_GRAPHICS_LOCK( );
 
@@ -35,12 +55,14 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 		FB_GRAPHICS_UNLOCK( );
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	}
+	device_id = (UINT_PTR)id + (UINT_PTR)JOYSTICKID1;
 
 	j = &joy[id];
 
 	if (!j->detected) {
 		j->detected = TRUE;
-		if (joyGetDevCaps(id + JOYSTICKID1, &j->caps, sizeof(j->caps)) != JOYERR_NOERROR) {
+		/* The validated id fits both WinMM joystick id parameter types. */
+		if (joyGetDevCaps(device_id, &j->caps, sizeof(j->caps)) != JOYERR_NOERROR) {
 			FB_GRAPHICS_UNLOCK( );
 			return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 		}
@@ -54,7 +76,7 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 
 	info.dwSize = sizeof(info);
 	info.dwFlags = JOY_RETURNALL;
-	if (joyGetPosEx(id + JOYSTICKID1, &info) != JOYERR_NOERROR) {
+	if (joyGetPosEx((UINT)device_id, &info) != JOYERR_NOERROR) {
 		FB_GRAPHICS_UNLOCK( );
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	}
@@ -90,3 +112,5 @@ FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, flo
 	FB_GRAPHICS_UNLOCK( );
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
+
+/* end of gfx_joystick.c */

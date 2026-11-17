@@ -113,7 +113,8 @@ FBCALL int fb_FileLock( int fnum, unsigned int inipos, unsigned int endpos )
 	    !fb_FileLockArgumentsValid( (long long)inipos, (long long)endpos ) )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
-	return fb_FileLockEx( FB_FILE_TO_HANDLE(fnum), inipos, endpos );
+	return fb_FileLockEx( FB_FILE_TO_HANDLE(fnum), (fb_off_t)inipos,
+	                      (fb_off_t)endpos );
 }
 
 FBCALL int fb_FileLockLarge( int fnum, long long inipos, long long endpos )
@@ -131,7 +132,8 @@ FBCALL int fb_FileUnlock( int fnum, unsigned int inipos, unsigned int endpos )
 	    !fb_FileLockArgumentsValid( (long long)inipos, (long long)endpos ) )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
-	return fb_FileUnlockEx( FB_FILE_TO_HANDLE(fnum), inipos, endpos );
+	return fb_FileUnlockEx( FB_FILE_TO_HANDLE(fnum), (fb_off_t)inipos,
+	                        (fb_off_t)endpos );
 }
 
 FBCALL int fb_FileUnlockLarge( int fnum, long long inipos, long long endpos )

@@ -7,14 +7,20 @@
 
 /* gfx hook for INPUT support */
 
+#include <limits.h>
+
 #include "../fb_gfx.h"
 
 static void move_back(void)
 {
-	fb_gfx->cursor_x--;
-	if (fb_gfx->cursor_x < 0) {
-		fb_gfx->cursor_x = fb_gfx->text_w - 1;
-		fb_gfx->cursor_y--;
+	if (fb_gfx->cursor_x > 0) {
+		fb_gfx->cursor_x--;
+	} else {
+		fb_gfx->cursor_x = (fb_gfx->text_w > 0)
+			? fb_gfx->text_w - 1
+			: 0;
+		if (fb_gfx->cursor_y > INT_MIN)
+			fb_gfx->cursor_y--;
 	}
 }
 
@@ -35,6 +41,10 @@ char *fb_GfxReadStr(char *buffer, ssize_t maxlen)
 		FB_GRAPHICS_UNLOCK( );
 		return NULL;
 	}
+	if (!buffer || maxlen <= 0) {
+		FB_GRAPHICS_UNLOCK( );
+		return NULL;
+	}
 
 	do {
 		fb_GfxPrintBuffer(cursor, 0);
@@ -46,7 +56,7 @@ char *fb_GfxReadStr(char *buffer, ssize_t maxlen)
 		move_back();
 
 		key = fb_Getkey();
-		if (key < 0x100) {
+		if ((key >= 0) && (key < 0x100)) {
 			if (key == 8) {
 				if (len > 0) {
 					cursor = cursor_backspace;
@@ -58,19 +68,20 @@ char *fb_GfxReadStr(char *buffer, ssize_t maxlen)
 					len--;
 				}
 			}
-			else if ((key != 7) && (len < maxlen - 1)) {
+			else if ((key != 7) &&
+			         (((size_t)len + 1u) < (size_t)maxlen)) {
 				if (key == 13) {
 					fb_GfxPrintBuffer(space, 0);
 					move_back();
 				}
-				buffer[len++] = key;
-				character[0] = key;
+				buffer[(size_t)len++] = (char)(unsigned char)key;
+				character[0] = (char)(unsigned char)key;
 				fb_GfxPrintBuffer(character, 0);
 			}
 		}
 	} while (key != 13);
 
-	buffer[len] = '\0';
+	buffer[(size_t)len] = '\0';
 
 	FB_GRAPHICS_UNLOCK( );
 	return buffer;

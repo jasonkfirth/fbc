@@ -19,7 +19,7 @@ FBCALL FB_WCHAR *fb_WstrFill1( ssize_t chars, int c )
 	if( dst != NULL )
 	{
 		/* fill it */
-		fb_wstr_Fill( dst, c, chars );
+		fb_wstr_Fill( dst, (FB_WCHAR)c, chars );
 	}
 
 	return dst;

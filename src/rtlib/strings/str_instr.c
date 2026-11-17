@@ -224,7 +224,9 @@ FBCALL ssize_t fb_StrInstr( ssize_t start, FBSTRING_ACCESS *src, FBSTRING_ACCESS
 		}
 		else if( size_patt==1 )
 		{
-			const char *pszEnd = (const char *) FB_MEMCHR( src->data + start - 1, patt->data[0], size_src - start + 1);
+			const char *pszEnd = (const char *) FB_MEMCHR( src->data + start - 1,
+			                                               patt->data[0],
+			                                               (size_t)size_src - (size_t)start + 1u );
 			if( pszEnd==NULL )
 			{
 				r = 0;

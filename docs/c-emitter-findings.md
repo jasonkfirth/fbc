@@ -11,9 +11,9 @@ This file intentionally does NOT replace raw diagnostics or claim a clean sweep.
 Warning cleanup remains unfinished. The historical inventories and diagnostic
 runs cover selected inputs, not every source or build configuration. The results
 below retain failing checks, timeouts and residual warnings as unfinished work.
-The [November 1 continuation](c-emitter-current-status.md) records fresh compiler
-and unit checks, repaired helper contracts and UDP handles, and current ERROR
-failures. Its per-source ledger separates current qualification from inventory.
+The [current continuation](c-emitter-current-status.md) records the selected
+compiler and unit checks, repaired helper contracts and completed corpus counts.
+Its per-source ledger separates current qualification from inventory.
 
 The audit emits C without the driver's diagnostic suppressions and checks it
 with aggressive GCC warnings and Clang `-Weverything -Wwrite-strings`. The original 9,254-input

@@ -18,7 +18,8 @@ FBCALL unsigned int fb_WstrAsc( const FB_WCHAR *str, ssize_t pos )
 	if( (len == 0) || (pos <= 0) || (pos > len) )
 		return 0;
 	else
-	return str[pos-1];
+		/* ASC exposes the raw code unit, including signed wchar_t bit patterns. */
+		return (unsigned int)str[pos-1];
 }
 
 /* end of strings/wide/strw_asc.c */

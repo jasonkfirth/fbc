@@ -52,6 +52,8 @@ Platform specific notes:
 		
 		The data must be sent in the printer's language (ESC/P, HPGL, ""PostScript"", etc...).  Emulation modes aren't supported yet.
 
+	On Unix targets, spooler commands use checked temporary heap storage and release it after opening or failure. Negative direct printer ports are rejected before constructing a device name.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/fileio/openlpt1.bas"}}%%(freebasic)
 ' Send some text to the Windows printer on LPT1:, using driver text imaging.

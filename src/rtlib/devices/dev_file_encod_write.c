@@ -7,35 +7,30 @@
  */
 #include "fb.h"
 
-static void hUTFToLE( char *buffer, ssize_t bytes, FB_FILE_ENCOD encod )
+static void hUTFToLE( unsigned char *buffer, ssize_t bytes, FB_FILE_ENCOD encod )
 {
-	unsigned char *dst;
-	ssize_t i, units;
+	UTF_16 unit16;
+	UTF_32 unit32;
+	unsigned char *unit_buffer;
+	size_t i, units;
 
-	switch( encod )
-	{
-	case FB_FILE_ENCOD_UTF16:
-		dst = (unsigned char *)buffer;
-		units = bytes / sizeof( UTF_16 );
-		for( i = 0; i < units; ++i )
-		{
-			fb_UTF16ToLE( dst, ((UTF_16 *)buffer)[i] );
-			dst += sizeof( UTF_16 );
+	if( bytes <= 0 )
+		return;
+
+	if( encod == FB_FILE_ENCOD_UTF16 ) {
+		units = (size_t)bytes / sizeof( UTF_16 );
+		for( i = 0; i < units; ++i ) {
+			unit_buffer = buffer + (i * sizeof( unit16 ));
+			memcpy( &unit16, unit_buffer, sizeof( unit16 ) );
+			fb_UTF16ToLE( unit_buffer, unit16 );
 		}
-		break;
-
-	case FB_FILE_ENCOD_UTF32:
-		dst = (unsigned char *)buffer;
-		units = bytes / sizeof( UTF_32 );
-		for( i = 0; i < units; ++i )
-		{
-			fb_UTF32ToLE( dst, ((UTF_32 *)buffer)[i] );
-			dst += sizeof( UTF_32 );
+	} else if( encod == FB_FILE_ENCOD_UTF32 ) {
+		units = (size_t)bytes / sizeof( UTF_32 );
+		for( i = 0; i < units; ++i ) {
+			unit_buffer = buffer + (i * sizeof( unit32 ));
+			memcpy( &unit32, unit_buffer, sizeof( unit32 ) );
+			fb_UTF32ToLE( unit_buffer, unit32 );
 		}
-		break;
-
-	default:
-		break;
 	}
 }
 
@@ -44,6 +39,7 @@ int fb_DevFileWriteEncod( FB_FILE *handle, const void* buffer, size_t chars )
 	    FILE *fp;
     char *encod_buffer;
 	ssize_t bytes;
+	size_t write_bytes;
 
     FB_LOCK();
 
@@ -52,27 +48,39 @@ int fb_DevFileWriteEncod( FB_FILE *handle, const void* buffer, size_t chars )
 		FB_UNLOCK();
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
+	if( chars > (size_t)FB_STRSIZEMSK ) {
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	}
 
 	/* convert (note: encoded file can only be opened in text-mode, so no
 	   			PUT# is allowed, no binary data should be emitted ever) */
 	encod_buffer = fb_CharToUTF( handle->encod,
 								 (const char *)buffer,
-								 chars,
+								 (ssize_t)chars,
 								 NULL,
 								 &bytes );
 
 	if( encod_buffer != NULL )
 	{
-		hUTFToLE( encod_buffer, bytes, handle->encod );
+		if( bytes < 0 ) {
+			if( encod_buffer != (const char *)buffer )
+				free( encod_buffer );
+			FB_UNLOCK();
+			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+		}
+		write_bytes = (size_t)bytes;
+		hUTFToLE( (unsigned char *)encod_buffer, bytes, handle->encod );
 
 		/* do write */
-		if( fwrite( encod_buffer, 1, bytes, fp ) != (size_t)bytes )
-		{
+		if( fwrite( encod_buffer, 1, write_bytes, fp ) != write_bytes ) {
+			if( encod_buffer != (const char *)buffer )
+				free( encod_buffer );
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 
-		if( encod_buffer != buffer )
+		if( encod_buffer != (const char *)buffer )
 			free( encod_buffer );
 	}
 

@@ -10,6 +10,19 @@
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
 
+/*
+    Row pitches are byte counts and can leave a 16-bit or 32-bit pixel word
+    unaligned at the start of the next source or destination row.
+*/
+#if defined(__GNUC__) || defined(__clang__)
+typedef unsigned short fb_put_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef unsigned int fb_put_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef unsigned short fb_put_u16_unaligned;
+typedef unsigned int fb_put_u32_unaligned;
+#endif
 
 #ifdef HOST_X86
 #include "../drivers/x86/fb_gfx_mmx.h"
@@ -20,34 +33,38 @@ extern void fb_hPutBlend4MMX(unsigned char *src, unsigned char *dest, int w, int
 
 static void fb_hPutBlend2C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	unsigned short *s = (unsigned short *)src, *d;
+	fb_put_u16_unaligned *s = (fb_put_u16_unaligned *)src, *d;
 	unsigned int sc, dc, drb, dg, srb, sg, dt, st;
+	unsigned int blend_alpha;
 	int x;
 	(void)blender;
 	(void)param;
 
 	alpha = (alpha + 7) >> 3;
+	/* fb_hPutBlend masks this value to one byte before dispatch. */
+	blend_alpha = (unsigned int)alpha;
 	src_pitch = (src_pitch >> 1) - w;
 	for (; h; h--) {
-		d = (unsigned short *)dest;
+		d = (fb_put_u16_unaligned *)dest;
 		if (w & 1) {
 			sc = *s++;
 			if (sc != 0xF81F) {
-				dc = *(unsigned short *)d;
+				dc = *d;
 				srb = sc & MASK_RB_16;
 				sg = sc & MASK_G_16;
 				drb = dc & MASK_RB_16;
 				dg = dc & MASK_G_16;
-				srb = ((srb - drb) * alpha) >> 5;
-				sg = ((sg - dg) * alpha) >> 5;
-				*(unsigned short *)d = ((drb + srb) & MASK_RB_16) | ((dg + sg) & MASK_G_16);
+				srb = ((srb - drb) * blend_alpha) >> 5;
+				sg = ((sg - dg) * blend_alpha) >> 5;
+				*d = (fb_put_u16_unaligned)(((drb + srb) & MASK_RB_16) |
+					((dg + sg) & MASK_G_16));
 			}
 			d++;
 		}
 		for (x = w >> 1; x; x--) {
-			sc = *(unsigned int *)s;
+			sc = *(fb_put_u32_unaligned *)s;
 			if (sc != 0xF81FF81F) {
-				dc = *(unsigned int *)d;
+				dc = *(fb_put_u32_unaligned *)d;
 				if ((sc & 0xFFFF) == 0xF81F) {
 					sc &= 0xFFFF0000;
 					sc |= (dc & 0xFFFF);
@@ -61,9 +78,9 @@ static void fb_hPutBlend2C(unsigned char *src, unsigned char *dest, int w, int h
 				sc &= (MASK_G_16 | ((unsigned int)MASK_RB_16 << 16));
 				dt = dc & (MASK_RB_16 | (MASK_G_16 << 16));
 				dc &= (MASK_G_16 | ((unsigned int)MASK_RB_16 << 16));
-				dc = ((((sc >> 5) - (dc >> 5)) * alpha) + dc) & (MASK_G_16 | ((unsigned int)MASK_RB_16 << 16));
-				sc = ((((st - dt) * alpha) >> 5) + dt) & (MASK_RB_16 | (MASK_G_16 << 16));
-				*(unsigned int *)d = dc | sc;
+				dc = ((((sc >> 5) - (dc >> 5)) * blend_alpha) + dc) & (MASK_G_16 | ((unsigned int)MASK_RB_16 << 16));
+				sc = ((((st - dt) * blend_alpha) >> 5) + dt) & (MASK_RB_16 | (MASK_G_16 << 16));
+				*(fb_put_u32_unaligned *)d = dc | sc;
 			}
 			s += 2;
 			d += 2;
@@ -75,16 +92,20 @@ static void fb_hPutBlend2C(unsigned char *src, unsigned char *dest, int w, int h
 
 static void fb_hPutBlend4C(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	unsigned int *s = (unsigned int *)src;
-	unsigned int *d, sc, dc, drb, dga, srb, sga;
+	fb_put_u32_unaligned *s = (fb_put_u32_unaligned *)src;
+	fb_put_u32_unaligned *d;
+	unsigned int sc, dc, drb, dga, srb, sga;
+	unsigned int blend_alpha;
 	int x;
 	(void)blender;
 	(void)param;
 
 	alpha++;
+	/* fb_hPutBlend masks this value to one byte before dispatch. */
+	blend_alpha = (unsigned int)alpha;
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
-		d = (unsigned int *)dest;
+		d = (fb_put_u32_unaligned *)dest;
 		for (x = w; x; x--) {
 			sc = *s++;
 			if ((sc & 0xFFFFFF) != 0xFF00FF) {
@@ -93,8 +114,8 @@ static void fb_hPutBlend4C(unsigned char *src, unsigned char *dest, int w, int h
 				sga = sc & MASK_GA_32;
 				drb = dc & MASK_RB_32;
 				dga = dc & MASK_GA_32;
-				srb = ((srb - drb) * alpha) >> 8;
-				sga = ((sga >> 8) - (dga >> 8)) * alpha;
+				srb = ((srb - drb) * blend_alpha) >> 8;
+				sga = ((sga >> 8) - (dga >> 8)) * blend_alpha;
 				*d = ((drb + srb) & MASK_RB_32) | ((dga + sga) & MASK_GA_32);
 			}
 			d++;

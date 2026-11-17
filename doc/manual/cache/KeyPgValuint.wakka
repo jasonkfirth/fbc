@@ -14,6 +14,7 @@ Converts a string to an unsigned 32bit integer
 
 {{fbdoc item="ret"}}
 	Returns a ##[[KeyPgUlong|Ulong]]## value of the converted string
+	The result is 32 bits on every target. Conversion from a wider native unsigned parser result retains its low 32 bits. Overflow of the native parser follows the target C library.
 	
 	If the first character of the string is invalid, ##**Valuint**## will return ##0##.
 

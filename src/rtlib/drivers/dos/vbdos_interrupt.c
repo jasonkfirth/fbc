@@ -48,6 +48,9 @@ typedef struct FB_VBDOS_REGTYPEX {
 	int es;
 } FB_VBDOS_REGTYPEX;
 
+void fb_VBDOSInterrupt( int intnum, const FB_VBDOS_REGTYPE *inreg, FB_VBDOS_REGTYPE *outreg );
+void fb_VBDOSInterruptX( int intnum, const FB_VBDOS_REGTYPEX *inreg, FB_VBDOS_REGTYPEX *outreg );
+
 static unsigned short fb_hVbdosWord( int value )
 {
 	return (unsigned short)(value & 0xffff);

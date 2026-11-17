@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include <stdbool.h>
+#include <limits.h>
 #include "../../fb_abi.h"
 
 #define INIT_CONSOLE 1
@@ -50,20 +51,35 @@ typedef struct FBCONSOLE
 	int inited;
 	int term_type;
 	int h_in;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the stream pointer at its existing native alignment. */
+	unsigned char input_alignment_padding[4];
+#endif
 	FILE *f_in;
 	struct termios old_term_out, old_term_in;
 	int old_in_flags;
 	bool saved_old_term_out;
 	bool saved_old_term_in;
 	bool saved_old_in_flags;
+	/* Three saved-state flags leave one byte before the native colors. */
+	unsigned char color_alignment_padding;
 	unsigned int fg_color, bg_color;
 	int cur_x, cur_y;
 	int w, h;
+#if defined(HOST_HAIKU) && defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the character plane pointer offset in the Haiku layout. */
+	unsigned char char_buffer_alignment_padding[4];
+#endif
 	unsigned char *char_buffer, *attr_buffer;
 #if defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64)
 	int has_perm;
 #endif
 	int scroll_region_changed;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8) && \
+    !(defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64))
+	/* Name the existing gap before the terminal sequence pointer array. */
+	unsigned char seq_alignment_padding[4];
+#endif
 	char *seq[SEQ_MAX];
 	int (*keyboard_getch)(void);
 	int (*keyboard_init)(void);
@@ -78,14 +94,41 @@ typedef struct FBCONSOLE
 
 extern FBCONSOLE fb_console_context FB_C_SYMBOL("__fb_con");
 
+/* Console consumers use int cell indexes. That limit also leaves room for
+   both byte planes in the supported 32/64-bit size_t allocation range. */
+static __inline__ int fb_hConsoleCellCount( int width, int height, size_t *cells )
+{
+	*cells = 0;
+	if( width <= 0 || height <= 0 )
+		return FALSE;
+	if( (size_t)width > (size_t)INT_MAX / (size_t)height )
+		return FALSE;
+	*cells = (size_t)width * (size_t)height;
+	return TRUE;
+}
+
+/* BG_LOCK protects the geometry and both plane pointers until the caller
+   finishes using this span. Cursor positions are one-based. */
+static __inline__ size_t fb_hConsoleBufferSpan( size_t *offset )
+{
+	size_t cells;
+	*offset = 0;
+	if( !fb_console_context.char_buffer || !fb_console_context.attr_buffer ||
+	    !fb_hConsoleCellCount( fb_console_context.w, fb_console_context.h, &cells ) ||
+	    fb_console_context.cur_x < 1 || fb_console_context.cur_x > fb_console_context.w ||
+	    fb_console_context.cur_y < 1 || fb_console_context.cur_y > fb_console_context.h )
+		return 0;
+	*offset = (size_t)(fb_console_context.cur_y - 1) * (size_t)fb_console_context.w +
+	          (size_t)(fb_console_context.cur_x - 1);
+	return cells - *offset;
+}
+
 void fb_hRecheckCursorPos( void );
 void fb_hRecheckConsoleSize( int requery_cursorpos );
 int fb_hTermOut(int code, int param1, int param2);
 void fb_hAddCh( int k );
 int fb_hGetCh(int remove);
-int fb_hXTermInitFocus(void);
-void fb_hXTermExitFocus(void);
-int fb_hXTermHasFocus(void);
+#include "../../fb_private_xfocus.h"
 int fb_hConsoleGfxMode
 	(
 		void (*gfx_exit)(void),

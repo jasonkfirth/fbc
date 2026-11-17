@@ -33,17 +33,22 @@ FBCALL FBSTRING_ACCESS *fb_FileStrInput( ssize_t bytes, int fnum )
         {
             dst->data[0] = 0;
             while( read_count != bytes ) {
+                size_t remaining = (size_t)(bytes - read_count);
                 res = fb_FileGetDataEx( handle,
                                         0,
                                         dst->data + read_count,
-                                        bytes - read_count,
+						remaining,
 										&len,
                                         TRUE,
                                         FALSE );
                 if( res!=FB_RTERROR_OK ) {
                     break;
                 }
-                read_count += len;
+                if( len > remaining ) {
+					res = FB_RTERROR_FILEIO;
+					break;
+				}
+				read_count += (ssize_t)len;
 
                 /* add the null-term */
                 dst->data[read_count] = '\0';
@@ -54,12 +59,15 @@ FBCALL FBSTRING_ACCESS *fb_FileStrInput( ssize_t bytes, int fnum )
             res = fb_FileGetDataEx( handle,
                                     0,
                                     dst->data,
-									bytes,
+					(size_t)bytes,
                                     &len,
                                     TRUE,
                                     FALSE );
             if( res==FB_RTERROR_OK ) {
-                read_count += len;
+				if( len > (size_t)bytes )
+					res = FB_RTERROR_FILEIO;
+				else
+					read_count = (ssize_t)len;
             }
         }
 
@@ -68,7 +76,7 @@ FBCALL FBSTRING_ACCESS *fb_FileStrInput( ssize_t bytes, int fnum )
 
         if( read_count != bytes )
         {
-            fb_hStrSetLength( dst, read_count );
+			fb_hStrSetLength( dst, (size_t)read_count );
         }
     }
     else

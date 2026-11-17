@@ -23,6 +23,8 @@ Clears the screen in both text modes and graphics modes
 		If ##2##, clears the text viewport
 
 
+	On Unix text consoles, clearing clips the text viewport against the current terminal dimensions and synchronizes shadow-buffer access with terminal resizing.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/console/cls.bas"}}%%(freebasic)
 '' set the color to light grey text on a blue background

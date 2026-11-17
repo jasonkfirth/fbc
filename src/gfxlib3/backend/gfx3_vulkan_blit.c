@@ -31,8 +31,10 @@ static int vulkan_surface_blit_single(FB_GFX3_VULKAN_RUNTIME *runtime,
 	FB_GFX3_VK_DESCRIPTOR_BUFFER_INFO buffer_info[3];
 	FB_GFX3_VK_WRITE_DESCRIPTOR_SET descriptor_writes[3];
 	FB_GFX3_RECT clipped;
-	int64_t destination_x2;
-	int64_t destination_y2;
+	int64_t width_minus_one;
+	int64_t height_minus_one;
+	int64_t clipped_x1_delta;
+	int64_t clipped_y1_delta;
 	size_t pixel_count_size;
 	uint32_t width;
 	uint32_t height;
@@ -84,12 +86,14 @@ static int vulkan_surface_blit_single(FB_GFX3_VULKAN_RUNTIME *runtime,
 		clipped.y2 = (int32_t)destination->height - 1;
 	if ((clipped.x1 > clipped.x2) || (clipped.y1 > clipped.y2))
 		return FB_GFX3_OK;
-	width = (uint32_t)(source_rect->x2 - source_rect->x1 + 1);
-	height = (uint32_t)(source_rect->y2 - source_rect->y1 + 1);
-	destination_x2 = (int64_t)destination_x + width - 1;
-	destination_y2 = (int64_t)destination_y + height - 1;
-	if ((destination_x2 < clipped.x1) ||
-	    (destination_y2 < clipped.y1) ||
+	width = (uint32_t)((int64_t)source_rect->x2 - source_rect->x1 + 1);
+	height = (uint32_t)((int64_t)source_rect->y2 - source_rect->y1 + 1);
+	width_minus_one = (int64_t)width - 1;
+	height_minus_one = (int64_t)height - 1;
+	clipped_x1_delta = (int64_t)clipped.x1 - destination_x;
+	clipped_y1_delta = (int64_t)clipped.y1 - destination_y;
+	if ((width_minus_one < clipped_x1_delta) ||
+	    (height_minus_one < clipped_y1_delta) ||
 	    (destination_x > clipped.x2) ||
 	    (destination_y > clipped.y2))
 		return FB_GFX3_OK;
@@ -1121,11 +1125,13 @@ static int vulkan_surface_blit_tile_submit(FB_GFX3_VULKAN_RUNTIME *runtime,
 	FB_GFX3_VK_DESCRIPTOR_BUFFER_INFO buffer_info[5];
 	FB_GFX3_VK_WRITE_DESCRIPTOR_SET descriptor_writes[5];
 	FB_GFX3_VULKAN_BLIT_COMMAND *commands;
+	unsigned char *tile_output_scratch;
 	uint32_t *tile_counts = NULL;
 	uint32_t *tile_ranges = NULL;
 	uint32_t *tile_cursors = NULL;
 	uint32_t *tile_indices = NULL;
 	FB_GFX3_VULKAN_BLIT_TRANS_TILE_COMMAND *trans_tile_commands = NULL;
+	void *scratch_element;
 	uint32_t tiles_x;
 	uint32_t tiles_y;
 	uint32_t tile_count;
@@ -1282,6 +1288,14 @@ static int vulkan_surface_blit_tile_submit(FB_GFX3_VULKAN_RUNTIME *runtime,
 		result = FB_GFX3_OUT_OF_MEMORY;
 		goto cleanup;
 	}
+	if (((range_size % _Alignof(uint32_t)) != 0u) ||
+	    (((range_size + cursor_size) % _Alignof(uint32_t)) != 0u) ||
+	    ((trans_pipeline_index >= 0) &&
+	     (((range_size + cursor_size) %
+	       _Alignof(FB_GFX3_VULKAN_BLIT_TRANS_TILE_COMMAND)) != 0u))) {
+		result = FB_GFX3_INVALID;
+		goto cleanup;
+	}
 	if (implementation->blit_tile_output_scratch_size < scratch_size) {
 		void *replacement = realloc(
 			implementation->blit_tile_output_scratch, scratch_size);
@@ -1293,14 +1307,20 @@ static int vulkan_surface_blit_tile_submit(FB_GFX3_VULKAN_RUNTIME *runtime,
 		implementation->blit_tile_output_scratch = replacement;
 		implementation->blit_tile_output_scratch_size = scratch_size;
 	}
-	tile_ranges = (uint32_t *)implementation->blit_tile_output_scratch;
-	tile_cursors = (uint32_t *)((unsigned char *)tile_ranges + range_size);
+	/* The checked offsets are byte counts, so keep pointer arithmetic byte-based. */
+	tile_output_scratch =
+		(unsigned char *)implementation->blit_tile_output_scratch;
+	/* The checked offsets keep each typed region aligned within the allocation. */
+	scratch_element = tile_output_scratch;
+	tile_ranges = scratch_element;
+	scratch_element = tile_output_scratch + range_size;
+	tile_cursors = scratch_element;
 	if (trans_pipeline_index >= 0) {
-		trans_tile_commands = (FB_GFX3_VULKAN_BLIT_TRANS_TILE_COMMAND *)
-			((unsigned char *)tile_cursors + cursor_size);
+		scratch_element = tile_output_scratch + range_size + cursor_size;
+		trans_tile_commands = scratch_element;
 	} else {
-		tile_indices = (uint32_t *)
-			((unsigned char *)tile_cursors + cursor_size);
+		scratch_element = tile_output_scratch + range_size + cursor_size;
+		tile_indices = scratch_element;
 	}
 	{
 		uint32_t cursor = 0u;

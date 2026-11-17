@@ -30,8 +30,9 @@ FBCALL unsigned int fb_ConsoleReadXY( int col, int row, int colorflag )
         return ((unsigned int)attribute) & 0xfffful;
     }
     else {
+		unsigned int character_mask = (sizeof(TCHAR) == 1) ? 0xffu : 0xffffu;
     	ReadConsoleOutputCharacter( FB_CONSOLE_OUTPUT_HANDLE, &character, 1, coord, &res);
-    	return ((unsigned int)character) & (sizeof(TCHAR) == 1? 0xfful : 0xfffful);
+		return ((unsigned int)character) & character_mask;
     }
 }
 

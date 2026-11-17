@@ -63,7 +63,7 @@ static int switched_to_fullscreen;
 
 static void alpha_remover_blitter(unsigned char *dest, int pitch)
 {
-	unsigned int *d, *s;
+	unsigned char *d, *s;
 	unsigned char *src = fb_gfx->framebuffer;
 	unsigned int c;
 	char *dirty = fb_gfx->dirty;
@@ -73,11 +73,14 @@ static void alpha_remover_blitter(unsigned char *dest, int pitch)
 
 	for (y = fb_gfx->h; y; y--) {
 		if (*dirty) {
-			s = (unsigned int *)src;
-			d = (unsigned int *)dest;
+			s = src;
+			d = dest;
 			for (x = fb_gfx->w; x; x--) {
-				c = *s++;
-				*d++ = c & ~MASK_A_32;
+				memcpy(&c, s, sizeof(c));
+				s += sizeof(c);
+				c &= ~MASK_A_32;
+				memcpy(d, &c, sizeof(c));
+				d += sizeof(c);
 			}
 		}
 		src += fb_gfx->pitch;
@@ -195,7 +198,7 @@ static int gdi_init(void)
 	if (!bitmap_info)
 		return -1;
 	bitmap_info->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	bitmap_info->bmiHeader.biBitCount = fb_win32.depth;
+	bitmap_info->bmiHeader.biBitCount = (WORD)fb_win32.depth;
 	bitmap_info->bmiHeader.biPlanes = 1;
 	bitmap_info->bmiHeader.biWidth = fb_win32.w;
 	bitmap_info->bmiHeader.biHeight = -fb_win32.h;

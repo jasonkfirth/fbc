@@ -6,13 +6,14 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 {
 	ssize_t len, maxlen;
 	char *p;
 
-	if( digits < 0 ) {
+	if( (digits < 0) || (digits > INT_MAX - 8) ) {
 		buffer[0] = '\0';
 		return NULL;
 	}
@@ -22,9 +23,17 @@ char *fb_hFloat2Str( double val, char *buffer, int digits, int mask )
 	else
 		p = buffer;
 
-	maxlen = 1+digits+6+1;
+	maxlen = (ssize_t)digits + 1 + 6 + 1;
 
-	len = snprintf( p, maxlen, "%.*g", digits, val );
+	/* The caller reserves digits plus exponent space; a truncation is rejected below. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
+	len = snprintf( p, (size_t)maxlen, "%.*g", digits, val );
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 	if( len <= 0 || len >= maxlen )
 	{

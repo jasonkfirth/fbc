@@ -47,6 +47,7 @@
 #include <ctype.h>
 #include <dpmi.h>
 #include <go32.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -131,6 +132,7 @@ typedef struct FB_SFX_MSDOS_DMA_BUFFER
 {
     int selector;
     unsigned short segment;
+    unsigned short segment_alignment_padding;
     unsigned long linear;
     unsigned long dma_linear;
     unsigned int dma_offset;
@@ -140,6 +142,32 @@ typedef struct FB_SFX_MSDOS_DMA_BUFFER
 
 static FB_SFX_MSDOS_DMA_BUFFER g_fb_sfx_msdos_dma_buffer;
 static unsigned char *g_fb_sfx_msdos_mix_buffer = NULL;
+
+static int fb_sfxMsdosReadPort8(int base_port, unsigned int offset,
+                                unsigned char *value)
+{
+    unsigned int port;
+
+    if (!value || (base_port < 0) || (base_port > USHRT_MAX) ||
+        (offset > (unsigned int)USHRT_MAX - (unsigned int)base_port))
+        return -1;
+    port = (unsigned int)base_port + offset;
+    *value = (unsigned char)inportb((unsigned short)port);
+    return 0;
+}
+
+static int fb_sfxMsdosWritePort8(int base_port, unsigned int offset,
+                                 unsigned char value)
+{
+    unsigned int port;
+
+    if ((base_port < 0) || (base_port > USHRT_MAX) ||
+        (offset > (unsigned int)USHRT_MAX - (unsigned int)base_port))
+        return -1;
+    port = (unsigned int)base_port + offset;
+    outportb((unsigned short)port, value);
+    return 0;
+}
 
 static const unsigned short g_fb_sfx_msdos_dma_addr_port[4] =
 {
@@ -162,7 +190,10 @@ static int fb_sfxMsdosDspWriteReady(int base_port)
 
     while (timeout-- > 0)
     {
-        if ((inportb(base_port + 0x0C) & 0x80) == 0)
+        unsigned char status;
+        if (fb_sfxMsdosReadPort8(base_port, 0x0C, &status) != 0)
+            return 0;
+        if ((status & 0x80U) == 0)
             return 1;
     }
 
@@ -175,7 +206,10 @@ static int fb_sfxMsdosDspReadReady(int base_port)
 
     while (timeout-- > 0)
     {
-        if (inportb(base_port + 0x0E) & 0x80)
+        unsigned char status;
+        if (fb_sfxMsdosReadPort8(base_port, 0x0E, &status) != 0)
+            return 0;
+        if (status & 0x80U)
             return 1;
     }
 
@@ -187,23 +221,28 @@ static int fb_sfxMsdosDspWrite(int base_port, unsigned char value)
     if (!fb_sfxMsdosDspWriteReady(base_port))
         return -1;
 
-    outportb(base_port + 0x0C, value);
-    return 0;
+    return fb_sfxMsdosWritePort8(base_port, 0x0C, value);
 }
 
 static int fb_sfxMsdosResetDsp(int base_port)
 {
-    outportb(base_port + 0x06, 1);
+    unsigned char response;
+
+    if (fb_sfxMsdosWritePort8(base_port, 0x06, 1) != 0)
+        return -1;
     /* The DOS thread profile wraps delay() with a PIT-based wait because
      * DJGPP's BIOS wait would disable the scheduler's RTC interrupt.
      */
     delay(3);
-    outportb(base_port + 0x06, 0);
+    if (fb_sfxMsdosWritePort8(base_port, 0x06, 0) != 0)
+        return -1;
 
     if (!fb_sfxMsdosDspReadReady(base_port))
         return -1;
 
-    return (inportb(base_port + 0x0A) == 0xAA) ? 0 : -1;
+    if (fb_sfxMsdosReadPort8(base_port, 0x0A, &response) != 0)
+        return -1;
+    return (response == 0xAAU) ? 0 : -1;
 }
 
 static void fb_sfxMsdosWaitForPlaybackTicks(double ticks)
@@ -214,7 +253,8 @@ static void fb_sfxMsdosWaitForPlaybackTicks(double ticks)
     if (ticks <= 0.0)
         return;
 
-    target_tick = (double)uclock() + ticks;
+    now = uclock();
+    target_tick = (double)now + ticks;
 
     do
     {
@@ -245,13 +285,13 @@ static int fb_sfxMsdosSelectDmaChannel(const FB_SFX_MSDOS_CONFIG *config)
 static int fb_sfxMsdosAllocDmaBuffer(int bytes)
 {
     int paragraphs;
-    int selector;
+    int selector = 0;
     int segment;
     unsigned long linear;
     unsigned long dma_linear;
     unsigned long page_end;
 
-    if (bytes <= 0)
+    if ((bytes <= 0) || (bytes > FB_SFX_MSDOS_DMA_8BIT_MAX_BYTES))
         return -1;
 
     memset(&g_fb_sfx_msdos_dma_buffer, 0, sizeof(g_fb_sfx_msdos_dma_buffer));
@@ -264,8 +304,12 @@ static int fb_sfxMsdosAllocDmaBuffer(int bytes)
 
     paragraphs = (bytes + 65535 + 15) >> 4;
     segment = __dpmi_allocate_dos_memory(paragraphs, &selector);
-    if (segment < 0)
+    if ((segment < 0) || (segment > USHRT_MAX) || (selector <= 0))
+    {
+        if (selector > 0)
+            __dpmi_free_dos_memory(selector);
         return -1;
+    }
 
     linear = ((unsigned long)segment) << 4;
     dma_linear = (linear + 0xFFFFUL) & ~0xFFFFUL;
@@ -388,14 +432,19 @@ static void fb_sfxMsdosConvertToUnsignedMono8(const float *samples, int frames, 
         ? fb_sfx_context->output_channels
         : 2;
 
+    if (!samples || !pcm || (frames <= 0) || (channels <= 0) ||
+        ((size_t)frames > (size_t)-1 / (size_t)channels))
+        return;
+
     for (i = 0; i < frames; ++i)
     {
         float mixed = 0.0f;
         int c;
         int sample_u8;
+        size_t sample_index = (size_t)i * (size_t)channels;
 
         for (c = 0; c < channels; ++c)
-            mixed += samples[(i * channels) + c];
+            mixed += samples[sample_index + (size_t)c];
 
         mixed /= (float)channels;
 
@@ -429,6 +478,13 @@ static int msdos_sb_init(int rate, int channels, int buffer, int flags)
     if (!g_fb_sfx_msdos.have_blaster || !g_fb_sfx_msdos.have_base_port)
     {
         SFX_DEBUG("msdos_sb: BLASTER is missing or does not specify a base port");
+        return -1;
+    }
+
+    if ((g_fb_sfx_msdos.base_port <= 0) ||
+        (g_fb_sfx_msdos.base_port > USHRT_MAX - 0x0E))
+    {
+        SFX_DEBUG("msdos_sb: BLASTER base port is out of range");
         return -1;
     }
 
@@ -535,8 +591,15 @@ static void msdos_sb_exit(void)
 static int msdos_sb_write(const float *samples, int frames)
 {
     int written;
+    int output_channels;
 
     if (!samples || frames <= 0 || !g_fb_sfx_msdos.valid)
+        return -1;
+
+    output_channels = (fb_sfx_context && fb_sfx_context->output_channels > 0)
+        ? fb_sfx_context->output_channels
+        : 2;
+    if ((size_t)frames > (size_t)-1 / (size_t)output_channels)
         return -1;
 
     written = 0;
@@ -545,33 +608,33 @@ static int msdos_sb_write(const float *samples, int frames)
     {
         double playback_ticks;
         int chunk_frames;
-        int chunk_bytes;
+        unsigned int chunk_bytes;
         int linear_offset;
+        size_t sample_offset;
 
         chunk_frames = frames - written;
         if (chunk_frames > g_fb_sfx_msdos_dma_buffer_frames)
             chunk_frames = g_fb_sfx_msdos_dma_buffer_frames;
 
-        chunk_bytes = chunk_frames;
+        chunk_bytes = (unsigned int)chunk_frames;
         linear_offset = (int)(g_fb_sfx_msdos_dma_buffer.dma_linear -
                               g_fb_sfx_msdos_dma_buffer.linear);
+        sample_offset = (size_t)written * (size_t)output_channels;
 
-        fb_sfxMsdosConvertToUnsignedMono8(samples + (written * ((fb_sfx_context && fb_sfx_context->output_channels > 0)
-            ? fb_sfx_context->output_channels
-            : 2)),
+        fb_sfxMsdosConvertToUnsignedMono8(samples + sample_offset,
             chunk_frames,
             g_fb_sfx_msdos_mix_buffer);
 
-        movedata(_go32_my_ds(),
-                 (unsigned)g_fb_sfx_msdos_mix_buffer,
-                 g_fb_sfx_msdos_dma_buffer.selector,
-                 linear_offset,
-                 (unsigned)chunk_bytes);
+        movedata((unsigned)_go32_my_ds(),
+                 (unsigned)(uintptr_t)g_fb_sfx_msdos_mix_buffer,
+                 (unsigned)g_fb_sfx_msdos_dma_buffer.selector,
+                 (unsigned)linear_offset,
+                 (size_t)chunk_bytes);
 
         if (fb_sfxMsdosProgramDma8(g_fb_sfx_msdos_dma_channel,
                                    g_fb_sfx_msdos_dma_buffer.dma_offset,
                                    (unsigned char)g_fb_sfx_msdos_dma_buffer.page,
-                                   (unsigned int)chunk_bytes) != 0)
+                                   chunk_bytes) != 0)
         {
             return -1;
         }
@@ -580,7 +643,7 @@ static int msdos_sb_write(const float *samples, int frames)
         if (g_fb_sfx_msdos_irq_enabled)
             fb_sfxMsdosIrqBegin();
 #endif
-        if (fb_sfxMsdosStartDmaPlayback(g_fb_sfx_msdos.base_port, (unsigned int)chunk_bytes) != 0)
+        if (fb_sfxMsdosStartDmaPlayback(g_fb_sfx_msdos.base_port, chunk_bytes) != 0)
             return -1;
 
         playback_ticks = ((double)UCLOCKS_PER_SEC * (double)chunk_frames) /
@@ -611,7 +674,10 @@ static int msdos_sb_write(const float *samples, int frames)
             classic 8-bit DMA path and leaves the DSP ready for the next
             block command.
         */
-        (void)inportb(g_fb_sfx_msdos.base_port + 0x0E);
+        {
+            unsigned char status;
+            (void)fb_sfxMsdosReadPort8(g_fb_sfx_msdos.base_port, 0x0E, &status);
+        }
 
         written += chunk_frames;
     }
@@ -646,7 +712,7 @@ static int msdos_sb_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverSoundBlaster =
 {
     "SoundBlaster",
-    FB_SFX_DRIVER_CAP_BLOCKING,
+    FB_SFX_DRIVER_CAP_BLOCKING FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     msdos_sb_init,
     msdos_sb_exit,
     msdos_sb_write,

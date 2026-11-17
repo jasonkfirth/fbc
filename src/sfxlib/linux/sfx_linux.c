@@ -22,10 +22,6 @@
 
 #ifndef DISABLE_ALSA
 extern const FB_SFX_DRIVER fb_sfxDriverAlsa;
-
-int fb_sfxCaptureAlsaStart(void);
-void fb_sfxCaptureAlsaStop(void);
-int fb_sfxCaptureAlsaRead(float *buffer, int frames);
 #endif
 
 #ifndef DISABLE_PULSE

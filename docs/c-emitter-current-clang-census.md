@@ -6,7 +6,171 @@ Responsibilities: Keep measured reductions separate from retained contracts.
 This file intentionally does NOT claim the entire campaign is complete.
 -->
 
-# Current selected compiler: compiler-owned debug bindings
+# Current native platform qualification
+
+The [platform-owner matrix](c-emitter-native-platform-owners.md) adds explicit
+Haiku SDK source diagnostics and Windows UTF-16 owner diagnostics. Their native
+execution and ABI records accompany the retained warning maps. The established
+compiler/corpus Clang queues below retain their recorded cuts.
+
+# Preceding SQLite DROP COLUMN qualification
+
+The [DROP COLUMN repair](c-emitter-sqlite-drop-column.md) preserves the owning
+module's 61 padding and 21 strict function-pointer cast observations under
+Clang at O0 and O2. SQLite remains at Clang 7,696. The disjoint GCC total falls
+by five to 184. Other Clang queues retain their recorded current cuts.
+
+# Preceding SQLite virtual-table qualification
+
+The [virtual-table transaction repair](c-emitter-sqlite-vtab-transactions.md)
+preserves the complete owning module's Clang O0/O2 warning map. SQLite remains
+at Clang 7,696. The measured GCC total falls by four to 189, with all broader
+Clang queues retaining their recorded source cuts.
+
+# Preceding forwarded-format qualification
+
+The [forwarded-format checks](c-emitter-forwarded-formats.md) preserve the
+original Clang diagnostics in both complete modules at O0 and O2. Copy-helper
+execution and the `cp` private-caller, native guard and type checks resolve both
+format contracts. The ledger reaches 127 of 129 reviewed observations, with
+two finite compiler cases pending. Complete queue totals retain their recorded
+cuts below.
+
+# Preceding numeric-format and runtime qualification
+
+The complete Linux packet-v50 replay retains MT 10,021 and non-MT 10,019
+Clang observations, with both modes GCC-clean. The numeric-format contract
+matrix retains its original module diagnostics under both tools and runtime
+modes. Coreutils' reviewed nonliteral count reaches 125 of 129. Two forwarded
+contracts and two finite compiler sites remain. The retained, Templari, port
+and additional-project Clang queue scopes below retain their measured cuts.
+
+# Preceding pointer-equality qualification
+
+Development main selects `4a477330`. The complete retained queue remains at
+Clang 16,433, including compiler 1,340 and fbctests 771. Templari's latest paired
+677-context cut remains at 54,317 under each C producer. Coreutils remains at
+1,782 and SQLite at 7,696, with identical complete C under both producers.
+Linux packet v49 retains MT 10,021 and non-MT 10,019. The additional-project
+Clang queues and the remaining native-platform owners retain their scope.
+
+# Preceding runtime source qualification
+
+Linux runtime packet v49 reaches Clang 10,021 for MT and 10,019 for non-MT,
+removing two observations from each complete native build. Both remain
+GCC-clean and all 478 recorded execution outcomes match their expectations.
+The exact existing DOS native audit closes 39 GCC warning-replay input checks.
+Seventeen other captured platform versions retain native verification, together
+with the separate Windows Unicode-header view and later EOF input version.
+The pointer-equality candidate retains its complete project-queue refresh.
+
+# Preceding union-member qualification
+
+Development main selects `ba3b0a98` after the
+[union-member repair](c-emitter-union-members.md). The complete retained queue
+remains at Clang 16,433, including compiler 1,340 and fbctests 771. Coreutils
+falls to 1,782 after two spurious cast-qualifier observations disappear with
+unchanged native objects. SQLite remains at 7,696.
+
+Templari's current 677-context graph records Clang 54,317 under each C producer.
+Its added server module contributes 143 padding observations and one startup
+registration. That module's complete C matches the preceding compiler under
+both producers. GCC remains at two observations across the graph.
+
+Linux runtime packet v48 retains MT 10,023 and non-MT 10,021. Nineteen later
+common/runtime input versions and 46 platform versions retain owning replay.
+The additional project's Clang queues retain their pending scope.
+
+# Preceding conditional native formats
+
+The [conditional-format qualification](c-emitter-iif-formats.md) selects
+`93d2c494`. Compiler Clang retains 1,340 observations and fbctests retains 771.
+Coreutils falls to 1,831 after nine nonliteral observations disappear and one
+byte-promotion observation becomes visible. SQLite retains 7,696. Templari's
+current 659-profile paired cut records 52,528 under each producer. Its increase
+of 120 follows project changes reproduced by the preceding compiler.
+
+# Current managed-field and Templari qualification
+
+The [cleanup dependency repair](c-emitter-cleanup-dependencies.md) selects
+`409dc1ef`. The complete 658-profile Templari paired census records Clang 52,408
+under each C producer. Its classes are padding 51,731, global constructors 675
+and strict function-pointer casts 2. The two API conversions retain their
+Win32/Win64 native qualification. GCC records two observations.
+
+Compiler Clang totals 1,340, comprising 1,327 padding and thirteen startup
+registrations. One padding observation is newly exposed. fbctests retains
+Clang 771, coreutils 1,839 and SQLite 7,696. All 703 fbctests and 1,053 port
+profiles reproduce their previous C exactly. The earlier sections retain
+their measured source and compiler cuts.
+
+# Private-format qualification
+
+The [private-format repair](c-emitter-local-formats.md) selects `f64ca95a`.
+Complete production reconciliation reaches coreutils GCC 195 / Clang 1,839
+and retains SQLite GCC 23 / Clang 7,696. Compiler and fbctests retain Clang
+1,339 and 771, with GCC zero in both queues. Two metadata-only call changes
+retain byte-identical native objects under both compilers. All 1,053 port
+emissions complete and every FBC warning line is preserved. The prior cuts
+below retain their original measurements.
+
+# Enum-width and source-contract qualification
+
+The [enum-width repair](c-emitter-enum-widths.md) retains the standalone C2FB
+converter's 158 Clang observations and zero GCC warnings. All 32 repaired native
+enum module builds are warning-free under both tools. The corrected coreutils
+version unit retains its one Clang nonliteral-format warning. Its complete
+production total remains 1,841, with current source reconciliation recorded.
+
+# Current standalone C2FB converter
+
+The [qualified-typedef repair](c-emitter-qualified-typedefs.md) audits the
+complete Win64 converter through both C producers. Their C is identical.
+Clang reports 158 observations on that input, comprising 156 padding and two
+startup registrations. GCC reports zero. Its 64 generated regression body/header
+module builds have zero warnings under both native tools. The production port
+and wider retained census below keep their own measured scopes.
+
+# Current census reference
+
+The selected compiler is `409dc1ef`. The last completed retained cut on
+`987d6d9d` covers 6,419 profiles at 12 GCC and 15,861 Clang observations,
+including the recovered Optical
+contexts. Padding and startup registration account for 15,837 Clang observations.
+See [current status](c-emitter-current-status.md)
+and [class dispositions](c-emitter-class-priorities.md) for the source cut,
+expanded queues and qualified ABI/lifecycle constraints. The separate current
+Linux port checks retain 1,839 coreutils and 7,696 SQLite Clang observations
+after the [native-type library repair](c-emitter-sqlite-native-types.md) and
+[evaluated-format repair](c-emitter-format-results.md).
+The subsequent [C2FB qualifier repair](c-emitter-pointer-qualifiers.md) removes
+eight GCC observations while retaining every affected Clang object and the
+then-current 1,852-observation Clang total. The subsequent
+[literal-offset and ABS repairs](c-emitter-literal-offsets.md) remove seven
+observations per native tool. The subsequent
+[plural-format repair](c-emitter-plural-formats.md) removes another four.
+The selected image reproduces all 703 fbctests and 1,040 port C files exactly.
+Thirteen port units add verified plural identity metadata. Compiler and fbctests
+Clang totals remain 1,339 and 771.
+The complete retained corpus has its older recorded compiler identity.
+The two shared repairs remove 478 GCC observations while preserving the
+corresponding Clang effective-C or complete native-object identities. The
+separate completed omaGUI replay on `cd32db5b` has 5,566 Clang observations,
+comprising 5,562 padding and four unreachable-code observations. The completed
+JRPG refresh on the preceding compiler has 10,018, comprising 9,670 padding
+and 348 startup registrations.
+The separate [FBSound matrix](c-emitter-fbsound-contexts.md) completes 236
+Windows/Linux 32/64-bit object profiles with 405 Clang observations and zero
+GCC warnings. Its padding and startup-registration classes account for 366
+observations. Full class counts and target provenance accompany that capture.
+The focused [Templari callback matrix](c-emitter-templari-callback.md) removes
+one strict function-pointer cast observation from each producer/width profile.
+The repaired module has eleven Win64 and nine Win32 Clang observations per
+producer. A complete current Templari Clang graph remains pending.
+Tables below retain
+their historical compiler identities.
+
+# Historical selected compiler: compiler-owned debug bindings
 
 `build/main-gcc/bin/fbc.exe` is `3b736d245e30fc79e34e386aca28eea7617ecb7cc3d1dc5e92771cb2133cd2b1`.
 838B6658 is the immediate rollback. Installed release artifacts and normal ST/MT

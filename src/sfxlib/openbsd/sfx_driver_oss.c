@@ -408,7 +408,7 @@ int fb_sfxPlatformCaptureRead(float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverOpenbsdOss =
 {
     "OpenBSD sndio",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     openbsd_sndio_init,
     openbsd_sndio_exit,
     openbsd_sndio_write,

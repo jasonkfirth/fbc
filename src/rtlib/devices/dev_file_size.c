@@ -10,7 +10,7 @@
 int fb_hDevFileSeekStart( FILE *fp, int mode, FB_FILE_ENCOD encod, int seek_zero )
 {
 	/* skip the BOM if in UTF-mode */
-	size_t ofs;
+	fb_off_t ofs;
 	(void)mode;
 
 	switch( encod )
@@ -25,6 +25,12 @@ int fb_hDevFileSeekStart( FILE *fp, int mode, FB_FILE_ENCOD encod, int seek_zero
 
 	case FB_FILE_ENCOD_UTF32:
 		ofs = sizeof( UTF_32 );
+		break;
+
+	case FB_FILE_ENCOD_ASCII:
+		if( seek_zero == FALSE )
+			return 0;
+		ofs = 0;
 		break;
 
 	default:
@@ -43,6 +49,8 @@ fb_off_t fb_DevFileGetSize( FILE *fp, int mode, FB_FILE_ENCOD encod, int seek_ba
 
 	switch( mode )
 	{
+	default:
+		break;
 	case FB_FILE_MODE_BINARY:
 	case FB_FILE_MODE_RANDOM:
 	case FB_FILE_MODE_INPUT:

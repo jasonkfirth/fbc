@@ -18,6 +18,7 @@ static double frequency;
 FBCALL double fb_Timer( void )
 {
 	LARGE_INTEGER count;
+	DWORD ticks;
 
 	if( timer == TIMER_NONE ) {
 		if( QueryPerformanceFrequency( &count ) ) {
@@ -29,7 +30,8 @@ FBCALL double fb_Timer( void )
 	}
 
 	if( timer == TIMER_NORMAL ) {
-		return (double)GetTickCount( ) * 0.001;
+		ticks = GetTickCount( );
+		return (double)ticks * 0.001;
 	} else {
 		QueryPerformanceCounter( &count );
 		return (double)count.QuadPart * frequency;

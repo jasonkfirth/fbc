@@ -29,13 +29,13 @@ FBCALL void fb_LEFTSELF( FBSTRING_ACCESS *src, ssize_t chars )
 	{
 		if( chars > src_len )
 		{
-			fb_hStrSetLength( src, src_len );
+			fb_hStrSetLength( src, (size_t)src_len );
 			/* add a NUL character */
 			src->data[src_len] = '\0';
 		}
 		else
 		{
-			fb_hStrSetLength( src, chars );
+			fb_hStrSetLength( src, (size_t)chars );
 			/* add a NUL character */
 			src->data[chars] = '\0';
 		}

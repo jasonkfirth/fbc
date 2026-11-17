@@ -35,6 +35,8 @@
 #define FB_SFX_SIMD_SSE2_INC
 
 #include <float.h>
+#include <stdint.h>
+#include <string.h>
 
 /* ------------------------------------------------------------------------- */
 /* Shared sample normalization                                               */
@@ -63,9 +65,12 @@ void fb_sfxConvertFloatToS16SIMD(const float *src, short *dst, int samples)
     const __m128 scale = _mm_set1_ps(32767.0f);
 #endif
     int i = 0;
+    size_t remaining;
 
     if (!src || !dst || samples <= 0)
         return;
+
+    remaining = (size_t)samples;
 
 #if FLT_EVAL_METHOD > 0
     /*
@@ -73,7 +78,7 @@ void fb_sfxConvertFloatToS16SIMD(const float *src, short *dst, int samples)
         precision.  Converting through double retains the exact product of a
         float and 32767, which matches that scalar result before truncation.
     */
-    for (; i <= samples - 4; i += 4)
+    for (; remaining >= 4; i += 4, remaining -= 4)
     {
         __m128 value = fb_sfxSimdClampFloat(_mm_loadu_ps(src + i));
         __m128 high_float = _mm_movehl_ps(value, value);
@@ -88,10 +93,10 @@ void fb_sfxConvertFloatToS16SIMD(const float *src, short *dst, int samples)
         high_integer = _mm_cvttpd_epi32(_mm_mul_pd(high, scale));
         integer = _mm_unpacklo_epi64(low_integer, high_integer);
         packed = _mm_packs_epi32(integer, integer);
-        _mm_storel_epi64((__m128i *)(dst + i), packed);
+        memcpy(dst + i, &packed, sizeof(short) * 4);
     }
 #else
-    for (; i <= samples - 8; i += 8)
+    for (; remaining >= 8; i += 8, remaining -= 8)
     {
         __m128 low = fb_sfxSimdClampFloat(_mm_loadu_ps(src + i));
         __m128 high = fb_sfxSimdClampFloat(_mm_loadu_ps(src + i + 4));
@@ -102,7 +107,7 @@ void fb_sfxConvertFloatToS16SIMD(const float *src, short *dst, int samples)
         low_integer = _mm_cvttps_epi32(_mm_mul_ps(low, scale));
         high_integer = _mm_cvttps_epi32(_mm_mul_ps(high, scale));
         packed = _mm_packs_epi32(low_integer, high_integer);
-        _mm_storeu_si128((__m128i *)(dst + i), packed);
+        memcpy(dst + i, &packed, sizeof(packed));
     }
 #endif
 
@@ -118,11 +123,14 @@ void fb_sfxConvertFloatToS32SIMD(const float *src, int *dst, int samples)
 {
     const __m128d scale = _mm_set1_pd(2147483647.0);
     int i = 0;
+    size_t remaining;
 
     if (!src || !dst || samples <= 0)
         return;
 
-    for (; i <= samples - 4; i += 4)
+    remaining = (size_t)samples;
+
+    for (; remaining >= 4; i += 4, remaining -= 4)
     {
         __m128 value = fb_sfxSimdClampFloat(_mm_loadu_ps(src + i));
         __m128 high_float = _mm_movehl_ps(value, value);
@@ -135,7 +143,7 @@ void fb_sfxConvertFloatToS32SIMD(const float *src, int *dst, int samples)
         low_integer = _mm_cvttpd_epi32(_mm_mul_pd(low, scale));
         high_integer = _mm_cvttpd_epi32(_mm_mul_pd(high, scale));
         packed = _mm_unpacklo_epi64(low_integer, high_integer);
-        _mm_storeu_si128((__m128i *)(dst + i), packed);
+        memcpy(dst + i, &packed, sizeof(packed));
     }
 
     for (; i < samples; ++i)
@@ -152,20 +160,33 @@ void fb_sfxConvertS16ToFloatSIMD(const short *src, float *dst, int samples)
     const __m128 positive_full_scale = _mm_set1_ps(32767.0f);
     const __m128 one = _mm_set1_ps(1.0f);
     int i = 0;
+    size_t remaining;
 
     if (!src || !dst || samples <= 0)
         return;
 
-    for (; i <= samples - 8; i += 8)
+    remaining = (size_t)samples;
+
+    for (; remaining >= 8; i += 8, remaining -= 8)
     {
-        __m128i packed = _mm_loadu_si128((const __m128i *)(src + i));
-        __m128i sign = _mm_srai_epi16(packed, 15);
-        __m128i low_integer = _mm_unpacklo_epi16(packed, sign);
-        __m128i high_integer = _mm_unpackhi_epi16(packed, sign);
-        __m128 low = _mm_cvtepi32_ps(low_integer);
-        __m128 high = _mm_cvtepi32_ps(high_integer);
-        __m128 low_full_scale = _mm_cmpeq_ps(low, positive_full_scale);
-        __m128 high_full_scale = _mm_cmpeq_ps(high, positive_full_scale);
+        __m128i packed;
+        __m128i sign;
+        __m128i low_integer;
+        __m128i high_integer;
+        __m128 low;
+        __m128 high;
+        __m128 low_full_scale;
+        __m128 high_full_scale;
+
+        memcpy(&packed, src + i, sizeof(packed));
+
+        sign = _mm_srai_epi16(packed, 15);
+        low_integer = _mm_unpacklo_epi16(packed, sign);
+        high_integer = _mm_unpackhi_epi16(packed, sign);
+        low = _mm_cvtepi32_ps(low_integer);
+        high = _mm_cvtepi32_ps(high_integer);
+        low_full_scale = _mm_cmpeq_ps(low, positive_full_scale);
+        high_full_scale = _mm_cmpeq_ps(high, positive_full_scale);
 
         low = _mm_mul_ps(low, scale);
         high = _mm_mul_ps(high, scale);
@@ -206,19 +227,26 @@ void fb_sfxMixMonoToStereoSIMD(const float *src,
 {
     const __m128 gains = _mm_set_ps(right_gain, left_gain,
                                     right_gain, left_gain);
-    int frame = 0;
+    size_t frame = 0;
+    size_t frame_count;
+    size_t remaining;
 
     if (!src || !dst || frames <= 0)
         return;
 
-    for (; frame <= frames - 4; frame += 4)
+    frame_count = (size_t)frames;
+    if (frame_count > SIZE_MAX / 2)
+        return;
+    remaining = frame_count;
+
+    for (; remaining >= 4; frame += 4, remaining -= 4)
     {
         fb_sfxSseAccumulateStereo(_mm_loadu_ps(src + frame),
                                   dst + frame * 2,
                                   gains);
     }
 
-    for (; frame < frames; frame++)
+    for (; frame < frame_count; frame++)
     {
         float sample = src[frame];
 
@@ -280,15 +308,22 @@ void fb_sfxMixWaveformToStereoSIMD(int waveform,
     const __m128 gains = _mm_set_ps(right_gain, left_gain,
                                     right_gain, left_gain);
     float current_phase;
-    int frame;
+    size_t frame;
+    size_t frame_count;
+    size_t remaining;
 
     if (!phase || !dst || frames <= 0 || phase_step <= 0.0f)
         return;
 
+    frame_count = (size_t)frames;
+    if (frame_count > SIZE_MAX / 2)
+        return;
+    remaining = frame_count;
+
     current_phase = *phase;
     frame = 0;
 
-    for (; frame <= frames - 4; frame += 4)
+    for (; remaining >= 4; frame += 4, remaining -= 4)
     {
         __m128 phases = _mm_add_ps(_mm_set1_ps(current_phase),
                                    _mm_mul_ps(offsets, step));
@@ -303,7 +338,7 @@ void fb_sfxMixWaveformToStereoSIMD(int waveform,
         current_phase -= (float)(int)current_phase;
     }
 
-    for (; frame < frames; frame++)
+    for (; frame < frame_count; frame++)
     {
         float sample = fb_sfxOscillatorWaveSample(waveform, current_phase);
 
@@ -325,11 +360,14 @@ void fb_sfxClampFloatBufferSIMD(float *buffer, int samples)
     const __m128 minimum = _mm_set1_ps(-1.0f);
     const __m128 maximum = _mm_set1_ps(1.0f);
     int index = 0;
+    size_t remaining;
 
     if (!buffer || samples <= 0)
         return;
 
-    for (; index <= samples - 4; index += 4)
+    remaining = (size_t)samples;
+
+    for (; remaining >= 4; index += 4, remaining -= 4)
     {
         __m128 value = _mm_loadu_ps(buffer + index);
         __m128 ordered = _mm_cmpord_ps(value, value);

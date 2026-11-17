@@ -21,6 +21,7 @@
 
 #include "../../fb.h"
 #include <errno.h>
+#include <stdint.h>
 
 #ifdef HOST_MINGW
 #include <windows.h>
@@ -37,7 +38,7 @@
 
 void fb_hConvertPath( char *path )
 {
-	ssize_t i, len;
+	size_t i, len;
 
 	DBG_ASSERT( path != NULL );
 
@@ -121,8 +122,12 @@ static FB_WCHAR *fb_hConvertPathToWCInternal( const char *path, UINT codepage, D
 		free( tmp );
 		return NULL;
 	}
+	if( (size_t)chars > SIZE_MAX / sizeof( FB_WCHAR ) ) {
+		free( tmp );
+		return NULL;
+	}
 
-	wpath = (FB_WCHAR*)malloc( chars * sizeof( FB_WCHAR ) );
+	wpath = (FB_WCHAR*)malloc( (size_t)chars * sizeof( FB_WCHAR ) );
 	if( wpath != NULL ) {
 		if( MultiByteToWideChar( codepage, flags, tmp, -1, wpath, chars ) <= 0 ) {
 			free( wpath );
@@ -176,7 +181,7 @@ char *fb_hConvertPathFromWC( const FB_WCHAR *path, int use_utf8 )
 	if( bytes <= 0 )
 		return NULL;
 
-	result = (char*)malloc( bytes );
+	result = (char*)malloc( (size_t)bytes );
 	if( result == NULL )
 		return NULL;
 

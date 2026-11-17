@@ -30,6 +30,8 @@ Gets the name of a week day from its integral representation
 	
 	The compiler will not recognize this function unless ##vbcompat.bi## or ##datetime.bi## is included.
 
+	On Unix targets, localized names are checked against the runtime string-size limit before allocation. The existing fallback names apply when the localized provider cannot supply a name.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/dates/weekdayname.bas"}}%%(freebasic)
 #include "vbcompat.bi"

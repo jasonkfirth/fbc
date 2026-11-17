@@ -391,7 +391,7 @@ static int winmm_device_select(int device_id)
 const FB_SFX_DRIVER fb_sfxDriverWinMM =
 {
     "WinMM",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     winmm_init,
     winmm_exit,
     winmm_write,

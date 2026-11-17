@@ -51,7 +51,7 @@ int fb_ConsoleGetMouse( int *x, int *y, int *z, int *buttons, int *clip )
 		{
 			/* Turning off QuickEdit requires the extended flag value */
 			dwMode |= (ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS);
-			dwMode &= (~ENABLE_QUICK_EDIT_MODE);
+			dwMode &= ~((DWORD)ENABLE_QUICK_EDIT_MODE);
 			SetConsoleMode( FB_CONSOLE_INPUT_HANDLE, dwMode );
 		}
 	}

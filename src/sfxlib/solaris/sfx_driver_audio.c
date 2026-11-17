@@ -531,7 +531,7 @@ static int solaris_audio_write(const float *buffer, int frames)
 const FB_SFX_DRIVER fb_sfxDriverSolarisAudio =
 {
     "Solaris audio",
-    FB_SFX_DRIVER_CAP_BLOCKING,
+    FB_SFX_DRIVER_CAP_BLOCKING FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     solaris_audio_init,
     solaris_audio_exit,
     solaris_audio_write,

@@ -1,7 +1,7 @@
 """Project: FreeBASIC external prototype regression
 File: c-external-prototypes.py
 Purpose: Check emitted declaration closure in release, debug and opaque outputs.
-Responsibilities: Execute live interop roots and inspect discarded prototype controls.
+Responsibilities: Execute interop roots and preserve conflicting object diagnostics.
 This file intentionally does NOT treat successful object creation as execution.
 """
 from collections import Counter
@@ -47,7 +47,8 @@ def main():
     flags = {
         'gcc': ['-std=gnu23', '-O2', '-fno-strict-aliasing', '-fwrapv', '-Wall', '-Wextra', '-Wpedantic',
                 '-Wconversion', '-Wsign-conversion', '-Wcast-qual', '-Wcast-align=strict',
-                '-Wpointer-arith', '-Wformat=2', '-Wstrict-prototypes', '-Wmissing-prototypes'],
+                '-Wpointer-arith', '-Wformat=2', '-Wstrict-prototypes', '-Wmissing-prototypes',
+                '-Werror=redundant-decls'],
         'clang': ['-std=gnu23', '-O2', '-fno-strict-aliasing', '-fwrapv', '-Weverything']}
 
     def run(tag, command):
@@ -73,9 +74,16 @@ def main():
                        '-gen', backend, '-m', source.stem, *extra, '-r', source, '-o', cpp]
             run(tag + '-emit', command)
             text = cpp.read_text()
+            for identifier in ('prototype_shared_scalar', 'prototype_shared_array',
+                               'prototype_shared_pointer', 'prototype_defined_scalar'):
+                declarations = re.findall(r'^extern [^\n]*\b' + identifier +
+                    r'(?:\[[^\n]*\])?\s*;', text, re.M)
+                assert len(declarations) == 1, (tag, identifier, declarations)
             declaration = r'\bprototype_dead\s*\([^;{}]*\)\s*;'
             retained = bool(re.search(declaration, text))
-            assert retained == (mode in ('debug', 'opaque')), (tag, retained)
+            # Module-level assembly leaves separate private procedure bodies
+            # available to the current reachability analysis.
+            assert retained == (mode == 'debug'), (tag, retained)
             if mode == 'intrinsic':
                 for identifier in ('_InterlockedExchangeAdd', '_InterlockedExchangeAdd64'):
                     assert re.search(r'\b' + identifier + r'\s*\([^;{}]*\)\s*;', text), (tag, identifier)
@@ -106,9 +114,25 @@ def main():
                     run(tag + '-' + cc + '-win32-object', [tools / (cc + '.exe'), *flags[cc], '-nostdinc', '-masm=intel', '-m32', '-c', cpp, '-o', obj])
                     objects32 += 1
     assert (runs, objects32) == (16, 4)
+    conflicting_declarations = []
+    for backend in ('gcc', 'clang'):
+        for control in ('CONFLICT_PROOF', 'CONFLICT_BOUNDS_PROOF'):
+            run(backend + '-' + control + '-emit', [args.compiler.resolve(), '-prefix', args.prefix.resolve(),
+                '-i', ROOT / 'inc', '-gen', backend, '-d', control, '-r', source, '-o', cpp])
+            for native in ('gcc', 'clang'):
+                command = [tools / (native + '.exe'), *flags[native], '-nostdinc',
+                    '-fsyntax-only', cpp]
+                result = subprocess.run(list(map(str, command)), cwd=ROOT, env=env,
+                    capture_output=True, text=True, timeout=90)
+                output = result.stdout + result.stderr
+                assert result.returncode != 0 and 'prototype_shared_' in output, output
+                conflicting_declarations.append(dict(backend=backend, control=control,
+                    native=native, command=list(map(str, command)), exit=result.returncode,
+                    output=output))
     assert all(digest(Path(p)) == sha for p, sha in pins.items())
     (work / 'receipt.json').write_text(json.dumps({'checks_complete': True, 'native_runs': runs,
         'Win32_objects': objects32, 'historical_stale_declaration_controls': old_controls,
+        'conflicting_declaration_controls': conflicting_declarations,
         'source_tool_runtime_sha256': pins, 'checks': checks, 'foreign_execution_claimed': False}, indent=2) + '\n')
     for path in (cpp, obj, shimobj, exe):
         assert path.resolve().parent == work

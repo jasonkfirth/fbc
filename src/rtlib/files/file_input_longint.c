@@ -13,6 +13,7 @@ FBCALL int fb_InputLongint( long long *dst )
     char buffer[FB_INPUT_MAXNUMERICLEN+1];
 	ssize_t len;
 	int isfp;
+	double rounded_value;
 
 	len = fb_FileInputNextToken( buffer, FB_INPUT_MAXNUMERICLEN, FB_FALSE, &isfp );
 
@@ -23,8 +24,10 @@ FBCALL int fb_InputLongint( long long *dst )
 		else
 			*dst = fb_hStr2Longint( buffer, len );
 	}
-	else
-		*dst = (long long)rint( fb_hStr2Double( buffer, len ) );
+	else {
+		rounded_value = rint( fb_hStr2Double( buffer, len ) );
+		*dst = (long long)rounded_value;
+	}
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }

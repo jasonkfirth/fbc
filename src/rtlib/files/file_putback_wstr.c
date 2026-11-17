@@ -31,18 +31,15 @@ int fb_FilePutBackWstrEx( FB_FILE *handle, const FB_WCHAR *src, size_t chars )
 
 		/* UTF? */
 		if( handle->encod != FB_FILE_ENCOD_ASCII )
-		{
-			if( chars > bytes / sizeof( FB_WCHAR ) )
-				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
-			else
-				bytes = chars * sizeof( FB_WCHAR );
-		}
+			bytes /= sizeof( FB_WCHAR );
+
+		if( chars > bytes )
+			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		else
 		{
-			if( chars > bytes )
-				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
-			else
-				bytes = chars;
+			bytes = chars;
+			if( handle->encod != FB_FILE_ENCOD_ASCII )
+				bytes *= sizeof( FB_WCHAR );
 		}
 	}
 

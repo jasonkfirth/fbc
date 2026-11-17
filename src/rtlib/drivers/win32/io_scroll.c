@@ -10,12 +10,12 @@
 
 static void fb_ConsoleScrollRawEx( HANDLE hConsole, int x1, int y1, int x2, int y2, int nrows )
 {
-    int height = y2 - y1 + 1;
+    int64_t height = (int64_t)y2 - y1 + 1;
 
-    if( nrows <= 0 )
+    if( (nrows <= 0) || (height <= 0) )
         return;
 
-    if( nrows >= height ) {
+    if( (int64_t)nrows >= height ) {
         /* clear view */
         fb_ConsoleClearViewRawEx( hConsole, x1, y1, x2, y2 );
 
@@ -34,7 +34,7 @@ static void fb_ConsoleScrollRawEx( HANDLE hConsole, int x1, int y1, int x2, int 
         dcoord.Y = (SHORT) y1;
 
         cinf.Char.AsciiChar	= ' ';
-        cinf.Attributes 	= fb_ConsoleGetColorAttEx( hConsole );
+	cinf.Attributes 	= (WORD)fb_ConsoleGetColorAttEx( hConsole );
 
         ScrollConsoleScreenBuffer( hConsole, &srec, NULL, dcoord, &cinf );
 #if 0

@@ -242,6 +242,7 @@ enum FB_PROCATTRIB
 	FB_PROCATTRIB_DESTRUCTOR0      = &h00001000  '' methods only - deleting destructor
 	FB_PROCATTRIB_SFXLIB           = &h00002000  '' compiler-registered sfxlib intrinsic
 	FB_PROCATTRIB_GFXLIB           = &h00004000  '' compiler-registered gfxlib intrinsic
+	FB_PROCATTRIB_NOINLINE         = &h00008000  '' retain a separate native procedure body
 end enum
 
 '' parameter modes

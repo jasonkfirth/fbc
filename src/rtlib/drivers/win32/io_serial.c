@@ -155,6 +155,8 @@ int fb_SerialOpen( FB_FILE *handle,
     case FB_FILE_ACCESS_ANY:
         dwDesiredAccess = GENERIC_READ | GENERIC_WRITE;
         break;
+    default:
+        break;
     }
 
     pszDev = fb_hSerialMakeDeviceName( iPort, pszDevice );
@@ -250,7 +252,7 @@ int fb_SerialOpen( FB_FILE *handle,
         } else {
             dcb.BaudRate = options->uiSpeed;
             dcb.fBinary = !options->AddLF; /* Windows serial ports are byte streams. */
-            dcb.fParity = options->CheckParity;
+            dcb.fParity = (options->CheckParity != FALSE);
             dcb.fOutxCtsFlow = options->DurationCTS!=0;
             dcb.fDtrControl = ( (options->KeepDTREnabled) ? DTR_CONTROL_ENABLE : DTR_CONTROL_DISABLE );
 
@@ -285,6 +287,8 @@ int fb_SerialOpen( FB_FILE *handle,
             case FB_SERIAL_PARITY_MARK:
                 dcb.Parity = MARKPARITY;
                 break;
+            default:
+                break;
             }
 
             switch ( options->StopBits ) {
@@ -296,6 +300,8 @@ int fb_SerialOpen( FB_FILE *handle,
                 break;
             case FB_SERIAL_STOP_BITS_2:
                 dcb.StopBits = TWOSTOPBITS;
+                break;
+            default:
                 break;
             }
 
@@ -352,6 +358,8 @@ int fb_SerialWrite( FB_FILE *handle,
 {
     W32_SERIAL_INFO *pInfo = (W32_SERIAL_INFO*) pvHandle;
     DWORD dwWriteCount;
+    const unsigned char *cursor = (const unsigned char *)data;
+    size_t remaining = length;
 
     (void)handle;
 
@@ -359,15 +367,23 @@ int fb_SerialWrite( FB_FILE *handle,
         return fb_ErrorSetNum( FB_RTERROR_FILEIO );
     }
 
-    if( !WriteFile( pInfo->hDevice,
-                   data,
-                   length,
-                   &dwWriteCount,
-                   NULL ) )
-        return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+    while( remaining > 0 ) {
+        DWORD request = (remaining > (size_t)MAXDWORD) ?
+                        MAXDWORD : (DWORD)remaining;
 
-    if( length != (size_t) dwWriteCount )
-        return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+        if( !WriteFile( pInfo->hDevice,
+                        cursor,
+                        request,
+                        &dwWriteCount,
+                        NULL ) )
+            return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+
+        if( dwWriteCount != request )
+            return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+
+        cursor += dwWriteCount;
+        remaining -= (size_t)dwWriteCount;
+    }
 
     return fb_ErrorSetNum( FB_RTERROR_OK );
 }
@@ -377,6 +393,8 @@ int fb_SerialRead( FB_FILE *handle,
 {
     W32_SERIAL_INFO *pInfo = (W32_SERIAL_INFO*) pvHandle;
     DWORD dwReadCount;
+    size_t request_size;
+    DWORD request;
 
     (void)handle;
 
@@ -386,9 +404,13 @@ int fb_SerialRead( FB_FILE *handle,
         return fb_ErrorSetNum( FB_RTERROR_FILEIO );
     }
 
+    request_size = (*pLength > (size_t)MAXDWORD) ?
+                   (size_t)MAXDWORD : *pLength;
+    request = (DWORD)request_size;
+
     if( !ReadFile( pInfo->hDevice,
                    data,
-                   *pLength,
+                   request,
                    &dwReadCount,
                    NULL ) )
         return fb_ErrorSetNum( FB_RTERROR_FILEIO );

@@ -44,7 +44,7 @@ FBCALL FBSTRING_ACCESS *fb_RTrimEx( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patte
                 {
                     if( FB_MEMCMP( src_ptr + test_index,
                                    pattern->data,
-                                   len_pattern )!=0 )
+                                   (size_t)len_pattern )!=0 )
                         break;
                     test_index -= len_pattern;
                 }

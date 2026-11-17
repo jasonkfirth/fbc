@@ -11,17 +11,38 @@
 #include <dpmi.h>
 #include <sys/farptr.h>
 
+static unsigned short fb_hGetConsolePage(void)
+{
+	int active = fb_console_context.active;
+
+	if ((active < 0) || (active > 7))
+		return 0;
+	return (unsigned short)active;
+}
+
+static unsigned long fb_hGetCursorPositionAddress(void)
+{
+	return 0x450UL + (unsigned long)fb_hGetConsolePage() *
+	       (unsigned long)sizeof(unsigned short);
+}
+
+static unsigned short fb_hPackCursorPosition(int col, int row)
+{
+	return (unsigned short)(((unsigned int)(unsigned char)row << 8) |
+	                        (unsigned int)(unsigned char)col);
+}
+
 /* Raw DOS console cursor positioning function, faster than console LOCATE */
 unsigned short fb_hSetCursorPos( int col, int row )
 {
-	unsigned long addr = 0x450 + fb_console_context.active * sizeof( short );
+	unsigned long addr = fb_hGetCursorPositionAddress();
 
 	if( row >= 0 ) {
 		unsigned short old = _farpeekw( _dos_ds, addr );
-		_farpokew( _dos_ds, addr, (row << 8) | col );
+		_farpokew( _dos_ds, addr, fb_hPackCursorPosition(col, row) );
 		return old;
 	} else {
-		_farpokew( _dos_ds, addr, col );
+		_farpokew( _dos_ds, addr, (unsigned short)col );
 		return 0;
 	}
 }
@@ -33,7 +54,7 @@ int fb_ConsoleLocate_BIOS( int row, int col, int cursor )
     int shape_visible;
     unsigned short usShapePos, usShapeSize;
 
-    usShapePos = _farpeekw( _dos_ds, 0x450 + fb_console_context.active * sizeof( short ) );
+    usShapePos = _farpeekw( _dos_ds, fb_hGetCursorPositionAddress() );
     usShapeSize = _farpeekw( _dos_ds, 0x460 );
     shape_visible = (usShapeSize & 0xC000)==0x0000;
 
@@ -53,12 +74,13 @@ int fb_ConsoleLocate_BIOS( int row, int col, int cursor )
     	the authoritative location when pages are switched.
     */
     regs.x.ax = 0x0200;
-    regs.x.bx = fb_console_context.active;
+    regs.x.bx = fb_hGetConsolePage();
     regs.h.dh = (unsigned char) y;
     regs.h.dl = (unsigned char) x;
     __dpmi_int(0x10, &regs);
 
-    _farpokew( _dos_ds, 0x450 + fb_console_context.active * sizeof( short ), (y << 8) | x );
+    _farpokew( _dos_ds, fb_hGetCursorPositionAddress(),
+               fb_hPackCursorPosition(x, y) );
 
     if( cursor >= 0)
     {
@@ -74,12 +96,15 @@ int fb_ConsoleLocate_BIOS( int row, int col, int cursor )
         __dpmi_int(0x10, &regs);
     }
 
-    return ( (x & 0xFF) | ((y & 0xFF) << 8) | (shape_visible ? 0x10000 : 0) );
+    return ((int)(unsigned char)x | ((int)(unsigned char)y << 8) |
+            (shape_visible ? 0x10000 : 0));
 }
 
 int fb_ConsoleLocate( int row, int col, int cursor )
 {
-    int result = fb_ConsoleLocate_BIOS( row-1, col-1, cursor );
+    int bios_row = row > 0 ? row - 1 : -1;
+    int bios_col = col > 0 ? col - 1 : -1;
+    int result = fb_ConsoleLocate_BIOS( bios_row, bios_col, cursor );
     fb_console_context.scrollWasOff = FALSE;
     return result + 0x0101;
 }

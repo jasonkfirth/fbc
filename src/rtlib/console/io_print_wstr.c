@@ -12,7 +12,7 @@ static void fb_hPrintWstrEx
 	(
 		FB_FILE *handle,
 		const FB_WCHAR *s,
-		size_t len, int mask
+		ssize_t len, int mask
 	)
 {
     /* add a lock here or the new-line won't be printed in the right
@@ -20,8 +20,8 @@ static void fb_hPrintWstrEx
        switch happens between FB_PRINT_EX() and PrintVoidEx() */
     FB_LOCK( );
 
-    if( len != 0 )
-        FB_PRINTWSTR_EX( handle, s, len, 0 );
+    if( len > 0 )
+        FB_PRINTWSTR_EX( handle, s, (size_t)len, 0 );
 
     fb_PrintVoidWstrEx( handle, mask );
 

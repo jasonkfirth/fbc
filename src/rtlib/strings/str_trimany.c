@@ -31,7 +31,7 @@ FBCALL FBSTRING_ACCESS *fb_TrimAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patte
 		{
 			while ( len != 0 )
 			{
-				if( FB_MEMCHR( pattern->data, *pachText, len_pattern ) == NULL )
+				if( FB_MEMCHR( pattern->data, *pachText, (size_t)len_pattern ) == NULL )
 					break;
 
 				--len;
@@ -40,7 +40,7 @@ FBCALL FBSTRING_ACCESS *fb_TrimAny( FBSTRING_ACCESS *src, FBSTRING_ACCESS *patte
 			while ( len != 0 )
 			{
 				--len;
-				if( FB_MEMCHR( pattern->data, pachText[len], len_pattern ) == NULL ) 
+				if( FB_MEMCHR( pattern->data, pachText[len], (size_t)len_pattern ) == NULL )
 				{
 					++len;
 					break;

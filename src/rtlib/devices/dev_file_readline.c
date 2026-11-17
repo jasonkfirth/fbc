@@ -6,10 +6,14 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 static char *hWrapper( char *buffer, size_t count, FILE *fp )
 {
-    return fgets( buffer, count, fp );
+    if( (count == 0) || (count > (size_t)INT_MAX) )
+        return NULL;
+
+    return fgets( buffer, (int)count, fp );
 }
 
 int fb_DevFileReadLineDumb
@@ -71,7 +75,7 @@ int fb_DevFileReadLineDumb
             }
         }
 
-        ssize_t tmp_buf_len;
+        size_t tmp_buf_len;
         
         if( !found )
         {
@@ -98,7 +102,8 @@ int fb_DevFileReadLineDumb
             buffer[buffer_len] = 0;
         }
 
-        src.size = src.len = buffer_len;
+        /* The fixed buffer keeps this signed descriptor length representable. */
+        src.size = src.len = (ssize_t)buffer_len;
 
         /* assign or concatenate */
         if( first_run )

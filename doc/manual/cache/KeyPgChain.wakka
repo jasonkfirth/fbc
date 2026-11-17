@@ -17,6 +17,8 @@ Temporarily transfers control to an external program
 {{fbdoc item="desc"}}
 	Transfers control over to an external program. When the program exits, execution resumes immediately after the call to ##**Chain**##.
 
+	On Unix targets, launch preparation checks temporary argument storage and releases it if the launch returns. Preparation failure returns ##-1##.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/system/chain.bas"}}%%(freebasic)
 #ifdef __FB_LINUX__

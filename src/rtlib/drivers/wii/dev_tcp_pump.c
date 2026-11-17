@@ -26,6 +26,8 @@
 
 #include <errno.h>
 #include <network.h>
+#include <poll.h>
+#include <unistd.h>
 #include <ogc/cond.h>
 #include <ogc/lwp.h>
 #include <ogc/mutex.h>
@@ -33,6 +35,11 @@
 
 #define FB_WII_TCP_PUMP_STACK_SIZE (32 * 1024)
 #define FB_WII_TCP_PUMP_READ_SIZE 1024
+/* The bounded wait lets destruction join this worker without queuing
+ * shutdown behind an idle recv. Use POSIX poll/close for the descriptor
+ * returned by socket(); net_poll/net_close use raw IOS socket numbers.
+ */
+#define FB_WII_TCP_POLL_MSECS 100
 
 struct FB_WII_TCP_PUMP {
 	FB_TCP_SOCKET hSocket;
@@ -112,6 +119,7 @@ static void *fb_hWiiTcpPumpThread( void *param )
 		size_t want;
 		int bytes;
 		int err;
+		struct pollfd readiness;
 
 		LWP_MutexLock( pump->mutex );
 		while( pump->used == FB_TCP_WII_RECV_BUFFER_SIZE && !pump->closing )
@@ -129,6 +137,24 @@ static void *fb_hWiiTcpPumpThread( void *param )
 		if( want > sizeof( temp ) )
 			want = sizeof( temp );
 
+		readiness.fd = pump->hSocket;
+		readiness.events = POLLIN;
+		readiness.revents = 0;
+		bytes = poll( &readiness, 1, FB_WII_TCP_POLL_MSECS );
+		if( bytes == 0 || (bytes > 0 && readiness.revents == 0) )
+			continue;
+		if( bytes < 0 ) {
+			LWP_MutexLock( pump->mutex );
+			pump->closed = TRUE;
+			pump->error = fb_hWiiTcpSocketError( bytes );
+			LWP_CondBroadcast( pump->cond );
+			LWP_MutexUnlock( pump->mutex );
+			break;
+		}
+		/* This worker is the only receiver. Readability cannot be consumed
+		 * by another reader between poll and recv. EOF/error also returns
+		 * immediately, so no indefinitely pending receive remains at exit.
+		 */
 		bytes = recv( pump->hSocket, temp, (s32)want, 0 );
 		err = fb_hWiiTcpSocketError( bytes );
 
@@ -213,11 +239,10 @@ void fb_WiiTcpPumpDestroy( FB_WII_TCP_PUMP *pump )
 	LWP_CondBroadcast( pump->cond );
 	LWP_MutexUnlock( pump->mutex );
 
-	shutdown( pump->hSocket, SHUT_RDWR );
-	net_close( pump->hSocket );
-
 	if( pump->thread_started && pump->thread != LWP_GetSelf() )
 		LWP_JoinThread( pump->thread, NULL );
+	shutdown( pump->hSocket, SHUT_RDWR );
+	close( pump->hSocket );
 
 	if( pump->cond != LWP_COND_NULL )
 		LWP_CondDestroy( pump->cond );

@@ -10,7 +10,10 @@
 
 FBCALL void fb_Delay( int msecs )
 {
-	Sleep( msecs );
+	if( msecs < 0 )
+		return;
+
+	Sleep( (DWORD)msecs );
 }
 
 /* end of drivers/win32/sys_delay.c */

@@ -26,6 +26,8 @@ int fb_DrvIntlGetTimeFormat( char *buffer, size_t len )
 				return TRUE;
 			}
 			break;
+		default:
+			break;
 		}
 	}
 

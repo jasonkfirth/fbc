@@ -471,6 +471,8 @@ def compiler_supports_gas64(args: argparse.Namespace) -> bool:
 
 def executable_name(stem: str, target_os: str | None = None) -> str:
     # Cross compilers name the target product, regardless of the runner host.
+    if target_os in ("wii", "xbox"):
+        return stem + (".dol" if target_os == "wii" else ".xbe")
     windows_target = (target_os in ("windows", "wince", "dos") or target_os.startswith(("msys", "mingw", "cygwin"))
                       if target_os is not None else host_uses_windows_executables())
     if not windows_target:
@@ -1261,7 +1263,7 @@ def compile_one(path: Path, root: Path, args: argparse.Namespace) -> Result:
             env.setdefault("SFXLIB_DRIVER", "null")
             env.setdefault("FB_GFX_DRIVER", "none")
             run_status, run_elapsed = run_command(
-                [str(binary), *EXAMPLE_RUN_ARGUMENTS.get(rel, ())],
+                [*args.run_prefix, str(binary), *EXAMPLE_RUN_ARGUMENTS.get(rel, ())],
                 cwd=run_cwd,
                 timeout=args.run_timeout,
                 log_path=run_log,
@@ -1453,6 +1455,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--compile-timeout", type=int, default=60)
     parser.add_argument("--run-timeout", type=int, default=15)
     parser.add_argument("--no-run", action="store_true")
+    parser.add_argument("--run-prefix", action="append", default=[],
+                        help="Prepend one argument to program execution, for a cross-target guest runner")
     parser.add_argument(
         "--keep-work",
         action="store_true",

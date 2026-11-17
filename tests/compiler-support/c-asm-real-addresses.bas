@@ -17,6 +17,26 @@ declare sub asm_clear_home cdecl alias "asm_clear_home"()
 declare function asm_call_raw_float cdecl alias "asm_call_raw_float"(byval bits as ulong) as ulong
 declare function asm_call_raw_double cdecl alias "asm_call_raw_double"(byval bits as ulongint) as ulongint
 
+#ifdef __FB_64BIT__
+declare sub asm_observe_entry cdecl alias "asm_observe_entry"()
+declare function asm_check_entry cdecl alias "asm_check_entry"() as ulongint
+
+sub LeafAssemblyCall cdecl alias "asm_leaf_call"()
+	'' Keep this leaf free of automatic locals and ordinary C calls. Those can
+	'' accidentally establish the aligned frame that inline CALL itself needs.
+	asm
+#ifdef __FB_WIN32__
+		'' The Windows x64 caller also owns a 32-byte shadow area.
+		sub rsp, 32
+#endif
+		call asm_observe_entry
+#ifdef __FB_WIN32__
+		add rsp, 32
+#endif
+	end asm
+end sub
+#endif
+
 function ReadFloatBits cdecl alias "asm_read_float"(byval value as single) as ulong
 	static raw as ulong
 	asm
@@ -134,6 +154,10 @@ private function Exercise(byval value as long, byref aliased as long) as long
 end function
 
 UnreachableAssembly(123)
+
+#ifdef __FB_64BIT__
+if asm_check_entry() <> 8 then end 17
+#endif
 
 dim value as long = 10
 dim aliased as long = 0

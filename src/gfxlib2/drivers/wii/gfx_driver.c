@@ -38,6 +38,7 @@
 */
 
 #include "../../fb_gfx.h"
+#include "gfx_wii_keyboard.h"
 
 #include <gccore.h>
 #include <stdint.h>
@@ -224,7 +225,7 @@ static int wii_find_pointer_channel(ir_t *ir, int *channel)
 static void wii_set_key_state(int scancode, int down)
 {
 	if (fb_gfx && fb_gfx->key && (scancode >= 0) && (scancode < 128))
-		fb_gfx->key[scancode] = down ? TRUE : FALSE;
+		fb_gfx->key[scancode] = (down || fb_hWiiKeyboardDown(scancode)) ? TRUE : FALSE;
 }
 
 static void wii_post_key_on_press(int down, int was_down, int key)
@@ -799,12 +800,15 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	visible_xfb = 0;
 	blitter = fb_hGetBlitter(32, FALSE);
 	quitting = FALSE;
+	if (blitter)
+		fb_hWiiKeyboardInit();
 
 	return blitter ? 0 : -1;
 }
 
 static void driver_exit(void)
 {
+	fb_hWiiKeyboardExit();
 	quitting = TRUE;
 	blitter = NULL;
 	video_w = 0;
@@ -930,6 +934,7 @@ static void driver_poll_events(void)
 		GETKEY, SLEEP, and MULTIKEY see the controller-to-keyboard bridge.
 	*/
 	wii_update_keyboard();
+	fb_hWiiKeyboardPoll();
 	driver_present_framebuffer();
 }
 

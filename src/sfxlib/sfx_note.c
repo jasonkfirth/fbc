@@ -39,6 +39,8 @@
         oscillator → envelope → mixer → buffer → driver
 */
 
+#include <limits.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "fb_sfx.h"
@@ -53,23 +55,27 @@ typedef struct
 {
     const char *name;
     int frequency;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Name the existing 64-bit tail padding without changing the layout. */
+    unsigned char tail_padding[4];
+#endif
 } FB_SFX_NOTEENTRY;
 
 
 static const FB_SFX_NOTEENTRY note_table[] =
 {
-    {"C", 261},
-    {"C#",277},
-    {"D", 293},
-    {"D#",311},
-    {"E", 329},
-    {"F", 349},
-    {"F#",370},
-    {"G", 392},
-    {"G#",415},
-    {"A", 440},
-    {"A#",466},
-    {"B", 493}
+    {.name = "C",  .frequency = 261},
+    {.name = "C#", .frequency = 277},
+    {.name = "D",  .frequency = 293},
+    {.name = "D#", .frequency = 311},
+    {.name = "E",  .frequency = 329},
+    {.name = "F",  .frequency = 349},
+    {.name = "F#", .frequency = 370},
+    {.name = "G",  .frequency = 392},
+    {.name = "G#", .frequency = 415},
+    {.name = "A",  .frequency = 440},
+    {.name = "A#", .frequency = 466},
+    {.name = "B",  .frequency = 493}
 };
 
 
@@ -100,24 +106,30 @@ static int fb_sfxNoteLookup(const char *note)
 
 static int fb_sfxNoteApplyOctave(int base, int octave)
 {
-    int shift;
+    int64_t shift;
+	uint64_t steps;
 
     if (base <= 0)
         return 0;
 
-    shift = octave - 4;
+    shift = (int64_t)octave - 4;
 
-    while (shift > 0)
-    {
-        base *= 2;
-        shift--;
-    }
-
-    while (shift < 0)
-    {
-        base /= 2;
-        shift++;
-    }
+	if (shift > 0) {
+		steps = (uint64_t)shift;
+		while (steps > 0u) {
+			if (base > INT_MAX / 2)
+				return 0;
+			base *= 2;
+			steps--;
+		}
+	} else if (shift < 0) {
+		/* The widened octave difference cannot be INT64_MIN. */
+		steps = 0u - (uint64_t)shift;
+		while ((steps > 0u) && (base > 0)) {
+			base /= 2;
+			steps--;
+		}
+	}
 
     return base;
 }
@@ -165,7 +177,7 @@ void fb_sfxNote(const char *note, int octave, float duration)
         "sfx_note: note=%s octave=%d duration=%f freq=%d",
         note,
         octave,
-        duration,
+        (double)duration,
         freq
     );
 }
@@ -203,7 +215,7 @@ void fb_sfxNoteChannel(
         channel,
         note,
         octave,
-        duration,
+        (double)duration,
         freq
     );
 }

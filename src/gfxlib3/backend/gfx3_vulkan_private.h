@@ -75,11 +75,24 @@ typedef FB_GFX3_VK_VOID_FUNCTION (FB_GFX3_VK_CALL
 	*FB_GFX3_VK_GET_DEVICE_PROC_ADDR)(FB_GFX3_VK_DEVICE device,
 	const char *name);
 
+/*
+ * Name the four-byte gaps the 64-bit Vulkan ABI places before aligned
+ * pointers and handles. The reserved members preserve each existing field
+ * offset; the macro is empty where the 64-bit gaps do not exist.
+ */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+#define FB_GFX3_VK_ABI_PADDING(name) uint32_t name;
+#else
+#define FB_GFX3_VK_ABI_PADDING(name)
+#endif
+
 typedef struct FB_GFX3_VK_APPLICATION_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	const char *application_name;
 	uint32_t application_version;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_engine_name)
 	const char *engine_name;
 	uint32_t engine_version;
 	uint32_t api_version;
@@ -87,12 +100,16 @@ typedef struct FB_GFX3_VK_APPLICATION_INFO {
 
 typedef struct FB_GFX3_VK_INSTANCE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_application_info)
 	const FB_GFX3_VK_APPLICATION_INFO *application_info;
 	uint32_t enabled_layer_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_enabled_layer_names)
 	const char *const *enabled_layer_names;
 	uint32_t enabled_extension_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_enabled_extension_names)
 	const char *const *enabled_extension_names;
 } FB_GFX3_VK_INSTANCE_CREATE_INFO;
 
@@ -127,8 +144,10 @@ typedef struct FB_GFX3_VK_SURFACE_FORMAT {
 
 typedef struct FB_GFX3_VK_SWAPCHAIN_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_surface)
 	FB_GFX3_VK_SURFACE surface;
 	uint32_t minimum_image_count;
 	uint32_t image_format;
@@ -138,6 +157,7 @@ typedef struct FB_GFX3_VK_SWAPCHAIN_CREATE_INFO {
 	FB_GFX3_VK_FLAGS image_usage;
 	uint32_t image_sharing_mode;
 	uint32_t queue_family_index_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_queue_family_indices)
 	const uint32_t *queue_family_indices;
 	uint32_t pre_transform;
 	uint32_t composite_alpha;
@@ -152,6 +172,7 @@ typedef struct FB_GFX3_VK_SWAPCHAIN_CREATE_INFO {
 */
 typedef struct FB_GFX3_VK_SEMAPHORE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 #if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
@@ -161,10 +182,13 @@ typedef struct FB_GFX3_VK_SEMAPHORE_CREATE_INFO {
 
 typedef struct FB_GFX3_VK_PRESENT_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	uint32_t wait_semaphore_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_wait_semaphores)
 	const FB_GFX3_VK_SEMAPHORE *wait_semaphores;
 	uint32_t swapchain_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_swapchains)
 	const FB_GFX3_VK_SWAPCHAIN *swapchains;
 	const uint32_t *image_indices;
 	FB_GFX3_VK_RESULT *results;
@@ -179,22 +203,27 @@ typedef struct FB_GFX3_VK_QUEUE_FAMILY_PROPERTIES {
 
 typedef struct FB_GFX3_VK_DEVICE_QUEUE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 	uint32_t queue_family_index;
 	uint32_t queue_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_queue_priorities)
 	const float *queue_priorities;
 } FB_GFX3_VK_DEVICE_QUEUE_CREATE_INFO;
 
 typedef struct FB_GFX3_VK_DEVICE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 	uint32_t queue_create_info_count;
 	const FB_GFX3_VK_DEVICE_QUEUE_CREATE_INFO *queue_create_infos;
 	uint32_t enabled_layer_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_enabled_layer_names)
 	const char *const *enabled_layer_names;
 	uint32_t enabled_extension_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_enabled_extension_names)
 	const char *const *enabled_extension_names;
 	const void *enabled_features;
 } FB_GFX3_VK_DEVICE_CREATE_INFO;
@@ -309,6 +338,7 @@ typedef union FB_GFX3_VK_PHYSICAL_DEVICE_PROPERTIES_STORAGE {
 
 typedef struct FB_GFX3_VK_COMMAND_POOL_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 	uint32_t queue_family_index;
@@ -316,6 +346,7 @@ typedef struct FB_GFX3_VK_COMMAND_POOL_CREATE_INFO {
 
 typedef struct FB_GFX3_VK_COMMAND_BUFFER_ALLOCATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_COMMAND_POOL command_pool;
 	uint32_t level;
@@ -324,13 +355,16 @@ typedef struct FB_GFX3_VK_COMMAND_BUFFER_ALLOCATE_INFO {
 
 typedef struct FB_GFX3_VK_COMMAND_BUFFER_BEGIN_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_inheritance_info)
 	const void *inheritance_info;
 } FB_GFX3_VK_COMMAND_BUFFER_BEGIN_INFO;
 
 typedef struct FB_GFX3_VK_FENCE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 #if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
@@ -340,24 +374,31 @@ typedef struct FB_GFX3_VK_FENCE_CREATE_INFO {
 
 typedef struct FB_GFX3_VK_SUBMIT_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	uint32_t wait_semaphore_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_wait_semaphores)
 	const uint64_t *wait_semaphores;
 	const FB_GFX3_VK_FLAGS *wait_stage_masks;
 	uint32_t command_buffer_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_command_buffers)
 	const FB_GFX3_VK_COMMAND_BUFFER *command_buffers;
 	uint32_t signal_semaphore_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_signal_semaphores)
 	const uint64_t *signal_semaphores;
 } FB_GFX3_VK_SUBMIT_INFO;
 
 typedef struct FB_GFX3_VK_BUFFER_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_size)
 	uint64_t size;
 	FB_GFX3_VK_FLAGS usage;
 	uint32_t sharing_mode;
 	uint32_t queue_family_index_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_queue_family_indices)
 	const uint32_t *queue_family_indices;
 } FB_GFX3_VK_BUFFER_CREATE_INFO;
 
@@ -392,6 +433,7 @@ typedef struct FB_GFX3_VK_PHYSICAL_DEVICE_MEMORY_PROPERTIES {
 
 typedef struct FB_GFX3_VK_MEMORY_ALLOCATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	uint64_t allocation_size;
 	uint32_t memory_type_index;
@@ -402,6 +444,7 @@ typedef struct FB_GFX3_VK_MEMORY_ALLOCATE_INFO {
 
 typedef struct FB_GFX3_VK_MEMORY_BARRIER {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS source_access_mask;
 	FB_GFX3_VK_FLAGS destination_access_mask;
@@ -409,6 +452,7 @@ typedef struct FB_GFX3_VK_MEMORY_BARRIER {
 
 typedef struct FB_GFX3_VK_BUFFER_MEMORY_BARRIER {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS source_access_mask;
 	FB_GFX3_VK_FLAGS destination_access_mask;
@@ -429,6 +473,7 @@ typedef struct FB_GFX3_VK_IMAGE_SUBRESOURCE_RANGE {
 
 typedef struct FB_GFX3_VK_IMAGE_MEMORY_BARRIER {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS source_access_mask;
 	FB_GFX3_VK_FLAGS destination_access_mask;
@@ -467,8 +512,10 @@ typedef struct FB_GFX3_VK_BUFFER_IMAGE_COPY {
 
 typedef struct FB_GFX3_VK_SHADER_MODULE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_code_size)
 	size_t code_size;
 	const uint32_t *code;
 } FB_GFX3_VK_SHADER_MODULE_CREATE_INFO;
@@ -483,6 +530,7 @@ typedef struct FB_GFX3_VK_DESCRIPTOR_SET_LAYOUT_BINDING {
 
 typedef struct FB_GFX3_VK_DESCRIPTOR_SET_LAYOUT_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 	uint32_t binding_count;
@@ -491,16 +539,19 @@ typedef struct FB_GFX3_VK_DESCRIPTOR_SET_LAYOUT_CREATE_INFO {
 
 typedef struct FB_GFX3_VK_PIPELINE_LAYOUT_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 	uint32_t set_layout_count;
 	const FB_GFX3_VK_DESCRIPTOR_SET_LAYOUT *set_layouts;
 	uint32_t push_constant_range_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_push_constant_ranges)
 	const void *push_constant_ranges;
 } FB_GFX3_VK_PIPELINE_LAYOUT_CREATE_INFO;
 
 typedef struct FB_GFX3_VK_PIPELINE_SHADER_STAGE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 	FB_GFX3_VK_FLAGS stage;
@@ -511,8 +562,10 @@ typedef struct FB_GFX3_VK_PIPELINE_SHADER_STAGE_CREATE_INFO {
 
 typedef struct FB_GFX3_VK_COMPUTE_PIPELINE_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_stage)
 	FB_GFX3_VK_PIPELINE_SHADER_STAGE_CREATE_INFO stage;
 	FB_GFX3_VK_PIPELINE_LAYOUT layout;
 	FB_GFX3_VK_PIPELINE base_pipeline_handle;
@@ -529,18 +582,22 @@ typedef struct FB_GFX3_VK_DESCRIPTOR_POOL_SIZE {
 
 typedef struct FB_GFX3_VK_DESCRIPTOR_POOL_CREATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_FLAGS flags;
 	uint32_t maximum_sets;
 	uint32_t pool_size_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_pool_sizes)
 	const FB_GFX3_VK_DESCRIPTOR_POOL_SIZE *pool_sizes;
 } FB_GFX3_VK_DESCRIPTOR_POOL_CREATE_INFO;
 
 typedef struct FB_GFX3_VK_DESCRIPTOR_SET_ALLOCATE_INFO {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_DESCRIPTOR_POOL descriptor_pool;
 	uint32_t descriptor_set_count;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_set_layouts)
 	const FB_GFX3_VK_DESCRIPTOR_SET_LAYOUT *set_layouts;
 } FB_GFX3_VK_DESCRIPTOR_SET_ALLOCATE_INFO;
 
@@ -552,6 +609,7 @@ typedef struct FB_GFX3_VK_DESCRIPTOR_BUFFER_INFO {
 
 typedef struct FB_GFX3_VK_WRITE_DESCRIPTOR_SET {
 	uint32_t structure_type;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_next)
 	const void *next;
 	FB_GFX3_VK_DESCRIPTOR_SET destination_set;
 	uint32_t destination_binding;
@@ -956,6 +1014,7 @@ typedef struct FB_GFX3_VULKAN_SUBMISSION_SLOT {
 	FB_GFX3_VULKAN_BUFFER_ALLOCATION primitive_winner_buffer;
 	FB_GFX3_VULKAN_BUFFER_ALLOCATION primitive_workgroup_buffer;
 	uint32_t primitive_generation;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_point_command_buffer)
 	/*
 		Point packets are frequent in software-style text and particle loops.
 		The slot fence protects this mapped storage until every point dispatch
@@ -1033,6 +1092,7 @@ typedef struct FB_GFX3_VULKAN_IMPLEMENTATION {
 	uint32_t desired_height;
 	uint32_t swapchain_format;
 	uint32_t swapchain_color_space;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_submission_slots)
 	FB_GFX3_VULKAN_SUBMISSION_SLOT
 		submission_slots[FB_GFX3_VK_SUBMISSION_SLOT_COUNT];
 	uint32_t active_submission_slot;
@@ -1064,6 +1124,7 @@ typedef struct FB_GFX3_VULKAN_IMPLEMENTATION {
 	uint32_t batch_command_owner_slot;
 	int batch_enabled;
 	int batch_command_recording;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_image_available)
 	/*
 		These aliases name the slot currently recording work.  Keeping the
 		legacy field names localizes the primitive recording code while slot
@@ -1175,6 +1236,7 @@ typedef struct FB_GFX3_VULKAN_IMPLEMENTATION {
 	FB_GFX3_VK_PIPELINE paint_pipeline;
 	FB_GFX3_VK_PIPELINE present_pipeline;
 	int shader_float64;
+	FB_GFX3_VK_ABI_PADDING(reserved_before_compute_descriptor_pool)
 	FB_GFX3_VK_DESCRIPTOR_POOL compute_descriptor_pool;
 	FB_GFX3_VK_DESCRIPTOR_SET compute_descriptor_set;
 	FB_GFX3_VK_DESTROY_DESCRIPTOR_SET_LAYOUT destroy_descriptor_set_layout;
@@ -1186,6 +1248,8 @@ typedef struct FB_GFX3_VULKAN_IMPLEMENTATION {
 	FB_GFX3_VK_CMD_BIND_DESCRIPTOR_SETS command_bind_descriptor_sets;
 	FB_GFX3_VK_CMD_DISPATCH command_dispatch;
 } FB_GFX3_VULKAN_IMPLEMENTATION;
+
+#undef FB_GFX3_VK_ABI_PADDING
 
 typedef struct FB_GFX3_VULKAN_SURFACE_IMPLEMENTATION {
 	FB_GFX3_VULKAN_IMPLEMENTATION *owner;

@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 /* dst     - preallocated buffer to hold processed args
    src     - source string for arguments, may contain embedded null chars
@@ -67,6 +68,9 @@ int fb_hParseArgs( char *dst, const char *src, ssize_t length )
 
 		} while ( i < length );
 
+		/* The public result is an int even when the source length is wider. */
+		if( argc == INT_MAX )
+			return -1;
 		argc++;
 
 		/* skip trailing white space */

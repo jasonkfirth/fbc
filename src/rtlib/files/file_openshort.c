@@ -113,8 +113,8 @@ FBCALL int fb_FileOpenShort( FBSTRING_ACCESS *str_file_mode,
 
     return fb_FileOpen( filename,
                         file_mode,
-                        access_mode,
-                        lock_mode,
+                        (unsigned int)access_mode,
+                        (unsigned int)lock_mode,
                         fnum,
                         len );
 }

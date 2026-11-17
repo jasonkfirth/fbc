@@ -76,7 +76,7 @@ void fb_sfxVolume(float level)
     fb_sfxRuntimeLock();
     fb_sfx_context->master_volume = level;
     fb_sfxRuntimeUnlock();
-    SFX_DEBUG("sfx_volume: master volume set to %f", level);
+    SFX_DEBUG("sfx_volume: master volume set to %f", (double)level);
 }
 
 
@@ -156,7 +156,7 @@ void fb_sfxVolumeChannel(int channel, float level)
     SFX_DEBUG(
         "sfx_volume: channel %d volume set to %f",
         channel,
-        level
+        (double)level
     );
 }
 

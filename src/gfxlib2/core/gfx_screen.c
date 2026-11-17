@@ -13,6 +13,7 @@
 
 #include "../fb_gfx.h"
 #include <limits.h>
+#include <math.h>
 #include <strings.h>
 
 #define NUM_MODES 22
@@ -27,33 +28,34 @@ typedef struct {
 	signed char font;
 	unsigned char text_w;
 	unsigned char text_h;
+	unsigned char tail_padding;
 } MODEINFO;
 
 static const MODEINFO mode_info[NUM_MODES] = {
-	{    0,    0, 0, 0, 1, -1            , -1        ,    0,  0 }, /* NULL mode */
-	{  320,  200, 2, 1, 8, FB_PALETTE_16 ,  FB_FONT_8,   40, 25 }, /* CGA mode 1 */
-	{  640,  200, 1, 2, 1, FB_PALETTE_16 ,  FB_FONT_8,   80, 25 }, /* CGA mode 2 */
+	{    0,    0, 0, 0, 1, -1            , -1        ,    0,  0, 0 }, /* NULL mode */
+	{  320,  200, 2, 1, 8, FB_PALETTE_16 ,  FB_FONT_8,   40, 25, 0 }, /* CGA mode 1 */
+	{  640,  200, 1, 2, 1, FB_PALETTE_16 ,  FB_FONT_8,   80, 25, 0 }, /* CGA mode 2 */
 	                                                              /* Unsupported modes (3, 4, 5, 6): */
-	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0 },
-	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0 },
-	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0 },
-	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0 },
-	{  320,  200, 4, 1, 8, FB_PALETTE_16 , FB_FONT_8 ,  40, 25 }, /* EGA mode 7 */
-	{  640,  200, 4, 2, 4, FB_PALETTE_16 , FB_FONT_8 ,  80, 25 }, /* EGA mode 8 */
-	{  640,  350, 4, 1, 2, FB_PALETTE_64 , FB_FONT_14,  80, 25 }, /* EGA mode 9 */
-	{  640,  350, 1, 1, 2, FB_PALETTE_2  , FB_FONT_14,  80, 25 }, /* EGA mode 10 */
-	{  640,  480, 1, 1, 1, FB_PALETTE_2  , FB_FONT_16,  80, 30 }, /* VGA mode 11 */
-	{  640,  480, 4, 1, 1, FB_PALETTE_256, FB_FONT_16,  80, 30 }, /* VGA mode 12 */
-	{  320,  200, 8, 1, 1, FB_PALETTE_256, FB_FONT_8 ,  40, 25 }, /* VGA mode 13 */
+	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0, 0 },
+	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0, 0 },
+	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0, 0 },
+	{    0,    0, 0, 0, 1, -1            , -1        ,   0,  0, 0 },
+	{  320,  200, 4, 1, 8, FB_PALETTE_16 , FB_FONT_8 ,  40, 25, 0 }, /* EGA mode 7 */
+	{  640,  200, 4, 2, 4, FB_PALETTE_16 , FB_FONT_8 ,  80, 25, 0 }, /* EGA mode 8 */
+	{  640,  350, 4, 1, 2, FB_PALETTE_64 , FB_FONT_14,  80, 25, 0 }, /* EGA mode 9 */
+	{  640,  350, 1, 1, 2, FB_PALETTE_2  , FB_FONT_14,  80, 25, 0 }, /* EGA mode 10 */
+	{  640,  480, 1, 1, 1, FB_PALETTE_2  , FB_FONT_16,  80, 30, 0 }, /* VGA mode 11 */
+	{  640,  480, 4, 1, 1, FB_PALETTE_256, FB_FONT_16,  80, 30, 0 }, /* VGA mode 12 */
+	{  320,  200, 8, 1, 1, FB_PALETTE_256, FB_FONT_8 ,  40, 25, 0 }, /* VGA mode 13 */
 	                                                              /* New modes: */
-	{  320,  240, 8, 1, 1, FB_PALETTE_256, FB_FONT_8 ,  40, 30 }, /* 14: 320x240 */
-	{  400,  300, 8, 1, 1, FB_PALETTE_256, FB_FONT_8 ,  50, 37 }, /* 15: 400x300 */
-	{  512,  384, 8, 1, 1, FB_PALETTE_256, FB_FONT_16,  64, 24 }, /* 16: 512x384 */
-	{  640,  400, 8, 1, 1, FB_PALETTE_256, FB_FONT_16,  80, 25 }, /* 17: 640x400 */
-	{  640,  480, 8, 1, 1, FB_PALETTE_256, FB_FONT_16,  80, 30 }, /* 18: 640x480 */
-	{  800,  600, 8, 1, 1, FB_PALETTE_256, FB_FONT_16, 100, 37 }, /* 19: 800x600 */
-	{ 1024,  768, 8, 1, 1, FB_PALETTE_256, FB_FONT_16, 128, 48 }, /* 20: 1024x768 */
-	{ 1280, 1024, 8, 1, 1, FB_PALETTE_256, FB_FONT_16, 160, 64 }  /* 21: 1280x1024 */
+	{  320,  240, 8, 1, 1, FB_PALETTE_256, FB_FONT_8 ,  40, 30, 0 }, /* 14: 320x240 */
+	{  400,  300, 8, 1, 1, FB_PALETTE_256, FB_FONT_8 ,  50, 37, 0 }, /* 15: 400x300 */
+	{  512,  384, 8, 1, 1, FB_PALETTE_256, FB_FONT_16,  64, 24, 0 }, /* 16: 512x384 */
+	{  640,  400, 8, 1, 1, FB_PALETTE_256, FB_FONT_16,  80, 25, 0 }, /* 17: 640x400 */
+	{  640,  480, 8, 1, 1, FB_PALETTE_256, FB_FONT_16,  80, 30, 0 }, /* 18: 640x480 */
+	{  800,  600, 8, 1, 1, FB_PALETTE_256, FB_FONT_16, 100, 37, 0 }, /* 19: 800x600 */
+	{ 1024,  768, 8, 1, 1, FB_PALETTE_256, FB_FONT_16, 128, 48, 0 }, /* 20: 1024x768 */
+	{ 1280, 1024, 8, 1, 1, FB_PALETTE_256, FB_FONT_16, 160, 64, 0 }  /* 21: 1280x1024 */
 };
 
 #ifdef HOST_NUTTX
@@ -227,20 +229,24 @@ static unsigned char *allocate_aligned_page(size_t page_size)
 
 	aligned = ((uintptr_t)allocation + sizeof(void *) + 15u) & ~(uintptr_t)15u;
 	page = (unsigned char *)aligned;
-	((void **)page)[-1] = allocation;
+	/* Store the base pointer before the aligned page without a typed load/store. */
+	memcpy(page - sizeof(allocation), (const void *)&allocation, sizeof(allocation));
 	return page;
 }
 
 static void free_aligned_pages(unsigned char **pages, int page_count)
 {
 	int page;
+	void *allocation;
 
 	if (!pages)
 		return;
 
 	for (page = 0; page < page_count; ++page) {
-		if (pages[page])
-			free(((void **)pages[page])[-1]);
+		if (pages[page]) {
+			memcpy((void *)&allocation, pages[page] - sizeof(allocation), sizeof(allocation));
+			free(allocation);
+		}
 	}
 	free((void *)pages);
 }
@@ -327,8 +333,8 @@ int fb_hApplyPendingResize(void)
 	visible_page = fb_gfx->visible_page;
 	bytes_per_pixel = fb_gfx->bpp;
 	scanline_size = fb_gfx->scanline_size;
-	color_mask = fb_gfx->color_mask;
-	depth = fb_gfx->depth;
+	color_mask = (unsigned int)fb_gfx->color_mask;
+	depth = (unsigned int)fb_gfx->depth;
 	old_width = fb_gfx->w;
 	old_height = fb_gfx->h;
 	old_pitch = fb_gfx->pitch;
@@ -337,7 +343,7 @@ int fb_hApplyPendingResize(void)
 	old_pages = fb_gfx->page;
 	old_con_pages = fb_gfx->con_pages;
 	old_dirty = fb_gfx->dirty;
-	if ((page_count <= 0) || (visible_page < 0) ||
+	if ((fb_gfx->depth <= 0) || (page_count <= 0) || (visible_page < 0) ||
 	    (visible_page >= page_count) || (bytes_per_pixel <= 0) ||
 	    (scanline_size <= 0) || (old_pitch <= 0) ||
 	    (old_text_width < 0) || (old_text_height < 0) ||
@@ -374,8 +380,8 @@ int fb_hApplyPendingResize(void)
 		if (!new_pages[page])
 			goto fail;
 		for (row = 0; row < height; ++row)
-			fb_hPixelSet(new_pages[page] + ((size_t)row * pitch),
-				MASK_A_32 & color_mask, (size_t)width);
+			fb_hPixelSet(new_pages[page] + ((size_t)row * (size_t)pitch),
+				(int)(MASK_A_32 & color_mask), (size_t)width);
 	}
 
 	new_dirty = (char *)malloc(dirty_size);
@@ -422,8 +428,8 @@ int fb_hApplyPendingResize(void)
 	copy_text_height = MIN(text_height, old_text_height);
 	for (page = 0; page < page_count; ++page) {
 		for (row = 0; row < copy_height; ++row) {
-			fb_hMemCpy(new_pages[page] + ((size_t)row * pitch),
-				old_pages[page] + ((size_t)row * old_pitch),
+			fb_hMemCpy(new_pages[page] + ((size_t)row * (size_t)pitch),
+				old_pages[page] + ((size_t)row * (size_t)old_pitch),
 				row_bytes);
 		}
 		if ((copy_text_width > 0) && (copy_text_height > 0)) {
@@ -432,9 +438,9 @@ int fb_hApplyPendingResize(void)
 				goto fail;
 			for (row = 0; row < copy_text_height; ++row) {
 				fb_hMemCpy(new_con_pages[page] +
-					((size_t)row * text_width),
+					((size_t)row * (size_t)text_width),
 					old_con_pages[page] +
-					((size_t)row * old_text_width),
+					((size_t)row * (size_t)old_text_width),
 					(size_t)copy_text_width * sizeof(GFX_CHAR_CELL));
 			}
 		}
@@ -468,9 +474,9 @@ int fb_hApplyPendingResize(void)
 		fb_gfx->pending_height = 0;
 		fb_gfx->id = screen_id++;
 		if (fb_gfx->cursor_x >= text_width)
-			fb_gfx->cursor_x = MAX(text_width - 1, 0);
+			fb_gfx->cursor_x = (text_width > 1) ? text_width - 1 : 0;
 		if (fb_gfx->cursor_y >= text_height)
-			fb_gfx->cursor_y = MAX(text_height - 1, 0);
+			fb_gfx->cursor_y = (text_height > 1) ? text_height - 1 : 0;
 
 		new_pages = NULL;
 		new_con_pages = NULL;
@@ -517,10 +523,11 @@ void fb_hResetCharCells(FB_GFXCTX *context, int do_alloc)
         }
 
         if( do_alloc ) {
-            size_t text_size = fb_gfx->text_w * fb_gfx->text_h;
+            size_t text_size = (size_t)fb_gfx->text_w * (size_t)fb_gfx->text_h;
 
             /* Allocate memory for all character cells */
-            fb_gfx->con_pages = (GFX_CHAR_CELL **)malloc(sizeof(GFX_CHAR_CELL *) * fb_gfx->num_pages);
+            fb_gfx->con_pages = (GFX_CHAR_CELL **)malloc(
+				sizeof(GFX_CHAR_CELL *) * (size_t)fb_gfx->num_pages);
             for (i = 0; i < fb_gfx->num_pages; i++) {
                 fb_gfx->con_pages[i] =
                     (GFX_CHAR_CELL *)calloc(1, sizeof(GFX_CHAR_CELL) * text_size);
@@ -543,7 +550,13 @@ void fb_hClearCharCells( int x1, int y1, int x2, int y2,
                          int page,
                          FB_WCHAR ch, unsigned fg, unsigned bg )
 {
+#if defined(DISABLE_WCHAR) && defined(__DJGPP__)
+    GFX_CHAR_CELL fill_cell = { ch, { 0, 0, 0 }, fg, bg };
+#elif !defined(DISABLE_WCHAR) && defined(__SIZEOF_WCHAR_T__) && (__SIZEOF_WCHAR_T__ == 2)
+    GFX_CHAR_CELL fill_cell = { ch, { 0, 0 }, fg, bg };
+#else
     GFX_CHAR_CELL fill_cell = { ch, fg, bg };
+#endif
     int clear_w = x2 - x1;
     int text_w = fb_gfx->text_w;
     int move_w = text_w - clear_w;
@@ -654,16 +667,17 @@ static int set_mode
         fb_gfx->scanline_size = scanline_size;
         fb_gfx->font = (font >= 0) ? &fb_font[font] : NULL;
 
-		if( aspect != 0.0f )
+	if( fpclassify(aspect) != FP_ZERO )
 			fb_gfx->aspect = aspect;
 		else
-			fb_gfx->aspect = (4.0 / 3.0) * ((float)fb_gfx->h / (float)fb_gfx->w);
+			fb_gfx->aspect = (float)((4.0 / 3.0) *
+				(double)((float)fb_gfx->h / (float)fb_gfx->w));
 
         switch (fb_gfx->depth) {
         case 15:
         case 16:	fb_gfx->color_mask = 0xFFFF; fb_gfx->depth = 16; break;
         case 24:
-        case 32:	fb_gfx->color_mask = 0xFFFFFFFF; fb_gfx->depth = 32; break;
+        case 32:	fb_gfx->color_mask = -1; fb_gfx->depth = 32; break;
         default:	fb_gfx->color_mask = (1 << fb_gfx->depth) - 1;
         }
 
@@ -797,12 +811,15 @@ static int set_mode
         fb_gfx->text_h = text_h;
 
         context = fb_hGetContext();
+        if (context->view_w < 0)
+			goto allocation_failed;
 
         fb_hResetCharCells(context, TRUE);
         for (i = 0; i < num_pages; i++) {
 		dest = fb_gfx->page[i];
 		for (j = 0; j < fb_gfx->h; j++) {
-	        	context->pixel_set(dest, context->bg_color, context->view_w);
+			context->pixel_set(dest, (int)context->bg_color,
+				(size_t)context->view_w);
 			dest += fb_gfx->pitch;
 	        }
 		}

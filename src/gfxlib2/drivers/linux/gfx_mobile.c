@@ -102,7 +102,8 @@ static int linux_display_dpi(Display *display, int screen)
 	    (dpi > FB_LINUX_METRIC_MAX_DPI)) {
 		millimeters = XDisplayWidthMM(display, screen);
 		if (millimeters > 0) {
-			dpi = ((double)XDisplayWidth(display, screen) * 25.4) /
+			int pixel_width = XDisplayWidth(display, screen);
+			dpi = ((double)pixel_width * 25.4) /
 				(double)millimeters;
 		} else {
 			dpi = 96.0;

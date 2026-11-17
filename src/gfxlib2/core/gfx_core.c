@@ -7,8 +7,22 @@
 
 /* core internal routines */
 
+#include <limits.h>
+#include <stdint.h>
+
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
+
+/* Byte-addressed scanlines can leave packed pixel words unaligned. */
+#if defined(__GNUC__) || defined(__clang__)
+typedef unsigned short fb_gfx_core_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef unsigned int fb_gfx_core_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef unsigned short fb_gfx_core_u16_unaligned;
+typedef unsigned int fb_gfx_core_u32_unaligned;
+#endif
 
 #if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
 #define FB_FALLTHROUGH __attribute__((fallthrough))
@@ -67,14 +81,18 @@ FB_GFXCTX *fb_hGetContext(void)
 		context->id = fb_gfx->id;
 		context->old_view_w = fb_gfx->w;
 		context->old_view_h = context->max_h = fb_gfx->h;
-		context->line = (unsigned char **)malloc(fb_gfx->h * sizeof(unsigned char *));
+		if (fb_gfx->h < 0 ||
+		    (size_t)fb_gfx->h > SIZE_MAX / sizeof(*context->line))
+			return context;
+		context->line = (unsigned char **)malloc(
+			(size_t)fb_gfx->h * sizeof(*context->line));
 		if (!context->line)
 			return context;
         if ((fb_gfx->depth > 4) && (fb_gfx->depth <= 8))
             context->fg_color = 15;
         else
-            context->fg_color = fb_gfx->color_mask;
-        context->bg_color = MASK_A_32 & fb_gfx->color_mask;
+            context->fg_color = (unsigned int)fb_gfx->color_mask;
+        context->bg_color = MASK_A_32 & (unsigned int)fb_gfx->color_mask;
 		context->flags = CTX_BUFFER_INIT;
 		fb_hPrepareTarget(context, NULL);
 		fb_hSetPixelTransfer(context, MASK_A_32);
@@ -98,10 +116,14 @@ void fb_hPrepareTarget(FB_GFXCTX *context, void *target)
 			context->view_x = 0;
 			context->view_y = 0;
 			if (header->type == PUT_HEADER_NEW) {
-				context->view_w = header->width;
-				context->view_h = h = header->height;
+				if (header->width > (unsigned int)INT_MAX ||
+				    header->height > (unsigned int)INT_MAX ||
+				    header->pitch > (unsigned int)INT_MAX)
+					return;
+				context->view_w = (int)header->width;
+				context->view_h = h = (int)header->height;
 				context->target_bpp = header->bpp;
-				context->target_pitch = header->pitch;
+				context->target_pitch = (int)header->pitch;
 				fb_hSetupFuncs(header->bpp);
 				data = (unsigned char *)target + sizeof(PUT_HEADER);
 			}
@@ -114,7 +136,11 @@ void fb_hPrepareTarget(FB_GFXCTX *context, void *target)
 			}
 			if (h > context->max_h) {
 				unsigned char **new_line;
-				new_line = (unsigned char **)realloc((void *)context->line, h * sizeof(unsigned char *));
+				if (h < 0 ||
+				    (size_t)h > SIZE_MAX / sizeof(*context->line))
+					return;
+				new_line = (unsigned char **)realloc((void *)context->line,
+					(size_t)h * sizeof(*context->line));
 				if (!new_line)
 					return;
 				context->line = new_line;
@@ -154,8 +180,8 @@ void fb_hSetPixelTransfer(FB_GFXCTX *context, unsigned int color)
 void fb_hTranslateCoord(FB_GFXCTX *context, float fx, float fy, int *x, int *y)
 {
 	if (context->flags & CTX_WINDOW_ACTIVE) {
-		fx = ((fx - context->win_x) * (context->view_w - 1)) / context->win_w;
-		fy = ((fy - context->win_y) * (context->view_h - 1)) / context->win_h;
+		fx = ((fx - context->win_x) * (float)(context->view_w - 1)) / context->win_w;
+		fy = ((fy - context->win_y) * (float)(context->view_h - 1)) / context->win_h;
 	}
 	
 	*x = CINT(fx);
@@ -190,6 +216,9 @@ void fb_hFixRelative(FB_GFXCTX *context, int coord_type, float *x1, float *y1, f
 			*x2 += *x1;
 			*y2 += *y1;
 			break;
+
+		default:
+			break;
 	}
 
 	if (x2) {
@@ -212,23 +241,24 @@ void fb_hFixCoordsOrder(int *x1, int *y1, int *x2, int *y2)
 
 static void fb_hPutPixel1(FB_GFXCTX *ctx, int x, int y, unsigned int color)
 {
-	ctx->line[y][x] = color;
+	ctx->line[y][x] = (unsigned char)color;
 }
 
 static void fb_hPutPixel2(FB_GFXCTX *ctx, int x, int y, unsigned int color)
 {
-	((unsigned short *)ctx->line[y])[x] = color;
+	((fb_gfx_core_u16_unaligned *)ctx->line[y])[x] = (fb_gfx_core_u16_unaligned)color;
 }
 
 static void fb_hPutPixel4(FB_GFXCTX *ctx, int x, int y, unsigned int color)
 {
-	((unsigned int *)ctx->line[y])[x] = color;
+	((fb_gfx_core_u32_unaligned *)ctx->line[y])[x] = color;
 }
 
 static void fb_hPutPixelAlpha4(FB_GFXCTX *ctx, int x, int y, unsigned int color)
 {
 	unsigned int dc, srb, sg, drb, dg, a;
-	unsigned int *d = ((unsigned int *)ctx->line[y]) + x;
+	fb_gfx_core_u32_unaligned *d =
+		((fb_gfx_core_u32_unaligned *)ctx->line[y]) + x;
 	
 	dc = *d;
 	a = color >> 24;
@@ -248,30 +278,30 @@ static unsigned int fb_hGetPixel1(FB_GFXCTX *ctx, int x, int y)
 
 static unsigned int fb_hGetPixel2(FB_GFXCTX *ctx, int x, int y)
 {
-	return ((unsigned short *)ctx->line[y])[x];
+	return ((fb_gfx_core_u16_unaligned *)ctx->line[y])[x];
 }
 
 static unsigned int fb_hGetPixel4(FB_GFXCTX *ctx, int x, int y)
 {
-	return ((unsigned int *)ctx->line[y])[x];
+	return ((fb_gfx_core_u32_unaligned *)ctx->line[y])[x];
 }
 
 static void *fb_hPixelSet2(void *dest, int color, size_t size)
 {
-	unsigned short *d = (unsigned short *)dest;
+	fb_gfx_core_u16_unaligned *d = (fb_gfx_core_u16_unaligned *)dest;
 	
 	for (; size; size--)
-		*d++ = color;
+		*d++ = (fb_gfx_core_u16_unaligned)color;
 	
 	return dest;
 }
 
 static void *fb_hPixelSet4(void *dest, int color, size_t size)
 {
-	unsigned int *d = (unsigned int *)dest;
+	fb_gfx_core_u32_unaligned *d = (fb_gfx_core_u32_unaligned *)dest;
 	
 	for (; size; size--)
-		*d++ = color;
+		*d++ = (unsigned int)color;
 	
 	return dest;
 }

@@ -28,7 +28,8 @@ SUITE( fbc_tests.crt.longdouble )
 	TEST( longdouble_size )
 		#if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
 			CU_ASSERT( sizeof( clongdouble ) = 16 )
-		#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
+		#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ ) or _
+		        defined( __FB_WII__ ) or defined( __FB_XBOX__ )
 			CU_ASSERT( sizeof( clongdouble ) = 8 )
 		#else
 			CU_ASSERT( sizeof( clongdouble ) = 12 )
@@ -56,7 +57,8 @@ SUITE( fbc_tests.crt.longdouble )
 			'' RISC OS APCS-32 aligns 64-bit values to four-byte boundaries.
 			#assert sizeof( TaggedLongDouble ) = 12
 			#assert offsetof( TaggedLongDouble, value ) = 4
-		#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
+		#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ ) or _
+		        defined( __FB_WII__ ) or defined( __FB_XBOX__ )
 			#assert sizeof( TaggedLongDouble ) = 16
 			#assert offsetof( TaggedLongDouble, value ) = 8
 		#else

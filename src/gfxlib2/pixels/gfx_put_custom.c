@@ -9,6 +9,17 @@
 
 #include "../fb_gfx.h"
 
+/* Byte-pitched rows can leave packed pixels at unaligned addresses. */
+#if defined(__GNUC__) || defined(__clang__)
+typedef unsigned short fb_put_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef unsigned int fb_put_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef unsigned short fb_put_u16_unaligned;
+typedef unsigned int fb_put_u32_unaligned;
+#endif
+
 static void fb_hPutCustom1(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
 	unsigned char *s = (unsigned char *)src;
@@ -31,15 +42,15 @@ static void fb_hPutCustom1(unsigned char *src, unsigned char *dest, int w, int h
 
 static void fb_hPutCustom2(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	unsigned short *s = (unsigned short *)src;
-	unsigned short *d;
+	fb_put_u16_unaligned *s = (fb_put_u16_unaligned *)src;
+	fb_put_u16_unaligned *d;
 	int x;
 	unsigned int cs, cd;
 	(void)alpha;
 
 	src_pitch = (src_pitch >> 1) - w;
 	for (; h; h--) {
-		d = (unsigned short *)dest;
+		d = (fb_put_u16_unaligned *)dest;
 		for (x = w; x; x--) {
 			cs = *s++;
 			cs = (((cs & 0x001F) << 3) | ((cs >> 2) & 0x7) |
@@ -50,7 +61,8 @@ static void fb_hPutCustom2(unsigned char *src, unsigned char *dest, int w, int h
 			      ((cd & 0x07E0) << 5) | ((cd >> 1) & 0x300) |
 			      ((cd & 0xF800) << 8) | ((cd << 3) & 0x70000));
 			cd = blender(cs, cd, param);
-			*d++ = (unsigned short)((cd >> 3) & 0x001F) | ((cd >> 5) & 0x07E0) | ((cd >> 8) & 0xF800);
+			*d++ = (fb_put_u16_unaligned)(((cd >> 3) & 0x001F) |
+				((cd >> 5) & 0x07E0) | ((cd >> 8) & 0xF800));
 		}
 		s += src_pitch;
 		dest += dest_pitch;
@@ -59,14 +71,14 @@ static void fb_hPutCustom2(unsigned char *src, unsigned char *dest, int w, int h
 
 static void fb_hPutCustom4(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
-	unsigned int *s = (unsigned int *)src;
-	unsigned int *d;
+	fb_put_u32_unaligned *s = (fb_put_u32_unaligned *)src;
+	fb_put_u32_unaligned *d;
 	int x;
 	(void)alpha;
 	
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
-		d = (unsigned int *)dest;
+		d = (fb_put_u32_unaligned *)dest;
 		for (x = w; x; x--) {
 			*d = blender(*s, *d, param);
 			s++;

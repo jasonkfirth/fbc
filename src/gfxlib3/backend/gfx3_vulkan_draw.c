@@ -222,9 +222,26 @@ int fb_gfx3_vulkan_surface_points_batch(FB_GFX3_VULKAN_RUNTIME *runtime,
 	command_buffer = &slot->point_command_buffer;
 	for (index = 0; index < active_count; index++) {
 		const FB_GFX3_VULKAN_POINTS *operation = active[index];
-		FB_GFX3_VULKAN_POINT_COMMAND *point_command =
-			(FB_GFX3_VULKAN_POINT_COMMAND *)((uint8_t *)command_buffer->mapped +
-			offsets[index]);
+		size_t command_offset = offsets[index];
+		FB_GFX3_VULKAN_POINT_COMMAND *point_command;
+		uint8_t *command_bytes;
+		uintptr_t mapped_address;
+
+		if (command_buffer->mapped == NULL)
+			return FB_GFX3_INVALID;
+		mapped_address = (uintptr_t)command_buffer->mapped;
+		/* Reject misaligned mapped memory before creating an object pointer. */
+		if (((mapped_address % _Alignof(FB_GFX3_VULKAN_POINT_COMMAND)) != 0u) ||
+		    ((command_offset % _Alignof(FB_GFX3_VULKAN_POINT_COMMAND)) != 0u))
+			return FB_GFX3_INVALID;
+		command_bytes = (uint8_t *)command_buffer->mapped + command_offset;
+#if defined(__GNUC__) || defined(__clang__)
+		point_command = (FB_GFX3_VULKAN_POINT_COMMAND *)
+			__builtin_assume_aligned(command_bytes,
+				_Alignof(FB_GFX3_VULKAN_POINT_COMMAND));
+#else
+		point_command = (FB_GFX3_VULKAN_POINT_COMMAND *)command_bytes;
+#endif
 
 		point_command->surface[0] = surface->width;
 		point_command->surface[1] = surface->height;
@@ -1071,6 +1088,8 @@ static int vulkan_surface_rectangle_tile_submit(
 	uint32_t *cursors = NULL;
 	uint32_t *indices = NULL;
 	uint32_t *tile_coordinates = NULL;
+	unsigned char *scratch;
+	void *scratch_element;
 	uint32_t tiles_x;
 	uint32_t tiles_y;
 	uint32_t tiles;
@@ -1175,6 +1194,12 @@ static int vulkan_surface_rectangle_tile_submit(
 		result = FB_GFX3_INVALID;
 		goto cleanup;
 	}
+	if (((range_size % _Alignof(uint32_t)) != 0u) ||
+	    (((range_size + cursor_size) % _Alignof(uint32_t)) != 0u) ||
+	    (((range_size + cursor_size + index_size) % _Alignof(uint32_t)) != 0u)) {
+		result = FB_GFX3_INVALID;
+		goto cleanup;
+	}
 	if (implementation->rectangle_tile_output_scratch_size < scratch_size) {
 		void *replacement = realloc(
 			implementation->rectangle_tile_output_scratch, scratch_size);
@@ -1186,10 +1211,16 @@ static int vulkan_surface_rectangle_tile_submit(
 		implementation->rectangle_tile_output_scratch = replacement;
 		implementation->rectangle_tile_output_scratch_size = scratch_size;
 	}
-	ranges = (uint32_t *)implementation->rectangle_tile_output_scratch;
-	cursors = (uint32_t *)((uint8_t *)ranges + range_size);
-	indices = (uint32_t *)((uint8_t *)cursors + cursor_size);
-	tile_coordinates = (uint32_t *)((uint8_t *)indices + index_size);
+	scratch = (unsigned char *)implementation->rectangle_tile_output_scratch;
+	/* Keep byte offsets explicit and verify alignment before typed access. */
+	scratch_element = scratch;
+	ranges = scratch_element;
+	scratch_element = scratch + range_size;
+	cursors = scratch_element;
+	scratch_element = scratch + range_size + cursor_size;
+	indices = scratch_element;
+	scratch_element = scratch + range_size + cursor_size + index_size;
+	tile_coordinates = scratch_element;
 	memset(ranges, 0, range_size);
 	memset(cursors, 0, cursor_size);
 	{
@@ -1848,6 +1879,8 @@ static int vulkan_surface_primitive_tile_submit(
 	uint32_t *cursors;
 	uint32_t *indices;
 	uint32_t *tile_coordinates;
+	unsigned char *scratch;
+	void *scratch_element;
 	uint32_t tiles_x;
 	uint32_t tiles_y;
 	uint32_t tiles;
@@ -1950,6 +1983,10 @@ static int vulkan_surface_primitive_tile_submit(
 	    (fb_gfx3_vk_size_multiply(primitive_count, sizeof(*commands),
 	     &command_size) != FB_GFX3_OK))
 		return FB_GFX3_INVALID;
+	if (((range_size % _Alignof(uint32_t)) != 0u) ||
+	    (((range_size + cursor_size) % _Alignof(uint32_t)) != 0u) ||
+	    (((range_size + cursor_size + index_size) % _Alignof(uint32_t)) != 0u))
+		return FB_GFX3_INVALID;
 	if (implementation->rectangle_tile_output_scratch_size < scratch_size) {
 		void *replacement = realloc(
 			implementation->rectangle_tile_output_scratch, scratch_size);
@@ -1959,10 +1996,16 @@ static int vulkan_surface_primitive_tile_submit(
 		implementation->rectangle_tile_output_scratch = replacement;
 		implementation->rectangle_tile_output_scratch_size = scratch_size;
 	}
-	ranges = (uint32_t *)implementation->rectangle_tile_output_scratch;
-	cursors = (uint32_t *)((uint8_t *)ranges + range_size);
-	indices = (uint32_t *)((uint8_t *)cursors + cursor_size);
-	tile_coordinates = (uint32_t *)((uint8_t *)indices + index_size);
+	scratch = (unsigned char *)implementation->rectangle_tile_output_scratch;
+	/* Keep byte offsets explicit and verify alignment before typed access. */
+	scratch_element = scratch;
+	ranges = scratch_element;
+	scratch_element = scratch + range_size;
+	cursors = scratch_element;
+	scratch_element = scratch + range_size + cursor_size;
+	indices = scratch_element;
+	scratch_element = scratch + range_size + cursor_size + index_size;
+	tile_coordinates = scratch_element;
 	memset(ranges, 0, range_size);
 	memset(cursors, 0, cursor_size);
 	{

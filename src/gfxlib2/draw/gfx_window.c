@@ -8,6 +8,7 @@
 /* WINDOW statement */
 
 #include "../fb_gfx.h"
+#include <math.h>
 
 FBCALL void fb_GfxWindow(float x1, float y1, float x2, float y2, int screen)
 {
@@ -22,7 +23,8 @@ FBCALL void fb_GfxWindow(float x1, float y1, float x2, float y2, int screen)
 	}
 
 	context = fb_hGetContext( );
-	if (x1 || y1 || x2 || y2) {
+	if ((fpclassify(x1) != FP_ZERO) || (fpclassify(y1) != FP_ZERO) ||
+	    (fpclassify(x2) != FP_ZERO) || (fpclassify(y2) != FP_ZERO)) {
 		if (x2 < x1) {
 			temp = x1;
 			x1 = x2;

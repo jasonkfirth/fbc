@@ -6,12 +6,15 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <stdint.h>
 
 FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 {
 	const FB_WCHAR *p, *r;
 	int radix;
 	ssize_t i;
+	size_t alloc_chars;
+	long long radix_value;
 	FB_WCHAR *q, c;
 	double ret;
 
@@ -49,14 +52,20 @@ FBCALL double fb_WstrToDouble( const FB_WCHAR *src, ssize_t len )
 				break;
 		}
 
-		return (double)fb_WstrRadix2Longint( r, len - fb_wstr_CalcDiff( p, r ), radix );
+		radix_value = fb_WstrRadix2Longint( r, len - fb_wstr_CalcDiff( p, r ), radix );
+		return (double)radix_value;
 	}
 
 	/* Workaround: wcstod() does not allow 'd' as an exponent specifier on 
 	 * non-win32 platforms, so create a temporary buffer and replace any 
 	 * 'd's with 'e'
 	 */
-	q = malloc( (len + 1) * sizeof(FB_WCHAR) );
+	alloc_chars = (size_t)len;
+	/* Include the terminator while keeping the allocation within pointer range. */
+	if( alloc_chars >= (size_t)PTRDIFF_MAX / sizeof(FB_WCHAR) )
+		return 0.0;
+	++alloc_chars;
+	q = malloc( alloc_chars * sizeof(FB_WCHAR) );
 	if( q == NULL )
 		return 0.0;
 	for( i = 0; i < len; i++ )

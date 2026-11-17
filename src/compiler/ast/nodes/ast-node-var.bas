@@ -60,18 +60,22 @@ function astNewVAR _
 		end select
 	end if
 
+	'' DJGPP has no native C TLS; libogc's LWP threads do not install the
+	'' compiler's native TLS template either. Both use runtime-owned slots.
+	var runtime_c_tls = (env.clopt.target = FB_COMPTARGET_DOS) or _
+	                    (env.clopt.target = FB_COMPTARGET_WII)
 	if( sym andalso symbIsThreadLocal( sym ) andalso (no_thread_local = FALSE) andalso _
 	    ((env.clopt.backend = FB_BACKEND_GAS) or _
 	     (env.clopt.backend = FB_BACKEND_GAS64) or _
 	     ((env.clopt.backend = FB_BACKEND_GCC) and _
-	      (env.clopt.target = FB_COMPTARGET_DOS))) andalso _
+	      runtime_c_tls)) andalso _
 	    (symbIsThreadLocalC( sym ) = FALSE orElse _
 	     env.clopt.target <> FB_COMPTARGET_LINUX orElse _
 	     fbGetOption( FB_COMPOPT_OUTTYPE ) = FB_OUTTYPE_DYNAMICLIB)) then
 		'' Match the private static storage rule. Names identify
 		'' public externs across modules, but cannot identify private objects
 		'' with identical spellings in separately compiled modules.
-		dim as integer private_tls_key = (env.clopt.target = FB_COMPTARGET_DOS) and _
+		dim as integer private_tls_key = runtime_c_tls and _
 			symbIsStatic( sym ) and _
 			((symbGetAttrib( sym ) and (FB_SYMBATTRIB_COMMON or FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_EXTERN)) = 0)
 		dim as ASTNODE ptr call_node
@@ -100,12 +104,11 @@ function astNewVAR _
 			astDelTREE( call_node )
 			return NULL
 		end if
-		'' DJGPP COFF has no native C TLS. Its C backend uses the same
-		'' runtime keys as assembly, with an ordinary object as the initial
-		'' value template. BASIC externs can address the provider's template.
+		'' Runtime C TLS uses the same keys as assembly, with an ordinary
+		'' initial-value template. BASIC externs can address that template.
 		if( private_tls_key orElse _
 		    (symbGetTypeIniTree( sym ) andalso (symbIsExtern( sym ) = FALSE)) orElse _
-		    ((env.clopt.target = FB_COMPTARGET_DOS) andalso symbIsExtern( sym )) ) then
+		    (runtime_c_tls andalso symbIsExtern( sym )) ) then
 			dim as ASTNODE ptr initial_address = astNewADDROF( _
 				astNewVAR( sym, 0, FB_DATATYPE_INVALID, NULL, TRUE ) )
 			initial_address = astNewCONV( pointer_integer_type, NULL, initial_address )

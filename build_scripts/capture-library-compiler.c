@@ -112,7 +112,10 @@ cleanup:
 
 int main( int argc, char **argv )
 {
-    char *compiler = getenv( "FBC_AUDIT_REAL_CC" );
+    const char *compiler_environment = "FBC_AUDIT_REAL_CC";
+    const char *basename = argv[0];
+    const char *separator = strrchr( basename, '/' );
+    char *compiler;
     char **arguments = NULL;
     char *capture_path = NULL;
     const char *object = NULL;
@@ -120,8 +123,18 @@ int main( int argc, char **argv )
     int status = 2, invoked = 0, spawn_error = 0;
     size_t length;
 
+    if( separator != NULL )
+        basename = separator + 1;
+    separator = strrchr( basename, '\\' );
+    if( separator != NULL )
+        basename = separator + 1;
+    if( strstr( basename, "gxx-capture" ) != NULL ||
+        strstr( basename, "clangxx-capture" ) != NULL )
+        compiler_environment = "FBC_AUDIT_REAL_CXX";
+    compiler = getenv( compiler_environment );
+
     if( compiler == NULL || compiler[0] == '\0' ) {
-        fputs( "FBC_AUDIT_REAL_CC must name the real compiler\n", stderr );
+        fprintf( stderr, "%s must name the real compiler\n", compiler_environment );
         return 2;
     }
     arguments = calloc( (size_t)argc + 1, sizeof( *arguments ) );

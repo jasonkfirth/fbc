@@ -209,7 +209,7 @@ static int aaudio_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverAAudio =
 {
 	"AAudio",
-	FB_SFX_DRIVER_CAP_BACKGROUND,
+	FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
 	aaudio_init,
 	aaudio_exit,
 	aaudio_write,

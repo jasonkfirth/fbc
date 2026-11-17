@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <sched.h>
+#include <string.h>
 
 #define FB_X11_DROP_MIN_VERSION 3u
 #define FB_X11_DROP_MAX_VERSION 5u
@@ -36,6 +37,9 @@ typedef struct FB_X11_DROP {
 	Atom selected;
 	unsigned int version;
 	int waiting, accepted;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t deadline_alignment_padding;
+#endif
 	double deadline;
 	FB_X11_DROP_ENABLED enabled;
 	FB_X11_DROP_SUBMIT submit;
@@ -204,6 +208,7 @@ static int fb_hX11DropEvent(FB_X11_DROP *state, const XEvent *event)
 			state->version = (unsigned int)version;
 			if ((message->data.l[1] & 1) != 0) {
 				Atom actual;
+				Atom types[64];
 				int format, result, safe;
 				unsigned long count, remaining;
 				unsigned char *data = NULL;
@@ -213,8 +218,11 @@ static int fb_hX11DropEvent(FB_X11_DROP *state, const XEvent *event)
 					&actual, &format, &count, &remaining, &data);
 				safe = fb_drop_xerror_end(state->display);
 				if (safe && result == Success && actual == XA_ATOM &&
-				    format == 32 && remaining == 0 && data != NULL)
-					fb_hX11DropChoose(state, (Atom *)data, count);
+				    format == 32 && remaining == 0 && data != NULL &&
+				    count <= sizeof(types) / sizeof(types[0])) {
+					memcpy(types, data, (size_t)count * sizeof(types[0]));
+					fb_hX11DropChoose(state, types, count);
+				}
 				if (data != NULL) XFree(data);
 			} else {
 				Atom types[3];

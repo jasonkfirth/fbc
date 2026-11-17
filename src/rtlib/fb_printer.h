@@ -5,19 +5,36 @@
  * Responsibilities: Shared runtime types, ABI declarations and internal contracts.
  * This file intentionally does NOT contain: Platform implementations or compiler parsing.
  */
+/* Keep the GNU flexible-tail spelling explicit in C++ builds. */
+#if defined(__GNUC__)
+#define FB_PRINTER_EXTENSION __extension__
+#else
+#define FB_PRINTER_EXTENSION
+#endif
+
 typedef struct {
 	char * proto;
 	int iPort;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the existing pointer alignment and flexible-tail offset. */
+	unsigned char name_alignment_padding[4];
+#endif
 	char * name;
 	char * title;
 	char * emu;
-	char raw[];
+	FB_PRINTER_EXTENSION char raw[];
 } DEV_LPT_PROTOCOL;
+
+#undef FB_PRINTER_EXTENSION
 
 typedef struct {
     void  *driver_opaque; /* this member must be first */
     char  *pszDevice;
     int    iPort;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* The native reference count keeps its original 64-bit offset. */
+    unsigned char refcount_alignment_padding[4];
+#endif
     size_t uiRefCount;
 } DEV_LPT_INFO;
 

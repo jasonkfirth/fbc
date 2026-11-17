@@ -9,10 +9,10 @@
 
 FBCALL int fb_IsTypeOf( FB_OBJECT *obj, FB_RTTI *typeRTTI )
 {
-	if( obj == NULL )
+	if( (obj == NULL) || (obj->pVT == NULL) || (typeRTTI == NULL) )
 		return FB_FALSE;
 	
-	FB_RTTI *objRTTI = ((FB_BASEVT *)(((unsigned char *)obj->pVT) - sizeof( FB_BASEVT )))->pRTTI;
+	FB_RTTI *objRTTI = (obj->pVT - 1)->pRTTI;
 	while( objRTTI != NULL )
 	{	
 		/* note: can't compare just the address because object or type could be declared in a DLL */

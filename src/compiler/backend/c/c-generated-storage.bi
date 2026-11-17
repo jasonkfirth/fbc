@@ -2,18 +2,17 @@
 	Project: FreeBASIC C backend
 	File: backend/c/c-generated-storage.bi
 	Purpose: Omit unobserved private global storage from generated C.
-	Responsibilities: Record actual C uses, close static initializer dependencies,
+	Responsibilities: Record C and ASM uses, close static initializer dependencies,
 	and retain public, owned, thread-local and debugger-visible storage.
 	This file intentionally does NOT contain: Procedure liveness, initialization
 	evaluation, source access flag changes or public ABI changes.
 '/
 
 type CGLOBALSTORAGE
-	name as zstring ptr
-	sym as FBSYMBOL ptr
+	'' The procedure pool owns this node and its C spelling until output closes.
+	leaf as CPROCLEAF ptr
 	needed as integer
 	debug_retained as integer
-	next_pending as CGLOBALSTORAGE ptr
 end type
 
 type CGLOBALINITIALIZERWORK
@@ -22,20 +21,13 @@ end type
 
 dim shared as TLIST c_global_storage_nodes, c_global_initializer_work
 dim shared as THASH c_global_storage_names
-dim shared as CGLOBALSTORAGE ptr c_global_storage_pending
 dim shared as integer c_global_storage_ready, c_global_storage_prepared
 
 private sub hCGlobalStorageFinish()
 	if( c_global_storage_ready = FALSE ) then exit sub
 	hashEnd(@c_global_storage_names)
-	var entry = cptr(CGLOBALSTORAGE ptr, listGetHead(@c_global_storage_nodes))
-	while( entry <> NULL )
-		ZstrFree(entry->name)
-		entry = listGetNext(entry)
-	wend
 	listEnd(@c_global_storage_nodes)
 	listEnd(@c_global_initializer_work)
-	c_global_storage_pending = NULL
 	c_global_storage_ready = FALSE
 	c_global_storage_prepared = FALSE
 end sub
@@ -75,26 +67,48 @@ private function hCGlobalStorageGet(byval sym as FBSYMBOL ptr) as CGLOBALSTORAGE
 	var entry = cptr(CGLOBALSTORAGE ptr, hashLookup(@c_global_storage_names, strptr(identifier)))
 	if( entry = NULL ) then
 		entry = listNewNode(@c_global_storage_nodes)
-		entry->name = ZstrDup(strptr(identifier))
-		hashAdd(@c_global_storage_names, entry->name, entry, hashHash(entry->name))
+		entry->leaf = hCLeafGetName(identifier)
+		assert(entry->leaf <> NULL)
+		hashAdd(@c_global_storage_names, entry->leaf->name, entry, hashHash(entry->leaf->name))
 	end if
 	return entry
 end function
 
-private sub hCGlobalStorageReference(byval sym as FBSYMBOL ptr)
+private sub hCGlobalStorageReference(byval sym as FBSYMBOL ptr, byval owner as CPROCLEAF ptr = NULL, _
+	byval asm_reference as integer = FALSE)
+	if( sym = NULL ) then exit sub
+	if( symbIsProc(sym) ) then
+		var target = hCLeafGet(sym)
+		if( target = NULL ) then target = hCLeafExternal(sym)
+		hCLeafLink(owner, target)
+		exit sub
+	end if
 	var entry = hCGlobalStorageGet(sym)
-	if( entry = NULL orelse entry->needed ) then exit sub
+	if( entry = NULL ) then
+		if( asm_reference ) then
+			'' Owned globals and local statics bypass declaration pruning but
+			'' still need a native reference when file-scope ASM names them.
+			var identifier = hGetCId(sym)
+			hCLeafLink(owner, hCLeafGetName(identifier), FALSE, TRUE)
+		end if
+		exit sub
+	end if
 	'' The dependency closure must finish before declarations are filtered.
 	'' A missed dependency is an internal error, never an omitted definition.
-	if( c_global_storage_prepared ) then
+	if( c_global_storage_prepared andalso entry->needed = FALSE ) then
 		errReportEx(FB_ERRMSG_INTERNAL, __FUNCTION__)
 	end if
-	entry->needed = TRUE
-	entry->next_pending = c_global_storage_pending
-	c_global_storage_pending = entry
+	hCLeafLink(owner, entry->leaf, FALSE, asm_reference)
 end sub
 
-private sub hCGlobalStorageInitializerReferences(byval n as ASTNODE ptr)
+private function hCGlobalStorageAsmReferenced(byval sym as FBSYMBOL ptr) as integer
+	if( sym = NULL orelse c_leaf_ready = FALSE ) then return FALSE
+	var identifier = hGetCId(sym)
+	var entry = cptr(CPROCLEAF ptr, hashLookup(@c_leaf_names, strptr(identifier)))
+	return (entry <> NULL) andalso entry->native_asm_referenced
+end function
+
+private sub hCGlobalStorageInitializerReferences(byval n as ASTNODE ptr, byval owner as CPROCLEAF ptr)
 	if( n = NULL ) then exit sub
 	'' TYPEINI entries use R for their sibling chain. An explicit work pool
 	'' also handles deeply nested expressions without growing the call stack.
@@ -105,7 +119,7 @@ private sub hCGlobalStorageInitializerReferences(byval n as ASTNODE ptr)
 		item = listGetTail(@c_global_initializer_work)
 		n = item->node
 		listDelNode(@c_global_initializer_work, item)
-		hCGlobalStorageReference(n->sym)
+		hCGlobalStorageReference(n->sym, owner)
 		if( n->r <> NULL ) then
 			item = listNewNode(@c_global_initializer_work)
 			item->node = n->r
@@ -128,16 +142,13 @@ private sub hCGlobalStorageRegister(byval sym as FBSYMBOL ptr)
 	    (symbGetIsAccessed(sym) = FALSE) ) then exit sub
 	var entry = hCGlobalStorageGet(sym)
 	if( entry <> NULL ) then
-		'' Only the global-symbol traversal lends symbol pointers to this index.
-		'' Those symbols survive through the final global declaration pass.
-		entry->sym = sym
-		if( env.clopt.debuginfo andalso (entry->needed = FALSE) ) then
-			entry->debug_retained = TRUE
-			hCGlobalStorageReference(sym)
+		if( env.clopt.debuginfo ) then
+			entry->leaf->must_keep = TRUE
 		end if
+		hCGlobalStorageInitializerReferences(symbGetTypeIniTree(sym), entry->leaf)
 	else
 		'' Public and owned definitions remain roots even without body reads.
-		hCGlobalStorageInitializerReferences(symbGetTypeIniTree(sym))
+		hCGlobalStorageInitializerReferences(symbGetTypeIniTree(sym), NULL)
 	end if
 end sub
 
@@ -147,12 +158,15 @@ private sub hCGlobalStoragePrepare()
 	'' declarations remain roots, including their initializer dependencies.
 	if( c_leaf_opaque ) then exit sub
 	symbForEachGlobal(FB_SYMBCLASS_VAR, @hCGlobalStorageRegister)
-	while( c_global_storage_pending <> NULL )
-		var entry = c_global_storage_pending
-		c_global_storage_pending = entry->next_pending
-		if( entry->sym <> NULL ) then
-			hCGlobalStorageInitializerReferences(symbGetTypeIniTree(entry->sym))
-		end if
+	'' Include initializer edges before deciding which declarations survive.
+	'' An ASM-only use belongs to its procedure, including dead callers.
+	hCLeafReachable(TRUE)
+	hCLeafReachable()
+	var entry = cptr(CGLOBALSTORAGE ptr, listGetHead(@c_global_storage_nodes))
+	while( entry <> NULL )
+		entry->needed = entry->leaf->referenced
+		entry->debug_retained = env.clopt.debuginfo and (entry->leaf->native_referenced = FALSE)
+		entry = listGetNext(entry)
 	wend
 	c_global_storage_prepared = TRUE
 end sub

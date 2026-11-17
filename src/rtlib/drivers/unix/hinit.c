@@ -14,13 +14,7 @@
 #include "../../fb_private_thread.h"
 #include <signal.h>
 #ifndef DISABLE_NCURSES
-#include <termcap.h>
-
-/*
- * Some termcap headers, including Apple's ncurses 6.0 termcap.h, declare
- * capability id arguments as char * even though the functions only read them.
- */
-#define FB_TERMCAP_ID( id ) ((char *)(id))
+#include "../../fb_private_termcap.h"
 #endif
 
 #if defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64)
@@ -107,6 +101,8 @@ FBCALL void fb_ProfileUnlock( void ) { pthread_mutex_unlock( &fb_profile_mutex )
 
 static void *bg_thread(void *arg)
 {
+	/* pthread entry points retain the shared callback signature. */
+	(void)arg;
 	while (fb_console_context.inited) {
 
 		BG_LOCK();
@@ -186,14 +182,14 @@ static int fb_hTermQuery( int code, int *val1, int *val2 )
 		   possible that there's other data pending in stdin, e.g. if the user
 		   happened to press a key at the right time. */
 
-		/* Read until an '\e[' (ESC char followed by '[') is reached,
+		/* Read until an '\033[' (ESC char followed by '[') is reached,
 		   it should be the begin of the terminal's answer string) */
 		int c;
 		do {
 			do {
 				c = getchar( );
 				if( c == EOF ) return FALSE;
-				if( c == '\e' ) break;
+				if( c == '\033' ) break;
 
 				/* Add skipped char to Inkey() buffer so it's not lost */
 				fb_hAddCh( c );
@@ -248,6 +244,10 @@ void fb_hRecheckCursorPos( void )
  */
 void fb_hRecheckConsoleSize( int requery_cursorpos )
 {
+	struct winsize win = { 0, 0, 0, 0 };
+	unsigned char *char_buffer, *attr_buffer;
+	size_t cells;
+
 	if( __fb_console_resized == FALSE )
 		return;
 
@@ -266,14 +266,14 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 
 	/* Try to query the terminal size */
 	/* Try TIOCGWINSZ */
-	struct winsize win = { 0, 0, 0, 0 };
 	if( ioctl( STDOUT_FILENO, TIOCGWINSZ, &win ) != 0 ) {
 #ifdef HOST_LINUX
 		/* Try an escape sequence */
 		int r, c;
-		if( fb_hTermQuery( SEQ_QUERY_WINDOW, &r, &c ) ) {
-			win.ws_row = r;
-			win.ws_col = c;
+		if( fb_hTermQuery( SEQ_QUERY_WINDOW, &r, &c ) &&
+		    r > 0 && r <= USHRT_MAX && c > 0 && c <= USHRT_MAX ) {
+			win.ws_row = (unsigned short)r;
+			win.ws_col = (unsigned short)c;
 		}
 #endif
 	}
@@ -288,17 +288,23 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 		win.ws_col = 80;
 	}
 
-	unsigned char *char_buffer = calloc(1, win.ws_row * win.ws_col * 2);
+	if( !fb_hConsoleCellCount( win.ws_col, win.ws_row, &cells ) )
+		return;
+	char_buffer = calloc(2, cells);
 	if( char_buffer == NULL )
 		return;
-	unsigned char *attr_buffer = char_buffer + (win.ws_row * win.ws_col);
+	attr_buffer = char_buffer + cells;
 	if (fb_console_context.char_buffer) {
 		int h = (fb_console_context.h < win.ws_row) ? fb_console_context.h : win.ws_row;
 		int w = (fb_console_context.w < win.ws_col) ? fb_console_context.w : win.ws_col;
 		int r;
-		for (r = 0; r < h; r++) {
-			memcpy(char_buffer + (r * win.ws_col), fb_console_context.char_buffer + (r * fb_console_context.w), w);
-			memcpy(attr_buffer + (r * win.ws_col), fb_console_context.attr_buffer + (r * fb_console_context.w), w);
+		if( w > 0 && h > 0 && fb_console_context.attr_buffer ) {
+			for( r = 0; r < h; r++ ) {
+				size_t new_offset = (size_t)r * (size_t)win.ws_col;
+				size_t old_offset = (size_t)r * (size_t)fb_console_context.w;
+				memcpy(char_buffer + new_offset, fb_console_context.char_buffer + old_offset, (size_t)w);
+				memcpy(attr_buffer + new_offset, fb_console_context.attr_buffer + old_offset, (size_t)w);
+			}
 		}
 		free(fb_console_context.char_buffer);
 	}
@@ -317,6 +323,7 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 
 static void sigwinch_handler(int sig)
 {
+	(void)sig;
 	__fb_console_resized = TRUE;
 	signal(SIGWINCH, sigwinch_handler);
 }
@@ -340,13 +347,13 @@ int fb_hTermOut( int code, int param1, int param2 )
 	   Thus, we provide the __fb_enable_vt100_escapes global variable, which
 	   FB programs can set to TRUE or FALSE as needed at runtime. */
 	const char *extra_seq[] = {
-		"\e(U",               /* SEQ_INIT_CHARSET */
-		"\e(B",               /* SEQ_EXIT_CHARSET */
-		"\e[6n",              /* SEQ_QUERY_CURSOR */
-		"\e[18t",             /* SEQ_QUERY_WINDOW */
-		"\e[?1000h\e[?1003h", /* SEQ_INIT_XMOUSE */
-		"\e[?1003l\e[?1000l", /* SEQ_EXIT_XMOUSE */
-		"\e[H\e[J\e[0m",      /* SEQ_EXIT_GFX_MODE */
+		"\033(U",               /* SEQ_INIT_CHARSET */
+		"\033(B",               /* SEQ_EXIT_CHARSET */
+		"\033[6n",              /* SEQ_QUERY_CURSOR */
+		"\033[18t",             /* SEQ_QUERY_WINDOW */
+		"\033[?1000h\033[?1003h", /* SEQ_INIT_XMOUSE */
+		"\033[?1003l\033[?1000l", /* SEQ_EXIT_XMOUSE */
+		"\033[H\033[J\033[0m",      /* SEQ_EXIT_GFX_MODE */
 	};
 
 	if (!fb_console_context.inited)
@@ -356,12 +363,12 @@ int fb_hTermOut( int code, int param1, int param2 )
 		int extra_index = code - SEQ_EXTRA;
 
 		/* Is use of the VT100 escape sequences disallowed? */
-		if (!__fb_enable_vt100_escapes)
+		if (!fb_enable_vt100_escapes)
 			return FALSE;
 
 		switch (code) {
 		case SEQ_SET_COLOR_EX:
-			if( fprintf( stdout, "\e[%dm", param1 ) < 4 )
+			if( fprintf( stdout, "\033[%dm", param1 ) < 4 )
 				return FALSE;
 			break;
 		default:
@@ -490,9 +497,9 @@ int fb_hInitConsole(void)
 	/* Send SIGINT on control-C */
 	term_in.c_iflag |= BRKINT;
 	/* Disable Xon/off and input BREAK condition ignoring */
-	term_in.c_iflag &= ~(IXOFF | IXON | IGNBRK);
+	term_in.c_iflag &= (tcflag_t)~(tcflag_t)(IXOFF | IXON | IGNBRK);
 	/* Character oriented, no echo */
-	term_in.c_lflag &= ~(ICANON | ECHO);
+	term_in.c_lflag &= (tcflag_t)~(tcflag_t)(ICANON | ECHO);
 	/* No timeout, just don't block */
 	term_in.c_cc[VMIN] = 1;
 	term_in.c_cc[VTIME] = 0;
@@ -680,15 +687,16 @@ static void hInit( void )
 	if ((!term) || (tgetent(buffer, term) <= 0))
 		return;
 	BC = UP = 0;
-	p = tgetstr(FB_TERMCAP_ID( "pc" ), NULL);
+	p = fb_hTermcapGetStr( "pc", NULL );
 	PC = p ? *p : 0;
 	if (tcgetattr(1, &tty))
 		return;
-	ospeed = cfgetospeed(&tty);
-	if (!tgetflag(FB_TERMCAP_ID( "am" )))
+	/* termcap exposes its encoded terminal speed through the short ospeed ABI. */
+	ospeed = (short)cfgetospeed(&tty);
+	if (!fb_hTermcapGetFlag( "am" ))
 		return;
 	for (i = 0; i < SEQ_MAX; i++)
-		fb_console_context.seq[i] = tgetstr(FB_TERMCAP_ID( seq[i] ), NULL);
+		fb_console_context.seq[i] = fb_hTermcapGetStr( seq[i], NULL );
 #endif
 
 	/* !!!TODO!!! detect other OS consoles? (freebsd: 'cons25', etc?) */
@@ -755,6 +763,7 @@ void fb_hInit( void )
 
 void fb_hEnd( int unused )
 {
+	(void)unused;
 	fb_hExitConsole();
 	fb_console_context.inited = FALSE;
 	if( bgthread_inited ) {

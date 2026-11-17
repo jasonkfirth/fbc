@@ -24,10 +24,23 @@
 #include "../../fb.h"
 #include "io_printer_private.h"
 #include <ctype.h>
+#include <string.h>
 
 typedef BOOL (WINAPI *FnGetDefaultPrinter)(LPTSTR pszBuffer, LPDWORD pcchBuffer);
 
 #define FB_WIN32_DWORD_MAX ((size_t)((DWORD)-1))
+
+/* WritePrinter takes LPVOID for an input buffer even though it only reads it. */
+typedef char FB_PRINTER_BUFFER_POINTER_WIDTH[
+	(sizeof(LPVOID) == sizeof(const void *)) ? 1 : -1];
+
+static LPVOID hPrinterInputBuffer(const void *buffer)
+{
+	LPVOID input_buffer;
+
+	memcpy((void *)&input_buffer, (const void *)&buffer, sizeof(input_buffer));
+	return input_buffer;
+}
 
 /* ------------------------------------------------------------------------- */
 /* Printer list helpers                                                      */
@@ -936,7 +949,7 @@ int fb_PrinterWrite( DEV_LPT_INFO *devInfo, const void *data, size_t length )
     dwLength = (DWORD)length;
 
     if( !WritePrinter( pInfo->hPrinter,
-                              (LPVOID) data,
+                       hPrinterInputBuffer(data),
                        dwLength,
                        &dwWritten ) )
     {
@@ -965,7 +978,7 @@ int fb_PrinterWriteWstr( DEV_LPT_INFO *devInfo, const FB_WCHAR *data, size_t len
         return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
     } else if( !WritePrinter( pInfo->hPrinter,
-                       (LPVOID) data,
+                       hPrinterInputBuffer(data),
                        dwLength,
                        &dwWritten ) )
     {

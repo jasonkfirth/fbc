@@ -61,6 +61,8 @@ static int fb_hCheckAMPM( const char *text, const char *text_end, size_t *pLengt
         result = 2;
         ++text;
         break;
+    default:
+        break;
     }
     if( result!=0 ) {
         char ch = (text < text_end) ? *text : 0;
@@ -82,7 +84,7 @@ static int fb_hCheckAMPM( const char *text, const char *text_end, size_t *pLengt
         while ( text < text_end && isspace( FB_CHAR_TO_INT( *text ) ) )
             ++text;
         if( pLength )
-            *pLength = text - text_start;
+            *pLength = (size_t)(text - text_start);
     }
     return result;
 }
@@ -146,7 +148,7 @@ int fb_hTimeParse( const char *text, size_t text_len, int *pHour, int *pMinute, 
             }
         }
         /* Update used length */
-        length = text - text_start;
+        length = (size_t)(text - text_start);
     }
 
     if( result ) {

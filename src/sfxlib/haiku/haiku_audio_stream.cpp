@@ -52,6 +52,7 @@
 #include <SoundPlayer.h>
 #include <MediaDefs.h>
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,10 +118,13 @@ static void audio_callback(
 {
     (void)cookie;
 
-    float *out = (float*)buffer;
+    float *out;
+    size_t channel_count;
+    size_t frame_size;
+    size_t frame_count;
 
-    int frames;
-    int samples;
+    if ((buffer == NULL) || (size == 0u))
+        return;
 
     if (!fb_sfx_context)
     {
@@ -128,8 +132,29 @@ static void audio_callback(
         return;
     }
 
-    samples = size / sizeof(float);
-    frames = samples / format.channel_count;
+    channel_count = (size_t)format.channel_count;
+    if ((channel_count == 0u) ||
+        (channel_count > ((size_t)-1 / sizeof(float))))
+    {
+        memset(buffer, 0, size);
+        return;
+    }
+
+    frame_size = channel_count * sizeof(float);
+    if ((size % frame_size) != 0u)
+    {
+        memset(buffer, 0, size);
+        return;
+    }
+
+    frame_count = size / frame_size;
+    if (frame_count > (size_t)INT_MAX)
+    {
+        memset(buffer, 0, size);
+        return;
+    }
+
+    out = (float*)buffer;
 
     /*
         Request new samples from the mixer.
@@ -146,7 +171,7 @@ static void audio_callback(
         small standalone Media Kit bridge and should at least stay
         buildable against the shared mixer API.
     */
-    fb_sfxMixFrame(out, frames);
+    fb_sfxMixFrame(out, (int)frame_count);
 }
 
 
@@ -157,23 +182,33 @@ static void audio_callback(
 int fb_hHaikuAudioStreamInit(void)
 {
     media_raw_audio_format format;
+    size_t buffer_frames;
+    size_t channel_count;
 
     fb_hHaikuStreamInitDebug();
 
     if (g_player)
         return 0;
 
+    if ((fb_sfx_haiku.sample_rate <= 0) ||
+        (fb_sfx_haiku.channels <= 0) ||
+        (fb_sfx_haiku.buffer_frames <= 0))
+        return -1;
+
+    buffer_frames = (size_t)fb_sfx_haiku.buffer_frames;
+    channel_count = (size_t)fb_sfx_haiku.channels;
+    if (buffer_frames > ((size_t)-1 / sizeof(float)) / channel_count)
+        return -1;
+
     HAIKU_STREAM_DBG("initializing audio stream\n");
 
     memset(&format, 0, sizeof(format));
 
-    format.frame_rate = fb_sfx_haiku.sample_rate;
-    format.channel_count = fb_sfx_haiku.channels;
+    format.frame_rate = (float)fb_sfx_haiku.sample_rate;
+    format.channel_count = (uint32)channel_count;
     format.format = media_raw_audio_format::B_AUDIO_FLOAT;
     format.byte_order = B_MEDIA_HOST_ENDIAN;
-    format.buffer_size = fb_sfx_haiku.buffer_frames *
-                         sizeof(float) *
-                         fb_sfx_haiku.channels;
+    format.buffer_size = buffer_frames * sizeof(float) * channel_count;
 
     g_player = new BSoundPlayer(
         &format,

@@ -26,8 +26,11 @@ static void hUTF16ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 	*total_bytes = 0;
 	while( chars > 0 )
 	{
-		c = *src++;
-		if( c >= UTF16_SUR_HIGH_START && c <= UTF16_SUR_HIGH_END )
+		c = (UTF_32)*src++;
+		/* Pair only units inside the counted span. A single unit follows
+		   the ordinary code-unit path used by the other wide encodings. */
+		if( c >= UTF16_SUR_HIGH_START && c <= UTF16_SUR_HIGH_END && chars > 1 &&
+		    (UTF_32)*src >= UTF16_SUR_LOW_START && (UTF_32)*src <= UTF16_SUR_LOW_END )
 		{
 			c = ((c - UTF16_SUR_HIGH_START) << UTF16_HALFSHIFT) +
 			     (((UTF_32)*src++) - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
@@ -49,19 +52,22 @@ static void hUTF16ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 		switch( bytes )
 		{
 		case 4:
-			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
+			*--dst = (UTF_8)((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
 			FB_FALLTHROUGH;
 		case 3:
-			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
+			*--dst = (UTF_8)((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
 			FB_FALLTHROUGH;
 		case 2:
-			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
+			*--dst = (UTF_8)((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
 			FB_FALLTHROUGH;
 		case 1:
 			*--dst = (UTF_8)(c | fb_utf8_bmarkTb[bytes]);
+			break;
+		default:
+			break;
 		}
 
 		dst += bytes;
@@ -78,7 +84,7 @@ static void hUTF32ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 	*total_bytes = 0;
 	while( chars > 0 )
 	{
-		c = *src++;
+		c = (UTF_32)*src++;
 		if( c < (UTF_32)0x80 )
 			bytes =	1;
 		else if( c < (UTF_32)0x800 )
@@ -93,19 +99,22 @@ static void hUTF32ToUTF8( const FB_WCHAR *src, ssize_t chars, UTF_8 *dst, ssize_
 		switch( bytes )
 		{
 		case 4:
-			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
+			*--dst = (UTF_8)((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
 			FB_FALLTHROUGH;
 		case 3:
-			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
+			*--dst = (UTF_8)((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
 			FB_FALLTHROUGH;
 		case 2:
-			*--dst = ((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
+			*--dst = (UTF_8)((c | UTF8_BYTEMARK) & UTF8_BYTEMASK);
 			c >>= 6;
 			FB_FALLTHROUGH;
 		case 1:
 			*--dst = (UTF_8)(c | fb_utf8_bmarkTb[bytes]);
+			break;
+		default:
+			break;
 		}
 
 		dst += bytes;
@@ -124,7 +133,7 @@ static char *hToUTF8( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *by
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( allocation );
+			dst = (char *)malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -143,25 +152,32 @@ static char *hToUTF8( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *by
 	case sizeof( UTF_32 ):
         hUTF32ToUTF8( src, chars, (UTF_8 *)dst, bytes );
 		break;
+	default:
+		break;
 	}
 
 	return dst;
 }
 
-static void hCharToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst )
+static void hCharToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst )
 {
+	UTF_16 unit;
+
 	while( chars > 0 )
 	{
-		*dst++ = (unsigned char)*src++;
+		unit = (unsigned char)*src++;
+		memcpy( dst, &unit, sizeof( unit ) );
+		dst += sizeof( unit );
 		--chars;
 	}
 }
 
 /* The caller either owns a sufficiently large output buffer or has
    allocated the checked worst-case size. Never realloc caller-owned storage. */
-static void hUTF32ToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, ssize_t *bytes )
+static void hUTF32ToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
 	UTF_32 c;
+	UTF_16 unit;
 
 	while( chars > 0 )
 	{
@@ -169,11 +185,15 @@ static void hUTF32ToUTF16( const FB_WCHAR *src, ssize_t chars, UTF_16 *dst, ssiz
 		if( c > UTF16_MAX_BMP )
 		{
 			c -= UTF16_HALFBASE;
-			*dst++ = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
+			unit = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
+			memcpy( dst, &unit, sizeof( unit ) );
+			dst += sizeof( unit );
 			c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 			*bytes += (ssize_t)sizeof( UTF_16 );
 		}
-		*dst++ = (UTF_16)c;
+		unit = (UTF_16)c;
+		memcpy( dst, &unit, sizeof( unit ) );
+		dst += sizeof( unit );
 		--chars;
 	}
 }
@@ -193,7 +213,7 @@ static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( allocation );
+			dst = (char *)malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -202,7 +222,7 @@ static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	switch( sizeof( FB_WCHAR ) )
 	{
 	case sizeof( char ):
-		hCharToUTF16( src, chars, (UTF_16 *)dst );
+		hCharToUTF16( src, chars, dst );
 		break;
 
 	case sizeof( UTF_16 ):
@@ -210,30 +230,39 @@ static char *hToUTF16( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 		break;
 
 	case sizeof( UTF_32 ):
-        hUTF32ToUTF16( src, chars, (UTF_16 *)dst, bytes );
+        hUTF32ToUTF16( src, chars, dst, bytes );
+		break;
+	default:
 		break;
 	}
 
 	return dst;
 }
 
-static void hCharToUTF32( const FB_WCHAR *src, ssize_t chars, UTF_32 *dst )
+static void hCharToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst )
 {
+	UTF_32 unit;
+
 	while( chars > 0 )
 	{
-		*dst++ = (unsigned char)*src++;
+		unit = (unsigned char)*src++;
+		memcpy( dst, &unit, sizeof( unit ) );
+		dst += sizeof( unit );
 		--chars;
 	}
 }
 
-static void hUTF16ToUTF32( const FB_WCHAR *src, ssize_t chars, UTF_32 *dst, ssize_t *bytes )
+static void hUTF16ToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *bytes )
 {
 	UTF_32 c;
 
 	while( chars > 0 )
 	{
 		c = (UTF_32)*src++;
-		if( c >= UTF16_SUR_HIGH_START && c <= UTF16_SUR_HIGH_END )
+		/* Pair only units inside the counted span. A single unit follows
+		   the ordinary code-unit path used by the other wide encodings. */
+		if( c >= UTF16_SUR_HIGH_START && c <= UTF16_SUR_HIGH_END && chars > 1 &&
+		    (UTF_32)*src >= UTF16_SUR_LOW_START && (UTF_32)*src <= UTF16_SUR_LOW_END )
 		{
 			c = ((c - UTF16_SUR_HIGH_START) << UTF16_HALFSHIFT) +
 			     (((UTF_32)*src++) - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
@@ -242,7 +271,8 @@ static void hUTF16ToUTF32( const FB_WCHAR *src, ssize_t chars, UTF_32 *dst, ssiz
 			--chars;
 		}
 
-		*dst++ = c;
+		memcpy( dst, &c, sizeof( c ) );
+		dst += sizeof( c );
 
 		--chars;
 	}
@@ -263,7 +293,7 @@ static char *hToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	{
 		if( dst == NULL )
 		{
-			dst = malloc( allocation );
+			dst = (char *)malloc( allocation );
 			if( dst == NULL )
 				return NULL;
 		}
@@ -272,11 +302,11 @@ static char *hToUTF32( const FB_WCHAR *src, ssize_t chars, char *dst, ssize_t *b
 	switch( sizeof( FB_WCHAR ) )
 	{
 	case sizeof( char ):
-		hCharToUTF32( src, chars, (UTF_32 *)dst );
+		hCharToUTF32( src, chars, dst );
 		break;
 
 	case sizeof( UTF_16 ):
-        hUTF16ToUTF32( src, chars, (UTF_32 *)dst, bytes );
+        hUTF16ToUTF32( src, chars, dst, bytes );
 		break;
 
 	case sizeof( UTF_32 ):
@@ -312,20 +342,16 @@ char *fb_WCharToUTF
 	*bytes = 0;
 	if( chars < 0 || (chars > 0 && src == NULL) )
 		return NULL;
-	switch( encod )
-	{
-	case FB_FILE_ENCOD_UTF8:
+	if( encod == FB_FILE_ENCOD_UTF8 )
 		return hToUTF8( src, chars, dst, bytes );
 
-	case FB_FILE_ENCOD_UTF16:
+	if( encod == FB_FILE_ENCOD_UTF16 )
 		return hToUTF16( src, chars, dst, bytes );
 
-	case FB_FILE_ENCOD_UTF32:
+	if( encod == FB_FILE_ENCOD_UTF32 )
 		return hToUTF32( src, chars, dst, bytes );
 
-	default:
-		return NULL;
-	}
+	return NULL;
 }
 
 /* end of strings/encoding/utf_convfrom_wchar.c */

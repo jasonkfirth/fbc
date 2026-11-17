@@ -75,7 +75,10 @@ typedef struct FB_STRING_INFO_
 /* block of memory to store strings */
 typedef struct FB_STRING_INFO_TB_
 {
-	unsigned char data[STRING_INFO_TB_SIZE];
+	union {
+		STRING_INFO alignment;
+		unsigned char bytes[STRING_INFO_TB_SIZE];
+	} data;
 	struct FB_STRING_INFO_TB_ *next;
 	int bytes_used;
 	int string_tb_id;
@@ -141,6 +144,10 @@ typedef struct FB_PROFILER_GLOBAL_
 	char filename[PROFILER_MAX_PATH];
 	char launch_time[32];
 	int options; /* PROFILE_OPTIONS */
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the existing native 64-bit profiler size and field offsets. */
+	unsigned char reserved_tail_padding[4];
+#endif
 } FB_PROFILER_GLOBAL;
 
 /* information about the profiler internals */

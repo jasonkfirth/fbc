@@ -45,6 +45,7 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 {
 	int depth = depth_arg;
 	int c;
+	unsigned int palette_index;
 
 	fb_dos_detect();
 	
@@ -62,19 +63,19 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	} else if ((w == 320) && (h == 100)) {
 		__dpmi_int(0x10, &fb_dos.regs);
 		
-		outportb(0x3D4, 9);
-		outportb(0x3D5, inportb(0x3D5) | 0x80);
+		fb_gfx_dos_outportb(0x3D4, 9);
+		fb_gfx_dos_outportb(0x3D5, fb_gfx_dos_inportb(0x3D5) | 0x80);
 		
 		refresh_rate = 70;
 	} else if ((w == 256) && (h == 256)) {
 		__dpmi_int(0x10, &fb_dos.regs);
 		
-		outportb(0x3D4, 0x11);
-		c = inportb(0x3D5) & 0x7F;
-		outportb(0x3D4, (c << 8) | 0x11);
-		outportb(0x3D5, c);
+		fb_gfx_dos_outportb(0x3D4, 0x11);
+		c = fb_gfx_dos_inportb(0x3D5) & 0x7F;
+		fb_gfx_dos_outportb(0x3D4, 0x11);
+		fb_gfx_dos_outportb(0x3D5, c);
 		
-		outportb(0x3C2, 0xE3);
+		fb_gfx_dos_outportb(0x3C2, 0xE3);
 		outportw(0x3D4, 0x5F00);
 		outportw(0x3D4, 0x3F01);
 		outportw(0x3D4, 0x4002);
@@ -98,81 +99,81 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 		outportw(0x3CE, 0x4005);
 		outportw(0x3CE, 0x0506);
 		
-		inportb(0x3DA);
-		outportb(0x3C0, 0x30);
-		outportb(0x3C0, 0x41);
+		fb_gfx_dos_inportb(0x3DA);
+		fb_gfx_dos_outportb(0x3C0, 0x30);
+		fb_gfx_dos_outportb(0x3C0, 0x41);
 		
-		inportb(0x3DA);
-		outportb(0x3C0, 0x33);
-		outportb(0x3C0, 0x00);
+		fb_gfx_dos_inportb(0x3DA);
+		fb_gfx_dos_outportb(0x3C0, 0x33);
+		fb_gfx_dos_outportb(0x3C0, 0x00);
 		
-		outportb(0x3C6, 0xFF);
+		fb_gfx_dos_outportb(0x3C6, 0xFF);
 		
 		refresh_rate = 70;
 	} else if ((w == 160) && (h == 120)) {
 		fb_dos.regs.x.ax = 0x0D;
 		__dpmi_int(0x10, &fb_dos.regs);
 
-		outportb(0x3D4, 0x11);
-		outportb(0x3D5, inportb(0x3D5)&0x7F);
-		outportb(0x3D4, 0x04);
-		outportb(0x3D5, inportb(0x3D5)+1);
-		outportb(0x3D4, 0x11);
-		outportb(0x3D5, inportb(0x3D5)|0x80);
+		fb_gfx_dos_outportb(0x3D4, 0x11);
+		fb_gfx_dos_outportb(0x3D5, fb_gfx_dos_inportb(0x3D5)&0x7F);
+		fb_gfx_dos_outportb(0x3D4, 0x04);
+		fb_gfx_dos_outportb(0x3D5, (fb_gfx_dos_inportb(0x3D5) + 1) & 0xFF);
+		fb_gfx_dos_outportb(0x3D4, 0x11);
+		fb_gfx_dos_outportb(0x3D5, fb_gfx_dos_inportb(0x3D5)|0x80);
 		
-		outportb(0x3C2, (inportb(0x3CC)&~0xC0)|0x80);
+		fb_gfx_dos_outportb(0x3C2, (fb_gfx_dos_inportb(0x3CC)&~0xC0)|0x80);
 		
-		outportb(0x3D4, 0x11);
-		outportb(0x3D5, inportb(0x3D5)&0x7F);
+		fb_gfx_dos_outportb(0x3D4, 0x11);
+		fb_gfx_dos_outportb(0x3D5, fb_gfx_dos_inportb(0x3D5)&0x7F);
 		
-		outportb(0x3D4, 0x06);
-		outportb(0x3D5, 0x0B);
+		fb_gfx_dos_outportb(0x3D4, 0x06);
+		fb_gfx_dos_outportb(0x3D5, 0x0B);
 		
-		outportb(0x3D4, 0x07);
-		outportb(0x3D5, 0x3E);
+		fb_gfx_dos_outportb(0x3D4, 0x07);
+		fb_gfx_dos_outportb(0x3D5, 0x3E);
 		
-		outportb(0x3D4, 0x10);
-		outportb(0x3D5, 0xEA);
+		fb_gfx_dos_outportb(0x3D4, 0x10);
+		fb_gfx_dos_outportb(0x3D5, 0xEA);
 		
-		outportb(0x3D4, 0x11);
-		outportb(0x3D5, 0x8C);
+		fb_gfx_dos_outportb(0x3D4, 0x11);
+		fb_gfx_dos_outportb(0x3D5, 0x8C);
 		
-		outportb(0x3D4, 0x12);
-		outportb(0x3D5, 0xDF);
+		fb_gfx_dos_outportb(0x3D4, 0x12);
+		fb_gfx_dos_outportb(0x3D5, 0xDF);
 		
-		outportb(0x3D4, 0x15);
-		outportb(0x3D5, 0xE7);
+		fb_gfx_dos_outportb(0x3D4, 0x15);
+		fb_gfx_dos_outportb(0x3D5, 0xE7);
 		
-		outportb(0x3D4, 0x16);
-		outportb(0x3D5, 0x04);
+		fb_gfx_dos_outportb(0x3D4, 0x16);
+		fb_gfx_dos_outportb(0x3D5, 0x04);
 		
-		outportb(0x3D4, 0x11);
-		outportb(0x3D5, inportb(0x3D5)|0x80);
+		fb_gfx_dos_outportb(0x3D4, 0x11);
+		fb_gfx_dos_outportb(0x3D5, fb_gfx_dos_inportb(0x3D5)|0x80);
 		
-		outportb(0x3CE, 0x05);
-		outportb(0x3CF, (inportb(0x3CF)&0x60)|0x40);
+		fb_gfx_dos_outportb(0x3CE, 0x05);
+		fb_gfx_dos_outportb(0x3CF, (fb_gfx_dos_inportb(0x3CF)&0x60)|0x40);
 		
-		inportb(0x3DA);
-		outportb(0x3C0, 0x30);
-		outportb(0x3C0, inportb(0x3C1)|0x40);
+		fb_gfx_dos_inportb(0x3DA);
+		fb_gfx_dos_outportb(0x3C0, 0x30);
+		fb_gfx_dos_outportb(0x3C0, fb_gfx_dos_inportb(0x3C1)|0x40);
 		
-		for (c=0; c<16; c++) {
-			outportb(0x3C0, c);
-			outportb(0x3C0, c);
+		for (palette_index = 0; palette_index < 16U; palette_index++) {
+			fb_gfx_dos_outportb(0x3C0, (int)palette_index);
+			fb_gfx_dos_outportb(0x3C0, (int)palette_index);
 		}
-		outportb(0x3C0, 0x20);
+		fb_gfx_dos_outportb(0x3C0, 0x20);
 		
-		outportb(0x3C8, 0x00);
+		fb_gfx_dos_outportb(0x3C8, 0x00);
 		
-		outportb(0x3C4, 0x04);
-		outportb(0x3C5, (inportb(0x3C5)&0xF7)|8);
-		outportb(0x3D4, 0x14);
-		outportb(0x3D5, (inportb(0x3D5)&~0x40)|64);
-		outportb(0x3D4, 0x017);
-		outportb(0x3D5, (inportb(0x3D5)&~0x40)|64);
+		fb_gfx_dos_outportb(0x3C4, 0x04);
+		fb_gfx_dos_outportb(0x3C5, (fb_gfx_dos_inportb(0x3C5)&0xF7)|8);
+		fb_gfx_dos_outportb(0x3D4, 0x14);
+		fb_gfx_dos_outportb(0x3D5, (fb_gfx_dos_inportb(0x3D5)&~0x40)|64);
+		fb_gfx_dos_outportb(0x3D4, 0x017);
+		fb_gfx_dos_outportb(0x3D5, (fb_gfx_dos_inportb(0x3D5)&~0x40)|64);
 		
-		outportb(0x3D4, 0x09);
-		outportb(0x3D5, (inportb(0x3D5)&0x60)|3);
+		fb_gfx_dos_outportb(0x3D4, 0x09);
+		fb_gfx_dos_outportb(0x3D5, (fb_gfx_dos_inportb(0x3D5)&0x60)|3);
 		
 		refresh_rate = 70;
 	} else if ((w == 80) && (h == 80)) {
@@ -200,13 +201,23 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 
 static void driver_update(void)
 {
-	int y;
-	unsigned int buffer = (unsigned int)fb_gfx->framebuffer;
+	size_t y, rows;
+	unsigned int buffer;
 	unsigned int screen = 0xA0000;
+	size_t row_bytes;
 
-	for (y = 0; y < fb_dos.h; y++, buffer += fb_dos.w, screen += fb_dos.w) {
+	if (!fb_gfx || !fb_gfx->framebuffer || !fb_gfx->dirty ||
+	    (fb_dos.w <= 0) || (fb_dos.h <= 0))
+		return;
+	row_bytes = (size_t)(unsigned int)fb_dos.w;
+	rows = (size_t)(unsigned int)fb_dos.h;
+	buffer = (unsigned int)(uintptr_t)fb_gfx->framebuffer;
+
+	for (y = 0; y < rows; y++, buffer += (unsigned int)row_bytes,
+	     screen += (unsigned int)row_bytes) {
 		if (fb_gfx->dirty[y]) {
-			movedata(_my_ds(), buffer, _dos_ds, screen, fb_dos.w);
+			movedata((unsigned int)_my_ds(), buffer, (unsigned int)_dos_ds,
+			         screen, row_bytes);
 		}
 	}
 }
@@ -214,8 +225,16 @@ static void end_of_driver_update(void) { /* do not remove */ }
 
 static int *driver_fetch_modes(int depth, int *size)
 {
-	if (depth != 8) return NULL;
-	
-	*size = sizeof(modes) / sizeof(int);
-	return memcpy((void*)malloc(sizeof(modes)), modes, sizeof(modes));
+	int *result;
+	if (!size)
+		return NULL;
+	*size = 0;
+	if (depth != 8)
+		return NULL;
+	result = malloc(sizeof(modes));
+	if (!result)
+		return NULL;
+	memcpy(result, modes, sizeof(modes));
+	*size = (int)(sizeof(modes) / sizeof(modes[0]));
+	return result;
 }

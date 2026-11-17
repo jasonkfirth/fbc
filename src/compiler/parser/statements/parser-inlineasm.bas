@@ -28,6 +28,7 @@
 #include once "parser/parser.bi"
 #include once "tooling/semantic-constructs.bi"
 #include once "ast/ast.bi"
+#include once "ast/nodes/c-procedure-reachability.bi"
 
 declare sub fbSemanticModelExportBinding _
 	( _
@@ -326,6 +327,12 @@ sub cAsmCode()
 						select case symbGetClass( s )
 						case FB_SYMBCLASS_PROC, FB_SYMBCLASS_LABEL
 							sym = s
+							if( symbIsProc(sym) ) then
+								'' ASM operands are real uses even without a BASIC call node.
+								symbSetIsAccessed(sym)
+								if( env.clopt.backend = FB_BACKEND_GCC or env.clopt.backend = FB_BACKEND_CLANG ) then _
+									astCProcRecordAsmReference(sym)
+							end if
 							fbSemanticModelExportBinding(sym, semantic_site, FALSE)
 							exit do, do
 

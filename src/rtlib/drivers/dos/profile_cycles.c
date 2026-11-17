@@ -25,6 +25,7 @@
 
 #include "../../fb.h"
 #include "../../fb_profile.h"
+#include <stdint.h>
 
 #ifdef HOST_WIN32
 	#include <windows.h>
@@ -57,13 +58,9 @@
 	__start_/__stop_ symbols used by GNU ld.
 */
 #define FB_PROFILE_CYCLE_SECTION "__DATA,fb_profcycdata"
-extern char fb_profilecycledata_start[] __asm("section$start$__DATA$fb_profcycdata");
-extern char fb_profilecycledata_stop[] __asm("section$end$__DATA$fb_profcycdata");
 #else
 /* profile section data */
 #define FB_PROFILE_CYCLE_SECTION "fb_profilecycledata"
-extern char fb_profilecycledata_start[];
-extern char fb_profilecycledata_stop[];
 #endif
 
 /* profiler record ids - these indicate what the record is */
@@ -103,6 +100,14 @@ typedef struct FB_PROFILE_RECORD_DATA
 	ssize_t call_count;
 	ssize_t reserved;
 } FB_PROFILE_RECORD_DATA;
+
+#if defined(HOST_DARWIN)
+extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_start[] __asm("section$start$__DATA$fb_profcycdata");
+extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_stop[] __asm("section$end$__DATA$fb_profcycdata");
+#else
+extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_start[];
+extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_stop[];
+#endif
 
 typedef struct FB_PROFILE_FILE_DATA
 {
@@ -205,24 +210,53 @@ static hProfilerReportBinary( void )
 }
 #endif
 
-static ssize_t hProfilerCountProcs( unsigned char *data, ssize_t length )
+static int hProfilerNextRecord(FB_PROFILE_RECORD_HEADER *data, size_t length,
+	                           size_t index, FB_PROFILE_RECORD_HEADER **record,
+	                           size_t *record_units)
 {
-	ssize_t index = 0, count = 0;
-	while( index < length ) {
-		FB_PROFILE_RECORD_HEADER *rec = (FB_PROFILE_RECORD_HEADER *)&data[index];
-		if( rec->id == FB_PROFILE_RECORD_DATA_ID ) {
-			count += 1;
-		}
-		index += rec->size;
+	FB_PROFILE_RECORD_HEADER *current;
+	size_t byte_size, units;
+
+	if (!data || !record || !record_units || (index >= length))
+		return 0;
+	current = data + index;
+	if (current->size < (ssize_t)sizeof(*current))
+		return 0;
+	byte_size = (size_t)current->size;
+	if ((byte_size % sizeof(*current)) != 0)
+		return 0;
+	units = byte_size / sizeof(*current);
+	if ((units > length - index) ||
+	    ((current->id == FB_PROFILE_RECORD_DATA_ID) &&
+	     (byte_size < sizeof(FB_PROFILE_RECORD_DATA))))
+		return 0;
+	*record = current;
+	*record_units = units;
+	return 1;
+}
+
+static size_t hProfilerCountProcs(FB_PROFILE_RECORD_HEADER *data,
+	                               size_t length)
+{
+	size_t index = 0, count = 0, record_units;
+	FB_PROFILE_RECORD_HEADER *record;
+
+	while (index < length) {
+		if (!hProfilerNextRecord(data, length, index, &record, &record_units))
+			return 0;
+		if (record->id == FB_PROFILE_RECORD_DATA_ID)
+			count++;
+		index += record_units;
 	}
 	return count;
 }
 
 static int name_sorter( const void *e1, const void *e2 )
 {
-	FB_PROFILE_RECORD_DATA *p1 = *(FB_PROFILE_RECORD_DATA **)e1;
-	FB_PROFILE_RECORD_DATA *p2 = *(FB_PROFILE_RECORD_DATA **)e2;
+	FB_PROFILE_RECORD_DATA *p1, *p2;
 	int ret;
+	memcpy(&p1, e1, sizeof(p1));
+	memcpy(&p2, e2, sizeof(p2));
 
 	ret = strcmp( p1->module_name, p2->module_name );
 	if( ret ) {
@@ -231,48 +265,48 @@ static int name_sorter( const void *e1, const void *e2 )
 	return strcmp( p1->proc_name, p2->proc_name );
 }
 
-static void hProfilerSortArray( FB_PROFILE_RECORD_DATA **array, ssize_t count )
+static void hProfilerSortArray( FB_PROFILE_RECORD_DATA **array, size_t count )
 {
-	qsort( (void *)array, count, sizeof(FB_PROFILE_RECORD_DATA *), name_sorter );
+	qsort(array, count, sizeof(*array), name_sorter);
 }
 
-static void hProfilerBuildArray (
-	FB_PROFILE_RECORD_DATA **array, ssize_t count,
-	unsigned char *data, ssize_t length
-)
+static size_t hProfilerBuildArray(FB_PROFILE_RECORD_DATA **array, size_t count,
+	                               FB_PROFILE_RECORD_HEADER *data,
+	                               size_t length)
 {
-	ssize_t index = 0;
-	int i = 0;
+	size_t index = 0, i = 0, record_units;
+	FB_PROFILE_RECORD_HEADER *record;
 
-	if( !array ) {
-		return;
-	}
+	if (!array)
+		return 0;
 
-	while( (index < length) && (i < count) ) {
-		FB_PROFILE_RECORD_HEADER *rec = (FB_PROFILE_RECORD_HEADER *)&data[index];
-		if( rec->id == FB_PROFILE_RECORD_DATA_ID ) {
-			array[i] = (FB_PROFILE_RECORD_DATA*)rec;
-			i += 1;
+	while ((index < length) && (i < count)) {
+		if (!hProfilerNextRecord(data, length, index, &record, &record_units))
+			return 0;
+		if (record->id == FB_PROFILE_RECORD_DATA_ID) {
+			array[i] = (FB_PROFILE_RECORD_DATA *)record;
+			i++;
 		}
-		index += rec->size;
+		index += record_units;
 	}
+	return i;
 }
 
 static void hProfilerReport (
 	FB_PROFILER_CYCLES *prof, FILE *f,
-	FB_PROFILE_RECORD_DATA **array, ssize_t count
+	FB_PROFILE_RECORD_DATA **array, size_t count
 )
 {
 	FB_PROFILE_RECORD_DATA *rec;
 	char * last_module = NULL;
-	ssize_t index;
+	size_t index;
 
 	if( (prof->global->options & PROFILE_OPTION_HIDE_HEADER) == 0 )
 	{
 		fprintf( f, "module  function             total             inside         call count\n\n" );
 	}
 
-	for( index = 0; index < count; index ++ )
+	for( index = 0; index < count; index++ )
 	{
 		rec = array[index];
 		if( last_module != rec->module_name ) {
@@ -296,8 +330,9 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 {
 	char filename[PROFILER_MAX_PATH];
 	FILE *f;
-	unsigned char *data;
-	ssize_t length, count;
+	FB_PROFILE_RECORD_HEADER *data;
+	uintptr_t data_start, data_stop;
+	size_t length, count;
 	FB_PROFILE_RECORD_DATA **array;
 
 	fb_ProfileGetFileName( filename, PROFILER_MAX_PATH );
@@ -317,17 +352,29 @@ static void hProfilerWriteReport( FB_PROFILER_CYCLES *prof )
 		fprintf( f, "Total program execution time: %5.4g seconds\n", fb_Timer() - prof->start_time );
 	}
 
-	data = (unsigned char *)&fb_profilecycledata_start[0];
-	length = (ssize_t)&fb_profilecycledata_stop[0] - (ssize_t)&fb_profilecycledata_start[0];
+	data_start = (uintptr_t)fb_profilecycledata_start;
+	data_stop = (uintptr_t)fb_profilecycledata_stop;
+	if ((data_stop < data_start) ||
+	    (((data_stop - data_start) % sizeof(*data)) != 0)) {
+		fclose(f);
+		return;
+	}
+	data = fb_profilecycledata_start;
+	length = (size_t)((data_stop - data_start) / sizeof(*data));
 
 	count = hProfilerCountProcs( data, length );
 	if( count ) {
-		array = (FB_PROFILE_RECORD_DATA **)PROFILER_malloc( sizeof(FB_PROFILE_RECORD_DATA*) * count );
+		if (count > (size_t)-1 / sizeof(*array)) {
+			fclose(f);
+			return;
+		}
+		array = PROFILER_malloc(sizeof(*array) * count);
 		if( array ) {
-			hProfilerBuildArray( array, count, data, length );
-			hProfilerSortArray( array, count );
-			hProfilerReport( prof, f, array, count );
-			PROFILER_free( (void *)array );
+			if (hProfilerBuildArray(array, count, data, length) == count) {
+				hProfilerSortArray(array, count);
+				hProfilerReport(prof, f, array, count);
+			}
+			PROFILER_free(array);
 		}
 	}
 

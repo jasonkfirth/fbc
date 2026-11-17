@@ -1,0 +1,33 @@
+{{fbdoc item="title" value="NOINLINE"}}----
+Disables procedure inlining in the C backends
+
+{{fbdoc item="syntax"}}##
+	[[KeyPgDeclare|Declare]] [[KeyPgFunction|Function]] //identifier// (//parameters//) [[KeyPgAs|As]] //return_type// **NoInline**
+	[[KeyPgFunction|Function]] //identifier// (//parameters//) [[KeyPgAs|As]] //return_type// **NoInline**
+	[[KeyPgDeclare|Declare]] [[KeyPgSub|Sub]] //identifier// (//parameters//) **NoInline**
+	[[KeyPgSub|Sub]] //identifier// (//parameters//) **NoInline**
+##
+
+{{fbdoc item="desc"}}
+	##NoInline## follows the complete procedure signature, including a function's result type. It precedes ##[[KeyPgStatic|Static]]## and ##[[KeyPgExport|Export]]## on a definition. A declaration carrying the modifier passes it to the matching definition. A definition can also add the modifier to an earlier declaration.
+
+	The ##-gen gcc## and ##-gen clang## backends emit the native ##noinline## function attribute. This can preserve a call boundary required by an imported C library's optimization policy. Native assembly backends already emit separate procedure bodies.
+
+	The modifier applies to module procedures and member procedures. Calling conventions, parameter types and procedure-pointer compatibility retain their usual rules. ##NoInline## remains available as an identifier outside this position in a procedure header.
+
+{{fbdoc item="ex"}}%%(freebasic)
+Declare Function adjust(ByVal value As Long) As Long NoInline
+
+Function adjust(ByVal value As Long) As Long
+    Return value + 3
+End Function
+
+Print adjust(4)
+%%
+
+{{fbdoc item="see"}}
+	- [[KeyPgDeclare|Declare]]
+	- [[KeyPgFunction|Function]], [[KeyPgSub|Sub]]
+	- [[CompilerOptgen|Compiler option -gen]]
+
+{{fbdoc item="back" value="CatPgProcedures|Procedures"}}

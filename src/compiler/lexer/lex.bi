@@ -343,6 +343,9 @@ declare sub lexNextToken _
 
 declare function lexGetCurrentLocation( ) as LEX_LOCATION
 declare function lexGetLastLocation( ) as LEX_LOCATION
+'' Output forms avoid filename-sized return buffers in recursive parsers.
+declare sub lexCopyCurrentLocation( byref destination as LEX_LOCATION )
+declare sub lexCopyLastLocation( byref destination as LEX_LOCATION )
 declare function lexGetNonphysicalTokenCount( ) as longint
 '' Logical replacement remainder, including already prefetched characters.
 declare function lexGetMacroRemainingUnits( ) as longint

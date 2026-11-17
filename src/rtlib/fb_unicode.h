@@ -66,6 +66,7 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 
 #ifdef DISABLE_WCHAR
 #	include <ctype.h>
+#	define FB_WINT int
 #	define FB_WCHAR char
 #	define FB_WCHAR_LITERAL(c) c
 #	define FB_WEOF ((FB_WCHAR)EOF)
@@ -100,13 +101,18 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 		int result;
 		va_list ap;
 		va_start(ap, format);
-		result = vsprintf( buffer, format, ap );
+		/* DOS narrow-wide mode stores one byte per FB_WCHAR. Keep the
+		   caller's character bound and report truncation like swprintf(). */
+		result = vsnprintf( buffer, n, format, ap );
 		va_end(ap);
+		if( (result >= 0) && ((size_t)result >= n) )
+			return -1;
 		return result;
 	}
 #elif defined HOST_MINGW || defined HOST_CYGWIN
 #	include <wchar.h>
 #	include <wctype.h>
+#	define FB_WINT wint_t
 /*
  * GCC and Clang expose the exact native type used for wchar_t. Keep internal
  * C declarations compatible with wide APIs without spelling a C++ keyword.
@@ -134,6 +140,7 @@ static __inline__ void fb_UTF32ToLE( unsigned char *dst, UTF_32 c )
 #	define __USE_ISOC95 1
 #	include <wchar.h>
 #	include <wctype.h>
+#	define FB_WINT wint_t
 #	define FB_WCHAR wchar_t
 #	define FB_WCHAR_LITERAL(c) L ## c
 #	define FB_WEOF ((FB_WCHAR)WEOF)
@@ -295,7 +302,7 @@ static __inline__ ssize_t fb_wstr_Len( const FB_WCHAR *s )
 {
 	/* Packed BASIC fields may begin between native wchar_t boundaries.
 	   C library wide-string functions require properly aligned pointers. */
-	if( (uintptr_t)(const void *)s % sizeof( FB_WCHAR ) != 0 ) {
+	if( (uintptr_t)s % sizeof( FB_WCHAR ) != 0 ) {
 		const unsigned char *p = (const unsigned char *)s;
 		ssize_t chars = 0;
 		FB_WCHAR value;
@@ -314,24 +321,27 @@ static __inline__ ssize_t fb_wstr_Len( const FB_WCHAR *s )
 ssize_t fb_wstr_ConvFromA( FB_WCHAR *dst, ssize_t dst_chars, const char *src );
 ssize_t fb_wstr_ConvToA( char *dst, ssize_t dst_chars, const FB_WCHAR *src );
 
+/* Wide classification uses wint_t, whose signedness can differ from FB_WCHAR.
+   Native mappings return a character or WEOF, stored in the existing FB_WCHAR
+   representation. The narrow configuration uses the int domain of ctype.h. */
 static __inline__ int fb_wstr_IsLower( FB_WCHAR c )
 {
-	return iswlower( c );
+	return iswlower( (FB_WINT)c );
 }
 
 static __inline__ int fb_wstr_IsUpper( FB_WCHAR c )
 {
-	return iswupper( c );
+	return iswupper( (FB_WINT)c );
 }
 
 static __inline__ FB_WCHAR fb_wstr_ToLower( FB_WCHAR c )
 {
-	return towlower( c );
+	return (FB_WCHAR)towlower( (FB_WINT)c );
 }
 
 static __inline__ FB_WCHAR fb_wstr_ToUpper( FB_WCHAR c )
 {
-	return towupper( c );
+	return (FB_WCHAR)towupper( (FB_WINT)c );
 }
 
 /* Copy n characters from A to B and terminate with NUL. */
@@ -404,16 +414,14 @@ static __inline__ const FB_WCHAR *fb_wstr_SkipCharRev( const FB_WCHAR *s, ssize_
 	return p;
 }
 
-static __inline__ FB_WCHAR *fb_wstr_Instr( const FB_WCHAR *s, const FB_WCHAR *patt )
+static __inline__ const FB_WCHAR *fb_wstr_Instr( const FB_WCHAR *s, const FB_WCHAR *patt )
 {
 	/*
-	   Some C libraries keep the historic C signature for wcsstr(), returning
-	   a non-const pointer even when the input is const. Others expose a
-	   const-preserving builtin. The runtime wrapper keeps FreeBASIC's older
-	   mutable return type, matching INSTR-style callers that only use the
-	   pointer position.
+	   The source is const and INSTR only uses the match position. Keep the
+	   result const so it is safe with both historical and const-preserving
+	   wcsstr() declarations.
 	 */
-	return (FB_WCHAR *)wcsstr( s, patt );
+	return wcsstr( s, patt );
 }
 
 static __inline__ size_t fb_wstr_InstrAny( const FB_WCHAR *s, const FB_WCHAR *sset )
@@ -427,8 +435,8 @@ static __inline__ int fb_wstr_Compare( const FB_WCHAR *str1, const FB_WCHAR *str
 	if( chars <= 0 )
 		return 0;
 
-	if( ((uintptr_t)(const void *)str1 % sizeof( FB_WCHAR ) != 0) ||
-	    ((uintptr_t)(const void *)str2 % sizeof( FB_WCHAR ) != 0) ) {
+	if( ((uintptr_t)str1 % sizeof( FB_WCHAR ) != 0) ||
+	    ((uintptr_t)str2 % sizeof( FB_WCHAR ) != 0) ) {
 		const unsigned char *left = (const unsigned char *)str1;
 		const unsigned char *right = (const unsigned char *)str2;
 		while( chars > 0 ) {

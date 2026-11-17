@@ -11,8 +11,6 @@
 
 static BMidiSynth *g_fb_sfx_haiku_synth = NULL;
 
-extern "C" void fb_sfxMidiDriverClose(void);
-
 extern "C" int fb_sfxMidiDriverOpen(int device)
 {
     (void)device;
@@ -37,12 +35,12 @@ extern "C" int fb_sfxMidiDriverSend(unsigned char status,
                                     unsigned char data1,
                                     unsigned char data2)
 {
-    int channel;
+    unsigned char channel;
 
     if (!g_fb_sfx_haiku_synth)
         return -1;
 
-    channel = (int)(status & 0x0Fu);
+    channel = (unsigned char)(status & 0x0Fu);
 
     switch (status & 0xF0u)
     {

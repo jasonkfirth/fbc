@@ -16,6 +16,10 @@ typedef struct FB_PRINT_INFO {
     WORD            wAttributes;
     HANDLE          hOutput;
     int             fViewSet;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } fb_PrintInfo;
 
 static void fb_hHookConScroll
@@ -106,7 +110,7 @@ static void fb_hHookConScroll
     if( iClearFrom!=iClearTo ) {
         SHORT left = (SHORT) x1;
         WORD attr = pInfo->wAttributes;
-        DWORD width = (DWORD) (x2 - x1 + 1);
+        DWORD width = (uint32_t)x2 - (uint32_t)x1 + 1u;
         for( iClearPos=iClearFrom; iClearPos!=iClearTo; ++iClearPos ) {
             DWORD written;
             COORD coord = { left, (SHORT) iClearPos };

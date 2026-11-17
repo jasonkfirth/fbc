@@ -78,6 +78,11 @@ FBCALL void *fb_TlsGetCtxExisting( int index )
 /* Retrieve or create new TLS context for given key */
 FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn )
 {
+	if( index < 0 || index >= FB_TLSKEYS )
+		return NULL;
+	if( len > SIZE_MAX - sizeof(FB_TLS_CTX_HEADER) )
+		return NULL;
+
 	void *ctx = fb_TlsGetCtxExisting( index );
 
 	if( ctx == NULL ) {
@@ -120,6 +125,9 @@ FBCALL void *fb_TlsGetCtx( int index, size_t len, FB_TLS_DESTRUCTOR destructorFn
 
 FBCALL void fb_TlsDelCtx( int index )
 {
+	if( index < 0 || index >= FB_TLSKEYS )
+		return;
+
 	void *ctx = (void *)FB_TLSGET( fb_tls_context_table[index] );
 
 	/* free mem block if any */

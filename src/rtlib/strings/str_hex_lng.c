@@ -12,7 +12,7 @@ static char hex_table[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C'
 FBCALL FBSTRING_ACCESS *fb_HEXEx_l ( unsigned long long num, int digits )
 {
 	FBSTRING_ACCESS *s;
-	int i;
+	unsigned int i;
 	unsigned long long num2;
 
 	if( digits <= 0 ) {
@@ -33,11 +33,11 @@ FBCALL FBSTRING_ACCESS *fb_HEXEx_l ( unsigned long long num, int digits )
 	if( s == NULL )
 		return &fb_ctx.null_desc;
 
-	i = digits - 1;
-	while( i >= 0 ) {
+	i = (unsigned int)digits;
+	while( i > 0 ) {
+		i -= 1;
 		s->data[i] = hex_table[num & 0xF];
 		num >>= 4;
-		i -= 1;
 	}
 
 	s->data[digits] = '\0';

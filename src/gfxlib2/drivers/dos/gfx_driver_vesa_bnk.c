@@ -2,6 +2,7 @@
 
 #include "../../fb_gfx.h"
 #include "fb_gfx_dos.h"
+#include <limits.h>
 
 static int driver_init(char *title, int w, int h, int depth, int refresh_rate, int flags);
 static void driver_exit(void);
@@ -39,6 +40,7 @@ static int data_locked = FALSE;
 static void (*fb_dos_vesa_set_bank)(void) = NULL;
 static BLITTER *blitter = NULL;
 static unsigned char *buffer = NULL;
+static size_t buffer_size = 0;
 
 int fb_dos_vesa_bank_number = 0;
 
@@ -81,13 +83,24 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	
 	if( depth != bpp || is_rgb )
 	{
+		unsigned int video_height = fb_dos.vesa_mode_info.YResolution;
+		unsigned int bytes_per_scanline = fb_dos.vesa_mode_info.BytesPerScanLine;
+
 		blitter = fb_hGetBlitter(bpp, is_rgb);
 		if( !blitter )
 			return -1;
-		
-		buffer = malloc( fb_dos.vesa_mode_info.YResolution * fb_dos.vesa_mode_info.BytesPerScanLine );
-		if( !buffer )
+
+		if( video_height == 0 || bytes_per_scanline == 0 ||
+		    (size_t)video_height > (size_t)-1 / (size_t)bytes_per_scanline )
 			return -1;
+
+		buffer_size = (size_t)video_height * (size_t)bytes_per_scanline;
+		buffer = malloc( buffer_size );
+		if( !buffer )
+		{
+			buffer_size = 0;
+			return -1;
+		}
 	}
 	else
 	{
@@ -98,12 +111,12 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	fb_dos_lock_data( &fb_dos_vesa_set_bank, sizeof(fb_dos_vesa_set_bank) );
 	fb_dos_lock_data( &fb_dos_vesa_pm_info, sizeof(fb_dos_vesa_pm_info) );
 	fb_dos_lock_data( &blitter, sizeof(blitter) );
-	fb_dos_lock_code( (void *)fb_dos_vesa_set_bank_pm, (void *)fb_dos_vesa_set_bank_pm_end - (void *)fb_dos_vesa_set_bank_pm );
-	fb_dos_lock_code( (void *)fb_dos_vesa_set_bank_int, (void *)fb_dos_vesa_set_bank_int_end - (void *)fb_dos_vesa_set_bank_int );
+	lock_code( fb_dos_vesa_set_bank_pm, fb_dos_vesa_set_bank_pm_end );
+	lock_code( fb_dos_vesa_set_bank_int, fb_dos_vesa_set_bank_int_end );
 	if( buffer )
 	{
 		fb_dos_lock_data( &buffer, sizeof(buffer) );
-		fb_dos_lock_data( buffer, h * fb_gfx->pitch );
+		fb_dos_lock_data( buffer, buffer_size );
 	}
 	data_locked = TRUE;
 
@@ -121,17 +134,18 @@ static void driver_exit(void)
 			fb_dos_unlock_data( &fb_dos_vesa_set_bank, sizeof(fb_dos_vesa_set_bank) );
 			fb_dos_unlock_data( &fb_dos_vesa_pm_info, sizeof(fb_dos_vesa_pm_info) );
 			fb_dos_unlock_data( &blitter, sizeof(blitter) );
-			fb_dos_unlock_code( (void *)fb_dos_vesa_set_bank_pm, (void *)fb_dos_vesa_set_bank_pm_end - (void *)fb_dos_vesa_set_bank_pm );
-			fb_dos_unlock_code( (void *)fb_dos_vesa_set_bank_int, (void *)fb_dos_vesa_set_bank_int_end - (void *)fb_dos_vesa_set_bank_int );
+			unlock_code( fb_dos_vesa_set_bank_pm, fb_dos_vesa_set_bank_pm_end );
+			unlock_code( fb_dos_vesa_set_bank_int, fb_dos_vesa_set_bank_int_end );
 			data_locked = FALSE;
 	}
 	
 	if( buffer )
 	{
 		fb_dos_unlock_data( &buffer, sizeof(buffer) );
-		fb_dos_unlock_data( buffer, fb_dos.vesa_mode_info.YResolution * fb_dos.vesa_mode_info.BytesPerScanLine );
+		fb_dos_unlock_data( buffer, buffer_size );
 		free( buffer );
 		buffer = NULL;
+		buffer_size = 0;
 	}
 	
 	fb_dos_exit();
@@ -140,9 +154,12 @@ static void driver_exit(void)
 static void fb_dos_vesa_set_bank_int(void)
 {
 	/* set write bank of window A based on fb_dos_vesa_bank_number */
+	if( fb_dos_vesa_bank_number < 0 || fb_dos_vesa_bank_number > USHRT_MAX )
+		return;
+
 	fb_dos.regs.x.ax = 0x4F05;
 	fb_dos.regs.x.bx = 0;
-	fb_dos.regs.x.dx = fb_dos_vesa_bank_number;
+	fb_dos.regs.x.dx = (unsigned short)fb_dos_vesa_bank_number;
 	__dpmi_int(0x10, &fb_dos.regs);
 }
 static void fb_dos_vesa_set_bank_int_end(void) { }
@@ -152,13 +169,21 @@ static void driver_update(void)
 	int curr_bank = -1;
 	unsigned char *memory_buffer;
 	unsigned char *framebuffer;
-	int framebuffer_start;
-	int bank_size;
-	int bank_granularity;
-	int bank_add;
-	int todo;
-	int copy_size;
-	int y1, y2;
+	unsigned long bank_number;
+	unsigned long framebuffer_start;
+	unsigned long bank_size;
+	unsigned long bank_granularity;
+	unsigned long bank_add;
+	unsigned long todo;
+	size_t copy_size;
+	unsigned int height;
+	unsigned int y1, y2;
+
+	if( fb_gfx == NULL || fb_gfx->dirty == NULL || fb_dos.h <= 0 ||
+	    fb_gfx->pitch <= 0 || fb_dos.vesa_mode_info.WinSize == 0 ||
+	    fb_dos.vesa_mode_info.WinGranularity == 0 )
+		return;
+	height = (unsigned int)fb_dos.h;
 
 	if( blitter )
 	{
@@ -169,45 +194,61 @@ static void driver_update(void)
 	{
 		framebuffer = fb_gfx->framebuffer;
 	}
+	if( framebuffer == NULL || fb_dos_vesa_set_bank == NULL )
+		return;
 
-	bank_size = fb_dos.vesa_mode_info.WinSize * 1024;
-	bank_granularity = fb_dos.vesa_mode_info.WinGranularity * 1024;
+	bank_size = (unsigned long)fb_dos.vesa_mode_info.WinSize * 1024ul;
+	bank_granularity = (unsigned long)fb_dos.vesa_mode_info.WinGranularity * 1024ul;
 	bank_add = bank_size / bank_granularity;
+	if( bank_add == 0 )
+		return;
 	
-	for (y1 = 0; y1 < fb_dos.h; y1++) {
+	for (y1 = 0; y1 < height; y1++) {
 		if (fb_gfx->dirty[y1]) {
-			for (y2 = fb_dos.h - 1; !fb_gfx->dirty[y2]; y2--)
-				;
-			
-			fb_dos_vesa_bank_number = (y1 * fb_gfx->pitch) / bank_granularity;
-			
-			framebuffer_start = fb_dos_vesa_bank_number * bank_granularity;
-			
-			todo = ((y2 + 1) * fb_gfx->pitch) - framebuffer_start;
-			
-			memory_buffer = framebuffer + framebuffer_start;
+			y2 = height;
+			while( y2 > y1 && !fb_gfx->dirty[y2 - 1] )
+				--y2;
+			if( y2 <= y1 )
+				return;
+
+			bank_number = ((unsigned long)y1 * (unsigned long)fb_gfx->pitch) / bank_granularity;
+			if( bank_number > USHRT_MAX )
+				return;
+			fb_dos_vesa_bank_number = (int)bank_number;
+
+			framebuffer_start = bank_number * bank_granularity;
+			todo = ((unsigned long)y2 * (unsigned long)fb_gfx->pitch) - framebuffer_start;
+			memory_buffer = framebuffer + (size_t)framebuffer_start;
 			
 			while (todo > 0) {
 				/* select the appropriate bank */
 				if (curr_bank != fb_dos_vesa_bank_number) {
 					curr_bank = fb_dos_vesa_bank_number;
-					
+					if( curr_bank < 0 || curr_bank > USHRT_MAX )
+						return;
 					fb_dos_vesa_set_bank();
 				}
 				
 				/* how much can we copy in one go? */
 				if (todo > bank_size)
-					copy_size = bank_size;
+					copy_size = (size_t)bank_size;
 				else
-					copy_size = todo;
+					copy_size = (size_t)todo;
+				if( copy_size == 0 )
+					return;
 				
 				/* copy a bank of data to the screen */
 				dosmemput(memory_buffer, copy_size, 0xA0000);
 				
 				/* move on to the next bank of data */
-				todo -= copy_size;
+				todo -= (unsigned long)copy_size;
 				memory_buffer += copy_size;
-				fb_dos_vesa_bank_number += bank_add;
+				if( todo > 0 ) {
+					bank_number += bank_add;
+					if( bank_number > USHRT_MAX )
+						return;
+					fb_dos_vesa_bank_number = (int)bank_number;
+				}
 			}
 			
 			break;

@@ -13,7 +13,7 @@ Code block that allows the use of architecture-specific instructions.
 {{fbdoc item="desc"}}
 	The ##**Asm**## block is used to insert specific machine-code instructions in a program in order to perform operations that cannot be carried out using the features of the language or to hand-optimize performance-sensitive sections of code.
 	
-	The current ""FreeBASIC"" compiler currently only produces code for Intel [[x86|80x86]]-based machines; however, in the future, the compiler might be ported to a platform which does not support the same instruction set.  Therefore, ##**Asm**## blocks should only be used when necessary, and a ""FreeBASIC""-only alternative should be provided if possible.
+	Instructions written for Intel [[x86|80x86]]-based machines cannot be used unchanged on other CPUs. Provide a ""FreeBASIC"" alternative when the program must support multiple architectures.
 	
 	The return value of a function may be set by using the ##[[KeyPgFunction|Function]]## keyword within brackets as shown in the example below.
 	
@@ -27,6 +27,12 @@ Code block that allows the use of architecture-specific instructions.
 			Instruction syntax is mostly the same as FASM uses, one important difference is that GAS requires size settings to be followed by the word "##ptr##".
 
 			With ##-gen gcc## or ##-gen clang##, Intel assembly uses native memory operands for automatic variables and address operands for private static variables. Assembly-visible scalar parameters retain one source storage location for the entire call, including references through an address taken before the assembly block. Reading a ##Single## or ##Double## parameter's raw bits does not first evaluate it as a floating-point value. Native compiler operand limits still apply; a read/write memory operand counts twice toward GCC's limit.
+
+			A resolved ""FreeBASIC"" procedure name in an Intel assembly operand retains that procedure's original native entry point, including ##Private## procedures. The C backends retain the required native code even when no ordinary ""FreeBASIC"" call names it. Assembly calls must follow the declared calling convention and original parameter layout; private C implementation optimizations do not change the entry used by assembly.
+
+			Inside a ##[[KeyPgNaked|Naked]]## procedure, references to private global objects and local ##Static## objects retain their native storage under C optimization. The C backends place local static declarations and their types before the native function entry, and assembly references use the platform's native object name.
+
+			The C backends can omit unrelated private procedures beside a checked subset of Intel instructions whose names are resolved symbols, registers or local labels within one joined assembly block. Directives, unknown names, calls, naked procedures and assembly branches to BASIC labels retain conservative procedure analysis. Storage analysis has its own boundary and can remain conservative even when procedure references are fully exposed. ""FreeBASIC"" source warnings retain their normal behavior.
 			
 			%%(freebasic)
 ' Assuming "n" is a FB global or local ULONG variable
@@ -36,6 +42,10 @@ inc  dword [n]       ' Not OK: size given, but still not accepted by GAS
 inc  dword ptr [n]   ' OK: "ptr" is needed by GAS here%%
 			
 		==Register Preservation==
+			With ##-gen gcc## or ##-gen clang##, the native compiler preserves registers according to the assembly block's declared effects. For a checked subset of 32-bit Intel instructions, these effects include partial-register aliases and implicit writes by ##cpuid##, ##xgetbv## and ##imul##. Checked blocks using ##push## or ##pop## with automatic variables receive a stable native stack frame, including optimized builds. Opaque assembly retains conservative register declarations.
+
+			On x86-64, ordinary ##**Asm**## blocks with the C backends establish a stable, 16-byte aligned native stack frame. The driver supplies ##-mno-red-zone## for each affected C module so inline stack operations also protect native spills. When compiling emitted C separately, supply that native compiler option as recorded by the module's comment. Assembly must restore ##rsp## before control leaves its block and follow the platform calling convention, including outgoing Windows x64 shadow space.
+
 			When an ##**Asm**## block is opened, the registers ##ebx##, ##esi##, and ##edi## are pushed to the stack, when the block is closed, these registers are popped back from the stack.  This is because these registers are required to be preserved by most or all OS's using the x86 CPU.  You can therefore use these registers without explicitly preserving them yourself. You should not change ##esp## and ##ebp##, since they are usually used to address local variables. 
 			**Note:** Inside a ##[[KeyPgNaked|Naked]]## procedure, there is no such register preservation.
 			

@@ -17,6 +17,8 @@ Returns the amount of free memory available
 {{fbdoc item="desc"}}
 	Returns the free memory (ram) available, in bytes.
 
+	On Linux, failed or nonpositive OS page queries return zero. A positive physical byte total exceeding the native ##Uinteger## range is capped at its largest representable value. The dummy parameter retains its existing ignored behavior.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/system/fre.bas"}}%%(freebasic)
 Dim mem As Uinteger = Fre

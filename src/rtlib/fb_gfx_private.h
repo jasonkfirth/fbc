@@ -20,6 +20,12 @@
 typedef FBCALL unsigned int (BLENDER)(unsigned int, unsigned int, void *);
 typedef void (PUTTER)(unsigned char *, unsigned char *, int, int, int, int, int, BLENDER *, void *);
 
+#if defined(__GNUC__)
+	#define FB_GFX_PRIVATE_EXTENSION __extension__
+#else
+	#define FB_GFX_PRIVATE_EXTENSION
+#endif
+
 typedef struct FB_GFXCTX {
 	int id;
 	int work_page;
@@ -27,16 +33,20 @@ typedef struct FB_GFXCTX {
 	int max_h;
 	int target_bpp;
 	int target_pitch;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the four-byte alignment gap before this pointer without moving it. */
+	unsigned char last_target_alignment_padding[4];
+#endif
 	void *last_target;
 	float last_x, last_y;
 	union {
-		struct {
+		FB_GFX_PRIVATE_EXTENSION struct {
 			int view_x, view_y, view_w, view_h;
 		};
 		int view[4];
 	};
 	union {
-		struct {
+		FB_GFX_PRIVATE_EXTENSION struct {
 			int old_view_x, old_view_y, old_view_w, old_view_h;
 		};
 		int old_view[4];
@@ -53,5 +63,7 @@ typedef struct FB_GFXCTX {
 	unsigned char tail_padding[4];
 #endif
 } FB_GFXCTX;
+
+#undef FB_GFX_PRIVATE_EXTENSION
 
 /* end of fb_gfx_private.h */

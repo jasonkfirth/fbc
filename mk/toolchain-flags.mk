@@ -130,14 +130,14 @@ endif
 
 ifeq ($(TARGET_OS),openbsd)
 
-  # Ports
-  CPPFLAGS += -I/usr/local/include
-  CFLAGS   += -I/usr/local/include
+  # Ports headers are external dependencies, not project warning targets.
+  CPPFLAGS += -isystem /usr/local/include
+  CFLAGS   += -isystem /usr/local/include
   LDFLAGS  += -L/usr/local/lib
 
   # X11
-  CPPFLAGS += -I/usr/X11R6/include
-  CFLAGS   += -I/usr/X11R6/include
+  CPPFLAGS += -isystem /usr/X11R6/include
+  CFLAGS   += -isystem /usr/X11R6/include
   LDFLAGS  += -L/usr/X11R6/lib
 
   # libexecinfo (needed on OpenBSD)

@@ -21,6 +21,7 @@
 #ifndef DISABLE_HAIKU
 
 #include "fb_gfx_haiku.h"
+#include "haiku_render.h"
 #include "haiku_debug.h"
 
 #include <Screen.h>

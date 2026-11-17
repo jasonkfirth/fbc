@@ -10,7 +10,7 @@
 static void hWriteStrEx( FB_FILE *handle, const char *s, size_t len, int mask )
 {
     const char *buff;
-	ssize_t bufflen;
+	size_t bufflen;
 
     /* close quote + new-line or comma */
     if( mask & FB_PRINT_BIN_NEWLINE )

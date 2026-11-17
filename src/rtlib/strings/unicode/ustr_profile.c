@@ -8,6 +8,7 @@
 
 #include "fb.h"
 #include "fb_profile.h"
+#include <stdint.h>
 
 /* Conversion owns a temporary descriptor. Release the string lock before
    entering the profiler, whose state has a separate lock. */
@@ -65,7 +66,8 @@ FBCALL int fb_WstrProfileGetFileName( FB_WCHAR *dst, int capacity )
 		units = capacity - 1;
 		/* A bounded UTF-16 output must never end on half of a pair. */
 		if( sizeof(FB_WCHAR) == 2 && units > 0 &&
-		    wide[units - 1] >= 0xD800 && wide[units - 1] <= 0xDBFF ) --units;
+		    (uint16_t)wide[units - 1] >= 0xD800 &&
+		    (uint16_t)wide[units - 1] <= 0xDBFF ) --units;
 	}
 	memcpy(dst, wide, (size_t)units * sizeof(FB_WCHAR));
 	dst[units] = 0;

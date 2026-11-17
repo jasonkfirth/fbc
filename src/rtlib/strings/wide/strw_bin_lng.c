@@ -10,7 +10,7 @@
 FBCALL FB_WCHAR *fb_WstrBinEx_l ( unsigned long long num, int digits )
 {
 	FB_WCHAR *s;
-	int i;
+	unsigned int i;
 	unsigned long long num2;
 
 	if( digits <= 0 ) {
@@ -31,11 +31,11 @@ FBCALL FB_WCHAR *fb_WstrBinEx_l ( unsigned long long num, int digits )
 	if( s == NULL )
 		return NULL;
 
-	i = digits - 1;
-	while( i >= 0 ) {
+	i = (unsigned int)digits;
+	while( i > 0 ) {
+		i -= 1;
 		s[i] = FB_WCHAR_LITERAL('0') + (num & 1); /* '0' or '1' */
 		num >>= 1;
-		i -= 1;
 	}
 
 	s[digits] = FB_WCHAR_LITERAL('\0');

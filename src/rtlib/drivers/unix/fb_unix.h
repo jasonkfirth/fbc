@@ -54,6 +54,6 @@ FBCALL void fb_BgUnlock( void );
 
 /* Global variable for disabling hard-coded VT100 escape sequences in
    fb_hTermOut(). */
-extern int __fb_enable_vt100_escapes;
+extern int fb_enable_vt100_escapes FB_RTLIB_SYMBOL("__fb_enable_vt100_escapes");
 
 /* end of drivers/unix/fb_unix.h */

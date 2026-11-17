@@ -925,10 +925,14 @@ private sub hOptimRewriteFromXmm _
 			if instr(prevpart1,"[")<>0 then
 				''OPTIMIZATION 3-1
 				if part1[0]=asc("x") then
-					'' MOVD has no XMM-to-XMM form.  A store followed by a load
-					'' may collapse to a register copy when the stored value is
-					'' still live in its source XMM register.
-					instruc="movaps"
+					'' MOVD has no XMM-to-XMM form. Keep the scalar width in
+					'' the replacement opcode: OPTIMIZATION 3-2 uses MOVQ to
+					'' retain all 64 bits when another copy follows this one.
+					if previnstruc="movss" orelse previnstruc="movd" then
+						instruc="movss"
+					else
+						instruc="movq"
+					end if
 				elseif previnstruc="movss" orelse part1[0]=asc("e") orelse right(part1,1)="d" then
 					instruc="movd"
 				else

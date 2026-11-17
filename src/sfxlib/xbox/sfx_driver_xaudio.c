@@ -434,7 +434,7 @@ static int xbox_driver_write(const float *samples, int frames)
 static const FB_SFX_DRIVER fb_sfxDriverXboxXAudio =
 {
     "xaudio",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     xbox_driver_init,
     xbox_driver_exit,
     xbox_driver_write,

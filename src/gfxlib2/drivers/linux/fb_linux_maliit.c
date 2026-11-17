@@ -142,6 +142,9 @@ typedef struct FB_LINUX_MALIIT_STATE {
 	int context_active;
 	int region_dirty;
 	unsigned int context_generation;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t keyboard_generation_alignment_padding;
+#endif
 	uint64_t keyboard_generation;
 	int keyboard_requested;
 	int focus_retry_pending;
@@ -150,6 +153,9 @@ typedef struct FB_LINUX_MALIIT_STATE {
 	int request_pending;
 	int request_visible;
 	int request_try_maliit;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t request_generation_alignment_padding;
+#endif
 	uint64_t request_generation;
 	FB_LINUX_MALIIT_FALLBACK_CALLBACK request_fallback;
 	int region_x;

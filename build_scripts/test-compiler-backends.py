@@ -150,6 +150,8 @@ def main() -> int:
         if clang:
             backends.append("clang")
     fixtures = [
+        ("procedure-noinline", "tests/compiler-support/c-procedure-noinline.bas",
+         "PROCEDURE_NOINLINE_PASS 455"),
         ("abi", "tests/compiler-support/backend-abi.bas", "backend ABI passed"),
         ("asm-att-llvm", "tests/quirk/inline-asm-att-llvm.bas",
          "PASS: inline assembly dialect"),
@@ -217,6 +219,8 @@ def main() -> int:
         ("label-flag-layout", "tests/compiler-support/c-label-flag-layout.bas", "C_LABEL_FLAG_LAYOUT_PASS"),
         ("label-flag-gosub", "tests/compiler-support/label-flag-gosub.bas", "LABEL_FLAG_GOSUB_PASS"),
         ("member-pointer-slots", "tests/compiler-support/c-member-pointer-slots.bas", "MEMBER_POINTER_SLOTS_PASS"),
+        ("union-member-qualifiers", "tests/compiler-support/c-union-member-qualifiers.bas", "UNION_MEMBER_QUALIFIERS_PASS"),
+        ("pointer-equality-views", "tests/compiler-support/c-pointer-equality-views.bas", "POINTER_EQUALITY_VIEWS_PASS"),
         ("pointer-field-words", "tests/compiler-support/c-pointer-field-words.bas", "POINTER_FIELD_WORDS_PASS  59"),
         ("byref-qualified-temporaries", "tests/compiler-support/c-byref-qualified-temporaries.bas", "BYREF_QUALIFIED_TEMPORARIES_PASS"),
         ("byref-qualified-aliases", "tests/compiler-support/c-byref-qualified-temporaries.bas", "BYREF_QUALIFIED_TEMPORARIES_PASS"),
@@ -226,9 +230,28 @@ def main() -> int:
         ("packed-descriptor-init", "tests/compiler-support/c-packed-descriptor-init.bas", "PACKED_DESCRIPTOR_INIT_PASS"),
         ("packed-anonymous-descriptors", "tests/compiler-support/c-packed-anonymous-descriptors.bas", "PACKED_ANONYMOUS_DESCRIPTORS_PASS"),
         ("external-prototypes", "tests/compiler-support/c-external-prototypes.bas", "EXTERNAL_PROTOTYPES_PASS"),
+        ("format-results", "tests/compiler-support/c-format-results.bas", "FORMAT_RESULTS_PASS"),
+        ("format-locals", "tests/compiler-support/c-format-locals.bas", "FORMAT_LOCALS_PASS"),
+        ("va-promotions", "tests/compiler-support/c-va-promotions.bas", "VA_PROMOTIONS_PASS"),
+        ("iif-formats", "tests/compiler-support/c-iif-formats.bas", "IIF_FORMATS_PASS"),
+        ("bulk-memory-arguments", "tests/compiler-support/c-bulk-memory-arguments.bas", "BULK_MEMORY_ARGUMENTS_PASS"),
+        ("error-external-fields", "tests/compiler-support/c-error-external-fields.bas", "ERROR_EXTERNAL_FIELDS_PASS"),
+        ("plural-format-results", "tests/compiler-support/c-plural-format-results.bas", "PLURAL_FORMAT_RESULTS_PASS"),
+        ("literal-offsets", "tests/compiler-support/c-literal-offsets.bas", "LITERAL_OFFSETS_PASS"),
     ]
     with tempfile.TemporaryDirectory(prefix="fbc-backends-") as temporary:
         working = Path(temporary)
+        # GAS64's subsequent copy rewrites must retain the scalar width even
+        # when this compiler was built through a different native backend.
+        xmm_copies = subprocess.run(
+            [sys.executable, '-B', str(root / 'tests/compiler-support/gas64-xmm-copies.py'),
+             '--fbc', str(options.fbc.resolve()), '--prefix', str(toolchain_prefix),
+             '--gcc', os.environ.get('GCC') or 'gcc'],
+            cwd=working, text=True, capture_output=True, timeout=180, check=False)
+        if xmm_copies.returncode:
+            print(xmm_copies.stdout + xmm_copies.stderr)
+            return 1
+        print(xmm_copies.stdout.strip())
         native_support = subprocess.run(
             [sys.executable, '-B', str(root / 'tests/compiler-support/test_native_c_support.py')],
             cwd=working, text=True, capture_output=True, timeout=30, check=False)
@@ -469,6 +492,25 @@ def main() -> int:
                     print(f"CRT/{target}: incorrect process-ID export")
                     return 1
             print(f"CRT/{target}: emission passed")
+        # Explicit C integer aliases keep the Itanium long/unsigned-long codes
+        # across target widths. Emission alone can check this without target SDKs.
+        for target, cpu in (("win32", "686"), ("win64", "x86-64"),
+                            ("linux", "686"), ("linux", "x86-64")):
+            for producer in ("gcc", "clang"):
+                generated = working / ("clong-" + target + "-" + cpu + "-" + producer + ".c")
+                emitted = subprocess.run(
+                    [*compiler_args, "-i", str(root / "inc"), "-r", "-gen", producer,
+                     "-target", target, "-arch", cpu,
+                     str(root / "tests/compiler-support/c-clong-mangling.bas"),
+                     "-o", str(generated)], cwd=working, text=True,
+                    capture_output=True, timeout=120, check=False)
+                code = generated.read_text() if generated.is_file() else ""
+                if emitted.returncode or not all(name in code for name in (
+                        "CPPABI10CHECK_LONGEl", "CPPABI11CHECK_ULONGEm")):
+                    print(f"CLong/{target}/{cpu}/{producer}: incorrect C++ type codes\n"
+                          f"{emitted.stdout}{emitted.stderr}")
+                    return 1
+                print(f"CLong/{target}/{cpu}/{producer}: emission passed")
         # RISC OS also overrides fbnetwire.bi for its APCS double layout.
         # Compile the actual Unicode fixture on the previously failing targets.
         for target in ("riscos", "freebsd", "netbsd", "openbsd", "aros", "amiga", "wince-arm"):
@@ -670,8 +712,10 @@ def main() -> int:
                                    "--work-dir", str(working)]
                 if clang:
                     variant_command += ["--clang", clang]
+                # The helper bounds each compiler/run command and its scratch.
+                # Its complete multi-module matrix needs no aggregate deadline.
                 variant_check = subprocess.run(variant_command, cwd=working, text=True,
-                                               capture_output=True, timeout=180, check=False)
+                                               capture_output=True, check=False)
                 if variant_check.returncode:
                     print(variant_check.stdout + variant_check.stderr)
                     return 1
@@ -818,6 +862,24 @@ def main() -> int:
                     fixtures.append(("deep-reachability", "tests/compiler-support/c-procedure-deep-reachability.bas", "DEEP_REACHABILITY=PASS"))
                     fixtures.append(("array-virtual-origins", "tests/compiler-support/c-array-virtual-origins.bas", "ARRAY_ORIGIN=PASS"))
                     fixtures.append(("destructor-reachability", "tests/compiler-support/c-destructor-reachability.bas", "LEAF= 0\nLEAF= 0\nLEAF= 0\nLEAF= 0\nLEAF= 0\nLEAF= 0\nVIRTUAL_ITEM\nVIRTUAL_BASE\nDESTRUCTOR_ROOTS_MAIN=PASS\nSTATIC_ROOT= 17\nLEAF= 0\nLEAF= 0"))
+            fixtures.extend((
+                ("deep-source-locations", "tests/compiler-support/c-deep-source-locations.bas",
+                 "DEEP_SOURCE_LOCATIONS_PASS"),
+                ("deep-source-locations-opt", "tests/compiler-support/c-deep-source-locations.bas",
+                 "DEEP_SOURCE_LOCATIONS_PASS"),
+                ("forward-pointer-results", "tests/compiler-support/c-forward-pointer-results.bas",
+                 "FORWARD_POINTER_RESULTS_PASS"),
+                ("forward-pointer-results-opt", "tests/compiler-support/c-forward-pointer-results.bas",
+                 "FORWARD_POINTER_RESULTS_PASS"),
+                ("clong-mangling", "tests/compiler-support/c-clong-mangling.bas",
+                 "CLONG_MANGLING_PASS"),
+                ("clong-mangling-opt", "tests/compiler-support/c-clong-mangling.bas",
+                 "CLONG_MANGLING_PASS"),
+                ("va-narrow-anchor", "tests/compiler-support/c-va-narrow-anchor.bas",
+                 "VA_NARROW_ANCHOR_PASS"),
+                ("va-narrow-anchor-opt", "tests/compiler-support/c-va-narrow-anchor.bas",
+                 "VA_NARROW_ANCHOR_PASS"),
+            ))
             if architecture in ("x86_64", "aarch64"):
                 fixtures.extend((
                     ("int128-layout", "tests/compiler-support/integer128-layout.bas",
@@ -837,11 +899,102 @@ def main() -> int:
                     ("thread-local-contextual-import", "tests/compiler-support/thread-contextual-import.bas",
                      "CONTEXTUAL_THREAD_IMPORT_PASS"),
                 ))
+            if system in ("win32", "win64"):
+                fixtures.append(("crt-thread-names",
+                                 "tests/compiler-support/crt-thread-names.bas",
+                                 "CRT_THREAD_NAMES_PASS"))
+            if architecture in ("x86", "686", "x86_64") or (system == "win32" and not architecture):
+                for backend in backends:
+                    if backend not in ("gcc", "clang"):
+                        continue
+                    stack_options = subprocess.run(
+                        [sys.executable, '-B', str(root / 'tests/compiler-support/c-asm-stack-options.py'),
+                         '--fbc', str(options.fbc.resolve()), '--prefix', str(toolchain_prefix),
+                         '--backend', backend, '--architecture', architecture, '--work-dir', str(working)],
+                        cwd=working, text=True, capture_output=True, check=False)
+                    if stack_options.returncode:
+                        print(stack_options.stdout + stack_options.stderr)
+                        return 1
+                    print(stack_options.stdout.strip())
+                fixtures.extend((
+                    ("asm-private-procedures", "tests/compiler-support/c-asm-private-procedures.bas",
+                     "ASM_PRIVATE_PROCEDURES_PASS"),
+                    ("asm-private-procedures-opt", "tests/compiler-support/c-asm-private-procedures.bas",
+                     "ASM_PRIVATE_PROCEDURES_PASS"),
+                    ("asm-inactive-procedures", "tests/compiler-support/c-asm-inactive-procedures.bas",
+                     "ASM_INACTIVE_PROCEDURES_PASS"),
+                    ("asm-inactive-procedures-emitted", "tests/compiler-support/c-asm-inactive-procedures.bas",
+                     "ASM_INACTIVE_PROCEDURES_PASS"),
+                    ("asm-procedure-reachability", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("asm-procedure-reachability-opt", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("asm-procedure-system-registers", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("asm-procedure-system-registers-opt", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("asm-private-storage", "tests/compiler-support/c-asm-private-storage.bas",
+                     "ASM_PRIVATE_STORAGE_PASS"),
+                    ("asm-private-storage-opt", "tests/compiler-support/c-asm-private-storage.bas",
+                     "ASM_PRIVATE_STORAGE_PASS"),
+                    ("asm-register-effects", "tests/compiler-support/c-asm-register-effects.bas",
+                     "ASM_REGISTER_EFFECTS_PASS"),
+                    ("asm-register-effects-opt", "tests/compiler-support/c-asm-register-effects.bas",
+                     "ASM_REGISTER_EFFECTS_PASS"),
+                    ("asm-procedure-opaque-opcode", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("asm-procedure-opaque-opcode-opt", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("asm-procedure-separate-label", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("asm-procedure-separate-label-opt", "tests/compiler-support/c-asm-procedure-reachability.bas",
+                     "ASM_PROCEDURE_REACHABILITY_PASS"),
+                    ("numeric-helper-reachability", "tests/compiler-support/c-numeric-helper-reachability.bas",
+                     "NUMERIC_HELPER_REACHABILITY_PASS"),
+                    ("numeric-helper-reachability-opt", "tests/compiler-support/c-numeric-helper-reachability.bas",
+                     "NUMERIC_HELPER_REACHABILITY_PASS"),
+                    ("va-narrow-anchor-dead", "tests/compiler-support/c-va-narrow-anchor.bas",
+                     "VA_NARROW_ANCHOR_PASS"),
+                ))
             if any(backend in ("gcc", "clang") for backend in backends):
                 noreturn_object = working / "noreturn-callback.o"
                 machine = (["-m64"] if architecture == "x86_64" else
                            ["-m32"] if architecture in ("x86", "686") or
                            (system == "win32" and architecture == "") else [])
+                abi_objects = {}
+                for name in ("c-clong-mangling", "c-va-narrow-anchor"):
+                    obj = working / (name + ".o")
+                    c_build = subprocess.run(
+                        [os.environ.get("GCC") or "gcc", *machine, "-std=c11", "-O2",
+                         "-Wall", "-Wextra", "-Werror", "-c",
+                         str(root / "tests/compiler-support" / (name + ".c")),
+                         "-o", str(obj)], cwd=working, text=True,
+                        capture_output=True, timeout=60, check=False)
+                    if c_build.returncode:
+                        print(f"{name}: native observer compilation failed\n"
+                              f"{c_build.stdout}{c_build.stderr}")
+                        return 1
+                    abi_objects[name] = obj
+                va_modes = {}
+                va_probe = ("#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L "
+                            "&& defined(__has_builtin)\n"
+                            "#if __has_builtin(__builtin_c23_va_start)\n"
+                            "FBC_C23_VA_START\n#endif\n#endif\n")
+                for producer, tool in (("gcc", os.environ.get("GCC") or "gcc"), ("clang", clang)):
+                    if tool is None:
+                        continue
+                    for dialect in ("gnu2x", "gnu11"):
+                        probe = subprocess.run(
+                            [tool, *machine, "-std=" + dialect, "-E", "-P", "-x", "c", "-"],
+                            input=va_probe, cwd=working, text=True, capture_output=True,
+                            timeout=60, check=False)
+                        if probe.returncode == 0:
+                            va_modes[producer] = (dialect, "FBC_C23_VA_START" in probe.stdout)
+                            break
+                    else:
+                        print(f"{producer}: C variadic dialect probe failed\n"
+                              f"{probe.stdout}{probe.stderr}")
+                        return 1
                 c_build = subprocess.run(
                     [os.environ.get("GCC") or "gcc", *machine, "-std=c11",
                      "-Wall", "-Wextra", "-Werror", "-c",
@@ -854,6 +1007,25 @@ def main() -> int:
                     return 1
                 fixtures.append(("noreturn-callback",
                                  "tests/compiler-support/c-noreturn-callback.bas", ""))
+                static_float_object = working / "static-float-effects.o"
+                c_build = subprocess.run(
+                    [os.environ.get("GCC") or "gcc", *machine, "-std=c11", "-O2",
+                     "-Wall", "-Wextra", "-Werror", "-c",
+                     str(root / "tests/compiler-support/c-static-float-effects.c"),
+                     "-o", str(static_float_object)], cwd=working, text=True,
+                    capture_output=True, timeout=60, check=False)
+                if c_build.returncode:
+                    print("Floating evaluation observer compilation failed\n" +
+                          c_build.stdout + c_build.stderr)
+                    return 1
+                fixtures.extend((
+                    ("static-float-effects", "tests/compiler-support/c-static-float-effects.bas",
+                     "STATIC_FLOAT_EFFECTS_PASS"),
+                    ("static-float-effects-opt", "tests/compiler-support/c-static-float-effects.bas",
+                     "STATIC_FLOAT_EFFECTS_PASS"),
+                    ("debug-static-locals", "tests/compiler-support/c-debug-static-locals.bas",
+                     "STATIC_LOCAL_EFFECTS_PASS\nSTATIC_LOCAL_CLEANUP_PASS"),
+                ))
                 dos_main = working / "dos-noreturn-main.c"
                 emitted = subprocess.run(
                     [*compiler_args, "-i", str(root / "inc"), "-target", "dos",
@@ -885,7 +1057,11 @@ def main() -> int:
             return 1
         for backend in backends:
             for fixture_index, (name, source, expected) in enumerate(fixtures):
+                if name == "error-external-fields" and backend not in ("gcc", "clang"):
+                    continue
                 if name == "noreturn-callback" and backend not in ("gcc", "clang"):
+                    continue
+                if name.startswith("asm-inactive-procedures") and backend not in ("gcc", "clang"):
                     continue
                 if name == "thread-local-arrays-extern" and backend not in ("gcc", "clang"):
                     continue
@@ -906,6 +1082,14 @@ def main() -> int:
                         continue
                 if name in ("wide-libc", "long-literals", "procedure-address-identity", "deep-reachability", "destructor-reachability", "array-virtual-origins") and backend not in ("gcc", "clang"):
                     continue
+                if (name.startswith("static-float-effects") or name == "debug-static-locals") and backend not in ("gcc", "clang"):
+                    continue
+                if (name.startswith("asm-procedure-") or name.startswith("numeric-helper-")) and backend not in ("gcc", "clang"):
+                    continue
+                if name.startswith("forward-pointer-results") and backend not in ("gcc", "clang"):
+                    continue
+                if (name.startswith("clong-mangling") or name.startswith("va-narrow-anchor")) and backend not in ("gcc", "clang"):
+                    continue
                 if name in ("gosub-values", "label-flag-layout") and backend not in ("gcc", "clang"):
                     continue
                 if name == "asm-att-llvm" and backend != "llvm":
@@ -918,7 +1102,7 @@ def main() -> int:
                 # "dispatch". These are ordinary test programs.
                 executable = working / (backend + "-test-" + str(fixture_index))
                 input_source = root / source
-                if name.startswith("c-abi"):
+                if name.startswith("c-abi") or name == "error-external-fields":
                     input_source = working / (backend + "-" + name + ".bas")
                     shutil.copy2(root / source, input_source)
                 # The suite runs from a temporary directory, so resolve sibling
@@ -927,6 +1111,42 @@ def main() -> int:
                            "-i", str(root / "inc"), "-i", str((root / source).parent),
                            "-gen", backend, "-v",
                            str(input_source), "-x", str(executable)]
+                if name == "error-external-fields":
+                    provider = working / (backend + "-error-fields-provider.bas")
+                    shutil.copy2(root / "tests/compiler-support/c-error-external-fields-provider.bas", provider)
+                    command += [str(provider), "-mt", "-exx", "-O", "2", "-w", "all",
+                                "-Wc", "-Wall", "-Wc", "-Wextra", "-Wc", "-Werror"]
+                if name.startswith("static-float-effects"):
+                    command += [str(static_float_object)]
+                    if name.endswith("-opt"):
+                        command += ["-O", "2"]
+                if name == "debug-static-locals":
+                    command += ["-g", "-O", "2"]
+                if name.startswith("static-float-effects") or name == "debug-static-locals":
+                    command += ["-w", "all", "-Wc", "-Wall", "-Wc", "-Wextra", "-Wc", "-Werror"]
+                if name.startswith("forward-pointer-results"):
+                    command += ["-w", "all", "-Wc", "-Wall", "-Wc", "-Wextra", "-Wc", "-Werror"]
+                    if name.endswith("-opt"):
+                        command += ["-O", "2"]
+                    if backend == "clang":
+                        command += ["-Wc", "-Werror=implicit-void-ptr-cast"]
+                if name.startswith("clong-mangling"):
+                    command += [str(abi_objects["c-clong-mangling"]),
+                                "-w", "all", "-Wc", "-Wall", "-Wc", "-Wextra", "-Wc", "-Werror"]
+                    if name.endswith("-opt"):
+                        command += ["-O", "2"]
+                if name.startswith("va-narrow-anchor"):
+                    dialect, c23_start = va_modes[backend]
+                    command += ["-Wc", "-std=" + dialect, "-Wc", "-Wall", "-Wc", "-Wextra"]
+                    if name.endswith("-dead"):
+                        command += ["-d", "DEAD_ONLY", "-asm", "intel",
+                                    "-Wc", "-Werror=unused-function", "-Wc", "-Werror=unused-macros"]
+                    else:
+                        command += [str(abi_objects["c-va-narrow-anchor"])]
+                    if name.endswith("-opt"):
+                        command += ["-O", "2"]
+                    if backend == "clang" and c23_start:
+                        command += ["-Wc", "-Werror=varargs"]
                 if name == 'byref-qualified-aliases':
                     # The warning remains intentional here; both pointees are
                     # mutable and the callee must observe its caller's real slot.
@@ -936,6 +1156,48 @@ def main() -> int:
                                 "-Wc", "-Werror=unused-variable"]
                     if name.endswith("-opt"):
                         command += ["-O", "2"]
+                if name.startswith("asm-private-procedures"):
+                    command += ["-asm", "intel"]
+                    if backend in ("gcc", "clang"):
+                        command += ["-Wc", "-Wall", "-Wc", "-Wextra", "-Wc", "-Werror"]
+                if name.startswith(("asm-register-effects", "asm-private-storage")):
+                    command += ["-asm", "intel", "-w", "all"]
+                    if name.endswith("-opt"):
+                        command += ["-O", "2"]
+                    if backend in ("gcc", "clang"):
+                        command += ["-Wc", "-Wall", "-Wc", "-Wextra", "-Wc", "-Werror"]
+                if name.startswith("asm-procedure-") or name.startswith("numeric-helper-"):
+                    proof_options = ["-asm", "intel", "-w", "all"]
+                    opaque = "opaque-opcode" in name or "separate-label" in name
+                    if "opaque-opcode" in name:
+                        proof_options += ["-d", "OPAQUE_OPCODE"]
+                    if "separate-label" in name:
+                        proof_options += ["-d", "SEPARATE_ASM_LABEL"]
+                    if "system-registers" in name:
+                        proof_options += ["-d", "SYSTEM_REGISTER_ASM"]
+                    if name.endswith("-opt"):
+                        proof_options += ["-O", "2"]
+                    command += [*proof_options, "-Wc", "-Wall", "-Wc", "-Wextra"]
+                    if not opaque:
+                        command += ["-Wc", "-Werror"]
+                    generated = working / (backend + "-" + name + ".c")
+                    emitted = subprocess.run(
+                        [*compiler_args, "-i", str(root / "inc"), "-gen", backend,
+                         *proof_options, "-m", input_source.stem, "-r", str(input_source),
+                         "-o", str(generated)], cwd=working, text=True,
+                        capture_output=True, timeout=120, check=False)
+                    code = generated.read_text() if generated.is_file() else ""
+                    marker = "UNREACHABLELEAF" if name.startswith("asm-procedure-") else "DEADSINGLE"
+                    if emitted.returncode or ((marker in code.upper()) != opaque):
+                        print(f"{backend}/{name}: private-body reference boundary changed\n"
+                              f"{emitted.stdout}{emitted.stderr}")
+                        return 1
+                if name.startswith("asm-inactive-procedures"):
+                    # Native optimization removes a branch to a deliberately
+                    # absent dependency. An inactive ASM user must not retain it.
+                    command += ["-asm", "intel", "-O", "2", "-Wc", "-Wall", "-Wc", "-Wextra"]
+                    if name.endswith("-emitted"):
+                        command += ["-d", "EMITTED_INACTIVE_ASM"]
                 if system == "darwin" and architecture in ("x86", "x86_64") and name in (
                         "abi", "asm-registers") and backend in ("gcc", "clang"):
                     # These fixtures contain Intel tokens. Darwin defaults to
@@ -1001,8 +1263,30 @@ def main() -> int:
                     command += ["-exx"]
                 if name == "virtual-receiver-checked":
                     command += ["-exx"]
-                if name.startswith("thread-local"):
+                if name.startswith("thread-local") or name == "crt-thread-names":
                     command += ["-mt"]
+                if name == "thread-local" and backend == "clang":
+                    command += ["-Wc", "-Werror=dollar-in-identifier-extension"]
+                if name == "crt-thread-names" and backend == "clang":
+                    command += ["-Wc", "-Werror=reserved-identifier"]
+                if name == "union-member-qualifiers" and backend in ("gcc", "clang"):
+                    command += ["-Wc", "-Wcast-qual", "-Wc", "-Werror=cast-qual"]
+                    contracts = subprocess.run(
+                        [sys.executable, '-B', str(root / 'tests/compiler-support/c-union-member-qualifiers.py'),
+                         '--fbc', str(options.fbc.resolve()), '--prefix', str(toolchain_prefix),
+                         '--backend', backend], cwd=working, text=True, capture_output=True, check=False)
+                    if contracts.returncode:
+                        print(f'{backend}/{name}: diagnostics failed\n{contracts.stdout}{contracts.stderr}')
+                        return 1
+                if name == "pointer-equality-views" and backend in ("gcc", "clang"):
+                    command += ["-Wc", "-Werror", "-Wc", "-Wcast-qual"]
+                    contracts = subprocess.run(
+                        [sys.executable, '-B', str(root / 'tests/compiler-support/c-pointer-equality-views.py'),
+                         '--fbc', str(options.fbc.resolve()), '--prefix', str(toolchain_prefix),
+                         '--backend', backend], cwd=working, text=True, capture_output=True, check=False)
+                    if contracts.returncode:
+                        print(f'{backend}/{name}: diagnostics failed\n{contracts.stdout}{contracts.stderr}')
+                        return 1
                 if name == "startup-declarations":
                     module_object = working / (backend + "-startup-module.o")
                     module_build = subprocess.run(
@@ -1015,11 +1299,24 @@ def main() -> int:
                               f"{module_build.stdout}{module_build.stderr}")
                         return 1
                     command += [str(module_object)]
-                if name == "external-prototypes":
-                    observer = working / (backend + "-external-prototypes.o")
+                if name in ("external-prototypes", "format-results", "format-locals", "va-promotions", "iif-formats", "plural-format-results", "literal-offsets", "bulk-memory-arguments"):
+                    if backend in ("gcc", "clang"):
+                        if name == "external-prototypes":
+                            command += ["-Wc", "-Werror=redundant-decls"]
+                        else:
+                            if name != "bulk-memory-arguments":
+                                command += ["-Wc", "-Werror=format-nonliteral"]
+                            contracts = subprocess.run(
+                                [sys.executable, "-B", str(root / "tests/compiler-support" / ("c-" + name + ".py")),
+                                 "--fbc", str(options.fbc.resolve()), "--prefix", str(toolchain_prefix),
+                                 "--backend", backend], cwd=working, text=True, capture_output=True, check=False)
+                            if contracts.returncode:
+                                print(f"{backend}/{name}: diagnostics failed\n{contracts.stdout}{contracts.stderr}")
+                                return 1
+                    observer = working / (backend + "-" + name + ".o")
                     built = subprocess.run(
                         [os.environ.get("GCC") or "gcc", "-std=c99", "-Wall", "-Wextra",
-                         "-Werror", "-c", str(root / "tests/compiler-support/c-external-prototypes.c"),
+                         "-Werror", "-c", str(root / "tests/compiler-support" / ("c-" + name + ".c")),
                          "-o", str(observer)], cwd=working, text=True, capture_output=True,
                         timeout=60, check=False)
                     if built.returncode:

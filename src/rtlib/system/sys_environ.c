@@ -12,10 +12,13 @@ static int hSetEnviron( const char *text )
 {
 #ifdef HOST_DOS
 	char *copy;
-	ssize_t len;
+	size_t len;
 	int res;
 
-	len = strlen( text ) + 1;
+	len = strlen( text );
+	if( len == SIZE_MAX )
+		return -1;
+	++len;
 	copy = (char *)malloc( len );
 	if( copy == NULL )
 		return -1;
@@ -35,15 +38,17 @@ static int hSetEnviron( const char *text )
 #else
 	const char *equals;
 	char *name;
-	ssize_t name_len;
+	size_t name_len;
 	int res;
 
 	equals = strchr( text, '=' );
 	if( equals == NULL )
 		return unsetenv( text );
 
-	name_len = equals - text;
-	if( name_len <= 0 )
+	name_len = (size_t)(equals - text);
+	if( name_len == 0 )
+		return -1;
+	if( name_len == SIZE_MAX )
 		return -1;
 
 	name = (char *)malloc( name_len + 1 );
@@ -65,7 +70,7 @@ FBCALL FBSTRING_ACCESS *fb_GetEnviron ( FBSTRING_ACCESS *varname )
 {
 	FBSTRING_ACCESS 	*dst;
 	char 		*tmp;
-	ssize_t len;
+	size_t len;
 
 	if( (varname != NULL) && (varname->data != NULL) )
 		tmp = getenv( varname->data );
@@ -77,13 +82,15 @@ FBCALL FBSTRING_ACCESS *fb_GetEnviron ( FBSTRING_ACCESS *varname )
 	if( tmp != NULL )
 	{
         len = strlen( tmp );
-        dst = fb_hStrAllocTemp_NoLock( NULL, len );
-		if( dst != NULL )
-		{
-			fb_hStrCopy( dst->data, tmp, len );
-		}
-		else
+		if( len > (size_t)FB_STRSIZEMSK )
 			dst = &fb_ctx.null_desc;
+		else {
+			dst = fb_hStrAllocTemp_NoLock( NULL, (ssize_t)len );
+			if( dst != NULL )
+				fb_hStrCopy( dst->data, tmp, (ssize_t)len );
+			else
+				dst = &fb_ctx.null_desc;
+		}
 	}
 	else
 		dst = &fb_ctx.null_desc;

@@ -12,19 +12,29 @@ FBCALL int fb_InputSingle( float *dst )
     char buffer[FB_INPUT_MAXNUMERICLEN+1];
 	ssize_t len;
 	int isfp;
+	long long parsed_value;
 
 	len = fb_FileInputNextToken( buffer, FB_INPUT_MAXNUMERICLEN, FB_FALSE, &isfp );
 
 	if( isfp == FALSE )
 	{
 		if( len <= FB_INPUT_MAXINTLEN )
-			*dst = (float)fb_hStr2Int( buffer, len );
+		{
+			parsed_value = fb_hStr2Int( buffer, len );
+			*dst = (float)parsed_value;
+		}
 		else if( len <= FB_INPUT_MAXLONGLEN )
-			*dst = (float)fb_hStr2Longint( buffer, len );
+		{
+			parsed_value = fb_hStr2Longint( buffer, len );
+			*dst = (float)parsed_value;
+		}
 		else
 		{
 			if( buffer[0] == '&' )
-				*dst = (float)fb_hStr2Longint( buffer, len );
+			{
+				parsed_value = fb_hStr2Longint( buffer, len );
+				*dst = (float)parsed_value;
+			}
 			else
 				*dst = strtof( buffer, NULL );
 		}
@@ -40,19 +50,29 @@ FBCALL int fb_InputDouble( double *dst )
     char buffer[FB_INPUT_MAXNUMERICLEN+1];
 	ssize_t len;
 	int isfp;
+	long long parsed_value;
 
 	len = fb_FileInputNextToken( buffer, FB_INPUT_MAXNUMERICLEN, FB_FALSE, &isfp );
 
 	if( isfp == FALSE )
 	{
 		if( len <= FB_INPUT_MAXINTLEN )
-			*dst = (double)fb_hStr2Int( buffer, len );
+		{
+			parsed_value = fb_hStr2Int( buffer, len );
+			*dst = (double)parsed_value;
+		}
 		else if( len <= FB_INPUT_MAXLONGLEN )
-			*dst = (double)fb_hStr2Longint( buffer, len );
+		{
+			parsed_value = fb_hStr2Longint( buffer, len );
+			*dst = (double)parsed_value;
+		}
 		else
 		{
 			if( buffer[0] == '&' )
-				*dst = (double)fb_hStr2Longint( buffer, len );
+			{
+				parsed_value = fb_hStr2Longint( buffer, len );
+				*dst = (double)parsed_value;
+			}
 			else
 				*dst = strtod( buffer, NULL );
 		}

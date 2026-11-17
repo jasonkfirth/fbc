@@ -35,11 +35,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include "extended_math.h"
-#if defined(__AROS__) || defined(__HAIKU__) || \
+#if defined(__AROS__) || defined(__HAIKU__) || defined(HOST_XBOX) || \
 	(defined(__MINGW32__) && !defined(_UCRT) && !defined(_WIN32_WCE))
 #define FB_LONGDOUBLE_LOCAL_PARSER
 #include "longdouble_parse.h"
 #endif
+
+/* CLongDouble comparisons implement exact language equality semantics. */
+static int longdouble_equal(long double left, long double right)
+{
+	return (left <= right) && (left >= right);
+}
 
 enum {
 	FB_LONGDOUBLE_BOP_ADD = 1,
@@ -137,8 +143,8 @@ int fb_LongDoubleCompare(const void *lhs, const void *rhs, int operation,
 	long double right = longdouble_load(rhs, storage_size);
 
 	switch (operation) {
-	case FB_LONGDOUBLE_CMP_EQ: return left == right;
-	case FB_LONGDOUBLE_CMP_NE: return left != right;
+	case FB_LONGDOUBLE_CMP_EQ: return longdouble_equal(left, right);
+	case FB_LONGDOUBLE_CMP_NE: return !longdouble_equal(left, right);
 	case FB_LONGDOUBLE_CMP_GT: return left > right;
 	case FB_LONGDOUBLE_CMP_LT: return left < right;
 	case FB_LONGDOUBLE_CMP_LE: return left <= right;
@@ -172,8 +178,9 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 
 	if (text == NULL) abort();
 #ifdef FB_LONGDOUBLE_LOCAL_PARSER
-	/* AROS and Haiku narrow strtold through double. Legacy MinGW/MSVCRT cannot
-	 * isolate its numeric locale with UCRT's thread-locale API. The local
+	/* AROS and Haiku narrow strtold through double. nxdk has no locale-taking
+	 * conversion API, and legacy MinGW/MSVCRT cannot isolate its numeric locale
+	 * with UCRT's thread-locale API. The local
 	 * parser keeps native precision without reading or changing locale state. */
 	size_t consumed;
 	value = fb_hParseLongDouble(text, &consumed);

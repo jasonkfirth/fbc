@@ -34,7 +34,7 @@ static void hStrSetEx
 		{
 			padlen = dlen - slen;
 			if( padlen > 0 )
-				memset( dst_ptr, 32, padlen );
+				memset( dst_ptr, 32, (size_t)padlen );
 			else
 				padlen = 0;
 		}
@@ -54,7 +54,7 @@ static void hStrSetEx
 		{
 			padlen = dlen - slen;
 			if( padlen > 0 )
-				memset( dst_ptr + slen, 32, padlen );
+				memset( dst_ptr + slen, 32, (size_t)padlen );
 		}
 
 		if( dst_is_fixed == FB_FALSE )
@@ -108,7 +108,7 @@ FBCALL void fb_StrLset ( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src )
 			len = dlen - slen;
 			if( len > 0 )
 			{
-				memset( &dst->data[slen], 32, len );
+				memset( &dst->data[slen], 32, (size_t)len );
 
 				/* null char */
 				dst->data[slen+len] = '\0';
@@ -143,7 +143,7 @@ FBCALL void fb_StrLsetANA ( void *dst, ssize_t dst_size, FBSTRING_ACCESS *src )
 			len = dlen - slen;
 			if( len > 0 )
 			{
-				memset( dst_bytes + slen, 32, len );
+				memset( dst_bytes + slen, 32, (size_t)len );
 			}
 		}
 	}
@@ -165,7 +165,7 @@ FBCALL void fb_StrRset ( FBSTRING_ACCESS *dst, FBSTRING_ACCESS *src )
 		{
 			padlen = dlen - slen;
 			if( padlen > 0 )
-				memset( dst->data, 32, padlen );
+				memset( dst->data, 32, (size_t)padlen );
 			else
 				padlen = 0;
 
@@ -197,7 +197,7 @@ FBCALL void fb_StrRsetANA ( void *dst, ssize_t dst_size, FBSTRING_ACCESS *src )
 		{
 			padlen = dlen - slen;
 			if( padlen > 0 )
-				memset( dst, 32, padlen );
+				memset( dst, 32, (size_t)padlen );
 			else
 				padlen = 0;
 

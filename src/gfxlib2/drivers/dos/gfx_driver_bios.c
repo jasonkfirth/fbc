@@ -4,6 +4,7 @@
 #include "fb_gfx_dos.h"
 #include <go32.h>
 #include <pc.h>
+#include <stdint.h>
 
 typedef void (*fnUpdate)(void);
 
@@ -89,12 +90,31 @@ static const driver_depth_modes scr_modes[] = {
 
 static unsigned char uchScanLineBuffer[ 640 ];
 
+static unsigned int driver_code_size( fnUpdate start, fnUpdate end )
+{
+	uintptr_t start_addr = (uintptr_t)start;
+	uintptr_t end_addr = (uintptr_t)end;
+	uintptr_t code_size;
+
+	/* DJGPP function pointers are code offsets in the current code segment. */
+	if( end_addr < start_addr )
+		return 0;
+	code_size = end_addr - start_addr;
+	if( code_size > UINT_MAX )
+		return 0;
+	return (unsigned int)code_size;
+}
+
 static int driver_init(char *title, int w, int h, int depth, int refresh_rate, int flags)
 {
     int i;
     unsigned char uchNewMode;
     const driver_depth_modes *depth_modes = NULL;
     int iResCount, iFoundRes;
+
+    if( (fb_gfx == NULL) || (fb_gfx->scanline_size <= 0) ||
+        (w <= 0) || (w > SHRT_MAX) || (h <= 0) || (h > USHRT_MAX) )
+        return -1;
 
     fb_dos_detect();
 
@@ -133,7 +153,8 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
     fb_dos.regs.h.al = depth_modes->modes[ iFoundRes ];
     __dpmi_int(0x10, &fb_dos.regs);
 
-    _movedatab( _dos_ds, 0x449, _my_ds(), (int) &uchNewMode, 1 );
+    _movedatab( _dos_ds, 0x449, (unsigned int)_my_ds(),
+                (unsigned int)(uintptr_t)&uchNewMode, 1U );
     if( uchNewMode!=depth_modes->modes[ iFoundRes ] )
         return -1;
 
@@ -144,7 +165,7 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 
     fb_dos.bios_mode = depth_modes->modes[ iFoundRes ];
 	fb_dos.update = depth_modes->pfnUpdate;
-    fb_dos.update_len = (unsigned char*)end_of_driver_update - (unsigned char*)fb_dos.update;
+	fb_dos.update_len = driver_code_size( fb_dos.update, end_of_driver_update );
     if( fb_dos.bios_mode >= 0x11 ) {
         /* 16 or 256 colors out of 64*64*64 (262144) */
         fb_dos.set_palette = fb_dos_vga_set_palette;
@@ -162,15 +183,13 @@ static int driver_init(char *title, int w, int h, int depth, int refresh_rate, i
 
 static unsigned char fb_dos_ega_quantize(int component)
 {
-	int level;
-
-	level = (component + 10) / 21;
-	if (level < 0)
-		level = 0;
-	if (level > 3)
-		level = 3;
-
-	return (unsigned char)level;
+	if( component <= 10 )
+		return 0;
+	if( component <= 31 )
+		return 1;
+	if( component <= 52 )
+		return 2;
+	return 3;
 }
 
 static unsigned char fb_dos_ega_color(int r, int g, int b)
@@ -191,12 +210,20 @@ static unsigned char fb_dos_ega_color(int r, int g, int b)
 
 static void fb_dos_ega_set_palette(void)
 {
-	int i, color_count;
+	int i;
+	unsigned int color_count;
+	if( (fb_dos.depth < 1) || (fb_dos.depth > 4) ||
+	    (fb_dos.pal_first < 0) || (fb_dos.pal_first > 255) ||
+	    (fb_dos.pal_last < 0) || (fb_dos.pal_last > 255) )
+		return;
 
-	color_count = MIN( (1 << fb_dos.depth), fb_dos.pal_last + 1 );
-	color_count = MIN( color_count, 16 );
+	color_count = 1U << (unsigned int)fb_dos.depth;
+	if( color_count > (unsigned int)fb_dos.pal_last + 1U )
+		color_count = (unsigned int)fb_dos.pal_last + 1U;
+	if( color_count > 16U )
+		color_count = 16U;
 
-	for (i = fb_dos.pal_first; i < color_count; i++) {
+	for (i = fb_dos.pal_first; (unsigned int)i < color_count; i++) {
 		fb_dos.regs.x.ax = 0x1000;
 		fb_dos.regs.h.bl = (unsigned char)i;
 		fb_dos.regs.h.bh = fb_dos_ega_color(fb_dos.pal[i].r, fb_dos.pal[i].g, fb_dos.pal[i].b);
@@ -301,27 +328,27 @@ static void fb_dos_cga_set_palette(void)
 static void init_planar_access( void )
 {
     /* Write mask: Allow all bits */
-    outportb(0x3CE, 0x08);
-    outportb(0x3CF, 0xFF);
+    fb_gfx_dos_outportb(0x3CE, 0x08);
+    fb_gfx_dos_outportb(0x3CF, 0xFF);
 
     /* Write mode: 0 */
-    outportb(0x3CE, 0x05);
-    outportb(0x3CF, 0x00);
+    fb_gfx_dos_outportb(0x3CE, 0x05);
+    fb_gfx_dos_outportb(0x3CF, 0x00);
 
     /* Overwrite mode, no rotation */
-    outportb(0x3CE, 0x03);
-    outportb(0x3CF, 0x00);
+    fb_gfx_dos_outportb(0x3CE, 0x03);
+    fb_gfx_dos_outportb(0x3CF, 0x00);
 
     /* Enable write access for plane "plane" */
-    outportb(0x3C4, 0x02);
+    fb_gfx_dos_outportb(0x3C4, 0x02);
 }
 
 static void driver_update_planar_ega_vga( unsigned int planes )
 {
     /* EGA/VGA planar mode */
-    int y;
-    unsigned w = fb_dos.w, w8 = w >> 3, w32 = w >> 5;
-    unsigned char *buffer = (unsigned char *)fb_gfx->framebuffer;
+    unsigned int y;
+    unsigned int w, h, w8, w32;
+    unsigned char *buffer;
     unsigned screen_offset = 0xA0000;
     static const unsigned char vga_bitmap[8] = {
         128, 64, 32, 16, 8, 4, 2, 1
@@ -329,12 +356,28 @@ static void driver_update_planar_ega_vga( unsigned int planes )
     static const unsigned char bitmask[4] = {
         1, 2, 4, 8
     };
-    unsigned uiDestOffset[4] = { 0, w8, w8*2, w8*3 };
+    unsigned int uiDestOffset[4];
+
+    if( (fb_gfx == NULL) || (fb_gfx->framebuffer == NULL) ||
+        (fb_gfx->dirty == NULL) || (fb_dos.w <= 0) || (fb_dos.w > 640) ||
+        (fb_dos.h <= 0) || (fb_dos.w % 8 != 0) ||
+        (planes == 0) || (planes > 4) )
+        return;
+
+    w = (unsigned int)fb_dos.w;
+    h = (unsigned int)fb_dos.h;
+    w8 = w >> 3;
+    w32 = w >> 5;
+    buffer = fb_gfx->framebuffer;
+    uiDestOffset[0] = 0;
+    uiDestOffset[1] = w8;
+    uiDestOffset[2] = w8 * 2U;
+    uiDestOffset[3] = w8 * 3U;
 
     init_planar_access();
 
     for (y = 0;
-         y != fb_dos.h;
+         y != h;
          ++y)
     {
         if (fb_gfx->dirty[y]) {
@@ -359,12 +402,13 @@ static void driver_update_planar_ega_vga( unsigned int planes )
                 ++uiDestIndex;
             }
             for( plane=0; plane!=planes; ++plane ) {
-                outportb(0x3C5, bitmask[plane] ); /* Select plane */
-                _movedatal(_my_ds(),
-                           (int) uchScanLineBuffer + uiDestOffset[ plane ],
+                fb_gfx_dos_outportb(0x3C5, bitmask[plane] ); /* Select plane */
+                _movedatal((unsigned int)_my_ds(),
+                           (unsigned long)((uintptr_t)uchScanLineBuffer +
+                                           (uintptr_t)uiDestOffset[ plane ]),
                            _dos_ds,
                            screen_offset,
-                           w32);
+                           (unsigned long)w32);
             }
         }
         buffer += w;
@@ -374,15 +418,27 @@ static void driver_update_planar_ega_vga( unsigned int planes )
 
 static void driver_update_bpp1(void)
 {
+    unsigned int w, h, w4, w8, w32;
+    unsigned char *buffer;
+    if( (fb_gfx == NULL) || (fb_gfx->framebuffer == NULL) ||
+        (fb_gfx->dirty == NULL) || (fb_dos.w <= 0) || (fb_dos.w > 640) ||
+        (fb_dos.h <= 0) || (fb_dos.w % 32 != 0) )
+        return;
+    w = (unsigned int)fb_dos.w;
+    h = (unsigned int)fb_dos.h;
+    w4 = w >> 2;
+    w8 = w >> 3;
+    w32 = w >> 5;
+    buffer = fb_gfx->framebuffer;
+
     if( fb_dos.bios_mode==0x06 ) {
         /* CGA interlaced mode */
-        int y, w = fb_dos.w, w4 = w >> 2, w8 = w >> 3, w32 = w >> 5;
-        unsigned int *buffer = (unsigned int *)fb_gfx->framebuffer;
+        unsigned int y;
         unsigned int screen_even = 0xB8000;
         unsigned int screen_odd  = 0xBA000;
 
         for (y = 0;
-             y != fb_dos.h;
+             y != h;
              ++y)
         {
             unsigned int *pScreenOffset = ( ((y & 1)==0) ? &screen_even : &screen_odd );
@@ -391,7 +447,8 @@ static void driver_update_bpp1(void)
                 unsigned x = w4;
                 unsigned char uchDst = 0;
                 while( x-- ) {
-                    unsigned value = buffer[x];
+                    unsigned int value;
+                    memcpy( &value, buffer + (size_t)x * sizeof(value), sizeof(value) );
                     if( x & 1 ) {
                         uchDst = (unsigned char)
                             (
@@ -413,24 +470,23 @@ static void driver_update_bpp1(void)
                             );
                     }
                 }
-                _movedatal(_my_ds(), (int) uchScanLineBuffer,
+                _movedatal((unsigned int)_my_ds(), (unsigned long)(uintptr_t)uchScanLineBuffer,
                            _dos_ds, *pScreenOffset,
-                           w32);
+                           (unsigned long)w32);
             }
-            buffer += w4;
+            buffer += w;
             *pScreenOffset += w8;
         }
     } else {
         /* EGA/VGA linear mode */
-        int y, w = fb_dos.w, w4 = w >> 2, w8 = w >> 3, w32 = w >> 5;
-        unsigned int *buffer = (unsigned int *)fb_gfx->framebuffer;
+        unsigned int y;
         unsigned int screen_offset = 0xA0000;
 
         init_planar_access();
-        outportb(0x3C5, 0x0F); /* All planes */
+        fb_gfx_dos_outportb(0x3C5, 0x0F); /* All planes */
 
         for (y = 0;
-             y != fb_dos.h;
+             y != h;
              ++y)
         {
             if (fb_gfx->dirty[y]) {
@@ -438,7 +494,8 @@ static void driver_update_bpp1(void)
                 unsigned x = w4;
                 unsigned char uchDst = 0;
                 while( x-- ) {
-                    unsigned value = buffer[x];
+                    unsigned int value;
+                    memcpy( &value, buffer + (size_t)x * sizeof(value), sizeof(value) );
                     if( x & 1 ) {
                         uchDst = (unsigned char)
                             (
@@ -460,11 +517,11 @@ static void driver_update_bpp1(void)
                             );
                     }
                 }
-                _movedatal(_my_ds(), (int) uchScanLineBuffer,
+                _movedatal((unsigned int)_my_ds(), (unsigned long)(uintptr_t)uchScanLineBuffer,
                            _dos_ds, screen_offset,
-                           w32);
+                           (unsigned long)w32);
             }
-            buffer += w4;
+            buffer += w;
             screen_offset += w8;
         }
     }
@@ -472,20 +529,30 @@ static void driver_update_bpp1(void)
 
 static void driver_update_bpp2(void)
 {
-	int y, w = fb_dos.w, w4 = w >> 2, w16 = w >> 4;
-	unsigned int *buffer = (unsigned int *)fb_gfx->framebuffer;
+	unsigned int y, w, h, w4, w16;
+	unsigned char *buffer;
     unsigned int screen_even = 0xB8000;
     unsigned int screen_odd  = 0xBA000;
+	if( (fb_gfx == NULL) || (fb_gfx->framebuffer == NULL) ||
+	    (fb_gfx->dirty == NULL) || (fb_dos.w <= 0) || (fb_dos.w > 640) ||
+	    (fb_dos.h <= 0) || (fb_dos.w % 16 != 0) )
+		return;
+	w = (unsigned int)fb_dos.w;
+	h = (unsigned int)fb_dos.h;
+	w4 = w >> 2;
+	w16 = w >> 4;
+	buffer = fb_gfx->framebuffer;
 
     for (y = 0;
-         y != fb_dos.h;
+         y != h;
          ++y)
     {
         unsigned int *pScreenOffset = ( ((y & 1)==0) ? &screen_even : &screen_odd );
         if (fb_gfx->dirty[y]) {
             unsigned x = w4;
             while( x-- ) {
-                unsigned value = buffer[x];
+                unsigned int value;
+                memcpy( &value, buffer + (size_t)x * sizeof(value), sizeof(value) );
                 uchScanLineBuffer[x] = (unsigned char)
                     (
                      ((value & 0x03000000) >> 24) +
@@ -494,11 +561,11 @@ static void driver_update_bpp2(void)
                      ((value & 0x00000003) <<  6)
                     );
             }
-            _movedatal(_my_ds(), (int) uchScanLineBuffer,
+            _movedatal((unsigned int)_my_ds(), (unsigned long)(uintptr_t)uchScanLineBuffer,
                        _dos_ds, *pScreenOffset,
-                       w16);
+                       (unsigned long)w16);
         }
-        buffer += w4;
+        buffer += w;
         *pScreenOffset += w4;
     }
 }
@@ -516,6 +583,8 @@ static int *driver_fetch_modes(int depth, int *size)
     int i;
     const driver_depth_modes *depth_modes = NULL;
     int iResCount;
+    size_t allocation_size;
+    int *modes;
 #ifdef DEBUG
     int iModeCount;
 #endif
@@ -526,7 +595,7 @@ static int *driver_fetch_modes(int depth, int *size)
         }
     }
 
-    if (depth_modes == NULL)
+    if ((depth_modes == NULL) || (size == NULL))
         return NULL;
 
     iResCount = 0;
@@ -540,7 +609,14 @@ static int *driver_fetch_modes(int depth, int *size)
     DBG_ASSERT( iModeCount==iResCount );
 #endif
 
+	if( (iResCount <= 0) ||
+	    ((size_t)iResCount > (size_t)-1 / sizeof(int)) )
+		return NULL;
+	allocation_size = (size_t)iResCount * sizeof(int);
+	modes = (int *)malloc( allocation_size );
+	if( modes == NULL )
+		return NULL;
+	memcpy( modes, depth_modes->resolutions, allocation_size );
 	*size = iResCount;
-    return memcpy((void*)malloc(iResCount * sizeof( int )),
-                  depth_modes->resolutions, iResCount * sizeof( int ));
+	return modes;
 }

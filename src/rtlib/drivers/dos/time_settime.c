@@ -11,9 +11,13 @@
 int fb_hSetTime( int h, int m, int s )
 {
 	struct time t;
-	t.ti_hour = h;
-	t.ti_min = m;
-	t.ti_sec = s;
+
+	if( h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59 )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	t.ti_hour = (unsigned char)h;
+	t.ti_min = (unsigned char)m;
+	t.ti_sec = (unsigned char)s;
 	t.ti_hund = 0;
 	settime(&t);
 	return 0;

@@ -112,7 +112,7 @@ void fb_sfxTone(int channel, int frequency, float duration)
         "sfx_tone: channel=%d freq=%d dur=%f",
         channel,
         frequency,
-        duration
+        (double)duration
     );
 }
 

@@ -167,7 +167,10 @@ static float fb_sfxWaveSaw(FB_SFXVOICE *v)
 
 static float fb_sfxWaveRandomNoise(void)
 {
-    return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+    int random_value;
+
+    random_value = rand();
+    return ((float)random_value / (float)RAND_MAX) * 2.0f - 1.0f;
 }
 
 static float fb_sfxWaveNoise(FB_SFXVOICE *v)

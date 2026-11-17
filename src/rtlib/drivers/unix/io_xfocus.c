@@ -6,12 +6,14 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include "../../fb.h"
+#include "../../fb_private_xfocus.h"
 
 #ifndef DISABLE_X11
 #include "../../fb_private_hdynload.h"
 #include <X11/Xlib.h>
+#include <limits.h>
 
-typedef Display *(*XOPENDISPLAY)(char *);
+typedef Display *(*XOPENDISPLAY)(const char *);
 typedef int (*XCLOSEDISPLAY)(Display *);
 typedef int (*XGETINPUTFOCUS)(Display *, Window *, int *);
 
@@ -21,7 +23,9 @@ typedef struct {
 	XGETINPUTFOCUS GetInputFocus;
 } X_FUNCS;
 
-static int ref_count = 0;
+/* Keyboard and mouse retain balanced attempts under the background lock.
+   A failed attempt keeps its reference so either owner may release first. */
+static unsigned int ref_count = 0;
 static FB_DYLIB xlib;
 static X_FUNCS X = { NULL, NULL, NULL };
 static Display *display;
@@ -34,8 +38,10 @@ int fb_hXTermInitFocus(void)
 	const char *const funcs[] = { "XOpenDisplay", "XCloseDisplay", "XGetInputFocus", NULL };
 	int dummy;
 
-	ref_count++;
-	if (ref_count > 1)
+	if (ref_count == UINT_MAX)
+		return -1;
+	++ref_count;
+	if (display != NULL)
 		return 0;
 
 	xlib = fb_hDynLoad("libX11.so", funcs, (void **)&X);
@@ -43,8 +49,11 @@ int fb_hXTermInitFocus(void)
 		return -1;
 
 	display = X.OpenDisplay(NULL);
-	if (!display)
+	if (!display) {
+		fb_hDynUnload(&xlib);
+		X = (X_FUNCS){ NULL, NULL, NULL };
 		return -1;
+	}
 
 	X.GetInputFocus(display, &xterm_window, &dummy);
 #endif
@@ -54,11 +63,18 @@ int fb_hXTermInitFocus(void)
 void fb_hXTermExitFocus(void)
 {
 #ifndef DISABLE_X11
-	ref_count--;
-	if (ref_count > 0)
+	if (ref_count == 0)
 		return;
-	X.CloseDisplay(display);
-	fb_hDynUnload(&xlib);
+	--ref_count;
+	if (ref_count != 0)
+		return;
+	if (display != NULL) {
+		X.CloseDisplay(display);
+		display = NULL;
+	}
+	if (xlib != NULL)
+		fb_hDynUnload(&xlib);
+	X = (X_FUNCS){ NULL, NULL, NULL };
 #endif
 }
 
@@ -67,6 +83,9 @@ int fb_hXTermHasFocus(void)
 #ifndef DISABLE_X11
 	Window focus_window;
 	int dummy;
+
+	if (display == NULL)
+		return FALSE;
 
 	X.GetInputFocus(display, &focus_window, &dummy);
 

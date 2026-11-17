@@ -337,6 +337,35 @@ void fb_sfxVoiceStopType(int voice_type)
     fb_sfxVoiceStopTypeChannel(voice_type, -1);
 }
 
+/*
+    MIDI note-off differs from a transport stop: preserve oscillator phase and
+    enter the instrument's release envelope instead of removing a nonzero
+    sample abruptly. Channel ownership remains with the caller; a subsequent
+    voice steal may still use the existing immediate stop operation.
+
+    This exported helper owns its runtime lock and never exposes voice pointers
+    or private layouts to applications. Repeated note-off is idempotent.
+*/
+void fb_sfxGeneratedReleaseChannel(int channel)
+{
+    int i;
+
+    fb_sfxRuntimeLock();
+    if (fb_sfx_context && channel >= 0 && channel < FB_SFX_MAX_CHANNELS)
+    {
+        for (i = 0; i < FB_SFX_MAX_VOICES; ++i)
+        {
+            FB_SFXVOICE *voice = &fb_sfx_context->voices[i];
+            if (voice->active && voice->channel == channel &&
+                (voice->type == FB_SFX_VOICE_SOUND ||
+                 voice->type == FB_SFX_VOICE_NOISE) &&
+                voice->env_state != FB_SFX_ENV_RELEASE)
+                fb_sfxEnvelopeRelease(voice);
+        }
+    }
+    fb_sfxRuntimeUnlock();
+}
+
 void fb_sfxVoiceStopTypeChannel(int voice_type, int channel)
 {
     int i;

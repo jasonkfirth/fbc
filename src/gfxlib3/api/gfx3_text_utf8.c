@@ -9,7 +9,9 @@
 /* Both renderers expose the same bitmap and packed-pattern C ABI. Compile
    the small common adapters against this library's implementations so their
    Unicode semantics and temporary ownership cannot drift apart. */
+// NOLINTNEXTLINE(bugprone-suspicious-include)
 #include "../../gfxlib2/text/gfx_drawstring_utf8.c"
+// NOLINTNEXTLINE(bugprone-suspicious-include)
 #include "../../gfxlib2/text/gfx_pattern_utf8.c"
 
 /* end of gfx3_text_utf8.c */

@@ -33,6 +33,14 @@
 
 static int surface_is_valid(const FB_GFX3_SURFACE *surface);
 
+static int context_glyph_extent_fits(int32_t origin, uint32_t extent,
+	uint32_t maximum_extent)
+{
+	if ((extent == 0u) || (extent > maximum_extent))
+		return 0;
+	return origin <= INT32_MAX - (int32_t)(extent - 1u);
+}
+
 static void context_mark_visible_modified(FB_GFX3_CONTEXT *context,
 	FB_GFX3_HANDLE target)
 {
@@ -134,7 +142,7 @@ static int context_flush_lines_locked(FB_GFX3_CONTEXT *context)
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = context->pending_line_target;
-	payload = (FB_GFX3_LINES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_LINES_COMMAND);
 	payload->count = (uint32_t)context->pending_line_count;
 	memset(payload->reserved, 0, sizeof(payload->reserved));
 	memcpy(payload->line, context->pending_lines, line_bytes);
@@ -181,7 +189,7 @@ static int context_flush_rectangles_locked(FB_GFX3_CONTEXT *context)
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = context->pending_rectangle_target;
-	payload = (FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_RECTANGLES_COMMAND);
 	payload->count = (uint32_t)context->pending_rectangle_count;
 	memset(payload->reserved, 0, sizeof(payload->reserved));
 	memcpy(payload->rectangle, context->pending_rectangles, rectangle_bytes);
@@ -265,7 +273,7 @@ static int context_flush_blits_locked(FB_GFX3_CONTEXT *context)
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = context->pending_blit_target;
-	payload = (FB_GFX3_BLITS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_BLITS_COMMAND);
 	payload->source = context->pending_blits[0].source;
 	payload->mode = context->pending_blits[0].mode;
 	payload->alpha = context->pending_blits[0].alpha;
@@ -309,7 +317,7 @@ static int context_flush_glyphs_locked(FB_GFX3_CONTEXT *context)
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = context->pending_glyph_target;
-	payload = (FB_GFX3_GLYPHS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_GLYPHS_COMMAND);
 	payload->clip = context->pending_glyph_clip;
 	payload->count = (uint32_t)context->pending_glyph_count;
 	memset(payload->reserved, 0, sizeof(payload->reserved));
@@ -564,14 +572,10 @@ static int context_stage_glyphs(FB_GFX3_SURFACE *surface,
 	      FB_GFX3_FEATURE_PACKED_GLYPHS) == 0u))
 		return FB_GFX3_UNSUPPORTED;
 	for (index = 0u; index < count; ++index) {
-		int64_t last_x = (int64_t)glyphs[index].x +
-			(int64_t)glyphs[index].width - 1;
-		int64_t last_y = (int64_t)glyphs[index].y +
-			(int64_t)glyphs[index].height - 1;
-
-		if ((glyphs[index].width == 0u) || (glyphs[index].width > 8u) ||
-		    (glyphs[index].height == 0u) || (glyphs[index].height > 16u) ||
-		    (last_x > INT32_MAX) || (last_y > INT32_MAX) ||
+		if (!context_glyph_extent_fits(glyphs[index].x,
+			glyphs[index].width, 8u) ||
+		    !context_glyph_extent_fits(glyphs[index].y,
+			glyphs[index].height, 16u) ||
 		    ((glyphs[index].flags &
 		      ~(uint32_t)FB_GFX3_GLYPH_BACKGROUND) != 0u))
 			return FB_GFX3_INVALID;
@@ -1070,7 +1074,7 @@ int fb_gfx3_context_set_palette(FB_GFX3_CONTEXT *context,
 		sizeof(*payload));
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
-	payload = (FB_GFX3_PALETTE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_PALETTE_COMMAND);
 	memcpy(payload->color, palette, sizeof(payload->color));
 	return context_submit(context, command, FALSE, NULL);
 }
@@ -1093,7 +1097,7 @@ int fb_gfx3_context_set_window_title(FB_GFX3_CONTEXT *context,
 		payload_size);
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
-	payload = (FB_GFX3_WINDOW_TITLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_WINDOW_TITLE_COMMAND);
 	payload->length = (uint32_t)length;
 	payload->reserved = 0;
 	memcpy(payload->title, title, length);
@@ -1114,7 +1118,7 @@ int fb_gfx3_context_run_interop_callback(FB_GFX3_CONTEXT *context,
 		sizeof(*payload));
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
-	payload = (FB_GFX3_INTEROP_CALLBACK_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_INTEROP_CALLBACK_COMMAND);
 	payload->callback = (uintptr_t)callback;
 	payload->user_data = (uintptr_t)user_data;
 	return context_submit(context, command, TRUE, NULL);
@@ -1167,7 +1171,7 @@ int fb_gfx3_surface_create(FB_GFX3_CONTEXT *context,
 		sizeof(*payload));
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
-	payload = (FB_GFX3_SURFACE_CREATE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_SURFACE_CREATE_COMMAND);
 	payload->width = width;
 	payload->height = height;
 	payload->depth = depth;
@@ -1218,7 +1222,7 @@ int fb_gfx3_surface_set_visible(FB_GFX3_SURFACE *surface)
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_PAGE_SET_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_PAGE_SET_COMMAND);
 	payload->width = surface->width;
 	payload->height = surface->height;
 	payload->depth = surface->depth;
@@ -1368,7 +1372,7 @@ int fb_gfx3_surface_upload(FB_GFX3_SURFACE *surface, int x, int y,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_SURFACE_UPLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_SURFACE_UPLOAD_COMMAND);
 	payload->destination_x = x;
 	payload->destination_y = y;
 	payload->width = width;
@@ -1407,7 +1411,7 @@ int fb_gfx3_surface_download(FB_GFX3_SURFACE *surface, int x, int y,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_SURFACE_DOWNLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_SURFACE_DOWNLOAD_COMMAND);
 	payload->source_x = x;
 	payload->source_y = y;
 	payload->width = width;
@@ -1437,7 +1441,7 @@ int fb_gfx3_surface_clear(FB_GFX3_SURFACE *surface,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_CLEAR_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_CLEAR_COMMAND);
 	payload->clip = *clip;
 	payload->color = color;
 	payload->flags = flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND;
@@ -1468,7 +1472,7 @@ int fb_gfx3_surface_points(FB_GFX3_SURFACE *surface,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_POINTS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_POINTS_COMMAND);
 	payload->clip = *clip;
 	payload->count = count;
 	memcpy(payload->point, points, points_size);
@@ -1554,7 +1558,7 @@ staged_done:
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_LINE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_LINE_COMMAND);
 	payload->clip = *clip;
 	payload->x1 = x1;
 	payload->y1 = y1;
@@ -1613,14 +1617,14 @@ int fb_gfx3_surface_lines_graphics_locked(FB_GFX3_SURFACE *surface,
 	for (index = 0u; index < count; index++) {
 		if ((lines[index].clip.x1 > lines[index].clip.x2) ||
 		    (lines[index].clip.y1 > lines[index].clip.y2) ||
-		    ((lines[index].flags & ~FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u))
+		    ((lines[index].flags & ~(uint32_t)FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u))
 			return FB_GFX3_INVALID;
 	}
 	command = fb_gfx3_command_create(FB_GFX3_COMMAND_LINES, payload_size);
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_LINES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_LINES_COMMAND);
 	payload->count = count;
 	memset(payload->reserved, 0, sizeof(payload->reserved));
 	memcpy(payload->line, lines, line_bytes);
@@ -1668,7 +1672,7 @@ static int context_surface_rectangle(FB_GFX3_SURFACE *surface,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_RECTANGLE_COMMAND);
 	payload->clip = *clip;
 	payload->x1 = x1;
 	payload->y1 = y1;
@@ -1737,7 +1741,7 @@ static int context_surface_ellipse(FB_GFX3_SURFACE *surface,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_ELLIPSE_COMMAND);
 	payload->clip = *clip;
 	payload->center_x = center_x;
 	payload->center_y = center_y;
@@ -1794,7 +1798,7 @@ int fb_gfx3_surface_paint(FB_GFX3_SURFACE *surface,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_PAINT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_PAINT_COMMAND);
 	payload->clip = *clip;
 	payload->x = x;
 	payload->y = y;
@@ -1852,7 +1856,7 @@ static int context_surface_blit(FB_GFX3_SURFACE *destination,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = destination->handle;
-	payload = (FB_GFX3_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_BLIT_COMMAND);
 	payload->source = source->handle;
 	payload->clip = *clip;
 	payload->source_rect = *source_rect;
@@ -1912,7 +1916,7 @@ int fb_gfx3_surface_transform_blit(FB_GFX3_SURFACE *destination,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = destination->handle;
-	payload = (FB_GFX3_TRANSFORM_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	payload->source = source->handle;
 	payload->clip = *clip;
 	payload->source_rect = *source_rect;
@@ -1942,7 +1946,7 @@ int fb_gfx3_surface_read_pixel(FB_GFX3_SURFACE *surface, int x, int y,
 	if (command == NULL)
 		return FB_GFX3_OUT_OF_MEMORY;
 	command->target = surface->handle;
-	payload = (FB_GFX3_READ_PIXEL_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, FB_GFX3_READ_PIXEL_COMMAND);
 	payload->x = x;
 	payload->y = y;
 	result = context_submit(surface->context, command, TRUE, &value);

@@ -33,17 +33,25 @@ FBCALL FB_WCHAR *fb_FileWstrInput( ssize_t chars, int fnum )
 		{
 			while( read_chars != chars )
 			{
+				size_t remaining = (size_t)(chars - read_chars);
 				res = fb_FileGetDataEx( handle,
 					0,
 					(void *)&dst[read_chars],
-					chars - read_chars,
+					remaining,
 					&len,
 					TRUE,
 					TRUE );
 				if( res != FB_RTERROR_OK )
 					break;
 
-				read_chars += len;
+				if( len > remaining ) {
+					res = FB_RTERROR_FILEIO;
+					break;
+				}
+				if( len == 0 )
+					break;
+
+				read_chars += (ssize_t)len;
 			}
 		}
 		else
@@ -51,11 +59,16 @@ FBCALL FB_WCHAR *fb_FileWstrInput( ssize_t chars, int fnum )
 			res = fb_FileGetDataEx( handle,
 				0,
 				(void *)dst,
-				chars,
+				(size_t)chars,
 				&len,
 				TRUE,
 				TRUE );
-			read_chars = chars;
+			if( res == FB_RTERROR_OK ) {
+				if( len > (size_t)chars )
+					res = FB_RTERROR_FILEIO;
+				else
+					read_chars = (ssize_t)len;
+			}
 		}
 
 		if( res == FB_RTERROR_OK )

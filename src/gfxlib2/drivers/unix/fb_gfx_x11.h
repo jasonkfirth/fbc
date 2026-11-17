@@ -21,6 +21,7 @@
 #include <X11/extensions/XShm.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/extensions/shape.h>
+#include <limits.h>
 
 #define DOUBLE_CLICK_TIME		250
 
@@ -29,6 +30,10 @@ typedef struct X11DRIVER
 	Display *display;
 	Visual *visual;
 	int screen;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Preserve the window handle's original aligned offset. */
+	unsigned char window_alignment_padding[4];
+#endif
 	Window window;
 	Window wmwindow;
 	Window fswindow;
@@ -43,7 +48,25 @@ typedef struct X11DRIVER
 	void (*exit)(void);
 	void (*update)(void);
 	int mouse_clip;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the four-byte tail gap without changing the driver state size. */
+	unsigned char tail_alignment_padding[4];
+#endif
 } X11DRIVER;
+
+/* Xlib uses unsigned dimensions; reject invalid geometry before conversion. */
+static __inline__ unsigned int fb_hX11Dimension(int value)
+{
+	return (value > 0) ? (unsigned int)value : 0u;
+}
+
+/* Avoid signed overflow when scaling a framebuffer extent for Xlib. */
+static __inline__ unsigned int fb_hX11ScaledDimension(int value, int scale)
+{
+	if ((value <= 0) || (scale <= 0) || (value > INT_MAX / scale))
+		return 0u;
+	return (unsigned int)(value * scale);
+}
 
 
 extern X11DRIVER fb_x11;

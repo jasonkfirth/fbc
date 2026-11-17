@@ -42,8 +42,12 @@ FBCALL void fb_GfxScreenInfo
 
 	if (fb_hStrDelTemp(driver)) {
 		name_len = strlen(name);
-		fb_hStrRealloc(driver, name_len, FB_FALSE);
-		memcpy(driver->data, name, name_len + 1);
+		if (name_len > (size_t)FB_STRSIZEMSK) {
+			name = "";
+			name_len = 0;
+		}
+		if (fb_hStrRealloc(driver, (ssize_t)name_len, FB_FALSE) != NULL)
+			memcpy(driver->data, name, name_len + 1);
 	}
 
 	FB_GRAPHICS_UNLOCK( );

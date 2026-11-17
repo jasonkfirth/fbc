@@ -111,10 +111,10 @@ static int32 fb_haiku_event_thread_func(void *userdata)
     fb_hHaikuUnlockState();
 
     BRect frame(
-        100,
-        100,
-        100 + fb_haiku.width  - 1,
-        100 + fb_haiku.height - 1
+        100.0f,
+        100.0f,
+        static_cast<float>(100 + fb_haiku.width  - 1),
+        static_cast<float>(100 + fb_haiku.height - 1)
     );
 
     if (fb_haiku.flags & DRIVER_FULLSCREEN)

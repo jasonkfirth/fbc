@@ -90,13 +90,6 @@ const char *fb_hWaylandAppId(char *buffer, size_t capacity, const char *fallback
 	return fallback;
 }
 
-extern void fb_hWaylandInitXdgProtocol(const struct wl_interface *output,
-	const struct wl_interface *seat, const struct wl_interface *surface);
-extern void fb_hWaylandInitTextInputProtocol(const struct wl_interface *seat,
-	const struct wl_interface *surface);
-extern void fb_hWaylandInitTextInputV2Protocol(const struct wl_interface *seat,
-	const struct wl_interface *surface);
-
 static void fb_wayland_load_optional(const char *name, void **address)
 {
 	const char *const names[] = { name };
@@ -105,6 +98,10 @@ static void fb_wayland_load_optional(const char *name, void **address)
 	if (fb_hDynLoadAlso(fb_wayland_library, names, &symbol, 1) == 0)
 		*address = symbol;
 }
+
+/* POSIX defines dlsym's function-symbol conversion; scope GCC's extension. */
+#define FB_WAYLAND_ASSIGN_FUNCTION_POINTER(destination, address) \
+	__extension__ ((destination) = (__typeof__(destination))(address))
 
 int fb_hWaylandGetApi(const FB_WAYLAND_API **api)
 {
@@ -120,12 +117,12 @@ int fb_hWaylandGetApi(const FB_WAYLAND_API **api)
 		fb_wayland_library = fb_hDynLoad("libwayland-client.so.0",
 			fb_wayland_function_names, symbols);
 		if (fb_wayland_library) {
-			fb_wayland_api.display_connect =
-				(struct wl_display *(*)(const char *))symbols[0];
-			fb_wayland_api.display_disconnect =
-				(void (*)(struct wl_display *))symbols[1];
-			fb_wayland_api.display_roundtrip =
-				(int (*)(struct wl_display *))symbols[2];
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_connect,
+				symbols[0]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_disconnect,
+				symbols[1]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_roundtrip,
+				symbols[2]);
 			fb_wayland_load_optional("wl_display_dispatch_pending",
 				&optional_symbols[0]);
 			fb_wayland_load_optional("wl_display_get_fd",
@@ -140,29 +137,28 @@ int fb_hWaylandGetApi(const FB_WAYLAND_API **api)
 				&optional_symbols[5]);
 			fb_wayland_load_optional("wl_proxy_marshal",
 				&optional_symbols[6]);
-			fb_wayland_api.display_dispatch_pending =
-				(int (*)(struct wl_display *))optional_symbols[0];
-			fb_wayland_api.display_get_fd =
-				(int (*)(struct wl_display *))optional_symbols[1];
-			fb_wayland_api.display_flush =
-				(int (*)(struct wl_display *))optional_symbols[2];
-			fb_wayland_api.display_prepare_read =
-				(int (*)(struct wl_display *))optional_symbols[3];
-			fb_wayland_api.display_read_events =
-				(int (*)(struct wl_display *))optional_symbols[4];
-			fb_wayland_api.display_cancel_read =
-				(void (*)(struct wl_display *))optional_symbols[5];
-			fb_wayland_api.proxy_marshal =
-				(void (*)(struct wl_proxy *, uint32_t, ...))optional_symbols[6];
-			fb_wayland_api.proxy_marshal_constructor_versioned =
-				(struct wl_proxy *(*)(struct wl_proxy *, uint32_t,
-					const struct wl_interface *, uint32_t, ...))symbols[3];
-			fb_wayland_api.proxy_get_version =
-				(uint32_t (*)(struct wl_proxy *))symbols[4];
-			fb_wayland_api.proxy_add_listener =
-				(int (*)(struct wl_proxy *, void (**)(void), void *))symbols[5];
-			fb_wayland_api.proxy_destroy =
-				(void (*)(struct wl_proxy *))symbols[6];
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_dispatch_pending,
+				optional_symbols[0]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_get_fd,
+				optional_symbols[1]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_flush,
+				optional_symbols[2]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_prepare_read,
+				optional_symbols[3]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_read_events,
+				optional_symbols[4]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.display_cancel_read,
+				optional_symbols[5]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.proxy_marshal,
+				optional_symbols[6]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(
+				fb_wayland_api.proxy_marshal_constructor_versioned, symbols[3]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.proxy_get_version,
+				symbols[4]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.proxy_add_listener,
+				symbols[5]);
+			FB_WAYLAND_ASSIGN_FUNCTION_POINTER(fb_wayland_api.proxy_destroy,
+				symbols[6]);
 			fb_wayland_loader_result = 0;
 		}
 	}
@@ -171,6 +167,8 @@ int fb_hWaylandGetApi(const FB_WAYLAND_API **api)
 	pthread_mutex_unlock(&fb_wayland_loader_mutex);
 	return fb_wayland_loader_result;
 }
+
+#undef FB_WAYLAND_ASSIGN_FUNCTION_POINTER
 
 int fb_hWaylandLoadSymbols(const char *const *names, void **addresses,
 	size_t count)

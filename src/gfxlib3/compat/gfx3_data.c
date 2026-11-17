@@ -45,6 +45,7 @@ enum {
 typedef struct FB_GFX3_LZW_ENTRY {
 	uint16_t prefix;
 	uint8_t value;
+	uint8_t tail_padding;
 } FB_GFX3_LZW_ENTRY;
 
 static unsigned char decoded_data[DATA_SIZE];

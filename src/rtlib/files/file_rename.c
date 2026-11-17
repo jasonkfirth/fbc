@@ -7,6 +7,9 @@
 */
 
 #include "fb.h"
+#ifdef HOST_XBOX
+#include "drivers/xbox/file_path.h"
+#endif
 
 /* NAME uses the C calling convention and retains rename()'s 0/-1 result.
    Desktop Windows needs wide paths; other providers already receive UTF-8
@@ -24,6 +27,8 @@ int fb_FileRename( const char *oldname, const char *newname )
 	free(oldpath);
 	free(newpath);
 	return result;
+#elif defined(HOST_XBOX)
+	return fb_hRenameFile(oldname, newname);
 #else
 	return rename(oldname, newname);
 #endif

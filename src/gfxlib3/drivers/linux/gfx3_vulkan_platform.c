@@ -30,8 +30,14 @@
 
 typedef struct FB_GFX3_VK_XLIB_SURFACE_CREATE_INFO {
 	uint32_t structure_type;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t next_alignment_padding;
+#endif
 	const void *next;
 	uint32_t flags;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t display_alignment_padding;
+#endif
 	void *display;
 	unsigned long window;
 } FB_GFX3_VK_XLIB_SURFACE_CREATE_INFO;

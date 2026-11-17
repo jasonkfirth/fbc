@@ -15,6 +15,7 @@
 /* ascii to unicode string convertion function */
 
 #include "../../fb.h"
+#include <limits.h>
 
 /* dst_chars == room in dst buffer without null terminator. Thus, the dst buffer
    must be at least (dst_chars + 1) * sizeof(FB_WCHAR).
@@ -22,20 +23,26 @@
    result = number of chars written, excluding null terminator that is always written */
 ssize_t fb_wstr_ConvFromA(FB_WCHAR *dst, ssize_t dst_chars, const char *src)
 {
+	size_t source_chars, copy_chars, capacity;
+
+	if( dst == NULL || dst_chars < 0 )
+		return 0;
 	if (src == NULL) {
 		*dst = FB_WCHAR_LITERAL('\0');
 		return 0;
 	}
 
-	ssize_t chars = strlen(src);
-	if (chars > dst_chars) {
-		chars = dst_chars;
-	}
-	memcpy(dst, src, chars + 1);
+	capacity = (size_t)dst_chars;
+	source_chars = strlen(src);
+	copy_chars = source_chars;
+	if( copy_chars > capacity )
+		copy_chars = capacity;
+	if( copy_chars > 0 )
+		memcpy( dst, src, copy_chars );
 
 	/* ensure that the null terminator is written, string may have been truncated */
-	dst[chars] = '\0';
-	return chars;
+	dst[copy_chars] = '\0';
+	return (ssize_t)copy_chars;
 }
 
 FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
@@ -48,7 +55,12 @@ FBCALL FB_WCHAR *fb_StrToWstr( const char *src )
 
 	/* on DOS, mbstowcs() simply calls memcpy() and won't compute
 	length  see fb_unicode.h */
-	chars = strlen( src );
+	{
+		size_t source_chars = strlen( src );
+		if( source_chars > (size_t)LONG_MAX )
+			return NULL;
+		chars = (ssize_t)source_chars;
+	}
 	if( chars == 0 )
 		return NULL;
 

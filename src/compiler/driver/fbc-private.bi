@@ -65,6 +65,9 @@ type FBCIOFILE
 
 	'' Whether -o was used to override the default .o file name
 	is_custom_objfile   as integer
+
+	'' Preserve the emitted C stack requirement through stage-two compilation.
+	c_asm_no_red_zone   as integer
 end type
 
 type FBC_OBJINF

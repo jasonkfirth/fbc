@@ -28,6 +28,8 @@ fb_off_t fb_FileLocationEx( FB_FILE *handle )
             /* if in seq mode, divide by 128 (QB quirk) */
             pos /= 128;
             break;
+        default:
+            break;
         }
     }
 

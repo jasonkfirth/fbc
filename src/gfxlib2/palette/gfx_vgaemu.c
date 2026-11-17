@@ -9,7 +9,8 @@
 
 #include "../fb_gfx.h"
 
-static int idx = 0, shift = 2, color = 0;
+static int idx = 0, color = 0;
+static unsigned int shift = 2u;
 
 int fb_GfxIn(unsigned short port)
 {
@@ -27,9 +28,9 @@ int fb_GfxIn(unsigned short port)
 			if (fb_gfx->depth > 8)
 				break;
 			value = (fb_gfx->device_palette[idx] >> shift) & 0x3F;
-			shift += 8;
-			if (shift > 18) {
-				shift = 2;
+			shift += 8u;
+			if (shift > 18u) {
+				shift = 2u;
 				idx++;
 				idx &= (fb_gfx->default_palette->colors - 1);
 			}
@@ -39,6 +40,8 @@ int fb_GfxIn(unsigned short port)
 			if (fb_gfx->driver->wait_vsync)
 				fb_gfx->driver->wait_vsync();
 			value = 8;
+			break;
+		default:
 			break;
 	}
 
@@ -61,14 +64,14 @@ int fb_GfxOut(unsigned short port, unsigned char value)
 		case 0x3C7:
 		case 0x3C8:
 			idx = value & (fb_gfx->default_palette->colors - 1);
-			shift = 2;
+			shift = 2u;
 			color = 0;
 			break;
 
 		case 0x3C9:
 			color |= ((value & 0x3F) << shift);
-			shift += 8;
-			if (shift > 18) {
+			shift += 8u;
+			if (shift > 18u) {
 				if (fb_gfx->default_palette == &fb_palette[FB_PALETTE_256])
 					fb_GfxPalette(idx, (color >> 2) & 0x3F3F3F, -1, -1);
 				else {
@@ -76,18 +79,19 @@ int fb_GfxOut(unsigned short port, unsigned char value)
 					r = color & 0xFF;
 					g = (color >> 8) & 0xFF;
 					b = (color >> 16) & 0xFF;
-					fb_gfx->palette[idx] = color;
+					fb_gfx->palette[idx] = (unsigned int)color;
 					for (i = 0; i < (1 << fb_gfx->depth); i++) {
 						if (fb_gfx->color_association[i] == idx) {
-							fb_gfx->device_palette[i] = color;
+							fb_gfx->device_palette[i] = (unsigned int)color;
 							if (fb_gfx->driver->set_palette)
 								fb_gfx->driver->set_palette(i, r, g, b);
 						}
 					}
-					fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h);
+					if (fb_gfx->h > 0)
+						fb_hMemSet(fb_gfx->dirty, TRUE, (size_t)fb_gfx->h);
 					DRIVER_UNLOCK();
 				}
-				shift = 2;
+				shift = 2u;
 				color = 0;
 				idx++;
 				idx &= (fb_gfx->default_palette->colors - 1);

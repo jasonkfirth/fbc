@@ -28,7 +28,7 @@ static FB_WCHAR hReadChar( FB_INPUTCTX *ctx )
 		if( ctx->index >= FB_STRSIZE( &ctx->str ) )
 			return FB_WEOF;
 		else
-			return (unsigned char)ctx->str.data[ctx->index++];
+			return (FB_WCHAR)(unsigned char)ctx->str.data[ctx->index++];
 	}
 
 }

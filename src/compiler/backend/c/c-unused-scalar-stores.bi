@@ -172,9 +172,9 @@ private function hCScalarStoreCandidate(byval sym as FBSYMBOL ptr) as integer
 	if( symbIsStatic(sym) ) then
 		'' Persistent storage may disappear only when it has no lifetime,
 		'' explicit initializer, external identity or surviving value read.
-		'' Floating static stores retain their existing evaluation contract.
+		'' Scalar RHS evaluation uses the same typed value context as automatic
+		'' slots; static storage adds the initializer and escape checks below.
 		if( hCScalarStoreType(symbGetFullType(sym)) = FALSE ) then return FALSE
-		if( typeGetClass(symbGetFullType(sym)) <> FB_DATACLASS_INTEGER ) then return FALSE
 		if( symbGetArrayDimensions(sym) <> 0 ) then return (hCStaticArrayBacking(sym) = sym)
 		return hCStaticScalarCandidate(sym)
 	end if

@@ -261,6 +261,10 @@ private sub hCompileBas _
 		fbGetLibs( @fbc.finallibs, @fbc.finallibpaths )
 	end if
 
+	'' irEnd() clears backend options. Keep this module's native stack contract
+	'' before another source module or a parser restart reuses the IR context.
+	module->c_asm_no_red_zone = fbCAsmNeedsNoRedZone( )
+
 	'' Shutdown the parser
 	fbEnd( )
 
@@ -500,6 +504,12 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 	select case( fbGetOption( FB_COMPOPT_BACKEND ) )
 	case FB_BACKEND_GCC, FB_BACKEND_CLANG
 		dim as boolean ism64target = false
+
+		if( module->c_asm_no_red_zone ) then
+			'' Inline ASM may PUSH or CALL, including opaque and asm-goto
+			'' forms. Native temporaries must stay above the current RSP.
+			ln += "-mno-red-zone "
+		end if
 
 		if( fbGetOption( FB_COMPOPT_BACKEND ) = FB_BACKEND_CLANG ) then
 			ln += fbcDriverGetClangTargetOption( )

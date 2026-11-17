@@ -25,7 +25,11 @@ type CABIPROC
 	semantic_signature as longint
 end type
 
-private const C_ABI_C23_BEGIN = !"#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L\n"
+'' GCC 11 supports unnamed definitions in C2x with the draft date 202000L.
+'' Earlier C dialects retain the named definition and its diagnostics.
+private const C_ABI_C23_BEGIN = _
+	!"#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L || " + _
+	!"(__STDC_VERSION__ >= 202000L && defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 11))\n"
 private const C_ABI_C23_ELSE = !"\n#else\n"
 private const C_ABI_C23_END = !"\n#endif\n"
 

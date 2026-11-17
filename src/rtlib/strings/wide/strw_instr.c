@@ -10,7 +10,7 @@
 FBCALL ssize_t fb_WstrInstr( ssize_t start, const FB_WCHAR *src, const FB_WCHAR *patt )
 {
 	ssize_t r;
-	FB_WCHAR *p;
+	const FB_WCHAR *p;
 
 	if( (src == NULL) || (patt == NULL) )
 		return 0;

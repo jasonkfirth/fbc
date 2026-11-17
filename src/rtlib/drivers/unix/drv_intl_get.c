@@ -28,6 +28,8 @@ const char *fb_DrvIntlGet( eFbIntlIndex Index )
 	case eFIL_NumThousandsSeparator:
 		return nl_langinfo( THOUSEP );
 #endif
+	default:
+		break;
 	}
 	return NULL;
 }

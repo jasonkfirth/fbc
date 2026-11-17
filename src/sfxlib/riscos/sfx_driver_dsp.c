@@ -289,7 +289,7 @@ static int riscos_dspDeviceList(void)
 const FB_SFX_DRIVER fb_sfxDriverRiscosDsp =
 {
     "RISC OS DigitalRenderer",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     riscos_dspInit,
     riscos_dspExit,
     riscos_dspWrite,

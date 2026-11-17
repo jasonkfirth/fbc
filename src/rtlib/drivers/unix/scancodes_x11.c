@@ -13,115 +13,119 @@
 typedef struct KeysymToScancode {
 	KeySym keysym;
 	int scancode;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Keep the native KeySym-aligned table stride. */
+	unsigned char tail_padding[4];
+#endif
 } KeysymToScancode;
 
 static const KeysymToScancode keysym_to_scancode[] =
 {
-	{ XK_Escape      , SC_ESCAPE       },
-	{ XK_F1          , SC_F1           },
-	{ XK_F2          , SC_F2           },
-	{ XK_F3          , SC_F3           },
-	{ XK_F4          , SC_F4           },
-	{ XK_F5          , SC_F5           },
-	{ XK_F6          , SC_F6           },
-	{ XK_F7          , SC_F7           },
-	{ XK_F8          , SC_F8           },
-	{ XK_F9          , SC_F9           },
-	{ XK_F10         , SC_F10          },
-	{ XK_F11         , SC_F11          },
-	{ XK_F12         , SC_F12          },
-	{ XK_Scroll_Lock , SC_SCROLLLOCK   },
-	{ XK_grave       , SC_TILDE        },
-	{ XK_quoteleft   , SC_TILDE        },
-	{ XK_asciitilde  , SC_TILDE        },
-	{ XK_1           , SC_1            },
-	{ XK_2           , SC_2            },
-	{ XK_3           , SC_3            },
-	{ XK_4           , SC_4            },
-	{ XK_5           , SC_5            },
-	{ XK_6           , SC_6            },
-	{ XK_7           , SC_7            },
-	{ XK_8           , SC_8            },
-	{ XK_9           , SC_9            },
-	{ XK_0           , SC_0            },
-	{ XK_minus       , SC_MINUS        },
-	{ XK_equal       , SC_EQUALS       },
-	{ XK_backslash   , SC_BACKSLASH    },
-	{ XK_BackSpace   , SC_BACKSPACE    },
-	{ XK_Tab         , SC_TAB          },
-	{ XK_q           , SC_Q            },
-	{ XK_w           , SC_W            },
-	{ XK_e           , SC_E            },
-	{ XK_r           , SC_R            },
-	{ XK_t           , SC_T            },
-	{ XK_y           , SC_Y            },
-	{ XK_u           , SC_U            },
-	{ XK_i           , SC_I            },
-	{ XK_o           , SC_O            },
-	{ XK_p           , SC_P            },
-	{ XK_bracketleft , SC_LEFTBRACKET  },
-	{ XK_bracketright, SC_RIGHTBRACKET },
-	{ XK_Return      , SC_ENTER        },
-	{ XK_Caps_Lock   , SC_CAPSLOCK     },
-	{ XK_a           , SC_A            },
-	{ XK_s           , SC_S            },
-	{ XK_d           , SC_D            },
-	{ XK_f           , SC_F            },
-	{ XK_g           , SC_G            },
-	{ XK_h           , SC_H            },
-	{ XK_j           , SC_J            },
-	{ XK_k           , SC_K            },
-	{ XK_l           , SC_L            },
-	{ XK_semicolon   , SC_SEMICOLON    },
-	{ XK_apostrophe  , SC_QUOTE        },
-	{ XK_Shift_L     , SC_LSHIFT       },
-	{ XK_z           , SC_Z            },
-	{ XK_x           , SC_X            },
-	{ XK_c           , SC_C            },
-	{ XK_v           , SC_V            },
-	{ XK_b           , SC_B            },
-	{ XK_n           , SC_N            },
-	{ XK_m           , SC_M            },
-	{ XK_comma       , SC_COMMA        },
-	{ XK_period      , SC_PERIOD       },
-	{ XK_slash       , SC_SLASH        },
-	{ XK_Shift_R     , SC_RSHIFT       },
-	{ XK_Control_L   , SC_CONTROL      },
-	{ XK_Meta_L      , SC_LWIN         },
-	{ XK_Alt_L       , SC_ALT          },
-	{ XK_space       , SC_SPACE        },
-	{ XK_Alt_R       , SC_ALT          },
-	{ XK_Meta_R      , SC_RWIN         },
-	{ XK_Menu        , SC_MENU         },
-	{ XK_Control_R   , SC_CONTROL      },
-	{ XK_Insert      , SC_INSERT       },
-	{ XK_Home        , SC_HOME         },
-	{ XK_Prior       , SC_PAGEUP       },
-	{ XK_Delete      , SC_DELETE       },
-	{ XK_End         , SC_END          },
-	{ XK_Next        , SC_PAGEDOWN     },
-	{ XK_Up          , SC_UP           },
-	{ XK_Left        , SC_LEFT         },
-	{ XK_Down        , SC_DOWN         },
-	{ XK_Right       , SC_RIGHT        },
-	{ XK_Num_Lock    , SC_NUMLOCK      },
-	{ XK_KP_Divide   , SC_SLASH        },
-	{ XK_KP_Multiply , SC_MULTIPLY     },
-	{ XK_KP_Subtract , SC_MINUS        },
-	{ XK_KP_Home     , SC_HOME         },
-	{ XK_KP_Up       , SC_UP           },
-	{ XK_KP_Prior    , SC_PAGEUP       },
-	{ XK_KP_Add      , SC_PLUS         },
-	{ XK_KP_Left     , SC_LEFT         },
-	{ XK_KP_Begin    , SC_CLEAR        },
-	{ XK_KP_Right    , SC_RIGHT        },
-	{ XK_KP_End      , SC_END          },
-	{ XK_KP_Down     , SC_DOWN         },
-	{ XK_KP_Next     , SC_PAGEDOWN     },
-	{ XK_KP_Enter    , SC_ENTER        },
-	{ XK_KP_Insert   , SC_INSERT       },
-	{ XK_KP_Delete   , SC_DELETE       },
-	{ NoSymbol       , 0               }
+	{ .keysym = XK_Escape, .scancode = SC_ESCAPE },
+	{ .keysym = XK_F1, .scancode = SC_F1 },
+	{ .keysym = XK_F2, .scancode = SC_F2 },
+	{ .keysym = XK_F3, .scancode = SC_F3 },
+	{ .keysym = XK_F4, .scancode = SC_F4 },
+	{ .keysym = XK_F5, .scancode = SC_F5 },
+	{ .keysym = XK_F6, .scancode = SC_F6 },
+	{ .keysym = XK_F7, .scancode = SC_F7 },
+	{ .keysym = XK_F8, .scancode = SC_F8 },
+	{ .keysym = XK_F9, .scancode = SC_F9 },
+	{ .keysym = XK_F10, .scancode = SC_F10 },
+	{ .keysym = XK_F11, .scancode = SC_F11 },
+	{ .keysym = XK_F12, .scancode = SC_F12 },
+	{ .keysym = XK_Scroll_Lock, .scancode = SC_SCROLLLOCK },
+	{ .keysym = XK_grave, .scancode = SC_TILDE },
+	{ .keysym = XK_quoteleft, .scancode = SC_TILDE },
+	{ .keysym = XK_asciitilde, .scancode = SC_TILDE },
+	{ .keysym = XK_1, .scancode = SC_1 },
+	{ .keysym = XK_2, .scancode = SC_2 },
+	{ .keysym = XK_3, .scancode = SC_3 },
+	{ .keysym = XK_4, .scancode = SC_4 },
+	{ .keysym = XK_5, .scancode = SC_5 },
+	{ .keysym = XK_6, .scancode = SC_6 },
+	{ .keysym = XK_7, .scancode = SC_7 },
+	{ .keysym = XK_8, .scancode = SC_8 },
+	{ .keysym = XK_9, .scancode = SC_9 },
+	{ .keysym = XK_0, .scancode = SC_0 },
+	{ .keysym = XK_minus, .scancode = SC_MINUS },
+	{ .keysym = XK_equal, .scancode = SC_EQUALS },
+	{ .keysym = XK_backslash, .scancode = SC_BACKSLASH },
+	{ .keysym = XK_BackSpace, .scancode = SC_BACKSPACE },
+	{ .keysym = XK_Tab, .scancode = SC_TAB },
+	{ .keysym = XK_q, .scancode = SC_Q },
+	{ .keysym = XK_w, .scancode = SC_W },
+	{ .keysym = XK_e, .scancode = SC_E },
+	{ .keysym = XK_r, .scancode = SC_R },
+	{ .keysym = XK_t, .scancode = SC_T },
+	{ .keysym = XK_y, .scancode = SC_Y },
+	{ .keysym = XK_u, .scancode = SC_U },
+	{ .keysym = XK_i, .scancode = SC_I },
+	{ .keysym = XK_o, .scancode = SC_O },
+	{ .keysym = XK_p, .scancode = SC_P },
+	{ .keysym = XK_bracketleft, .scancode = SC_LEFTBRACKET },
+	{ .keysym = XK_bracketright, .scancode = SC_RIGHTBRACKET },
+	{ .keysym = XK_Return, .scancode = SC_ENTER },
+	{ .keysym = XK_Caps_Lock, .scancode = SC_CAPSLOCK },
+	{ .keysym = XK_a, .scancode = SC_A },
+	{ .keysym = XK_s, .scancode = SC_S },
+	{ .keysym = XK_d, .scancode = SC_D },
+	{ .keysym = XK_f, .scancode = SC_F },
+	{ .keysym = XK_g, .scancode = SC_G },
+	{ .keysym = XK_h, .scancode = SC_H },
+	{ .keysym = XK_j, .scancode = SC_J },
+	{ .keysym = XK_k, .scancode = SC_K },
+	{ .keysym = XK_l, .scancode = SC_L },
+	{ .keysym = XK_semicolon, .scancode = SC_SEMICOLON },
+	{ .keysym = XK_apostrophe, .scancode = SC_QUOTE },
+	{ .keysym = XK_Shift_L, .scancode = SC_LSHIFT },
+	{ .keysym = XK_z, .scancode = SC_Z },
+	{ .keysym = XK_x, .scancode = SC_X },
+	{ .keysym = XK_c, .scancode = SC_C },
+	{ .keysym = XK_v, .scancode = SC_V },
+	{ .keysym = XK_b, .scancode = SC_B },
+	{ .keysym = XK_n, .scancode = SC_N },
+	{ .keysym = XK_m, .scancode = SC_M },
+	{ .keysym = XK_comma, .scancode = SC_COMMA },
+	{ .keysym = XK_period, .scancode = SC_PERIOD },
+	{ .keysym = XK_slash, .scancode = SC_SLASH },
+	{ .keysym = XK_Shift_R, .scancode = SC_RSHIFT },
+	{ .keysym = XK_Control_L, .scancode = SC_CONTROL },
+	{ .keysym = XK_Meta_L, .scancode = SC_LWIN },
+	{ .keysym = XK_Alt_L, .scancode = SC_ALT },
+	{ .keysym = XK_space, .scancode = SC_SPACE },
+	{ .keysym = XK_Alt_R, .scancode = SC_ALT },
+	{ .keysym = XK_Meta_R, .scancode = SC_RWIN },
+	{ .keysym = XK_Menu, .scancode = SC_MENU },
+	{ .keysym = XK_Control_R, .scancode = SC_CONTROL },
+	{ .keysym = XK_Insert, .scancode = SC_INSERT },
+	{ .keysym = XK_Home, .scancode = SC_HOME },
+	{ .keysym = XK_Prior, .scancode = SC_PAGEUP },
+	{ .keysym = XK_Delete, .scancode = SC_DELETE },
+	{ .keysym = XK_End, .scancode = SC_END },
+	{ .keysym = XK_Next, .scancode = SC_PAGEDOWN },
+	{ .keysym = XK_Up, .scancode = SC_UP },
+	{ .keysym = XK_Left, .scancode = SC_LEFT },
+	{ .keysym = XK_Down, .scancode = SC_DOWN },
+	{ .keysym = XK_Right, .scancode = SC_RIGHT },
+	{ .keysym = XK_Num_Lock, .scancode = SC_NUMLOCK },
+	{ .keysym = XK_KP_Divide, .scancode = SC_SLASH },
+	{ .keysym = XK_KP_Multiply, .scancode = SC_MULTIPLY },
+	{ .keysym = XK_KP_Subtract, .scancode = SC_MINUS },
+	{ .keysym = XK_KP_Home, .scancode = SC_HOME },
+	{ .keysym = XK_KP_Up, .scancode = SC_UP },
+	{ .keysym = XK_KP_Prior, .scancode = SC_PAGEUP },
+	{ .keysym = XK_KP_Add, .scancode = SC_PLUS },
+	{ .keysym = XK_KP_Left, .scancode = SC_LEFT },
+	{ .keysym = XK_KP_Begin, .scancode = SC_CLEAR },
+	{ .keysym = XK_KP_Right, .scancode = SC_RIGHT },
+	{ .keysym = XK_KP_End, .scancode = SC_END },
+	{ .keysym = XK_KP_Down, .scancode = SC_DOWN },
+	{ .keysym = XK_KP_Next, .scancode = SC_PAGEDOWN },
+	{ .keysym = XK_KP_Enter, .scancode = SC_ENTER },
+	{ .keysym = XK_KP_Insert, .scancode = SC_INSERT },
+	{ .keysym = XK_KP_Delete, .scancode = SC_DELETE },
+	{ .keysym = NoSymbol, .scancode = 0 }
 };
 
 unsigned char fb_x11keycode_to_scancode[256];
@@ -134,24 +138,37 @@ void fb_hInitX11KeycodeToScancodeTb
 		XFREE Free
 	)
 {
-	int keycode_min, keycode_max, i, j;
+	int keycode_min = 0, keycode_max = -1, i, j;
 	int keysyms_per_keycode_return;
 
+	/* A rebuilt map starts without entries from an earlier keyboard layout. */
+	memset( fb_x11keycode_to_scancode, 0, sizeof(fb_x11keycode_to_scancode) );
 	DisplayKeycodes( display, &keycode_min, &keycode_max );
 	if( keycode_min < 0   ) keycode_min = 0;
 	if( keycode_max > 255 ) keycode_max = 255;
 
 	for( i = keycode_min; i <= keycode_max; i++ ) {
-		KeySym *keysyms = GetKeyboardMapping( display, i, 1, &keysyms_per_keycode_return );
+		KeySym *keysyms;
+		KeySym keysym;
+		keysyms_per_keycode_return = 0;
+		/* The clamped loop index fits Xlib's one-byte KeyCode. */
+		keysyms = GetKeyboardMapping( display, (KeyCode)i, 1, &keysyms_per_keycode_return );
+		if( keysyms == NULL )
+			continue;
+		if( keysyms_per_keycode_return <= 0 ) {
+			Free( keysyms );
+			continue;
+		}
 
-		KeySym keysym = keysyms[0];
+		keysym = keysyms[0];
 		if( keysym != NoSymbol ) {
 			for( j = 0;
 			     keysym_to_scancode[j].scancode &&
 			         (keysym_to_scancode[j].keysym != keysym);
 			     j++ )
 				;
-			fb_x11keycode_to_scancode[i] = keysym_to_scancode[j].scancode;
+			/* The native scan-code table contains values from 0 through 127. */
+			fb_x11keycode_to_scancode[i] = (unsigned char)keysym_to_scancode[j].scancode;
 		}
 
 		Free( keysyms );

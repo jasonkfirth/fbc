@@ -9,6 +9,16 @@
 
 #include "../fb_gfx.h"
 #include "../gfx_simd.h"
+#include <limits.h>
+#include <stdint.h>
+
+/* Byte-pitched destination rows can leave packed pixels unaligned. */
+#if defined(__GNUC__) || defined(__clang__)
+typedef unsigned int fb_put_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef unsigned int fb_put_u32_unaligned;
+#endif
 
 #ifdef HOST_X86
 #include "../drivers/x86/fb_gfx_mmx.h"
@@ -18,7 +28,7 @@ extern void fb_hPutAlphaMaskMMX(unsigned char *src, unsigned char *dest, int w, 
 static void fb_hPutAlphaMask(unsigned char *src, unsigned char *dest, int w, int h, int src_pitch, int dest_pitch, int alpha, BLENDER *blender, void *param)
 {
 	unsigned char *s;
-	unsigned int *d;
+	fb_put_u32_unaligned *d;
 	unsigned int dc, sc;
 	int x;
 
@@ -37,7 +47,7 @@ static void fb_hPutAlphaMask(unsigned char *src, unsigned char *dest, int w, int
 #endif
 
 	s = src;
-	d = (unsigned int *)dest;
+	d = (fb_put_u32_unaligned *)dest;
 	src_pitch -= w;
 	dest_pitch = (dest_pitch >> 2) - w;
 	for (; h; h--) {
@@ -102,10 +112,26 @@ FBCALL int fb_GfxPut(void *target, float fx, float fy, unsigned char *src, int x
 
 	header = (PUT_HEADER *)src;
 	if (header->type == PUT_HEADER_NEW) {
+		/* New-format dimensions are unsigned; this path uses signed geometry. */
+		if ((header->width > (unsigned int)INT_MAX) ||
+		    (header->height > (unsigned int)INT_MAX) ||
+		    (header->pitch > (unsigned int)INT_MAX) || (header->bpp <= 0)) {
+			FB_GRAPHICS_UNLOCK( );
+			return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+		}
 		bpp = header->bpp;
-		w = header->width;
-		h = header->height;
-		pitch = header->pitch;
+		w = (int)header->width;
+		h = (int)header->height;
+		pitch = (int)header->pitch;
+		if ((w > 0) && ((size_t)w > ((size_t)pitch / (size_t)bpp))) {
+			FB_GRAPHICS_UNLOCK( );
+			return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+		}
+		if ((h > 0) &&
+		    ((size_t)pitch > ((size_t)PTRDIFF_MAX / (size_t)h))) {
+			FB_GRAPHICS_UNLOCK( );
+			return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
+		}
 		src += sizeof(PUT_HEADER);
 	} else {
 		bpp = header->old.bpp;
@@ -163,7 +189,7 @@ FBCALL int fb_GfxPut(void *target, float fx, float fy, unsigned char *src, int x
 
 	DRIVER_LOCK();
 	putter(src, context->line[y] + (x * context->target_bpp), w, h, pitch, context->target_pitch, alpha, blender, param);
-	SET_DIRTY(context, y, h);
+	SET_DIRTY(context, y, (size_t)h);
 	DRIVER_UNLOCK();
 
 	FB_GRAPHICS_UNLOCK( );

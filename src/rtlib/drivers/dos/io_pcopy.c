@@ -8,6 +8,7 @@
 #include "../../fb.h"
 #include "fb_private_console.h"
 #include <go32.h>
+#include <stdint.h>
 
 int fb_ConsolePageCopy( int src, int dst )
 {
@@ -25,10 +26,19 @@ int fb_ConsolePageCopy( int src, int dst )
 	int cols, rows;
 	fb_ConsoleGetSize( &cols, &rows );
 
-	unsigned long srcAddr = fb_hGetPageAddr( src, cols, rows );
-	unsigned long dstAddr = fb_hGetPageAddr( dst, cols, rows );
+	unsigned long srcAddr;
+	unsigned long dstAddr;
+	size_t copy_bytes;
 
-	_movedataw( _dos_ds, srcAddr, _dos_ds, dstAddr, cols * rows );
+	if( cols <= 0 || rows <= 0 ||
+	    (size_t)cols > (size_t)-1 / (size_t)rows )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+	srcAddr = fb_hGetPageAddr( src, cols, rows );
+	dstAddr = fb_hGetPageAddr( dst, cols, rows );
+	copy_bytes = (size_t)cols * (size_t)rows;
+
+	_movedataw( _dos_ds, srcAddr, _dos_ds, dstAddr, copy_bytes );
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }

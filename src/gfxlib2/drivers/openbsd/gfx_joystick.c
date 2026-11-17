@@ -31,6 +31,7 @@
 */
 
 #include "../../fb_gfx.h"
+#include "gfx_joystick.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -59,17 +60,19 @@
 #define FB_HID_USAGE_HAT_SWITCH           0x0039u
 
 typedef struct FB_OPENBSD_JOY_ {
-	int fd;
 	report_desc_t report_desc;
-	int axis_count;
-	int button_count;
-	int has_hat;
+	ssize_t dpad;
 	hid_item_t axis_item[FB_OPENBSD_JOY_MAX_AXES];
 	hid_item_t button_item[FB_OPENBSD_JOY_MAX_BUTTONS];
 	hid_item_t hat_item;
 	float axis[FB_OPENBSD_JOY_MAX_AXES];
 	uint32_t buttons;
-	ssize_t dpad;
+	int fd;
+	unsigned int axis_count;
+	unsigned int button_count;
+	int has_hat;
+	/* Name the existing alignment space without changing the private layout. */
+	uint32_t tail_padding;
 } FB_OPENBSD_JOY;
 
 static FB_OPENBSD_JOY fb_openbsd_joy[FB_OPENBSD_JOY_MAX_DEVICES];
@@ -160,6 +163,8 @@ static float fb_openbsd_joy_normalize_axis(int value, const hid_item_t *item)
 {
 	int minimum;
 	int maximum;
+	int64_t value_offset;
+	int64_t value_range;
 
 	minimum = item->logical_minimum;
 	maximum = item->logical_maximum;
@@ -172,20 +177,24 @@ static float fb_openbsd_joy_normalize_axis(int value, const hid_item_t *item)
 	if (value >= maximum)
 		return 1.0f;
 
-	return (((float)(value - minimum) * 2.0f) / (float)(maximum - minimum)) - 1.0f;
+	value_offset = (int64_t)value - (int64_t)minimum;
+	value_range = (int64_t)maximum - (int64_t)minimum;
+	return (float)(((double)value_offset * 2.0) / (double)value_range - 1.0);
 }
 
 static ssize_t fb_openbsd_joy_dpad_from_hat(int value, const hid_item_t *item)
 {
 	int hat;
 
-	if (item->logical_minimum == 1 && item->logical_maximum == 8)
-		hat = value - 1;
-	else
+	if (item->logical_minimum == 1 && item->logical_maximum == 8) {
+		if (value < 1 || value > 8)
+			return 0;
+		hat = (int)((unsigned int)value - 1u);
+	} else {
+		if (value < 0 || value > 7)
+			return 0;
 		hat = value;
-
-	if (hat < 0 || hat > 7)
-		return 0;
+	}
 
 	switch (hat) {
 	case 0: return XPAD_DPAD_UP;
@@ -243,11 +252,12 @@ static int fb_openbsd_joy_scan_items(FB_OPENBSD_JOY *joy)
 	return (joy->axis_count > 0) || (joy->button_count > 0);
 }
 
-static int fb_openbsd_joy_open_path(FB_OPENBSD_JOY *joy, const char *prefix, int index)
+static int fb_openbsd_joy_open_path(FB_OPENBSD_JOY *joy, const char *prefix,
+	unsigned int index)
 {
 	char device_name[32];
 
-	if (snprintf(device_name, sizeof(device_name), "%s%d", prefix, index) >=
+	if (snprintf(device_name, sizeof(device_name), "%s%u", prefix, index) >=
 		(int)sizeof(device_name))
 		return FALSE;
 
@@ -272,9 +282,9 @@ static void fb_openbsd_joy_init(void)
 		NULL
 	};
 	FB_OPENBSD_JOY *joy;
-	int count;
-	int i;
-	int j;
+	unsigned int count;
+	unsigned int i;
+	unsigned int j;
 
 	if (fb_openbsd_joy_inited)
 		return;
@@ -299,26 +309,26 @@ static void fb_openbsd_joy_init(void)
 }
 
 static void fb_openbsd_joy_update_report(FB_OPENBSD_JOY *joy,
-										 const unsigned char *report)
+											 unsigned char *report)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < joy->axis_count; ++i) {
 		int value;
 
-		value = hid_get_data((void *)report, &joy->axis_item[i]);
+		value = hid_get_data(report, &joy->axis_item[i]);
 		joy->axis[i] = fb_openbsd_joy_normalize_axis(value, &joy->axis_item[i]);
 	}
 
 	joy->buttons = 0;
 	for (i = 0; i < joy->button_count; ++i) {
-		if (hid_get_data((void *)report, &joy->button_item[i]))
+		if (hid_get_data(report, &joy->button_item[i]))
 			joy->buttons |= (1u << i);
 	}
 
 	if (joy->has_hat)
 		joy->dpad = fb_openbsd_joy_dpad_from_hat(
-			hid_get_data((void *)report, &joy->hat_item),
+			hid_get_data(report, &joy->hat_item),
 			&joy->hat_item);
 }
 
@@ -353,17 +363,21 @@ int fb_hGfxOpenbsdGetJoystickState(int id,
 								   ssize_t *dpad)
 {
 	FB_OPENBSD_JOY *joy;
+	unsigned int device_index;
 
 	fb_openbsd_joy_clear_outputs(buttons, a1, a2, a3, a4, a5, a6, a7, a8);
 	if (dpad)
 		*dpad = 0;
 
-	if ((id < 0) || (id >= FB_OPENBSD_JOY_MAX_DEVICES))
+	if (id < 0)
+		return FALSE;
+	device_index = (unsigned int)id;
+	if (device_index >= (unsigned int)FB_OPENBSD_JOY_MAX_DEVICES)
 		return FALSE;
 
 	fb_openbsd_joy_init();
 
-	joy = &fb_openbsd_joy[id];
+	joy = &fb_openbsd_joy[device_index];
 	if (joy->fd < 0)
 		return FALSE;
 

@@ -220,7 +220,7 @@ static int paula_submit(ULONG produced)
 static int paula_device_list(void) { return 1; }
 
 const FB_SFX_DRIVER fb_sfxDriverAmigaPaula = {
-    "Amiga Paula", FB_SFX_DRIVER_CAP_BACKGROUND | FB_SFX_DRIVER_CAP_BLOCKING,
+    "Amiga Paula", FB_SFX_DRIVER_CAP_BACKGROUND | FB_SFX_DRIVER_CAP_BLOCKING FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     paula_init, paula_exit, paula_write, NULL, NULL, paula_device_list, NULL
 };
 

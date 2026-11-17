@@ -48,7 +48,7 @@ FBCALL unsigned long long fb_hStr2ULongint( char *src, ssize_t len )
 		{
 			p += skip;
 #ifdef HOST_MINGW
-			return fb_hStrRadix2Longint( p, len - skip, radix );
+			return (unsigned long long)fb_hStrRadix2Longint( p, len - skip, radix );
 #endif
 		}
 	}

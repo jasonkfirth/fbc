@@ -52,13 +52,14 @@ static void __attribute__((no_reorder)) pcspk_interrupt_end(void) { }
 
 int fb_sfxMsdosPcSpeakerIrqInit(void)
 {
-    size_t code_size = (const char *)pcspk_interrupt_end - (const char *)pcspk_interrupt;
+    size_t code_size = fb_dos_address_range_size((uintptr_t)pcspk_interrupt,
+                                                 (uintptr_t)pcspk_interrupt_end);
     if (installed || !fb_DosThreadInit())
         return -1;
     memset(&speaker_queue, 0, sizeof(speaker_queue));
     if (fb_dos_lock_data(&speaker_queue, sizeof(speaker_queue)) != 0)
         return -1;
-    if (fb_dos_lock_code(pcspk_interrupt, code_size) != 0)
+    if (fb_dos_lock_code((uintptr_t)pcspk_interrupt, code_size) != 0)
         goto fail_data;
     if (!lwp_set_tick_hook(pcspk_interrupt, RTC8192))
         goto fail_code;
@@ -66,7 +67,7 @@ int fb_sfxMsdosPcSpeakerIrqInit(void)
     return 0;
 
 fail_code:
-    fb_dos_unlock_code(pcspk_interrupt, code_size);
+    fb_dos_unlock_code((uintptr_t)pcspk_interrupt, code_size);
 fail_data:
     fb_dos_unlock_data(&speaker_queue, sizeof(speaker_queue));
     return -1;
@@ -81,8 +82,9 @@ void fb_sfxMsdosPcSpeakerIrqExit(void)
      */
     lwp_clear_tick_hook(pcspk_interrupt);
     installed = 0;
-    fb_dos_unlock_code(pcspk_interrupt,
-        (const char *)pcspk_interrupt_end - (const char *)pcspk_interrupt);
+    fb_dos_unlock_code((uintptr_t)pcspk_interrupt,
+        fb_dos_address_range_size((uintptr_t)pcspk_interrupt,
+                                  (uintptr_t)pcspk_interrupt_end));
     fb_dos_unlock_data(&speaker_queue, sizeof(speaker_queue));
 }
 

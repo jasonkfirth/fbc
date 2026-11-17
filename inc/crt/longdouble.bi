@@ -25,8 +25,9 @@
 	end type
 	type clongdouble as __clongdouble_storage Field = 16
 	#assert sizeof( clongdouble ) = 16
-#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ )
-	'' ARM32, MIPS o32, and Darwin/Windows ARM64 use 8 bytes.
+#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ ) or _
+        defined( __FB_WII__ ) or defined( __FB_XBOX__ )
+	'' ARM32, MIPS o32, Darwin/Windows ARM64, devkitPPC and nxdk use 8 bytes.
 	type __clongdouble_storage
 		__(0 to 8-1) as ubyte
 		declare operator cast( ) as byte

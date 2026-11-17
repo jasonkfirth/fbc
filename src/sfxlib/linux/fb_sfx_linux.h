@@ -114,6 +114,14 @@ void fb_sfxLinuxExit(void);
 
 int fb_sfxLinuxWrite(float *buffer, int frames);
 
+#ifndef DISABLE_ALSA
+int fb_sfxCaptureAlsaInit(void);
+int fb_sfxCaptureAlsaStart(void);
+void fb_sfxCaptureAlsaStop(void);
+void fb_sfxCaptureAlsaShutdown(void);
+int fb_sfxCaptureAlsaRead(float *buffer, int frames);
+#endif
+
 
 /* ------------------------------------------------------------------------- */
 /* Driver status                                                             */

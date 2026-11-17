@@ -22,12 +22,6 @@
 #include "../../fb.h"
 #include "../../io_serial_private.h"
 
-int fb_dos_SerialGetStatus( int com_num, FB_COM_STATUS *status );
-int fb_dos_SerialSetLines( int com_num, unsigned int mask,
-	unsigned int values );
-int fb_dos_SerialSetBreak( int com_num, int enabled );
-int fb_dos_SerialPurge( int com_num, unsigned int queues );
-
 /* ------------------------------------------------------------------------- */
 /* Portable backend adapters                                                 */
 /* ------------------------------------------------------------------------- */

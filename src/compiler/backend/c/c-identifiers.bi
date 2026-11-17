@@ -114,6 +114,11 @@ private function hCUseEmulatedTlsName( byval sym as FBSYMBOL ptr, byval rawname 
 	if( (sym = NULL) or (rawname = NULL) ) then return FALSE
 	if( sym->class <> FB_SYMBCLASS_VAR ) then return FALSE
 	if( symbIsThreadLocal(sym) = FALSE ) then return FALSE
+	'' Private storage has no cross-module descriptor-name contract. Its C
+	'' identifier can be encoded before the native compiler creates TLS data.
+	if( symbIsStatic(sym) andalso _
+	    (sym->attrib and (FB_SYMBATTRIB_PUBLIC or FB_SYMBATTRIB_COMMON or _
+	    FB_SYMBATTRIB_EXTERN)) = 0 ) then return FALSE
 	if( left(*rawname, 5) = "fb_c_" or left(*rawname, 8) = "fb_type_" or _
 	    left(*rawname, 5) = "__FB_" ) then return FALSE
 	'' Some emulated TLS implementations prefix an explicit asm label with an
@@ -163,6 +168,8 @@ private function hCSymbolNeedsEncoding( byval sym as FBSYMBOL ptr ) as integer
 		     "_itow", "_ultow", "_i64tow", "_ui64tow", _
 		     "_chdir", "_putenv", "_rmdir", "_beep", _
 		     "_fileno", "_get_osfhandle", "_setmode", "__WSAFDIsSet", _
+		     "_beginthreadex", "_endthreadex", "__dpmi_yield", "__dpmi_int", _
+		     "_farsetsel", "_farnspokeb", "_go32_dpmi_lock_data", "__crt0_glob_function", _
 		     "__caca0_get_event", "__lzo_init_v2", "_initwin_1", "_initwin_2", _
 		     "__CONSTRUC", "__DESTRUC"
 			return TRUE

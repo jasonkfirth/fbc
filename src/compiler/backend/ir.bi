@@ -496,6 +496,8 @@ enum IR_OPT
 
 	IR_OPT_ADDRCISC      = &h00010000  '' complex addressing modes (base+idx*disp)
 	IR_OPT_MISSINGOPS    = &h00020000  '' Some "complex" math operators unavailable? (call irSupportsOp() for details)
+	'' Per-module requirement collected during C emission, before irEnd().
+	IR_OPT_C_ASM_NO_RED_ZONE = &h00040000
 end enum
 
 type IRCTX

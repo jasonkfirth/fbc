@@ -33,6 +33,8 @@
 
 #ifndef DISABLE_HAIKU
 
+#include "haiku_runtime.h"
+
 #include <string.h>
 
 

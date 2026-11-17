@@ -7,11 +7,13 @@ This file intentionally does NOT compile fixtures or change diagnostic policy.
 """
 import subprocess
 import sys
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 from native_c_support import (c23_standard, is_gnu_compiler, native_command,
                               native_machine_flags, resolve_executable,
-                              has_assembly_function)
+                              has_assembly_function, native_source_flags)
 
 
 class NativeCompilerContracts(unittest.TestCase):
@@ -88,6 +90,30 @@ class NativeCompilerContracts(unittest.TestCase):
         for label in ('BODY', '_BODY'):
             self.assertTrue(has_assembly_function('static int BODY(int);', label + ':\n', 'BODY'))
         self.assertFalse(has_assembly_function('static int BODY(int);', 'OTHER_BODY:\n', 'BODY'))
+
+    def test_generated_stack_option_is_a_complete_comment(self):
+        marker = b'/* Compile x86-64 inline ASM with -mno-red-zone. */'
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'unit.c'
+            for data, expected in ((b'\t' + marker + b'\r\n', ('-mno-red-zone',)),
+                                   (b'"' + marker + b'";\n', ()),
+                                   (b'x' * 70000 + marker + b'\n', ()),
+                                   (b'x' * 70000 + b'\n' + marker + b'\n', ('-mno-red-zone',))):
+                with self.subTest(expected=expected, bytes=len(data)):
+                    source.write_bytes(data)
+                    self.assertEqual(native_source_flags(source), expected)
+
+    def test_generated_stack_options_preserve_caller_precedence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = (Path(directory) / name for name in ('unit.c', 'output.c'))
+            marker = b'/* Compile x86-64 inline ASM with -mno-red-zone. */\n'
+            source.write_bytes(marker)
+            output.write_bytes(marker)
+            command = ['gcc', '-std=gnu11', '-mred-zone', '-c', str(source), '-o', str(output)]
+            self.assertEqual(native_command(command), ['gcc', '-mno-red-zone', *command[1:]])
+            source.write_bytes(b'int value;\n')
+            self.assertEqual(native_command(command), command)
+            self.assertEqual(native_command(['application', str(output)]), ['application', str(output)])
 
 
 if __name__ == '__main__':

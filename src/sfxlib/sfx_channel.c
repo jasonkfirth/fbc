@@ -127,7 +127,7 @@ void fb_sfxChannelSetVolume(int channel, float volume)
     ch->volume = volume;
     fb_sfxRuntimeUnlock();
 
-    SFX_DEBUG("sfx_channel: channel %d volume = %f", channel, volume);
+    SFX_DEBUG("sfx_channel: channel %d volume = %f", channel, (double)volume);
 }
 
 
@@ -169,7 +169,7 @@ void fb_sfxChannelSetPan(int channel, float pan)
     ch->pan = pan;
     fb_sfxRuntimeUnlock();
 
-    SFX_DEBUG("sfx_channel: channel %d pan = %f", channel, pan);
+    SFX_DEBUG("sfx_channel: channel %d pan = %f", channel, (double)pan);
 }
 
 

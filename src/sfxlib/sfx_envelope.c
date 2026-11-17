@@ -102,7 +102,7 @@ void fb_sfxEnvelopeDefine(
     env->release = release;
 
     SFX_DEBUG("sfx_envelope: define id=%d A=%f D=%f S=%f R=%f",
-              id, attack, decay, sustain, release);
+              id, (double)attack, (double)decay, (double)sustain, (double)release);
 }
 
 

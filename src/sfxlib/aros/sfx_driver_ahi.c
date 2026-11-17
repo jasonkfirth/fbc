@@ -197,7 +197,7 @@ static int aros_ahiDeviceList(void)
 const FB_SFX_DRIVER fb_sfxDriverArosAhi =
 {
     "AROS AHI",
-    FB_SFX_DRIVER_CAP_BACKGROUND | FB_SFX_DRIVER_CAP_BLOCKING,
+    FB_SFX_DRIVER_CAP_BACKGROUND | FB_SFX_DRIVER_CAP_BLOCKING FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     aros_ahiInit,
     aros_ahiExit,
     aros_ahiWrite,

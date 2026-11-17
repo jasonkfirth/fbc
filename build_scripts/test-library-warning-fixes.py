@@ -35,11 +35,13 @@ def main():
             parser.error('missing archive: ' + str(archive))
     tests = [] if args.mt or args.archives_only else [
         ('lpt-device-state', False), ('profile-filename', False),
-        ('utf-word-values', False), ('console-view-resize', False),
-        ('time-parse-bounds', False), ('win32-file-mode-bounds', True)]
+        ('utf-word-values', False), ('utf-counted-values', False),
+        ('console-view-resize', False),
+        ('time-parse-bounds', False), ('date-parse-bounds', False),
+        ('com-option-ranges', False), ('win32-file-mode-bounds', True)]
     tests += [('rnd-state-runtime', True), ('time-parse-runtime', True),
               ('str-instrrev-runtime', True), ('tls-context-runtime', True),
-              ('prototype-contracts', True),
+              ('prototype-contracts', True), ('date-parse-runtime', True),
               ('gfx-pixel-shifts', True)]
     results = []
     for name, linked in tests:

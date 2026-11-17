@@ -38,6 +38,8 @@
 
 #ifndef DISABLE_HAIKU
 
+#include "../../../rtlib/fb.h"
+
 #include <image.h>
 #include <OS.h>
 
@@ -98,18 +100,20 @@ char *fb_hGetExePath(char *dst, ssize_t maxlen)
 {
     image_info info;
     int32 cookie = 0;
+    size_t capacity;
 
     if (!dst || maxlen <= 0)
         return NULL;
 
+    capacity = (size_t)maxlen;
     dst[0] = '\0';
 
     while (get_next_image_info(0, &cookie, &info) == B_OK)
     {
         if (info.type == B_APP_IMAGE)
         {
-            strncpy(dst, info.name, maxlen - 1);
-            dst[maxlen - 1] = '\0';
+            strncpy(dst, info.name, capacity - 1u);
+            dst[capacity - 1u] = '\0';
 
             /*
                 Strip the executable name from the path.

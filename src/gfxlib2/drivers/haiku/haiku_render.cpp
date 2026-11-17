@@ -27,9 +27,11 @@
 #ifndef DISABLE_HAIKU
 
 #include "fb_gfx_haiku.h"
+#include "haiku_render.h"
 
 #include <Bitmap.h>
 #include <View.h>
+#include <float.h>
 #include <limits.h>
 #include <new>
 #include <string.h>
@@ -39,6 +41,22 @@
 /* ------------------------------------------------------------------------- */
 
 extern BBitmap *g_bmp;
+
+static int fb_hHaikuPixelEndpointIsExact(int dimension)
+{
+    unsigned int endpoint = (unsigned int)(dimension - 1);
+
+    /* BRect stores endpoints as float. Integers above the mantissa limit are
+       exact only when their discarded low bits are zero. */
+    while (endpoint > (1u << FLT_MANT_DIG))
+    {
+        if (endpoint & 1u)
+            return FALSE;
+        endpoint >>= 1;
+    }
+
+    return TRUE;
+}
 
 /* ------------------------------------------------------------------------- */
 /* Presentation bitmap allocation                                            */
@@ -50,11 +68,12 @@ BBitmap *fb_hHaikuCreateBitmap(int width, int height)
 
     /* BRect uses floats. Reject dimensions whose inclusive endpoint rounds. */
     if (width <= 0 || height <= 0 || width > INT_MAX / 4 ||
-        (double)(float)(width - 1) != (double)(width - 1) ||
-        (double)(float)(height - 1) != (double)(height - 1))
+        !fb_hHaikuPixelEndpointIsExact(width) ||
+        !fb_hHaikuPixelEndpointIsExact(height))
         return NULL;
 
-    bitmap = new(std::nothrow) BBitmap(BRect(0, 0, width - 1, height - 1),
+    bitmap = new(std::nothrow) BBitmap(BRect(0.0f, 0.0f,
+        static_cast<float>(width - 1), static_cast<float>(height - 1)),
         B_BITMAP_ACCEPTS_VIEWS, B_RGB32);
     if (!bitmap || !bitmap->IsValid() || !bitmap->Bits() ||
         bitmap->BitsLength() <= 0 || bitmap->BytesPerRow() < width * 4 ||
@@ -67,7 +86,7 @@ BBitmap *fb_hHaikuCreateBitmap(int width, int height)
         return NULL;
     }
 
-    memset(bitmap->Bits(), 0, bitmap->BitsLength());
+    memset(bitmap->Bits(), 0, (size_t)bitmap->BitsLength());
     return bitmap;
 }
 

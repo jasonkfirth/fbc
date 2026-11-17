@@ -8,6 +8,49 @@ This file intentionally does NOT claim a new complete corpus census.
 
 # Unused C parameters after store removal
 
+## GCC draft-C23 capability, November 14
+
+GCC 11 supports unnamed definition parameters in its draft-C23 mode, whose
+standard-date macro is `202000L`. The final C23 date remains `202311L`.
+The emitted capability condition now accepts that GCC implementation while
+retaining the final-date test for other compilers. GNU11 keeps its named
+definitions and unused-parameter diagnostics. Debug and opaque-assembly
+definitions retain the established name-preservation rules.
+[GCC implementation](https://gcc.gnu.org/pipermail/gcc-cvs/2020-October/336068.html)
+
+The rebuilt compiler is `2ebfd87df80d9d5613fb36888930361d9779937e877ac29568f8b4c9d47c3118`.
+All 224 compiler units reach an exact emitted-C fixed point with zero GCC
+warnings. The complete GCC/Clang backend suite passes in 814.040 seconds.
+All 703 fbctests profiles pass with zero GCC and 771 Clang observations.
+Of these, 557 retain exact preceding C identities. The remaining 146 receive
+fresh GCC and Clang compilation with their original unsuppressed options.
+
+Both permanent parameter scripts pass the public/private calling-contract,
+GNU11/GNU23, debug, assembly and foreign-target controls. A native Linux
+capability probe passes eight values and four exact before/after object
+identities. The full production port replay reemits 1,053 units and preserves
+every FBC warning line. Exactly 116 C units change by the capability condition
+alone. Their complete before/after GCC objects match byte for byte and remove
+343 unused-parameter warnings. Their Clang effective C also matches exactly.
+All 937 other C units retain exact native-result identities.
+
+Coreutils therefore falls from 1,104 to 911 GCC warnings across 498 units.
+SQLite falls from 261 to 111 across 555. Their Clang totals remain 2,412 and
+7,784. Strict source-only lint passes the changed helper with zero findings.
+Compiler structure checks pass 413 documented files and 21 host source graphs.
+The required-semantic linter consumer remains incompatible with the current
+diagnostic capabilities and retains its separate open disposition.
+
+Receipts use the `draft-c23-parameters`, `draft-c23-port-replay` and
+`draft-c23-port-native-result` prefixes dated November 14 under
+`build/c-emitter-forward-views-20261105`. The source cut preserves eighteen
+dirty compiler inputs in 310,313 compressed bytes.
+The selected development path passes twenty-two actual executions. Its
+immediate rollback is `8ee4f7d0`. Installed release binaries and runtime archives
+retain their recorded hashes.
+
+## Historical final-body parameter repair
+
 The main shared C helper now checks final emitted references even when the
 original parameter access flag was set. Private store removal can remove the
 last read. The check recognizes identifier boundaries, so a short name such as

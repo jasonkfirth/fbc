@@ -40,7 +40,8 @@ static void fb_sfxPcSpeakerWaitForNextSample(void)
 
     if (g_fb_sfx_pcspk_next_tick <= 0.0)
     {
-        g_fb_sfx_pcspk_next_tick = (double)uclock();
+        now = uclock();
+        g_fb_sfx_pcspk_next_tick = (double)now;
         return;
     }
 
@@ -65,7 +66,7 @@ static void fb_sfxPcSpeakerWriteLevel(int high)
         speaker data line.
     */
 
-    port_value = (unsigned char)(inportb(FB_SFX_MSDOS_SPEAKER_PORT) & ~0x03u);
+    port_value = (unsigned char)(inportb(FB_SFX_MSDOS_SPEAKER_PORT) & 0xFCu);
     if (high)
         port_value |= 0x02u;
 
@@ -123,7 +124,8 @@ static void msdos_pcspk_exit(void)
      * port-61 controls made while playback was active.
      */
     outportb(FB_SFX_MSDOS_SPEAKER_PORT,
-        (inportb(FB_SFX_MSDOS_SPEAKER_PORT) & ~3U) | (g_fb_sfx_pcspk_saved_port61 & 3U));
+        (unsigned char)((inportb(FB_SFX_MSDOS_SPEAKER_PORT) & 0xFCu) |
+                        (g_fb_sfx_pcspk_saved_port61 & 0x03u)));
 
     g_fb_sfx_pcspk_active = 0;
     g_fb_sfx_pcspk_rate = 0;
@@ -203,7 +205,7 @@ static int msdos_pcspk_write(const float *samples, int frames)
 const FB_SFX_DRIVER fb_sfxDriverPcSpeaker =
 {
     "PCSpeaker",
-    FB_SFX_DRIVER_CAP_BLOCKING,
+    FB_SFX_DRIVER_CAP_BLOCKING FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     msdos_pcspk_init,
     msdos_pcspk_exit,
     msdos_pcspk_write,

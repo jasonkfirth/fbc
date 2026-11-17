@@ -25,7 +25,12 @@ FBCALL void fb_PrintBufferWstrEx( const FB_WCHAR *buffer, size_t len, int mask )
 /*:::::*/
 FBCALL void fb_PrintBufferWstr( const FB_WCHAR *buffer, int mask )
 {
-	return fb_PrintBufferWstrEx( buffer, fb_wstr_Len( buffer ), mask );
+	ssize_t length = fb_wstr_Len( buffer );
+	if( length < 0 ) {
+		fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		return;
+	}
+	fb_PrintBufferWstrEx( buffer, (size_t)length, mask );
 }
 
 /* end of hooks/hook_print_wstr.c */

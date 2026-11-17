@@ -77,6 +77,9 @@ static ssize_t hReadUTF8ToChar( FILE *fp, char *dst, ssize_t max_chars )
 				FB_FALLTHROUGH;
 			case 0:
 				wc += *p++;
+				break;
+			default:
+				break;
 		}
 
 		wc -= fb_utf8_offsetsTb[extbytes];
@@ -84,7 +87,7 @@ static ssize_t hReadUTF8ToChar( FILE *fp, char *dst, ssize_t max_chars )
 		if( wc > 255 )
 			wc = '?';
 
-		*dst++ = wc;
+		*dst++ = (char)wc;
 		--chars;
 	}
 
@@ -114,7 +117,7 @@ static ssize_t hReadUTF16ToChar( FILE *fp, char *dst, ssize_t max_chars )
             c = '?';
         }
 
-        *dst++ = c;
+        *dst++ = (char)c;
         --chars;
     }
 
@@ -137,7 +140,7 @@ static ssize_t hReadUTF32ToChar( FILE *fp, char *dst, ssize_t max_chars )
         if( c > 255 )
             c = '?';
 
-        *dst++ = c;
+        *dst++ = (char)c;
         --chars;
     }
 
@@ -146,21 +149,16 @@ static ssize_t hReadUTF32ToChar( FILE *fp, char *dst, ssize_t max_chars )
 
 ssize_t fb_hFileRead_UTFToChar( FILE *fp, FB_FILE_ENCOD encod, char *dst, ssize_t max_chars )
 {
-	switch( encod )
-	{
-	case FB_FILE_ENCOD_UTF8:
+	if( encod == FB_FILE_ENCOD_UTF8 )
 		return hReadUTF8ToChar( fp, dst, max_chars );
 
-	case FB_FILE_ENCOD_UTF16:
+	if( encod == FB_FILE_ENCOD_UTF16 )
 		return hReadUTF16ToChar( fp, dst, max_chars );
 
-	case FB_FILE_ENCOD_UTF32:
+	if( encod == FB_FILE_ENCOD_UTF32 )
 		return hReadUTF32ToChar( fp, dst, max_chars );
 
-	default:
-		return 0;
-	}
-
+	return 0;
 }
 
 /*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*
@@ -218,21 +216,24 @@ static ssize_t hUTF8ToUTF16( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 				FB_FALLTHROUGH;
 			case 0:
 				wc += *p++;
+				break;
+			default:
+				break;
 		}
 
 		wc -= fb_utf8_offsetsTb[extbytes];
 
 		if( wc <= UTF16_MAX_BMP )
 		{
-			*dst++ = wc;
+			*dst++ = (FB_WCHAR)(UTF_16)wc;
 		}
 		else
 		{
 			if( chars > 1 )
 			{
 				wc -= UTF16_HALFBASE;
-				*dst++ = ((wc >> UTF16_HALFSHIFT) +	UTF16_SUR_HIGH_START);
-				*dst++ = ((wc & UTF16_HALFMASK)	+ UTF16_SUR_LOW_START);
+				*dst++ = (FB_WCHAR)((wc >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
+				*dst++ = (FB_WCHAR)((wc & UTF16_HALFMASK)	+ UTF16_SUR_LOW_START);
 				--chars;
 			}
 		}
@@ -294,11 +295,14 @@ static ssize_t hUTF8ToUTF32( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 				FB_FALLTHROUGH;
 			case 0:
 				wc += *p++;
+				break;
+			default:
+				break;
 		}
 
 		wc -= fb_utf8_offsetsTb[extbytes];
 
-		*dst++ = wc;
+		*dst++ = (FB_WCHAR)wc;
 		--chars;
 	}
 
@@ -322,6 +326,8 @@ static ssize_t hReadUTF8ToWchar( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 
 	case sizeof( UTF_32 ):
 		res = hUTF8ToUTF32( fp, dst, max_chars );
+		break;
+	default:
 		break;
 	}
 
@@ -351,7 +357,7 @@ static ssize_t hUTF16ToUTF32( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
                  (c2 - UTF16_SUR_LOW_START) + UTF16_HALFBASE;
         }
 
-        *dst++ = c;
+        *dst++ = (FB_WCHAR)c;
         --chars;
     }
 
@@ -407,13 +413,13 @@ static ssize_t hUTF32ToUTF16( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 			c -= UTF16_HALFBASE;
 			if( chars > 1 )
 			{
-				*dst++ = (UTF_16)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
+				*dst++ = (FB_WCHAR)((c >> UTF16_HALFSHIFT) + UTF16_SUR_HIGH_START);
 				--chars;
 			}
 			c = ((c & UTF16_HALFMASK) + UTF16_SUR_LOW_START);
 		}
 
-		*dst++ = (UTF_16)c;
+		*dst++ = (FB_WCHAR)(UTF_16)c;
 		--chars;
     }
 
@@ -451,6 +457,8 @@ static ssize_t hReadUTF32ToWchar( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 			res = max_chars - chars;
 		}
 		break;
+	default:
+		break;
 	}
 
 	return res;
@@ -458,21 +466,16 @@ static ssize_t hReadUTF32ToWchar( FILE *fp, FB_WCHAR *dst, ssize_t max_chars )
 
 ssize_t fb_hFileRead_UTFToWchar( FILE *fp, FB_FILE_ENCOD encod, FB_WCHAR *dst, ssize_t max_chars )
 {
-	switch( encod )
-	{
-	case FB_FILE_ENCOD_UTF8:
+	if( encod == FB_FILE_ENCOD_UTF8 )
 		return hReadUTF8ToWchar( fp, dst, max_chars );
 
-	case FB_FILE_ENCOD_UTF16:
+	if( encod == FB_FILE_ENCOD_UTF16 )
 		return hReadUTF16ToWchar( fp, dst, max_chars );
 
-	case FB_FILE_ENCOD_UTF32:
+	if( encod == FB_FILE_ENCOD_UTF32 )
 		return hReadUTF32ToWchar( fp, dst, max_chars );
 
-	default:
-		return 0;
-	}
-
+	return 0;
 }
 
 /* end of devices/dev_file_encod_read_core.c */

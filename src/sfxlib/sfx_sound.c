@@ -111,8 +111,8 @@ void fb_sfxSoundChannel(
         "sfx_sound: ch=%d freq=%d dur=%f vol=%f",
         channel,
         frequency,
-        duration,
-        volume
+        (double)duration,
+        (double)volume
     );
 }
 

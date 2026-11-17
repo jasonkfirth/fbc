@@ -32,7 +32,7 @@ FBCALL FBSTRING_ACCESS *fb_StrMid( FBSTRING_ACCESS *src, ssize_t start, ssize_t 
             dst = fb_hStrAllocTemp_NoLock( NULL, len );
 			if( dst != NULL )
             {
-				FB_MEMCPY( dst->data, src->data + start, len );
+				FB_MEMCPY( dst->data, src->data + start, (size_t)len );
 				/* null term */
 				dst->data[len] = '\0';
             }

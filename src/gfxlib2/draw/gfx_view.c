@@ -51,7 +51,8 @@ FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, 
             context->view_y = 0;
             context->view_w = fb_gfx->w;
             context->view_h = fb_gfx->h;
-            fb_hGfxBox(x1 - 1, y1 - 1, x2 + 1, y2 + 1, border_color & fb_gfx->color_mask, FALSE, 0xFFFF);
+			fb_hGfxBox(x1 - 1, y1 - 1, x2 + 1, y2 + 1,
+				border_color & (unsigned int)fb_gfx->color_mask, FALSE, 0xFFFF);
         }
 
         /* Clip viewport to screen (without "moving" the viewport). The drawing
@@ -77,7 +78,7 @@ FBCALL void fb_GfxView(int x1, int y1, int x2, int y2, unsigned int fill_color, 
         DBG_ASSERT(context->view_w > 0 && context->view_w <= fb_gfx->w);
         DBG_ASSERT(context->view_h > 0 && context->view_h <= fb_gfx->h);
 
-        if (!(flags & DEFAULT_COLOR_1)) {
+		if (!((unsigned int)flags & DEFAULT_COLOR_1)) {
             old_bg_color = context->bg_color;
             context->bg_color = fb_hFixColor(context->target_bpp, fill_color);
             fb_GfxClear(1);

@@ -40,6 +40,8 @@
 */
 
 #include <ctype.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "fb_sfx.h"
@@ -87,6 +89,23 @@ static int fb_sfxPlayDurationFrames(float duration)
     return frames;
 }
 
+/* Long PLAY strings can exceed the frame counter even when each note is valid. */
+static int fb_sfxPlayFrameAdd(int left, int right, int *sum)
+{
+    int64_t result;
+
+    if (!sum)
+        return 0;
+
+    /* Widen both inputs before adding so the check itself cannot overflow. */
+    result = (int64_t)left + (int64_t)right;
+    if ((result < INT_MIN) || (result > INT_MAX))
+        return 0;
+
+    *sum = (int)result;
+    return 1;
+}
+
 static int fb_sfxPlayClampOctave(int octave)
 {
     if (octave < FB_SFX_PLAY_OCTAVE_MIN)
@@ -113,7 +132,13 @@ static int fb_sfxPlayParseNumber(const char **pp, int *value)
 
     while (isdigit((unsigned char)*p))
     {
-        result = (result * 10) + (*p - '0');
+        int digit = *p - '0';
+
+        /* Keep consuming oversized values without overflowing the parser. */
+        if (result > ((INT_MAX - digit) / 10))
+            result = INT_MAX;
+        else if (result < INT_MAX)
+            result = (result * 10) + digit;
         p++;
         saw_digit = 1;
     }
@@ -139,7 +164,8 @@ static int fb_sfxPlayParseDots(const char **pp)
 
     while (*p == '.')
     {
-        dots++;
+        if (dots < INT_MAX)
+            dots++;
         p++;
     }
 
@@ -175,8 +201,9 @@ static float fb_sfxPlayApplyDots(float duration, int dots)
 
     add = duration * 0.5f;
 
-    while (dots-- > 0)
+    while (dots > 0)
     {
+        dots--;
         duration += add;
         add *= 0.5f;
     }
@@ -414,25 +441,37 @@ static int fb_sfxPlayNoteIndex(char note)
 static int fb_sfxPlayFrequency(int note, int octave)
 {
     int base;
-    int shift;
+    int octave_delta;
+    unsigned int steps;
 
     if (note < 0 || note >= 12)
         return 0;
 
+    octave = fb_sfxPlayClampOctave(octave);
     base = note_table[note];
 
-    shift = octave - 4;
+    /* Clamping bounds this difference to -4 through 2. */
+    octave_delta = octave - 4;
 
-    while (shift > 0)
+    if (octave_delta > 0)
     {
-        base *= 2;
-        shift--;
+        steps = (unsigned int)octave_delta;
+        while (steps > 0u)
+        {
+            if (base > INT_MAX / 2)
+                return 0;
+            base *= 2;
+            steps--;
+        }
     }
-
-    while (shift < 0)
+    else if (octave_delta < 0)
     {
-        base /= 2;
-        shift++;
+        steps = 0u - (unsigned int)octave_delta;
+        while ((steps > 0u) && (base > 0))
+        {
+            base /= 2;
+            steps--;
+        }
     }
 
     return base;
@@ -561,13 +600,18 @@ static int fb_sfxPlayStringImpl(int channel, const char *str, int default_foregr
                 !st.foreground &&
                 !background_queue_anchored)
             {
-                sequence_delay += fb_sfxPlayBackgroundStartDelay(st.channel);
+                if (!fb_sfxPlayFrameAdd(sequence_delay,
+                    fb_sfxPlayBackgroundStartDelay(st.channel),
+                    &sequence_delay)) {
+                    break;
+                }
                 background_queue_anchored = 1;
                 if (sequence_delay < 0)
                     background_queue_drop = 1;
             }
 
-            end_frame = sequence_delay + length;
+            if (!fb_sfxPlayFrameAdd(sequence_delay, length, &end_frame))
+                break;
 
             if (!background_queue_drop || st.foreground)
                 fb_sfxPlayQueueTone(&st, freq, duration, sequence_delay);
@@ -604,13 +648,18 @@ static int fb_sfxPlayStringImpl(int channel, const char *str, int default_foregr
                 !st.foreground &&
                 !background_queue_anchored)
             {
-                sequence_delay += fb_sfxPlayBackgroundStartDelay(st.channel);
+                if (!fb_sfxPlayFrameAdd(sequence_delay,
+                    fb_sfxPlayBackgroundStartDelay(st.channel),
+                    &sequence_delay)) {
+                    break;
+                }
                 background_queue_anchored = 1;
                 if (sequence_delay < 0)
                     background_queue_drop = 1;
             }
 
-            end_frame = sequence_delay + length;
+            if (!fb_sfxPlayFrameAdd(sequence_delay, length, &end_frame))
+                break;
 
             if (st.foreground && end_frame > foreground_frames)
                 foreground_frames = end_frame;
@@ -649,13 +698,18 @@ static int fb_sfxPlayStringImpl(int channel, const char *str, int default_foregr
                     !st.foreground &&
                     !background_queue_anchored)
                 {
-                    sequence_delay += fb_sfxPlayBackgroundStartDelay(st.channel);
+                    if (!fb_sfxPlayFrameAdd(sequence_delay,
+                        fb_sfxPlayBackgroundStartDelay(st.channel),
+                        &sequence_delay)) {
+                        break;
+                    }
                     background_queue_anchored = 1;
                     if (sequence_delay < 0)
                         background_queue_drop = 1;
                 }
 
-                end_frame = sequence_delay + length;
+                if (!fb_sfxPlayFrameAdd(sequence_delay, length, &end_frame))
+                    break;
 
                 if (st.foreground && end_frame > foreground_frames)
                     foreground_frames = end_frame;
@@ -670,13 +724,18 @@ static int fb_sfxPlayStringImpl(int channel, const char *str, int default_foregr
                 !st.foreground &&
                 !background_queue_anchored)
             {
-                sequence_delay += fb_sfxPlayBackgroundStartDelay(st.channel);
+                if (!fb_sfxPlayFrameAdd(sequence_delay,
+                    fb_sfxPlayBackgroundStartDelay(st.channel),
+                    &sequence_delay)) {
+                    break;
+                }
                 background_queue_anchored = 1;
                 if (sequence_delay < 0)
                     background_queue_drop = 1;
             }
 
-            end_frame = sequence_delay + length;
+            if (!fb_sfxPlayFrameAdd(sequence_delay, length, &end_frame))
+                break;
 
             freq = fb_sfxPlayNoteNumberFrequency(note_number);
             if (freq > 0 && (!background_queue_drop || st.foreground))

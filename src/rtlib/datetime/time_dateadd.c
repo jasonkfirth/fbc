@@ -6,14 +6,26 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
+#include <math.h>
 
 /*:::::*/
 FBCALL double fb_DateAdd( FBSTRING_ACCESS *interval, double interval_value_arg, double serial )
 {
     int year, month, day, hour, minute, second;
     int carry_value, test_value;
-    int interval_value = (int) fb_FIXDouble( interval_value_arg );
+    double fixed_interval_value = fb_FIXDouble( interval_value_arg );
+    int interval_value;
     int interval_type = fb_hTimeGetIntervalType( interval );
+
+    if( !isfinite( fixed_interval_value ) ||
+        (fixed_interval_value < (double)INT_MIN) ||
+        (fixed_interval_value > (double)INT_MAX) )
+    {
+        fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+        return serial;
+    }
+    interval_value = (int)fixed_interval_value;
 
     fb_ErrorSetNum( FB_RTERROR_OK );
 
@@ -83,6 +95,8 @@ FBCALL double fb_DateAdd( FBSTRING_ACCESS *interval, double interval_value_arg, 
             day = test_value;
         break;
 
+    default:
+        break;
     }
 
     serial = fb_DateSerial( year, month, day ) +

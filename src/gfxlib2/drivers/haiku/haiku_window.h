@@ -29,6 +29,12 @@ public:
     virtual void DispatchMessage(BMessage *msg, BHandler *target);
     virtual void WindowActivated(bool active);
     virtual bool QuitRequested();
+
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+private:
+    /* Name the four-byte tail gap in this native window object. */
+    unsigned char tail_alignment_padding[4];
+#endif
 };
 
 /* ------------------------------------------------------------------------- */

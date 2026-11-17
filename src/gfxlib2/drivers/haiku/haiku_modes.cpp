@@ -88,6 +88,7 @@ int *fb_hHaikuFetchModes(int depth, int *size)
     int *modes = NULL;
     int count = 0;
     int capacity = 256;
+    size_t allocation_size = sizeof(*modes) * (size_t)capacity;
 
     uint32 i;
 
@@ -103,7 +104,7 @@ int *fb_hHaikuFetchModes(int depth, int *size)
 
     *size = 0;
 
-    modes = (int*)malloc(sizeof(int) * capacity);
+    modes = (int*)malloc(allocation_size);
 
     if (!modes)
     {
@@ -111,7 +112,7 @@ int *fb_hHaikuFetchModes(int depth, int *size)
         return NULL;
     }
 
-    memset(modes, 0, sizeof(int) * capacity);
+    memset(modes, 0, allocation_size);
 
     /* --------------------------------------------------------------------- */
     /* Real display modes from Haiku                                         */

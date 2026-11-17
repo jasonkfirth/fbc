@@ -49,8 +49,10 @@ FBSTRING_ACCESS *fb_DrvIntlGetWeekdayName( int weekday, int short_names )
 #endif
 
     name_len = strlen( pszName );
+    if( name_len > (size_t)FB_STRSIZEMSK )
+        return NULL;
 
-    result = fb_hStrAllocTemp( NULL, name_len );
+    result = fb_hStrAllocTemp( NULL, (ssize_t)name_len );
     if( result!=NULL ) {
         FB_MEMCPY( result->data, pszName, name_len + 1 );
     }

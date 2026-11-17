@@ -13,6 +13,8 @@ Returns the path of the running program
 {{fbdoc item="desc"}}
 	Returns the path (the location) of the calling program. This is not necessarily the same as ##[[KeyPgCurdir|Curdir]]##.
 
+	On Linux, a truncated native executable-path query is rejected and an empty string is returned. A complete path must fit within the runtime query buffer, including its terminator.
+
 {{fbdoc item="ex"}}
 {{fbdoc item="filename" value="examples/manual/system/exepath.bas"}}%%(freebasic)
 Dim pathname As String = ExePath

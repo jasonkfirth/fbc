@@ -37,6 +37,7 @@
 */
 
 #include "haiku_debug.h"
+#include "haiku_runtime.h"
 
 #include <stdio.h>
 #include <stdlib.h>

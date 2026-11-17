@@ -201,7 +201,7 @@ static int rb_init(int frames, int channels)
     }
 
     rb_size = frames * channels * 4; /* extra slack */
-    rb_data = (float*)malloc(rb_size * sizeof(float));
+    rb_data = (float*)malloc((size_t)rb_size * sizeof(float));
     if (!rb_data)
     {
         rb_size = 0;
@@ -486,6 +486,7 @@ typedef struct HAIKU_PLAYER_INIT_REQUEST
     status_t status;
     int completed;
     int timed_out;
+    uint32 reserved;
 } HAIKU_PLAYER_INIT_REQUEST;
 
 static void haiku_player_shutdown(void)
@@ -546,6 +547,9 @@ static int32 haiku_player_create_thread(void *arg)
     BSoundPlayer *player;
     status_t status;
     int timed_out;
+
+    if (!request)
+        return B_BAD_VALUE;
 
     player = new BSoundPlayer(&request->fmt, "fbsfx", audio_callback, NULL);
     if (!player)
@@ -684,13 +688,22 @@ static void audio_callback(void *cookie, void *buffer, size_t size, const media_
     (void)cookie;
     (void)fmt;
 
+    if (!buffer)
+        return;
+
     if (!fb_sfx_context)
     {
         memset(buffer, 0, size);
         return;
     }
 
-    int samples = size / sizeof(short);
+    if (size / sizeof(short) > (size_t)INT_MAX)
+    {
+        memset(buffer, 0, size);
+        return;
+    }
+
+    int samples = (int)(size / sizeof(short));
     short *out = (short*)buffer;
     int remaining = samples;
     int offset = 0;
@@ -734,14 +747,14 @@ static int haiku_driver_init(int rate, int channels, int buffer, int flags)
 
     media_raw_audio_format fmt;
     memset(&fmt, 0, sizeof(fmt));
-    fmt.frame_rate = fb_sfx_haiku.sample_rate;
-    fmt.channel_count = fb_sfx_haiku.channels;
+    fmt.frame_rate = (float)fb_sfx_haiku.sample_rate;
+    fmt.channel_count = (uint32)fb_sfx_haiku.channels;
     fmt.format = media_raw_audio_format::B_AUDIO_SHORT;
     fmt.byte_order = B_MEDIA_LITTLE_ENDIAN;
     bytes_per_sample = (int)sizeof(short);
-    fmt.buffer_size = fb_sfx_haiku.buffer_frames *
-                      fb_sfx_haiku.channels *
-                      bytes_per_sample;
+    fmt.buffer_size = (size_t)fb_sfx_haiku.buffer_frames *
+                      (size_t)fb_sfx_haiku.channels *
+                      (size_t)bytes_per_sample;
 
     if (fmt.buffer_size <= 0)
     {
@@ -823,7 +836,7 @@ static void haiku_driver_poll(void)
 extern "C" const FB_SFX_DRIVER fb_sfxDriverHaiku =
 {
     "Haiku",
-    FB_SFX_DRIVER_CAP_BACKGROUND,
+    FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
     haiku_driver_init,
     haiku_driver_exit,
     haiku_driver_write,

@@ -39,6 +39,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* Defining DEBUG or D2D_DEBUG will turn on debugging for Direct2D & Direct3D
 // (if it's used). To see any output from them you'll need to install 
@@ -233,7 +234,7 @@ typedef struct D2DGlobalState
 */
 static D2DGlobalState* GetGlobalState(HWND hwnd)
 {
-	D2DGlobalState* pState = GetProp(hwnd, MAKEINTRESOURCE(D2D_PROP_ID));
+	D2DGlobalState* pState = (D2DGlobalState*)GetProp(hwnd, MAKEINTRESOURCE(D2D_PROP_ID));
 
 #ifdef DO_DEBUG
 	if(pState) {
@@ -248,7 +249,7 @@ static D2DGlobalState* GetGlobalState(HWND hwnd)
 
 static D2DGlobalState* CreateGlobalState(HWND hwnd, HMODULE hD2D, ID2D1Factory* pFactory, WNDPROC wndprocCookie)
 {
-	D2DGlobalState* pState = calloc(1, sizeof(*pState));
+	D2DGlobalState* pState = (D2DGlobalState*)calloc(1, sizeof(*pState));
 
 	if(pState) {
 		BYTE i = 0;
@@ -314,7 +315,7 @@ static LRESULT CALLBACK D2DWndProcSubclass(HWND hwnd, UINT msg, WPARAM wParam, L
 				BYTE fbScan = pKeyTableKey[0];
 				BYTE alternateKey = (pKeyTableKey[1] == wParam) ? pKeyTableKey[2] : pKeyTableKey[1];
 				if(alternateKey) {
-					fb_gfx->key[fbScan] = (value << 7) | ((GetKeyState(alternateKey) & 0x8000) ? TRUE : FALSE);
+					fb_gfx->key[fbScan] = (char)((value << 7) | ((GetKeyState(alternateKey) & 0x8000) ? TRUE : FALSE));
 				}
 				else {
 					fb_gfx->key[fbScan] = (char)value;
@@ -335,6 +336,8 @@ static LRESULT CALLBACK D2DWndProcSubclass(HWND hwnd, UINT msg, WPARAM wParam, L
 			fb_gfxDriverD2D.unlock();
 		}
 		break;
+	default:
+		break;
 	}
 	return CallWindowProc(pGlobalState->wndProcCookie, hwnd, msg, wParam, lParam);
 }
@@ -348,6 +351,7 @@ static HWND CreateTheWindow(WNDPROC* pOriginalProc)
 	DWORD exStyle = 0;
 	DEVMODE mode = {0};
 	int fbFlags = fb_win32.flags;
+	LONG_PTR previousProc;
 	HMONITOR hCurMonitor = fb_win32.monitor;
 	MONITORINFOEX mInf;
 	BOOL isFullScreen = (fbFlags & DRIVER_FULLSCREEN);
@@ -397,7 +401,8 @@ static HWND CreateTheWindow(WNDPROC* pOriginalProc)
 			fb_gfx->refresh_rate = (int)mode.dmDisplayFrequency;
 	}
 	hwnd = fb_win32.wnd;
-	*pOriginalProc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&D2DWndProcSubclass);
+	previousProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)&D2DWndProcSubclass);
+	*pOriginalProc = (WNDPROC)previousProc;
 	DBG_TEXT("%s - Created window at %p, size=%dx%d, original wndproc at %p", hwnd, winSize.right - winSize.left, winSize.bottom - winSize.top, *pOriginalProc);
 	return hwnd;
 }
@@ -510,7 +515,7 @@ static int GdiInteropSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 		/* if depth conversion is necessary, we need a blitter and a temp buffer */
 		if(fb_gfx->depth < 24) {
 			pGlobalState->pBlitter = fb_hGetBlitter(32, FALSE);
-			if(!(pGlobalState->pTempBuffer = calloc(1, bitmapSize.height * stride))) {
+			if(!(pGlobalState->pTempBuffer = (unsigned char*)calloc(1, bitmapSize.height * stride))) {
 				goto errorReturn;
 			}
 		}
@@ -609,7 +614,7 @@ static int D2DDirectSetup(D2DGlobalState* pGlobalState, HWND hwnd)
 	*/
 	if((renderProps.pixelFormat.format < DXGI_FORMAT_B8G8R8A8_UNORM) || (fb_gfx->depth < 24)) {
 		pGlobalState->pBlitter = fb_hGetBlitter(32, renderProps.pixelFormat.format < DXGI_FORMAT_B8G8R8A8_UNORM);
-		if(!(pGlobalState->pTempBuffer = calloc(1, hwndRenderProps.pixelSize.height * stride))) {
+		if(!(pGlobalState->pTempBuffer = (unsigned char*)calloc(1, hwndRenderProps.pixelSize.height * stride))) {
 			goto errorReturn;
 		}
 	}
@@ -663,7 +668,7 @@ static void D2DCommonPaintInternal(D2DGlobalState* pGlobalState)
 	stride = (UINT)(winWidth * 4);
 	pDirtyStart = fb_gfx->dirty;
 	pDirtyEnd = pDirtyStart + (size_t)fb_gfx->h;
-	pFirstDirtyRow = FB_MEMCHR(pDirtyStart, TRUE, (size_t)fb_gfx->h);
+	pFirstDirtyRow = (const char*)FB_MEMCHR(pDirtyStart, TRUE, (size_t)fb_gfx->h);
 	/* nothing's dirty, don't do anything */
 	if(!pFirstDirtyRow) {
 		fb_gfxDriverD2D.unlock();
@@ -674,13 +679,29 @@ static void D2DCommonPaintInternal(D2DGlobalState* pGlobalState)
 	// we optimize and look at ptr-size bytes per time, instead of just looping 
 	// over single ones.
 	*/
-	while(PtrToUlong(pDirtyEnd) & (ptrSize - 1)) {
+	while((pDirtyEnd > pDirtyStart) && (PtrToUlong(pDirtyEnd) & (ptrSize - 1))) {
 		if(*(--pDirtyEnd)) {
 			pLastDirtyRow = pDirtyEnd;
 			goto fillInDirtyRect;
 		}
 	}
-	while((dirtyRows = *(ULONG_PTR*)(pDirtyEnd -= ptrSize)) == 0);
+	dirtyRows = 0;
+	while((size_t)(pDirtyEnd - pDirtyStart) >= sizeof(dirtyRows)) {
+		pDirtyEnd -= sizeof(dirtyRows);
+		memcpy(&dirtyRows, pDirtyEnd, sizeof(dirtyRows));
+		if(dirtyRows != 0)
+			break;
+	}
+	if(dirtyRows == 0) {
+		if(pDirtyEnd > pDirtyStart) {
+			memcpy(&dirtyRows, pDirtyStart, (size_t)(pDirtyEnd - pDirtyStart));
+			pDirtyEnd = pDirtyStart;
+		}
+		if(dirtyRows == 0) {
+			fb_gfxDriverD2D.unlock();
+			return;
+		}
+	}
 #ifdef _WIN64
 	BitScanReverse64(&bitPos, dirtyRows);
 #else
@@ -705,10 +726,10 @@ fillInDirtyRect:
 	}
 	dirtyRect.top = (UINT32)(first_dirty_row * (size_t)scanlineSize);
 	dirtyRect.bottom = (UINT32)(dirty_row_count * (size_t)scanlineSize);
-	drawRect.left = dirtyRect.left;
-	drawRect.right = dirtyRect.right;
-	drawRect.top = dirtyRect.top;
-	drawRect.bottom = dirtyRect.bottom;
+	drawRect.left = (float)dirtyRect.left;
+	drawRect.right = (float)dirtyRect.right;
+	drawRect.top = (float)dirtyRect.top;
+	drawRect.bottom = (float)dirtyRect.bottom;
 
 	DBG_TEXT("%s - dirty rect L-%lu, T-%lu, R-%lu, B-%lu", dirtyRect.left, dirtyRect.top, dirtyRect.right, dirtyRect.bottom);
 
@@ -922,7 +943,7 @@ static void D2DPushToVector(MiniVector* pVector, int elemToAdd)
 		newCapacity = pVector->capacity + 20;
 		if ((size_t)newCapacity > ((size_t)-1 / sizeof(*pNewData)))
 			return;
-		pNewData = realloc(pVector->pData, (size_t)newCapacity * sizeof(*pNewData));
+		pNewData = (int*)realloc(pVector->pData, (size_t)newCapacity * sizeof(*pNewData));
 		if(!pNewData)
 		{
 			return;
@@ -941,7 +962,7 @@ static void D2DEnumOutputModes(IDXGIOutput* pOutput, MiniVector* pDepthModes)
 	while(*pFormats != DXGI_FORMAT_UNKNOWN)	{
 		IDXGIOutput_GetDisplayModeList(pOutput, *pFormats, DXGI_ENUM_MODES_INTERLACED, &numOutputModes, NULL);
 		if(numOutputModes != 0) {
-			DXGI_MODE_DESC* pModeList = calloc(numOutputModes, sizeof(*pModeList));
+			DXGI_MODE_DESC* pModeList = (DXGI_MODE_DESC*)calloc(numOutputModes, sizeof(*pModeList));
 			if(pModeList && (!NOTIFY_FAILED_HR(IDXGIOutput_GetDisplayModeList(pOutput, *pFormats, DXGI_ENUM_MODES_INTERLACED, &numOutputModes, pModeList)))) {
 				UINT i;
 				UINT32 packed_mode;

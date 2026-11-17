@@ -33,7 +33,7 @@ FBCALL int fb_LocateEx( int row, int col, int cursor, int *current_pos )
         }
 
         if( col!=0 )
-            FB_HANDLE_SCREEN->line_length = col - 1;
+			FB_HANDLE_SCREEN->line_length = (unsigned int)(col - 1);
 
         FB_UNLOCK();
     }

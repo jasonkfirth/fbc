@@ -7,13 +7,18 @@
  */
 #include "../../fb.h"
 #include <windows.h>
+#include <stdint.h>
 
 /* maxlen is the size of the buffer including the null terminator 
    and must be >= 1 */
 
 char *fb_hGetExePath( char *dst, ssize_t maxlen )
 {
-	GetModuleFileName( GetModuleHandle( NULL ), dst, maxlen );
+	if( (dst == NULL) || (maxlen < 1) ||
+	    ((uint64_t)maxlen > (uint64_t)MAXDWORD) )
+		return NULL;
+
+	GetModuleFileName( GetModuleHandle( NULL ), dst, (DWORD)maxlen );
 
 	char *p = strrchr( dst, '\\' );
 	if( p != NULL )

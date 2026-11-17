@@ -9,6 +9,7 @@
         Provide Haiku-specific shared sfxlib teardown.
 */
 
+#include "../fb_sfx_internal.h"
 #ifndef DISABLE_HAIKU
 #include "fb_sfx_haiku.h"
 #endif

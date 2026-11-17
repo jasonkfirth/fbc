@@ -10,14 +10,14 @@
 #include <stdint.h>
 
 /* String lengths are stored as signed values by the runtime. */
-static int64_t SizeToDelta( size_t value )
+static ssize_t SizeToDelta( size_t value )
 {
     if( value > (size_t)FB_STRSIZEMSK ) {
         DBG_ASSERT( value <= (size_t)FB_STRSIZEMSK );
         value = (size_t)FB_STRSIZEMSK;
     }
 
-    return (int64_t)value;
+    return (ssize_t)value;
 }
 
 static void DoAdjust
@@ -84,13 +84,15 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 	FBSTRING result = { 0, 0, 0 };
 
     int current_x, current_y;
-    int cols, rows;
-    size_t pos, len, tmp_buffer_len = 0;
+    int cols = 0, rows = 0;
+    size_t pos, len, tmp_buffer_len = 0, column_count = 0;
     int cursor_visible;
     int k;
     char tmp_buffer[12];
 
     fb_GetSize(&cols, &rows);
+    if( cols > 0 )
+        column_count = (size_t)cols;
 
     cursor_visible = (fb_Locate( 0, 0, -1, 0, 0 ) & 0x10000) != 0;
     fb_Locate( 0, 0, FALSE, 0, 0 );
@@ -193,16 +195,17 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 			break;
 
 		case KEY_UP:  /* Move cursor up */
-			if( pos >= (size_t)cols ) {
+			if( (column_count != 0) && (pos >= column_count) ) {
 				DoMove( &current_x, &current_y, -cols, cols, rows );
-				pos -= cols;
+				pos -= column_count;
 			}
 			break;
 
 		case KEY_DOWN:  /* Move cursor down */
-			if( (pos + cols) <= len ) {
+			if( (column_count != 0) && (pos <= len) &&
+			    (column_count <= len - pos) ) {
 				DoMove( &current_x, &current_y, cols, cols, rows );
-				pos += cols;
+				pos += column_count;
 			}
 			break;
 
@@ -222,10 +225,10 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
 
         if( delete_char_count ) {
             FBSTRING_ACCESS *str_fill;
-            FBSTRING_ACCESS *str_left = fb_StrMid( &result, 1, pos );
+            FBSTRING_ACCESS *str_left = fb_StrMid( &result, 1, SizeToDelta( pos ) );
             FBSTRING_ACCESS *str_right = fb_StrMid( &result,
-                                             pos + 1 + delete_char_count,
-                                             len - pos - delete_char_count);
+                                             SizeToDelta( pos + 1 + delete_char_count ),
+                                             SizeToDelta( len - pos - delete_char_count ) );
             fb_StrAssign( &result, -1, str_left, -1, FALSE );
             fb_StrConcatAssign( &result, -1, str_right, -1, FALSE );
             len -= delete_char_count;
@@ -235,7 +238,7 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
             fb_PrintBufferEx( result.data + pos, len - pos, 0 );
 
             /* Overwrite all deleted characters with SPC's */
-            str_fill = fb_StrFill1 ( delete_char_count, ' ' );
+            str_fill = fb_StrFill1 ( SizeToDelta( delete_char_count ), ' ' );
             fb_PrintBufferEx( str_fill->data, delete_char_count, 0 );
             fb_hStrDelTemp( str_fill );
 
@@ -247,10 +250,12 @@ FBCALL FBSTRING_ACCESS *fb_ConReadLine( int soft_cursor )
         if( add_char ) {
             int old_x = current_x, old_y = current_y;
             FBSTRING_ACCESS *str_add;
-            FBSTRING_ACCESS *str_left = fb_StrMid( &result, 1, pos );
-            FBSTRING_ACCESS *str_right = fb_StrMid( &result, pos + 1, len - pos);
+            FBSTRING_ACCESS *str_left = fb_StrMid( &result, 1, SizeToDelta( pos ) );
+            FBSTRING_ACCESS *str_right = fb_StrMid( &result,
+                                             SizeToDelta( pos + 1 ),
+                                             SizeToDelta( len - pos ) );
             tmp_buffer[tmp_buffer_len] = 0;
-            str_add = fb_StrAllocTempDescF( tmp_buffer, tmp_buffer_len + 1 );
+            str_add = fb_StrAllocTempDescF( tmp_buffer, SizeToDelta( tmp_buffer_len + 1 ) );
             fb_StrAssign( &result, -1, str_left, -1, FALSE );
             fb_StrConcatAssign( &result, -1, str_add, -1, FALSE );
             fb_StrConcatAssign( &result, -1, str_right, -1, FALSE );

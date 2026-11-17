@@ -38,7 +38,8 @@ static void close_dir ( void )
 
 static int get_attrib ( char *name, struct stat *info )
 {
-	int attrib = 0, mask;
+	int attrib = 0;
+	mode_t mask;
 
 	/* read only */
 	if( info->st_uid == geteuid() )
@@ -177,7 +178,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 				len = (p - filespec->data) + 1;
 				if( len > MAX_PATH - 1 )
 					len = MAX_PATH - 1;
-				memcpy( ctx->dirname, filespec->data, len );
+				memcpy( ctx->dirname, filespec->data, (size_t)len );
 				ctx->dirname[len] = '\0';
 			}
 				else
@@ -234,8 +235,12 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 
 	/* store filename if found */
 	if( name ) {
-		len = strlen( name );
-		res = fb_hStrAllocTemp_NoLock( NULL, len );
+		size_t name_len = strlen( name );
+		res = NULL;
+		if( name_len <= (size_t)FB_STRSIZEMSK ) {
+			len = (ssize_t)name_len;
+			res = fb_hStrAllocTemp_NoLock( NULL, len );
+		}
 		if( res )
 			fb_hStrCopy( res->data, name, len );
 		else

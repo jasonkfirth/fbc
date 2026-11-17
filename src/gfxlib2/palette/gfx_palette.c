@@ -22,7 +22,9 @@ unsigned int fb_hMakeColor(int bpp, unsigned int index, int r, int g, int b)
 	unsigned int color;
 
 	if (bpp == 2)
-		color = (b >> 3) | ((g << 3) & 0x07E0) | ((r << 8) & 0xF800);
+		color = ((unsigned int)b >> 3) |
+		        (((unsigned int)g << 3) & 0x07E0u) |
+		        (((unsigned int)r << 8) & 0xF800u);
 	else
 		color = index;
 
@@ -31,7 +33,10 @@ unsigned int fb_hMakeColor(int bpp, unsigned int index, int r, int g, int b)
 
 unsigned int fb_hFixColor(int bpp, unsigned int color)
 {
-	return fb_hMakeColor(bpp, color, (color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF) & BPP_MASK(bpp);
+	return fb_hMakeColor(bpp, color,
+		(int)((color >> 16) & 0xFFu),
+		(int)((color >> 8) & 0xFFu),
+		(int)(color & 0xFFu)) & (unsigned int)BPP_MASK(bpp);
 }
 
 void fb_hRestorePalette(void)
@@ -52,7 +57,8 @@ void fb_hSetPaletteColorRgb(int index, int r, int g, int b)
 {
 	index &= (fb_gfx->default_palette->colors - 1);
 
-	fb_gfx->device_palette[index] = r | (g << 8) | (b << 16);
+	fb_gfx->device_palette[index] = (unsigned int)r |
+		((unsigned int)g << 8) | ((unsigned int)b << 16);
 
 	if (fb_gfx->driver->set_palette)
 		fb_gfx->driver->set_palette(index, r, g, b);
@@ -65,15 +71,15 @@ void fb_hSetPaletteColor(int index, unsigned int color)
 	index &= (fb_gfx->default_palette->colors - 1);
 
 	if (fb_gfx->default_palette == &fb_palette[FB_PALETTE_256]) {
-		r = ((color & 0x3F) * 255.0) / 63.0;
-		g = (((color & 0x3F00) >> 8) * 255.0) / 63.0;
-		b = (((color & 0x3F0000) >> 16) * 255.0) / 63.0;
+		r = (int)(((color & 0x3Fu) * 255.0) / 63.0);
+		g = (int)((((color & 0x3F00u) >> 8) * 255.0) / 63.0);
+		b = (int)((((color & 0x3F0000u) >> 16) * 255.0) / 63.0);
 	} else {
-		color &= (fb_gfx->default_palette->colors - 1);
+		color &= (unsigned int)(fb_gfx->default_palette->colors - 1);
 		r = (fb_gfx->palette[color] & 0xFF);
 		g = (fb_gfx->palette[color] >> 8) & 0xFF;
 		b = (fb_gfx->palette[color] >> 16) & 0xFF;
-		fb_gfx->color_association[index] = color;
+		fb_gfx->color_association[index] = (unsigned char)color;
 	}
 
 	fb_hSetPaletteColorRgb(index, r, g, b);
@@ -119,7 +125,8 @@ FBCALL void fb_GfxPalette(int index, int red, int green, int blue)
 			r = palette->data[i * 3];
 			g = palette->data[(i * 3) + 1];
 			b = palette->data[(i * 3) + 2];
-			fb_gfx->palette[i] = r | (g << 8) | (b << 16);
+			fb_gfx->palette[i] = (unsigned int)r |
+				((unsigned int)g << 8) | ((unsigned int)b << 16);
 			if (i < (1 << fb_gfx->depth)) {
 				if (mode_association) {
 					fb_gfx->color_association[i] = mode_association[i];
@@ -127,7 +134,8 @@ FBCALL void fb_GfxPalette(int index, int red, int green, int blue)
 					g = palette->data[(fb_gfx->color_association[i] * 3) + 1];
 					b = palette->data[(fb_gfx->color_association[i] * 3) + 2];
 				}
-				fb_gfx->device_palette[i] = r | (g << 8) | (b << 16);
+				fb_gfx->device_palette[i] = (unsigned int)r |
+					((unsigned int)g << 8) | ((unsigned int)b << 16);
 				if (fb_gfx->driver->set_palette)
 					fb_gfx->driver->set_palette(i, r, g, b);
 			}
@@ -139,7 +147,8 @@ FBCALL void fb_GfxPalette(int index, int red, int green, int blue)
 			fb_hSetPaletteColorRgb(index, red, green, blue);
 	}
 
-	fb_hMemSet(fb_gfx->dirty, TRUE, fb_gfx->h);
+	if (fb_gfx->h > 0)
+		fb_hMemSet(fb_gfx->dirty, TRUE, (size_t)fb_gfx->h);
 
 	DRIVER_UNLOCK();
 	FB_GRAPHICS_UNLOCK( );

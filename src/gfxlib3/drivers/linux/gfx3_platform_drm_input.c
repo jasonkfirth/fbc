@@ -47,6 +47,9 @@ typedef struct FB_GFX3_DRM_INPUT_DEVICE {
 	int shift_right;
 	int caps_lock;
 	unsigned char event_buffer[sizeof(struct input_event)];
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t event_buffer_length_alignment_padding;
+#endif
 	size_t event_buffer_length;
 	ssize_t buttons;
 	ssize_t dpad_keys;
@@ -56,6 +59,9 @@ typedef struct FB_GFX3_DRM_INPUT_DEVICE {
 struct FB_GFX3_DRM_INPUT_ADAPTER {
 	FB_GFX3_INPUT_STATE *input;
 	uint32_t device_count;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t device_array_alignment_padding;
+#endif
 	FB_GFX3_DRM_INPUT_DEVICE device[FB_GFX3_DRM_INPUT_DEVICE_MAX];
 };
 
@@ -513,8 +519,12 @@ void fb_gfx3_platform_drm_input_pump(FB_GFX3_DRM_INPUT_ADAPTER *adapter)
 			}
 			if ((amount < 0) && (errno == EINTR))
 				continue;
-			if ((amount < 0) && ((errno == EAGAIN) || (errno == EWOULDBLOCK)))
+			if ((amount < 0) && (errno == EAGAIN))
 				break;
+#if EWOULDBLOCK != EAGAIN
+			if ((amount < 0) && (errno == EWOULDBLOCK))
+				break;
+#endif
 			drm_input_close_device(adapter, device);
 			break;
 		}

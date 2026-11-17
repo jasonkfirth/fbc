@@ -157,7 +157,7 @@ static int get_input(void)
 	int k, cb, cx, cy;
 
 	k = fb_console_context.keyboard_getch();
-	if (k == '\e') {
+	if (k == '\033') {
 		k = fb_console_context.keyboard_getch();
 		if (k == EOF)
 			return 27;

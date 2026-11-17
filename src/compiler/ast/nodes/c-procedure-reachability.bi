@@ -15,8 +15,16 @@
 #define CPROC_STATIC_QUEUED (&h10)
 '' A static cleanup wrapper is emitted after body reachability settles.
 #define CPROC_STATIC_ROOT   (&h20)
+'' A resolved ASM operand also needs its original native entry and body.
+#define CPROC_ASM_REFERENCE (&h40)
+'' Partial object retirement can call a generated child destructor after AST flushing.
+#define CPROC_CLEANUP_ROOT  (&h80)
 
 declare sub astCProcRecordAddress( byval proc as FBSYMBOL ptr )
+declare sub astCProcRecordAsmReference( byval proc as FBSYMBOL ptr )
+
+declare sub astCProcRecordFieldCleanup( byval resource as FBSYMBOL ptr )
+declare function astCProcHasAsmReference( byval proc as FBSYMBOL ptr ) as integer
 
 #endif
 '' end of ast/nodes/c-procedure-reachability.bi

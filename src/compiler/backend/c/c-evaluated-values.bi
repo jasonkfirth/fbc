@@ -25,17 +25,20 @@ private function hCEvaluatedScalar(byval dtype as integer, byref value as string
 	assert(typeIsPtr(kind) = FALSE)
 	var helper = "fb_EvaluatedValue" + str(kind)
 	if( c_evaluated_value_emitted(kind) = FALSE ) then
-		'' GCC can omit floating arithmetic in a void expression even at -O0.
-		'' A by-value argument retains the value context of the original store.
-		'' Returning that value allows ordinary native inlining and dead-store
-		'' optimization, without introducing a named unread destination.
+		'' An identity call can disappear after native inlining, including
+		'' floating conversions and integer operations whose evaluation matters.
+		'' A volatile value keeps that evaluation and destination rounding when
+		'' the BASIC store has no reader. It does not access the removed storage.
 		var typename = hEmitType(kind, NULL)
 		var section = sectionGosub(0)
+		var first = ctx.sections(0).bufferlen
 		hWriteLine("static inline " + typename + " " + helper + "(" + typename + " value)")
-		hWriteLine("{ return value; }")
+		hWriteLine("{ volatile " + typename + " evaluated = value; return evaluated; }")
+		hCLeafNativeSpan(helper, TRUE, first, ctx.sections(0).bufferlen)
 		sectionReturn(section)
 		c_evaluated_value_emitted(kind) = TRUE
 	end if
+	hCLeafNativeReference(helper)
 	return helper + "( (" + value + ") )"
 end function
 
@@ -43,13 +46,17 @@ end function
 '' conversion. No pointee is accessed, owned or converted through an integer.
 '' The erased object type also avoids moving a local record tag into the header.
 private function hCEvaluatedPointer(byref value as string) as string
+	var helper = "fb_EvaluatedPointer"
 	if( c_evaluated_pointer_emitted = FALSE ) then
 		var section = sectionGosub(0)
+		var first = ctx.sections(0).bufferlen
 		hWriteLine("static inline const void* fb_EvaluatedPointer(const void* value)")
 		hWriteLine("{ return value; }")
+		hCLeafNativeSpan(helper, TRUE, first, ctx.sections(0).bufferlen)
 		sectionReturn(section)
 		c_evaluated_pointer_emitted = TRUE
 	end if
+	hCLeafNativeReference(helper)
 	return "fb_EvaluatedPointer( (" + value + ") )"
 end function
 

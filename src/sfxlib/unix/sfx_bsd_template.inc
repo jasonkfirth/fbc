@@ -69,7 +69,6 @@
 #endif
 
 extern const FB_SFX_DRIVER FB_SFX_BSD_DRIVER_NAME;
-extern const FB_SFX_DRIVER fb_sfxDriverNull_internal;
 
 #if defined(__GNUC__) || defined(__clang__)
 #define FB_SFX_BSD_WEAK __attribute__((weak))

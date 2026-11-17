@@ -7,10 +7,8 @@
  */
 #include "fb.h"
 
-/* calculate the number of array elements based on the passed
-   in to fb_hArrayRealloc().  Note that this is a different
-   format than the arrary->dimTB[] table
-*/
+/* Calculate the number of array elements based on the bounds passed
+   to fb_hArrayRealloc(). This differs from array->dimTB[]. */
 size_t fb_hArrayCalcElements
 	(
 		size_t dimensions,
@@ -20,9 +18,18 @@ size_t fb_hArrayCalcElements
 {
 	size_t i, elements;
 
-	elements = (uboundTB[0] - lboundTB[0]) + 1;
-	for( i = 1; i < dimensions; i++ )
-		elements *= (uboundTB[i] - lboundTB[i]) + 1;
+	if( (dimensions == 0) || (dimensions > FB_MAXDIMENSIONS) )
+		return 0;
+
+	elements = 1;
+	for( i = 0; i < dimensions; i++ ) {
+		size_t dim_elements = fb_hArrayCalcDimElements( lboundTB[i], uboundTB[i] );
+
+		if( (dim_elements == 0) || (elements > SIZE_MAX / dim_elements) )
+			return 0;
+
+		elements *= dim_elements;
+	}
 
 	return elements;
 }
@@ -37,19 +44,20 @@ ssize_t fb_hArrayCalcDiff
 	size_t i, elements;
 	size_t diff = 0;
 
-	if( dimensions == 0 )
+	if( (dimensions == 0) || (dimensions > FB_MAXDIMENSIONS) )
 		return 0;
 
 	for( i = 0; i < dimensions-1; i++ )
 	{
-		elements = ((size_t)uboundTB[i+1] - (size_t)lboundTB[i+1]) + 1;
+		elements = fb_hArrayCalcDimElements( lboundTB[i+1], uboundTB[i+1] );
+		if( elements == 0 )
+			return 0;
 		diff = (diff + (size_t)lboundTB[i]) * elements;
 	}
 
 	diff += (size_t)lboundTB[dimensions-1];
 
-	/* A virtual origin uses native-word wrapping, including SSIZE_MIN.
-	   Negating that bound as a signed value is not a C operation. */
+	/* A virtual origin wraps in the native address width. */
 	return (ssize_t)((size_t)0 - diff);
 }
 

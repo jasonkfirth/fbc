@@ -17,6 +17,7 @@ Returns the corresponding ASCII or Unicode integer representation of a character
 
 {{fbdoc item="ret"}}
 	The raw character value stored at ##//position//## in ##//str//##.
+	For a wide string, the result preserves the unsigned code-unit value even when the target's native wide-character type is signed.
 	If both ##//str//## and ##//position//## can be evaluated at compile time (like ##**Asc**("a")## or ##**Asc**(chr(97))## or ##**Asc**("abc", 2)## ...), the value is returned in a ##[[KeyPgUinteger|uinteger]]## result, otherwise in a ##[[KeyPgUlong|ulong]]## result.
 
 {{fbdoc item="desc"}}

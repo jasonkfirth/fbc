@@ -13,7 +13,7 @@
 /* constructor fb_Object$( ) */
 void fb_ObjectCtor( FB_OBJECT *this_ )
 {
-	this_->pVT = (FB_BASEVT *)(((unsigned char *)&Object_VT) + sizeof( FB_BASEVT ));
+	this_->pVT = &Object_VT + 1;
 }
 
 /* end of objects/oop_object.c */

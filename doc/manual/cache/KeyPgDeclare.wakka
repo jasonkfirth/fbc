@@ -18,6 +18,8 @@ Declares a module-level or member procedure
 {{fbdoc item="param"}}
 	##//param_list//##
 		Parenthesized comma-separated list of parameters.
+
+	The contextual modifier ##[[KeyPgNoInline|NoInline]]## may follow a complete procedure signature to disable native procedure inlining in the C backends.
 	##//return_type//##
 		The return type of a ##[[KeyPgFunction|Function]]##, ##[[KeyPgOperator|Operator]]##, or ##[[KeyPgProperty|Property]]## procedure.
 	##//name//##

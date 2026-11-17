@@ -6,6 +6,8 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include "../../fb.h"
+#include <limits.h>
+#include <stdlib.h>
 
 /* DEV_LPT_INFO->driver_opaque := (FILE *) file_handle */
 
@@ -14,6 +16,7 @@ int fb_PrinterOpen( DEV_LPT_INFO *devInfo, int iPort, const char *pszDevice )
     int result;
     char filename[64];
     FILE *fp;
+	(void)pszDevice;
 		
     if( iPort==0 ) {
 				/* "LPT:" selects default "LPT1:" */
@@ -52,14 +55,25 @@ int fb_PrinterWriteWstr( DEV_LPT_INFO *devInfo, const FB_WCHAR *data, size_t len
     	string path before sending bytes to the LPT device.
     */
 
-    char *temp = alloca( length + 1 );
+	char *temp;
+	int result;
 
-    if( length > 0 )
-        fb_wstr_ConvToA( temp, length, data );
-    else
-    	*temp = '\0';
+	if( length > (size_t)LONG_MAX || length == (size_t)-1 )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
-    return fb_PrinterWrite( devInfo, (void *)temp, length );
+	temp = malloc( length + 1 );
+	if( temp == NULL )
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+
+    if( length > 0 ) {
+        fb_wstr_ConvToA( temp, (ssize_t)length, data );
+    } else {
+        *temp = '\0';
+    }
+
+	result = fb_PrinterWrite( devInfo, temp, length );
+	free( temp );
+	return result;
 }
 
 int fb_PrinterClose( DEV_LPT_INFO *devInfo )

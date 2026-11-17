@@ -147,6 +147,9 @@ typedef struct FB_GFX3_PLATFORM_DRM {
 	uint32_t pending_framebuffer;
 	uint32_t width;
 	uint32_t height;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t gbm_device_alignment_padding;
+#endif
 	struct gbm_device *gbm_device;
 	struct gbm_surface *gbm_surface;
 	struct gbm_bo *current_buffer;
@@ -155,6 +158,9 @@ typedef struct FB_GFX3_PLATFORM_DRM {
 	EGLSurface egl_surface;
 	EGLContext egl_context;
 	drmModeModeInfo mode;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t saved_crtc_alignment_padding;
+#endif
 	drmModeCrtc *saved_crtc;
 	drmEventContext event_context;
 } FB_GFX3_PLATFORM_DRM;

@@ -7,6 +7,8 @@
  */
 #include "fb.h"
 
+#include <stdint.h>
+
 int fb_DevFileEof( FB_FILE *handle )
 {
     FILE *fp;
@@ -28,7 +30,16 @@ int fb_DevFileEof( FB_FILE *handle )
 		/* note: handle->putback_size will be checked by fb_FileEofEx() */
 		/* This detects both cases: a) last read reached EOF, b) next
 		   read will reach EOF */
-		eof = (ftello( fp ) >= handle->size);
+		{
+			fb_off_t position = ftello(fp);
+			if (position == (fb_off_t)-1) {
+				eof = (handle->size == -1);
+			} else if (handle->size == -1) {
+				eof = TRUE;
+			} else {
+				eof = ((uintmax_t)position >= (uintmax_t)handle->size);
+			}
+		}
 		break;
 
 	/* text-mode (INPUT, OUTPUT or APPEND) */
@@ -40,7 +51,7 @@ int fb_DevFileEof( FB_FILE *handle )
 		eof = feof( fp );
 		if( !eof ) {
 			/* b) peek ahead: will the next read reach EOF? */
-			int c = getc( fp );
+			int c = fgetc( fp );
 			eof = (c == EOF);
 			if( !eof ) {
 				ungetc( c, fp );

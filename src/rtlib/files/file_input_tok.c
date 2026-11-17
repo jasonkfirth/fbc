@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
 
 #if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
 #define FB_FALLTHROUGH __attribute__((fallthrough))
@@ -115,6 +116,8 @@ int fb_FileInputNextToken
 	FB_INPUTCTX *ctx = FB_TLSGETCTX( INPUT );
 
 	*isfp = FALSE;
+	if( max_chars > INT_MAX )
+		max_chars = INT_MAX;
 
 	/* */
 	skipdelim = TRUE;
@@ -209,7 +212,7 @@ int fb_FileInputNextToken
 
 		default:
 savechar:
-			*buffer++ = c;
+			*buffer++ = (char)(unsigned char)c;
             ++len;
             break;
 		}
@@ -225,7 +228,7 @@ exit:
 	if( skipdelim )
 		hSkipDelimiter( ctx, c );
 
-	return len;
+	return (int)len;
 }
 
 /* end of files/file_input_tok.c */

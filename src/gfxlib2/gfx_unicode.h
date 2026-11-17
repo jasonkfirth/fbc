@@ -9,6 +9,8 @@
 #ifndef FB_GFX_UNICODE_H
 #define FB_GFX_UNICODE_H
 
+#include <stdint.h>
+
 /* The caller owns the returned temporary descriptor. Only its allocation
    uses the string lock; drawing takes the graphics lock after conversion. */
 static FBSTRING_ACCESS *fb_hGfxWideGlyphs( const FB_WCHAR *buffer, size_t length )
@@ -22,16 +24,22 @@ static FBSTRING_ACCESS *fb_hGfxWideGlyphs( const FB_WCHAR *buffer, size_t length
 		return NULL;
 	}
 	FB_STRLOCK();
-	glyphs = fb_hUStrAlloc_NoLock(length);
+	glyphs = fb_hUStrAlloc_NoLock((ssize_t)length);
 	if( glyphs != NULL && length > 0 ) {
 		for( i = 0; i < length; ++i ) {
-			scalar = buffer[i];
-			if( sizeof(FB_WCHAR) == 2 && scalar >= 0xD800 && scalar <= 0xDBFF &&
-			    i + 1 < length && buffer[i + 1] >= 0xDC00 && buffer[i + 1] <= 0xDFFF ) {
-				scalar = 0x10000 + ((scalar - 0xD800) << 10) + buffer[i + 1] - 0xDC00;
-				++i;
+			if( sizeof(FB_WCHAR) == 2 ) {
+				scalar = (unsigned int)(uint16_t)buffer[i];
+				if( scalar >= 0xD800 && scalar <= 0xDBFF &&
+				    i + 1 < length && (uint16_t)buffer[i + 1] >= 0xDC00 &&
+				    (uint16_t)buffer[i + 1] <= 0xDFFF ) {
+					scalar = 0x10000u + ((scalar - 0xD800u) << 10) +
+						(unsigned int)(uint16_t)buffer[i + 1] - 0xDC00u;
+					++i;
+				}
+			} else {
+				scalar = (unsigned int)buffer[i];
 			}
-			glyphs->data[written++] = scalar <= 0xFF ? scalar : '?';
+			glyphs->data[written++] = (char)(unsigned char)(scalar <= 0xFF ? scalar : '?');
 		}
 		fb_hStrSetLength(glyphs, written);
 		glyphs->data[written] = 0;

@@ -6,6 +6,7 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <math.h>
 
 
 /*:::::*/
@@ -44,9 +45,9 @@ FBCALL int fb_SGNl ( long long int x )
 /*:::::*/
 FBCALL int fb_SGNSingle ( float x )
 {
-	if( x == 0.0 )
+	if( fpclassify(x) == FP_ZERO )
 		return 0;
-	else if( x > 0.0 )
+	else if( x > 0.0f )
 		return 1;
 	else
 		return -1;
@@ -55,7 +56,7 @@ FBCALL int fb_SGNSingle ( float x )
 /*:::::*/
 FBCALL int fb_SGNDouble ( double x )
 {
-	if( x == 0.0 )
+	if( fpclassify(x) == FP_ZERO )
 		return 0;
 	else if( x > 0.0 )
 		return 1;

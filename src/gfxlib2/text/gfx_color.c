@@ -32,9 +32,9 @@ unsigned int fb_GfxColor(unsigned int fg, unsigned int bg, int flags)
 	switch (fb_gfx->mode_num) {
 		case 1:
 			if (!(flags & FB_COLOR_BG_DEFAULT))
-				fb_GfxPalette(-(4 - (bg & 0x3)), 0, 0, 0);
+				fb_GfxPalette(-(4 - (int)(bg & 0x3u)), 0, 0, 0);
 			if (!(flags & FB_COLOR_FG_DEFAULT))
-				fb_GfxPalette(0, fg, -1, -1);
+				fb_GfxPalette(0, (int)fg, -1, -1);
 			break;
 		
 		case 7:
@@ -43,21 +43,27 @@ unsigned int fb_GfxColor(unsigned int fg, unsigned int bg, int flags)
 			if (!(flags & FB_COLOR_FG_DEFAULT))
 				context->fg_color = (fg & 0xF);
 			if (!(flags & FB_COLOR_BG_DEFAULT))
-				fb_GfxPalette(0, bg, -1, -1);
+				fb_GfxPalette(0, (int)bg, -1, -1);
 			break;
 		
 		default:
 			if (!(flags & FB_COLOR_FG_DEFAULT)) {
 				if (fb_gfx->depth > 8)
-					context->fg_color = fb_hMakeColor(fb_gfx->bpp, fg, (fg >> 16) & 0xFF, (fg >> 8) & 0xFF, fg & 0xFF);
+					context->fg_color = fb_hMakeColor(fb_gfx->bpp, fg,
+						(int)((fg >> 16) & 0xFFu),
+						(int)((fg >> 8) & 0xFFu), (int)(fg & 0xFFu));
 				else
-					context->fg_color = (fg & BPP_MASK(context->target_bpp));
+					context->fg_color =
+						(fg & (unsigned int)BPP_MASK(context->target_bpp));
 			}
 			if (!(flags & FB_COLOR_BG_DEFAULT)) {
 				if (fb_gfx->depth > 8)
-					context->bg_color = fb_hMakeColor(fb_gfx->bpp, bg, (bg >> 16) & 0xFF, (bg >> 8) & 0xFF, bg & 0xFF);
+					context->bg_color = fb_hMakeColor(fb_gfx->bpp, bg,
+						(int)((bg >> 16) & 0xFFu),
+						(int)((bg >> 8) & 0xFFu), (int)(bg & 0xFFu));
 				else
-					context->bg_color = (bg & BPP_MASK(context->target_bpp));
+					context->bg_color =
+						(bg & (unsigned int)BPP_MASK(context->target_bpp));
 			}
 			break;
 	}

@@ -105,8 +105,19 @@ typedef struct FB_SFX_MIDI_TRACKSTATE
     size_t size;
     size_t offset;
     unsigned char running_status;
+#if defined(__SIZEOF_LONG__) && (__SIZEOF_LONG__ == 8)
+    /* Three size_t fields place running_status at offset 24 on LP64. */
+    unsigned char next_tick_alignment_padding[7];
+#elif defined(__SIZEOF_LONG__) && (__SIZEOF_LONG__ == 4)
+    /* Keep next_tick aligned when unsigned long has four-byte alignment. */
+    unsigned char next_tick_alignment_padding[3];
+#endif
     unsigned long next_tick;
     int finished;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+    /* Name the existing 64-bit tail padding without changing the layout. */
+    unsigned char tail_padding[4];
+#endif
 } FB_SFX_MIDI_TRACKSTATE;
 
 static void fb_sfxMidiSleepMs(unsigned long milliseconds)

@@ -166,7 +166,7 @@ void fb_sfxBeepEx(int frequency, float duration)
     SFX_DEBUG(
         "sfx_beep: freq=%d duration=%f",
         frequency,
-        duration
+        (double)duration
     );
 }
 
@@ -201,9 +201,9 @@ void fb_sfxBeepPitch(float duration, float pitch)
 
     SFX_DEBUG(
         "sfx_beep: pitch=%f freq=%d duration=%f",
-        pitch,
+        (double)pitch,
         frequency,
-        duration
+        (double)duration
     );
 }
 

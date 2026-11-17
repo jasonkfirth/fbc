@@ -24,10 +24,16 @@
    version of it. */
 typedef struct {
 	UINT cbSize;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char hwnd_alignment_padding[4];
+#endif
 	HWND hwnd;
 	DWORD dwFlags;
 	UINT uCount;
 	DWORD dwTimeout;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char reserved_tail_padding[4];
+#endif
 } FB_FLASHWINFO, *PFB_FLASHWINFO;
 
 typedef BOOL (WINAPI *SETLAYEREDWINDOWATTRIBUTES)(HWND hWnd, COLORREF crKey, BYTE bAlpha, DWORD dwFlags);
@@ -43,6 +49,9 @@ typedef BOOL (WINAPI *CLOSETOUCHINPUTHANDLE)(HANDLE hTouchInput);
 
 typedef struct {
 	int version;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char hinstance_alignment_padding[4];
+#endif
 	HINSTANCE hinstance;
 	WNDCLASS wndclass;
 	HWND wnd;
@@ -57,6 +66,9 @@ typedef struct {
 	int window_scaling;
 	int window_scale;
 	RECT window_scaled_rect;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char init_alignment_padding[4];
+#endif
 	int (*init)(void);
 	void (*exit)(void);
 	void (*paint)(void);
@@ -66,6 +78,9 @@ typedef struct {
 	DWORD WINAPI (*thread)( LPVOID param );
 #endif
 	int mouse_clip;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char user32_procs_alignment_padding[4];
+#endif
 
 	/* user32 procs */
 	SETLAYEREDWINDOWATTRIBUTES SetLayeredWindowAttributes;

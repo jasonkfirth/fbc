@@ -53,6 +53,18 @@ static SLObjectItf player_object = NULL;
 static SLPlayItf player = NULL;
 static SLAndroidSimpleBufferQueueItf queue = NULL;
 static FB_SFX_OPENSL_BUFFER buffers[FB_SFX_OPENSL_BUFFERS];
+/*
+	OpenSL retains each PCM pointer until its FIFO completion callback. A
+	first-free scan on both sides is incorrect: after slot 0 is resubmitted,
+	the next completion belongs to slot 1, not the now-busy slot 0.
+
+	The runtime lock serializes writers. buffer_mutex protects reservations
+	and both cursors against the callback. Advance the producer only after a
+	successful Enqueue, so a rejected submission cannot leave a FIFO hole.
+	Enqueue runs without buffer_mutex: completion may precede its return.
+*/
+static int next_buffer_to_write = 0;
+static int next_buffer_to_complete = 0;
 static int channels_active = FB_SFX_DEFAULT_CHANNELS;
 static int buffer_frames_active = FB_SFX_DEFAULT_BUFFER;
 static pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -62,19 +74,16 @@ static int shutting_down = 0;
 
 static void opensl_callback(SLAndroidSimpleBufferQueueItf caller, void *context)
 {
-	int i;
-
 	(void)caller;
 	(void)context;
 
 	pthread_mutex_lock(&buffer_mutex);
-	for (i = 0; i < FB_SFX_OPENSL_BUFFERS; ++i)
+	if (!shutting_down && buffers[next_buffer_to_complete].in_use)
 	{
-		if (buffers[i].in_use)
-		{
-			buffers[i].in_use = 0;
-			break;
-		}
+		buffers[next_buffer_to_complete].in_use = 0;
+		++next_buffer_to_complete;
+		if (next_buffer_to_complete == FB_SFX_OPENSL_BUFFERS)
+			next_buffer_to_complete = 0;
 	}
 	pthread_cond_signal(&buffer_cond);
 	pthread_mutex_unlock(&buffer_mutex);
@@ -86,6 +95,8 @@ static void release_all_buffers_locked(void)
 
 	for (i = 0; i < FB_SFX_OPENSL_BUFFERS; ++i)
 		buffers[i].in_use = 0;
+	next_buffer_to_write = 0;
+	next_buffer_to_complete = 0;
 	pthread_cond_broadcast(&buffer_cond);
 }
 
@@ -143,6 +154,8 @@ static int allocate_buffers(int frames, int channels)
 
 	buffer_frames_active = frames;
 	channels_active = channels;
+	next_buffer_to_write = 0;
+	next_buffer_to_complete = 0;
 	return 0;
 }
 
@@ -324,7 +337,6 @@ static void opensl_exit(void)
 
 static FB_SFX_OPENSL_BUFFER *wait_for_buffer(int *paused)
 {
-	int i;
 	int may_wait;
 
 	*paused = 0;
@@ -342,14 +354,12 @@ static FB_SFX_OPENSL_BUFFER *wait_for_buffer(int *paused)
 			return NULL;
 		}
 
-		for (i = 0; i < FB_SFX_OPENSL_BUFFERS; ++i)
+		if (!buffers[next_buffer_to_write].in_use)
 		{
-			if (!buffers[i].in_use)
-			{
-				buffers[i].in_use = 1;
-				pthread_mutex_unlock(&buffer_mutex);
-				return &buffers[i];
-			}
+			FB_SFX_OPENSL_BUFFER *buffer = &buffers[next_buffer_to_write];
+			buffer->in_use = 1;
+			pthread_mutex_unlock(&buffer_mutex);
+			return buffer;
 		}
 
 		/*
@@ -417,13 +427,19 @@ static int opensl_write(const float *samples, int frames)
 		return -1;
 	}
 
+	pthread_mutex_lock(&buffer_mutex);
+	++next_buffer_to_write;
+	if (next_buffer_to_write == FB_SFX_OPENSL_BUFFERS)
+		next_buffer_to_write = 0;
+	pthread_mutex_unlock(&buffer_mutex);
+
 	return frames;
 }
 
 const FB_SFX_DRIVER fb_sfxDriverOpenSLES =
 {
 	"OpenSL ES",
-	FB_SFX_DRIVER_CAP_BACKGROUND,
+	FB_SFX_DRIVER_CAP_BACKGROUND FB_SFX_DRIVER_ABI_ALIGNMENT_INITIALIZER,
 	opensl_init,
 	opensl_exit,
 	opensl_write,

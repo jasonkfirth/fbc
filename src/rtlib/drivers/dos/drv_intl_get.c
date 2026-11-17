@@ -23,9 +23,9 @@ const char *fb_DrvIntlGet( eFbIntlIndex Index )
 		return Info.decimal_sep;
 	case eFIL_NumThousandsSeparator:
 		return Info.thousands_sep;
+	default:
+		return NULL;
 	}
-
-	return NULL;
 }
 
 /* end of drivers/dos/drv_intl_get.c */

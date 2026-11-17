@@ -27,6 +27,22 @@
 
 #include <emmintrin.h>
 
+/*
+    The unaligned intrinsics accept a one-byte-aligned vector type. Matching
+    scalar aliases keep the pixel tails safe when rows are not word-aligned.
+*/
+#if defined(__GNUC__) || defined(__clang__)
+typedef __m128i_u simd_m128i_u;
+typedef unsigned short simd_u16_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+typedef unsigned int simd_u32_unaligned
+	__attribute__((__aligned__(1), __may_alias__));
+#else
+typedef __m128i simd_m128i_u;
+typedef unsigned short simd_u16_unaligned;
+typedef unsigned int simd_u32_unaligned;
+#endif
+
 enum FB_GFX_SIMD_LOGIC {
 	FB_GFX_SIMD_AND,
 	FB_GFX_SIMD_OR,
@@ -166,11 +182,11 @@ int fb_hSimdAvailable(void)
 
 void *fb_hPixelSet2SIMD(void *dest, int color, size_t size)
 {
-	unsigned short *cursor = (unsigned short *)dest;
+	simd_u16_unaligned *cursor = (simd_u16_unaligned *)dest;
 	const __m128i fill = _mm_set1_epi16((short)color);
 
 	while (size >= 8u) {
-		_mm_storeu_si128((__m128i *)cursor, fill);
+		_mm_storeu_si128((simd_m128i_u *)cursor, fill);
 		cursor += 8;
 		size -= 8u;
 	}
@@ -183,11 +199,11 @@ void *fb_hPixelSet2SIMD(void *dest, int color, size_t size)
 
 void *fb_hPixelSet4SIMD(void *dest, int color, size_t size)
 {
-	unsigned int *cursor = (unsigned int *)dest;
+	simd_u32_unaligned *cursor = (simd_u32_unaligned *)dest;
 	const __m128i fill = _mm_set1_epi32(color);
 
 	while (size >= 4u) {
-		_mm_storeu_si128((__m128i *)cursor, fill);
+		_mm_storeu_si128((simd_m128i_u *)cursor, fill);
 		cursor += 4;
 		size -= 4u;
 	}
@@ -200,7 +216,7 @@ void *fb_hPixelSet4SIMD(void *dest, int color, size_t size)
 
 void *fb_hPixelSetAlpha4SIMD(void *dest, int color, size_t size)
 {
-	unsigned int *cursor = (unsigned int *)dest;
+	simd_u32_unaligned *cursor = (simd_u32_unaligned *)dest;
 	const __m128i source = _mm_set1_epi32(color);
 	unsigned int source_color = (unsigned int)color;
 	unsigned int source_rb = source_color & MASK_RB_32;
@@ -209,11 +225,12 @@ void *fb_hPixelSetAlpha4SIMD(void *dest, int color, size_t size)
 	unsigned int alpha = source_color >> 24;
 
 	while (size >= 4u) {
-		__m128i destination = _mm_loadu_si128((const __m128i *)cursor);
+		__m128i destination = _mm_loadu_si128(
+			(const simd_m128i_u *)cursor);
 		__m128i result = simd_blend_source_alpha(source, destination,
 			FALSE, TRUE);
 
-		_mm_storeu_si128((__m128i *)cursor, result);
+		_mm_storeu_si128((simd_m128i_u *)cursor, result);
 		cursor += 4;
 		size -= 4u;
 	}
@@ -245,9 +262,9 @@ static void simd_logic_row(unsigned char *source,
 
 	while ((bytes - offset) >= 16u) {
 		__m128i source_pixels = _mm_loadu_si128(
-			(const __m128i *)(source + offset));
+			(const simd_m128i_u *)(source + offset));
 		__m128i destination_pixels = _mm_loadu_si128(
-			(const __m128i *)(destination + offset));
+			(const simd_m128i_u *)(destination + offset));
 		__m128i result;
 
 		switch (operation) {
@@ -260,11 +277,12 @@ static void simd_logic_row(unsigned char *source,
 		case FB_GFX_SIMD_XOR:
 			result = _mm_xor_si128(destination_pixels, source_pixels);
 			break;
+		case FB_GFX_SIMD_PRESET:
 		default:
 			result = _mm_xor_si128(source_pixels, all_bits);
 			break;
 		}
-		_mm_storeu_si128((__m128i *)(destination + offset), result);
+		_mm_storeu_si128((simd_m128i_u *)(destination + offset), result);
 		offset += 16u;
 	}
 	while (offset < bytes) {
@@ -278,6 +296,7 @@ static void simd_logic_row(unsigned char *source,
 		case FB_GFX_SIMD_XOR:
 			destination[offset] ^= source[offset];
 			break;
+		case FB_GFX_SIMD_PRESET:
 		default:
 			destination[offset] = (unsigned char)~source[offset];
 			break;
@@ -364,18 +383,19 @@ void fb_hPutTrans1SIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		int x = 0;
+		size_t x = 0u;
 
-		for (; x <= (w - 16); x += 16) {
-			__m128i source = _mm_loadu_si128((const __m128i *)(src + x));
+		for (; x + 16u <= (size_t)w; x += 16u) {
+			__m128i source = _mm_loadu_si128(
+				(const simd_m128i_u *)(src + x));
 			__m128i destination = _mm_loadu_si128(
-				(const __m128i *)(dest + x));
+				(const simd_m128i_u *)(dest + x));
 			__m128i transparent = _mm_cmpeq_epi8(source, zero);
 
-			_mm_storeu_si128((__m128i *)(dest + x),
+			_mm_storeu_si128((simd_m128i_u *)(dest + x),
 				simd_select(transparent, destination, source));
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			if (src[x] != 0u)
 				dest[x] = src[x];
 		}
@@ -396,23 +416,24 @@ void fb_hPutTrans2SIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned short *source = (unsigned short *)src;
-		unsigned short *destination = (unsigned short *)dest;
-		int x = 0;
+		simd_u16_unaligned *source = (simd_u16_unaligned *)src;
+		simd_u16_unaligned *destination =
+			(simd_u16_unaligned *)dest;
+		size_t x = 0u;
 
-		for (; x <= (w - 8); x += 8) {
+		for (; x + 8u <= (size_t)w; x += 8u) {
 			__m128i source_pixels = _mm_loadu_si128(
-				(const __m128i *)(source + x));
+				(const simd_m128i_u *)(source + x));
 			__m128i destination_pixels = _mm_loadu_si128(
-				(const __m128i *)(destination + x));
+				(const simd_m128i_u *)(destination + x));
 			__m128i transparent = _mm_cmpeq_epi16(source_pixels,
 				transparent_color);
 
-			_mm_storeu_si128((__m128i *)(destination + x),
+			_mm_storeu_si128((simd_m128i_u *)(destination + x),
 				simd_select(transparent, destination_pixels,
 					source_pixels));
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			if (source[x] != MASK_COLOR_16)
 				destination[x] = source[x];
 		}
@@ -434,23 +455,24 @@ void fb_hPutTrans4SIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
-		int x = 0;
+		simd_u32_unaligned *source = (simd_u32_unaligned *)src;
+		simd_u32_unaligned *destination =
+			(simd_u32_unaligned *)dest;
+		size_t x = 0u;
 
-		for (; x <= (w - 4); x += 4) {
+		for (; x + 4u <= (size_t)w; x += 4u) {
 			__m128i source_pixels = _mm_loadu_si128(
-				(const __m128i *)(source + x));
+				(const simd_m128i_u *)(source + x));
 			__m128i destination_pixels = _mm_loadu_si128(
-				(const __m128i *)(destination + x));
+				(const simd_m128i_u *)(destination + x));
 			__m128i colors = _mm_and_si128(source_pixels, rgb_mask);
 			__m128i transparent = _mm_cmpeq_epi32(colors,
 				transparent_color);
 
-			_mm_storeu_si128((__m128i *)(destination + x),
+			_mm_storeu_si128((simd_m128i_u *)(destination + x),
 				simd_select(transparent, destination_pixels, colors));
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			unsigned int color = source[x] & FB_GFX_SIMD_RGB_MASK_32;
 
 			if (color != MASK_COLOR_32)
@@ -475,21 +497,22 @@ void fb_hPutAlpha4SIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
-		int x = 0;
+		simd_u32_unaligned *source = (simd_u32_unaligned *)src;
+		simd_u32_unaligned *destination =
+			(simd_u32_unaligned *)dest;
+		size_t x = 0u;
 
-		for (; x <= (w - 4); x += 4) {
+		for (; x + 4u <= (size_t)w; x += 4u) {
 			__m128i source_pixels = _mm_loadu_si128(
-				(const __m128i *)(source + x));
+				(const simd_m128i_u *)(source + x));
 			__m128i destination_pixels = _mm_loadu_si128(
-				(const __m128i *)(destination + x));
+				(const simd_m128i_u *)(destination + x));
 			__m128i result = simd_blend_source_alpha(source_pixels,
 				destination_pixels, TRUE, FALSE);
 
-			_mm_storeu_si128((__m128i *)(destination + x), result);
+			_mm_storeu_si128((simd_m128i_u *)(destination + x), result);
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			unsigned int source_color = source[x];
 			unsigned int destination_color = destination[x];
 			unsigned int factor = (source_color >> 24) + 1u;
@@ -525,15 +548,16 @@ void fb_hPutAdd4SIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
-		int x = 0;
+		simd_u32_unaligned *source = (simd_u32_unaligned *)src;
+		simd_u32_unaligned *destination =
+			(simd_u32_unaligned *)dest;
+		size_t x = 0u;
 
-		for (; x <= (w - 4); x += 4) {
+		for (; x + 4u <= (size_t)w; x += 4u) {
 			__m128i source_pixels = _mm_loadu_si128(
-				(const __m128i *)(source + x));
+				(const simd_m128i_u *)(source + x));
 			__m128i destination_pixels = _mm_loadu_si128(
-				(const __m128i *)(destination + x));
+				(const simd_m128i_u *)(destination + x));
 			__m128i source_low = _mm_unpacklo_epi8(source_pixels, zero);
 			__m128i source_high = _mm_unpackhi_epi8(source_pixels, zero);
 			__m128i scaled;
@@ -550,9 +574,9 @@ void fb_hPutAdd4SIMD(unsigned char *src, unsigned char *dest,
 				_mm_and_si128(source_pixels, rgb_mask),
 				transparent_color);
 			result = simd_select(transparent, destination_pixels, result);
-			_mm_storeu_si128((__m128i *)(destination + x), result);
+			_mm_storeu_si128((simd_m128i_u *)(destination + x), result);
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			unsigned int source_color = source[x];
 			unsigned int destination_color = destination[x];
 			unsigned int first;
@@ -594,21 +618,22 @@ void fb_hPutBlend2SIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned short *source = (unsigned short *)src;
-		unsigned short *destination = (unsigned short *)dest;
-		int x = 0;
+		simd_u16_unaligned *source = (simd_u16_unaligned *)src;
+		simd_u16_unaligned *destination =
+			(simd_u16_unaligned *)dest;
+		size_t x = 0u;
 
-		for (; x <= (w - 8); x += 8) {
+		for (; x + 8u <= (size_t)w; x += 8u) {
 			__m128i source_pixels = _mm_loadu_si128(
-				(const __m128i *)(source + x));
+				(const simd_m128i_u *)(source + x));
 			__m128i destination_pixels = _mm_loadu_si128(
-				(const __m128i *)(destination + x));
+				(const simd_m128i_u *)(destination + x));
 			__m128i result = simd_blend_rgb565(source_pixels,
 				destination_pixels, factor);
 
-			_mm_storeu_si128((__m128i *)(destination + x), result);
+			_mm_storeu_si128((simd_m128i_u *)(destination + x), result);
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			unsigned int source_color = source[x];
 			unsigned int destination_color = destination[x];
 			unsigned int source_rb;
@@ -646,15 +671,16 @@ void fb_hPutBlend4SIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
-		int x = 0;
+		simd_u32_unaligned *source = (simd_u32_unaligned *)src;
+		simd_u32_unaligned *destination =
+			(simd_u32_unaligned *)dest;
+		size_t x = 0u;
 
-		for (; x <= (w - 4); x += 4) {
+		for (; x + 4u <= (size_t)w; x += 4u) {
 			__m128i source_pixels = _mm_loadu_si128(
-				(const __m128i *)(source + x));
+				(const simd_m128i_u *)(source + x));
 			__m128i destination_pixels = _mm_loadu_si128(
-				(const __m128i *)(destination + x));
+				(const simd_m128i_u *)(destination + x));
 			__m128i result = simd_blend_constant(source_pixels,
 				destination_pixels, factor);
 			__m128i transparent = _mm_cmpeq_epi32(
@@ -662,9 +688,9 @@ void fb_hPutBlend4SIMD(unsigned char *src, unsigned char *dest,
 				transparent_color);
 
 			result = simd_select(transparent, destination_pixels, result);
-			_mm_storeu_si128((__m128i *)(destination + x), result);
+			_mm_storeu_si128((simd_m128i_u *)(destination + x), result);
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			unsigned int source_color = source[x];
 			unsigned int destination_color;
 			unsigned int source_rb;
@@ -707,14 +733,14 @@ void fb_hPutAlphaMaskSIMD(unsigned char *src, unsigned char *dest,
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *destination = (unsigned int *)dest;
-		int x = 0;
+		simd_u32_unaligned *destination = (simd_u32_unaligned *)dest;
+		size_t x = 0u;
 
-		for (; x <= (w - 4); x += 4) {
+		for (; x + 4u <= (size_t)w; x += 4u) {
 			unsigned int packed_alpha;
 			__m128i source_alpha;
 			__m128i destination_pixels = _mm_loadu_si128(
-				(const __m128i *)(destination + x));
+				(const simd_m128i_u *)(destination + x));
 
 			memcpy(&packed_alpha, src + x, sizeof(packed_alpha));
 			source_alpha = _mm_cvtsi32_si128((int)packed_alpha);
@@ -723,11 +749,11 @@ void fb_hPutAlphaMaskSIMD(unsigned char *src, unsigned char *dest,
 			source_alpha = _mm_unpacklo_epi16(source_alpha,
 				_mm_setzero_si128());
 			source_alpha = _mm_slli_epi32(source_alpha, 24);
-			_mm_storeu_si128((__m128i *)(destination + x),
+			_mm_storeu_si128((simd_m128i_u *)(destination + x),
 				_mm_or_si128(_mm_and_si128(destination_pixels, rgb_mask),
 					source_alpha));
 		}
-		for (; x < w; ++x) {
+		for (; x < (size_t)w; ++x) {
 			destination[x] =
 				(destination[x] & FB_GFX_SIMD_RGB_MASK_32) |
 				((unsigned int)src[x] << 24);

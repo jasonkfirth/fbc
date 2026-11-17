@@ -28,6 +28,7 @@
 #include "../gfx3_backend_opengl.h"
 #include "../gfx3_backend_select.h"
 #include "../gfx3_backend_vulkan.h"
+#include <math.h>
 #include "../gfx3_api_internal.h"
 #include "../gfx3_compat.h"
 #include "../gfx3_console.h"
@@ -42,6 +43,12 @@
 #include "../drivers/linux/gfx3_mobile.h"
 #endif
 
+/* Graphics sentinels require exact equality, including signed-zero behavior. */
+static int gfx3_float_equal(float left, float right)
+{
+	return (left <= right) && (left >= right);
+}
+
 typedef struct FB_GFX3_STANDARD_MODE {
 	uint16_t width;
 	uint16_t height;
@@ -50,31 +57,32 @@ typedef struct FB_GFX3_STANDARD_MODE {
 	uint8_t console_font_width;
 	uint8_t console_font_height;
 	uint8_t console_rows;
+	uint8_t tail_padding;
 } FB_GFX3_STANDARD_MODE;
 
 static const FB_GFX3_STANDARD_MODE standard_modes[] = {
-	{    0,    0, 0, 1, 8,  8,  0 }, /* Text mode / close graphics */
-	{  320,  200, 2, 8, 8,  8, 25 }, /* CGA */
-	{  640,  200, 1, 1, 8,  8, 25 }, /* CGA monochrome */
-	{  720,  348, 1, 2, 9, 14, 25 }, /* Hercules */
-	{  640,  400, 1, 1, 8, 16, 25 }, /* Olivetti and AT&T */
-	{  320,  200, 4, 1, 8,  8, 25 }, /* PCjr and Tandy 16-colour */
-	{  640,  200, 2, 1, 8,  8, 25 }, /* PCjr and Tandy 4-colour */
-	{  320,  200, 4, 8, 8,  8, 25 }, /* EGA */
-	{  640,  200, 4, 4, 8,  8, 25 }, /* EGA */
-	{  640,  350, 4, 2, 8, 14, 25 }, /* EGA */
-	{  640,  350, 1, 2, 8, 14, 25 }, /* EGA monochrome */
-	{  640,  480, 1, 1, 8, 16, 30 }, /* VGA monochrome */
-	{  640,  480, 4, 1, 8, 16, 30 }, /* VGA */
-	{  320,  200, 8, 1, 8,  8, 25 }, /* VGA / MCGA */
-	{  320,  240, 8, 1, 8,  8, 30 },
-	{  400,  300, 8, 1, 8,  8, 37 },
-	{  512,  384, 8, 1, 8, 16, 24 },
-	{  640,  400, 8, 1, 8, 16, 25 },
-	{  640,  480, 8, 1, 8, 16, 30 },
-	{  800,  600, 8, 1, 8, 16, 37 },
-	{ 1024,  768, 8, 1, 8, 16, 48 },
-	{ 1280, 1024, 8, 1, 8, 16, 64 }
+	{    0,    0, 0, 1, 8,  8,  0, 0 }, /* Text mode / close graphics */
+	{  320,  200, 2, 8, 8,  8, 25, 0 }, /* CGA */
+	{  640,  200, 1, 1, 8,  8, 25, 0 }, /* CGA monochrome */
+	{  720,  348, 1, 2, 9, 14, 25, 0 }, /* Hercules */
+	{  640,  400, 1, 1, 8, 16, 25, 0 }, /* Olivetti and AT&T */
+	{  320,  200, 4, 1, 8,  8, 25, 0 }, /* PCjr and Tandy 16-colour */
+	{  640,  200, 2, 1, 8,  8, 25, 0 }, /* PCjr and Tandy 4-colour */
+	{  320,  200, 4, 8, 8,  8, 25, 0 }, /* EGA */
+	{  640,  200, 4, 4, 8,  8, 25, 0 }, /* EGA */
+	{  640,  350, 4, 2, 8, 14, 25, 0 }, /* EGA */
+	{  640,  350, 1, 2, 8, 14, 25, 0 }, /* EGA monochrome */
+	{  640,  480, 1, 1, 8, 16, 30, 0 }, /* VGA monochrome */
+	{  640,  480, 4, 1, 8, 16, 30, 0 }, /* VGA */
+	{  320,  200, 8, 1, 8,  8, 25, 0 }, /* VGA / MCGA */
+	{  320,  240, 8, 1, 8,  8, 30, 0 },
+	{  400,  300, 8, 1, 8,  8, 37, 0 },
+	{  512,  384, 8, 1, 8, 16, 24, 0 },
+	{  640,  400, 8, 1, 8, 16, 25, 0 },
+	{  640,  480, 8, 1, 8, 16, 30, 0 },
+	{  800,  600, 8, 1, 8, 16, 37, 0 },
+	{ 1024,  768, 8, 1, 8, 16, 48, 0 },
+	{ 1280, 1024, 8, 1, 8, 16, 64, 0 }
 };
 
 static FB_GFX3_MODE active_mode;
@@ -562,9 +570,13 @@ FBCALL unsigned int fb_GfxPoint(void *target, float x, float y)
 	FB_GFX3_SURFACE *gpu_surface;
 	FB_GFX3_IMAGE_VIEW image;
 	uint32_t color = UINT32_MAX;
+	float cursor_value;
 
-	if (y == -8388607.0f)
-		return (unsigned int)fb_GfxCursor((int)x);
+	if (gfx3_float_equal(y, -8388607.0f))
+	{
+		cursor_value = fb_GfxCursor((int)x);
+		return (unsigned int)cursor_value;
+	}
 	FB_GRAPHICS_LOCK();
 	state = api_get_draw_state();
 	if (state != NULL) {
@@ -629,7 +641,8 @@ FBCALL void fb_GfxEllipse(void *target, float x, float y, float radius,
 					(uint32_t)flags);
 				fb_gfx3_image_cache_metadata_touch(&image);
 			}
-		} else if ((start == 0.0f) && (end == 6.283186f)) {
+	} else if ((fpclassify(start) == FP_ZERO) &&
+	    gfx3_float_equal(end, 6.283186f)) {
 			fb_gfx3_compat_ellipse(state, x, y, radius, color, aspect,
 				filled, (uint32_t)flags);
 		} else {

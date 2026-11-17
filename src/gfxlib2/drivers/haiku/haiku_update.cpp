@@ -75,11 +75,11 @@ static bool fb_hHaikuCopyFramebuffer(BRect *damage, int first_line,
             if (!fb_gfx->dirty[y])
                 continue;
             const uint8_t *source = fb_gfx->framebuffer +
-                (size_t)y * fb_gfx->pitch;
+                (size_t)y * (size_t)fb_gfx->pitch;
             for (int repeat = 0; repeat < fb_gfx->scanline_size; repeat++)
             {
                 int physical_y = y * fb_gfx->scanline_size + repeat;
-                uint8_t *target = dst + (size_t)physical_y * dst_pitch;
+                uint8_t *target = dst + (size_t)physical_y * (size_t)dst_pitch;
                 if (memcmp(source, target, (size_t)fb_gfx->w * 4) == 0)
                     continue;
                 int first_x = 0;
@@ -95,7 +95,9 @@ static bool fb_hHaikuCopyFramebuffer(BRect *damage, int first_line,
                 memcpy(target + (size_t)first_x * 4,
                     source + (size_t)first_x * 4,
                     (size_t)(last_x - first_x + 1) * 4);
-                BRect row_damage(first_x, physical_y, last_x, physical_y);
+                BRect row_damage(static_cast<float>(first_x),
+                    static_cast<float>(physical_y), static_cast<float>(last_x),
+                    static_cast<float>(physical_y));
                 *damage = damage->IsValid() ? (*damage | row_damage) : row_damage;
             }
         }
@@ -108,8 +110,11 @@ static bool fb_hHaikuCopyFramebuffer(BRect *damage, int first_line,
     if (!blitter)
         return false;
     blitter(dst, dst_pitch);
-    *damage = BRect(0, first_line * fb_gfx->scanline_size,
-        fb_gfx->w - 1, (last_line + 1) * fb_gfx->scanline_size - 1);
+    *damage = BRect(0.0f,
+        static_cast<float>((int64_t)first_line * fb_gfx->scanline_size),
+        static_cast<float>(fb_gfx->w - 1),
+        static_cast<float>(((int64_t)last_line + 1) *
+            fb_gfx->scanline_size - 1));
     return true;
 }
 
@@ -125,7 +130,8 @@ void fb_hHaikuUpdate(void)
 
     /* Dirty markers are logical rows. The allocation also leaves space for
        scanline replication, but the shared blitter consumes only h markers. */
-    const char *first = (const char*)memchr(fb_gfx->dirty, TRUE, fb_gfx->h);
+    const char *first = (const char*)memchr(
+        fb_gfx->dirty, TRUE, (size_t)fb_gfx->h);
     if (!first)
         return;
     int first_line = (int)(first - fb_gfx->dirty);
@@ -147,7 +153,7 @@ void fb_hHaikuUpdate(void)
                without posting a message for every drawing primitive. */
             static_cast<FBHaikuView*>(g_view)->InvalidateFramebufferRect(damage);
         }
-        memset(fb_gfx->dirty, 0, fb_gfx->h);
+        memset(fb_gfx->dirty, 0, (size_t)fb_gfx->h);
     }
     win->Unlock();
 }

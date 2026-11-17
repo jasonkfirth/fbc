@@ -50,12 +50,20 @@
 #elif defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
+#pragma GCC diagnostic ignored "-Walloca"
+#pragma GCC diagnostic ignored "-Wbad-function-cast"
+#pragma GCC diagnostic ignored "-Wcast-align"
 #pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wdouble-promotion"
+#pragma GCC diagnostic ignored "-Wfloat-equal"
 #pragma GCC diagnostic ignored "-Wlogical-op"
+#pragma GCC diagnostic ignored "-Wpadded"
 #pragma GCC diagnostic ignored "-Wshadow"
 #pragma GCC diagnostic ignored "-Wshadow=compatible-local"
 #pragma GCC diagnostic ignored "-Wshadow=local"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wstrict-overflow"
+#pragma GCC diagnostic ignored "-Wswitch-enum"
 #endif
 
 #include "third_party/dr_wav.h"
@@ -70,6 +78,7 @@
 #if defined(__clang_analyzer__)
 #define STB_VORBIS_HEADER_ONLY
 #endif
+/* NOLINTNEXTLINE(bugprone-suspicious-include): stb_vorbis is a single-file implementation. */
 #include "third_party/stb_vorbis.c"
 #if defined(__clang_analyzer__)
 #undef STB_VORBIS_HEADER_ONLY
@@ -250,6 +259,17 @@ static int fb_sfxDecodeOgg(const char *filename,
     *sample_rate = local_rate;
     return 0;
 }
+
+/*
+    GCC can attribute -Wstrict-overflow from inlined dr_wav helpers to this
+    dispatch boundary. The function only validates its arguments and selects
+    a decoder, so keep that exception local to the decoder calls. GCC emits
+    these notices after analyzing the inline calls, so leave the exception
+    active through the end of this file.
+*/
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wstrict-overflow"
+#endif
 
 int fb_sfxDecodeFile(const char *filename,
                      float **samples,

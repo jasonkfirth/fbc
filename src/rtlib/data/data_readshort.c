@@ -13,11 +13,11 @@ FBCALL void fb_DataReadShort( short *dst )
 
 	if( fb_data_ptr ) {
 		if( fb_data_ptr->len == FB_DATATYPE_OFS ) {
-			*dst = (size_t)fb_data_ptr->ofs;
+			*dst = (short)(size_t)fb_data_ptr->ofs;
 		} else if( fb_data_ptr->len & FB_DATATYPE_WSTR ) {
-			*dst = fb_WstrToInt( fb_data_ptr->wstr, fb_data_ptr->len & 0x7FFF );
+			*dst = (short)fb_WstrToInt( fb_data_ptr->wstr, fb_data_ptr->len & 0x7FFF );
 		} else {
-			*dst = fb_hStr2Int( fb_data_ptr->zstr, fb_data_ptr->len );
+			*dst = (short)fb_hStr2Int( fb_data_ptr->zstr, fb_data_ptr->len );
 		}
 	} else {
 		/* no more DATA */

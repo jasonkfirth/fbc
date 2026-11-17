@@ -28,10 +28,12 @@ static FB_FILE_HOOKS hooks_dev_scrn_null = {
    console/terminal windows but also with graphics window) */
 void fb_DevScrnUpdateWidth( void )
 {
-	int cols;
+	int cols, cursor_x, line_length;
 	fb_GetSize( &cols, NULL );
-	FB_HANDLE_SCREEN->line_length = fb_GetX( ) - 1;
-	FB_HANDLE_SCREEN->width = cols;
+	cursor_x = fb_GetX( );
+	line_length = (cursor_x > 1) ? cursor_x - 1 : 0;
+	FB_HANDLE_SCREEN->line_length = (unsigned int)line_length;
+	FB_HANDLE_SCREEN->width = (unsigned int)((cols > 0) ? cols : 0);
 }
 
 void fb_DevScrnMaybeUpdateWidth( void )

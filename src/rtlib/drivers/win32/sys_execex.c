@@ -13,6 +13,7 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 {
     char buffer[MAX_PATH+1], *arguments;
     int	res = 0, got_program;
+    int arguments_heap_allocated = FALSE;
     size_t len_arguments;
 #ifdef HOST_MINGW
     char empty_arguments[] = "";
@@ -35,8 +36,18 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
         arguments = empty_arguments;
     } else {
         len_arguments = FB_STRSIZE( args );
-        arguments = alloca( len_arguments + 1 );
-        DBG_ASSERT( arguments!=NULL );
+        if( len_arguments >= (size_t)PTRDIFF_MAX ) {
+            fb_hStrDelTemp( args );
+            fb_hStrDelTemp( program );
+            return -1;
+        }
+        arguments = (char *)malloc( len_arguments + 1 );
+        if( arguments == NULL ) {
+            fb_hStrDelTemp( args );
+            fb_hStrDelTemp( program );
+            return -1;
+        }
+        arguments_heap_allocated = TRUE;
         if( len_arguments )
             FB_MEMCPY( arguments, args->data, len_arguments );
         arguments[len_arguments] = 0;
@@ -45,8 +56,19 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
     len_program = strlen( buffer );
     len_arguments = ( ( args==NULL ) ? 0 : FB_STRSIZE( args ) );
 
-    arguments = alloca( len_program + len_arguments + 2 );
-    DBG_ASSERT( arguments!=NULL );
+    if( (len_program > (size_t)PTRDIFF_MAX - 2u) ||
+        (len_arguments > (size_t)PTRDIFF_MAX - len_program - 2u) ) {
+        fb_hStrDelTemp( args );
+        fb_hStrDelTemp( program );
+        return -1;
+    }
+    arguments = (char *)malloc( len_program + len_arguments + 2u );
+    if( arguments == NULL ) {
+        fb_hStrDelTemp( args );
+        fb_hStrDelTemp( program );
+        return -1;
+    }
+    arguments_heap_allocated = TRUE;
 
     FB_MEMCPY( arguments, buffer, len_program );
     arguments[len_program] = ' ';
@@ -67,9 +89,9 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 	{
 #ifdef HOST_MINGW
         if( do_fork )
-        	res = _spawnl( _P_WAIT, buffer, buffer, arguments, NULL );
+            res = (int)_spawnl( _P_WAIT, buffer, buffer, arguments, NULL );
         else
-        	res = _execl( buffer, buffer, arguments, NULL );
+            res = (int)_execl( buffer, buffer, arguments, NULL );
 #else
         STARTUPINFO StartupInfo;
         PROCESS_INFORMATION ProcessInfo;
@@ -106,6 +128,9 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
         }
 #endif
 	}
+
+	if( arguments_heap_allocated )
+		free( arguments );
 
 	return res;
 }

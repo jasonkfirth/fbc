@@ -30,7 +30,7 @@ int fb_gfx3_gl_blit(FB_GFX3_OPENGL_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 	switch (payload->mode) {
 	case FB_GFX3_BLIT_TRANS:
 	case FB_GFX3_BLIT_PSET:
@@ -210,7 +210,7 @@ int fb_gfx3_gl_transform_blit(FB_GFX3_OPENGL_STATE *state,
 	if ((state == NULL) || (command == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	switch (payload->mode) {
 	case FB_GFX3_BLIT_TRANS:
 	case FB_GFX3_BLIT_PSET:
@@ -349,7 +349,7 @@ int fb_gfx3_gl_read_pixel(FB_GFX3_OPENGL_STATE *state,
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_READ_PIXEL_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_READ_PIXEL_COMMAND);
 	result = fb_gfx3_gl_surface_retain(state, command->target,
 		command->sequence, &surface);
 	if (result != FB_GFX3_OK)

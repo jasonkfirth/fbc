@@ -6,7 +6,73 @@ Responsibilities: Explain retained roots, native controls and selected queue imp
 This file intentionally does NOT rename required external ABI symbols.
 -->
 
-# External prototype reachability, November 3, 2026
+# External object declarations, November 14, 2026
+
+Multiple BASIC names can bind the same external C object. The emitter now
+checks the complete generated extern declaration against its existing owned
+declaration cache. An identical declaration is emitted once per translation
+unit. Types, bounds, qualifiers and attributes participate in the comparison.
+Definitions and their initializers continue through the normal allocation pass.
+
+Object cache keys use a prefix containing a space, keeping them distinct from
+valid C procedure identifiers. The existing per-output initialization and
+cleanup own the records. Semantic name observations run before the duplicate
+check, preserving each source binding's export metadata.
+Independent model-reader checks verify all eight aliased source bindings with
+both C producers. Each retains its C token and object name. Enabling the full
+semantic export preserves the exact emitted C bytes.
+
+The compiler image is `acc4a8921db861ccd1b2856f164c2033d78ae28ce069b1cf0b52f5f573c57f76`.
+Its 224-unit self-host reaches an exact emitted-C fixed point with zero GCC
+warnings. Only the HLC compiler unit changes. All 703 fbctests outputs match
+their preceding C identities and preserve GCC zero / Clang 771. Their replay
+also records actual opened BASIC inputs for each owning profile.
+
+All 1,053 coreutils/SQLite production units are reemitted. Exactly 135 remove
+one repeated extern declaration each. Both Linux GCC and Clang compile every
+before/after pair with the original unsuppressed flags. All 270 complete native
+objects match byte for byte. The remaining 918 C outputs match their parents
+exactly. Every original FBC warning line is preserved. Coreutils falls from
+911 to 776 GCC warnings, with 2,412 Clang observations. SQLite retains GCC 111
+and Clang 7,784 across its 555 Linux units.
+
+The permanent external-prototype fixture now checks aliased scalars, arrays,
+pointer objects and initialized BASIC data. An independent C observer compares
+addresses and reads the final values. Sixteen native value executions and four
+Win32 object profiles pass. Eight negative controls retain native errors for
+conflicting scalar types and array bounds. The ordinary backend runner enables
+`-Werror=redundant-decls` for this fixture.
+
+Two Win64 full-program runs compile two BASIC modules in one invocation, checking
+cache reset between outputs. Four further Win32 executions observe two BASIC
+modules through a native C startup. Both C producers and both native observer
+compilers are covered. The selected SDK has Win64 runtime files. Its Win32
+FreeBASIC runtime files are absent, so the Win32 probe records its C-startup
+scope explicitly.
+
+The Windows intrinsic profiles retain two Clang reserved-identifier observations
+per object for the required `_InterlockedExchangeAdd` spellings. The preceding
+compiler reproduces the same class and count through the exact saved recipes.
+Source-only lint and compiler structure receipts accompany the value controls.
+The installed semantic-lint consumer retains its existing capability mismatch.
+
+Receipts use the `extern-aliases` prefix dated November 14 under
+`build/c-emitter-forward-views-20261105`. The source cut preserves eighteen dirty
+compiler inputs and separately records three subsequent test-input corrections.
+The earlier standalone helper's module-assembly expectation is corrected against
+the preceding compiler's actual reachability behavior. Failed controls and the
+input-invalidated suite attempts retain their logs. The final complete GCC/Clang
+backend suite passes in 621.517 seconds. Development-path selection passes
+twenty-four actual executions, including both producers of the extended fixture.
+The source cut occupies 310,599 compressed bytes. Strict source-only lint reports
+zero findings and structure checks pass 413 files across 21 host graphs.
+Immediate rollback is `2ebfd87d`. Installed release binaries and runtime archives
+pass their preservation checks.
+The supplemental source-delivery receipt contains forty-six dirty repository
+qualification inputs in 266,822 compressed bytes, with relative paths, hashes
+and the Git base revision for replay elsewhere.
+
+# Historical external prototype reachability, November 3, 2026
 
 Discarded private helpers can leave an external procedure's AST access flag set.
 The C backend previously retained those declarations even when every emitted

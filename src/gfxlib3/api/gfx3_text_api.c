@@ -384,6 +384,10 @@ static uint32_t text_custom_font_transparent_color(
 typedef struct FB_GFX3_CUSTOM_FONT {
 	const FB_GFX3_IMAGE_VIEW *image;
 	FB_GFX_FONT metrics;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } FB_GFX3_CUSTOM_FONT;
 
 static int text_parse_custom_font(const FB_GFX3_IMAGE_VIEW *font,

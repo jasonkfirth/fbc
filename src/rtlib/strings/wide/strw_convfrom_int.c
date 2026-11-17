@@ -53,7 +53,7 @@ FBCALL int fb_WstrToInt( const FB_WCHAR *src, ssize_t len )
 
 	/* wcstol() saturates values outside [-2^31, 2^31)
 	so use wcstoul() instead */
-	return wcstoul( p, NULL, radix );
+	return (int)wcstoul( p, NULL, radix );
 }
 
 FBCALL int fb_WstrValInt( const FB_WCHAR *str )

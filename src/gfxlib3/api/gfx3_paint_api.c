@@ -796,11 +796,11 @@ FBCALL int fb_GfxPaintPattern(void *target, float x, float y, FBSTRING_ACCESS *p
 	unsigned char data[FB_GFX_PAINT_PACKED_HEADER + FB_GFX_PAINT_PACKED_MAX_ROWS];
 	int size = fb_hGfxPackPattern(data, pattern, foreground, background);
 	fb_hStrDelTemp(pattern);
-	if (!size || !isfinite(x) || !isfinite(y))
+	if ((size <= 0) || !isfinite(x) || !isfinite(y))
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	/* Packed rows use the checked CPU flood and the existing surface barriers.
 	   The native GPU pattern command has a fixed 8x8 raw-pixel layout. */
-	return fb_ErrorSetNum(paint(target, x, y, foreground, border, data, size,
+	return fb_ErrorSetNum(paint(target, x, y, foreground, border, data, (size_t)size,
 		FB_GFX_PAINT_PACKED, relative ? FB_GFX3_COORDINATE_R : FB_GFX3_COORDINATE_A));
 }
 

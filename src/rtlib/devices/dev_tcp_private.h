@@ -39,6 +39,11 @@ typedef struct {
 
 typedef struct {
 	FB_TCP_SOCKET hSocket;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8) && \
+	(!defined(HOST_WIN32) || defined(HOST_CYGWIN))
+	/* Preserve the native gap between an int socket and its device pointer. */
+	unsigned char socket_alignment_padding[4];
+#endif
 	char *pszDevice;
 	unsigned int timeout;
 	int is_server;
@@ -54,6 +59,10 @@ typedef struct {
 #endif
 #if defined(HOST_WII)
 	FB_WII_TCP_PUMP *wii_pump;
+#endif
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing native 64-bit tail padding after the handle state. */
+	unsigned char reserved_tail_padding[4];
 #endif
 } DEV_TCP_INFO;
 

@@ -8,6 +8,8 @@
 /* graphical mode text output */
 
 #include "../fb_gfx.h"
+#include <limits.h>
+#include <stdint.h>
 
 typedef struct FB_PRINT_INFO {
 	FB_GFXCTX *context;
@@ -36,12 +38,21 @@ void fb_hHookConScrollGfx (FB_GFXCTX *context, int x1, int y1,
                            int lines,
                            int *dirty_start, int *dirty_end )
 {
-    int h = y2 - y1;
-    int w = x2 - x1;
+    int h, w;
+	int64_t wide_h, wide_w;
     int clear_row, clear_start = 0, clear_end = 0;
 
     if( lines==0 )
         return;
+
+    wide_h = (int64_t)y2 - (int64_t)y1;
+    wide_w = (int64_t)x2 - (int64_t)x1;
+    if( (wide_h <= 0) || (wide_w <= 0) ||
+        ((uint64_t)wide_h > (uint64_t)INT_MAX) ||
+        ((uint64_t)wide_w > (uint64_t)INT_MAX) )
+        return;
+    h = (int)wide_h;
+    w = (int)wide_w;
 
     clear_end = y2;
 
@@ -55,11 +66,11 @@ void fb_hHookConScrollGfx (FB_GFXCTX *context, int x1, int y1,
         clear_start = y1 + h;
 
         while( h-- )
-            fb_hPixelCpy(context->line[y_dst++], context->line[y_src++], w);
+            fb_hPixelCpy(context->line[y_dst++], context->line[y_src++], (size_t)w);
     }
 
     for( clear_row=clear_start; clear_row!=clear_end; ++clear_row )
-        context->pixel_set(context->line[clear_row], context->bg_color, w);
+        context->pixel_set(context->line[clear_row], (int)context->bg_color, (size_t)w);
 
     fb_hSetDirty( dirty_start, dirty_end, y1, y2 );
 }
@@ -72,28 +83,87 @@ static void fb_hHookConScroll
 		int rows
 	)
 {
-    int w = x2 - x1 + 1;
-    int h = y2 - y1 + 1;
+    int w, h, y_src = 0, y_dst = 0;
     int clear_start, clear_end;
-    fb_PrintInfo *pInfo = (fb_PrintInfo*) handle->Opaque;
-    int font_w = fb_gfx->font->w;
-    int font_h = fb_gfx->font->h;
-    fb_hHookConScrollGfx( pInfo->context, x1 * font_w, y1 * font_h,
-                          (x2 + 1) * font_w, (y2 + 1) * font_h,
-                          rows * font_h,
+    int font_w, font_h;
+    int64_t wide_w, wide_h, pixel_x1, pixel_y1, pixel_x2, pixel_y2, pixel_rows;
+    size_t con_width, total_cells;
+    size_t source_offset = 0, destination_offset = 0, cell_line_width;
+    fb_PrintInfo *pInfo;
+    GFX_CHAR_CELL *page;
+
+    if( (fb_gfx == NULL) || (handle == NULL) )
+		return;
+	pInfo = (fb_PrintInfo*) handle->Opaque;
+	if( (pInfo == NULL) || (pInfo->context == NULL) || (fb_gfx->font == NULL) ||
+	    (fb_gfx->con_pages == NULL) || (fb_gfx->text_w <= 0) || (fb_gfx->text_h <= 0) ||
+	    (fb_gfx->w <= 0) || (fb_gfx->h <= 0) ||
+	    (pInfo->context->work_page < 0) || (pInfo->context->work_page >= fb_gfx->num_pages) ||
+	    (x1 < 0) || (y1 < 0) || (x2 < x1) || (y2 < y1) ||
+	    (x2 >= fb_gfx->text_w) || (y2 >= fb_gfx->text_h) )
+		return;
+
+	font_w = fb_gfx->font->w;
+	font_h = fb_gfx->font->h;
+	if( (font_w <= 0) || (font_h <= 0) )
+		return;
+	wide_w = (int64_t)x2 - (int64_t)x1 + 1;
+	wide_h = (int64_t)y2 - (int64_t)y1 + 1;
+	if( ((uint64_t)wide_w > (uint64_t)INT_MAX) ||
+	    ((uint64_t)wide_h > (uint64_t)INT_MAX) )
+		return;
+	w = (int)wide_w;
+	h = (int)wide_h;
+	pixel_x1 = (int64_t)x1 * (int64_t)font_w;
+	pixel_y1 = (int64_t)y1 * (int64_t)font_h;
+	pixel_x2 = ((int64_t)x2 + 1) * (int64_t)font_w;
+	pixel_y2 = ((int64_t)y2 + 1) * (int64_t)font_h;
+	pixel_rows = (int64_t)rows * (int64_t)font_h;
+	if( (pixel_x2 > (int64_t)fb_gfx->w) || (pixel_y2 > (int64_t)fb_gfx->h) ||
+	    (pixel_rows < (int64_t)INT_MIN) || (pixel_rows > (int64_t)INT_MAX) )
+		return;
+
+	con_width = (size_t)fb_gfx->text_w;
+	page = fb_gfx->con_pages[pInfo->context->work_page];
+	if( (page == NULL) || (con_width == 0) ||
+	    ((size_t)fb_gfx->text_h > (SIZE_MAX / con_width)) ||
+	    ((size_t)w > (SIZE_MAX / sizeof(GFX_CHAR_CELL))) )
+		return;
+	total_cells = (size_t)fb_gfx->text_h * con_width;
+	if( total_cells > (SIZE_MAX / sizeof(GFX_CHAR_CELL)) )
+		return;
+	cell_line_width = (size_t)w * sizeof(GFX_CHAR_CELL);
+	if( (rows >= 0) && (rows < h) ) {
+		y_src = y1 + rows;
+		y_dst = y1;
+		if( ((size_t)y_src > (SIZE_MAX / con_width)) ||
+		    ((size_t)y_dst > (SIZE_MAX / con_width)) )
+			return;
+		source_offset = (size_t)y_src * con_width;
+		destination_offset = (size_t)y_dst * con_width;
+		if( ((size_t)x1 > (SIZE_MAX - source_offset)) ||
+		    ((size_t)x1 > (SIZE_MAX - destination_offset)) )
+			return;
+		source_offset += (size_t)x1;
+		destination_offset += (size_t)x1;
+		if( (source_offset > total_cells) || (destination_offset > total_cells) ||
+		    ((size_t)w > (total_cells - source_offset)) ||
+		    ((size_t)w > (total_cells - destination_offset)) )
+			return;
+	}
+
+	fb_hHookConScrollGfx( pInfo->context, (int)pixel_x1, (int)pixel_y1,
+                          (int)pixel_x2, (int)pixel_y2, (int)pixel_rows,
                           &pInfo->dirty_start, &pInfo->dirty_end );
 
     /* Don't foget to update the character cells */
     clear_end = y2 + 1;
-    if( rows >= h ) {
+    /* Match the pixel scroll path: a negative scroll clears the region. */
+    if( (rows >= h) || (rows < 0) ) {
         clear_start = y1;
     } else {
-        int y_src = y1 + rows;
-        int y_dst = y1;
-        size_t con_width = fb_gfx->text_w;
-        GFX_CHAR_CELL *src = fb_gfx->con_pages[ pInfo->context->work_page ] + y_src * con_width;
-        GFX_CHAR_CELL *dst = fb_gfx->con_pages[ pInfo->context->work_page ] + y_dst * con_width;
-        size_t cell_line_width = w * sizeof( GFX_CHAR_CELL );
+        GFX_CHAR_CELL *src = page + source_offset;
+        GFX_CHAR_CELL *dst = page + destination_offset;
 
         h -= rows;
         clear_start = y1 + h;
@@ -120,6 +190,14 @@ static int fb_hHookConWriteGfx
 {
 
 	const unsigned char *pachText = (const unsigned char *) buffer;
+    int font_w, font_h;
+
+    if( (fb_gfx->font == NULL) || ((length != 0) && (buffer == NULL)) )
+		return FALSE;
+	font_w = fb_gfx->font->w;
+	font_h = fb_gfx->font->h;
+	if( (font_w <= 0) || (font_h <= 0) || (font_w > (INT_MAX - 7)) )
+		return FALSE;
 
     /* cursor? */
     if( (length == 1) && ((size_t)*pachText == 255) )
@@ -127,25 +205,35 @@ static int fb_hHookConWriteGfx
     	/* note: can't use 'mask' because it will be always 0 (due the endless
     	         levels if indirection */
     	int x;
-	for( x = 0; x < fb_gfx->font->w; x++ )
+	for( x = 0; x < font_w; x++ )
     	{
     		context->put_pixel( context,
     							target_x + x,
-							target_y + fb_gfx->font->h - 1,
+							target_y + font_h - 1,
     							context->fg_color );
     	}
     }
     else
     {
 	    int char_bit_mask;
-	    int char_row_byte_count = BYTES_PER_PIXEL(fb_gfx->font->w);
-	    size_t i, char_size = char_row_byte_count * fb_gfx->font->h;
+	    int char_row_byte_count;
+	    size_t i, char_size;
+
+	    if( fb_gfx->font->data == NULL )
+	        return FALSE;
+	    char_row_byte_count = BYTES_PER_PIXEL(font_w);
+	    if( (char_row_byte_count <= 0) ||
+	        ((size_t)char_row_byte_count > (SIZE_MAX / (size_t)font_h)) )
+	        return FALSE;
+	    char_size = (size_t)char_row_byte_count * (size_t)font_h;
+	    if( char_size > (SIZE_MAX / ((size_t)UCHAR_MAX + (size_t)1)) )
+	        return FALSE;
 
 	    for( i=0; i!=length; ++i ) {
 	        size_t char_index = (size_t) *pachText++;
 	        const unsigned char *src = &fb_gfx->font->data[char_index * char_size];
 	        int char_y;
-	        for (char_y = 0; char_y != fb_gfx->font->h; char_y++)
+	        for (char_y = 0; char_y != font_h; char_y++)
 	        {
 	            int char_x, char_row_byte;
 	            int text_y = target_y + char_y;
@@ -197,7 +285,7 @@ static int fb_hHookConWrite
 
     while( length-- ) {
         --cell;
-        cell->ch = pachText[length];
+        cell->ch = (FB_WCHAR)pachText[length];
         cell->fg = fg;
         cell->bg = bg;
     }
@@ -211,6 +299,7 @@ void fb_GfxPrintBufferEx( const void *buffer, size_t len, int mask )
     const char *pachText = (const char *) buffer;
     int win_left, win_top, win_cols, win_rows;
     int view_top, view_bottom;
+    int64_t dirty_height;
     fb_PrintInfo info;
     fb_ConHooks hooks;
 
@@ -274,7 +363,10 @@ void fb_GfxPrintBufferEx( const void *buffer, size_t len, int mask )
         fb_GfxLocateRaw( hooks.Coord.Y, hooks.Coord.X, -1 );
     }
 
-    SET_DIRTY(context, info.dirty_start, info.dirty_end - info.dirty_start);
+    dirty_height = (int64_t)info.dirty_end - (int64_t)info.dirty_start;
+	if( (fb_gfx->dirty != NULL) && (info.dirty_start >= 0) &&
+	    (info.dirty_end >= info.dirty_start) && (info.dirty_end <= fb_gfx->h) )
+		SET_DIRTY(context, info.dirty_start, (size_t)dirty_height);
 
     DRIVER_UNLOCK();
 	FB_GRAPHICS_UNLOCK( );

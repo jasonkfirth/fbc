@@ -216,4 +216,19 @@ private function hCReadOnlyLocalType(byval sym as FBSYMBOL ptr, byval dtype as i
 	return dtype
 end function
 
+private sub hCReadOnlyLocalRequire(byval sym as FBSYMBOL ptr)
+	'' A separate complete-body proof can establish an implicit result slot.
+	'' Keep its C qualification in the same table used for declarations,
+	'' stores and reads, so lowering does not manufacture writable addresses.
+	assert(c_readonly_locals_ready)
+	var entry = hCReadOnlyLocalFind(sym)
+	if( entry = NULL ) then
+		entry = listNewNode(@c_readonly_locals)
+		entry->sym = sym
+		var identifier = hGetCId(sym)
+		entry->identifier = ZstrDup(strptr(identifier))
+	end if
+	entry->readonly_value = TRUE
+end sub
+
 /' end of backend/c/c-readonly-locals.bi '/

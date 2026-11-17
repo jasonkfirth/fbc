@@ -10,11 +10,12 @@
 int fb_DevFileReadEncodWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *max_chars )
 {
     FILE *fp;
-    size_t chars;
+    size_t requested;
+    ssize_t chars;
 
     FB_LOCK();
 
-    chars = *max_chars;
+    requested = *max_chars;
 
     fp = (FILE *)handle->opaque;
     if( fp == stdout || fp == stderr )
@@ -26,14 +27,26 @@ int fb_DevFileReadEncodWstr( FB_FILE *handle, FB_WCHAR *dst, size_t *max_chars )
         return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
     }
 
+    if( requested > ((size_t)PTRDIFF_MAX / sizeof( FB_WCHAR )) )
+	{
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
+
 	/* do read */
-	chars = fb_hFileRead_UTFToWchar( fp, handle->encod, dst, chars );
+	chars = fb_hFileRead_UTFToWchar( fp, handle->encod, dst, (ssize_t)requested );
+	if( (chars < 0) || ((size_t)chars > requested) )
+	{
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
+	}
 
 	/* fill with nulls if at eof */
-	if( chars != *max_chars )
-        memset( (char *)&dst[chars], 0, (*max_chars - chars) * sizeof( FB_WCHAR ) );
+	if( (size_t)chars != requested )
+        memset( (char *)&dst[(size_t)chars], 0,
+		        (requested - (size_t)chars) * sizeof( FB_WCHAR ) );
 
-    *max_chars = chars;
+	*max_chars = (size_t)chars;
 
 	FB_UNLOCK();
 

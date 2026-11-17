@@ -109,7 +109,7 @@ FBCALL void fb_StrSwap( void *str1, ssize_t size1, int fillrem1,
 		} else if( len2 > len1 ) {
 			FB_MEMCPYX( (unsigned char *)(p1 + len1),
 			            (unsigned char *)(p2 + len1),
-			            len2 - len1 );
+			            (size_t)(len2 - len1) );
 		}
 	
 		p1[len2] = '\0';
@@ -124,7 +124,7 @@ FBCALL void fb_StrSwap( void *str1, ssize_t size1, int fillrem1,
 		if( fillrem2 ) {
 			ssize_t used2 = len1;
 			if( size2 > used2 ) {
-				memset( p2 + used2, 0, size2 - used2 );
+				memset( p2 + used2, 0, (size_t)(size2 - used2) );
 			}
 		}
     }
@@ -132,7 +132,7 @@ FBCALL void fb_StrSwap( void *str1, ssize_t size1, int fillrem1,
 	/* string  -> string */
 	else if( (size1 & FB_STRISFIXED) && (size2 & FB_STRISFIXED) ) {
 		if( (len2 - len1) > 0 ) {
-			memset( p2 + len1, 32, len2 - len1 );
+			memset( p2 + len1, 32, (size_t)(len2 - len1) );
 		} 
 	}
 
@@ -149,13 +149,13 @@ FBCALL void fb_StrSwap( void *str1, ssize_t size1, int fillrem1,
 		} else if( len2 > len1 ) {
 			FB_MEMCPYX( (unsigned char *)(p1 + len1),
 			            (unsigned char *)(p2 + len1),
-			            len2 - len1 );
+			            (size_t)(len2 - len1) );
 		}
 
 		p1[len2] = '\0';
 
 		if( (len2 - size1) > 0 ) {
-			memset( p2 + len1, 32, len2 - size1 );
+			memset( p2 + len1, 32, (size_t)(len2 - size1) );
 		} 
 
 	}

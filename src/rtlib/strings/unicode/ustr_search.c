@@ -119,7 +119,8 @@ static FBSTRING_ACCESS *hTrim( FBSTRING_ACCESS *src, FBSTRING_ACCESS *pattern, i
 					--last;
 				} else {
 					if( (pattern_length <= 0) || (pattern_length > last - first) ||
-					    memcmp( src->data + last - pattern_length, pattern->data, (size_t)(pattern_length) ) ) break;
+					    memcmp( src->data + last - pattern_length, pattern->data,
+					        (size_t)(pattern_length) ) != 0 ) break;
 					last -= pattern_length;
 				}
 			}

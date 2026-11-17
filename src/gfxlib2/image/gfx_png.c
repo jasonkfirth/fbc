@@ -140,6 +140,10 @@ typedef struct PNG_BYTE_BUFFER {
 	size_t size;
 	size_t capacity;
 	int failed;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } PNG_BYTE_BUFFER;
 
 typedef struct PNG_BIT_WRITER {
@@ -574,6 +578,10 @@ typedef struct PNG_BIT_READER {
 	unsigned int current;
 	unsigned int remaining_bits;
 	int failed;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	/* Name the existing 64-bit tail padding without changing the layout. */
+	unsigned char tail_padding[4];
+#endif
 } PNG_BIT_READER;
 
 typedef struct PNG_HUFFMAN {
@@ -1383,13 +1391,24 @@ exit:
 /* Scanline reconstruction and sample conversion                             */
 /* ------------------------------------------------------------------------- */
 
-static unsigned int png_paeth_predictor(unsigned int left, unsigned int above,
-	unsigned int upper_left)
+static unsigned int png_paeth_predictor(unsigned char left, unsigned char above,
+	unsigned char upper_left)
 {
-	int estimate = (int)left + (int)above - (int)upper_left;
-	int left_distance = abs(estimate - (int)left);
-	int above_distance = abs(estimate - (int)above);
-	int diagonal_distance = abs(estimate - (int)upper_left);
+	unsigned int estimate = 255u + left + above - upper_left;
+	unsigned int left_reference = 255u + left;
+	unsigned int above_reference = 255u + above;
+	unsigned int upper_left_reference = 255u + upper_left;
+	unsigned int left_distance;
+	unsigned int above_distance;
+	unsigned int diagonal_distance;
+
+	/* The bias keeps byte-derived distances nonnegative in unsigned math. */
+	left_distance = (estimate >= left_reference) ?
+		estimate - left_reference : left_reference - estimate;
+	above_distance = (estimate >= above_reference) ?
+		estimate - above_reference : above_reference - estimate;
+	diagonal_distance = (estimate >= upper_left_reference) ?
+		estimate - upper_left_reference : upper_left_reference - estimate;
 
 	if ((left_distance <= above_distance) &&
 	    (left_distance <= diagonal_distance))
@@ -1430,8 +1449,12 @@ static int png_unfilter_row(unsigned char *row, const unsigned char *previous,
 			break;
 		case 4:
 			row[i] = (unsigned char)(row[i] +
-				png_paeth_predictor(left, above, upper_left));
+				png_paeth_predictor((unsigned char)left,
+					(unsigned char)above,
+					(unsigned char)upper_left));
 			break;
+		default:
+			return FALSE;
 		}
 	}
 	return TRUE;
@@ -1650,8 +1673,8 @@ static int png_prepare_destination(FB_GFXCTX *ctx, const PNG_IMAGE *image,
 				      (ctx->target_bpp == 4)))
 					return FB_RTERROR_ILLEGALFUNCTIONCALL;
 				target_bpp = (unsigned int)ctx->target_bpp;
-				header->old.bpp = (unsigned short)target_bpp;
-				header->old.width = (unsigned short)image->width;
+				header->old.bpp = (unsigned short)(target_bpp & 0x7u);
+				header->old.width = (unsigned short)(image->width & 0x1FFFu);
 				header->old.height = (unsigned short)image->height;
 				header->pitch =
 					((image->width * target_bpp) + 15u) & ~15u;
@@ -1794,7 +1817,8 @@ int fb_hGfxPngLoad(FB_GFXCTX *ctx, FILE *file, void *dest, void *pal,
 	}
 	if (!png_convert_passes(ctx, &image, width, height, bpp))
 		result = FB_RTERROR_FILEIO;
-	SET_DIRTY(ctx, 0, fb_gfx->h);
+				if (fb_gfx->h > 0)
+					SET_DIRTY(ctx, 0, (size_t)fb_gfx->h);
 	DRIVER_UNLOCK();
 
 exit:
@@ -1966,7 +1990,9 @@ static unsigned char png_filter_byte(unsigned int filter,
 		return (unsigned char)(value - ((left + above) >> 1));
 	default:
 		return (unsigned char)(value -
-			png_paeth_predictor(left, above, upper_left));
+			png_paeth_predictor((unsigned char)left,
+				(unsigned char)above,
+				(unsigned char)upper_left));
 	}
 }
 

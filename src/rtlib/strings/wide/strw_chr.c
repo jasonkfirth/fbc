@@ -28,7 +28,7 @@ FB_WCHAR *fb_WstrChr ( int args, ... )
 		for( i = 0; i < args; i++ )
 		{
 			num = va_arg( ap, unsigned int );
-			*s++ = num;
+			*s++ = (FB_WCHAR)num;
 		}
 		/* null-term */
 		*s = 0;

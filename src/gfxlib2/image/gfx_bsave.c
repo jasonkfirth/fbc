@@ -23,6 +23,8 @@
 
 #include "../fb_gfx.h"
 #include "../gfx_png.h"
+#include <limits.h>
+#include <string.h>
 #include <strings.h>
 #ifdef HOST_WIN32
 	#include <windows.h>
@@ -78,24 +80,35 @@ static int write_bmp_header(FILE *f, unsigned int bfSize,
 static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 {
 	PUT_HEADER *put_header;
-	int w, h, i, bfSize, biSizeImage, bfOffBits, biClrUsed, inbpp, inpitch, outpitch, color;
-	unsigned char *s, *buffer, *p;
+	int w, h, i, row, inbpp, inpitch;
+	unsigned int bfSize, bfOffBits, biSizeImage, biClrUsed, color;
+	unsigned char *s, *source, *buffer, *p;
+	unsigned short source_pixel;
 	unsigned int *palette = (unsigned int *)pal, *paltmp = 0;
+	/* Use the maximum size_t value for the overflow checks below. */
+	size_t size_max = (size_t)-1;
+	size_t row_size, outpitch, image_size, copy_size;
 
 	if (src) {
 		put_header = (PUT_HEADER *)src;
 		if (put_header->type == PUT_HEADER_NEW) {
-			w = put_header->width;
-			h = put_header->height;
+			if ((put_header->width > (unsigned int)INT_MAX) ||
+			    (put_header->height > (unsigned int)INT_MAX) ||
+			    (put_header->pitch > (unsigned int)INT_MAX))
+				return FB_RTERROR_ILLEGALFUNCTIONCALL;
+			w = (int)put_header->width;
+			h = (int)put_header->height;
 			s = (unsigned char *)src + sizeof(PUT_HEADER);
 			inbpp = put_header->bpp;
-			inpitch = put_header->pitch;
+			inpitch = (int)put_header->pitch;
 		}
 		else {
 			w = put_header->old.width;
 			h = put_header->old.height;
 			s = (unsigned char *)src + 4;
 			inbpp = (put_header->old.bpp ? put_header->old.bpp : fb_gfx->bpp);
+			if ((inbpp <= 0) || (w > (INT_MAX / inbpp)))
+				return FB_RTERROR_ILLEGALFUNCTIONCALL;
 			inpitch = w * inbpp;
 		}
 	}
@@ -107,10 +120,13 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 		inpitch = fb_gfx->pitch;
 	}
 
-	if (w <= 0 || h <= 0 || s == 0 || inpitch < w * inbpp) {
+	if ((w <= 0) || (h <= 0) || (s == NULL) || (inbpp <= 0)) {
 		/* Something wrong with the image header */
 		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 	}
+	if ((w > (INT_MAX / inbpp)) || (inpitch < w * inbpp) ||
+	    ((size_t)(h - 1) > (size_max / (size_t)inpitch)))
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
 
 	switch (inbpp) {
 	case 1: /* 8-bit or 24-bit output (default to 8) */
@@ -136,31 +152,44 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 	/* Change bits/pixel to bytes/pixel */
 	outbpp >>= 3;
 
+	/* BMP pixel rows are padded to four-byte boundaries. */
 	switch (outbpp) {
 	case 1:
-		outpitch = ( (w + 3) & ~3 );
-		biSizeImage = outpitch * h;
-		bfOffBits = 54 + 256*4;
-		bfSize = bfOffBits + biSizeImage;
-		biClrUsed = 256;
+		row_size = (size_t)w;
+		if (row_size > (size_max - 3u))
+			return FB_RTERROR_ILLEGALFUNCTIONCALL;
+		outpitch = (row_size + 3u) & ~(size_t)3u;
+		/* 54-byte BMP headers plus 256 four-byte palette entries. */
+		bfOffBits = 54u + (256u * 4u);
+		biClrUsed = 256u;
 		break;
 	case 3:
-		outpitch = ( ((w * 3) + 3) & ~3 );
-		biSizeImage = outpitch * h;
-		bfOffBits = 54;
-		bfSize = bfOffBits + biSizeImage;
-		biClrUsed = 0;
+		if ((size_t)w > ((size_max - 3u) / 3u))
+			return FB_RTERROR_ILLEGALFUNCTIONCALL;
+		row_size = (size_t)w * 3u;
+		outpitch = (row_size + 3u) & ~(size_t)3u;
+		bfOffBits = 54u;
+		biClrUsed = 0u;
 		break;
 	case 4:
 	default:
 		DBG_ASSERT(outbpp == 4);
-		outpitch = w * 4;
-		biSizeImage = outpitch * h;
-		bfOffBits = 54;
-		bfSize = bfOffBits + biSizeImage;
-		biClrUsed = 0;
+		if ((size_t)w > (size_max / 4u))
+			return FB_RTERROR_ILLEGALFUNCTIONCALL;
+		row_size = (size_t)w * 4u;
+		outpitch = row_size;
+		bfOffBits = 54u;
+		biClrUsed = 0u;
 		break;
 	}
+	if ((outpitch == 0u) || ((size_t)h > (size_max / outpitch)))
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+	image_size = outpitch * (size_t)h;
+	/* BMP file size fields are 32-bit unsigned values. */
+	if (image_size > (size_t)(UINT_MAX - bfOffBits))
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+	bfSize = (unsigned int)(image_size + bfOffBits);
+	biSizeImage = (unsigned int)image_size;
 
 	if (!write_bmp_header(f, (unsigned int)bfSize,
 	    (unsigned int)bfOffBits, (unsigned int)w, (unsigned int)h,
@@ -195,37 +224,49 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 		}
 	}
 
-	buffer = (unsigned char *)calloc(1, outpitch + 15);
+	buffer = (unsigned char *)calloc(1, outpitch);
 	if (buffer == 0) {
 		if (paltmp) free(paltmp);
 		return FB_RTERROR_OUTOFMEM;
 	}
 
-	s += (h - 1) * inpitch;
-	for (; h; h--) {
+	source = s;
+	for (row = h; row > 0; row--) {
+		s = source + ((size_t)(row - 1) * (size_t)inpitch);
 		p = buffer;
+		/* PUT payload bytes are not guaranteed to have native pixel alignment. */
 		switch (inbpp) {
 			case 1:
 				if (outbpp == 1) {
-					fb_hMemCpy(p, s, inpitch);
+					copy_size = (size_t)inpitch;
+					/* Only the padded BMP row is written if source pitch is wider. */
+					if (copy_size > outpitch)
+						copy_size = outpitch;
+					fb_hMemCpy(p, s, copy_size);
 				}
 				else {
 					DBG_ASSERT(outbpp == 3);
 					for (i = 0; i < w; i++) {
-						color = palette[((unsigned char *)s)[i]];
-						*p++ = (color & 0xFF0000) >> 16;
-						*p++ = (color & 0xFF00) >> 8;
-						*p++ = (color & 0xFF);
+						color = palette[s[i]];
+						*p++ = (unsigned char)((color & 0xFF0000u) >> 16);
+						*p++ = (unsigned char)((color & 0x0000FF00u) >> 8);
+						*p++ = (unsigned char)(color & 0x000000FFu);
 					}
 				}
 				break;
 			case 2:
 				DBG_ASSERT(outbpp == 3);
 				for (i = 0; i < w; i++) {
-					color = ((unsigned short *)s)[i];
-					*p++ = ((color & 0x001F) << 3) | ((color & 0x001F) >> 2);
-					*p++ = ((color & 0x07E0) >> 3) | ((color & 0x07E0) >> 9);
-					*p++ = ((color & 0xF800) >> 8) | ((color & 0xF800) >> 13);
+					memcpy(&source_pixel,
+					       s + ((size_t)i * sizeof(source_pixel)),
+					       sizeof(source_pixel));
+					color = source_pixel;
+					*p++ = (unsigned char)(((color & 0x001Fu) << 3) |
+					                       ((color & 0x001Fu) >> 2));
+					*p++ = (unsigned char)(((color & 0x07E0u) >> 3) |
+					                       ((color & 0x07E0u) >> 9));
+					*p++ = (unsigned char)(((color & 0xF800u) >> 8) |
+					                       ((color & 0xF800u) >> 13));
 				}
 				break;
 			case 4:
@@ -233,12 +274,12 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 				DBG_ASSERT(inbpp == 4);
 				DBG_ASSERT(outbpp == 3 || outbpp == 4);
 				for (i = 0; i < w; i++) {
-					color = ((unsigned int *)s)[i];
-					*p++ = color & 0xFF;
-					*p++ = (color >> 8) & 0xFF;
-					*p++ = (color >> 16) & 0xFF;
+					memcpy(&color, s + ((size_t)i * sizeof(color)), sizeof(color));
+					*p++ = (unsigned char)(color & 0xFFu);
+					*p++ = (unsigned char)((color >> 8) & 0xFFu);
+					*p++ = (unsigned char)((color >> 16) & 0xFFu);
 					if (outbpp == 4)
-						*p++ = (color >> 24) & 0xFF;
+						*p++ = (unsigned char)((color >> 24) & 0xFFu);
 				}
 				break;
 		}
@@ -247,7 +288,6 @@ static int save_bmp(FB_GFXCTX *ctx, FILE *f, void *src, void *pal, int outbpp)
 			if (paltmp) free(paltmp);
 			return FB_RTERROR_FILEIO;
 		}
-		s -= inpitch;
 	}
 
 	free(buffer);
@@ -303,7 +343,7 @@ FBCALL int fb_GfxBsaveEx(FBSTRING_ACCESS *filename, void *src, unsigned int size
 		fputc(size & 0xFF, f);
 		fputc((size >> 8) & 0xFF, f);
 		fputc((size >> 16) & 0xFF, f);
-		fputc(size >> 24, f);
+		fputc((int)((size >> 24) & 0xFFu), f);
 
 		if (!src) {
 			DRIVER_LOCK();

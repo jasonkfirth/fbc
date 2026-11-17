@@ -229,7 +229,10 @@ static float fb_sfxOscillatorSaw(FB_SFXVOICE *voice)
 
 static float fb_sfxOscillatorRandomNoise(void)
 {
-    return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+    int random_value;
+
+    random_value = rand();
+    return ((float)random_value / (float)RAND_MAX) * 2.0f - 1.0f;
 }
 
 static float fb_sfxOscillatorNoise(FB_SFXVOICE *voice)

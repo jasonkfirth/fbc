@@ -6,6 +6,14 @@
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
 #include "fb.h"
+#include <limits.h>
+#include <stdint.h>
+
+#if defined(_MSC_VER)
+#define FB_FILE_GET_ALIGNOF(type) __alignof(type)
+#else
+#define FB_FILE_GET_ALIGNOF(type) __alignof__(type)
+#endif
 
 int fb_FileGetDataEx
 	(
@@ -31,6 +39,13 @@ int fb_FileGetDataEx
 	if( pos < 0 )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
+    if( (length != 0) && (dst == NULL) )
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
+    if( is_unicode && (dst != NULL) &&
+        ((uintptr_t)dst % FB_FILE_GET_ALIGNOF(FB_WCHAR) != 0) )
+        return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
     FB_LOCK();
 
     res = fb_ErrorSetNum( FB_RTERROR_OK );
@@ -52,17 +67,16 @@ int fb_FileGetDataEx
             return fb_ErrorSetNum( FB_RTERROR_FILEIO );
         }
 
-        if( handle->encod != FB_FILE_ENCOD_ASCII )
-            buffer_chars = handle->putback_size / sizeof( FB_WCHAR );
-        else
-            buffer_chars = handle->putback_size;
+		buffer_chars = handle->putback_size;
+		if( handle->encod != FB_FILE_ENCOD_ASCII )
+			buffer_chars /= sizeof( FB_WCHAR );
 
         if( buffer_chars > chars )
             buffer_chars = chars;
 
-        bytes = buffer_chars;
-        if( handle->encod != FB_FILE_ENCOD_ASCII )
-            bytes *= sizeof( FB_WCHAR );
+		bytes = buffer_chars;
+		if( handle->encod != FB_FILE_ENCOD_ASCII )
+			bytes *= sizeof( FB_WCHAR );
 
         if( buffer_chars != 0 )
         {
@@ -95,11 +109,14 @@ int fb_FileGetDataEx
                 else
                 {
                     size_t len = buffer_chars;
-                    FB_WCHAR *wcp = (FB_WCHAR *)pachData;
+                    char *wcp = pachData;
                     unsigned char *cp = (unsigned char *)handle->putback_buffer;
 
-                    while( len-- > 0 )
-                        *wcp++ = *cp++;
+                    while( len-- > 0 ) {
+                        FB_WCHAR wc = (FB_WCHAR)*cp++;
+                        memcpy(wcp, &wc, sizeof(wc));
+                        wcp += sizeof(wc);
+                    }
                 }
             }
 
@@ -111,10 +128,9 @@ int fb_FileGetDataEx
                          handle->putback_size );
             }
 
-            if( is_unicode )
-                pachData += buffer_chars * sizeof( FB_WCHAR );
-            else
-                pachData += buffer_chars;
+			pachData += buffer_chars;
+			if( is_unicode && sizeof( FB_WCHAR ) > 1 )
+				pachData += buffer_chars * (sizeof( FB_WCHAR ) - 1);
 
             read_chars = buffer_chars;
             chars -= buffer_chars;
@@ -144,9 +160,14 @@ int fb_FileGetDataEx
         {
         	if( handle->hooks->pfnReadWstr == NULL )
             	res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		else if( pachData == NULL ||
+		         ((uintptr_t)pachData % FB_FILE_GET_ALIGNOF(FB_WCHAR) != 0) )
+			res = fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
         	else
         	{
-        		res = handle->hooks->pfnReadWstr( handle, (FB_WCHAR *)pachData, &chars );
+                void *aligned_data = pachData;
+                res = handle->hooks->pfnReadWstr( handle,
+                    aligned_data, &chars );
         		read_chars += chars;
         	}
         }
@@ -155,40 +176,52 @@ int fb_FileGetDataEx
     if( handle->mode == FB_FILE_MODE_RANDOM &&
         res == FB_RTERROR_OK &&
         adjust_rec_pos &&
-        handle->len != 0 &&
         handle->hooks->pfnSeek != NULL )
     {
         /* if in random mode, reads must be of reclen.
          * The device must also support the SEEK method and the length
          * must be non-null */
 
-		if( length != (size_t)handle->len )
-			res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+        if( handle->len < 0 ) {
+            res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
+        } else if( handle->len > 0 ) {
+            size_t record_length = (size_t)handle->len;
+            size_t consumed_bytes;
 
+			if( length != record_length )
+				res = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
-		size_t skip_size = (handle->len -
-        				   ((!is_unicode? read_chars: read_chars*sizeof( FB_WCHAR )) % handle->len)) % handle->len;
-
-        if( skip_size != 0 )
-        {
-            /* don't forget the put back buffer */
-            if( skip_size > handle->putback_size )
-            {
-                skip_size -= handle->putback_size;
-                handle->putback_size = 0;
+            if( is_unicode ) {
+                /* Reduce before scaling so large reads cannot overflow. */
+                uint64_t consumed_chars = (uint64_t)(read_chars % record_length);
+                consumed_bytes = (size_t)((consumed_chars * sizeof(FB_WCHAR)) % record_length);
+            } else {
+                consumed_bytes = read_chars % record_length;
             }
-            else
-            {
-                handle->putback_size -= skip_size;
-                skip_size = 0;
-            }
-        }
 
-        if (skip_size!=0)
-        {
-            /* devices that don't support seek should simulate it
-             with read or never allow to be opened for random access */
-            handle->hooks->pfnSeek( handle, skip_size, SEEK_CUR );
+            size_t skip_size = (record_length - consumed_bytes) % record_length;
+
+            if( skip_size != 0 )
+            {
+                /* don't forget the put back buffer */
+                if( skip_size > handle->putback_size )
+                {
+                    skip_size -= handle->putback_size;
+                    handle->putback_size = 0;
+                }
+                else
+                {
+                    handle->putback_size -= skip_size;
+                    skip_size = 0;
+                }
+            }
+
+            if (skip_size!=0)
+            {
+                /* devices that don't support seek should simulate it
+                 with read or never allow to be opened for random access */
+                handle->hooks->pfnSeek( handle, (fb_off_t)skip_size, SEEK_CUR );
+            }
         }
     }
 
@@ -229,8 +262,13 @@ FBCALL int fb_FileGet( int fnum, int pos, void *dst, size_t chars )
 
 FBCALL int fb_FileGetLarge( int fnum, long long pos, void *dst, size_t chars )
 {
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
 	return fb_FileGetDataEx( FB_FILE_TO_HANDLE(fnum),
-							 pos,
+							 offset,
 							 dst,
 							 chars,
 							 NULL,
@@ -251,8 +289,13 @@ FBCALL int fb_FileGetIOB( int fnum, int pos, void *dst, size_t chars, size_t *by
 
 FBCALL int fb_FileGetLargeIOB( int fnum, long long pos, void *dst, size_t chars, size_t *bytesread )
 {
+	fb_off_t offset;
+
+	if( !FB_FILE_INDEX_VALID(fnum) || !fb_hFileOffsetFromLongLong(pos, &offset) )
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+
 	return fb_FileGetDataEx( FB_FILE_TO_HANDLE(fnum),
-							 pos,
+							 offset,
 							 dst,
 							 chars,
 							 bytesread,

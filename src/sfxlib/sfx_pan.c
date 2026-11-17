@@ -82,7 +82,7 @@ void fb_sfxPan(int channel, float position)
     SFX_DEBUG(
         "sfx_pan: channel %d pan set to %f",
         channel,
-        position
+        (double)position
     );
 }
 

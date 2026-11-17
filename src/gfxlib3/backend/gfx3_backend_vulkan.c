@@ -46,9 +46,15 @@ typedef struct FB_GFX3_VULKAN_BACKEND_STATE {
 	FB_GFX3_ANDROID_KEYBOARD_OVERLAY keyboard_overlay;
 	uint32_t keyboard_overlay_state;
 	int keyboard_overlay_known;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t submitted_sequence_alignment_padding;
+#endif
 	uint64_t submitted_sequence;
 	uint64_t completed_sequence;
 	int presentation_dirty;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	uint32_t primitive_scratch_alignment_padding;
+#endif
 	/*
 		Mixed primitive conversion runs only on the render thread. Retaining the
 		largest host array avoids returning to the process allocator for every
@@ -179,7 +185,7 @@ static int vulkan_backend_surface_create(
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_CREATE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_CREATE_COMMAND);
 	surface = (FB_GFX3_VULKAN_BACKEND_SURFACE *)
 		calloc(1, sizeof(*surface));
 	if (surface == NULL)
@@ -226,7 +232,7 @@ static int vulkan_backend_surface_upload(
 
 	if (fb_gfx3_command_payload_size(command) < header_size)
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_UPLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_UPLOAD_COMMAND);
 	if ((payload->width == 0) || (payload->height == 0) ||
 	    (payload->data_size !=
 	     fb_gfx3_command_payload_size(command) - header_size))
@@ -265,7 +271,7 @@ static int vulkan_backend_surface_download(
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_SURFACE_DOWNLOAD_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_SURFACE_DOWNLOAD_COMMAND);
 	if ((payload->destination_address == 0) ||
 	    (payload->destination_address > UINTPTR_MAX))
 		return FB_GFX3_INVALID;
@@ -304,7 +310,7 @@ static int vulkan_backend_clear(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_CLEAR_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_CLEAR_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -334,7 +340,7 @@ static int vulkan_backend_points(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	if (fb_gfx3_command_payload_size(command) <
 	    offsetof(FB_GFX3_POINTS_COMMAND, point))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_POINTS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 	if ((fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
 	     &points_size) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(offsetof(FB_GFX3_POINTS_COMMAND, point),
@@ -369,7 +375,7 @@ static size_t vulkan_backend_points_batch_count(FB_GFX3_COMMAND *const *commands
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 		return 1;
-	first = (const FB_GFX3_POINTS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_POINTS_COMMAND);
 	if (available > FB_GFX3_VULKAN_BACKEND_POINTS_BATCH_LIMIT)
 		available = FB_GFX3_VULKAN_BACKEND_POINTS_BATCH_LIMIT;
 	/*
@@ -388,7 +394,7 @@ static size_t vulkan_backend_points_batch_count(FB_GFX3_COMMAND *const *commands
 		    (fb_gfx3_command_payload_size(commands[index]) <
 		     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 			break;
-		payload = (const FB_GFX3_POINTS_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_POINTS_COMMAND);
 		if ((payload->count == 0u) ||
 		    (memcmp(&payload->clip, &first->clip, sizeof(payload->clip)) != 0) ||
 		    (fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
@@ -417,7 +423,7 @@ static int vulkan_backend_points_batch(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_POINTS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_POINTS_COMMAND);
 	/*
 		Keep every public POINTS command distinct. The Vulkan runtime records
 		them as ordered dispatches in one submission, avoiding a queue submit and
@@ -434,7 +440,7 @@ static int vulkan_backend_points_batch(FB_GFX3_VULKAN_BACKEND_STATE *state,
 		    (fb_gfx3_command_payload_size(commands[index]) <
 		     offsetof(FB_GFX3_POINTS_COMMAND, point)))
 			return FB_GFX3_INVALID;
-		payload = (const FB_GFX3_POINTS_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_POINTS_COMMAND);
 		if ((payload->count == 0u) ||
 			(memcmp(&payload->clip, &first->clip, sizeof(payload->clip)) != 0) ||
 			(fb_gfx3_size_multiply(payload->count, sizeof(payload->point[0]),
@@ -521,7 +527,7 @@ static size_t vulkan_backend_primitive_batch_count(
 			if (fb_gfx3_command_payload_size(command) <
 			    offsetof(FB_GFX3_POINTS_COMMAND, point))
 				break;
-			points = (const FB_GFX3_POINTS_COMMAND *)command->payload;
+			points = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 			if ((points->count == 0u) ||
 			    (fb_gfx3_size_multiply(points->count,
 			     sizeof(points->point[0]), &point_bytes) != FB_GFX3_OK) ||
@@ -547,7 +553,7 @@ static size_t vulkan_backend_primitive_batch_count(
 
 			if (fb_gfx3_command_payload_size(command) != sizeof(*line))
 				break;
-			line = (const FB_GFX3_LINE_COMMAND *)command->payload;
+			line = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 			if (((line->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 			    (llabs((long long)line->x2 - line->x1) > 32767) ||
 			    (llabs((long long)line->y2 - line->y1) > 32767))
@@ -569,7 +575,7 @@ static size_t vulkan_backend_primitive_batch_count(
 			if (fb_gfx3_command_payload_size(command) <
 			    offsetof(FB_GFX3_LINES_COMMAND, line))
 				break;
-			lines = (const FB_GFX3_LINES_COMMAND *)command->payload;
+			lines = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 			if ((lines->count == 0u) ||
 			    (fb_gfx3_size_multiply(lines->count,
 			     sizeof(lines->line[0]), &line_bytes) != FB_GFX3_OK) ||
@@ -609,7 +615,7 @@ static size_t vulkan_backend_primitive_batch_count(
 			    sizeof(*rectangle))
 				break;
 			rectangle =
-				(const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 			if (!vulkan_backend_rectangle_workgroups(rectangle,
 			    &added_workgroups))
 				break;
@@ -624,7 +630,7 @@ static size_t vulkan_backend_primitive_batch_count(
 			    offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle))
 				break;
 			rectangles =
-				(const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 			if ((rectangles->count == 0u) ||
 			    (fb_gfx3_size_multiply(rectangles->count,
 			     sizeof(rectangles->rectangle[0]), &rectangle_bytes) !=
@@ -654,7 +660,7 @@ static size_t vulkan_backend_primitive_batch_count(
 
 			if (fb_gfx3_command_payload_size(command) != sizeof(*ellipse))
 				break;
-			ellipse = (const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+			ellipse = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 			if (((ellipse->flags &
 			      FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 			    !(ellipse->radius_x >= 0.0f) ||
@@ -765,7 +771,7 @@ static int vulkan_backend_primitive_batch(
 		}
 		if (command->type == FB_GFX3_COMMAND_POINTS) {
 			const FB_GFX3_POINTS_COMMAND *points =
-				(const FB_GFX3_POINTS_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_POINTS_COMMAND);
 			uint32_t point_index;
 
 			for (point_index = 0u; point_index < points->count;
@@ -786,7 +792,7 @@ static int vulkan_backend_primitive_batch(
 			}
 		} else if (command->type == FB_GFX3_COMMAND_LINE) {
 			const FB_GFX3_LINE_COMMAND *line =
-				(const FB_GFX3_LINE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 
 			vulkan_backend_primitive_add_line(
 				&primitives[primitive_index], line,
@@ -794,7 +800,7 @@ static int vulkan_backend_primitive_batch(
 			primitive_index++;
 		} else if (command->type == FB_GFX3_COMMAND_LINES) {
 			const FB_GFX3_LINES_COMMAND *lines =
-				(const FB_GFX3_LINES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 			uint32_t line_index;
 
 			for (line_index = 0u; line_index < lines->count; line_index++) {
@@ -806,7 +812,7 @@ static int vulkan_backend_primitive_batch(
 			}
 		} else if (command->type == FB_GFX3_COMMAND_RECTANGLE) {
 			const FB_GFX3_RECTANGLE_COMMAND *rectangle =
-				(const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 
 			vulkan_backend_primitive_add_rectangle(
 				&primitives[primitive_index], rectangle,
@@ -814,7 +820,7 @@ static int vulkan_backend_primitive_batch(
 			primitive_index++;
 		} else if (command->type == FB_GFX3_COMMAND_RECTANGLES) {
 			const FB_GFX3_RECTANGLES_COMMAND *rectangles =
-				(const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 			uint32_t rectangle_index;
 
 			for (rectangle_index = 0u;
@@ -828,7 +834,7 @@ static int vulkan_backend_primitive_batch(
 			}
 		} else if (command->type == FB_GFX3_COMMAND_ELLIPSE) {
 			const FB_GFX3_ELLIPSE_COMMAND *ellipse =
-				(const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 			FB_GFX3_VULKAN_PRIMITIVE *primitive =
 				&primitives[primitive_index];
 
@@ -881,7 +887,7 @@ static size_t vulkan_backend_glyph_batch_count(
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)))
 		return 1u;
-	first = (const FB_GFX3_GLYPHS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_GLYPHS_COMMAND);
 	if ((first->count == 0u) ||
 	    (first->count > FB_GFX3_VULKAN_BACKEND_GLYPH_BATCH_LIMIT) ||
 	    (fb_gfx3_size_multiply(first->count, sizeof(first->glyph[0]),
@@ -902,7 +908,7 @@ static size_t vulkan_backend_glyph_batch_count(
 		    (fb_gfx3_command_payload_size(command) <
 		     offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)))
 			break;
-		candidate = (const FB_GFX3_GLYPHS_COMMAND *)command->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_GLYPHS_COMMAND);
 		if ((candidate->count == 0u) ||
 		    (candidate->count >
 		     FB_GFX3_VULKAN_BACKEND_GLYPH_BATCH_LIMIT - total) ||
@@ -939,7 +945,7 @@ static int vulkan_backend_glyphs(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	    (fb_gfx3_command_payload_size(commands[0]) <
 	     offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_GLYPHS_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_GLYPHS_COMMAND);
 	for (command_index = 0u; command_index < command_count; ++command_index) {
 		const FB_GFX3_GLYPHS_COMMAND *payload;
 		uint32_t item;
@@ -950,8 +956,7 @@ static int vulkan_backend_glyphs(FB_GFX3_VULKAN_BACKEND_STATE *state,
 		    (fb_gfx3_command_payload_size(commands[command_index]) <
 		     offsetof(FB_GFX3_GLYPHS_COMMAND, glyph)))
 			return FB_GFX3_INVALID;
-		payload = (const FB_GFX3_GLYPHS_COMMAND *)
-			commands[command_index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[command_index], const FB_GFX3_GLYPHS_COMMAND);
 		if ((payload->count == 0u) ||
 		    (payload->count >
 		     FB_GFX3_VULKAN_BACKEND_GLYPH_BATCH_LIMIT - total) ||
@@ -988,8 +993,7 @@ static int vulkan_backend_glyphs(FB_GFX3_VULKAN_BACKEND_STATE *state,
 		for (command_index = 0u; command_index < command_count;
 		     ++command_index) {
 			const FB_GFX3_GLYPHS_COMMAND *payload =
-				(const FB_GFX3_GLYPHS_COMMAND *)
-				commands[command_index]->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(commands[command_index], const FB_GFX3_GLYPHS_COMMAND);
 
 			memcpy(combined + destination_index, payload->glyph,
 				(size_t)payload->count * sizeof(payload->glyph[0]));
@@ -1017,7 +1021,7 @@ static int vulkan_backend_line(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_LINE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINE_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1057,7 +1061,7 @@ static int vulkan_backend_line_batch(FB_GFX3_VULKAN_BACKEND_STATE *state,
 			result = FB_GFX3_INVALID;
 			goto cleanup;
 		}
-		payload = (const FB_GFX3_LINE_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_LINE_COMMAND);
 		lines[index].clip = payload->clip;
 		lines[index].x1 = payload->x1;
 		lines[index].y1 = payload->y1;
@@ -1171,6 +1175,8 @@ static int vulkan_backend_long_line_points(
 		return FB_GFX3_OK;
 
 	point_capacity = (uint64_t)(last_step - first_step) + 1u;
+	if (point_capacity == 0u)
+		return FB_GFX3_OK;
 	if ((point_capacity > UINT32_MAX) ||
 	    (fb_gfx3_size_multiply((size_t)point_capacity, sizeof(*points),
 	     &allocation_size) != FB_GFX3_OK))
@@ -1250,7 +1256,7 @@ static int vulkan_backend_lines(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	    (fb_gfx3_command_payload_size(command) <
 	     offsetof(FB_GFX3_LINES_COMMAND, line)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_LINES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_LINES_COMMAND);
 	if ((payload->count == 0u) ||
 	    (fb_gfx3_size_multiply(payload->count, sizeof(payload->line[0]),
 	     &line_bytes) != FB_GFX3_OK) ||
@@ -1360,7 +1366,7 @@ static int vulkan_backend_rectangle(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_RECTANGLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLE_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1381,7 +1387,7 @@ static int vulkan_backend_ellipse(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_ELLIPSE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_ELLIPSE_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1440,7 +1446,7 @@ static int vulkan_backend_ellipse_batch(FB_GFX3_VULKAN_BACKEND_STATE *state,
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*payload)))
 			return FB_GFX3_INVALID;
-		payload = (const FB_GFX3_ELLIPSE_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_ELLIPSE_COMMAND);
 		if (!(payload->radius_x >= 0.0f) ||
 		    !(payload->radius_x <= 32767.0f) ||
 		    !(payload->radius_y >= 0.0f) ||
@@ -1474,7 +1480,7 @@ static int vulkan_backend_paint(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PAINT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAINT_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1495,7 +1501,7 @@ static int vulkan_backend_blit(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &destination);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1522,7 +1528,7 @@ static int vulkan_backend_transform_blit(
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &destination);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1554,7 +1560,7 @@ static int vulkan_backend_transform_blit_batch(
 	    (commands[0] == NULL) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return FB_GFX3_INVALID;
-	first = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 	if (first->source == commands[0]->target)
 		return FB_GFX3_UNSUPPORTED;
 	for (index = 0u; index < count; ++index) {
@@ -1565,8 +1571,7 @@ static int vulkan_backend_transform_blit_batch(
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*payload)))
 			return FB_GFX3_INVALID;
-		payload = (const FB_GFX3_TRANSFORM_BLIT_COMMAND *)
-			commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
 		    (payload->source != first->source) ||
 		    ((index > 0u) && (commands[index]->sequence <=
@@ -1610,7 +1615,7 @@ static int vulkan_backend_blits(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	    (fb_gfx3_command_payload_size(command) <
 	     offsetof(FB_GFX3_BLITS_COMMAND, blit)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_BLITS_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLITS_COMMAND);
 	if ((payload->count == 0u) ||
 	    (payload->count > FB_GFX3_VULKAN_BACKEND_BLIT_BATCH_LIMIT) ||
 	    (fb_gfx3_size_multiply(payload->count, sizeof(payload->blit[0]),
@@ -1699,7 +1704,7 @@ static int vulkan_backend_blit_batch(FB_GFX3_VULKAN_BACKEND_STATE *state,
 		return FB_GFX3_INVALID;
 	if (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first_payload))
 		return FB_GFX3_INVALID;
-	first_payload = (const FB_GFX3_BLIT_COMMAND *)commands[0]->payload;
+	first_payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_BLIT_COMMAND);
 	if (first_payload->source == commands[0]->target)
 		return FB_GFX3_UNSUPPORTED;
 	for (index = 0; index < count; index++) {
@@ -1710,7 +1715,7 @@ static int vulkan_backend_blit_batch(FB_GFX3_VULKAN_BACKEND_STATE *state,
 		    (fb_gfx3_command_payload_size(commands[index]) !=
 		     sizeof(*payload)))
 			return FB_GFX3_INVALID;
-		payload = (const FB_GFX3_BLIT_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_BLIT_COMMAND);
 		if ((commands[index]->target != commands[0]->target) ||
 		    (payload->source != first_payload->source))
 			return FB_GFX3_INVALID;
@@ -1774,7 +1779,7 @@ static int vulkan_backend_rectangle_clear_batch(
 			result = FB_GFX3_INVALID;
 			goto cleanup;
 		}
-		payload = (const FB_GFX3_RECTANGLE_COMMAND *)commands[index]->payload;
+		payload = FB_GFX3_COMMAND_PAYLOAD_AS(commands[index], const FB_GFX3_RECTANGLE_COMMAND);
 		if ((payload->filled == 0) ||
 		    ((payload->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0)) {
 			result = FB_GFX3_INVALID;
@@ -1841,7 +1846,7 @@ static int vulkan_backend_rectangles(FB_GFX3_VULKAN_BACKEND_STATE *state,
 	    (fb_gfx3_command_payload_size(command) <
 	     offsetof(FB_GFX3_RECTANGLES_COMMAND, rectangle)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_RECTANGLES_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_RECTANGLES_COMMAND);
 	if ((payload->count == 0u) ||
 	    (payload->count > FB_GFX3_VULKAN_BACKEND_RECTANGLE_BATCH_LIMIT) ||
 	    (fb_gfx3_size_multiply(payload->count, sizeof(payload->rectangle[0]),
@@ -1891,7 +1896,7 @@ static int vulkan_backend_read_pixel(
 	if ((command->completion == NULL) ||
 	    (fb_gfx3_command_payload_size(command) != sizeof(*payload)))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_READ_PIXEL_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_READ_PIXEL_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1918,7 +1923,7 @@ static int vulkan_backend_page_set(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PAGE_SET_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAGE_SET_COMMAND);
 	result = vulkan_backend_surface_retain(state, command, &surface);
 	if (result != FB_GFX3_OK)
 		return result;
@@ -1941,7 +1946,7 @@ static int vulkan_backend_palette(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (fb_gfx3_command_payload_size(command) != sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_PALETTE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PALETTE_COMMAND);
 	memcpy(state->palette, payload->color, sizeof(state->palette));
 	if (state->visible_surface != 0)
 		state->presentation_dirty = TRUE;
@@ -2027,7 +2032,7 @@ static int vulkan_backend_window_title(FB_GFX3_VULKAN_BACKEND_STATE *state,
 
 	if (payload_size < sizeof(*payload))
 		return FB_GFX3_INVALID;
-	payload = (const FB_GFX3_WINDOW_TITLE_COMMAND *)command->payload;
+	payload = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_WINDOW_TITLE_COMMAND);
 	if ((fb_gfx3_size_add(sizeof(*payload), payload->length,
 	     &expected_size) != FB_GFX3_OK) ||
 	    (fb_gfx3_size_add(expected_size, 1, &expected_size) != FB_GFX3_OK) ||
@@ -2340,7 +2345,7 @@ static int vulkan_backend_page_copy_description(
 	if (command->type == FB_GFX3_COMMAND_BLIT) {
 		if (fb_gfx3_command_payload_size(command) != sizeof(*blit))
 			return FALSE;
-		blit = (const FB_GFX3_BLIT_COMMAND *)command->payload;
+		blit = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 	} else if (command->type == FB_GFX3_COMMAND_BLITS) {
 		const FB_GFX3_BLITS_COMMAND *blits;
 		size_t expected_size;
@@ -2348,7 +2353,7 @@ static int vulkan_backend_page_copy_description(
 		if (fb_gfx3_command_payload_size(command) <
 		    offsetof(FB_GFX3_BLITS_COMMAND, blit))
 			return FALSE;
-		blits = (const FB_GFX3_BLITS_COMMAND *)command->payload;
+		blits = FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLITS_COMMAND);
 		if ((blits->count != 1u) ||
 		    (fb_gfx3_size_add(offsetof(FB_GFX3_BLITS_COMMAND, blit),
 		     sizeof(blits->blit[0]), &expected_size) != FB_GFX3_OK) ||
@@ -2492,7 +2497,7 @@ static int vulkan_backend_page_copy_run(
 
 		if (command->type == FB_GFX3_COMMAND_PAGE_SET) {
 			const FB_GFX3_PAGE_SET_COMMAND *payload =
-				(const FB_GFX3_PAGE_SET_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_PAGE_SET_COMMAND);
 			size_t destination_index;
 
 			result = vulkan_backend_page_copy_retain(state, command->target,
@@ -2631,7 +2636,7 @@ static size_t vulkan_backend_clear_batch_count(FB_GFX3_COMMAND *const *commands,
 	if ((commands == NULL) || (available == 0) || (commands[0] == NULL) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1;
-	first = (const FB_GFX3_CLEAR_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_CLEAR_COMMAND);
 	if ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0)
 		return 1;
 	while (count < available) {
@@ -2643,7 +2648,7 @@ static size_t vulkan_backend_clear_batch_count(FB_GFX3_COMMAND *const *commands,
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_CLEAR_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_CLEAR_COMMAND);
 		if (((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0) ||
 		    (memcmp(&candidate->clip, &first->clip,
 		     sizeof(candidate->clip)) != 0))
@@ -2668,7 +2673,7 @@ static size_t vulkan_backend_paint_batch_count(
 	    (commands[0]->type != FB_GFX3_COMMAND_PAINT) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1u;
-	first = (const FB_GFX3_PAINT_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_PAINT_COMMAND);
 	if ((first->paint_mode != 0u) || (first->pattern_size != 0u) ||
 	    ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
 	    (first->color == first->border_color))
@@ -2683,7 +2688,7 @@ static size_t vulkan_backend_paint_batch_count(
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_PAINT_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_PAINT_COMMAND);
 		if ((candidate->paint_mode != 0u) ||
 		    (candidate->pattern_size != 0u) ||
 		    ((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0u) ||
@@ -2726,7 +2731,7 @@ static size_t vulkan_backend_rectangle_clear_batch_count(
 	    (commands[0]->type != FB_GFX3_COMMAND_RECTANGLE) ||
 	    (fb_gfx3_command_payload_size(commands[0]) != sizeof(*first)))
 		return 1;
-	first = (const FB_GFX3_RECTANGLE_COMMAND *)commands[0]->payload;
+	first = FB_GFX3_COMMAND_PAYLOAD_AS(commands[0], const FB_GFX3_RECTANGLE_COMMAND);
 	if ((first->filled == 0) ||
 	    ((first->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0))
 		return 1;
@@ -2740,7 +2745,7 @@ static size_t vulkan_backend_rectangle_clear_batch_count(
 		    (fb_gfx3_command_payload_size(commands[count]) !=
 		     sizeof(*candidate)))
 			break;
-		candidate = (const FB_GFX3_RECTANGLE_COMMAND *)commands[count]->payload;
+		candidate = FB_GFX3_COMMAND_PAYLOAD_AS(commands[count], const FB_GFX3_RECTANGLE_COMMAND);
 		if ((candidate->filled == 0) ||
 		    ((candidate->flags & FB_GFX3_PRIMITIVE_ALPHA_BLEND) != 0))
 			break;
@@ -2926,7 +2931,7 @@ static int vulkan_backend_execute(FB_GFX3_BACKEND *backend,
 		    (fb_gfx3_command_payload_size(command) ==
 		     sizeof(FB_GFX3_BLIT_COMMAND))) {
 			const FB_GFX3_BLIT_COMMAND *payload =
-				(const FB_GFX3_BLIT_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_BLIT_COMMAND);
 
 			while ((payload->source != command->target) &&
 			       (index + execute_count < count) &&
@@ -2941,7 +2946,7 @@ static int vulkan_backend_execute(FB_GFX3_BACKEND *backend,
 				     sizeof(*candidate_payload)))
 					break;
 				candidate_payload =
-					(const FB_GFX3_BLIT_COMMAND *)candidate->payload;
+					FB_GFX3_COMMAND_PAYLOAD_AS(candidate, const FB_GFX3_BLIT_COMMAND);
 				if ((candidate->target != command->target) ||
 				    (candidate_payload->source != payload->source))
 					break;
@@ -2951,7 +2956,7 @@ static int vulkan_backend_execute(FB_GFX3_BACKEND *backend,
 		    (fb_gfx3_command_payload_size(command) ==
 		     sizeof(FB_GFX3_TRANSFORM_BLIT_COMMAND))) {
 			const FB_GFX3_TRANSFORM_BLIT_COMMAND *payload =
-				(const FB_GFX3_TRANSFORM_BLIT_COMMAND *)command->payload;
+				FB_GFX3_COMMAND_PAYLOAD_AS(command, const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 
 			while ((payload->source != command->target) &&
 			       (index + execute_count < count) &&
@@ -2967,8 +2972,7 @@ static int vulkan_backend_execute(FB_GFX3_BACKEND *backend,
 				     sizeof(*candidate_payload)))
 					break;
 				candidate_payload =
-					(const FB_GFX3_TRANSFORM_BLIT_COMMAND *)
-					candidate->payload;
+					FB_GFX3_COMMAND_PAYLOAD_AS(candidate, const FB_GFX3_TRANSFORM_BLIT_COMMAND);
 				if ((candidate->target != command->target) ||
 				    (candidate_payload->source != payload->source))
 					break;
@@ -3132,6 +3136,7 @@ static int vulkan_backend_wait_idle(FB_GFX3_BACKEND *backend)
 
 const FB_GFX3_BACKEND_VTABLE fb_gfx3_backend_vulkan = {
 	FB_GFX3_BACKEND_ABI_VERSION,
+	FB_GFX3_BACKEND_ABI_ALIGNMENT_INITIALIZER
 	"Vulkan compute",
 	vulkan_backend_probe,
 	vulkan_backend_init,

@@ -66,8 +66,9 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	/* see fb_private_thread.h for defintion of FBTHREAD_STACK_MIN */
 	stack_size = stack_size >= (ssize_t)FBTHREAD_STACK_MIN ? stack_size : (ssize_t)FBTHREAD_STACK_MIN;
 
-	/* Refuse an unsupported size instead of silently using pthread defaults. */
-	if( pthread_attr_setstacksize( &tattr, stack_size ) != 0 ) {
+	/* The clamped size is positive before conversion to pthread's size_t.
+	   Refuse an unsupported size instead of silently using pthread defaults. */
+	if( pthread_attr_setstacksize( &tattr, (size_t)stack_size ) != 0 ) {
 		pthread_attr_destroy( &tattr );
 		free( info );
 		free( thread );

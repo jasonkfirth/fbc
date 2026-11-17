@@ -32,6 +32,10 @@
 
 FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, ... )
 {
+	(void)proc;
+	(void)abi;
+	(void)stack_size;
+	(void)num_args;
 	return NULL;
 }
 
@@ -139,7 +143,7 @@ static ffi_type *getStruct( va_list *args_list )
     ffi_arg->alignment = 0;
     ffi_arg->type = FFI_TYPE_STRUCT;
     ffi_arg->elements = 
-        (ffi_type **)malloc( sizeof( ffi_type * ) * ( num_elems + 1 ) );
+        (ffi_type **)malloc( sizeof( ffi_type * ) * ( (size_t)num_elems + 1u ) );
     if( ffi_arg->elements == NULL )
     {
         free( ffi_arg );
@@ -211,8 +215,8 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
     {
         va_list args_list;
 
-        ffi_args = (ffi_type **)malloc( sizeof( ffi_type * ) * num_args );
-        values = (void **)malloc( sizeof( void * ) * num_args );
+        ffi_args = (ffi_type **)malloc( sizeof( ffi_type * ) * (size_t)num_args );
+        values = (void **)malloc( sizeof( void * ) * (size_t)num_args );
         if( (ffi_args == NULL) || (values == NULL) )
         {
             free( (void *)values );
@@ -308,7 +312,7 @@ static FBCALL void threadproc( void *param )
         status = ffi_prep_cif( 
             &cif,               // handle
             abi,                // ABI (CDECL or STDCALL on x86, host default otherwise)
-            info->num_args,     // number of arguments
+            (unsigned int)info->num_args, // bounded argument count
             &ffi_type_void,     // return type
             info->ffi_arg_types // argument types
         );

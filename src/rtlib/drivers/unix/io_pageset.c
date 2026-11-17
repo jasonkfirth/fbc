@@ -10,6 +10,9 @@
 
 int fb_ConsolePageSet( int active, int visible )
 {
+	/* The Unix text console has a single active and visible page. */
+	(void)active;
+	(void)visible;
 	return -1;
 }
 

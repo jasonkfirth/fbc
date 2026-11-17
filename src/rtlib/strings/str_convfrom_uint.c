@@ -48,7 +48,9 @@ FBCALL unsigned int fb_hStr2UInt( char *src, ssize_t len )
 			p += skip;
 	}
 
-	return strtoul( p, NULL, radix );
+	/* VALUINT returns 32 bits even when the native unsigned long is wider.
+	   Conversion to unsigned int retains the low bits of the parser result. */
+	return (unsigned int)strtoul( p, NULL, radix );
 }
 
 FBCALL unsigned int fb_VALUINT ( FBSTRING_ACCESS *str )

@@ -36,7 +36,8 @@ FBCALL void fb_hDateDecodeSerial ( double serial,
         }
     }
 
-    cur_day += serial;
+    /* floor() and the calendar loops leave an integral day offset here. */
+    cur_day += (int)serial;
 
     if( pYear )
         *pYear = cur_year;

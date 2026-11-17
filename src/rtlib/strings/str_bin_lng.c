@@ -10,7 +10,7 @@
 FBCALL FBSTRING_ACCESS *fb_BINEx_l ( unsigned long long num, int digits )
 {
 	FBSTRING_ACCESS *s;
-	int i;
+	unsigned int i;
 	unsigned long long num2;
 
 	if( digits <= 0 ) {
@@ -31,11 +31,11 @@ FBCALL FBSTRING_ACCESS *fb_BINEx_l ( unsigned long long num, int digits )
 	if( s == NULL )
 		return &fb_ctx.null_desc;
 
-	i = digits - 1;
-	while( i >= 0 ) {
+	i = (unsigned int)digits;
+	while( i > 0 ) {
+		i -= 1;
 		s->data[i] = '0' + (num & 1); /* '0' or '1' */
 		num >>= 1;
-		i -= 1;
 	}
 
 	s->data[digits] = '\0';

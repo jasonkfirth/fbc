@@ -69,6 +69,8 @@ double fb_hGetFirstWeekOfYear( int year,
             serial_week_begin += 7.0;
         }
         break;
+    default:
+        break;
     }
 
     return serial_week_begin;

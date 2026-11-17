@@ -7,6 +7,13 @@
  */
 #include "fb.h"
 #include "rnd_state.h"
+#include <math.h>
+
+/* RANDOMIZE uses exactly -1.0 as its automatic-seed sentinel. */
+static int hDoubleEqual(double left, double right)
+{
+	return (left <= right) && (left >= right);
+}
 
 /* Needed by FB_RND_REAL */
 #if defined HOST_WIN32
@@ -74,19 +81,27 @@ static uint64_t hDoubleToBits( double value )
 	return bits.i;
 }
 
+/* RND(0.0f) is the exact sentinel for returning the previous value. */
 /* FB_RND_CRT */
 static uint32_t hRnd_CRT32 ( void )
 {
-	return rand( );
+	int value;
+
+	value = rand( );
+	/* rand() is specified to return a value in the nonnegative range. */
+	return (uint32_t)value;
 }
 
 static double hRnd_CRT ( float n )
 {
-	if( n == 0.0 )
+	uint32_t value;
+
+	if( fpclassify(n) == FP_ZERO )
 		return last_num;
 
 	/* return between 0 and 1 (but never 1) */
-	return (double)hRnd_CRT32() * ( 1.0 / ( (double)RAND_MAX + 1.0 ) );
+	value = hRnd_CRT32();
+	return (double)value * ( 1.0 / ( (double)RAND_MAX + 1.0 ) );
 }
 
 static void hRndCtxInitCRT32 ( uint32_t seed )
@@ -108,12 +123,15 @@ static uint32_t hRnd_FAST32 ( void )
 
 static double hRnd_FAST ( float n )
 {
+	uint32_t value;
+
 	/* return last value if argument is 0.0 */
-	if( n == 0.0 )
+	if( fpclassify(n) == FP_ZERO )
 		return (double)ctx.iseed32 / (double)4294967296ULL;
 
 	/* return between 0 and 1 (but never 1) */
-	return (double)hRnd_FAST32() / (double)4294967296ULL;
+	value = hRnd_FAST32();
+	return (double)value / (double)4294967296ULL;
 }
 
 static void hRndCtxInitFAST32 ( uint32_t seed )
@@ -162,10 +180,13 @@ static uint32_t hRnd_MTWIST32 ( void )
 
 static double hRnd_MTWIST ( float n )
 {
-	if( n == 0.0 )
+	uint32_t value;
+
+	if( fpclassify(n) == FP_ZERO )
 		return last_num;
 
-	return (double)hRnd_MTWIST32() / (double)4294967296ULL;
+	value = hRnd_MTWIST32();
+	return (double)value / (double)4294967296ULL;
 }
 
 static void hRndCtxInitMTWIST32 ( uint64_t seed )
@@ -192,17 +213,19 @@ static double hRnd_QB ( float n )
 		float f;
 		uint32_t i;
 	} ftoi;
+	uint32_t value, s;
 
-	if( n == 0.0 )
-		return (float)ctx.iseed32 / (float)0x1000000;
+	if( fpclassify(n) == FP_ZERO )
+		return (double)((float)ctx.iseed32 / (float)0x1000000);
 
-	if( n < 0.0 ) {
+	if( n < 0.0f ) {
 		ftoi.f = n;
-		uint32_t s = ftoi.i;
+		s = ftoi.i;
 		ctx.iseed32 = s + ( s >> 24 );
 	}
 
-	return (float)hRnd_QB32() / (float)0x1000000;
+	value = hRnd_QB32();
+	return (double)((float)value / (float)0x1000000);
 }
 
 static void hRndCtxInitQB32 ( uint32_t seed )
@@ -257,10 +280,13 @@ static uint32_t hRnd_REAL32( void )
 
 static double hRnd_REAL( float n )
 {
-	if( n == 0.0 )
+	uint32_t value;
+
+	if( fpclassify(n) == FP_ZERO )
 		return last_num;
 
-	return (double)hRnd_REAL32() / (double)4294967296ULL;
+	value = hRnd_REAL32();
+	return (double)value / (double)4294967296ULL;
 }
 
 static void hRndCtxInitREAL32 ( uint64_t seed )
@@ -326,10 +352,12 @@ static int getAlogrithm( int algorithm )
 FBCALL void fb_Randomize ( double seed, int algorithm )
 {
 	uint64_t seedbits;
+	uint32_t s;
+	int selected_algorithm;
 
 	FB_MATH_LOCK();
 
-	if( seed == -1.0 )
+	if( hDoubleEqual(seed, -1.0) )
 	{
 		/* Take value of Timer to ensure a non-constant seed.  The seeding
 		algorithms (with the exception of the QB one) take the integer value
@@ -339,7 +367,8 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 		seed = (double)( (uint32_t)seedbits ^ (uint32_t)( seedbits >> 32 ) );
 	}
 
-	ctx.algorithm = getAlogrithm( algorithm );
+	selected_algorithm = getAlogrithm( algorithm );
+	ctx.algorithm = (uint32_t)selected_algorithm;
 
 	switch( ctx.algorithm ) {
 	case FB_RND_CRT:
@@ -353,7 +382,7 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 
 	case FB_RND_QB: {
 		seedbits = hDoubleToBits( seed );
-		uint32_t s = (uint32_t)( seedbits >> 32 );
+		s = (uint32_t)( seedbits >> 32 );
 		s ^= ( s >> 16 );
 		s = ( ( s & 0xFFFF ) << 8 ) | ( ctx.iseed32 & 0xFF );
 		hRndCtxInitQB32( (uint32_t)s );

@@ -79,11 +79,11 @@ static int driver_init(char *title, int w, int h, int depth_arg, int refresh_rat
 	outportw(SC_INDEX, 0x0604);  /* disable chain4 */
 	
 	outportw(SC_INDEX, 0x0100);  /* synchronous reset */
-	outportb(MISC_OUTPUT, 0xE3); /* select 25 MHz dot clock & 60 Hz scanning rate */
+	fb_gfx_dos_outportb(MISC_OUTPUT, 0xE3); /* select 25 MHz dot clock & 60 Hz scanning rate */
 	outportw(SC_INDEX, 0x0300);  /* undo reset (restart sequencer) */
 	
-	outportb(CRTC_INDEX, 0x11);  /* VSync End reg contains register write protect bit */
-	outportb(CRTC_INDEX+1, inportb(CRTC_INDEX+1) & 0x7F);	/* remove write protect on various CRTC registers */
+	fb_gfx_dos_outportb(CRTC_INDEX, 0x11);  /* VSync End reg contains register write protect bit */
+	fb_gfx_dos_outportb(CRTC_INDEX+1, fb_gfx_dos_inportb(CRTC_INDEX+1) & 0x7F);	/* remove write protect on various CRTC registers */
 	
 	for (i = 0; i < CRT_PARM_LENGTH; i++) {
 		outportw(CRTC_INDEX, CRTParams[i]);
@@ -116,7 +116,7 @@ static void driver_update(void)
 					_farnspokeb(screen, buffer[x]);
 				}
 			} else {
-				screen += fb_dos.w / 4;
+				screen += (unsigned long)fb_dos.w / 4ul;
 			}
 			buffer += fb_dos.w;
 		}

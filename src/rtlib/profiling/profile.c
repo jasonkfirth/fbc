@@ -18,6 +18,9 @@
 #include "fb.h"
 #include "fb_profile.h"
 
+#include <limits.h>
+#include <string.h>
+
 #ifdef HOST_WIN32
 	#include <windows.h>
 #endif
@@ -55,21 +58,40 @@ unsigned int fb_ProfileHashName( const char *p )
 STRING_INFO *STRING_TABLE_alloc( STRING_TABLE *strings, int length )
 {
 	STRING_INFO *info;
+	void *record_storage;
+	size_t padded_length;
+	size_t record_size;
 	int size;
+
+	if( !strings || !strings->tb || (length <= 0) ||
+		((size_t)length > (size_t)STRING_INFO_TB_SIZE) ) {
+		return NULL;
+	}
+	if( (strings->tb->bytes_used < 0) ||
+		(strings->tb->bytes_used > STRING_INFO_TB_SIZE) ) {
+		return NULL;
+	}
 
 	/* minumum size per string (assuming 4 bytes per int)
 	** - space for STRING_INFO
 	** - pad with additional NUL bytes to make size a multiple of 4
 	*/
-	size = sizeof(STRING_INFO) + ((length + (sizeof(int)-1))
-	       & ~(sizeof(int)-1));
+	padded_length = (size_t)length + (sizeof(int)-1);
+	padded_length &= ~((size_t)sizeof(int)-1);
+	record_size = sizeof(STRING_INFO) + padded_length;
 
-	if( size > STRING_INFO_TB_SIZE ) {
+	if( record_size > (size_t)STRING_INFO_TB_SIZE ) {
 		return NULL;
 	}
+	size = (int)record_size;
 
 	if( size > (STRING_INFO_TB_SIZE - strings->tb->bytes_used) ) {
-		STRING_INFO_TB *tb = (STRING_INFO_TB*)PROFILER_calloc( 1, sizeof(STRING_INFO_TB) );
+		STRING_INFO_TB *tb;
+
+		if( strings->tb->string_tb_id == INT_MAX ) {
+			return NULL;
+		}
+		tb = (STRING_INFO_TB*)PROFILER_calloc( 1, sizeof(STRING_INFO_TB) );
 		if( !tb ) {
 			return NULL;
 		}
@@ -80,7 +102,8 @@ STRING_INFO *STRING_TABLE_alloc( STRING_TABLE *strings, int length )
 		strings->tb = tb;
 	}
 
-	info = (STRING_INFO*)&strings->tb->data[strings->tb->bytes_used];
+	record_storage = &strings->tb->data.bytes[strings->tb->bytes_used];
+	info = record_storage;
 	info->size = size;
 	strings->tb->bytes_used += size;
 
@@ -115,9 +138,20 @@ void STRING_TABLE_destructor( STRING_TABLE *strings )
 STRING_INFO *STRING_TABLE_add( STRING_TABLE *strings, const char *src, unsigned int hashkey )
 {
 	STRING_INFO *info;
+	size_t source_length = 0;
+	size_t max_source_length = (size_t)STRING_INFO_TB_SIZE - sizeof(STRING_INFO);
 	int length;
 
-	length = strlen( src ) + 1;
+	if( !src ) {
+		return NULL;
+	}
+	while( (source_length < max_source_length) && (src[source_length] != '\0') ) {
+		source_length += 1;
+	}
+	if( source_length == max_source_length ) {
+		return NULL;
+	}
+	length = (int)(source_length + 1);
 
 	info = STRING_TABLE_alloc( strings, length );
 	if( info ) {
@@ -125,7 +159,7 @@ STRING_INFO *STRING_TABLE_add( STRING_TABLE *strings, const char *src, unsigned 
 		info->hashkey = hashkey;
 
 		/* copy the string */
-		strncpy( (char *)(info+1), src, length );
+		memcpy( info + 1, src, (size_t)length );
 	}
 	return info;
 }
@@ -133,19 +167,32 @@ STRING_INFO *STRING_TABLE_add( STRING_TABLE *strings, const char *src, unsigned 
 int STRING_TABLE_max_len( STRING_TABLE *strings )
 {
 	STRING_INFO_TB *tb;
-	STRING_INFO *info;
+	STRING_INFO info;
+	const int header_size = (int)sizeof(STRING_INFO);
 	int max_len = 0, index;
 	if( strings ) {
 		tb = strings->tb;
 		while ( tb ) {
+			if( (tb->bytes_used < 0) || (tb->bytes_used > STRING_INFO_TB_SIZE) ) {
+				tb = tb->next;
+				continue;
+			}
 			index = 0;
 			while( index < tb->bytes_used )
 			{
-				info = (STRING_INFO*)&tb->data[index];
-				if( info->length > max_len ) {
-					max_len = info->length;
+				int bytes_remaining = tb->bytes_used - index;
+				if( bytes_remaining < header_size ) {
+					break;
 				}
-				index += info->size;
+				memcpy( &info, &tb->data.bytes[index], sizeof(info) );
+				if( (info.size < header_size) || (info.size > bytes_remaining) ||
+					(info.length < 1) || ((size_t)info.length > (size_t)info.size - sizeof(info)) ) {
+					break;
+				}
+				if( info.length > max_len ) {
+					max_len = info.length;
+				}
+				index += info.size;
 			}
 			tb = tb->next;
 		}
@@ -156,7 +203,11 @@ int STRING_TABLE_max_len( STRING_TABLE *strings )
 STRING_INFO *STRING_HASH_TB_find( STRING_HASH_TB *tb, const char *src, unsigned int hashkey )
 {
 	STRING_INFO *info;
-	int hash_index = hashkey % STRING_HASH_TB_SIZE;
+	int hash_index = (int)(hashkey % (unsigned int)STRING_HASH_TB_SIZE);
+
+	if( !src ) {
+		return NULL;
+	}
 
 	while( tb ) {
 		info = tb->items[hash_index];
@@ -174,6 +225,9 @@ STRING_INFO *STRING_HASH_TB_find( STRING_HASH_TB *tb, const char *src, unsigned 
 
 STRING_INFO *STRING_HASH_TABLE_find( STRING_HASH_TABLE *hash, const char *src, unsigned int hashkey )
 {
+	if( !hash ) {
+		return NULL;
+	}
 	return STRING_HASH_TB_find( hash->tb, src, hashkey );
 }
 
@@ -200,9 +254,15 @@ void STRING_HASH_TABLE_destructor( STRING_HASH_TABLE *hash )
 
 STRING_INFO *STRING_HASH_TABLE_add( STRING_HASH_TABLE *hash, const char *src, unsigned int hashkey )
 {
-	STRING_HASH_TB *tb = hash->tb;
+	STRING_HASH_TB *tb;
 	STRING_INFO *info;
-	int hash_index = hashkey % STRING_HASH_TB_SIZE;
+	int hash_index;
+
+	if( !hash || !src ) {
+		return NULL;
+	}
+	tb = hash->tb;
+	hash_index = (int)(hashkey % (unsigned int)STRING_HASH_TB_SIZE);
 
 	if( !tb ) {
 		tb = (STRING_HASH_TB*)PROFILER_calloc( 1, sizeof( STRING_HASH_TB ) );
@@ -231,9 +291,15 @@ STRING_INFO *STRING_HASH_TABLE_add( STRING_HASH_TABLE *hash, const char *src, un
 
 STRING_INFO *STRING_HASH_TABLE_add_info( STRING_HASH_TABLE *hash, STRING_INFO *new_info )
 {
-	STRING_HASH_TB *tb = hash->tb;
+	STRING_HASH_TB *tb;
 	STRING_INFO *info;
-	int hash_index = new_info->hashkey % STRING_HASH_TB_SIZE;
+	int hash_index;
+
+	if( !hash || !new_info ) {
+		return NULL;
+	}
+	tb = hash->tb;
+	hash_index = (int)(new_info->hashkey % (unsigned int)STRING_HASH_TB_SIZE);
 
 	if( !tb ) {
 		tb = (STRING_HASH_TB*)PROFILER_calloc( 1, sizeof( STRING_HASH_TB ) );
@@ -298,6 +364,15 @@ char *PROFILER_add_ignore( FB_PROFILER_GLOBAL *prof, const char *src, unsigned i
 ** Profiler Metrics (internal stats)
 */
 
+static int hProfilerMetricsAddSize( int total, size_t size )
+{
+	if( (total < 0) || (size > (size_t)INT_MAX) ||
+		((size_t)total > (size_t)INT_MAX - size) ) {
+		return INT_MAX;
+	}
+	return total + (int)size;
+}
+
 void fb_hPROFILER_METRICS_Clear( FB_PROFILER_METRICS *metrics )
 {
 	if( metrics ) {
@@ -324,26 +399,39 @@ void fb_hPROFILER_METRICS_Clear( FB_PROFILER_METRICS *metrics )
 void fb_hPROFILER_METRICS_Strings( FB_PROFILER_METRICS *metrics, STRING_TABLE *strings )
 {
 	STRING_INFO_TB *tb;
-	STRING_INFO *info;
+	STRING_INFO info;
+	const int header_size = (int)sizeof(STRING_INFO);
 	int index;
 
 	if( metrics && strings ) {
 		tb = strings->tb;
 		while ( tb ) {
-			metrics->string_bytes_allocated += sizeof( STRING_INFO_TB );
-			metrics->string_bytes_used += tb->bytes_used;
-			metrics->string_bytes_free += sizeof( STRING_INFO_TB ) - tb->bytes_used;
+			if( (tb->bytes_used < 0) || (tb->bytes_used > STRING_INFO_TB_SIZE) ) {
+				tb = tb->next;
+				continue;
+			}
+			metrics->string_bytes_allocated = hProfilerMetricsAddSize( metrics->string_bytes_allocated, sizeof(STRING_INFO_TB) );
+			metrics->string_bytes_used = hProfilerMetricsAddSize( metrics->string_bytes_used, (size_t)tb->bytes_used );
+			metrics->string_bytes_free = hProfilerMetricsAddSize( metrics->string_bytes_free, sizeof(STRING_INFO_TB) - (size_t)tb->bytes_used );
 			metrics->string_count_blocks += 1;
 
 			index = 0;
 			while( index < tb->bytes_used )
 			{
-				info = (STRING_INFO*)&tb->data[index];
-				if( info->length > metrics->string_max_len ) {
-					metrics->string_max_len = info->length;
+				int bytes_remaining = tb->bytes_used - index;
+				if( bytes_remaining < header_size ) {
+					break;
+				}
+				memcpy( &info, &tb->data.bytes[index], sizeof(info) );
+				if( (info.size < header_size) || (info.size > bytes_remaining) ||
+					(info.length < 1) || ((size_t)info.length > (size_t)info.size - sizeof(info)) ) {
+					break;
+				}
+				if( info.length > metrics->string_max_len ) {
+					metrics->string_max_len = info.length;
 				}
 				metrics->string_count_strings += 1;
-				index += info->size;
+				index += info.size;
 			}
 			tb = tb->next;
 		}
@@ -357,7 +445,7 @@ void fb_hPROFILER_METRICS_HashTable( FB_PROFILER_METRICS *metrics, STRING_HASH_T
 	if( metrics && hash ) {
 		tb = hash->tb;
 		while( tb ) {
-			metrics->hash_bytes_allocated += sizeof( STRING_HASH_TB );
+			metrics->hash_bytes_allocated = hProfilerMetricsAddSize( metrics->hash_bytes_allocated, sizeof(STRING_HASH_TB) );
 			metrics->hash_count_blocks += 1;
 
 			for( i=0; i < STRING_HASH_TB_SIZE; i++ )
@@ -431,20 +519,22 @@ void PROFILER_GLOBAL_destroy( void ) {
 
 static int hProfileCopyFilename( char *dst, const char *src, int length )
 {
-	int len;
+	size_t len;
+	size_t capacity;
 
-	if( !fb_profiler || !dst || !src ) {
+	if( !fb_profiler || !dst || !src || (length <= 0) ) {
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
+	capacity = (size_t)length;
 	len = strlen(src);
 
-	if( len < 1 || len >= PROFILER_MAX_PATH-1 ) {
+	if( (len < 1) || (len >= (size_t)PROFILER_MAX_PATH - 1) || (len >= capacity) ) {
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
-	strncpy( dst, src, length );
-	dst[length-1] = '\0';
+	strncpy( dst, src, capacity );
+	dst[capacity - 1] = '\0';
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
 }
