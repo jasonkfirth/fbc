@@ -29,6 +29,11 @@
 
 #include <stdint.h>
 
+uint32_t __aeabi_ul2f(uint64_t value);
+uint64_t __aeabi_ul2d(uint64_t value);
+uint32_t __aeabi_l2f(int64_t value);
+uint64_t __aeabi_l2d(int64_t value);
+
 /* ------------------------------------------------------------------------- */
 /* Unsigned bit construction                                                 */
 /* ------------------------------------------------------------------------- */

@@ -48,6 +48,11 @@ typedef union FB_AROS_M68K_SINGLE_BITS {
 extern double __real___divdf3( double dividend, double divisor );
 extern float __real___divsf3( float dividend, float divisor );
 
+double __wrap___divdf3( double dividend, double divisor );
+float __wrap___divsf3( float dividend, float divisor );
+double __wrap___extendsfdf2( float source );
+float __wrap___truncdfsf2( double source );
+
 static uint64_t fb_hArosRoundToEven( uint64_t significand, int shift )
 {
 	uint64_t halfway;

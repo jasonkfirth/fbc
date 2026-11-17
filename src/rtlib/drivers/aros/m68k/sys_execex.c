@@ -46,6 +46,8 @@
 #include <proto/dos.h>
 #include <proto/exec.h>
 #include <unistd.h>
+#include <limits.h>
+#include <stdint.h>
 
 struct fb_aros_child_result
 {
@@ -142,13 +144,15 @@ static struct Process *fb_hArosCreateChild(
 static int fb_hArosExecute( const char *program, char **argv, int argument_count )
 {
 	struct CommandLineInterface *cli;
-	struct fb_aros_child_result child_result;
+	struct fb_aros_child_result *child_result;
+	struct ETask *child_task;
 	struct Process *child;
 	BPTR child_input;
 	BPTR error_output;
 	BPTR segment;
 	char *arguments;
 	IPTR child_id;
+	LONG result;
 	ULONG stack_size = AROS_STACKSIZE;
 
 	/*
@@ -169,8 +173,18 @@ static int fb_hArosExecute( const char *program, char **argv, int argument_count
 	}
 
 	cli = Cli();
-	if( cli != NULL && cli->cli_DefaultStack > 0 )
-		stack_size = cli->cli_DefaultStack * CLI_DEFAULTSTACK_UNIT;
+	if( cli != NULL && cli->cli_DefaultStack > 0 ) {
+		ULONG stack_units = (ULONG)cli->cli_DefaultStack;
+		if( stack_units <= (ULONG_MAX / CLI_DEFAULTSTACK_UNIT) )
+			stack_size = stack_units * CLI_DEFAULTSTACK_UNIT;
+	}
+
+	child_result = (struct fb_aros_child_result *)malloc(
+		sizeof( *child_result ) );
+	if( child_result == NULL ) {
+		UnLoadSeg( segment );
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
 
 	arguments = fb_hArosArguments( argv, argument_count );
 	if( arguments == NULL ) {
@@ -179,13 +193,14 @@ static int fb_hArosExecute( const char *program, char **argv, int argument_count
 			(CONST_STRPTR)"FreeBASIC: unable to allocate child arguments\n"
 		);
 		UnLoadSeg( segment );
+		free( child_result );
 		return -1;
 	}
-	child_result.result = RETURN_FAIL;
+	child_result->result = RETURN_FAIL;
 	child_input = Input();
 	child = fb_hArosCreateChild(
 		segment, arguments, child_input, Output(), error_output,
-		stack_size, program, &child_result
+		stack_size, program, child_result
 	);
 	if( child == NULL && child_input != BNULL ) {
 		/*
@@ -196,7 +211,7 @@ static int fb_hArosExecute( const char *program, char **argv, int argument_count
 		 */
 		child = fb_hArosCreateChild(
 			segment, arguments, BNULL, Output(), error_output,
-			stack_size, program, &child_result
+			stack_size, program, child_result
 		);
 	}
 	free( arguments );
@@ -208,14 +223,25 @@ static int fb_hArosExecute( const char *program, char **argv, int argument_count
 			IoErr()
 		);
 		UnLoadSeg( segment );
+		free( child_result );
 		return -1;
 	}
 
-	child_id = GetETask( (struct Task *)child )->et_UniqueID;
+	child_task = GetETask( (struct Task *)child );
+	if( child_task == NULL ) {
+		/* Keep child-owned memory alive if its required death notification is absent. */
+		FPrintf( error_output,
+			(CONST_STRPTR)"FreeBASIC: unable to track child process '%s'\n",
+			program );
+		return -1;
+	}
+	child_id = child_task->et_UniqueID;
 	ChildWait( child_id );
+	result = child_result->result;
 	UnLoadSeg( segment );
 	ChildFree( child_id );
-	return child_result.result;
+	free( child_result );
+	return result;
 }
 
 FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork )
@@ -229,6 +255,8 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 	int index;
 	int result = -1;
 	ssize_t arguments_length;
+	int owns_arguments = FALSE;
+	size_t argv_count;
 
 	if( program == NULL || program->data == NULL ) {
 		fb_hStrDelTemp( args );
@@ -244,9 +272,25 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 		arguments = empty_arguments;
 	} else {
 		arguments_length = FB_STRSIZE( args );
-		arguments = alloca( arguments_length + 1 );
-		DBG_ASSERT( arguments != NULL );
-		arguments[arguments_length] = '\0';
+		if( (arguments_length < 0) ||
+		    ((args->data == NULL) && (arguments_length != 0)) ) {
+			fb_hStrDelTemp( args );
+			fb_hStrDelTemp( program );
+			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		}
+		if( arguments_length == 0 ) {
+			arguments = empty_arguments;
+		} else {
+			arguments = (char *)malloc( (size_t)arguments_length + 1u );
+			if( arguments == NULL ) {
+				fb_hStrDelTemp( args );
+				fb_hStrDelTemp( program );
+				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+			}
+			owns_arguments = TRUE;
+			memcpy( arguments, args->data, (size_t)arguments_length );
+			arguments[arguments_length] = '\0';
+		}
 		if( arguments_length > 0 )
 			argument_count = fb_hParseArgs( arguments, args->data, arguments_length );
 	}
@@ -256,12 +300,30 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 	fb_hStrDelTemp_NoLock( program );
 	FB_STRUNLOCK();
 
-	if( argument_count == -1 )
+	if( argument_count < 0 ) {
+		if( owns_arguments )
+			free( arguments );
 		return -1;
+	}
+	if( argument_count == INT_MAX ) {
+		if( owns_arguments )
+			free( arguments );
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	}
 
 	argument_count++;
-	argv = alloca( sizeof( char * ) * (argument_count + 1) );
-	DBG_ASSERT( argv != NULL );
+	argv_count = (size_t)argument_count + 1u;
+	if( argv_count > (SIZE_MAX / sizeof( argv[0] )) ) {
+		if( owns_arguments )
+			free( arguments );
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
+	argv = (char **)malloc( argv_count * sizeof( argv[0] ) );
+	if( argv == NULL ) {
+		if( owns_arguments )
+			free( arguments );
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
 
 	argv[0] = buffer;
 	cursor = arguments;
@@ -285,6 +347,9 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 	FB_LOCK();
 	fb_hInitConsole();
 	FB_UNLOCK();
+	free( argv );
+	if( owns_arguments )
+		free( arguments );
 
 	return result;
 }

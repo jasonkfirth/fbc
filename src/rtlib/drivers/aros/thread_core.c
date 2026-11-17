@@ -69,6 +69,11 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	FBTHREAD *thread;
 	FBTHREADINFO *info;
 	pthread_attr_t thread_attributes;
+	size_t native_stack_size;
+	int create_result;
+
+	if( proc == NULL )
+		return NULL;
 
 	thread = (FBTHREAD *)malloc( sizeof( FBTHREAD ) );
 	if( thread == NULL ) {
@@ -95,15 +100,23 @@ FBCALL FBTHREAD *fb_ThreadCreate( FB_THREADPROC proc, void *param, ssize_t stack
 	stack_size = stack_size >= (ssize_t)FBTHREAD_STACK_MIN
 		? stack_size
 		: (ssize_t)FBTHREAD_STACK_MIN;
-	pthread_attr_setstacksize( &thread_attributes, stack_size );
-
-	if( pthread_create( &thread->id, &thread_attributes, threadproc, info ) ) {
+	native_stack_size = (size_t)stack_size;
+	if( pthread_attr_setstacksize( &thread_attributes, native_stack_size ) ) {
+		pthread_attr_destroy( &thread_attributes );
 		free( thread );
 		free( info );
-		thread = NULL;
+		return NULL;
 	}
 
+	create_result = pthread_create( &thread->id, &thread_attributes,
+		threadproc, info );
 	pthread_attr_destroy( &thread_attributes );
+	if( create_result ) {
+		free( thread );
+		free( info );
+		return NULL;
+	}
+
 	return thread;
 }
 

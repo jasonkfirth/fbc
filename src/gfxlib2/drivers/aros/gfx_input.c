@@ -108,8 +108,8 @@ static void aros_post_key(struct IntuiMessage *message)
     int count;
     int index;
 
-    raw = message->Code & ~IECODE_UP_PREFIX;
-    pressed = ((message->Code & IECODE_UP_PREFIX) == 0);
+    raw = (unsigned int)message->Code & ~(unsigned int)IECODE_UP_PREFIX;
+    pressed = ((message->Code & (UWORD)IECODE_UP_PREFIX) == 0);
 
     if (raw == RAWKEY_NM_WHEEL_UP || raw == RAWKEY_NM_WHEEL_DOWN ||
         raw == RAWKEY_NM_WHEEL_LEFT || raw == RAWKEY_NM_WHEEL_RIGHT)
@@ -287,6 +287,8 @@ void fb_arosGfxPollEvents(void)
                 BeginRefresh(fb_aros_gfx.window);
                 EndRefresh(fb_aros_gfx.window, TRUE);
                 refresh = TRUE;
+                break;
+            default:
                 break;
         }
 

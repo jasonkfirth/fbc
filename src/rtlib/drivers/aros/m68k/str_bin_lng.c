@@ -68,7 +68,7 @@ FBCALL FBSTRING_ACCESS *fb_BINEx_l( unsigned long long num, int digits )
 
 	remaining.number = num;
 	for( index = digits - 1; index >= 0; --index ) {
-		result->data[index] = '0' + (remaining.word.low & 1);
+		result->data[index] = (char)('0' + (remaining.word.low & 1U));
 		fb_hArosShiftRightOne( &remaining );
 	}
 

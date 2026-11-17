@@ -29,6 +29,10 @@ typedef struct {
 	/* Retain the native size_t alignment after the one-byte schema kind. */
 	unsigned char kind_alignment_padding[sizeof(size_t) - sizeof(char)];
 	size_t size, offset, count, dims, storage, child, next, minimum;
+#if defined(HOST_AROS) && defined(__arm__)
+	/* Keep the 64-bit bounds naturally aligned on the ARM target ABI. */
+	uint32_t lower_alignment_padding;
+#endif
 	int64_t lower[FB_MAXDIMENSIONS], upper[FB_MAXDIMENSIONS];
 } SER_NODE;
 

@@ -30,6 +30,8 @@
 #ifndef FB_GFX_SIMD_NEON_INC
 #define FB_GFX_SIMD_NEON_INC
 
+#include <string.h>
+
 enum FB_GFX_SIMD_LOGIC {
 	FB_GFX_SIMD_AND,
 	FB_GFX_SIMD_OR,
@@ -39,6 +41,32 @@ enum FB_GFX_SIMD_LOGIC {
 
 /* All 32-bit gfxlib2 drawing colours store RGB in the low 24 bits. */
 #define FB_GFX_SIMD_RGB_MASK_32 0x00FFFFFFu
+
+static inline uint16_t simd_load_u16_unaligned(const unsigned char *source)
+{
+	uint16_t value;
+	memcpy(&value, source, sizeof(value));
+	return value;
+}
+
+static inline uint32_t simd_load_u32_unaligned(const unsigned char *source)
+{
+	uint32_t value;
+	memcpy(&value, source, sizeof(value));
+	return value;
+}
+
+static inline void simd_store_u16_unaligned(unsigned char *destination,
+	uint16_t value)
+{
+	memcpy(destination, &value, sizeof(value));
+}
+
+static inline void simd_store_u32_unaligned(unsigned char *destination,
+	uint32_t value)
+{
+	memcpy(destination, &value, sizeof(value));
+}
 
 /* ------------------------------------------------------------------------- */
 /* Shared NEON helpers                                                       */
@@ -293,6 +321,9 @@ void fb_hPutAndSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_AND);
 }
@@ -301,6 +332,9 @@ void fb_hPutOrSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_OR);
 }
@@ -309,6 +343,9 @@ void fb_hPutXorSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_XOR);
 }
@@ -317,6 +354,9 @@ void fb_hPutPResetSIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	simd_put_logic(src, dest, w, h, src_pitch, dest_pitch,
 		FB_GFX_SIMD_PRESET);
 }
@@ -330,6 +370,9 @@ void fb_hPutTrans1SIMD(unsigned char *src, unsigned char *dest,
 	BLENDER *blender, void *param)
 {
 	const uint8x16_t zero = vdupq_n_u8(0u);
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
@@ -358,28 +401,34 @@ void fb_hPutTrans2SIMD(unsigned char *src, unsigned char *dest,
 	BLENDER *blender, void *param)
 {
 	const uint16x8_t transparent_color = vdupq_n_u16(MASK_COLOR_16);
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned short *source = (unsigned short *)src;
-		unsigned short *destination = (unsigned short *)dest;
 		int x = 0;
 
 		for (; x <= (w - 8); x += 8) {
-			uint16x8_t source_pixels = vld1q_u16(source + x);
-			uint16x8_t destination_pixels = vld1q_u16(
-				destination + x);
+			size_t offset = (size_t)x * sizeof(uint16_t);
+			uint16x8_t source_pixels = vreinterpretq_u16_u8(
+				vld1q_u8(src + offset));
+			uint16x8_t destination_pixels = vreinterpretq_u16_u8(
+				vld1q_u8(dest + offset));
 			uint16x8_t transparent = vceqq_u16(source_pixels,
 				transparent_color);
+			uint16x8_t result = vbslq_u16(transparent, destination_pixels,
+				source_pixels);
 
-			vst1q_u16(destination + x,
-				vbslq_u16(transparent, destination_pixels,
-					source_pixels));
+			vst1q_u8(dest + offset, vreinterpretq_u8_u16(result));
 		}
 		for (; x < w; ++x) {
-			if (source[x] != MASK_COLOR_16)
-				destination[x] = source[x];
+			size_t offset = (size_t)x * sizeof(uint16_t);
+			uint16_t source_pixel = simd_load_u16_unaligned(src + offset);
+
+			if (source_pixel != MASK_COLOR_16)
+				simd_store_u16_unaligned(dest + offset, source_pixel);
 		}
 		src += src_pitch;
 		dest += dest_pitch;
@@ -392,30 +441,35 @@ void fb_hPutTrans4SIMD(unsigned char *src, unsigned char *dest,
 {
 	const uint32x4_t rgb_mask = vdupq_n_u32(FB_GFX_SIMD_RGB_MASK_32);
 	const uint32x4_t transparent_color = vdupq_n_u32(MASK_COLOR_32);
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
 		int x = 0;
 
 		for (; x <= (w - 4); x += 4) {
-			uint32x4_t source_pixels = vld1q_u32(source + x);
-			uint32x4_t destination_pixels = vld1q_u32(
-				destination + x);
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			uint32x4_t source_pixels = vreinterpretq_u32_u8(
+				vld1q_u8(src + offset));
+			uint32x4_t destination_pixels = vreinterpretq_u32_u8(
+				vld1q_u8(dest + offset));
 			uint32x4_t colors = vandq_u32(source_pixels, rgb_mask);
 			uint32x4_t transparent = vceqq_u32(colors,
 				transparent_color);
 
-			vst1q_u32(destination + x,
-				vbslq_u32(transparent, destination_pixels, colors));
+			vst1q_u8(dest + offset, vreinterpretq_u8_u32(
+				vbslq_u32(transparent, destination_pixels, colors)));
 		}
 		for (; x < w; ++x) {
-			unsigned int color = source[x] & FB_GFX_SIMD_RGB_MASK_32;
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			uint32_t source_pixel = simd_load_u32_unaligned(src + offset);
+			uint32_t color = source_pixel & FB_GFX_SIMD_RGB_MASK_32;
 
 			if (color != MASK_COLOR_32)
-				destination[x] = color;
+				simd_store_u32_unaligned(dest + offset, color);
 		}
 		src += src_pitch;
 		dest += dest_pitch;
@@ -430,26 +484,28 @@ void fb_hPutAlpha4SIMD(unsigned char *src, unsigned char *dest,
 	int w, int h, int src_pitch, int dest_pitch, int alpha,
 	BLENDER *blender, void *param)
 {
+	(void)alpha;
+	(void)blender;
+	(void)param;
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
 		int x = 0;
 
 		for (; x <= (w - 4); x += 4) {
-			uint8x16_t source_pixels = vld1q_u8(
-				(const uint8_t *)(source + x));
-			uint8x16_t destination_pixels = vld1q_u8(
-				(const uint8_t *)(destination + x));
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			uint8x16_t source_pixels = vld1q_u8(src + offset);
+			uint8x16_t destination_pixels = vld1q_u8(dest + offset);
 			uint8x16_t result = simd_blend_source_alpha(source_pixels,
 				destination_pixels, TRUE, FALSE);
 
-			vst1q_u8((uint8_t *)(destination + x), result);
+			vst1q_u8(dest + offset, result);
 		}
 		for (; x < w; ++x) {
-			unsigned int source_color = source[x];
-			unsigned int destination_color = destination[x];
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			unsigned int source_color = simd_load_u32_unaligned(src + offset);
+			unsigned int destination_color =
+				simd_load_u32_unaligned(dest + offset);
 			unsigned int factor = (source_color >> 24) + 1u;
 			unsigned int source_rb = source_color & MASK_RB_32;
 			unsigned int source_ga = source_color & MASK_GA_32;
@@ -459,9 +515,10 @@ void fb_hPutAlpha4SIMD(unsigned char *src, unsigned char *dest,
 			source_rb = ((source_rb - destination_rb) * factor) >> 8;
 			source_ga = ((source_ga >> 8) - (destination_ga >> 8)) *
 				factor;
-			destination[x] =
+			destination_color =
 				((destination_rb + source_rb) & MASK_RB_32) |
 				((destination_ga + source_ga) & MASK_GA_32);
+			simd_store_u32_unaligned(dest + offset, destination_color);
 		}
 		src += src_pitch;
 		dest += dest_pitch;
@@ -476,19 +533,18 @@ void fb_hPutAdd4SIMD(unsigned char *src, unsigned char *dest,
 	const uint32x4_t rgb_mask = vdupq_n_u32(FB_GFX_SIMD_RGB_MASK_32);
 	const uint32x4_t transparent_color = vdupq_n_u32(MASK_COLOR_32);
 	unsigned int amount = (unsigned int)alpha & 0xFFu;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
 		int x = 0;
 
 		for (; x <= (w - 4); x += 4) {
-			uint8x16_t source_pixels = vld1q_u8(
-				(const uint8_t *)(source + x));
-			uint8x16_t destination_pixels = vld1q_u8(
-				(const uint8_t *)(destination + x));
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			uint8x16_t source_pixels = vld1q_u8(src + offset);
+			uint8x16_t destination_pixels = vld1q_u8(dest + offset);
 			uint16x8_t source_low = vmovl_u8(
 				vget_low_u8(source_pixels));
 			uint16x8_t source_high = vmovl_u8(
@@ -507,11 +563,13 @@ void fb_hPutAdd4SIMD(unsigned char *src, unsigned char *dest,
 				transparent_color);
 			result = vbslq_u8(vreinterpretq_u8_u32(transparent),
 				destination_pixels, result);
-			vst1q_u8((uint8_t *)(destination + x), result);
+			vst1q_u8(dest + offset, result);
 		}
 		for (; x < w; ++x) {
-			unsigned int source_color = source[x];
-			unsigned int destination_color = destination[x];
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			unsigned int source_color = simd_load_u32_unaligned(src + offset);
+			unsigned int destination_color =
+				simd_load_u32_unaligned(dest + offset);
 			unsigned int first;
 			unsigned int second;
 
@@ -532,7 +590,7 @@ void fb_hPutAdd4SIMD(unsigned char *src, unsigned char *dest,
 			destination_color = first & source_color;
 			source_color |= ((((second | destination_color) >> 7) +
 				0x7F7F7F7Fu) ^ 0x7F7F7F7Fu) | first;
-			destination[x] = source_color;
+			simd_store_u32_unaligned(dest + offset, source_color);
 		}
 		src += src_pitch;
 		dest += dest_pitch;
@@ -545,26 +603,30 @@ void fb_hPutBlend2SIMD(unsigned char *src, unsigned char *dest,
 {
 	unsigned int amount = ((unsigned int)(alpha & 0xFF) + 7u) >> 3;
 	const int16x8_t factor = vdupq_n_s16((int16_t)amount);
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned short *source = (unsigned short *)src;
-		unsigned short *destination = (unsigned short *)dest;
 		int x = 0;
 
 		for (; x <= (w - 8); x += 8) {
-			uint16x8_t source_pixels = vld1q_u16(source + x);
-			uint16x8_t destination_pixels = vld1q_u16(
-				destination + x);
+			size_t offset = (size_t)x * sizeof(uint16_t);
+			uint16x8_t source_pixels = vreinterpretq_u16_u8(
+				vld1q_u8(src + offset));
+			uint16x8_t destination_pixels = vreinterpretq_u16_u8(
+				vld1q_u8(dest + offset));
 			uint16x8_t result = simd_blend_rgb565(source_pixels,
 				destination_pixels, factor);
 
-			vst1q_u16(destination + x, result);
+			vst1q_u8(dest + offset, vreinterpretq_u8_u16(result));
 		}
 		for (; x < w; ++x) {
-			unsigned int source_color = source[x];
-			unsigned int destination_color = destination[x];
+			size_t offset = (size_t)x * sizeof(uint16_t);
+			unsigned int source_color = simd_load_u16_unaligned(src + offset);
+			unsigned int destination_color =
+				simd_load_u16_unaligned(dest + offset);
 			unsigned int source_rb;
 			unsigned int source_g;
 			unsigned int destination_rb;
@@ -578,9 +640,11 @@ void fb_hPutBlend2SIMD(unsigned char *src, unsigned char *dest,
 			destination_g = destination_color & MASK_G_16;
 			source_rb = ((source_rb - destination_rb) * amount) >> 5;
 			source_g = ((source_g - destination_g) * amount) >> 5;
-			destination[x] = (unsigned short)(
+			destination_color = (unsigned short)(
 				((destination_rb + source_rb) & MASK_RB_16) |
 				((destination_g + source_g) & MASK_G_16));
+			simd_store_u16_unaligned(dest + offset,
+				(uint16_t)destination_color);
 		}
 		src += src_pitch;
 		dest += dest_pitch;
@@ -594,19 +658,18 @@ void fb_hPutBlend4SIMD(unsigned char *src, unsigned char *dest,
 	const uint32x4_t rgb_mask = vdupq_n_u32(FB_GFX_SIMD_RGB_MASK_32);
 	const uint32x4_t transparent_color = vdupq_n_u32(MASK_COLOR_32);
 	unsigned int factor = (unsigned int)(alpha & 0xFF) + 1u;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *source = (unsigned int *)src;
-		unsigned int *destination = (unsigned int *)dest;
 		int x = 0;
 
 		for (; x <= (w - 4); x += 4) {
-			uint8x16_t source_pixels = vld1q_u8(
-				(const uint8_t *)(source + x));
-			uint8x16_t destination_pixels = vld1q_u8(
-				(const uint8_t *)(destination + x));
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			uint8x16_t source_pixels = vld1q_u8(src + offset);
+			uint8x16_t destination_pixels = vld1q_u8(dest + offset);
 			uint8x16_t result = simd_blend_constant(source_pixels,
 				destination_pixels, factor);
 			uint32x4_t transparent = vceqq_u32(vandq_u32(
@@ -615,10 +678,11 @@ void fb_hPutBlend4SIMD(unsigned char *src, unsigned char *dest,
 
 			result = vbslq_u8(vreinterpretq_u8_u32(transparent),
 				destination_pixels, result);
-			vst1q_u8((uint8_t *)(destination + x), result);
+			vst1q_u8(dest + offset, result);
 		}
 		for (; x < w; ++x) {
-			unsigned int source_color = source[x];
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			unsigned int source_color = simd_load_u32_unaligned(src + offset);
 			unsigned int destination_color;
 			unsigned int source_rb;
 			unsigned int source_ga;
@@ -627,7 +691,7 @@ void fb_hPutBlend4SIMD(unsigned char *src, unsigned char *dest,
 
 			if ((source_color & FB_GFX_SIMD_RGB_MASK_32) == MASK_COLOR_32)
 				continue;
-			destination_color = destination[x];
+			destination_color = simd_load_u32_unaligned(dest + offset);
 			source_rb = source_color & MASK_RB_32;
 			source_ga = source_color & MASK_GA_32;
 			destination_rb = destination_color & MASK_RB_32;
@@ -635,9 +699,10 @@ void fb_hPutBlend4SIMD(unsigned char *src, unsigned char *dest,
 			source_rb = ((source_rb - destination_rb) * factor) >> 8;
 			source_ga = ((source_ga >> 8) - (destination_ga >> 8)) *
 				factor;
-			destination[x] =
+			destination_color =
 				((destination_rb + source_rb) & MASK_RB_32) |
 				((destination_ga + source_ga) & MASK_GA_32);
+			simd_store_u32_unaligned(dest + offset, destination_color);
 		}
 		src += src_pitch;
 		dest += dest_pitch;
@@ -653,31 +718,40 @@ void fb_hPutAlphaMaskSIMD(unsigned char *src, unsigned char *dest,
 	BLENDER *blender, void *param)
 {
 	const uint32x4_t rgb_mask = vdupq_n_u32(FB_GFX_SIMD_RGB_MASK_32);
+	(void)alpha;
+	(void)blender;
+	(void)param;
 
 	if ((w <= 0) || (h <= 0))
 		return;
 	while (h-- != 0) {
-		unsigned int *destination = (unsigned int *)dest;
 		int x = 0;
 
 		for (; x <= (w - 8); x += 8) {
+			size_t offset = (size_t)x * sizeof(uint32_t);
 			uint16x8_t source_16 = vmovl_u8(vld1_u8(src + x));
 			uint32x4_t alpha_low = vshlq_n_u32(
 				vmovl_u16(vget_low_u16(source_16)), 24);
 			uint32x4_t alpha_high = vshlq_n_u32(
 				vmovl_u16(vget_high_u16(source_16)), 24);
-			uint32x4_t destination_low = vld1q_u32(destination + x);
-			uint32x4_t destination_high = vld1q_u32(destination + x + 4);
+			uint32x4_t destination_low = vreinterpretq_u32_u8(
+				vld1q_u8(dest + offset));
+			uint32x4_t destination_high = vreinterpretq_u32_u8(
+				vld1q_u8(dest + offset + 4u * sizeof(uint32_t)));
 
-			vst1q_u32(destination + x,
-				vorrq_u32(vandq_u32(destination_low, rgb_mask), alpha_low));
-			vst1q_u32(destination + x + 4,
-				vorrq_u32(vandq_u32(destination_high, rgb_mask), alpha_high));
+			vst1q_u8(dest + offset, vreinterpretq_u8_u32(
+				vorrq_u32(vandq_u32(destination_low, rgb_mask), alpha_low)));
+			vst1q_u8(dest + offset + 4u * sizeof(uint32_t),
+				vreinterpretq_u8_u32(vorrq_u32(
+					vandq_u32(destination_high, rgb_mask), alpha_high)));
 		}
 		for (; x < w; ++x) {
-			destination[x] =
-				(destination[x] & FB_GFX_SIMD_RGB_MASK_32) |
-				((unsigned int)src[x] << 24);
+			size_t offset = (size_t)x * sizeof(uint32_t);
+			uint32_t destination_pixel = simd_load_u32_unaligned(
+				dest + offset);
+			destination_pixel = (destination_pixel &
+				FB_GFX_SIMD_RGB_MASK_32) | ((uint32_t)src[x] << 24);
+			simd_store_u32_unaligned(dest + offset, destination_pixel);
 		}
 		src += src_pitch;
 		dest += dest_pitch;

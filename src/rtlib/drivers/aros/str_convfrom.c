@@ -465,7 +465,7 @@ static FB_AROS_DECIMAL_VALUE hScanDecimal( FB_AROS_NUMERIC_INPUT *input,
 				fraction += (FB_AROS_DECIMAL_VALUE)0.75 * sign;
 		}
 		if( ((FB_AROS_DECIMAL_MANT_DIG - precision_bits) >= 2) &&
-		    (fb_hArosRemainder( fraction, 1.0 ) == 0.0) )
+		    (fpclassify( fb_hArosRemainder( fraction, 1.0 ) ) == FP_ZERO) )
 			fraction += (FB_AROS_DECIMAL_VALUE)1.0;
 	}
 
@@ -486,12 +486,12 @@ static FB_AROS_DECIMAL_VALUE hScanDecimal( FB_AROS_NUMERIC_INPUT *input,
 			++binary_exponent;
 		}
 		if( (binary_exponent + FB_AROS_DECIMAL_MANT_DIG > maximum_exponent) ||
-		    (denormal && (fraction != (FB_AROS_DECIMAL_VALUE)0.0)) )
+		    (denormal && (fpclassify( fraction ) != FP_ZERO)) )
 			errno = ERANGE;
 	}
 
 	value = fb_hArosScaleBinary( value, binary_exponent );
-	if( value == (FB_AROS_DECIMAL_VALUE)0.0 )
+	if( fpclassify( value ) == FP_ZERO )
 		errno = ERANGE;
 	return value;
 }
@@ -532,6 +532,7 @@ FBCALL double fb_hStr2Double( char *source, ssize_t length )
 	int radix;
 	int skip;
 	ssize_t index;
+	long long integer_value;
 
 	text = fb_hStrSkipChar( source, length, 32 );
 	length -= (ssize_t)(text - source);
@@ -562,7 +563,9 @@ FBCALL double fb_hStr2Double( char *source, ssize_t length )
 				skip = 1;
 				break;
 			}
-			return fb_hStrRadix2Longint( text + skip, length - skip, radix );
+			integer_value = fb_hStrRadix2Longint( text + skip,
+			                                    length - skip, radix );
+			return (double)integer_value;
 		}
 		if( (text[0] == '0') && ((text[1] == 'x') || (text[1] == 'X')) )
 			return 0.0;

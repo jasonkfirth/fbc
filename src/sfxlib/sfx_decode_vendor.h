@@ -13,6 +13,7 @@
 
         - include the configured dr_wav and dr_mp3 implementation headers
         - include stb_vorbis as its single-file implementation
+        - provide stb_vorbis with the target alloca intrinsic when needed
         - keep upstream decoder diagnostics out of the caller's warning set
 
     This file intentionally does NOT contain:
@@ -27,6 +28,12 @@
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC system_header
+#endif
+
+#if defined(__GNUC__) && !defined(alloca) && !defined(__MINGW32__) \
+	&& !defined(__linux__) && !defined(__linux) && !defined(__sun__) \
+	&& !defined(__EMSCRIPTEN__) && !defined(__NEWLIB__)
+#define alloca(size) __builtin_alloca(size)
 #endif
 
 #include "third_party/dr_wav.h"

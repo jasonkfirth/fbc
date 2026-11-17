@@ -32,6 +32,7 @@
 #include <dos/dos.h>
 #include <dos/dosextens.h>
 #include <proto/dos.h>
+#include <limits.h>
 #include <sys/stat.h>
 
 /* ------------------------------------------------------------------------- */
@@ -234,7 +235,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir(FBSTRING_ACCESS *filespec, int attrib, int *out_a
     char *name;
     char *separator;
     int temporary_attrib;
-    ssize_t length;
+    size_t length;
     struct stat information;
 
     if (out_attrib == NULL)
@@ -260,7 +261,7 @@ FBCALL FBSTRING_ACCESS *fb_Dir(FBSTRING_ACCESS *filespec, int attrib, int *out_a
                 if (separator == filespec->data)
                     length = 1;
                 else
-                    length = separator - filespec->data;
+                    length = (size_t)(separator - filespec->data);
                 if (length > MAX_PATH - 1)
                     length = MAX_PATH - 1;
                 memcpy(context->dirname, filespec->data, length);
@@ -321,11 +322,19 @@ FBCALL FBSTRING_ACCESS *fb_Dir(FBSTRING_ACCESS *filespec, int attrib, int *out_a
     if (name != NULL)
     {
         length = strlen(name);
-        result = fb_hStrAllocTemp_NoLock(NULL, length);
-        if (result != NULL)
-            fb_hStrCopy(result->data, name, length);
-        else
+        if (length > (size_t)SSIZE_MAX)
+        {
             result = &fb_ctx.null_desc;
+            fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
+        }
+        else
+        {
+            result = fb_hStrAllocTemp_NoLock(NULL, (ssize_t)length);
+            if (result != NULL)
+                fb_hStrCopy(result->data, name, (ssize_t)length);
+            else
+                result = &fb_ctx.null_desc;
+        }
     }
     else
     {

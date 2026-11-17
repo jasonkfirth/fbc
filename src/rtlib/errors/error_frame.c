@@ -26,6 +26,11 @@ struct FB_ERROR_CALLBACK {
 	FB_ERROR_FRAME_CALLBACK callback;
 };
 
+/* Keep the libc jump buffer's target ABI alignment unchanged. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 struct FB_ERROR_OWNER {
 	jmp_buf buffer;
 	FB_ERROR_OWNER *next;
@@ -36,6 +41,9 @@ struct FB_ERROR_OWNER {
 	int target;
 	unsigned flags;
 };
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 typedef struct FB_ERROR_DISPATCH {
 	struct FB_ERROR_DISPATCH *previous;

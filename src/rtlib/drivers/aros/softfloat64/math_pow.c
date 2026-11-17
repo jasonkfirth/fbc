@@ -46,7 +46,7 @@ ulperr_exp: 0.509 ULP (ULP error of exp, 0.511 ULP without fma)
 /* Top 12 bits of a double (sign and exponent bits).  */
 static inline uint32_t top12(double x)
 {
-	return asuint64(x) >> 52;
+	return (uint32_t)(asuint64(x) >> 52);
 }
 
 /* Compute y+TAIL = log(x) where the rounded result is y and TAIL has about
@@ -64,7 +64,7 @@ static inline double_t log_inline(uint64_t ix, double_t *tail)
 	   The ith subinterval contains z and c is near its center.  */
 	tmp = ix - OFF;
 	i = (tmp >> (52 - POW_LOG_TABLE_BITS)) % N;
-	k = (int64_t)tmp >> 52; /* arithmetic shift */
+	k = (int)((int64_t)tmp >> 52); /* arithmetic shift */
 	iz = ix - (tmp & 0xfffULL << 52);
 	z = asdouble(iz);
 	kd = (double_t)k;
@@ -169,7 +169,8 @@ static inline double specialcase(double_t tmp, uint64_t sbits, uint64_t ki)
 		lo = one - hi + y + lo;
 		y = eval_as_double(hi + lo) - one;
 		/* Fix the sign of 0.  */
-		if (y == 0.0)
+		if (__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL,
+		    FP_SUBNORMAL, FP_ZERO, y) == FP_ZERO)
 			y = asdouble(sbits & 0x8000000000000000);
 		/* The underflow exception needs to be signaled explicitly.  */
 		fp_force_eval(fp_barrier(0x1p-1022) * 0x1p-1022);

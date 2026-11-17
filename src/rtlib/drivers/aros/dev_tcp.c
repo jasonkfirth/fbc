@@ -105,6 +105,136 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#endif
 #endif
 
+#if defined(HOST_AROS)
+/*
+    bsdsocket.library vectors marshal signed POSIX values through unsigned
+    register words. Keep that AROS ABI conversion inside these wrappers so
+    strict diagnostics remain enabled for the runtime's own socket logic.
+*/
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+static ULONG fb_hArosSocketBaseTags(struct TagItem *tags)
+{
+	return SocketBaseTagList(tags);
+}
+
+static int fb_hArosSocket(int domain, int type, int protocol)
+{
+	return socket(domain, type, protocol);
+}
+
+static int fb_hArosConnect(int socket, const struct sockaddr *address,
+	socklen_t address_length)
+{
+	return connect(socket, address, address_length);
+}
+
+static int fb_hArosBind(int socket, const struct sockaddr *address,
+	socklen_t address_length)
+{
+	return bind(socket, address, address_length);
+}
+
+static int fb_hArosListen(int socket, int backlog)
+{
+	return listen(socket, backlog);
+}
+
+static int fb_hArosAccept(int socket, struct sockaddr *address,
+	socklen_t *address_length)
+{
+	return accept(socket, address, address_length);
+}
+
+static int fb_hArosShutdown(int socket, int how)
+{
+	return shutdown(socket, how);
+}
+
+static int fb_hArosSend(int socket, const void *buffer, int length, int flags)
+{
+	return send(socket, buffer, length, flags);
+}
+
+static int fb_hArosRecv(int socket, void *buffer, int length, int flags)
+{
+	return recv(socket, buffer, length, flags);
+}
+
+static int fb_hArosSetSockOpt(int socket, int level, int option,
+	const void *value, socklen_t value_length)
+{
+	return setsockopt(socket, level, option, value, value_length);
+}
+
+static int fb_hArosCloseSocket(int socket)
+{
+	return CloseSocket(socket);
+}
+
+static int fb_hArosWaitSelect(int count, fd_set *readers, fd_set *writers,
+	fd_set *errors, struct timeval *timeout)
+{
+	return WaitSelect(count, readers, writers, errors, timeout, NULL);
+}
+
+static int fb_hArosIoctlSocket(int socket, unsigned long request, char *argument)
+{
+	return IoctlSocket(socket, request, argument);
+}
+
+static LONG fb_hArosGetAddrInfo(const char *node, const char *service,
+	const struct addrinfo *hints, struct addrinfo **result)
+{
+	return getaddrinfo(node, service, hints, result);
+}
+
+static void fb_hArosFreeAddrInfo(struct addrinfo *result)
+{
+	freeaddrinfo(result);
+}
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
+#undef SocketBaseTagList
+#define SocketBaseTagList(tags) fb_hArosSocketBaseTags(tags)
+#undef socket
+#define socket(domain, type, protocol) fb_hArosSocket(domain, type, protocol)
+#undef connect
+#define connect(socket, address, length) fb_hArosConnect(socket, address, length)
+#undef bind
+#define bind(socket, address, length) fb_hArosBind(socket, address, length)
+#undef listen
+#define listen(socket, backlog) fb_hArosListen(socket, backlog)
+#undef accept
+#define accept(socket, address, length) fb_hArosAccept(socket, address, length)
+#undef shutdown
+#define shutdown(socket, how) fb_hArosShutdown(socket, how)
+#undef send
+#define send(socket, buffer, length, flags) fb_hArosSend(socket, buffer, length, flags)
+#undef recv
+#define recv(socket, buffer, length, flags) fb_hArosRecv(socket, buffer, length, flags)
+#undef setsockopt
+#define setsockopt(socket, level, option, value, length) \
+	fb_hArosSetSockOpt(socket, level, option, value, length)
+#undef CloseSocket
+#define CloseSocket(socket) fb_hArosCloseSocket(socket)
+#undef WaitSelect
+#define WaitSelect(count, readers, writers, errors, timeout, signals) \
+	fb_hArosWaitSelect(count, readers, writers, errors, timeout)
+#undef IoctlSocket
+#define IoctlSocket(socket, request, argument) \
+	fb_hArosIoctlSocket(socket, request, argument)
+#undef getaddrinfo
+#define getaddrinfo(node, service, hints, result) \
+	fb_hArosGetAddrInfo(node, service, hints, result)
+#undef freeaddrinfo
+#define freeaddrinfo(result) fb_hArosFreeAddrInfo(result)
+#endif
+
 #if defined(HOST_DOS) || defined(HOST_JS)
 	#define FB_TCP_CLOSESOCKET(s) (0)
 	#define FB_TCP_SOCKET_ERROR(s) TRUE
@@ -166,6 +296,85 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_SEND(s, b, l, f) send( s, b, l, f )
 	#define FB_TCP_SETSOCKOPT(s, l, o, v, n) setsockopt( s, l, o, v, n )
 	#define FB_TCP_CAN_QUERY_BYTES TRUE
+#endif
+
+#if defined(HOST_AROS)
+static FB_TCP_SOCKET fb_hArosTcpCreateSocket(long domain, long type,
+	long protocol)
+{
+	long native_socket;
+	FB_TCP_SOCKET result;
+
+	if ((domain < INT_MIN) || (domain > INT_MAX) ||
+	    (type < INT_MIN) || (type > INT_MAX) ||
+	    (protocol < INT_MIN) || (protocol > INT_MAX))
+		return FB_TCP_INVALID_SOCKET;
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+	native_socket = socket((int)domain, (int)type, (int)protocol);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
+	if (native_socket < 0)
+		return FB_TCP_INVALID_SOCKET;
+	if (native_socket >= FD_SETSIZE) {
+		if (native_socket <= INT_MAX) {
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+			FB_TCP_CLOSESOCKET((FB_TCP_SOCKET)native_socket);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+		}
+		return FB_TCP_INVALID_SOCKET;
+	}
+
+	/* AROS' fd_set is limited to FD_SETSIZE and stores int socket numbers. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+	result = (FB_TCP_SOCKET)native_socket;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+	return result;
+}
+
+static int fb_hArosTcpAddressLength(size_t length, socklen_t *result)
+{
+	if ((result == NULL) || (length == 0) || (length > (size_t)UINT_MAX))
+		return FALSE;
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+	*result = (socklen_t)length;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+	return TRUE;
+}
+
+static int fb_hArosTcpSetFd(FB_TCP_SOCKET socket, fd_set *set)
+{
+	if ((set == NULL) || (socket < 0) || (socket >= FD_SETSIZE))
+		return FALSE;
+
+	FD_SET((unsigned int)socket, set);
+	return TRUE;
+}
 #endif
 
 #define FB_TCP_SOCKET_CLIENT 0
@@ -308,9 +517,10 @@ static int fb_hDevTcpInit( void )
 			init_result = fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		} else {
 			struct TagItem tags[2];
+			int *errno_pointer = &errno;
 
 			tags[0].ti_Tag = SBTM_SETVAL( SBTC_ERRNOPTR( sizeof( errno ) ) );
-			tags[0].ti_Data = (IPTR)&errno;
+			tags[0].ti_Data = (IPTR)errno_pointer;
 			tags[1].ti_Tag = TAG_DONE;
 			tags[1].ti_Data = 0;
 
@@ -495,7 +705,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 			struct timeval value;
 
 			value.tv_sec = timeout / 1000;
-			value.tv_usec = (timeout % 1000) * 1000;
+			value.tv_usec = (suseconds_t)((timeout % 1000u) * 1000u);
 
 			#if !defined(HOST_WII)
 				FB_TCP_SETSOCKOPT( hSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&value, sizeof( value ) );
@@ -721,13 +931,29 @@ static int fb_hDevTcpCreateConnectedSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_
 		return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 
 	for( it = result; it != NULL; it = it->ai_next ) {
-		hSocket = (FB_TCP_SOCKET)socket( it->ai_family, it->ai_socktype, it->ai_protocol );
+	#if defined(HOST_AROS)
+		socklen_t address_length;
+		hSocket = fb_hArosTcpCreateSocket( it->ai_family,
+		                                  it->ai_socktype,
+		                                  it->ai_protocol );
+	#else
+		hSocket = (FB_TCP_SOCKET)socket( it->ai_family, it->ai_socktype,
+		                                it->ai_protocol );
+	#endif
 		if( FB_TCP_SOCKET_ERROR( hSocket ) )
 			continue;
 
 		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_CLIENT );
 
+	#if defined(HOST_AROS)
+		if( !fb_hArosTcpAddressLength( it->ai_addrlen, &address_length ) ) {
+			FB_TCP_CLOSESOCKET( hSocket );
+			continue;
+		}
+		if( connect( hSocket, it->ai_addr, address_length ) == 0 ) {
+	#else
 		if( connect( hSocket, it->ai_addr, (int)it->ai_addrlen ) == 0 ) {
+	#endif
 			fb_hDevTcpSetNoDelay( hSocket );
 			*hSocketOut = hSocket;
 			freeaddrinfo( result );
@@ -807,15 +1033,27 @@ static int fb_hDevTcpCreateServerSocket( DEV_TCP_PROTOCOL *tcp_proto, FB_TCP_SOC
 
 	for( it = result; it != NULL; it = it->ai_next ) {
 		int yes = 1;
-
-		hSocket = (FB_TCP_SOCKET)socket( it->ai_family, it->ai_socktype, it->ai_protocol );
+	#if defined(HOST_AROS)
+		socklen_t address_length;
+		hSocket = fb_hArosTcpCreateSocket( it->ai_family,
+		                                  it->ai_socktype,
+		                                  it->ai_protocol );
+	#else
+		hSocket = (FB_TCP_SOCKET)socket( it->ai_family, it->ai_socktype,
+		                                it->ai_protocol );
+	#endif
 		if( FB_TCP_SOCKET_ERROR( hSocket ) )
 			continue;
 
 		setsockopt( hSocket, SOL_SOCKET, SO_REUSEADDR, (const char *)&yes, sizeof( yes ) );
 		fb_hDevTcpApplySocketOptions( hSocket, tcp_proto->timeout, FB_TCP_SOCKET_LISTENER );
 
+	#if defined(HOST_AROS)
+		if( !fb_hArosTcpAddressLength( it->ai_addrlen, &address_length ) ||
+		    (bind( hSocket, it->ai_addr, address_length ) != 0) ) {
+	#else
 		if( bind( hSocket, it->ai_addr, (int)it->ai_addrlen ) != 0 ) {
+	#endif
 			FB_TCP_CLOSESOCKET( hSocket );
 			continue;
 		}
@@ -874,7 +1112,14 @@ static int fb_hDevTcpPeekState( DEV_TCP_INFO *info )
 		return -1;
 
 	FD_ZERO( &set );
+	#if defined(HOST_AROS)
+	if( !fb_hArosTcpSetFd( info->hSocket, &set ) ) {
+		info->is_closed = TRUE;
+		return -1;
+	}
+	#else
 	FD_SET( info->hSocket, &set );
+	#endif
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 
@@ -964,7 +1209,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 	size_t total = 0;
 
 	while( total < length ) {
-		int chunk = (int)MIN( length - total, (size_t)INT_MAX );
+		size_t chunk = MIN( length - total, (size_t)INT_MAX );
 		int sent;
 		int err;
 		int flags = 0;
@@ -979,7 +1224,7 @@ static int fb_hDevTcpSendAll( DEV_TCP_INFO *info, const char *buffer, size_t len
 			return fb_ErrorSetNum( FB_RTERROR_FILEIO );
 		}
 
-		total += sent;
+		total += (size_t)sent;
 	}
 
 	return FB_RTERROR_OK;
@@ -1012,9 +1257,16 @@ static void fb_hDevTcpShutdownConnectedSocket( DEV_TCP_INFO *info )
 		int res;
 
 		FD_ZERO( &set );
+	#if defined(HOST_AROS)
+		if( !fb_hArosTcpSetFd( info->hSocket, &set ) ) {
+			info->is_closed = TRUE;
+			break;
+		}
+	#else
 		FD_SET( info->hSocket, &set );
+	#endif
 		tv.tv_sec = slice / 1000;
-		tv.tv_usec = (slice % 1000) * 1000;
+		tv.tv_usec = (suseconds_t)((slice % 1000u) * 1000u);
 
 		FB_UNLOCK();
 		res = FB_TCP_SELECT( info->hSocket + 1, &set, NULL, NULL, &tv );
@@ -1151,7 +1403,7 @@ static int fb_DevTcpRead( FB_FILE *handle, void *value, size_t *pValuelen )
 		                                    0,
 		                                    &err );
 		if( bytes > 0 ) {
-			*pValuelen = buffered + bytes;
+			*pValuelen = buffered + (size_t)bytes;
 		} else if( bytes == 0 ) {
 			info->is_closed = TRUE;
 			*pValuelen = buffered;
@@ -1317,10 +1569,10 @@ static void fb_hDevTcpAppendChunk( FBSTRING_ACCESS *dst, const char *buffer, ssi
 {
 	FBSTRING_ACCESS *src;
 
-	if( len <= 0 )
+	if( (len <= 0) || (len >= SSIZE_MAX) )
 		return;
 
-	src = fb_StrAllocTempDescF( (void *)buffer, len + 1 );
+	src = fb_StrAllocTempDescF( buffer, len + 1 );
 	if( dst->data == NULL ) {
 		fb_StrAssign( dst, -1, src, -1, FALSE );
 	} else {

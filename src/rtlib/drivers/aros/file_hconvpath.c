@@ -38,8 +38,8 @@
 void fb_hConvertPath( char *path )
 {
 	char *source;
-	ssize_t index;
-	ssize_t length;
+	size_t index;
+	size_t length;
 
 	DBG_ASSERT( path != NULL );
 

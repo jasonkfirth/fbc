@@ -10,7 +10,7 @@
 
     Responsibilities:
 
-        - provide the compiler-backed stack allocation primitive
+        - keep AROS math classification type-aware under strict GCC warnings
         - expose AROS DOS types used by shared file-device helpers
         - declare the AROS-local logical-size maintenance bridge
 
@@ -23,14 +23,23 @@
 #define FB_RTLIB_AROS_H
 
 #include <dos/dos.h>
+#include <math.h>
 
 /*
-    AROS exposes alloca() only to source files that opt into its legacy
-    extension header.  GCC's intrinsic has the same lifetime and avoids
-    changing feature visibility for every runtime translation unit.
+    AROS's fpclassify() and isfinite() macros use __builtin_choose_expr to
+    select type-specific functions. GCC still checks the unselected function
+    calls and reports false narrowing warnings for double and long double.
+    These generic builtins preserve the argument type during warning analysis.
 */
-#undef alloca
-#define alloca(size) __builtin_alloca(size)
+#if defined(__GNUC__) || defined(__clang__)
+#undef fpclassify
+#define fpclassify(value) \
+	__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, (value))
+#undef isfinite
+#define isfinite(value) __builtin_isfinite(value)
+#undef isnan
+#define isnan(value) __builtin_isnan(value)
+#endif
 
 /*
     AROS file-device sources share POSIXC stream-positioning helpers.  Keeping

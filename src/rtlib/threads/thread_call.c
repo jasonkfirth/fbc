@@ -135,41 +135,41 @@ static ffi_type *getStruct( va_list *args_list )
     num_elems = (int)elem_count;
 
     /* prepare type */
-    ffi_type *ffi_arg = (ffi_type *)malloc( sizeof( ffi_type ) );
-    if( ffi_arg == NULL )
+    ffi_type *structure_type = (ffi_type *)malloc( sizeof( ffi_type ) );
+    if( structure_type == NULL )
         return NULL;
 
-    ffi_arg->size = 0;
-    ffi_arg->alignment = 0;
-    ffi_arg->type = FFI_TYPE_STRUCT;
-    ffi_arg->elements = 
+    structure_type->size = 0;
+    structure_type->alignment = 0;
+    structure_type->type = FFI_TYPE_STRUCT;
+	structure_type->elements =
         (ffi_type **)malloc( sizeof( ffi_type * ) * ( (size_t)num_elems + 1u ) );
-    if( ffi_arg->elements == NULL )
+    if( structure_type->elements == NULL )
     {
-        free( ffi_arg );
+        free( structure_type );
         return NULL;
     }
-    ffi_arg->elements[num_elems] = NULL;
+    structure_type->elements[num_elems] = NULL;
     
     /* scan elements */
     for( i=0; i<num_elems; i++ )
     {
-        ffi_arg->elements[i] = getArgument( args_list );
-        if( ffi_arg->elements[i] == NULL )
+        structure_type->elements[i] = getArgument( args_list );
+        if( structure_type->elements[i] == NULL )
         {
             /* error, free memory and return NULL */
             for( j=0; j<i; j++ )
             {
-                if( ffi_arg->elements[j]->type == FFI_TYPE_STRUCT )
-                    freeStruct( ffi_arg->elements[j] );
+                if( structure_type->elements[j]->type == FFI_TYPE_STRUCT )
+                    freeStruct( structure_type->elements[j] );
             }
-	            free( (void *)ffi_arg->elements );
-	            free( ffi_arg );
+	            free( (void *)structure_type->elements );
+	            free( structure_type );
             return NULL;
         }
     }
     
-    return ffi_arg;
+    return structure_type;
 }
 
 static ffi_type *getArgument( va_list *args_list )

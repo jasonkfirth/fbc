@@ -73,7 +73,9 @@ static inline double specialcase(double_t tmp, uint64_t sbits, uint64_t ki)
 		lo = 1.0 - hi + y + lo;
 		y = eval_as_double(hi + lo) - 1.0;
 		/* Avoid -0.0 with downward rounding.  */
-		if (WANT_ROUNDING && y == 0.0)
+		if (WANT_ROUNDING &&
+		    (__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL,
+		     FP_SUBNORMAL, FP_ZERO, y) == FP_ZERO))
 			y = 0.0;
 		/* The underflow exception needs to be signaled explicitly.  */
 		fp_force_eval(fp_barrier(0x1p-1022) * 0x1p-1022);
@@ -85,7 +87,7 @@ static inline double specialcase(double_t tmp, uint64_t sbits, uint64_t ki)
 /* Top 12 bits of a double (sign and exponent bits).  */
 static inline uint32_t top12(double x)
 {
-	return asuint64(x) >> 52;
+	return (uint32_t)(asuint64(x) >> 52);
 }
 
 double exp(double x)

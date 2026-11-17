@@ -31,7 +31,9 @@ FBCALL FB_WCHAR *fb_WstrFill2( ssize_t chars, const FB_WCHAR *src )
 
 	if( (chars > 0) && (src != NULL) && (fb_wstr_Len( src ) > 0) )
 	{
-		dst = fb_WstrFill1( chars, src[0] );
+		dst = fb_wstr_AllocTemp( chars );
+		if( dst != NULL )
+			fb_wstr_Fill( dst, src[0], chars );
 	}
 	else
 		dst = NULL;

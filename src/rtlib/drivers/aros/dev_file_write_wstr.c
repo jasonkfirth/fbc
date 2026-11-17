@@ -21,19 +21,28 @@
 */
 
 #include "../../fb.h"
+#include <stdint.h>
+#include <limits.h>
 
 int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR *source,
 			 size_t characters )
 {
 	char *buffer;
+	char local_buffer[FB_LOCALBUFF_MAXLEN + 1];
 	ssize_t bytes;
 	FILE *fp;
 	int result;
+	int allocated = FALSE;
 
 	FB_LOCK();
 
 	fp = (FILE *)handle->opaque;
-	if( fp == NULL )
+	if( (fp == NULL) || ((source == NULL) && (characters != 0)) )
+	{
+		FB_UNLOCK();
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	}
+	if( (characters > (size_t)SSIZE_MAX) || (characters == SIZE_MAX) )
 	{
 		FB_UNLOCK();
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
@@ -41,7 +50,7 @@ int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR *source,
 
 	if( characters < FB_LOCALBUFF_MAXLEN )
 	{
-		buffer = alloca( characters + 1 );
+		buffer = local_buffer;
 	}
 	else
 	{
@@ -51,12 +60,14 @@ int fb_DevFileWriteWstr( FB_FILE *handle, const FB_WCHAR *source,
 			FB_UNLOCK();
 			return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 		}
+		allocated = TRUE;
 	}
 
-	bytes = fb_wstr_ConvToA( buffer, characters, source );
-	result = fwrite( buffer, 1, bytes, fp ) == (size_t)bytes;
+	bytes = fb_wstr_ConvToA( buffer, (ssize_t)characters, source );
+	result = (bytes >= 0) &&
+		(fwrite( buffer, 1, (size_t)bytes, fp ) == (size_t)bytes);
 
-	if( characters >= FB_LOCALBUFF_MAXLEN )
+	if( allocated )
 		free( buffer );
 
 	if( result )

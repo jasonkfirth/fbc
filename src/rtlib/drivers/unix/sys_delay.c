@@ -11,8 +11,12 @@
 FBCALL void fb_Delay( int msecs )
 {
 	struct timeval tv;
-	tv.tv_sec = msecs / 1000;
-	tv.tv_usec = (msecs % 1000) * 1000;
+	unsigned int delay_milliseconds;
+	if( msecs <= 0 )
+		return;
+	delay_milliseconds = (unsigned int)msecs;
+	tv.tv_sec = delay_milliseconds / 1000U;
+	tv.tv_usec = (suseconds_t)((delay_milliseconds % 1000U) * 1000U);
 	select(0, NULL, NULL, NULL, &tv);
 }
 

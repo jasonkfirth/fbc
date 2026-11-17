@@ -11,6 +11,7 @@ FBCALL long long fb_WstrRadix2Longint( const FB_WCHAR *src, ssize_t len, int rad
 {
 	long long v;
 	int c;
+	unsigned int current;
 
 	v = 0;
 
@@ -21,7 +22,10 @@ FBCALL long long fb_WstrRadix2Longint( const FB_WCHAR *src, ssize_t len, int rad
 			while( len > 0 )
 			{
 				--len;
-				c = *src++;
+				current = (unsigned int)*src++;
+				if( current > 127U )
+					break;
+				c = (int)current;
 				if( (c >= 97) && (c <= 102) )
 					c -= 87;
 				else if( (c >= 65) && (c <= 70) )
@@ -39,7 +43,10 @@ FBCALL long long fb_WstrRadix2Longint( const FB_WCHAR *src, ssize_t len, int rad
 		case 8:
 			while( len > 0 ) {
 				--len;
-				c = *src++;
+				current = (unsigned int)*src++;
+				if( current > 127U )
+					break;
+				c = (int)current;
 				if( (c >= 48) && (c <= 55) )
 					v = (v * 8) + (c - 48);
 				else
@@ -51,7 +58,10 @@ FBCALL long long fb_WstrRadix2Longint( const FB_WCHAR *src, ssize_t len, int rad
 		case 2:
 			while( len > 0 ) {
 				--len;
-				c = *src++;
+				current = (unsigned int)*src++;
+				if( current > 127U )
+					break;
+				c = (int)current;
 				if( (c >= 48) && (c <= 49) )
 					v = (v * 2) + (c - 48);
 				else

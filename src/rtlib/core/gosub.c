@@ -14,6 +14,11 @@
 void __mingw_longjmp( jmp_buf buf, int value );
 #endif
 
+/* jmp_buf has target-specific alignment that must remain native to libc. */
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpadded"
+#endif
 typedef struct gosubnode {
 	jmp_buf buf;
 	struct gosubnode *next;
@@ -21,6 +26,9 @@ typedef struct gosubnode {
 	 * identifiers, stored in a native word beside the node pointer. */
 	uintptr_t target;
 } GOSUBNODE;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 /* The compiler owns one pointer in automatic storage. Its initializer remains
  * at the original source position; only this module knows the node layout.

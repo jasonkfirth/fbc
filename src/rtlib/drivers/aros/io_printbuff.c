@@ -62,8 +62,17 @@ static void fb_hArosWrite(const void *buffer, size_t length)
         LONG requested;
         LONG written;
 
-        requested = (length > (size_t)LONG_MAX) ? LONG_MAX : (LONG)length;
+        requested = (length > (size_t)INT32_MAX) ? (LONG)INT32_MAX :
+            (LONG)length;
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
+        /* Write's legacy AROS API uses APTR although it only reads this data. */
         written = Write(output, (APTR)cursor, requested);
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
         if (written <= 0)
             return;
 
@@ -92,6 +101,10 @@ void fb_ConsolePrintBufferEx(const void *buffer, size_t length, int mask)
 {
     const unsigned char *input;
     unsigned char output_buffer[FB_AROS_OUTPUT_BUFFER_SIZE];
+    size_t width;
+    size_t height;
+    size_t total_cells;
+    size_t current_cell;
     size_t available;
     size_t copy_length;
     size_t output_length;
@@ -111,15 +124,33 @@ void fb_ConsolePrintBufferEx(const void *buffer, size_t length, int mask)
     fb_hRecheckConsoleSize(TRUE);
     BG_UNLOCK();
 
-    available = (fb_console_context.w * fb_console_context.h) -
-        (((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1);
+    if (fb_console_context.w <= 0 || fb_console_context.h <= 0 ||
+        fb_console_context.cur_x < 1 || fb_console_context.cur_y < 1 ||
+        fb_console_context.cur_x > fb_console_context.w ||
+        fb_console_context.cur_y > fb_console_context.h ||
+        fb_console_context.char_buffer == NULL ||
+        fb_console_context.attr_buffer == NULL)
+        return;
+
+    width = (size_t)fb_console_context.w;
+    height = (size_t)fb_console_context.h;
+    if (width > SIZE_MAX / height)
+        return;
+    total_cells = width * height;
+    current_cell = ((size_t)(fb_console_context.cur_y - 1) * width) +
+        (size_t)(fb_console_context.cur_x - 1);
+    if (current_cell > total_cells)
+        return;
+
+    available = total_cells - current_cell;
     copy_length = (available < length) ? available : length;
     memcpy(fb_console_context.char_buffer +
-        ((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1,
-        buffer, copy_length);
+        current_cell, buffer, copy_length);
     memset(fb_console_context.attr_buffer +
-        ((fb_console_context.cur_y - 1) * fb_console_context.w) + fb_console_context.cur_x - 1,
-        fb_console_context.fg_color | (fb_console_context.bg_color << 4), copy_length);
+        current_cell,
+        (int)(unsigned char)(((unsigned int)fb_console_context.fg_color & 0x0fU) |
+        (((unsigned int)fb_console_context.bg_color & 0x0fU) << 4)),
+        copy_length);
 
     input = buffer;
     output_length = 0;
@@ -132,9 +163,13 @@ void fb_ConsolePrintBufferEx(const void *buffer, size_t length, int mask)
 
         if (character < 32 && ((CTRL_ALWAYS >> character) & 1u) != 0) {
             const unsigned char translated[] = {
-                ENTER_UTF8[0], ENTER_UTF8[1], ENTER_UTF8[2],
+                (unsigned char)ENTER_UTF8[0],
+                (unsigned char)ENTER_UTF8[1],
+                (unsigned char)ENTER_UTF8[2],
                 0xef, 0x80, (unsigned char)(character | 0x80),
-                EXIT_UTF8[0], EXIT_UTF8[1], EXIT_UTF8[2]
+                (unsigned char)EXIT_UTF8[0],
+                (unsigned char)EXIT_UTF8[1],
+                (unsigned char)EXIT_UTF8[2]
             };
             size_t index;
 

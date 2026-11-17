@@ -38,6 +38,13 @@
 #include <stdint.h>
 #include <string.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_LONGDOUBLE_FPCLASSIFY(value) \
+	__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL, FP_ZERO, (value))
+#else
+#define FB_LONGDOUBLE_FPCLASSIFY(value) fpclassify(value)
+#endif
+
 typedef struct FB_LONGDOUBLE_INPUT {
     const unsigned char *begin;
     const unsigned char *cursor;
@@ -313,7 +320,7 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 		for (k=a; k!=z; k=((k+1) & MASK)) {
 			uint32_t tmp = x[k] & ((UINT32_C(1)<<sh)-UINT32_C(1));
 			x[k] = (x[k]>>sh) + carry;
-			carry = (1000000000>>sh) * tmp;
+			carry = (UINT32_C(1000000000) >> sh) * tmp;
 			if (k==a && !x[k]) {
 				a = ((a+1) & MASK);
 				i--;
@@ -365,7 +372,7 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 				frac += 0.75*sign;
 		}
 		if (LDBL_MANT_DIG-bits >= 2 &&
-		    fpclassify(fmodl(frac, 1.0L)) == FP_ZERO)
+		    FB_LONGDOUBLE_FPCLASSIFY(fmodl(frac, 1.0L)) == FP_ZERO)
 			frac++;
 	}
 
@@ -383,7 +390,7 @@ static long double fb_ld_decfloat(FB_LONGDOUBLE_INPUT *f, int c, int bits, int e
 			adjusted_e2++;
 		}
 		if (adjusted_e2 > emax ||
-		    (denormal && fpclassify(frac) != FP_ZERO))
+		    (denormal && FB_LONGDOUBLE_FPCLASSIFY(frac) != FP_ZERO))
 			errno = ERANGE;
 	}
 
@@ -518,12 +525,12 @@ static long double fb_ld_hexfloat(FB_LONGDOUBLE_INPUT *f, int bits, int emin, in
 	if (bits < LDBL_MANT_DIG)
 		bias = copysignl(scalbn(1, 32+LDBL_MANT_DIG-bits-1), sign);
 
-	if (bits<32 && fpclassify(y) != FP_ZERO && !(x&1)) x++, y=0;
+	if (bits<32 && FB_LONGDOUBLE_FPCLASSIFY(y) != FP_ZERO && !(x&1)) x++, y=0;
 
 	y = bias + sign*(long double)x + sign*y;
 	y -= bias;
 
-	if (fpclassify(y) == FP_ZERO) errno = ERANGE;
+	if (FB_LONGDOUBLE_FPCLASSIFY(y) == FP_ZERO) errno = ERANGE;
 
 	return scalbnl(y, (int)e2);
 }
@@ -567,7 +574,7 @@ static long double fb_ld_scan(FB_LONGDOUBLE_INPUT *f, int prec, int pok)
 			fb_ld_unget(f);
 			if (pok) for (; i>3; i--) fb_ld_unget(f);
 		}
-		return (float)sign * INFINITY;
+		return copysignl(INFINITY, (long double)sign);
 	}
 	if (!i) for (i=0; i<3 && (c|32)=="nan"[i]; i++)
 		if (i<2) c = fb_ld_get(f);

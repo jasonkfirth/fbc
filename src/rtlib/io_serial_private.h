@@ -73,6 +73,10 @@
 		struct IOExtSer *request;
 		FB_SERIAL_OPTIONS *pOptions;
 		int unit;
+#if defined(HOST_64BIT)
+		/* Keep the native 64-bit structure size explicit for strict padding checks. */
+		unsigned int trailing_padding;
+#endif
 	} AROS_SERIAL_INFO;
 	typedef AROS_SERIAL_INFO AMIGA_SERIAL_INFO;
 #elif defined HOST_RISCOS

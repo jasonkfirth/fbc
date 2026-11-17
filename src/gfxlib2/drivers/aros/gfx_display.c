@@ -59,14 +59,22 @@ static void aros_source_rgb(const unsigned char *source, int x,
 
     if (fb_gfx->depth == 16)
     {
-        pixel = ((const unsigned short *)source)[x];
+        uint16_t source_pixel;
+        memcpy(&source_pixel, source + ((size_t)x * sizeof(source_pixel)),
+            sizeof(source_pixel));
+        pixel = source_pixel;
         *red = (unsigned char)(((pixel >> 11) & 31U) * 255U / 31U);
         *green = (unsigned char)(((pixel >> 5) & 63U) * 255U / 63U);
         *blue = (unsigned char)((pixel & 31U) * 255U / 31U);
         return;
     }
 
-    pixel = ((const unsigned int *)source)[x];
+    {
+        uint32_t source_pixel;
+        memcpy(&source_pixel, source + ((size_t)x * sizeof(source_pixel)),
+            sizeof(source_pixel));
+        pixel = source_pixel;
+    }
     *red = (unsigned char)((pixel >> 16) & 255U);
     *green = (unsigned char)((pixel >> 8) & 255U);
     *blue = (unsigned char)(pixel & 255U);
@@ -79,11 +87,26 @@ static void aros_convert_row(int y)
     unsigned char red;
     unsigned char green;
     unsigned char blue;
+    size_t source_pitch;
+    size_t destination_pitch;
     int x;
 
-    source = fb_gfx->framebuffer + ((size_t)y * fb_gfx->pitch);
+    if ((fb_gfx == NULL) || (fb_gfx->framebuffer == NULL) ||
+        (fb_aros_gfx.present_buffer == NULL) ||
+        (y < 0) || (y >= fb_aros_gfx.height) ||
+        (fb_gfx->pitch <= 0) || (fb_aros_gfx.width <= 0) ||
+        ((size_t)fb_aros_gfx.width > (SIZE_MAX / 4U)))
+        return;
+
+    source_pitch = (size_t)fb_gfx->pitch;
+    destination_pitch = (size_t)fb_aros_gfx.width * 4U;
+    if (((size_t)y > (SIZE_MAX / source_pitch)) ||
+        ((size_t)y > (SIZE_MAX / destination_pitch)))
+        return;
+
+    source = fb_gfx->framebuffer + ((size_t)y * source_pitch);
     destination = fb_aros_gfx.present_buffer +
-        ((size_t)y * (size_t)fb_aros_gfx.width * 4U);
+        ((size_t)y * destination_pitch);
 
     for (x = 0; x < fb_aros_gfx.width; ++x)
     {
@@ -289,7 +312,12 @@ void fb_arosGfxReadScreenInfo(ssize_t *width, ssize_t *height,
 
     *width = screen->Width;
     *height = screen->Height;
-    *depth = GetBitMapAttr(screen->RastPort.BitMap, BMA_DEPTH);
+	{
+		IPTR bitmap_depth = GetBitMapAttr(screen->RastPort.BitMap, BMA_DEPTH);
+		*depth = (bitmap_depth > (IPTR)SSIZE_MAX)
+			? SSIZE_MAX
+			: (ssize_t)bitmap_depth;
+	}
     *refresh = 0;
 
     if (screen != fb_aros_gfx.screen)

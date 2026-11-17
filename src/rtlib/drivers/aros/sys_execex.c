@@ -32,14 +32,16 @@
 #include <dos/dostags.h>
 #include <proto/dos.h>
 #include <unistd.h>
+#include <limits.h>
+#include <stdint.h>
 
 FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fork )
 {
 	char buffer[MAX_PATH];
-	char *command;
+	char *command = NULL;
 	char empty_arguments[] = "";
 	char *arguments;
-	char **argv;
+	char **argv = NULL;
 	char *cursor;
 	char *write_cursor;
 	int argument_count = 0;
@@ -47,6 +49,7 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 	volatile int result = -1;
 	size_t command_length;
 	ssize_t arguments_length;
+	int owns_arguments = FALSE;
 
 	if( program == NULL || program->data == NULL ) {
 		fb_hStrDelTemp( args );
@@ -62,9 +65,25 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 		arguments = empty_arguments;
 	} else {
 		arguments_length = FB_STRSIZE( args );
-		arguments = alloca( arguments_length + 1 );
-		DBG_ASSERT( arguments != NULL );
-		arguments[arguments_length] = '\0';
+		if( (arguments_length < 0) ||
+		    ((args->data == NULL) && (arguments_length != 0)) ) {
+			fb_hStrDelTemp( args );
+			fb_hStrDelTemp( program );
+			return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+		}
+		if( arguments_length == 0 ) {
+			arguments = empty_arguments;
+		} else {
+			arguments = (char *)malloc( (size_t)arguments_length + 1u );
+			if( arguments == NULL ) {
+				fb_hStrDelTemp( args );
+				fb_hStrDelTemp( program );
+				return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+			}
+			owns_arguments = TRUE;
+			memcpy( arguments, args->data, (size_t)arguments_length );
+			arguments[arguments_length] = '\0';
+		}
 		if( arguments_length > 0 )
 			argument_count = fb_hParseArgs( arguments, args->data, arguments_length );
 	}
@@ -74,12 +93,31 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 	fb_hStrDelTemp_NoLock( program );
 	FB_STRUNLOCK();
 
-	if( argument_count == -1 )
+	if( argument_count < 0 ) {
+		if( owns_arguments )
+			free( arguments );
 		return -1;
+	}
+	if( argument_count == INT_MAX ) {
+		if( owns_arguments )
+			free( arguments );
+		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
+	}
 
 	argument_count++;
-	argv = alloca( sizeof( char * ) * (argument_count + 1) );
-	DBG_ASSERT( argv != NULL );
+	if( ((size_t)argument_count + 1u) >
+	    (SIZE_MAX / sizeof( argv[0] )) ) {
+		if( owns_arguments )
+			free( arguments );
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
+	argv = (char **)malloc( ((size_t)argument_count + 1u) *
+	                       sizeof( argv[0] ) );
+	if( argv == NULL ) {
+		if( owns_arguments )
+			free( arguments );
+		return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+	}
 
 	argv[0] = buffer;
 	cursor = arguments;
@@ -103,24 +141,39 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 		 * particularly on ARM.  SystemTags() is the native synchronous process
 		 * boundary and preserves the command's return code.
 		 */
-		command_length = strlen( buffer ) + 1;
-		for( index = 1; index < argument_count; index++ )
-			command_length += strlen( argv[index] ) + 3;
-		command = alloca( command_length );
-		DBG_ASSERT( command != NULL );
-		write_cursor = command;
-		write_cursor += snprintf( write_cursor, command_length, "%s", buffer );
+		command_length = strlen( buffer ) + 1u;
 		for( index = 1; index < argument_count; index++ ) {
-			write_cursor += snprintf(
-				write_cursor,
-				command_length - (size_t)(write_cursor - command),
-				" \"%s\"",
-				argv[index]
-			);
+			size_t argument_length = strlen( argv[index] );
+			if( (command_length > (SIZE_MAX - 3u)) ||
+			    (argument_length > (SIZE_MAX - command_length - 3u)) ) {
+				result = fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+				goto restore_console;
+			}
+			command_length += argument_length + 3u;
 		}
+		command = (char *)malloc( command_length );
+		if( command == NULL ) {
+			result = fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+			goto restore_console;
+		}
+		write_cursor = command;
+		{
+			size_t program_length = strlen( buffer );
+			memcpy( write_cursor, buffer, program_length );
+			write_cursor += program_length;
+		}
+		for( index = 1; index < argument_count; index++ ) {
+			size_t argument_length = strlen( argv[index] );
+			*write_cursor++ = ' ';
+			*write_cursor++ = '"';
+			memcpy( write_cursor, argv[index], argument_length );
+			write_cursor += argument_length;
+			*write_cursor++ = '"';
+		}
+		*write_cursor = '\0';
 
 		result = SystemTags(
-			command,
+			(CONST_STRPTR)command,
 			SYS_Input, Input(),
 			SYS_Output, Output(),
 			SYS_Error, Output(),
@@ -131,9 +184,14 @@ FBCALL int fb_ExecEx( FBSTRING_ACCESS *program, FBSTRING_ACCESS *args, int do_fo
 		result = execvp( buffer, argv );
 	}
 
+restore_console:
 	FB_LOCK();
 	fb_hInitConsole();
 	FB_UNLOCK();
+	free( command );
+	free( argv );
+	if( owns_arguments )
+		free( arguments );
 
 	return result;
 }

@@ -115,14 +115,20 @@ static int hReadScalar( USTR_READER *reader )
 			scalar = (int)fb_hUtf8Decode( file->putback_buffer, (ssize_t)file->putback_size, &offset );
 		} else {
 			FB_WCHAR unit;
+			uint32_t codepoint;
 			memcpy( &unit, file->putback_buffer, sizeof(unit) );
-			scalar = unit;
+			codepoint = (uint32_t)unit;
+			if( (codepoint > 0x10FFFFU) ||
+			    ((codepoint >= 0xD800U) && (codepoint <= 0xDFFFU)) )
+				scalar = FB_UTF8_REPLACEMENT;
+			else
+				scalar = (int)codepoint;
 			offset = sizeof(unit);
-			if( sizeof(FB_WCHAR) == 2 && (uint16_t)scalar >= 0xD800 &&
-			    (uint16_t)scalar <= 0xDBFF && file->putback_size >= 4 ) {
+			if( sizeof(FB_WCHAR) == 2 && (codepoint >= 0xD800U) &&
+			    (codepoint <= 0xDBFFU) && file->putback_size >= 4 ) {
 				memcpy( &unit, file->putback_buffer + 2, sizeof(unit) );
 				if( (uint16_t)unit >= 0xDC00 && (uint16_t)unit <= 0xDFFF ) {
-					scalar = 0x10000 + (((int)(uint16_t)scalar - 0xD800) << 10) +
+					scalar = 0x10000 + (((int)(uint16_t)codepoint - 0xD800) << 10) +
 					         (int)(uint16_t)unit - 0xDC00;
 					offset = 4;
 				}

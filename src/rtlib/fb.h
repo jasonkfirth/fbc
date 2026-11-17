@@ -464,6 +464,10 @@ typedef struct FB_RTLIB_CTX_ {
 	void          (*exit_sfxlib)(void);
 	int           (*idle_sfxlib)(int msecs);
 	void          (*exit_gfxlib2)(void);
+#if defined(HOST_AROS) && defined(__arm__)
+	/* Preserve the native alignment of the runtime context on AROS ARM. */
+	unsigned char   tail_alignment_padding[4];
+#endif
 } FB_RTLIB_CTX;
 
 extern FB_RTLIB_CTX fb_ctx FB_RTLIB_SYMBOL("__fb_ctx");

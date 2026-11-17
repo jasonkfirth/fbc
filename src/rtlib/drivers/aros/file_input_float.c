@@ -34,6 +34,9 @@ FBCALL int fb_InputSingle( float *destination )
 	char buffer[FB_INPUT_MAXNUMERICLEN + 1];
 	ssize_t length;
 	int is_float;
+	int integer_value;
+	long long long_value;
+	double double_value;
 
 	length = fb_FileInputNextToken( buffer, FB_INPUT_MAXNUMERICLEN,
 		FB_FALSE, &is_float );
@@ -41,17 +44,30 @@ FBCALL int fb_InputSingle( float *destination )
 	if( is_float == FALSE )
 	{
 		if( length <= FB_INPUT_MAXINTLEN )
-			*destination = (float)fb_hStr2Int( buffer, length );
+		{
+			integer_value = fb_hStr2Int( buffer, length );
+			*destination = (float)integer_value;
+		}
 		else if( length <= FB_INPUT_MAXLONGLEN )
-			*destination = (float)fb_hStr2Longint( buffer, length );
+		{
+			long_value = fb_hStr2Longint( buffer, length );
+			*destination = (float)long_value;
+		}
 		else if( buffer[0] == '&' )
-			*destination = (float)fb_hStr2Longint( buffer, length );
+		{
+			long_value = fb_hStr2Longint( buffer, length );
+			*destination = (float)long_value;
+		}
 		else
-			*destination = (float)fb_hStr2Double( buffer, length );
+		{
+			double_value = fb_hStr2Double( buffer, length );
+			*destination = (float)double_value;
+		}
 	}
 	else
 	{
-		*destination = (float)fb_hStr2Double( buffer, length );
+		double_value = fb_hStr2Double( buffer, length );
+		*destination = (float)double_value;
 	}
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
@@ -62,6 +78,8 @@ FBCALL int fb_InputDouble( double *destination )
 	char buffer[FB_INPUT_MAXNUMERICLEN + 1];
 	ssize_t length;
 	int is_float;
+	int integer_value;
+	long long long_value;
 
 	length = fb_FileInputNextToken( buffer, FB_INPUT_MAXNUMERICLEN,
 		FB_FALSE, &is_float );
@@ -69,11 +87,20 @@ FBCALL int fb_InputDouble( double *destination )
 	if( is_float == FALSE )
 	{
 		if( length <= FB_INPUT_MAXINTLEN )
-			*destination = (double)fb_hStr2Int( buffer, length );
+		{
+			integer_value = fb_hStr2Int( buffer, length );
+			*destination = (double)integer_value;
+		}
 		else if( length <= FB_INPUT_MAXLONGLEN )
-			*destination = (double)fb_hStr2Longint( buffer, length );
+		{
+			long_value = fb_hStr2Longint( buffer, length );
+			*destination = (double)long_value;
+		}
 		else if( buffer[0] == '&' )
-			*destination = (double)fb_hStr2Longint( buffer, length );
+		{
+			long_value = fb_hStr2Longint( buffer, length );
+			*destination = (double)long_value;
+		}
 		else
 			*destination = fb_hStr2Double( buffer, length );
 	}

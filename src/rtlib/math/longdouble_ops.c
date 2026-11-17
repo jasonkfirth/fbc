@@ -34,6 +34,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(__GNUC__) || defined(__clang__)
+#define FB_LONGDOUBLE_IS_NAN(value) __builtin_isnanl(value)
+#else
+#define FB_LONGDOUBLE_IS_NAN(value) isnan(value)
+#endif
 #include "extended_math.h"
 #if defined(__AROS__) || defined(__HAIKU__) || defined(HOST_XBOX) || \
 	(defined(__MINGW32__) && !defined(_UCRT) && !defined(_WIN32_WCE))
@@ -260,7 +266,7 @@ int64_t fb_LongDoubleToSigned(const void *source,
 	long double value = longdouble_load(source, storage_size);
 
 	/* Avoid undefined C float-to-integer conversions at and beyond the limits. */
-	if (isnan(value)) return 0;
+	if (FB_LONGDOUBLE_IS_NAN(value)) return 0;
 	if (value >= 0x1p63L) return INT64_MAX;
 	if (value <= -0x1p63L) return INT64_MIN;
 	return (int64_t)value;
@@ -271,7 +277,7 @@ uint64_t fb_LongDoubleToUnsigned(const void *source,
 {
 	long double value = longdouble_load(source, storage_size);
 
-	if (isnan(value) || (value <= 0.0L)) return 0;
+	if (FB_LONGDOUBLE_IS_NAN(value) || (value <= 0.0L)) return 0;
 	if (value >= 0x1p64L) return UINT64_MAX;
 	return (uint64_t)value;
 }

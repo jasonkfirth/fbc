@@ -81,10 +81,10 @@ static int fb_hArosSerialConfigure( AROS_SERIAL_INFO *info,
 	if( options->ReceiveBuffer != 0 )
 		request->io_RBufLen = options->ReceiveBuffer;
 
-	request->io_SerFlags &= ~(SERF_PARTY_ON | SERF_PARTY_ODD |
+	request->io_SerFlags &= (UBYTE)~(UBYTE)(SERF_PARTY_ON | SERF_PARTY_ODD |
 		SERF_7WIRE | SERF_EOFMODE);
 	request->io_SerFlags |= SERF_XDISABLED;
-	request->io_ExtFlags &= ~(SEXTF_MARK | SEXTF_MSPON);
+	request->io_ExtFlags &= ~(ULONG)(SEXTF_MARK | SEXTF_MSPON);
 
 	switch( options->Parity ) {
 	case FB_SERIAL_PARITY_NONE:
@@ -157,7 +157,7 @@ int fb_SerialOpen( FB_FILE *handle, int port, FB_SERIAL_OPTIONS *options,
 	if( (options->DurationCTS != 0) && !options->SuppressRTS )
 		info->request->io_SerFlags |= SERF_7WIRE;
 
-	if( OpenDevice( device_name, (ULONG)info->unit,
+	if( OpenDevice( (CONST_STRPTR)device_name, (ULONG)info->unit,
 	    (struct IORequest *)info->request, 0 ) != 0 ) {
 		DeleteIORequest( (struct IORequest *)info->request );
 		DeleteMsgPort( info->reply_port );
@@ -213,7 +213,15 @@ int fb_SerialWrite( FB_FILE *handle, void *serial_handle, const void *data,
 	if( length > (size_t)((ULONG)-1) )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
+	/* IORequest uses APTR for CMD_WRITE although the device only reads data. */
 	info->request->IOSer.io_Data = (APTR)data;
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 	info->request->IOSer.io_Length = (ULONG)length;
 	info->request->IOSer.io_Actual = 0;
 	result = fb_hArosSerialRequest( info, CMD_WRITE );

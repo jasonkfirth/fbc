@@ -25,16 +25,6 @@
 #define DR_WAV_IMPLEMENTATION
 #define DR_MP3_IMPLEMENTATION
 
-/*
-    stb_vorbis includes alloca declarations for MinGW and several Unix SDKs.
-    Other GCC targets may still need the compiler intrinsic at this boundary.
-*/
-#if defined(__GNUC__) && !defined(alloca) && !defined(__MINGW32__) \
-    && !defined(__linux__) && !defined(__linux) && !defined(__sun__) \
-    && !defined(__EMSCRIPTEN__) && !defined(__NEWLIB__)
-#define alloca __builtin_alloca
-#endif
-
 #include "sfx_decode_vendor.h"
 
 #include <ctype.h>

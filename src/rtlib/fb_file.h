@@ -111,8 +111,9 @@ typedef struct FB_FILE_ {
     int             mode;
     int             len;
     FB_FILE_ENCOD   encod;
-#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
-    /* Keep the size field at its existing Win64 offset. */
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
+    (defined(HOST_AROS) && defined(__arm__))
+    /* Keep the 64-bit size field naturally aligned on Win64 and AROS ARM. */
     unsigned char   size_alignment_padding[4];
 #endif
     fb_off_t        size;
