@@ -52,7 +52,7 @@ static int fb_hSerialSetFd(fd_set *set, int descriptor)
 #if defined(HOST_OPENBSD)
 	FD_SET(descriptor, set);
 #else
-	FD_SET((unsigned int)descriptor, set);
+	FD_SET(descriptor, set);
 #endif
 	return TRUE;
 }

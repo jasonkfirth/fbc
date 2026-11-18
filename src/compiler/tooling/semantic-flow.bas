@@ -323,10 +323,12 @@ sub fbSemanticModelExportFlow(byval phase as longint)
 			previous = 0
 		case AST_NODECLASS_CALL
 			dim as string stop_reason
-			if( symbGetProcIsNoReturn(node->sym) ) then
-				stop_reason = "known-no-return"
-			elseif( (node->l = NULL) and symbGetIsRTL(node->sym) and (node->sym->id.alias <> NULL) ) then
-				if( *node->sym->id.alias = FB_RTL_END ) then stop_reason = "runtime-end"
+			if( node->sym <> NULL ) then
+				if( symbGetProcIsNoReturn(node->sym) ) then
+					stop_reason = "known-no-return"
+				elseif( (node->l = NULL) and symbGetIsRTL(node->sym) and (node->sym->id.alias <> NULL) ) then
+					if( *node->sym->id.alias = FB_RTL_END ) then stop_reason = "runtime-end"
+				end if
 			end if
 			if( len(stop_reason) > 0 ) then
 				fbSemanticModelAppendDetail("K" + TABCHAR + "node" + TABCHAR + fbSemanticModelNumber(item->identity) + _

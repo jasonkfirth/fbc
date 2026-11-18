@@ -34,7 +34,7 @@ static int hReadChar( FB_INPUTCTX *ctx )
 		if( ctx->index >= FB_STRSIZE( &ctx->str ) )
 			return EOF;
 		else
-			return ctx->str.data[ctx->index++];
+			return (unsigned char)ctx->str.data[ctx->index++];
 	}
 }
 
@@ -90,7 +90,7 @@ static void hSkipDelimiter( FB_INPUTCTX *ctx, int c )
         break;
 
 	case '\r':
-		if( (c = hReadChar( ctx )) != '\n' )
+		if( (c = hReadChar( ctx )) != '\n' && c != EOF )
 			hUnreadChar( ctx, c );
 		break;
 
@@ -100,12 +100,13 @@ static void hSkipDelimiter( FB_INPUTCTX *ctx, int c )
 	}
 }
 
-int fb_FileInputNextToken
+static int hNextToken
 	(
 		char *buffer,
 		ssize_t max_chars,
 		int is_string,
-		int *isfp
+		int *isfp,
+		int discard_excess
 	)
 {
 	/* max_chars does not include the null terminator, the buffer is
@@ -127,7 +128,7 @@ int fb_FileInputNextToken
 
 	c = hSkipWhiteSpc( ctx );
 
-	while( (c != EOF) && (len < max_chars) )
+	while( (c != EOF) && ((len < max_chars) || discard_excess) )
 	{
 		switch( c )
 		{
@@ -136,7 +137,7 @@ int fb_FileInputNextToken
 			goto exit;
 
 		case '\r':
-			if( (c = hReadChar( ctx )) != '\n' )
+			if( (c = hReadChar( ctx )) != '\n' && c != EOF )
 				hUnreadChar( ctx, c );
 
 			skipdelim = FALSE;
@@ -212,8 +213,10 @@ int fb_FileInputNextToken
 
 		default:
 savechar:
-			*buffer++ = (char)(unsigned char)c;
-            ++len;
+			if( len < max_chars ) {
+				*buffer++ = (char)(unsigned char)c;
+				++len;
+			}
             break;
 		}
 
@@ -229,6 +232,19 @@ exit:
 		hSkipDelimiter( ctx, c );
 
 	return (int)len;
+}
+
+int fb_FileInputNextToken( char *buffer, ssize_t max_chars, int is_string, int *isfp )
+{
+	return hNextToken( buffer, max_chars, is_string, isfp, FALSE );
+}
+
+int fb_hConsoleInputNextToken( char *buffer, ssize_t max_bytes )
+{
+	int isfp;
+	/* Truncating a wide destination must not leave the rest of the field
+	   waiting for the next variable in a mixed INPUT statement. */
+	return hNextToken( buffer, max_bytes, TRUE, &isfp, TRUE );
 }
 
 /* end of files/file_input_tok.c */

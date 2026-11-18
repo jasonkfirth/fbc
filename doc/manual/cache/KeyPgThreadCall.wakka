@@ -25,23 +25,22 @@ Starts a user-defined procedure with parameters in a separate execution thread
 	
 	While most subroutines are supported, the following types of subroutines may not be called:
 		- Subroutines using [[KeyPgVaArg|variable arguments]].
-		- Subroutines with unions which are passed as arguments.
-		- Subroutines with user types containing unions, arrays, strings, or bitfields which are passed as arguments.
+		- Subroutines with ##BYVAL## unions or non-trivial user types.
+		- Subroutines with ##BYVAL## user types containing unions, arrays, strings, or bitfields.
 	
 	When using **Threadcall**, parenthesis around the parameter list are required unless the subroutine has no parameters.
 	
-	**Warning:**
-		**""-""** Presently when **Threadcall** involves to pass parameters to the thread, there is no guarantee that the corresponding data are still maintained after the end of the **Threadcall** statement and this until the thread is launched.
-		**""-""** That can cause bad behavior:
-			""-"" see example below where the not displayed parameter ##//id//## seems to be the consequence of a prematurely destroyed string argument (visible for a fbc version >= 1.00),
-			""-"" replace ##//id As String//## with ##//id As Zstring//## in the parameters declaration seems to workaround the problem when passing this parameter.
-		**""-""** Therefore it is more advisable for the moment to use ##[[KeyPgThreadCreate|Threadcreate]]## (100% safe) instead.	
+	**Argument lifetime:**
+		- Values passed ##BYVAL## are captured before ##Threadcall## returns. Copying a pointer value gives the worker access to the same pointee.
+		- For a variable passed ##BYREF## or an array passed by descriptor, the worker accesses the original storage. Keep it alive until the worker finishes, and synchronize any concurrent access. For a local variable, call ##[[KeyPgThreadWait|Threadwait]]## before leaving its scope.
+		- The libffi runtime owns a copy of STRING or USTRING values passed ##BYVAL##, and of temporary STRING or USTRING values passed ##BYREF##, such as a literal or function result. Mutating such a copy does not change the caller's data.
+		- Other compiler-created temporary references are rejected. A conversion that would require copying a ##BYREF## argument back after the call is also rejected. Use a variable of the parameter's type in storage that lives until the worker finishes.
 
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/threads/threadcall.bas"}}%%(freebasic)
 '' Threading using "ThreadCall"
 
-Sub thread( id As String, tlock As Any Ptr, count As Integer )
+Sub worker( ByRef id As String, ByVal tlock As Any Ptr, ByVal count As Integer )
 	For i As Integer = 1 To count
 		MutexLock tlock
 		Print "thread " & id;
@@ -52,8 +51,9 @@ Sub thread( id As String, tlock As Any Ptr, count As Integer )
 End Sub
 
 Dim tlock As Any Ptr = MutexCreate()
-Dim a As Any Ptr = ThreadCall thread("A", tlock, 6)
-Dim b As Any Ptr = ThreadCall thread("B", tlock, 4)
+Dim id_a As String = "A", id_b As String = "B"
+Dim a As Any Ptr = ThreadCall worker(id_a, tlock, 6)
+Dim b As Any Ptr = ThreadCall worker(id_b, tlock, 4)
 ThreadWait a
 ThreadWait b
 MutexDestroy tlock
@@ -65,7 +65,7 @@ Print "All done (and without Dim Shared!)"
 
 {{fbdoc item="target"}}
 	- **Threadcall** is not available with the DOS version / target of ""FreeBASIC"", because multithreading is not supported by DOS kernel nor the used extender.
-	- In Linux the threads are always started in the order they are created, this can't be assumed in ""Win32"". It's an OS, not a ""FreeBASIC"" issue. 
+	- Use synchronization when one thread must run before another.
 	- In Linux, the ##[[KeyPgStdcall|Stdcall]]## and ##[[KeyPgPascal|Pascal]]## calling conventions are not supported
 	- In Windows, the ##[[KeyPgPascal|Pascal]]## calling convention is not supported.
 

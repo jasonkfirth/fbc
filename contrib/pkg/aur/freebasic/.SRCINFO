@@ -1,7 +1,7 @@
 pkgbase = freebasic
 	pkgdesc = FreeBASIC compiler and runtime libraries
-	pkgver = 1.20.5
-	pkgrel = 2
+	pkgver = 1.20.6
+	pkgrel = 1
 	url = https://www.freebasic.net/
 	arch = x86_64
 	arch = aarch64
@@ -36,7 +36,7 @@ pkgbase = freebasic
 	conflicts = fbc
 	conflicts = fbc-git
 	options = !strip
-	source = https://downloads.sourceforge.net/project/fbc/FreeBASIC-1.20.5/Source/FreeBASIC-1.20.5-source-bootstrap.tar.xz
+	source = https://downloads.sourceforge.net/project/fbc/FreeBASIC-1.20.6/Source/FreeBASIC-1.20.6-source-bootstrap.tar.xz
 	sha256sums = SKIP
 
 pkgname = freebasic

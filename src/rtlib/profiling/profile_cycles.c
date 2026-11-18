@@ -120,8 +120,8 @@ typedef struct FB_PROFILE_FILE_DATA
 typedef struct FB_PROFILER_CYCLES_
 {
 	FB_PROFILER_GLOBAL *global;
-#if defined(HOST_AROS) && defined(__arm__)
-	/* Keep the floating timestamp naturally aligned on the ARM target ABI. */
+#if (defined(HOST_AROS) || defined(HOST_LINUX)) && defined(__arm__)
+	/* Keep the floating timestamp naturally aligned on ARM32. */
 	uint32_t start_time_alignment_padding;
 #endif
 	double start_time;

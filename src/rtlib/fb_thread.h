@@ -52,6 +52,7 @@ enum {
 #ifdef HOST_AMIGA
 	FB_TLSKEY_AMIGA_TCP,
 #endif
+	FB_TLSKEY_SCREENLIST,
 	FB_TLSKEYS
 };
 

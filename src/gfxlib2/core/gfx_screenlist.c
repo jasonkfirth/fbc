@@ -1,44 +1,43 @@
 /*
  * FreeBASIC gfxlib2: gfx_screenlist.c
  * Purpose: Enumerate modes exposed by the selected native driver.
- * Responsibilities: driver selection, pages and mode queries.
+ * Responsibilities: Collect, sort and iterate a snapshot for each caller thread.
  * This file intentionally does NOT contain drawing algorithms or native presentation.
  */
 
 /* Function to get supported video modes. */
 
 #include "../fb_gfx.h"
-#include <limits.h>
+#include <stdint.h>
 
-static int *list = NULL, list_size, current;
+typedef struct {
+	int *modes;
+	size_t count;
+	size_t next;
+} FB_SCREENLISTCTX;
 
-static void add_mode(int mode)
+static void fb_SCREENLISTCTX_Destructor(void *data)
 {
-	int i, *new_list;
+	FB_SCREENLISTCTX *ctx = (FB_SCREENLISTCTX *)data;
+	free(ctx->modes);
+}
 
-	if (!list) {
-		list = malloc(sizeof(int) * 2);
-		if (!list)
+static void add_mode(FB_SCREENLISTCTX *ctx, int mode)
+{
+	size_t i;
+	int *modes;
+
+	for (i = 0; i < ctx->count; i++) {
+		if (ctx->modes[i] == mode)
 			return;
-		list[0] = mode;
-		list[1] = 0;
-		list_size = 1;
-	} else {
-		for (i = 0; i < list_size; i++) {
-			if (list[i] == mode)
-				return;
-		}
-		if ((list_size < 0) || (list_size == INT_MAX) ||
-		    ((size_t)list_size >= ((size_t)-1 / sizeof(*list))))
-			return;
-		new_list = (int *)realloc(list,
-			sizeof(*list) * ((size_t)list_size + 1));
-		if (!new_list)
-			return;
-		list = new_list;
-		list[list_size] = mode;
-		list_size++;
 	}
+	if (ctx->count >= SIZE_MAX / sizeof(*modes))
+		return;
+	modes = (int *)realloc(ctx->modes, (ctx->count + 1) * sizeof(*modes));
+	if (!modes)
+		return;
+	ctx->modes = modes;
+	ctx->modes[ctx->count++] = mode;
 }
 
 static int mode_sorter(const void *e1, const void *e2)
@@ -58,39 +57,50 @@ static int mode_sorter(const void *e1, const void *e2)
 
 FBCALL int fb_GfxScreenList(int depth)
 {
-	const GFXDRIVER *driver;
-	int i, j, *temp, size, result;
+	FB_SCREENLISTCTX *ctx;
+	int result = 0;
 
-	FB_GRAPHICS_LOCK( );
+	if (depth > 0)
+		ctx = FB_TLSGETCTX(SCREENLIST);
+	else
+		ctx = (FB_SCREENLISTCTX *)fb_TlsGetCtxExisting(FB_TLSKEY_SCREENLIST);
+	if (!ctx)
+		return 0;
 
 	if (depth > 0) {
-		if (list)
-			free(list);
-		list = NULL;
+		size_t i;
+		free(ctx->modes);
+		ctx->modes = NULL;
+		ctx->count = 0;
+		ctx->next = 0;
+
+		/* Drivers share native display state. Once copied, the snapshot
+		   belongs to this thread and survives graphics mode changes. */
+		FB_GRAPHICS_LOCK();
 		for (i = 0; fb_gfx_drivers_list[i]; i++) {
-			driver = fb_gfx_drivers_list[i];
+			const GFXDRIVER *driver = fb_gfx_drivers_list[i];
 			if (driver->fetch_modes) {
-				temp = driver->fetch_modes(depth, &size);
+				int count = 0;
+				int *temp = driver->fetch_modes(depth, &count);
 				if (temp) {
-					for (j = 0; j < size; j++)
-						add_mode(temp[j]);
+					int j;
+					for (j = 0; j < count; j++)
+						add_mode(ctx, temp[j]);
 					free(temp);
 				}
 			}
 		}
-		if (list && (list_size > 0))
-			qsort(list, (size_t)list_size, sizeof(*list), mode_sorter);
-		current = 0;
+		FB_GRAPHICS_UNLOCK();
+		if (ctx->count > 1)
+			qsort(ctx->modes, ctx->count, sizeof(*ctx->modes), mode_sorter);
 	}
 
-	current++;
-	if ((!list) || (current > list_size)) {
-		result = 0;
-	} else {
-		result = list[current - 1];
-	}
-
-	FB_GRAPHICS_UNLOCK( );
+	if (ctx->next < ctx->count)
+		result = ctx->modes[ctx->next++];
+	/* Completed walks release storage immediately. The TLS destructor
+	   also handles a thread that exits before reading its last mode. */
+	if (ctx->next == ctx->count)
+		fb_TlsDelCtx(FB_TLSKEY_SCREENLIST);
 	return result;
 }
 

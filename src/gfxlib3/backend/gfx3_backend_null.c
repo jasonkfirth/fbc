@@ -41,7 +41,7 @@ typedef struct FB_GFX3_NULL_SURFACE {
 
 typedef struct FB_GFX3_NULL_STATE {
 	FB_GFX3_RESOURCE_REGISTRY *resources;
-#if defined(HOST_AROS) && defined(__arm__)
+#if (defined(HOST_AROS) || defined(HOST_LINUX)) && defined(__arm__)
 	uint32_t sequence_alignment_padding;
 #endif
 	uint64_t submitted_sequence;

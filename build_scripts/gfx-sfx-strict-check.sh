@@ -332,7 +332,7 @@ build_flags() {
 		-Wwrite-strings \
 		-Wredundant-decls \
 		-Wnull-dereference \
-		-Wno-unused-parameter)"
+		-Wunused-parameter)"
 
 	if [ "$language" = "c" ]; then
 		extra="$(append_supported_flags "$compiler" "$language" \

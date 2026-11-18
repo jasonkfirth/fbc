@@ -45,6 +45,9 @@
 
 typedef struct FB_GFX3_GLES_FENCE {
 	GLsync sync;
+#if defined(HOST_LINUX) && defined(__arm__)
+	uint32_t sequence_alignment_padding;
+#endif
 	uint64_t sequence;
 	struct FB_GFX3_GLES_FENCE *next;
 } FB_GFX3_GLES_FENCE;
@@ -126,12 +129,14 @@ typedef struct FB_GFX3_GLES_STATE {
 	GLint line_batch_size_location;
 	GLuint palette_texture;
 	uint32_t palette[256];
-#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
+	(defined(HOST_LINUX) && defined(__arm__))
 	uint32_t visible_surface_alignment_padding;
 #endif
 	FB_GFX3_HANDLE visible_surface;
 	uint32_t maximum_texture_size;
-#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
+	(defined(HOST_LINUX) && defined(__arm__))
 	uint32_t submitted_sequence_alignment_padding;
 #endif
 	uint64_t submitted_sequence;

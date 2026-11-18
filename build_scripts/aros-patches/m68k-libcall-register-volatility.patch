@@ -1,0 +1,31 @@
+--- a/arch/m68k-all/include/gencall.c
++++ b/arch/m68k-all/include/gencall.c
+@@ -63,10 +63,10 @@
+     int has_bn = (flags & FLAG_BN);
+     const char *output = "\"=r\"(_ret0), \"=r\"(_ret1), \"=r\"(_mem0), \"=r\"(_mem1)";
+ 
+-    printf("\tregister volatile ULONG _ret0 asm(\"%%d0\"); \\\n");
+-    printf("\tregister volatile ULONG _ret1 asm(\"%%d1\"); \\\n");
+-    printf("\tregister volatile ULONG _mem0 asm(\"%%a0\"); \\\n");
+-    printf("\tregister volatile ULONG _mem1 asm(\"%%a1\"); \\\n");
++    printf("\tregister ULONG _ret0 asm(\"%%d0\"); \\\n");
++    printf("\tregister ULONG _ret1 asm(\"%%d1\"); \\\n");
++    printf("\tregister ULONG _mem0 asm(\"%%a0\"); \\\n");
++    printf("\tregister ULONG _mem1 asm(\"%%a1\"); \\\n");
+     printf("\t{ \\\n");
+ 
+     /* Input values */
+@@ -79,11 +79,11 @@
+ 
+     /* Define registers */
+     for (i = 0; i < id; i++)
+-        printf("\t   register volatile ULONG  __AROS_%sTA(a%d) asm(__AROS_%sSA(a%d)); \\\n",
++        printf("\t   register ULONG  __AROS_%sTA(a%d) asm(__AROS_%sSA(a%d)); \\\n",
+                type, i + 1, type, i + 1
+         );
+     if (has_bn)
+-        printf("\t   register volatile ULONG _bn asm(\"%%a6\"); \\\n");
++        printf("\t   register ULONG _bn asm(\"%%a6\"); \\\n");
+ 
+     /* Set registers (non FP) */
+     for (i = 1; i <= id; i++)

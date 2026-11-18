@@ -1,6 +1,6 @@
 Name:           freebasic
-Version:        1.20.5
-Release:        2%{?dist}
+Version:        1.20.6
+Release:        1%{?dist}
 Summary:        FreeBASIC compiler
 
 License:        GPL-2.0-or-later AND LGPL-2.1-or-later
@@ -67,6 +67,9 @@ headers, examples, and documentation needed to build FreeBASIC programs.
 %{_mandir}/man1/fbc.1*
 
 %changelog
+* Wed Nov 18 2026 FreeBASIC packagers <packagers@example.invalid> - 1.20.6-1
+- Bump the compiler and package version to 1.20.6.
+
 * Thu Oct 22 2026 FreeBASIC packagers <packagers@example.invalid> - 1.20.5-2
 - Prepare the next package revision for forthcoming changes.
 

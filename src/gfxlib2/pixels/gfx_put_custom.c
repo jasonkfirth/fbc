@@ -74,13 +74,16 @@ static void fb_hPutCustom4(unsigned char *src, unsigned char *dest, int w, int h
 	fb_put_u32_unaligned *s = (fb_put_u32_unaligned *)src;
 	fb_put_u32_unaligned *d;
 	int x;
+	unsigned int source_pixel, destination_pixel;
 	(void)alpha;
 	
 	src_pitch = (src_pitch >> 2) - w;
 	for (; h; h--) {
 		d = (fb_put_u32_unaligned *)dest;
 		for (x = w; x; x--) {
-			*d = blender(*s, *d, param);
+			source_pixel = *s;
+			destination_pixel = *d;
+			*d = blender(source_pixel, destination_pixel, param);
 			s++;
 			d++;
 		}

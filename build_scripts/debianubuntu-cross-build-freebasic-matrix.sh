@@ -408,6 +408,7 @@ need_cmd() {
 }
 
 run() { echo "==> $*"; "$@"; }
+msg() { echo ""; echo "==> $1"; }
 
 if command -v gmake >/dev/null 2>&1; then
     MAKE_CMD="gmake"

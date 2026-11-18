@@ -23,6 +23,8 @@ Finds available fullscreen video modes
 	
 	It is safe to call this function before any graphics mode has been set.
 
+	With gfxlib2, each thread starts and continues its own list of modes.
+
 {{fbdoc item="ex"}}
 	{{fbdoc item="filename" value="examples/manual/gfx/screenlist.bas"}}%%(freebasic)
 Dim As Long mode

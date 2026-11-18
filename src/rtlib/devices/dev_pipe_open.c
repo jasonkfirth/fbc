@@ -11,6 +11,9 @@
 
 int fb_DevPipeOpen( FB_FILE *handle, const char *filename, size_t filename_len )
 {
+	(void)handle;
+	(void)filename;
+	(void)filename_len;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 }
 

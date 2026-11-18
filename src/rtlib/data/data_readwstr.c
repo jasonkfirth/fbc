@@ -15,7 +15,10 @@ FBCALL void fb_DataReadWstr( FB_WCHAR *dst, ssize_t dst_size )
 
 	if( fb_data_ptr ) {
 		if( fb_data_ptr->len == FB_DATATYPE_OFS ) {
-			/* !!!WRITEME!!! */
+			/* DATA stores addresses as pointer-width unsigned offsets. */
+			FB_WCHAR *text = fb_ULongintToWstr( (unsigned long long)(uintptr_t)fb_data_ptr->ofs );
+			fb_WstrAssign( dst, dst_size, text );
+			fb_wstr_Del( text );
 		} else if( fb_data_ptr->len & FB_DATATYPE_WSTR ) {
 			fb_WstrAssign( dst, dst_size, fb_data_ptr->wstr );
 		} else {

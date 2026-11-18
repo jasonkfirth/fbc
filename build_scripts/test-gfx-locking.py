@@ -73,6 +73,16 @@ def main():
             print("GFX_LOCKING_CONTROL_PASS older mode path rejected")
         elif result.returncode or "GFX_LOCKING_PASS" not in result.stdout:
             raise RuntimeError("graphics lock regression failed")
+        if not options.control_source:
+            screenlist_source = root / "tests/gfxlib2/screenlist-threads.c"
+            screenlist = work / ("screenlist-threads.exe" if os.name == "nt" else "screenlist-threads")
+            run([options.cc, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-DENABLE_MT",
+                 "-I" + str(root / "src/rtlib"), screenlist_source,
+                 libdir / "libfbgfxmt.a", libdir / "libfbmt.a",
+                 *libraries, "-lm", "-pthread", *shlex.split(options.ldflags),
+                 "-o", screenlist])
+            print(run([screenlist]).stdout, end="")
+            sources.append(screenlist_source)
         if options.receipt:
             inputs = [Path(source) for source in sources] + [libdir / name for name in ("libfbgfxmt.a", "libfbmt.a")]
             identities = {}

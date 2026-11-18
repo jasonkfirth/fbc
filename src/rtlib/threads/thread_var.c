@@ -81,7 +81,8 @@ static void *hTlsGetVar( const char *name, const void *key, unsigned int len,
 
 	for( var = ctx->vars; var != NULL; var = var->next ) {
 		if( (key != NULL) ? (var->key == key) :
-		    ((var->key == NULL) && (strcmp( var->name, name ) == 0)) ) {
+		    ((var->key == NULL) && (name != NULL) &&
+		     (strcmp( var->name, name ) == 0)) ) {
 			if( (var->size != (size_t)len) || (var->align != (size_t)align) ) {
 				return hTlsUserVarAllocationFailure( );
 			}

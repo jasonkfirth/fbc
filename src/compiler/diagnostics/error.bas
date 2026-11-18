@@ -412,7 +412,7 @@ declare function hMakeParamDesc _
 		/'FB_ERRMSG_FORNEXTVARIABLEMISMATCH            '/ @"FOR/NEXT variable name mismatch", _
 		/'FB_ERRMSG_OPTIONREQUIRESSSE                  '/ @"Selected option requires an SSE FPU mode", _
 		/'FB_ERRMSG_EXPECTEDRELOP                      '/ @"Expected relational operator ( =, >, <, <>, <=, >= )", _
-		/'FB_ERRMSG_STMTUNSUPPORTEDINC                 '/ @"Unsupported statement in -gen gcc/clang mode", _
+		/'FB_ERRMSG_STMTUNSUPPORTEDINC                 '/ @"Legacy varargs are unsupported in -gen gcc/clang/llvm mode; use CVA_LIST and CVA_*", _
 		/'FB_ERRMSG_TOOMANYLABELS                      '/ @"Too many labels", _
 		/'FB_ERRMSG_UNSUPPORTEDFUNCTION                '/ @"Unsupported function", _
 		/'FB_ERRMSG_EXPECTEDSUB                        '/ @"Expected sub", _
@@ -465,6 +465,8 @@ declare function hMakeParamDesc _
 		/'FB_ERRMSG_ILLEGALSFXLIBCOMMANDREDEF          '/ @"Illegal redefinition of sfxlib command. If sfxlib is not used, define FB_NO_SFXLIB before using this name", _
 		/'FB_ERRMSG_INTEGER128UNSUPPORTED              '/ @"128-bit integer operations are not supported by the native assembly backend", _
 		/'FB_ERRMSG_THREADLOCALUNSUPPORTED             '/ @"Thread Local declaration is not supported for this type, initializer, or target", _
+		/'FB_ERRMSG_THREADCALLTEMPREF                  '/ @"ThreadCall cannot borrow a temporary argument; use a variable that lives until the worker finishes", _
+		/'FB_ERRMSG_THREADCALLCOPYBACK                 '/ @"ThreadCall cannot copy a converted BYREF argument back; use a variable of the parameter type", _
 		/'FB_ERRMSGS                                   '/ @"FB_ERRMSGS"  _
 	}
 

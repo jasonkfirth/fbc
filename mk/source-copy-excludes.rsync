@@ -10,6 +10,8 @@
 # A redirected Windows device name can become a file on a hosted source tree.
 /nul
 /NUL
+# The bin tree contains only compiler and host-tool outputs, not source inputs.
+/bin/
 /freebasic-dist.tar
 /freebasic-package.tar
 /freebasic-package.zip

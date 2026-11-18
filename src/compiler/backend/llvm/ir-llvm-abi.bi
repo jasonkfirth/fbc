@@ -11,6 +11,7 @@
 ''
 ''     - lower i386 128-bit scalars to the aligned two-word C ABI
 ''     - identify large System V x86-64 aggregates passed in caller-owned memory
+''     - classify small x86-64 Linux aggregate results for the native ABI
 ''     - keep declarations, calls, returns, and parameter storage on one ABI
 ''
 '' This file intentionally does NOT contain:
@@ -26,6 +27,28 @@
 const LLVM_INT128_STORAGE_ALIGNMENT = 16
 const LLVM_I386_INT128_WORD_BITS = 64
 const LLVM_I386_INT128_ABI_ALIGNMENT = LLVM_INT128_STORAGE_ALIGNMENT
+
+const LLVM_SYSV_EIGHTBYTE_BYTES = 8
+const LLVM_SYSV_RESULT_PARTS = 2
+const LLVM_SYSV_SMALL_RESULT_BYTES = LLVM_SYSV_EIGHTBYTE_BYTES * LLVM_SYSV_RESULT_PARTS
+const LLVM_BITS_PER_BYTE = 8
+
+enum LLVMSYSVRESULTCLASS
+	LLVM_SYSV_NO_CLASS
+	LLVM_SYSV_SSE
+	LLVM_SYSV_INTEGER
+end enum
+
+type LLVMSYSVRESULTPART
+	kind as LLVMSYSVRESULTCLASS
+	bytes as integer
+end type
+
+type LLVMSYSVRESULT
+	subtype as FBSYMBOL ptr
+	in_memory as integer
+	part(0 to LLVM_SYSV_RESULT_PARTS - 1) as LLVMSYSVRESULTPART
+end type
 
 private function hUsesI386Integer128ABI( ) as integer
 	function = (fbGetCpuFamily( ) = FB_CPUFAMILY_X86) and (fbGetBits( ) = 32)
@@ -167,6 +190,135 @@ private function hGetCLongDoubleLLVMType( byval subtype as FBSYMBOL ptr ) as str
 	case else
 		return ""
 	end select
+end function
+
+'' -------------------------------------------------------------------------
+'' Small System V aggregate results
+'' -------------------------------------------------------------------------
+
+private sub hMergeSystemVResultBytes _
+	( byref result as LLVMSYSVRESULT, byval first_byte as integer, _
+	  byval end_byte as integer, byval kind as LLVMSYSVRESULTCLASS )
+
+	assert( first_byte >= 0 andalso first_byte < end_byte )
+	assert( end_byte <= LLVM_SYSV_SMALL_RESULT_BYTES )
+	for part as integer = first_byte \ LLVM_SYSV_EIGHTBYTE_BYTES to _
+	                       (end_byte - 1) \ LLVM_SYSV_EIGHTBYTE_BYTES
+		var used = end_byte - part * LLVM_SYSV_EIGHTBYTE_BYTES
+		if( used > LLVM_SYSV_EIGHTBYTE_BYTES ) then used = LLVM_SYSV_EIGHTBYTE_BYTES
+		if( used > result.part(part).bytes ) then result.part(part).bytes = used
+		'' INTEGER wins when fields share bytes, including union members.
+		if( kind > result.part(part).kind ) then result.part(part).kind = kind
+	next
+end sub
+
+private function hClassifySystemVResultFields _
+	( byval subtype as FBSYMBOL ptr, byval base_offset as integer, _
+	  byref result as LLVMSYSVRESULT ) as integer
+
+	if( subtype = NULL orelse hIsCLongDoubleType( FB_DATATYPE_STRUCT, subtype ) ) then _
+		return FALSE
+	if( subtype->lgt <= 0 orelse subtype->lgt > LLVM_SYSV_SMALL_RESULT_BYTES - base_offset ) then _
+		return FALSE
+
+	'' Visit every union member and every element of nested arrays. The
+	'' register class is based on absolute byte offsets, not the LLVM fields
+	'' chosen to describe the aggregate's storage.
+	var fld = symbUdtGetFirstField( subtype )
+	while( fld )
+		var dtype = symbGetType( fld )
+		var element_type = symbGetSubtype( fld )
+		var field_size = symbGetSizeOf( fld )
+		var available = subtype->lgt - fld->ofs
+		if( fld->ofs < 0 orelse available <= 0 orelse symbIsDynamic( fld ) ) then return FALSE
+
+		var field_offset = base_offset + cint( fld->ofs )
+		if( symbIsBitfield( fld ) ) then
+			'' Bitfields occupy only their declared bits. Their backing
+			'' integer type need not fit in the remaining bytes of a packed UDT.
+			var first_bit = fld->var_.bitpos
+			var end_bit = first_bit + fld->var_.bits
+			if( first_bit < 0 orelse end_bit > available * LLVM_BITS_PER_BYTE ) then return FALSE
+			hMergeSystemVResultBytes( result, field_offset + first_bit \ LLVM_BITS_PER_BYTE, _
+			    field_offset + (end_bit + LLVM_BITS_PER_BYTE - 1) \ LLVM_BITS_PER_BYTE, _
+			    LLVM_SYSV_INTEGER )
+		else
+			var elements = symbGetArrayElements( fld )
+			if( field_size <= 0 orelse elements <= 0 orelse elements > available \ field_size ) then _
+				return FALSE
+			var data_class = typeGetClass( dtype )
+			if( data_class = FB_DATACLASS_UDT andalso element_type = NULL ) then return FALSE
+			var alignment = typeCalcNaturalAlign( dtype, element_type )
+			if( data_class = FB_DATACLASS_UDT ) then
+				'' A packed nested type can begin at any byte allowed by
+				'' its pack setting. Its members still have to be checked
+				'' at their absolute offsets before choosing registers.
+				var pack = element_type->udt.align
+				if( pack > 0 andalso pack < alignment ) then alignment = pack
+			end if
+			if( alignment <= 0 ) then return FALSE
+			if( field_offset mod alignment <> 0 ) then result.in_memory = TRUE
+
+			select case data_class
+			case FB_DATACLASS_UDT
+				for element as integer = 0 to cint( elements ) - 1
+					if( hClassifySystemVResultFields( element_type, _
+					    field_offset + element * cint( field_size ), result ) = FALSE ) then return FALSE
+				next
+			case FB_DATACLASS_FPOINT
+				hMergeSystemVResultBytes( result, field_offset, _
+				    field_offset + cint( elements * field_size ), LLVM_SYSV_SSE )
+			case FB_DATACLASS_INTEGER
+				if( dtype = FB_DATATYPE_XMMWORD ) then return FALSE
+				hMergeSystemVResultBytes( result, field_offset, _
+				    field_offset + cint( elements * field_size ), LLVM_SYSV_INTEGER )
+			case else
+				if( dtype <> FB_DATATYPE_FIXSTR ) then return FALSE
+				hMergeSystemVResultBytes( result, field_offset, _
+				    field_offset + cint( elements * field_size ), LLVM_SYSV_INTEGER )
+			end select
+		end if
+		fld = symbUdtGetNextField( fld )
+	wend
+	return TRUE
+end function
+
+private function hGetLinuxX64SmallResult( byval proc as FBSYMBOL ptr ) as LLVMSYSVRESULT
+	dim as LLVMSYSVRESULT result
+	if( proc = NULL orelse env.clopt.target <> FB_COMPTARGET_LINUX orelse _
+	    fbGetCpuFamily( ) <> FB_CPUFAMILY_X86_64 ) then return result
+	if( symbProcReturnsOnStack( proc ) orelse _
+	    typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ) <> FB_DATATYPE_STRUCT ) then return result
+
+	var subtype = symbGetProcRealSubtype( proc )
+	if( hClassifySystemVResultFields( subtype, 0, result ) ) then
+		if( result.part(0).kind <> LLVM_SYSV_NO_CLASS orelse _
+		    result.part(1).kind <> LLVM_SYSV_NO_CLASS ) then result.subtype = subtype
+	end if
+	return result
+end function
+
+private function hSystemVResultPartType( byref part as const LLVMSYSVRESULTPART ) as string
+	assert( part.kind <> LLVM_SYSV_NO_CLASS )
+	if( part.kind = LLVM_SYSV_SSE ) then
+		if( part.bytes <= typeGetSize( FB_DATATYPE_SINGLE ) ) then return "float"
+		'' Two single values can share one SSE slot. Treat the slot as
+		'' bits, with no floating point conversion or arithmetic.
+		return "double"
+	end if
+	return "i" & (part.bytes * LLVM_BITS_PER_BYTE)
+end function
+
+private function hSystemVResultType( byref result as const LLVMSYSVRESULT ) as string
+	if( result.in_memory ) then return "void"
+	if( result.part(0).kind = LLVM_SYSV_NO_CLASS ) then return hSystemVResultPartType( result.part(1) )
+	if( result.part(1).kind = LLVM_SYSV_NO_CLASS ) then return hSystemVResultPartType( result.part(0) )
+	return "{ " + hSystemVResultPartType( result.part(0) ) + ", " + _
+		hSystemVResultPartType( result.part(1) ) + " }"
+end function
+
+private function hSystemVResultPointerAttribute( byval subtype as FBSYMBOL ptr ) as string
+	return " sret(" + hEmitType( FB_DATATYPE_STRUCT, subtype ) + ")"
 end function
 
 private function hGetSystemVStructRegisterCounts _

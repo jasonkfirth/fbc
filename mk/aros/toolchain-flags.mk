@@ -37,10 +37,6 @@ CPPFLAGS += -DFB_SFX_MT_ENABLED=1
 
 ifeq ($(TARGET_ARCH),m68k)
   AROS_MACHDEP := -march=68000 -msoft-float
-  # The m68k SDK declares the stack pointer as an AROS global register
-  # variable for inline library vectors. GCC 6 warns at every containing
-  # function even though the SDK-provided call sequence is intentional.
-  AROS_WARNING_FLAGS := -Wno-volatile-register-var
 else ifeq ($(TARGET_ARCH),arm)
   AROS_MACHDEP := -march=armv7-a -marm -mfloat-abi=hard -mfpu=neon-vfpv4
 else ifeq ($(TARGET_ARCH),x86_64)
@@ -57,8 +53,8 @@ AROS_OBJECT_FLAGS := -fno-common
 # Toolchain realization
 ##############################################################################
 
-TOOLCHAIN_CFLAGS   += $(AROS_MACHDEP) $(AROS_OBJECT_FLAGS) $(AROS_WARNING_FLAGS)
-TOOLCHAIN_CXXFLAGS += $(AROS_MACHDEP) $(AROS_OBJECT_FLAGS) $(AROS_WARNING_FLAGS)
+TOOLCHAIN_CFLAGS   += $(AROS_MACHDEP) $(AROS_OBJECT_FLAGS)
+TOOLCHAIN_CXXFLAGS += $(AROS_MACHDEP) $(AROS_OBJECT_FLAGS)
 
 # The AROS driver already emits a self-contained executable module. Its
 # -static option changes the C library selection and drops libposixc, so it
@@ -66,7 +62,7 @@ TOOLCHAIN_CXXFLAGS += $(AROS_MACHDEP) $(AROS_OBJECT_FLAGS) $(AROS_WARNING_FLAGS)
 TOOLCHAIN_LDFLAGS += $(AROS_MACHDEP)
 
 AROS_FBC_STAGE_FLAGS := \
-  $(foreach option,$(AROS_MACHDEP) $(AROS_OBJECT_FLAGS) $(AROS_WARNING_FLAGS),-Wc $(option))
+  $(foreach option,$(AROS_MACHDEP) $(AROS_OBJECT_FLAGS),-Wc $(option))
 TOOLCHAIN_FBCFLAGS   += $(AROS_FBC_STAGE_FLAGS)
 TOOLCHAIN_FBRTCFLAGS += $(AROS_FBC_STAGE_FLAGS)
 TOOLCHAIN_FBRTLFLAGS += $(AROS_FBC_STAGE_FLAGS)

@@ -42,7 +42,7 @@ static int js_has_browser_window(void)
 	return EM_ASM_INT({
 		return (typeof window !== 'undefined') &&
 		       (typeof document !== 'undefined');
-	});
+	}, 0);
 }
 
 static void driver_blit()
@@ -392,8 +392,8 @@ const GFXDRIVER *fb_gfx_drivers_list[] = {
 
 void fb_hScreenInfo(ssize_t *width, ssize_t *height, ssize_t *depth, ssize_t *refresh)
 {
-	*width = EM_ASM_INT({ return typeof screen !== 'undefined' ? screen.width : 0; });
-	*height = EM_ASM_INT({ return typeof screen !== 'undefined' ? screen.height : 0; });
+	*width = EM_ASM_INT({ return typeof screen !== 'undefined' ? screen.width : 0; }, 0);
+	*height = EM_ASM_INT({ return typeof screen !== 'undefined' ? screen.height : 0; }, 0);
 	*depth = 32;
 	*refresh = GFX_JS_FPS;
 }

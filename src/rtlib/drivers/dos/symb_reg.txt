@@ -647,6 +647,8 @@ extern_asm(_fb_FloatToWstr);
 extern_asm(_fb_CVI);
 extern_asm(_fb_ArraySngBoundChk);
 extern_asm(_fb_ConsoleInput);
+extern_asm(_fb_ConsoleInputWstr);
+extern_asm(_fb_hConsoleBytesToWstr);
 extern_asm(_fb_Width);
 extern_asm(_fb_ConsolePageCopy);
 extern_asm(_fb_ConsoleGetColorAtt);
@@ -1543,6 +1545,8 @@ DXE_EXPORT_TABLE (libfb_symbol_table)
     DXE_EXPORT_ASM (_fb_CVI)
     DXE_EXPORT_ASM (_fb_ArraySngBoundChk)
     DXE_EXPORT_ASM (_fb_ConsoleInput)
+    DXE_EXPORT_ASM (_fb_ConsoleInputWstr)
+    DXE_EXPORT_ASM (_fb_hConsoleBytesToWstr)
     DXE_EXPORT_ASM (_fb_Width)
     DXE_EXPORT_ASM (_fb_ConsolePageCopy)
     DXE_EXPORT_ASM (_fb_ConsoleGetColorAtt)

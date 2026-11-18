@@ -231,7 +231,6 @@ const MAXVARINISCOPES = 128
 
 type IRLLVMCONTEXT
 	indent              as integer  '' current indentation used by hWriteLine()
-	linenum             as integer
 
 	varini              as string
 	variniscopelevel    as integer
@@ -278,19 +277,15 @@ declare function hInteger128StorageAlignment _
 		byval subtype as FBSYMBOL ptr _
 	) as integer
 declare sub hEmitStruct( byval s as FBSYMBOL ptr )
-declare sub _emitDBG _
-	( _
-		byval op as integer, _
-		byval proc as FBSYMBOL ptr, _
-		byval lnum as integer, _
-		ByVal filename As zstring ptr = 0 _
-	)
 declare function hVregToStr( byval vreg as IRVREG ptr ) as string
 declare function hLoadCLongDoubleNativeValue _
 	( byval value as IRVREG ptr, byval subtype as FBSYMBOL ptr ) as IRVREG ptr
 declare sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 declare sub hEmitStore( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 declare sub hLoadVreg( byval v as IRVREG ptr )
+declare function hEmitFloat( byval value as double, byval dtype as integer ) as string
+declare sub hDbgEnd( )
+declare function hDbgInstructionAttachment( ) as string
 declare sub hEmitBop _
 	( _
 		byval op as integer, _
@@ -343,12 +338,8 @@ private sub _init( )
 
 	irSetOption( IR_OPT_FPUIMMEDIATES or IR_OPT_MISSINGOPS )
 
-	'' IR_OPT_CPUSELFBOPS disabled, to prevent AST from producing self-ops.
-	'' LLVM does not have self ops, and implementing them manually here would be
-	'' unnecessarily complex, especially in cases like:
-	''    a = noconvcast(a) op b   (self-bop with type-casted destination vreg)
-	'' because _setVregDataType() generates code to represent the cast, and the
-	'' resulting REG can't be used as store destination.
+	'' Leave IR_OPT_CPUSELFBOPS disabled. LLVM instructions write SSA values;
+	'' a BASIC self operation still needs a separate load and store.
 
 	if( fbIs64bit( ) ) then
 		dtypeName(FB_DATATYPE_INTEGER) = dtypeName(FB_DATATYPE_LONGINT)
@@ -468,6 +459,7 @@ end function
 
 private sub _end( )
 	irhlEnd( )
+	hDbgEnd( )
 
 	if( ctx.head_txt.buffer <> NULL ) then
 		deallocate( ctx.head_txt.buffer )
@@ -553,10 +545,13 @@ private sub hAppendOutputBuffer _
 	output_buffer->bufferlen = required
 end sub
 
-private sub hWriteLine( byref ln as string )
+private sub hWriteLine( byref ln as string, byval attach_location as integer = TRUE )
 	dim as IRLLVMOUTPUTBUFFER ptr output_buffer = any
 
 	if( (ctx.indent > 0) andalso (len( ln ) > 0) ) then
+		if( attach_location andalso ctx.inproc andalso (ctx.section = SECTION_BODY) andalso _
+		    (ln[0] <> asc( ";" )) andalso env.clopt.debuginfo ) then _
+			ln += hDbgInstructionAttachment( )
 		ln = string( ctx.indent, TABCHAR ) + ln
 	end if
 
@@ -890,6 +885,7 @@ private function hEmitProcHeader _
 	dim as integer dtype = any
 	dim as FBSYMBOL ptr subtype = any
 	dim as integer i386_int128_result = any
+	var small_result = hGetLinuxX64SmallResult( proc )
 	dim as integer cabi_clongdouble_result = _
 		hUsesCLongDoubleCABI( proc ) andalso _
 		hIsCLongDoubleType( symbGetProcRealType( proc ), _
@@ -910,6 +906,8 @@ private function hEmitProcHeader _
 	'' Keep the source scalar type in the body, but expose that target ABI here.
 	if( i386_int128_result ) then
 		semantic_result = "void"
+	elseif( small_result.subtype ) then
+		semantic_result = hSystemVResultType( small_result )
 	elseif( cabi_clongdouble_result ) then
 		semantic_result = hGetCLongDoubleLLVMType( symbGetProcRealSubtype( proc ) )
 		if( semantic_result = "" ) then
@@ -943,11 +941,22 @@ private function hEmitProcHeader _
 
 	'' If returning a struct, there's an extra parameter
 	dim as FBSYMBOL ptr hidden = NULL
-	if( symbProcReturnsOnStack( proc ) andalso (cabi_clongdouble_result = FALSE) ) then
+	if( (small_result.subtype andalso small_result.in_memory) orelse _
+	    (symbProcReturnsOnStack( proc ) andalso (cabi_clongdouble_result = FALSE)) ) then
 		dim as integer semantic_hidden_dtype
 		dim as FBSYMBOL ptr semantic_hidden_subtype
 		dim as string semantic_hidden, semantic_hidden_attributes
-		if( i386_int128_result ) then
+		if( small_result.subtype andalso small_result.in_memory ) then
+			semantic_hidden_dtype = typeAddrOf( FB_DATATYPE_STRUCT )
+			semantic_hidden_subtype = small_result.subtype
+			semantic_hidden = hEmitType( semantic_hidden_dtype, semantic_hidden_subtype )
+			ln += semantic_hidden
+			if( is_type = FALSE ) then
+				semantic_hidden_attributes = hSystemVResultPointerAttribute( small_result.subtype )
+				ln += semantic_hidden_attributes
+			end if
+			if( is_proto = FALSE ) then ln += " %abi.result"
+		elseif( i386_int128_result ) then
 			if( is_proto ) then
 				semantic_hidden_dtype = typeAddrOf( symbGetFullType( proc ) )
 				semantic_hidden_subtype = NULL
@@ -1582,7 +1591,7 @@ private function hUDTUsesPackedLayout( byval s as FBSYMBOL ptr ) as integer
 	'' Some i386 LLVM targets give i128 less than FreeBASIC's 16-byte alignment.
 	'' Preserve the compiler-computed member offsets instead of relying on that
 	'' target data layout for aggregates that contain 128-bit values.
-	if( ((s->udt.align > 0) and (s->udt.align < 8)) or _
+	if( ((s->udt.align > 0) and ((s->udt.align < 8) or (s->udt.align < s->udt.natalign))) or _
 	    (hUsesI386Integer128ABI( ) andalso hUDTHasInteger128Value( s )) ) then return TRUE
 	'' Anonymous members are flattened. Their own packing can place a scalar
 	'' at an offset that LLVM's ordinary struct layout cannot represent.
@@ -1606,10 +1615,14 @@ private function hUDTHasExplicitPadding( byval s as FBSYMBOL ptr ) as integer
 	end if
 	dim as FBSYMBOL ptr fld = symbUdtGetFirstField( s )
 	while( fld )
-		if( symbIsDynamic( fld ) = FALSE andalso _
-		    (fld->var_.align > typeCalcNaturalAlign( _
-		        symbGetFullType( fld ), symbGetSubtype( fld ) )) ) then
-			return TRUE
+		if( symbIsDynamic( fld ) = FALSE ) then
+			var dtype = symbGetType( fld )
+			var subtype = symbGetSubtype( fld )
+			if( fld->var_.align > typeCalcNaturalAlign( dtype, subtype ) ) then return TRUE
+			'' FreeBASIC can align a packed member using the nested
+			'' type's natural alignment. LLVM sees its smaller pack.
+			if( dtype = FB_DATATYPE_STRUCT andalso (subtype <> NULL) andalso _
+			    hUDTUsesPackedLayout( subtype ) ) then return TRUE
 		end if
 		fld = symbUdtGetNextField( fld )
 	wend
@@ -1636,26 +1649,13 @@ private function hUDTAlignmentType( byval s as FBSYMBOL ptr ) as string
 	dim as integer aggregate_align = s->udt.natalign
 	if( (s->udt.align > 0) and (s->udt.align < aggregate_align) ) then _
 		aggregate_align = s->udt.align
-	if( (s->udt.align > 0) and (s->udt.align < 8) ) then return ""
-
-	'' A union's non-first members do not occupy LLVM storage. An empty array
-	'' also preserves alignment raised by a typedef-aligned scalar field.
-	dim as integer needs_alignment_storage = _
-		symbGetUDTIsUnion( s ) or symbGetUDTHasAnonUnion( s )
-	if( needs_alignment_storage = FALSE ) then
-		dim as FBSYMBOL ptr fld = symbUdtGetFirstField( s )
-		while( fld )
-			if( symbIsDynamic( fld ) = FALSE andalso _
-			    (fld->var_.align > typeCalcNaturalAlign( _
-			        symbGetFullType( fld ), symbGetSubtype( fld ) )) ) then
-				needs_alignment_storage = TRUE
-				exit while
-			end if
-			fld = symbUdtGetNextField( fld )
-		wend
-	end if
-	if( needs_alignment_storage andalso aggregate_align > 1 ) then _
+	'' LLVM packed payloads align to one byte. The zero-sized member
+	'' restores FreeBASIC's alignment without adding an initializer field
+	'' that occupies memory. It also covers union aliases and aligned types.
+	if( aggregate_align > 1 andalso hUDTHasExplicitPadding( s ) ) then
+		if( aggregate_align = 16 ) then return "[0 x <16 x i8>]"
 		return "[0 x i" & (aggregate_align * 8) & "]"
+	end if
 	return ""
 end function
 
@@ -1827,6 +1827,8 @@ private sub hAddGlobalCtorDtor( byval proc as FBSYMBOL ptr )
 	end if
 end sub
 
+#include once "backend/llvm/ir-llvm-debug.bi"
+
 private function _emitBegin( ) as integer
 	if( hFileExists( env.outf.name ) ) then
 		if( kill( env.outf.name ) <> 0 ) then
@@ -1850,7 +1852,6 @@ private function _emitBegin( ) as integer
 	ctx.proc_allocas.bufferlen = 0
 	ctx.current_proc = NULL
 	ctx.inproc = FALSE
-	ctx.linenum = 0
 	ctx.section = SECTION_HEAD
 	hWriteLine( "target triple = """ + hLLVMTargetTriple( ) + """" )
 	strsetInit( @ctx.definedprocs, 64 )
@@ -1867,9 +1868,7 @@ private function _emitBegin( ) as integer
 		builtins(i).used = FALSE
 	next
 
-	if( env.clopt.debuginfo ) then
-		_emitDBG( AST_OP_DBG_LINEINI, NULL, 0 )
-	end if
+	hDbgBegin( )
 
 	if( fbIs64bit( ) ) then
 		hWriteLine( "%FBSTRING = type { i8*, i64, i64 }" )
@@ -1889,6 +1888,9 @@ private sub _emitEnd( )
 	'' This must be done during _emitEnd() instead of _emitBegin() because
 	'' _emitBegin() is called even before any input code is parsed.
 	ctx.section = SECTION_HEAD
+	if( llvm_dbg.unit_id ) then
+		hWriteLine( "declare void @llvm.dbg.declare(metadata, metadata, metadata)" )
+	end if
 
 	for i as integer = 0 to BUILTIN__COUNT-1
 		if( builtins(i).used ) then
@@ -1936,6 +1938,12 @@ private sub _emitEnd( )
 			output_error = TRUE
 		end if
 	end if
+
+	if( llvm_dbg.records.bufferlen > 0 ) then
+		if( put( #env.outf.num, , *llvm_dbg.records.buffer, llvm_dbg.records.bufferlen ) <> 0 ) then _
+			output_error = TRUE
+	end if
+	hDbgEnd( )
 
 	if( close( #env.outf.num ) <> 0 ) then
 		output_error = TRUE
@@ -2069,6 +2077,7 @@ private sub _procAllocArg( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr
 	ln += ", "
 	ln += hEmitType( typeAddrOf( dtype ), subtype ) + " " + hEmitVarName( sym )
 	hWriteLine( ln )
+	hDbgDeclareArg( proc, sym )
 end sub
 
 private sub _procAllocLocal( byval proc as FBSYMBOL ptr, byval sym as FBSYMBOL ptr )
@@ -2146,6 +2155,21 @@ private sub _setVregDataType _
 		*v = *temp0
 	end if
 
+end sub
+
+private sub _setNoConvDataType _
+	( byval v as IRVREG ptr, byval dtype as integer, byval subtype as FBSYMBOL ptr )
+
+	select case v->typ
+	case IR_VREGTYPE_VAR, IR_VREGTYPE_IDX, IR_VREGTYPE_PTR
+		'' astLoadCONV calls this callback only for a cast that changes the
+		'' type of an existing value or storage view. Keep its base, index
+		'' and displacement; hPrepareAddress casts the address at use time.
+		v->dtype = dtype
+		v->subtype = subtype
+	case else
+		_setVregDataType( v, dtype, subtype )
+	end select
 end sub
 
 private sub hAddAddressComponents _
@@ -2311,7 +2335,9 @@ private sub hLoadVreg( byval v as IRVREG ptr )
 		var s = hVregToStr( temp0 ) + " = load "
 		s += hEmitType( typeDeref( v->dtype ), v->subtype ) + ", "
 		s += hEmitType( v->dtype, v->subtype ) + " "
-		s += hVregToStr( v )
+		'' An offset or dereference can designate a packed member.
+		'' LLVM's default load alignment would assert a natural boundary.
+		s += hVregToStr( v ) + ", align 1"
 		hWriteLine( s )
 		*v = *temp0
 	end select
@@ -2978,8 +3004,9 @@ private function hGetConvOpCode( byval ldtype as integer, byval rdtype as intege
 	end if
 
 	if( typeGetClass( rdtype ) = FB_DATACLASS_FPOINT ) then
-		'' float to int (rounding was taken care of above)
-		return iif( typeIsSigned( ldtype ), cptr(const zstring ptr, @"fptosi"), cptr(const zstring ptr, @"fptoui") )
+		'' Runtime float-to-int conversions go through hEmitFloatToInteger.
+		assert( FALSE )
+		return NULL
 	end if
 
 	'' int to int
@@ -3012,6 +3039,96 @@ private function hGetConvOpCode( byval ldtype as integer, byval rdtype as intege
 
 	return iif( typeIsSigned( rdtype ), cptr(const zstring ptr, @"sext"), cptr(const zstring ptr, @"zext") )
 end function
+
+private function hFloatInIntegerRange _
+	( byval value as IRVREG ptr, byval minimum as double, byval limit as double ) as IRVREG ptr
+
+	var dtype = hEmitType( value->dtype, value->subtype )
+	var operand = hVregToStr( value )
+	var lower_ok = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+	var upper_ok = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+	var in_range = irhlAllocVreg( FB_DATATYPE_BOOLEAN, NULL )
+	'' Ordered comparisons reject NaN. Use an exclusive upper bound so it
+	'' can be represented exactly even when the greatest integer cannot.
+	hWriteLine( hVregToStr( lower_ok ) + " = fcmp oge " + dtype + " " + operand + _
+	    ", " + hEmitFloat( minimum, value->dtype ) )
+	hWriteLine( hVregToStr( upper_ok ) + " = fcmp olt " + dtype + " " + operand + _
+	    ", " + hEmitFloat( limit, value->dtype ) )
+	hWriteLine( hVregToStr( in_range ) + " = and i1 " + hVregToStr( lower_ok ) + _
+	    ", " + hVregToStr( upper_ok ) )
+	return in_range
+end function
+
+private function hGuardedFloatToInt _
+	( byval rounded as IRVREG ptr, byval in_range as IRVREG ptr, _
+	  byval fallback as double, byval int_dtype as integer ) as IRVREG ptr
+
+	var float_type = hEmitType( rounded->dtype, rounded->subtype )
+	var safe_value = irhlAllocVreg( rounded->dtype, NULL )
+	var result = irhlAllocVreg( int_dtype, NULL )
+	'' Guard the operand itself. fptosi/fptoui produce LLVM poison on an
+	'' out-of-range operand, even if the input was only a rounding overflow.
+	hWriteLine( hVregToStr( safe_value ) + " = select i1 " + hVregToStr( in_range ) + _
+	    ", " + float_type + " " + hVregToStr( rounded ) + _
+	    ", " + float_type + " " + hEmitFloat( fallback, rounded->dtype ) )
+	var opcode = iif( typeIsSigned( int_dtype ), "fptosi", "fptoui" )
+	hWriteLine( hVregToStr( result ) + " = " + opcode + " " + float_type + " " + _
+	    hVregToStr( safe_value ) + " to " + hEmitType( int_dtype, NULL ) )
+	return result
+end function
+
+private sub hEmitFloatToInteger( byval dest as IRVREG ptr, byval source as IRVREG ptr )
+	hLoadVreg( source )
+	var float_dtype = typeGetDtAndPtrOnly( source->dtype )
+	var float_type = hEmitType( float_dtype, NULL )
+	var rounded = irhlAllocVreg( float_dtype, NULL )
+	var intrinsic = "@llvm.nearbyint.f64"
+	if( float_dtype = FB_DATATYPE_SINGLE ) then
+		builtins(BUILTIN_NEARBYINTF).used = TRUE
+		intrinsic = "@llvm.nearbyint.f32"
+	else
+		assert( float_dtype = FB_DATATYPE_DOUBLE )
+		builtins(BUILTIN_NEARBYINT).used = TRUE
+	end if
+	hWriteLine( hVregToStr( rounded ) + " = call " + float_type + " " + intrinsic + _
+	    "(" + float_type + " " + hVregToStr( source ) + ")" )
+
+	'' Use the same widened signed intermediate as the C backend. In
+	'' particular, narrowing -1 to an unsigned small integer gives all ones.
+	'' On invalid inputs use the signed minimum (x86's integer indefinite).
+	var size_type = typeGetSizeType( dest->dtype )
+	var int_dtype = FB_DATATYPE_LONG
+	if( size_type > FB_SIZETYPE_INT32 ) then int_dtype = FB_DATATYPE_LONGINT
+	assert( typeGetBits( dest->dtype ) <= typeGetBits( int_dtype ) )
+	dim as double signed_limit = 2.0 ^ (typeGetBits( int_dtype ) - 1)
+	var valid_signed = hFloatInIntegerRange( rounded, -signed_limit, signed_limit )
+	var result = hGuardedFloatToInt( rounded, valid_signed, -signed_limit, int_dtype )
+
+	if( size_type = FB_SIZETYPE_UINT64 ) then
+		'' Preserve negative-to-unsigned wrapping through the signed path.
+		'' Only values in the upper unsigned half need fptoui.
+		var valid_high = hFloatInIntegerRange( rounded, signed_limit, signed_limit * 2.0 )
+		var high_value = hGuardedFloatToInt( rounded, valid_high, 0.0, FB_DATATYPE_ULONGINT )
+		var combined = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+		hWriteLine( hVregToStr( combined ) + " = select i1 " + hVregToStr( valid_high ) + _
+		    ", i64 " + hVregToStr( high_value ) + ", i64 " + hVregToStr( result ) )
+		result = combined
+	end if
+
+	if( typeGetBits( dest->dtype ) < typeGetBits( result->dtype ) ) then
+		var narrowed = irhlAllocVreg( dest->dtype, dest->subtype )
+		hWriteLine( hVregToStr( narrowed ) + " = trunc " + hEmitType( result->dtype, NULL ) + _
+		    " " + hVregToStr( result ) + " to " + hEmitType( dest->dtype, dest->subtype ) )
+		result = narrowed
+	end if
+	result->dtype = dest->dtype
+	result->subtype = dest->subtype
+	if( irIsREG( dest ) ) then
+		*dest = *result
+	else
+		hEmitStore( dest, result )
+	end if
+end sub
 
 private sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 	if( (typeGetDtAndPtrOnly( v1->dtype ) = FB_DATATYPE_BOOLEAN) andalso _
@@ -3099,32 +3216,10 @@ private sub hEmitConvert( byval v1 as IRVREG ptr, byval v2 as IRVREG ptr )
 		exit sub
 	end if
 
-	'' Converting float to int? Needs special treatment to achieve FB's rounding behaviour,
-	'' because LLVM's fptosi/fptoui just truncate.
-	if( (typeGetClass( v2->dtype ) = FB_DATACLASS_FPOINT) and _
+	if( (typeGetClass( v2->dtype ) = FB_DATACLASS_FPOINT) andalso _
 	    (typeGetClass( v1->dtype ) = FB_DATACLASS_INTEGER) ) then
-		'' Round v2 by calling llvm.nearbyint() and then using the result
-		'' as the new v2. This rounding does float to float, then we can feed
-		'' that into fptosi/fptoui to get the [u]int.
-		var v0 = irhlAllocVreg( v2->dtype, v2->subtype )
-		hLoadVreg( v2 )
-
-		var ln = hVregToStr( v0 ) + " = call "
-		'' Memory views can retain const even though LLVM's scalar value
-		'' type has no qualification. The intrinsic must match that value.
-		var input_dtype = typeGetDtAndPtrOnly(v2->dtype)
-		if( input_dtype = FB_DATATYPE_SINGLE ) then
-			builtins(BUILTIN_NEARBYINTF).used = TRUE
-			ln += "float @llvm.nearbyint.f32(float "
-		else
-			assert( input_dtype = FB_DATATYPE_DOUBLE )
-			builtins(BUILTIN_NEARBYINT).used = TRUE
-			ln += "double @llvm.nearbyint.f64(double "
-		end if
-		ln += hVregToStr( v2 ) + ")"
-		hWriteLine( ln )
-
-		*v2 = *v0
+		hEmitFloatToInteger( v1, v2 )
+		exit sub
 	end if
 
 	assert( (v1->dtype <> v2->dtype) or (v1->subtype <> v2->subtype) )
@@ -3178,7 +3273,7 @@ private sub hEmitStore( byval l as IRVREG ptr, byval r as IRVREG ptr )
 	end if
 	ln += rhs + ", "
 	ln += hEmitType( l->dtype, l->subtype ) + " "
-	ln += hVregToStr( l )
+	ln += hVregToStr( l ) + ", align 1"
 	hWriteLine( ln )
 end sub
 
@@ -3194,6 +3289,101 @@ end sub
 private sub _emitLoad( byval v1 as IRVREG ptr )
 	/' do nothing '/
 end sub
+
+'' -------------------------------------------------------------------------
+'' Move small aggregate results between BASIC storage and ABI registers
+'' -------------------------------------------------------------------------
+
+private function hAllocSystemVResultSlot( byval subtype as FBSYMBOL ptr ) as IRVREG ptr
+	var slot = irhlAllocVreg( typeAddrOf( FB_DATATYPE_STRUCT ), subtype )
+	var alloca_line = string( ctx.indent, TABCHAR ) + hVregToStr( slot ) + _
+	    " = alloca " + hEmitType( FB_DATATYPE_STRUCT, subtype ) + NEWLINE
+	'' Calls inside loops reuse this slot. LLVM allocas in the loop body
+	'' would instead grow the stack on each iteration.
+	hAppendOutputBuffer( @ctx.proc_allocas, strptr( alloca_line ), len( alloca_line ) )
+	return slot
+end function
+
+private function hSystemVResultPartAddress _
+	( byval slot as IRVREG ptr, byval part as integer, byref part_type as const string ) as string
+
+	var address = hVregToStr( slot )
+	var address_type = hEmitType( slot->dtype, slot->subtype )
+	if( part > 0 ) then
+		var bytes = irhlAllocVreg( typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+		var offset_address = irhlAllocVreg( typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+		hWriteLine( hVregToStr( bytes ) + " = bitcast " + address_type + " " + address + " to i8*" )
+		hWriteLine( hVregToStr( offset_address ) + " = getelementptr i8, i8* " + _
+		    hVregToStr( bytes ) + ", i64 " & (part * LLVM_SYSV_EIGHTBYTE_BYTES) )
+		address = hVregToStr( offset_address )
+		address_type = "i8*"
+	end if
+
+	var typed_address = irhlAllocVreg( typeAddrOf( FB_DATATYPE_BYTE ), NULL )
+	hWriteLine( hVregToStr( typed_address ) + " = bitcast " + address_type + " " + _
+	    address + " to " + part_type + "*" )
+	return hVregToStr( typed_address )
+end function
+
+private function hPackSystemVResult _
+	( byval value as IRVREG ptr, byref result as const LLVMSYSVRESULT ) as string
+
+	var slot = hAllocSystemVResultSlot( result.subtype )
+	var aggregate_type = hEmitType( FB_DATATYPE_STRUCT, result.subtype )
+	hWriteLine( "store " + aggregate_type + " " + hVregToStr( value ) + ", " + _
+	    aggregate_type + "* " + hVregToStr( slot ) + ", align 1" )
+
+	dim as string values(0 to LLVM_SYSV_RESULT_PARTS - 1)
+	for part as integer = 0 to LLVM_SYSV_RESULT_PARTS - 1
+		if( result.part(part).kind = LLVM_SYSV_NO_CLASS ) then continue for
+		var part_type = hSystemVResultPartType( result.part(part) )
+		var address = hSystemVResultPartAddress( slot, part, part_type )
+		var piece = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+		values(part) = hVregToStr( piece )
+		hWriteLine( values(part) + " = load " + part_type + ", " + part_type + "* " + address + ", align 1" )
+	next
+
+	if( values(0) = "" ) then return values(1)
+	if( values(1) = "" ) then return values(0)
+
+	var abi_type = hSystemVResultType( result )
+	var first = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+	var both = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+	hWriteLine( hVregToStr( first ) + " = insertvalue " + abi_type + " undef, " + _
+	    hSystemVResultPartType( result.part(0) ) + " " + values(0) + ", 0" )
+	hWriteLine( hVregToStr( both ) + " = insertvalue " + abi_type + " " + hVregToStr( first ) + ", " + _
+	    hSystemVResultPartType( result.part(1) ) + " " + values(1) + ", 1" )
+	return hVregToStr( both )
+end function
+
+private function hUnpackSystemVResult _
+	( byval value as IRVREG ptr, byref result as const LLVMSYSVRESULT ) as IRVREG ptr
+
+	var slot = hAllocSystemVResultSlot( result.subtype )
+	var aggregate_type = hEmitType( FB_DATATYPE_STRUCT, result.subtype )
+	var abi_type = hSystemVResultType( result )
+	var both = (result.part(0).kind <> LLVM_SYSV_NO_CLASS) andalso _
+	           (result.part(1).kind <> LLVM_SYSV_NO_CLASS)
+
+	'' The native return can omit tail padding and whole unused eightbytes.
+	'' Clear the destination before reconstructing the BASIC aggregate.
+	hWriteLine( "store " + aggregate_type + " zeroinitializer, " + _
+	    aggregate_type + "* " + hVregToStr( slot ) + ", align 1" )
+	for part as integer = 0 to LLVM_SYSV_RESULT_PARTS - 1
+		if( result.part(part).kind = LLVM_SYSV_NO_CLASS ) then continue for
+		var part_type = hSystemVResultPartType( result.part(part) )
+		var address = hSystemVResultPartAddress( slot, part, part_type )
+		var piece = value
+		if( both ) then
+			piece = irhlAllocVreg( FB_DATATYPE_ULONGINT, NULL )
+			hWriteLine( hVregToStr( piece ) + " = extractvalue " + abi_type + " " + _
+			    hVregToStr( value ) + ", " & part )
+		end if
+		hWriteLine( "store " + part_type + " " + hVregToStr( piece ) + ", " + _
+		    part_type + "* " + address + ", align 1" )
+	next
+	return slot
+end function
 
 private sub _emitLoadRes _
 	( _
@@ -3217,6 +3407,20 @@ private sub _emitLoadRes _
 
 	hLoadVreg( v1 )
 	_setVregDataType( v1, vr->dtype, vr->subtype )
+
+	var small_result = hGetLinuxX64SmallResult( ctx.current_proc )
+	if( small_result.subtype ) then
+		if( small_result.in_memory ) then
+			var aggregate_type = hEmitType( FB_DATATYPE_STRUCT, small_result.subtype )
+			hWriteLine( "store " + aggregate_type + " " + hVregToStr( v1 ) + ", " + _
+			    aggregate_type + "* %abi.result, align 1" )
+			hWriteLine( "ret void" )
+		else
+			var native_value = hPackSystemVResult( v1, small_result )
+			hWriteLine( "ret " + hSystemVResultType( small_result ) + " " + native_value )
+		end if
+		exit sub
+	end if
 
 	hWriteLine( "ret " + hEmitType( vr->dtype, vr->subtype ) + " " + hVregToStr( v1 ) )
 
@@ -3465,6 +3669,15 @@ private sub hDoCall _
 	if( tail_param <> NULL ) then
 		is_variadic = (symbGetParamMode( tail_param ) = FB_PARAMMODE_VARARG)
 	end if
+	var small_result = hGetLinuxX64SmallResult( proc )
+	var small_result_in_memory = (small_result.subtype <> NULL) andalso small_result.in_memory
+	dim as IRVREG ptr small_result_slot = NULL
+	if( small_result_in_memory ) then
+		'' A native sret pointer occupies the first integer argument register,
+		'' including when the remaining arguments contain an ellipsis.
+		small_result_slot = hAllocSystemVResultSlot( small_result.subtype )
+		systemv_integer_registers_used += 1
+	end if
 	i386_int128_result = hIsI386Integer128Result( proc )
 	if( i386_int128_result ) then
 		'' The caller-owned slot is the LLVM result for this target ABI.
@@ -3472,10 +3685,10 @@ private sub hDoCall _
 	end if
 
 	if( vr = NULL ) then
-		'' Result discarded? Not allowed in LLVM, so assign to a
-		'' temporary result vreg that will be unused.
+		'' Keep an SSA name for other discarded results. An sret call
+		'' has no SSA result and still receives its temporary slot.
 		if( (symbGetType( proc ) <> FB_DATATYPE_VOID) andalso _
-		    (i386_int128_result = FALSE) ) then
+		    (i386_int128_result = FALSE) andalso (small_result_in_memory = FALSE) ) then
 			vr = irhlAllocVreg( typeGetDtAndPtrOnly( symbGetProcRealType( proc ) ), _
 						symbGetProcRealSubtype( proc ) )
 		end if
@@ -3489,9 +3702,11 @@ private sub hDoCall _
 	'' the proc/param symbols - can't rely on the args, because our AST can
 	'' have args with different dtype than the params.
 
-	if( vr ) then
+	if( vr andalso (small_result_in_memory = FALSE) ) then
 		if( is_clongdouble_cabi_result ) then
 			v0 = irhlAllocVreg( FB_DATATYPE_DOUBLE, NULL )
+		elseif( small_result.subtype ) then
+			v0 = irhlAllocVreg( vr->dtype, vr->subtype )
 		elseif( irIsREG( vr ) ) then
 			v0 = vr
 		else
@@ -3508,6 +3723,8 @@ private sub hDoCall _
 				           ": CLongDouble call results are not supported by the LLVM backend for this target" )
 				semantic_result = hEmitType( v0->dtype, v0->subtype )
 			end if
+		elseif( small_result.subtype ) then
+			semantic_result = hSystemVResultType( small_result )
 		else
 			semantic_result = hEmitType( v0->dtype, v0->subtype )
 		end if
@@ -3539,6 +3756,16 @@ private sub hDoCall _
 
 	'' args
 	arg = listGetTail( @irhl.callargs )
+	if( small_result_in_memory ) then
+		var slot_type = hEmitType( small_result_slot->dtype, small_result.subtype )
+		var slot_attributes = hSystemVResultPointerAttribute( small_result.subtype )
+		var slot_name = hVregToStr( small_result_slot )
+		DZstrConcatAssign( args, slot_type + slot_attributes + " " + slot_name )
+		fbSemanticModelCallAbiArgument(semantic_call, NULL, 0, 1, "hidden-result", _
+		    FB_DATATYPE_STRUCT, small_result.subtype, small_result_slot->dtype, small_result.subtype, _
+		    slot_type, slot_attributes, slot_name)
+		if( arg andalso (arg->level = level) ) then DZstrConcatAssign( args, ", " )
+	end if
 	while( arg andalso (arg->level = level) )
 		prev = listGetPrev( arg )
 		dim as integer semantic_input_dtype = arg->vr->dtype
@@ -3831,6 +4058,16 @@ private sub hDoCall _
 			else
 				hEmitStore( vr, aggregate_value )
 			end if
+		elseif( small_result.subtype andalso semantic_demanded ) then
+			if( small_result_in_memory = FALSE ) then _
+				small_result_slot = hUnpackSystemVResult( v0, small_result )
+			var aggregate_type = hEmitType( FB_DATATYPE_STRUCT, small_result.subtype )
+			var aggregate_value = vr
+			if( irIsREG( vr ) = FALSE ) then _
+				aggregate_value = irhlAllocVreg( vr->dtype, vr->subtype )
+			hWriteLine( hVregToStr( aggregate_value ) + " = load " + aggregate_type + ", " + _
+			    aggregate_type + "* " + hVregToStr( small_result_slot ) + ", align 1" )
+			if( irIsREG( vr ) = FALSE ) then hEmitStore( vr, aggregate_value )
 		elseif( irIsREG( vr ) = FALSE ) then
 			hEmitStore( vr, v0 )
 		end if
@@ -3922,13 +4159,13 @@ private sub _emitJmpTb _
 	ln += hVregToStr( v1 ) + ", "
 	ln += "label %" + *symbGetMangledName( deflabel ) + " "
 	ln += "["
-	hWriteLine( ln )
+	hWriteLine( ln, FALSE )
 
 	ctx.indent += 1
 	for i as integer = 0 to labelcount - 1
 		ln = dtype + " " & (values[i]+bias) & ", "
 		ln += "label %" + *symbGetMangledName( labels[i] )
-		hWriteLine( ln )
+		hWriteLine( ln, FALSE )
 	next
 	ctx.indent -= 1
 
@@ -4260,6 +4497,7 @@ private sub _emitMacro _
 end sub
 
 private sub _emitDECL( byval sym as FBSYMBOL ptr )
+	hDbgDeclare( sym )
 end sub
 
 private sub _emitDBG _
@@ -4270,16 +4508,12 @@ private sub _emitDBG _
 		ByVal filename As zstring ptr _
 	)
 
-	if( op = AST_OP_DBG_LINEINI ) Then
-		'' LLVM IR has no #line directive. Keep the source location as a
-		'' comment until this backend emits LLVM debug metadata.
-		if( filename <> NULL ) then
-			hWriteLine( "; line " & lnum & " """ & hReplace( filename, "\", $"\\" ) & """" )
-		else
-			hWriteLine( "; line " & lnum & " """ & hReplace( env.inf.name, "\", $"\\" ) & """" )
-		end if
-		ctx.linenum = lnum
-	end If
+	select case op
+	case AST_OP_DBG_LINEINI
+		hDbgSourceLine( lnum, filename )
+	case AST_OP_DBG_LINEEND
+		hDbgSourceLine( 0, NULL )
+	end select
 
 end sub
 
@@ -4813,6 +5047,7 @@ private sub _emitProcBegin _
 		''ln += "internal "
 	end if
 	ln += hEmitProcHeader( proc, FALSE, FALSE )
+	ln += hDbgProcBegin( proc )
 
 	hWriteLine( ln )
 
@@ -4845,6 +5080,8 @@ private sub _emitProcEnd _
 
 	ctx.indent -= 1
 	hWriteLine( "}" )
+	llvm_dbg.location = 0
+	llvm_dbg.subprogram = 0
 	ctx.current_proc = NULL
 	ctx.inproc = FALSE
 	if( ctx.proc_has_indirectbr ) then
@@ -4877,9 +5114,11 @@ private sub _emitProcEnd _
 end sub
 
 private sub _emitScopeBegin( byval s as FBSYMBOL ptr )
+	hDbgScopeBegin( )
 end sub
 
 private sub _emitScopeEnd( byval s as FBSYMBOL ptr )
+	hDbgScopeEnd( )
 end sub
 
 static as IR_VTBL irllvm_vtbl = _
@@ -4948,7 +5187,7 @@ static as IR_VTBL irllvm_vtbl = _
 	@irhlAllocVrIdx, _
 	@irhlAllocVrPtr, _
 	@irhlAllocVrOfs, _
-	@_setVregDataType, _
+	@_setNoConvDataType, _
 	NULL, _
 NULL, _
 NULL, _

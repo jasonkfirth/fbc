@@ -11,6 +11,9 @@ FBCALL int fb_FileLineInputWstr( int fnum, FB_WCHAR *dst, ssize_t max_chars )
 {
     FB_FILE *handle = FB_FILE_TO_HANDLE(fnum);
 
+    if( handle == FB_HANDLE_SCREEN )
+        fb_DevScrnInit_ReadLineWstr();
+
     if( !FB_HANDLE_USED(handle) )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 

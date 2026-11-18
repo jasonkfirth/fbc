@@ -46,7 +46,7 @@ typedef struct FB_GFX3_VULKAN_RUNTIME {
 	*/
 	char selected_device_name[256];
 	/* VkPhysicalDeviceLimits::maxStorageBufferRange for the selected adapter. */
-#if defined(HOST_AROS) && defined(__arm__)
+#if (defined(HOST_AROS) || defined(HOST_LINUX)) && defined(__arm__)
 	uint32_t maximum_storage_buffer_alignment_padding;
 #endif
 	uint64_t maximum_storage_buffer_range;
@@ -62,7 +62,7 @@ typedef struct FB_GFX3_VULKAN_RUNTIME {
 #if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
 	/* Preserve the following 64-bit submission counter's native offset. */
 	uint32_t completed_submission_alignment_padding;
-#elif defined(HOST_AROS) && defined(__arm__)
+#elif (defined(HOST_AROS) || defined(HOST_LINUX)) && defined(__arm__)
 	uint32_t completed_submission_alignment_padding;
 #endif
 	/* Historical submission counter retained for existing bootstrap diagnostics. */

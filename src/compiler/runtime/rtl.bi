@@ -435,6 +435,7 @@
 
 #define FB_RTL_FILEINPUT                "fb_FileInput"
 #define FB_RTL_CONSOLEINPUT             "fb_ConsoleInput"
+#define FB_RTL_CONSOLEINPUTWSTR         "fb_ConsoleInputWstr"
 #define FB_RTL_INPUTBOOL                "fb_InputBool"
 #define FB_RTL_INPUTBYTE                "fb_InputByte"
 #define FB_RTL_INPUTUBYTE               "fb_InputUbyte"
@@ -1185,6 +1186,7 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_ERRORNATIVEHANDLERFRAME
 	FB_RTL_IDX_ERRORNATIVEDISPATCH
 	FB_RTL_IDX_TLSGETVARKEY
+	FB_RTL_IDX_CONSOLEINPUTWSTR
 	FB_RTL_INDEXES
 end enum
 
@@ -1229,6 +1231,7 @@ enum
 	FB_THREADCALL_FLOAT64
 	FB_THREADCALL_STRUCT
 	FB_THREADCALL_PTR
+	FB_THREADCALL_STRING           '' pointer to a worker-owned STRING/USTRING descriptor
 end enum
 
 '' Semantic contracts describe the selected runtime declaration only. The
@@ -1926,7 +1929,9 @@ declare function rtlFileInput _
 		byval isfile as integer, _
 		byval expr as ASTNODE ptr, _
 		byval addquestion as integer, _
-		byval addnewline as integer _
+		byval addnewline as integer, _
+		byval has_wstring as integer = FALSE, _
+		byval insertion_point as ASTNODE ptr = NULL _
 	) as integer
 
 declare function rtlFileInputGet _

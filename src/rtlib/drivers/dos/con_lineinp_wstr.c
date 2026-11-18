@@ -29,8 +29,6 @@ int fb_ConsoleLineInputWstr
 {
     FBSTRING_ACCESS *tmp_result;
 
-    /* !!!FIXME!!! no support for unicode input */
-
     FB_LOCK();
 
     fb_PrintBufferEx( NULL, 0, FB_PRINT_FORCE_ADJUST );
@@ -53,7 +51,9 @@ int fb_ConsoleLineInputWstr
     if( tmp_result == NULL )
         return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
 
-    fb_WstrAssignFromA( dst, max_chars, tmp_result, -1 );
+    /* The DOS keyboard supplies code-page bytes through the line editor. */
+    fb_hConsoleBytesToWstr( dst, max_chars, tmp_result->data, FB_STRSIZE(tmp_result) );
+    fb_hStrDelTemp( tmp_result );
 
     return fb_ErrorSetNum( FB_RTERROR_OK );
 }

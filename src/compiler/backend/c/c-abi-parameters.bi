@@ -32,6 +32,12 @@ private const C_ABI_C23_BEGIN = _
 	!"(__STDC_VERSION__ >= 202000L && defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 11))\n"
 private const C_ABI_C23_ELSE = !"\n#else\n"
 private const C_ABI_C23_END = !"\n#endif\n"
+private const C_ABI_LEGACY_BEGIN = _
+	!"\n#if !defined(__STDC_VERSION__) || " + _
+	!"!(__STDC_VERSION__ >= 202311L || " + _
+	!"(__STDC_VERSION__ >= 202000L && defined(__GNUC__) && " + _
+	!"!defined(__clang__) && __GNUC__ >= 11))\n"
+private const C_ABI_LEGACY_END = !"#endif\n"
 
 '' These pools own C spellings, not symbols. Local symbols may already have
 '' expired when the final output observes global callback initializers.
@@ -345,8 +351,8 @@ private function hCAbiWriteOutput _
 	hCAbiSemanticHeaders( )
 	'' GNU11 requires parameter names in definitions. C23 permits an unnamed
 	'' parameter, so emit both headers and let the C compiler select its path.
-	'' The body and the ABI are identical in both paths. No warning attribute is
-	'' needed, and the legacy path still exposes its unused-parameter warnings.
+	'' The legacy path keeps names and explicitly consumes only parameters proven
+	'' unused in the final emitted body.
 	dim as uinteger cursor = 0
 	dim as uinteger ignored_index = 0
 	var entry = c_abi_definitions
@@ -386,7 +392,24 @@ private function hCAbiWriteOutput _
 			if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_C23_ELSE)), len(C_ABI_C23_ELSE)) = FALSE ) then return FALSE
 			if( hCAbiWriteChunk(buffer + position, header_length) = FALSE ) then return FALSE
 			if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_C23_END)), len(C_ABI_C23_END)) = FALSE ) then return FALSE
-			cursor = position + header_length
+			var header_end = position + header_length
+			var body_position = entry->body_at
+			if( (body_position >= header_end) andalso (body_position <= size) ) then
+				if( hCAbiWriteChunk(buffer + header_end, body_position - header_end) = FALSE ) then return FALSE
+				if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_LEGACY_BEGIN)), len(C_ABI_LEGACY_BEGIN)) = FALSE ) then return FALSE
+				var param = entry->parameters
+				while( param <> NULL )
+					if( param->emit_unused ) then
+						var text = "(void)" + *param->name + ";" + NEWLINE
+						if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(text)), len(text)) = FALSE ) then return FALSE
+					end if
+					param = param->next_param
+				wend
+				if( hCAbiWriteChunk(cptr(const ubyte ptr, strptr(C_ABI_LEGACY_END)), len(C_ABI_LEGACY_END)) = FALSE ) then return FALSE
+				cursor = body_position
+			else
+				cursor = header_end
+			end if
 		end if
 		entry = entry->next_definition
 	wend

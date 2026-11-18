@@ -12,6 +12,9 @@ FBCALL int fb_FileInput( int fnum )
     FB_INPUTCTX *ctx;
     FB_FILE *handle = NULL;
 
+    if( fnum == 0 )
+        fb_DevScrnInit_Read();
+
     FB_LOCK();
 
     handle = FB_FILE_TO_HANDLE(fnum);
@@ -22,6 +25,10 @@ FBCALL int fb_FileInput( int fnum )
     }
 
     ctx = FB_TLSGETCTX( INPUT );
+    if( ctx == NULL ) {
+        FB_UNLOCK();
+        return fb_ErrorSetNum( FB_RTERROR_OUTOFMEM );
+    }
 
     ctx->handle = handle;
     ctx->status = 0;

@@ -158,6 +158,8 @@ static FB_PROFILER_CALLS *fb_profiler = NULL;
 static char *PROFILER_THREAD_add_string( FB_PROFILER_THREAD *ctx, const char *src, unsigned int hashkey )
 {
 	STRING_INFO *info = STRING_HASH_TABLE_add( &ctx->strings_hash, src, hashkey );
+	if( info == NULL )
+		return NULL;
 	return (char*)(info+1);
 }
 
@@ -1250,11 +1252,18 @@ static void hProfilerWriteReport( FB_PROFILER_CALLS *prof )
 ** Call Stack
 */
 
-static void hInitCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *proc, const char *procname )
+static int hInitCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *proc, const char *procname )
 {
-	unsigned int hashkey = fb_ProfileHashName( procname );
+	unsigned int hashkey;
+
+	if( (ctx == NULL) || (proc == NULL) || (procname == NULL) )
+		return FALSE;
+
+	hashkey = fb_ProfileHashName( procname );
 
 	proc->name = PROFILER_THREAD_add_string( ctx, procname, hashkey );
+	if( proc->name == NULL )
+		return FALSE;
 	proc->hashkey = hashkey;
 	proc->proc_id = PROFILER_new_proc_id( ctx );
 	proc->start_time = fb_Timer();
@@ -1266,6 +1275,7 @@ static void hInitCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *proc, const char *p
 	} else {
 		proc->flags = PROCINFO_FLAGS_NONE;
 	}
+	return TRUE;
 }
 
 static FB_PROCINFO *hPushCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *parent_proc, const char *procname )
@@ -1273,6 +1283,9 @@ static FB_PROCINFO *hPushCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *parent_proc
 	FB_PROCINFO *orig_parent_proc, *proc;
 	int j, hash_index, offset;
 	unsigned int hashkey;
+
+	if( (ctx == NULL) || (parent_proc == NULL) || (procname == NULL) )
+		return NULL;
 
 	hashkey = fb_ProfileHashName( procname );
 
@@ -1291,13 +1304,17 @@ static FB_PROCINFO *hPushCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *parent_proc
 				hash_index = ( hash_index + offset ) % PROC_MAX_CHILDREN;
 			} else {
 				proc = FB_PROFILER_THREAD_alloc_proc( ctx );
+				if( proc == NULL )
+					return NULL;
 				goto fill_proc;
 			}
 		}
 
 		if ( !parent_proc->next ) {
-			parent_proc->next = FB_PROFILER_THREAD_alloc_proc( ctx );
-			proc = parent_proc->next;
+			proc = FB_PROFILER_THREAD_alloc_proc( ctx );
+			if( proc == NULL )
+				return NULL;
+			parent_proc->next = proc;
 			goto fill_proc;
 		}
 
@@ -1305,7 +1322,8 @@ static FB_PROCINFO *hPushCall( FB_PROFILER_THREAD *ctx, FB_PROCINFO *parent_proc
 	}
 
 fill_proc:
-	hInitCall( ctx, proc, procname );
+	if( !hInitCall( ctx, proc, procname ) )
+		return NULL;
 	proc->parent = orig_parent_proc;
 	parent_proc->child[hash_index] = proc;
 
@@ -1349,6 +1367,8 @@ FBCALL void *fb_ProfileBeginProc( const char *procname )
 	}
 
 	ctx = tls->ctx;
+	if( ctx == NULL )
+		return NULL;
 	proc = ctx->thread_proc;
 
 	/* First function call of a newly spawned thread has no proc set */
@@ -1357,7 +1377,10 @@ FBCALL void *fb_ProfileBeginProc( const char *procname )
 			procname = THREAD_PROC_NAME;
 		}
 		proc = FB_PROFILER_THREAD_alloc_proc( ctx );
-		hInitCall( ctx, proc, procname );
+		if( proc == NULL )
+			return NULL;
+		if( !hInitCall( ctx, proc, procname ) )
+			return NULL;
 		proc->flags |= PROCINFO_FLAGS_THREAD;
 		ctx->thread_entry = proc;
 		proc->local_count += 1;
@@ -1371,8 +1394,11 @@ FBCALL void *fb_ProfileBeginProc( const char *procname )
 	ctx->thread_proc = proc;
 
 	if( (proc->flags & PROCINFO_FLAGS_CALLPTR) != 0 ) {
-		proc = hPushCall( ctx, proc, procname );
-		ctx->thread_proc = proc;
+		FB_PROCINFO *call_proc = hPushCall( ctx, proc, procname );
+		if( call_proc == NULL )
+			return NULL;
+		proc = call_proc;
+		ctx->thread_proc = call_proc;
 	}
 
 	return (FB_PROCINFO *)proc;
@@ -1407,6 +1433,8 @@ FBCALL void *fb_ProfileBeginCall( const char *procname )
 	}
 
 	ctx = tls->ctx;
+	if( ctx == NULL )
+		return NULL;
 	parent_proc = ctx->thread_proc;
 
 	/* First function call of a newly spawned thread has no parent proc set */
@@ -1415,7 +1443,10 @@ FBCALL void *fb_ProfileBeginCall( const char *procname )
 			procname = THREAD_PROC_NAME;
 		}
 		parent_proc = FB_PROFILER_THREAD_alloc_proc( ctx );
-		hInitCall( ctx, parent_proc, THREAD_PROC_NAME );
+		if( parent_proc == NULL )
+			return NULL;
+		if( !hInitCall( ctx, parent_proc, THREAD_PROC_NAME ) )
+			return NULL;
 		parent_proc->flags |= PROCINFO_FLAGS_THREAD;
 	}
 
@@ -1445,12 +1476,21 @@ FBCALL void fb_InitProfile( void )
 		return;
 	}
 	fb_profiler = PROFILER_CALLS_create( );
+	if( fb_profiler == NULL )
+		return;
 	fb_PROFILECTX_Constructor( tls );
 	ctx = tls->ctx;
+	if( ctx == NULL )
+		return;
 
 	/* assume we are starting from MAIN procedure */
 	ctx->thread_entry = FB_PROFILER_THREAD_alloc_proc( ctx );
-	hInitCall( ctx, ctx->thread_entry, MAIN_PROC_NAME );
+	if( ctx->thread_entry == NULL )
+		return;
+	if( !hInitCall( ctx, ctx->thread_entry, MAIN_PROC_NAME ) ) {
+		ctx->thread_entry = NULL;
+		return;
+	}
 	ctx->thread_proc = ctx->thread_entry;
 	ctx->thread_proc->flags |= PROCINFO_FLAGS_MAIN;
 	ctx->thread_proc->local_count = 1;

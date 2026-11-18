@@ -466,7 +466,8 @@ static void vga16_blitter(unsigned char *dest, int pitch)
 						c = fb_gfx->device_palette[s[i]];
 						color[i] = color_conv[((c & 0xF0) >> 4) | ((c & 0xF000) >> 8) | ((c & 0xF00000) >> 12)];
 					}
-					buffer[offset] = (color[0] << 4) | color[1];
+					buffer[offset] = (unsigned char)(
+						((color[0] & 0x0Fu) << 4) | (color[1] & 0x0Fu));
 				}
 				else
 				{

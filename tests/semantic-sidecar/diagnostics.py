@@ -67,7 +67,7 @@ class Diagnostics:
                 raise ValueError("Unescaped diagnostic field")
             row = [unescape(field) for field in fields]
             if index == 0:
-                if row[:2] != ["FBCDIA", "1"] or row[2] not in ("1.20.4", "1.20.5"):
+                if row[:2] != ["FBCDIA", "1"] or row[2] not in ("1.20.4", "1.20.5", "1.20.6"):
                     raise ValueError("Unsupported diagnostic artifact or producer")
                 result.producer = row[2]
                 continue

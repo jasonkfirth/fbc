@@ -29,7 +29,7 @@
 #include once "runtime/rtl.bi"
 #include once "tooling/semantic-expressions.bi"
 
-	dim shared as FB_RTL_PROCDEF funcdata( 0 to 75 ) = _
+	dim shared as FB_RTL_PROCDEF funcdata( 0 to 76 ) = _
 	{ _
 		/' function fb_FileOpen _
 			( _
@@ -1256,6 +1256,18 @@
 				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
+		/' fb_ConsoleInputWstr has the same prompt ABI as fb_ConsoleInput. '/ _
+		( _
+			@FB_RTL_CONSOLEINPUTWSTR, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE or FB_RTL_OPT_UTF8ARGS, _
+			3, _
+			{ _
+				( typeSetIsConst( FB_DATATYPE_STRING ), FB_PARAMMODE_BYREF, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeSetIsConst( FB_DATATYPE_LONG ), FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
 		/' EOL '/ _
 		( _
 			NULL _
@@ -2141,7 +2153,9 @@ function rtlFileInput _
 		byval isfile as integer, _
 		byval expr as ASTNODE ptr, _
 		byval addquestion as integer, _
-		byval addnewline as integer _
+		byval addnewline as integer, _
+		byval has_wstring as integer, _
+		byval insertion_point as ASTNODE ptr _
 	) as integer
 
 	dim as ASTNODE ptr proc = any
@@ -2154,7 +2168,11 @@ function rtlFileInput _
 	if( isfile ) then
 		f = PROCLOOKUP( FILEINPUT )
 	else
-		f = PROCLOOKUP( CONSOLEINPUT )
+		if( has_wstring ) then
+			f = PROCLOOKUP( CONSOLEINPUTWSTR )
+		else
+			f = PROCLOOKUP( CONSOLEINPUT )
+		end if
 		addpromptargs = TRUE
 	end if
 
@@ -2181,7 +2199,11 @@ function rtlFileInput _
 		end if
 	end if
 
-	astAdd( proc )
+	if( isfile ) then
+		astAdd( proc )
+	else
+		astAddAfter( proc, insertion_point )
+	end if
 
 	function = TRUE
 

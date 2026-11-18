@@ -61,12 +61,12 @@ private sub hReportMacroError(byval s as FBSYMBOL ptr, byval errnum as integer)
 end sub
 
 private function isMacroAllowed(byval s as FBSYMBOL ptr) as integer
-	'' The va_arg() and va_next() built in macros aren't supported with -gen gcc
+	'' VA_ARG and VA_NEXT require the legacy stack cursor from VA_FIRST.
 	'' Error recovery: continue parsing as usual
 	if (pp.skipping = FALSE) then
 		if (s->def.flags and FB_DEFINE_FLAGS_NOGCC) then
 			select case env.clopt.backend
-			case FB_BACKEND_GCC, FB_BACKEND_CLANG
+			case FB_BACKEND_GCC, FB_BACKEND_CLANG, FB_BACKEND_LLVM
 				errReport(FB_ERRMSG_STMTUNSUPPORTEDINC)
 				return FALSE
 			end select

@@ -168,7 +168,7 @@ ifneq ($(strip $(BOOTSTRAP_FBC)),)
 BUILD_CONFIG_BOOT_RULES := $(subst $(build_config_space),:,$(strip $(shell cksum $(foreach path,$(filter $(mkpath)/bootstrap/%,$(MAKEFILE_LIST)),$(call build_config_quote,$(path))) | cksum)))
 BUILD_CONFIG_EMIT := $(call build_config_hash,$(BUILD_CONFIG_RULES) $(BUILD_CONFIG_BOOT_RULES) $(BOOT_FBC) $(call build_config_tool,BOOT_FBC) $(BOOT_FBC_TOOL_ENV) $(BOOT_EMIT_TARGET) $(BOOT_FBC_TARGET) $(BOOTSTRAP_ARCH) $(BOOTFBCGEN) $(BOOTFBCFLAGS) $(BOOTSTRAP_COMPAT_DEFINES))
 BUILD_CONFIG_BOOT_MEMBERS := $(subst $(build_config_space),:,$(strip $(shell find "$(BOOTSTRAP_PATH)" -maxdepth 1 -type f \( -name '*.c' -o -name '*.asm' \) -print 2>/dev/null | LC_ALL=C sort | cksum)))
-BUILD_CONFIG_BOOT := $(call build_config_hash,$(BUILD_CONFIG_C) $(BUILD_CONFIG_BOOT_RULES) $(BUILD_CONFIG_BOOT_MEMBERS) $(BOOTSTRAP_CFLAGS) $(BOOTSTRAP_WARN_SUPPRESS) $(BOOTSTRAP_ASM_SYNTAX_CFLAGS) $(PIC_CFLAGS) $(AS) $(ASFLAGS) $(call build_config_tool,AS) $(if $(wildcard $(BOOTSTRAP_PATH)/.emit-config),$(file <$(BOOTSTRAP_PATH)/.emit-config)))
+BUILD_CONFIG_BOOT := $(call build_config_hash,$(BUILD_CONFIG_C) $(BUILD_CONFIG_BOOT_RULES) $(BUILD_CONFIG_BOOT_MEMBERS) $(BOOTSTRAP_CFLAGS) $(BOOTSTRAP_ASM_SYNTAX_CFLAGS) $(PIC_CFLAGS) $(AS) $(ASFLAGS) $(call build_config_tool,AS) $(if $(wildcard $(BOOTSTRAP_PATH)/.emit-config),$(file <$(BOOTSTRAP_PATH)/.emit-config)))
 BUILD_CONFIG_BOOT_LINK := $(call build_config_hash,$(BUILD_CONFIG_LINK) $(BOOTSTRAP_EARLY_LIBS) $(BOOTSTRAP_RT0) $(BOOTSTRAP_RTL) $(BOOTSTRAP_TERM_LIB) $(BOOTSTRAP_PLATFORM_LIBS))
 $(eval $(call declare_build_config,$(BOOTSTRAP_FBC),$(BOOTSTRAP_OBJ),$(BUILD_CONFIG_BOOT),$(BUILD_CONFIG_BOOT_LINK),$(BOOTSTRAP_OBJDIR)/.build-config))
 endif

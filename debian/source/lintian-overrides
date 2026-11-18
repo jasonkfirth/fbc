@@ -1,3 +1,12 @@
 # termlib_min.js is the upstream terminal runtime consumed by the Emscripten
 # target. The unminified third-party source is not part of this source tree.
 freebasic source: source-is-missing [lib/termlib_min.js]
+# Bootstrap C is emitted by the compiler and contains generated string tables
+# that are intentionally kept as single C string literals.
+freebasic source: very-long-line-length-in-source-file [bootstrap/linux-amd64/*]
+# Several checked-in generated tables and audit snapshots preserve upstream
+# formatting and are not compiler inputs.
+freebasic source: very-long-line-length-in-source-file [docs/*]
+freebasic source: very-long-line-length-in-source-file [tests/*]
+freebasic source: very-long-line-length-in-source-file [inc/*]
+freebasic source: very-long-line-length-in-source-file [examples/*]

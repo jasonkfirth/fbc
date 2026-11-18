@@ -35,11 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__GNUC__) || defined(__clang__)
-#define FB_LONGDOUBLE_IS_NAN(value) __builtin_isnanl(value)
-#else
 #define FB_LONGDOUBLE_IS_NAN(value) isnan(value)
-#endif
 #include "extended_math.h"
 #if defined(__AROS__) || defined(__HAIKU__) || defined(HOST_XBOX) || \
 	(defined(__MINGW32__) && !defined(_UCRT) && !defined(_WIN32_WCE))

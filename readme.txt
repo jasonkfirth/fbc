@@ -11,7 +11,7 @@
     Release documents:  https://deb.fbxl.net/docs/
     1.10-1.20 history:   https://deb.fbxl.net/docs/guides/release-history-1.10-to-1.20.md
     Discord:            https://discord.gg/286rSdK
-    IRC channel:        ##freebasic at https://webchat.freenode.net
+    IRC channel:        #freebasic at https://libera.chat
     Features:           https://freebasic.net/wiki/CompilerFeatures
     Requirements:       https://freebasic.net/wiki/CompilerRequirements
 
@@ -55,7 +55,7 @@
       for you, for example:
         Tiko editor:   https://github.com/PaulSquires/tiko/releases
         VisualFBEditor https://github.com/XusinboyBekchanov/VisualFBEditor/releases
-       Or even though is older and unmaintained will work (with some effort):
+       Or the newly maintained:
         FBIDE:         https://fbide.freebasic.net/
 
     Linux and other Unix-like systems:

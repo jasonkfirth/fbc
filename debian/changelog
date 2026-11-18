@@ -1,3 +1,10 @@
+freebasic (1.20.6-1) unstable; urgency=medium
+
+  * Bump the compiler and package version to 1.20.6.
+  * Keep package metadata synchronized with mk/version.mk.
+
+ -- SJ_Zero <sj@fbxl.net>  Wed, 18 Nov 2026 00:00:00 -0400
+
 freebasic (1.20.5-2) unstable; urgency=medium
 
   * Prepare package revision 2 for forthcoming compiler and runtime changes.

@@ -155,7 +155,9 @@ int fb_GfxLineInputWstr(const FB_WCHAR *text, FB_WCHAR *destination,
 		fb_PrintVoid(0, FB_PRINT_NEWLINE);
 	if (result == NULL)
 		return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
-	fb_WstrAssignFromA(destination, maximum_characters, result, -1);
+	fb_hConsoleBytesToWstr(destination, maximum_characters, result->data,
+		FB_STRSIZE(result));
+	fb_hStrDelTemp(result);
 	return fb_ErrorSetNum(FB_RTERROR_OK);
 }
 

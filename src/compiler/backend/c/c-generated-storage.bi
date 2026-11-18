@@ -67,8 +67,9 @@ private function hCGlobalStorageGet(byval sym as FBSYMBOL ptr) as CGLOBALSTORAGE
 	var entry = cptr(CGLOBALSTORAGE ptr, hashLookup(@c_global_storage_names, strptr(identifier)))
 	if( entry = NULL ) then
 		entry = listNewNode(@c_global_storage_nodes)
+		if( entry = NULL ) then return NULL
 		entry->leaf = hCLeafGetName(identifier)
-		assert(entry->leaf <> NULL)
+		if( entry->leaf = NULL ) then return NULL
 		hashAdd(@c_global_storage_names, entry->leaf->name, entry, hashHash(entry->leaf->name))
 	end if
 	return entry

@@ -224,11 +224,7 @@ void *fb_Int128FromDouble(void *destination, double source, int is_signed)
 		negative = 0;
 		magnitude = source_value;
 	}
-#if defined(__GNUC__) || defined(__clang__)
-	if (__builtin_isnanl(source_value)) abort();
-#else
 	if (isnan(source_value)) abort();
-#endif
 
 	if (is_signed) {
 		if ((negative && magnitude > signed_limit) ||

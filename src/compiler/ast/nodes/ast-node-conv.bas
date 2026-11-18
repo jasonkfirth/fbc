@@ -720,10 +720,12 @@ function astNewCONV _
 	doconv = hConvNeedsConversion( ldtype, to_dtype, ldclass )
 
 	var use_int128_helpers = astUsesInt128Helpers( )
-	'' 32-bit libgcc does not provide the native i128 floating conversion
-	'' routines. Keep LLVM integer arithmetic native, but use portable casts.
+	'' LLVM float-to-i128 uses the checked runtime conversion, including
+	'' overflow and NaN handling. 32-bit libgcc also lacks i128-to-float.
 	if( use_int128_helpers orElse _
-	    ((env.clopt.backend = FB_BACKEND_LLVM) andAlso (fbGetBits( ) = 32)) ) then
+	    ((env.clopt.backend = FB_BACKEND_LLVM) andalso _
+	     ((fbGetBits( ) = 32) orelse _
+	      (typeIsInteger128Scalar( to_dtype ) andalso ldclass = FB_DATACLASS_FPOINT))) ) then
 		if( (typeIsInteger128Scalar( ldtype ) andalso _
 		     typeIsInteger128Scalar( to_dtype )) = FALSE ) then
 			if( typeIsInteger128Scalar( to_dtype ) ) then

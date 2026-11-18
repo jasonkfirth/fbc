@@ -11,19 +11,20 @@
  * For example:
  *
  * FB code:
- *    declare sub MySub(x as integer, y as integer)
+ *    declare sub MySub cdecl(byval x as long, byval y as long)
  *    thread = threadcall MySub(2, 3)
  *    threadwait thread
  *
  * Turned into this by fbc:
  *    a = 2
  *    b = 3
- *    thread = fb_ThreadCall(@MySub, STDCALL, 2, INT, @a, INT, @b)
+ *    thread = fb_ThreadCall(@MySub, CDECL, 0, 2, INT32, @a, INT32, @b)
  *    fb_ThreadWait(thread)
  *
- * fb_ThreadCall() packs the call and parameter data it's given into an array
- * of pointers and then launches a thread. The new thread reconstructs the call
- * using LibFFI and then calls the user's procedure.
+ * The compiler passes an address for each lowered ABI argument. The
+ * launching thread prepares the call and copies those values before
+ * returning. A plain pointer is copied as a pointer; its pointee is
+ * borrowed. The STRING tag also copies the descriptor and its text.
  */
 
 #include "fb.h"
@@ -56,12 +57,24 @@ FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, 
 
 typedef struct FB_THREAD_CALL
 {
+	ffi_cif       cif;
 	void         *proc;
-	int           abi;
 	int           num_args;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char args_alignment_padding[4];
+#endif
 	ffi_type    **ffi_arg_types;
 	void        **values;
+	FBSTRING     *strings;
 } FBTHREADCALL;
+
+typedef struct {
+	const void *value;
+	int copy_string;
+#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+	unsigned char tail_padding[4];
+#endif
+} FBTHREADCALL_INPUT;
 
 /* mirrored in compiler/rtl.bi */
 enum {
@@ -78,7 +91,8 @@ enum {
 	FB_THREADCALL_FLOAT32,
 	FB_THREADCALL_FLOAT64,
 	FB_THREADCALL_STRUCT,
-	FB_THREADCALL_PTR
+	FB_THREADCALL_PTR,
+	FB_THREADCALL_STRING
 };
 
 static void freeStruct( ffi_type *arg )
@@ -113,16 +127,22 @@ static void freeThreadCall( FBTHREADCALL *info )
 
     for( i=0; i<info->num_args; i++ )
     {
-        if( info->ffi_arg_types[i]->type == FFI_TYPE_STRUCT )
+        if( info->ffi_arg_types != NULL && info->ffi_arg_types[i] != NULL &&
+            info->ffi_arg_types[i]->type == FFI_TYPE_STRUCT )
             freeStruct( info->ffi_arg_types[i] );
+        if( info->values != NULL )
+            free( info->values[i] );
+        if( info->strings != NULL )
+            fb_StrDelete( &info->strings[i] );
     }
 
+	    free( info->strings );
 	    free( (void *)info->values );
 	    free( (void *)info->ffi_arg_types );
 	    free( info );
 }
 
-static ffi_type *getArgument( va_list *args_list );
+static ffi_type *getArgument( ssize_t arg_type, va_list *args_list );
 
 static ffi_type *getStruct( va_list *args_list )
 {
@@ -130,7 +150,7 @@ static ffi_type *getStruct( va_list *args_list )
     int num_elems;
     int i, j;
 
-    if( (elem_count < 0) || (elem_count > FB_THREADCALL_MAX_ELEMS) )
+    if( (elem_count <= 0) || (elem_count > FB_THREADCALL_MAX_ELEMS) )
         return NULL;
     num_elems = (int)elem_count;
 
@@ -154,7 +174,8 @@ static ffi_type *getStruct( va_list *args_list )
     /* scan elements */
     for( i=0; i<num_elems; i++ )
     {
-        structure_type->elements[i] = getArgument( args_list );
+        ssize_t type = va_arg( (*args_list), ssize_t );
+        structure_type->elements[i] = getArgument( type, args_list );
         if( structure_type->elements[i] == NULL )
         {
             /* error, free memory and return NULL */
@@ -172,10 +193,8 @@ static ffi_type *getStruct( va_list *args_list )
     return structure_type;
 }
 
-static ffi_type *getArgument( va_list *args_list )
+static ffi_type *getArgument( ssize_t arg_type, va_list *args_list )
 {
-    ssize_t arg_type = va_arg( (*args_list), ssize_t );
-
     switch( arg_type )
     {
         case FB_THREADCALL_INT8:    return &ffi_type_sint8;
@@ -195,135 +214,132 @@ static ffi_type *getArgument( va_list *args_list )
     }
 }
 
-static FBCALL void threadproc( void *param );
-
-FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, ... )
+/* Prepare on the launching thread. libffi fills in the sizes of
+   aggregate argument types here, before we read any caller storage. */
+static int prepareCall( FBTHREADCALL *call, int convention )
 {
-    ffi_type     **ffi_args;
-    void         **values;
-    FBTHREADCALL  *param;
-    FBTHREAD     *thread;
-    int i, j;
+	ffi_abi abi = FFI_DEFAULT_ABI;
+#if defined HOST_X86 && !defined HOST_64BIT
+	if( convention == FB_THREADCALL_CDECL )
+		abi = FFI_SYSV;
+#if defined(HOST_WIN32)
+	else if( convention == FB_THREADCALL_STDCALL )
+		abi = FFI_STDCALL;
+#endif
+	else
+		return FALSE;
+#else
+	if( convention != FB_THREADCALL_CDECL && convention != FB_THREADCALL_STDCALL )
+		return FALSE;
+#endif
+	return ffi_prep_cif( &call->cif, abi, (unsigned int)call->num_args,
+	                     &ffi_type_void, call->ffi_arg_types ) == FFI_OK;
+}
 
-    if( (proc == NULL) || (num_args < 0) || (num_args > FB_THREADCALL_MAX_ELEMS) )
-        return NULL;
-    
-    /* initialize lists and arrays */
-    ffi_args = NULL;
-    values = NULL;
-    if( num_args > 0 )
-    {
-        va_list args_list;
+static int captureArgument( FBTHREADCALL *call, int index, const FBTHREADCALL_INPUT *input )
+{
+	size_t bytes = call->ffi_arg_types[index]->size;
+	if( input->value == NULL || bytes == 0 )
+		return FALSE;
 
-        ffi_args = (ffi_type **)malloc( sizeof( ffi_type * ) * (size_t)num_args );
-        values = (void **)malloc( sizeof( void * ) * (size_t)num_args );
-        if( (ffi_args == NULL) || (values == NULL) )
-        {
-            free( (void *)values );
-            free( (void *)ffi_args );
-            return NULL;
-        }
+	call->values[index] = malloc( bytes );
+	if( call->values[index] == NULL )
+		return FALSE;
+	if( input->copy_string ) {
+		const FBSTRING_ACCESS *source;
+		FBSTRING *copy = &call->strings[index];
+		ssize_t length;
 
-        va_start(args_list, num_args);
-
-        /* scan arguments and values from var_args */
-        for( i=0; i<num_args; i++ )
-        {
-            ffi_args[i] = getArgument( &args_list );
-            if( ffi_args[i] == NULL )
-            {
-                /* error, free all memory allocated up to this point */
-                va_end( args_list );
-                for( j=0; j<i; j++ )
-                {
-                    if( ffi_args[j]->type == FFI_TYPE_STRUCT )
-                        freeStruct( ffi_args[j] );
-                }
-                free( (void *)values );
-                free( (void *)ffi_args );
-                return NULL;
-            }
-            values[i] = va_arg( args_list, void * );
-        }
-        va_end( args_list );
-    }
-    
-    /* pack into thread parameter */
-    param = malloc( sizeof( FBTHREADCALL ) );
-    if( param == NULL )
-    {
-        for( j=0; j<num_args; j++ )
-        {
-            if( ffi_args[j]->type == FFI_TYPE_STRUCT )
-                freeStruct( ffi_args[j] );
-        }
-        free( (void *)values );
-        free( (void *)ffi_args );
-        return NULL;
-    }
-    param->proc = proc;
-    param->abi = abi;
-    param->num_args = num_args;
-    param->ffi_arg_types = ffi_args;
-    param->values = values;
-    
-    /* actually start thread */
-    thread = fb_ThreadCreate( threadproc, (void *)param, stack_size );
-    if( thread == NULL )
-        freeThreadCall( param );
-
-    return thread;
+		memcpy( &source, input->value, sizeof(source) );
+		if( source == NULL || bytes != sizeof(copy) )
+			return FALSE;
+		length = FB_STRSIZE(source);
+		if( length > 0 ) {
+			if( source->data == NULL || fb_hStrAlloc( copy, length ) == NULL )
+				return FALSE;
+			memcpy( copy->data, source->data, (size_t)length );
+			copy->data[length] = '\0';
+		}
+		memcpy( call->values[index], &copy, sizeof(copy) );
+	} else {
+		memcpy( call->values[index], input->value, bytes );
+	}
+	return TRUE;
 }
 
 static FBCALL void threadproc( void *param )
 {
-    FBTHREADCALL *info = ( FBTHREADCALL * )param;
-    ffi_status status = FFI_OK;
-    ffi_abi abi = FFI_DEFAULT_ABI;
-    ffi_cif cif;
+	FBTHREADCALL *call = (FBTHREADCALL *)param;
+	ffi_call( &call->cif, FFI_FN(call->proc), NULL, call->values );
+	freeThreadCall( call );
+}
 
-#if defined HOST_X86 && !defined HOST_64BIT
-    /* check calling convention */
-    if( info->abi == FB_THREADCALL_CDECL )
-        abi = FFI_SYSV;
-#if defined( HOST_WIN32 )
-    else if( info->abi == FB_THREADCALL_STDCALL )
-        abi = FFI_STDCALL;
-#endif
-    else
-        status = FFI_BAD_ABI;
+FBTHREAD *fb_ThreadCall( void *proc, int abi, ssize_t stack_size, int num_args, ... )
+{
+	FBTHREADCALL *call;
+	FBTHREADCALL_INPUT *inputs = NULL;
+	FBTHREAD *thread;
+	int i, copy_strings = FALSE;
 
-    /* prep FFI call interface */
-    if( status == FFI_OK )
-#else
-    /*
-     * libffi exposes the native platform ABI as FFI_DEFAULT_ABI on non-x86
-     * targets. 32-bit x86 remains special because CDECL and STDCALL are
-     * separate ABIs there.
-     */
-    if( (info->abi == FB_THREADCALL_CDECL) ||
-        (info->abi == FB_THREADCALL_STDCALL) )
-        abi = FFI_DEFAULT_ABI;
-    else
-        status = FFI_BAD_ABI;
+	if( proc == NULL || num_args < 0 || num_args > FB_THREADCALL_MAX_ELEMS )
+		return NULL;
+	call = (FBTHREADCALL *)calloc( 1, sizeof(*call) );
+	if( call == NULL )
+		return NULL;
+	call->proc = proc;
+	call->num_args = num_args;
 
-    if( status == FFI_OK )
-#endif
-        status = ffi_prep_cif( 
-            &cif,               // handle
-            abi,                // ABI (CDECL or STDCALL on x86, host default otherwise)
-            (unsigned int)info->num_args, // bounded argument count
-            &ffi_type_void,     // return type
-            info->ffi_arg_types // argument types
-        );
-        
-    /* execute */
-    if( status == FFI_OK )
-        ffi_call( &cif, FFI_FN( info->proc ), NULL, info->values );
-    
+	if( num_args > 0 ) {
+		va_list args_list;
+		size_t count = (size_t)num_args;
+		inputs = (FBTHREADCALL_INPUT *)malloc( count * sizeof(*inputs) );
+		call->ffi_arg_types = (ffi_type **)calloc( count, sizeof(*call->ffi_arg_types) );
+		call->values = (void **)calloc( count, sizeof(*call->values) );
+		if( inputs == NULL || call->ffi_arg_types == NULL || call->values == NULL )
+			goto fail;
 
-    /* free memory and exit */
-    freeThreadCall( info );
+		va_start( args_list, num_args );
+		for( i = 0; i < num_args; ++i ) {
+			ssize_t type = va_arg( args_list, ssize_t );
+			inputs[i].copy_string = (type == FB_THREADCALL_STRING);
+			if( inputs[i].copy_string ) {
+				copy_strings = TRUE;
+				call->ffi_arg_types[i] = &ffi_type_pointer;
+			} else {
+				call->ffi_arg_types[i] = getArgument( type, &args_list );
+			}
+			if( call->ffi_arg_types[i] == NULL )
+				break;
+			inputs[i].value = va_arg( args_list, void * );
+		}
+		va_end( args_list );
+		if( i != num_args )
+			goto fail;
+
+		if( copy_strings ) {
+			call->strings = (FBSTRING *)calloc( count, sizeof(*call->strings) );
+			if( call->strings == NULL )
+				goto fail;
+		}
+	}
+	if( !prepareCall( call, abi ) )
+		goto fail;
+	for( i = 0; i < num_args; ++i ) {
+		if( !captureArgument( call, i, &inputs[i] ) )
+			goto fail;
+	}
+	free( inputs );
+
+	/* The launching frame owns only its original arguments now. */
+	thread = fb_ThreadCreate( threadproc, call, stack_size );
+	if( thread == NULL )
+		freeThreadCall( call );
+	return thread;
+
+fail:
+	free( inputs );
+	freeThreadCall( call );
+	return NULL;
 }
 
 #endif

@@ -808,13 +808,14 @@ install_debian_target_sysroot() {
 
 assert_orig_tarball_clean() {
     local archive="$1"
-    local bad_entry
+    local bad_entry=""
 
     bad_entry="$(
         tar -tJf "$archive" |
         while IFS= read -r entry; do
-            rel="${entry#*/}"
-            case "$rel" in
+            if [[ "$entry" != */ ]] && [ -z "$bad_entry" ]; then
+                rel="${entry#*/}"
+                case "$rel" in
                 */obj/*|\
                 .build-alpine/*|\
                 .build-debianubuntu*/*|\
@@ -848,9 +849,10 @@ assert_orig_tarball_clean() {
                 *.tmp|\
                 tmp/*)
                     printf '%s\n' "$entry"
-                    break
+                    bad_entry="$entry"
                     ;;
-            esac
+                esac
+            fi
         done
     )"
 
@@ -1215,6 +1217,7 @@ package_current_target() {
     local origtar
     local rc
     local bootstrap_srcdir
+    local bootstrap_sources_present=0
     local deb_build_options
     local changes_files=()
     local override_file
@@ -1252,13 +1255,20 @@ package_current_target() {
     srcdir="${pkgname}-${upver}"
     bootstrap_srcdir="$ROOT/bootstrap/$BUILD_BOOTKEY"
 
+    if [ -d "$bootstrap_srcdir" ] &&
+        find "$bootstrap_srcdir" -maxdepth 1 -type f \
+            \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .
+    then
+        bootstrap_sources_present=1
+    fi
+
     msg "staging Debian source tree"
 
-    if [ ! -d "$bootstrap_srcdir" ]; then
+    if [ "$bootstrap_sources_present" -eq 0 ]; then
         [ -f "$BOOTSTRAP_TAR" ] || die "missing bootstrap sources: $bootstrap_srcdir and $BOOTSTRAP_TAR"
         assert_removable_tree "$WORKDIR/bootstrap-from-tar"
         run mkdir -p "$WORKDIR/bootstrap-from-tar"
-        run tar -xJf "$BOOTSTRAP_TAR" -C "$WORKDIR/bootstrap-from-tar" \
+        run tar --no-same-owner -xJf "$BOOTSTRAP_TAR" -C "$WORKDIR/bootstrap-from-tar" \
             "FreeBASIC-${upver}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
         bootstrap_srcdir="$WORKDIR/bootstrap-from-tar/FreeBASIC-${upver}-source-bootstrap-${BUILD_BOOTKEY}/bootstrap/${BUILD_BOOTKEY}"
     fi
@@ -1379,6 +1389,10 @@ package_current_target() {
     rm -rf "$srcdir/contrib/winlibs-legacy"
     rm -f "$srcdir/contrib/swig/swig.exe"
     rm -f "$srcdir"/doc/manual/*.chm
+    find "$srcdir/lib" "$srcdir/winCE" -type f \
+        \( -iname '*.dll' -o -iname '*.exe' -o -iname '*.cpl' -o -iname '*.sys' \
+            -o -iname '*.ovl' -o -iname '*.com' -o -iname '*.386' \
+            -o -iname '*.fon' -o -iname '*.bin' -o -iname '*.awx' \) -delete
     rm -f "$srcdir"/lib/linux-*/libgcc_s.so.1
     find \
         "$srcdir/doc/fbchkdoc" \

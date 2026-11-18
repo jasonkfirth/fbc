@@ -84,6 +84,7 @@ int fb_ConsoleLineInput
 {
 	int res, old_x;
 	size_t len;
+	ssize_t signed_len;
 
     fb_PrintBufferEx( NULL, 0, FB_PRINT_FORCE_ADJUST );
     fb_GetXY( &old_x, NULL );
@@ -114,7 +115,8 @@ int fb_ConsoleLineInput
 
         res = fb_DevFileReadLineDumb( stdin, &str_result, hWrapper );
 
-        len = FB_STRSIZE(&str_result);
+        signed_len = FB_STRSIZE(&str_result);
+        len = (signed_len > 0) ? (size_t)signed_len : 0;
 
         /* We have to handle the NEWLINE stuff here because we *REQUIRE*
          * the *COMPLETE* temporary input string for the correct position

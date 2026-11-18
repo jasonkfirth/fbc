@@ -1,6 +1,39 @@
+Version 1.20.6
+
+[changed]
+- version/package metadata: start the 1.20.6 development line, synchronize distro package versions and reset package release counters for the new upstream version.
+- maintenance: review every entry in `todo.txt` against the current compiler and runtime, remove completed work, and retain outstanding cases.
+- compiler/LLVM: match the x86-64 Linux C ABI for small struct and union results, including mixed integer and SSE registers and a hidden result pointer for unaligned packed structs. Add smoke coverage for calls in both directions between C and FreeBASIC, including procedure pointers and variadic calls. Rebuild affected LLVM objects before mixing them with newly compiled code.
+- compiler/LLVM: preserve the destination address for casts on variables, indexed elements, packed fields and pointer dereferences. Round float-to-integer conversions before narrowing, preserve unsigned wrapping, and check the operand range before emitting a conversion that could produce poison. Use the checked runtime helpers for float-to-128-bit integer conversions.
+- compiler/LLVM: preserve FreeBASIC's member offsets and array strides with explicit padding and alignment for packed and nested aggregates. Keep typed fields for procedure pointer relocations. Add conversion and layout checks to compiler smoke tests.
+- compiler/LLVM: emit DWARF for procedures, parameters, locals, lexical scopes, fixed aggregates and lines from included source files. Use GNU assembler compatible source paths and check the linked debug metadata in the smoke suite.
+- compiler/varargs: reject the legacy `VA_FIRST`, `VA_ARG` and `VA_NEXT` interface on LLVM and direct users to `CVA_LIST` and `CVA_*`. Make legacy macro registration consistent across the C backends and test both LLVM rejection and the supported replacement.
+- compiler/rtlib text input: select wide console input when an `INPUT` statement has a WSTRING destination. Preserve Unicode in `INPUT`, `LINE INPUT` and `WINPUT`, including redirected UTF-8 input and native Windows console reads. Keep one cursor for mixed destinations and consume the rest of a truncated field before reading the next one. Add pipe, terminal and encoded-file smoke tests.
+- rtlib/DATA: convert address-valued records to unsigned decimal text when reading into STRING, WSTRING or USTRING. Cover truncation and advancement to the next record.
+- gfxlib2: give each thread its own `ScreenList()` snapshot and cursor. Release the snapshot at exhaustion or thread exit, support cleanup in the NuttX compatibility layer, and document the behavior. Add an interleaved enumeration regression to the graphics locking tests.
+- compiler/rtlib ThreadCall: copy lowered arguments before launching a libffi worker, and give it private copies of BYVAL and temporary BYREF STRING and USTRING values. Preserve aliases to caller-owned variables and array descriptors. Diagnose other temporary references and conversions that require BYREF copyback. Document the caller's lifetime and synchronization duties, and add regression tests for launch-frame exit and rejected arguments.
+- Linux package matrix: define the missing status-message helper in the Debian-family cross builder so shared QEMU binfmt setup can run before package builds.
+- Debian package build: ignore directory entries when checking the orig-source archive, and consume the full tar listing so generated-content failures are reported without a pipefail exit.
+- package source staging: exclude the generated host `bin/` tree, including cross-tool wrappers, from filtered source archives.
+- Debian package build: detect empty bootstrap directories and unpack valid emitted sources from the bootstrap archive before building.
+- Debian package staging: extract bootstrap archives as the current build user so reused container workspaces remain removable and writable.
+- Debian source package staging: remove non-Linux prebuilt Windows DLL, EXE, CPL, SYS, OVL, COM, 386, FON, BIN and AWX payloads from the orig archive; document generated bootstrap and data-table long lines for Lintian.
+- Debian metadata: replace obsolete MySQL development package recommendations with the current MySQL development package, use groff's portable at-sign escape in the compiler manpage, and account for spelling false positives in embedded diagnostic strings.
+- gfxlib2/Emscripten: pass an explicit empty argument to `EM_ASM_INT` blocks so Clang's C23 variadic-macro diagnostics remain clean.
+- rtlib/JavaScript and ARM32: use the standard `isnan()` classification macro for long-double inputs on Emscripten; name the natural file-size/context alignment gaps on wasm32 and Linux ARM32; and fix signed-length, enum-conversion, and unused-parameter warnings in the JavaScript runtime build.
+- rtlib/Linux: consume port-I/O callback arguments in the unsupported non-x86 stubs so arm64 builds remain warning-free.
+- rtlib/ARM32: name the existing 64-bit alignment gaps in Linux runtime, serialization, graphics, and input records without changing their field offsets.
+- gfxlib2/ARM: pass aligned pixel temporaries to the custom blender so GCC 15 can lower the arm64 call without an internal compiler error.
+- compiler/LLVM: convert debug metadata pointer keys through the target-sized unsigned type on 32-bit builds.
+- compiler/C: check generated global-storage record and leaf allocations before dereferencing them.
+- compiler/semantic flow: guard optional procedure symbols before classifying no-return and runtime-end calls.
+- gfxlib2/Linux: bound the VGA16 palette indices before packing them into a byte so s390x GCC can verify the narrowing conversion.
+- rtlib/profiling and TLS: check allocation failures before dereferencing profiler records or optional names, eliminating cross-compiler null-dereference diagnostics and preserving safe failure behavior.
+
 Version 1.20.5
 
 [changed]
+- build/GCC warnings: apply the expanded, compiler-probed warning profile to the BASIC compiler, runtime, graphics and sound libraries, and bootstrap-generated C. Remove warning suppressions from normal, strict and AROS builds; fix exposed Unix runtime warnings and the AROS m68k SDK register declaration warning. Keep `-Wpadded` enabled for handwritten runtime and library sources; omit it for emitted BASIC UDT layouts, which are checked by generated size and offset assertions.
 - build/strict GCC: expand library checks for alignment, qualifiers, conversions, formats, bounds, initialization, padding, lifetime, stack use and control flow. Probe each flag with -Werror so compilers that only warn about unsupported flags do not select them. Add the gfxlib3-objects Make target so the strict runner can compile the selected gfxlib3 sources even on targets without a native graphics backend. Treat the Windows CE and AROS SDK include paths as system headers.
 - gfxlib3: use GCC synchronization builtins and the runtime TLS registry on toolchains that lack C11 atomics or native thread-local storage. Retain native layouts for graphics modes, renderer profiles, queues, compatibility state and Vulkan records, and name the existing sequence, completion and Vulkan alignment gaps on AROS ARM.
 - sfxlib: put the bundled WAV, MP3 and Vorbis implementations behind a system-header wrapper, including an alloca builtin for affected targets and the Vorbis declaration-only path for Clang analysis. Keep the Windows CE decoder diagnostics scoped to the bundled decoder includes. Use shared backend and MIDI declarations on AROS, RISC OS and Windows CE and in the MIDI stub, acquire the Windows CE runtime declarations before the C linkage block, guard diagnostic pragmas for older GCC, and retain the driver statistics layout.

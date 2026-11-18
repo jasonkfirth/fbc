@@ -1,0 +1,2 @@
+# Diagnostic examples in the generated executable can resemble misspelled words.
+freebasic: spelling-error-in-binary IIf If [usr/bin/fbc]

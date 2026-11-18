@@ -231,6 +231,13 @@ int32 fb_ConsoleInput(const FBSTRING_ACCESS *prompt, const int32 add_question,
     return 0;
 }
 
+/* Both statement forms use the same serial input record. */
+int32 fb_ConsoleInputWstr(const FBSTRING_ACCESS *prompt, const int32 add_question,
+    const int32 add_newline)
+{
+    return fb_ConsoleInput(prompt, add_question, add_newline);
+}
+
 int32 fb_InputInt(int32 *value)
 {
     char buffer[FB_NUTTX_INPUT_BUFFER_SIZE];

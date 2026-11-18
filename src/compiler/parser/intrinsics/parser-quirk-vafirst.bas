@@ -283,9 +283,10 @@ function cVAFunct() as ASTNODE ptr
 		hMatchRPRNT( )
 	end if
 
-	'' C backend? va_* not supported
+	'' A register-based va_list cannot be obtained by walking past the last
+	'' named parameter. The C and LLVM backends use CVA_START instead.
 	select case env.clopt.backend
-	case FB_BACKEND_GCC, FB_BACKEND_CLANG
+	case FB_BACKEND_GCC, FB_BACKEND_CLANG, FB_BACKEND_LLVM
 		errReport( FB_ERRMSG_STMTUNSUPPORTEDINC, TRUE )
 
 		'' error recovery: fake an expr

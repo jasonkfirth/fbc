@@ -149,15 +149,45 @@ endif
 # Base warnings and portability
 ##############################################################################
 
-BASE_WARN_CFLAGS := \
-  -Wall \
-  -Wextra \
+warning_flag_supported = $(strip $(shell printf 'int main(void) { return 0; }\n' | $(1) -Werror $(3) -x $(2) -c -o /dev/null - >/dev/null 2>&1 && echo $(3)))
+
+WARNING_CFLAGS_CANDIDATES := \
+  -Wall -Wextra -Wpedantic \
+  -Wformat=2 -Wformat-security -Wformat-nonliteral -Wformat-overflow=2 -Wformat-truncation=2 \
+  -Wundef -Wwrite-strings -Wredundant-decls -Wnull-dereference \
+  -Wstrict-prototypes -Wnested-externs -Wold-style-definition \
+  -Wpointer-arith -Wcast-align -Wcast-align=strict -Wcast-qual -Wshadow \
+  -Wmissing-declarations -Wmissing-prototypes \
+  -Wconversion -Wsign-conversion -Wfloat-conversion -Wdouble-promotion -Wfloat-equal \
+  -Wuninitialized -Wmaybe-uninitialized -Winit-self -Warray-bounds=2 \
+  -Wstringop-overflow=4 -Wstringop-truncation -Wnull-dereference \
+  -Wunused -Wunused-parameter -Wunused-function -Wunused-but-set-variable \
+  -Wsign-compare -Wswitch -Wswitch-default -Wimplicit-fallthrough \
+  -Wshift-overflow=2 -Wshift-negative-value -Wstrict-overflow=1 -Wpadded \
+  -Wuse-after-free=3 -Wdangling-pointer=2 -Walloca -Wvla \
+  -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wtrampolines \
+  -Wmissing-include-dirs -Wdate-time -Wbad-function-cast \
   -Werror=implicit-function-declaration
 
-BASE_WARN_CXXFLAGS := \
-  -Wall \
-  -Wextra \
-  -Wno-unused-parameter
+WARNING_CXXFLAGS_CANDIDATES := \
+  -Wall -Wextra -Wpedantic \
+  -Wformat=2 -Wformat-security -Wformat-nonliteral -Wformat-overflow=2 -Wformat-truncation=2 \
+  -Wundef -Wwrite-strings -Wredundant-decls -Wnull-dereference \
+  -Wpointer-arith -Wcast-align -Wcast-align=strict -Wcast-qual -Wshadow \
+  -Wmissing-declarations \
+  -Wconversion -Wsign-conversion -Wfloat-conversion -Wdouble-promotion -Wfloat-equal \
+  -Wuninitialized -Wmaybe-uninitialized -Winit-self -Warray-bounds=2 \
+  -Wstringop-overflow=4 -Wstringop-truncation \
+  -Wunused -Wunused-parameter -Wunused-function -Wunused-but-set-variable \
+  -Wsign-compare -Wswitch -Wswitch-default -Wimplicit-fallthrough \
+  -Wshift-overflow=2 -Wshift-negative-value -Wstrict-overflow=1 -Wpadded \
+  -Wuse-after-free=3 -Wdangling-pointer=2 -Walloca -Wvla \
+  -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wtrampolines \
+  -Wmissing-include-dirs -Wdate-time \
+  -Wold-style-cast -Woverloaded-virtual -Wnon-virtual-dtor
+
+BASE_WARN_CFLAGS := $(strip $(foreach flag,$(WARNING_CFLAGS_CANDIDATES),$(call warning_flag_supported,$(CC),c,$(flag))))
+BASE_WARN_CXXFLAGS := $(strip $(foreach flag,$(WARNING_CXXFLAGS_CANDIDATES),$(call warning_flag_supported,$(CXX),c++,$(flag))))
 
 BASE_PORTABILITY_CFLAGS := \
   -fno-strict-aliasing

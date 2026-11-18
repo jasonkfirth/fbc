@@ -714,6 +714,11 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 			'' understand LLVM's Windows unwind directives.
 			ln += "-filetype=obj "
 		end if
+		if( (directtoobj = FALSE) andalso fbGetOption( FB_COMPOPT_DEBUGINFO ) ) then
+			'' GNU as expects a single .file path with DWARF 4. LLVM
+			'' otherwise splits even an absolute DIFile path into two operands.
+			ln += "--dwarf-directory=false "
+		end if
 
 		select case( fbGetCpuFamily( ) )
 		case FB_CPUFAMILY_X86

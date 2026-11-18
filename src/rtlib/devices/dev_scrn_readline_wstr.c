@@ -9,21 +9,8 @@
 
 int fb_DevScrnReadLineWstr( FB_FILE *handle, FB_WCHAR *dst, ssize_t dst_chars )
 {
-	int res;
-	FBSTRING temp = { 0, 0, 0 };
 	(void)handle;
-
-	/* !!!FIXME!!! no unicode input supported */
-
-	res = fb_LineInput( NULL, (void *)&temp, -1, FALSE, FALSE, TRUE );
-
-	if( res == FB_RTERROR_OK ) {
-		fb_WstrAssignFromA( dst, dst_chars, (void *)&temp, -1 );
-	}
-
-	fb_StrDelete( &temp );
-
-	return res;
+	return fb_LineInputWstr( NULL, dst, dst_chars, FALSE, TRUE );
 }
 
 void fb_DevScrnInit_ReadLineWstr( void )

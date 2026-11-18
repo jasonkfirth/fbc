@@ -15,7 +15,8 @@ FBCALL void fb_DataReadStr( void *dst, ssize_t dst_size, int fillrem )
 
 	if( fb_data_ptr ) {
 		if( fb_data_ptr->len == FB_DATATYPE_OFS ) {
-			/* !!!WRITEME!!! */
+			FBSTRING_ACCESS *text = fb_ULongintToStr( (unsigned long long)(uintptr_t)fb_data_ptr->ofs );
+			fb_StrAssign( dst, dst_size, text, -1, fillrem );
 		} else if( fb_data_ptr->len & FB_DATATYPE_WSTR ) {
 			fb_WstrAssignToA( dst, dst_size, fb_data_ptr->wstr, fillrem );
 		} else {

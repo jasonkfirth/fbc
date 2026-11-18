@@ -313,7 +313,9 @@ FBCALL void fb_UStrDataRead( void *destination, ssize_t size, int fill )
 	(void)size;
 	(void)fill;
 	FB_LOCK();
-	if( fb_data_ptr == NULL || fb_data_ptr->len == FB_DATATYPE_OFS ) fb_UStrAssign( dst, -1, NULL, 0, 0 );
+	if( fb_data_ptr == NULL ) fb_UStrAssign( dst, -1, NULL, 0, 0 );
+	else if( fb_data_ptr->len == FB_DATATYPE_OFS )
+		fb_UStrAssign( dst, -1, fb_ULongintToStr( (unsigned long long)(uintptr_t)fb_data_ptr->ofs ), -1, 0 );
 	else if( fb_data_ptr->len & FB_DATATYPE_WSTR )
 		fb_UStrAssign( dst, -1, fb_UStrFromWstr( fb_data_ptr->wstr ), -1, 0 );
 	else

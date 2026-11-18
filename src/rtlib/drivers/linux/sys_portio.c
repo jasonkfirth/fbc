@@ -17,6 +17,7 @@ int fb_hIn( unsigned short port )
 	__asm__ volatile ("inb %1, %0" : "=a" (value) : "d" (port));
 	return (int)value;
 #else
+	(void)port;
 	return -fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #endif
 }
@@ -29,6 +30,8 @@ int fb_hOut( unsigned short port, unsigned char value )
 	__asm__ volatile ("outb %0, %1" : : "a" (value), "d" (port));
 	return FB_RTERROR_OK;
 #else
+	(void)port;
+	(void)value;
 	return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 #endif
 }

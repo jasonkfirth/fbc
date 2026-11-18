@@ -84,7 +84,7 @@ static void hSkipDelimiter( FB_INPUTCTX *ctx, FB_WCHAR c )
         break;
 
 	case FB_WCHAR_LITERAL('\r'):
-		if( (c = hReadChar( ctx )) != FB_WCHAR_LITERAL('\n') )
+		if( (c = hReadChar( ctx )) != FB_WCHAR_LITERAL('\n') && c != FB_WEOF )
 			hUnreadChar( ctx, c );
 		break;
 
@@ -120,7 +120,7 @@ void fb_FileInputNextTokenWstr( FB_WCHAR *buffer, ssize_t max_chars, int is_stri
 			goto exit;
 
 		case FB_WCHAR_LITERAL('\r'):
-			if( (c = hReadChar( ctx )) != FB_WCHAR_LITERAL('\n') )
+			if( (c = hReadChar( ctx )) != FB_WCHAR_LITERAL('\n') && c != FB_WEOF )
 				hUnreadChar( ctx, c );
 
 			skipdelim = FALSE;

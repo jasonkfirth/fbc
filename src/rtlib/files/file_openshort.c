@@ -18,7 +18,7 @@ FBCALL int fb_FileOpenShort( FBSTRING_ACCESS *str_file_mode,
 {
     unsigned file_mode = 0;
     int access_mode = -1, lock_mode = -1;
-    size_t file_mode_len, access_mode_len, lock_mode_len;
+    ssize_t file_mode_len, access_mode_len, lock_mode_len;
     int error_code = FB_RTERROR_OK;
 
     if( !FB_FILE_INDEX_VALID( fnum ) )

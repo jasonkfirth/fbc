@@ -490,6 +490,9 @@ prepare_native_prerequisites() {
     apply_patch_once \
         "$SCRIPT_DIR/aros-patches/native-posixc-vfork-child-id.patch" \
         "$AROS_SOURCE"
+    apply_patch_once \
+        "$SCRIPT_DIR/aros-patches/m68k-libcall-register-volatility.patch" \
+        "$AROS_SOURCE"
     if grep -q 'static char \*aros_command_name' \
         "$AROS_SOURCE/tools/collect-aros/docommand-exec.c" &&
         grep -q 'NP_NotifyOnDeath' \

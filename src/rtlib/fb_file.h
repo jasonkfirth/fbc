@@ -112,8 +112,9 @@ typedef struct FB_FILE_ {
     int             len;
     FB_FILE_ENCOD   encod;
 #if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
-    (defined(HOST_AROS) && defined(__arm__))
-    /* Keep the 64-bit size field naturally aligned on Win64 and AROS ARM. */
+    (defined(HOST_AROS) && defined(__arm__)) || \
+    (defined(HOST_LINUX) && defined(__arm__)) || defined(__EMSCRIPTEN__)
+    /* Keep 64-bit file sizes naturally aligned on 64-bit, ARM32, and wasm32. */
     unsigned char   size_alignment_padding[4];
 #endif
     fb_off_t        size;
@@ -310,6 +311,7 @@ FBCALL int          fb_FilePutBackWstr  ( int fnum, const FB_WCHAR *src, size_t 
        int          fb_FilePutBackWstrEx( FB_FILE *handle, const FB_WCHAR *src, size_t chars );
 
 FBCALL int          fb_FileInput        ( int fnum );
+FBCALL int          fb_ConsoleInputWstr ( FBSTRING_ACCESS *text, int addquestion, int addnewline );
 FBCALL FBSTRING_ACCESS    *fb_FileStrInput     ( ssize_t bytes, int fnum );
 FBCALL FB_WCHAR    *fb_FileWstrInput    ( ssize_t chars, int fnum );
 FBCALL int          fb_FileLineInput    ( int fnum, void *dst, ssize_t dst_len, int fillrem );
@@ -360,6 +362,7 @@ FBCALL int          fb_SetPos           ( FB_FILE *handle, int line_length );
 
        int          fb_FileInputNextToken( char *buffer, ssize_t maxlen, int isstring, int *isfp );
        void         fb_FileInputNextTokenWstr( FB_WCHAR *buffer, ssize_t max_chars, int is_string );
+       int          fb_hConsoleInputNextToken( char *buffer, ssize_t max_bytes );
 
 FBCALL FBSTRING_ACCESS    *fb_Dir              ( FBSTRING_ACCESS *filespec, int attrib, int *out_attrib );
 FBCALL FBSTRING_ACCESS    *fb_Dir64            ( FBSTRING_ACCESS *filespec, int attrib, long long *outattrib );

@@ -65,7 +65,12 @@ typedef struct FB_NUTTX_HEADLESS_IMAGE {
     unsigned char data[1];
 } FB_NUTTX_HEADLESS_IMAGE;
 
-static void *fb_nuttx_tls[FB_TLSKEYS];
+typedef struct {
+    void *data;
+    FB_TLS_DESTRUCTOR destructor;
+} FB_NUTTX_TLS_SLOT;
+
+static FB_NUTTX_TLS_SLOT fb_nuttx_tls[FB_TLSKEYS];
 static int fb_nuttx_view_toprow = -1;
 static int fb_nuttx_view_botrow = -1;
 
@@ -324,26 +329,39 @@ void fb_MutexUnlock(FBMUTEX *mutex)
     (void)mutex;
 }
 
+void *fb_TlsGetCtxExisting(int index)
+{
+    if ((index < 0) || (index >= FB_TLSKEYS))
+        return NULL;
+
+    return fb_nuttx_tls[index].data;
+}
+
 void *fb_TlsGetCtx(int index, size_t len, FB_TLS_DESTRUCTOR destructor)
 {
-    (void)destructor;
-
     if ((index < 0) || (index >= FB_TLSKEYS) || (len == 0))
         return NULL;
 
-    if (fb_nuttx_tls[index] == NULL)
-        fb_nuttx_tls[index] = calloc(1, len);
-
-    return fb_nuttx_tls[index];
+    if (fb_nuttx_tls[index].data == NULL) {
+        fb_nuttx_tls[index].data = calloc(1, len);
+        fb_nuttx_tls[index].destructor = destructor;
+    }
+    return fb_nuttx_tls[index].data;
 }
 
 void fb_TlsDelCtx(int index)
 {
+    FB_NUTTX_TLS_SLOT slot;
+
     if ((index < 0) || (index >= FB_TLSKEYS))
         return;
 
-    free(fb_nuttx_tls[index]);
-    fb_nuttx_tls[index] = NULL;
+    slot = fb_nuttx_tls[index];
+    fb_nuttx_tls[index].data = NULL;
+    fb_nuttx_tls[index].destructor = NULL;
+    if (slot.data != NULL && slot.destructor != NULL)
+        slot.destructor(slot.data);
+    free(slot.data);
 }
 
 void fb_TlsFreeCtxTb(void)

@@ -129,7 +129,7 @@ FBCALL ssize_t fb_FileAttr( int handle, int returntype )
 			break;
 
 		case FB_FILE_ATTR_ENCODING:
-			ret = file->encod;
+			ret = (ssize_t)file->encod;
 			err = FB_RTERROR_OK;
 			break;
 

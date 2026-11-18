@@ -37,7 +37,8 @@ typedef struct FB_X11_DROP {
 	Atom selected;
 	unsigned int version;
 	int waiting, accepted;
-#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
+	(defined(HOST_LINUX) && defined(__arm__))
 	uint32_t deadline_alignment_padding;
 #endif
 	double deadline;

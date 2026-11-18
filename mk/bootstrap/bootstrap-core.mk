@@ -259,35 +259,13 @@ $(BOOTSTRAP_OBJ): | bootstrap-emission-ready
 # Bootstrap object compilation
 ##############################################################################
 
-#
-# Emitted bootstrap C is machine-generated compiler output.
-#
-# It should still compile with the normal optimization, portability,
-# feature, and hardening flags where practical, but the ordinary warning
-# profile is too noisy for generated code and can turn benign emitter
-# patterns into build failures on newer compilers.
-#
-# Keep this warning relaxation scoped to bootstrap-minimal so that normal
-# source builds continue using the project's full warning policy.
-#
-BOOTSTRAP_CFLAGS := \
- $(filter-out \
-  -Wall \
-  -Wextra \
-  -Werror=implicit-function-declaration \
-  -Wfatal-errors \
-  -Wformat \
-  -Werror=format-security, \
-  $(ALLCFLAGS))
-
-BOOTSTRAP_WARN_SUPPRESS := \
- -Wno-format \
- -Wno-sign-compare \
- -Wno-parentheses \
- -Wno-unused-parameter \
- -Wno-unused-label \
- -Wno-unused-variable \
- -Wno-unused-function
+# Bootstrap C is emitted by the BASIC compiler. Keep the same warning
+# profile as the runtime so generated compiler code stays warning-clean too.
+BOOTSTRAP_CFLAGS := $(ALLCFLAGS)
+# GCC's -Wpadded reports intentional C layout gaps in emitted BASIC UDTs.
+# The backend emits sizeof/offsetof assertions for those records, so this
+# layout-only warning is useful for handwritten runtime structs, not here.
+BOOTSTRAP_CFLAGS := $(filter-out -Wpadded,$(BOOTSTRAP_CFLAGS))
 
 BOOTSTRAP_ASM_SYNTAX_CFLAGS :=
 ifneq ($(filter x86 x86_64,$(TARGET_ARCH)),)
@@ -300,7 +278,7 @@ endif
 # IMPORTANT: build bootstrap objects with PIC (required for PIE on OpenBSD)
 $(BOOTSTRAP_OBJDIR)/%.o: $(BOOTSTRAP_PATH)/%.c
 	@mkdir -p "$(dir $@)"
-	$(RUN_CC) $(CPPFLAGS) $(BOOTSTRAP_CFLAGS) $(BOOTSTRAP_WARN_SUPPRESS) $(BOOTSTRAP_ASM_SYNTAX_CFLAGS) $(PIC_CFLAGS) -c $< -o $@
+	$(RUN_CC) $(CPPFLAGS) $(BOOTSTRAP_CFLAGS) $(BOOTSTRAP_ASM_SYNTAX_CFLAGS) $(PIC_CFLAGS) -c $< -o $@
 
 $(BOOTSTRAP_OBJDIR)/%.o: $(BOOTSTRAP_PATH)/%.asm
 	@mkdir -p "$(dir $@)"

@@ -629,12 +629,13 @@ private sub hAddMacro( byval macdef as FB_RTL_MACRODEF ptr )
 		end if
 	end if
 
-	'' not supported by the C backend?
+	'' Preserve the macro's name for the diagnostic on C and LLVM.
 	if( (macdef->options and FB_RTL_OPT_NOGCC) <> 0 ) then
-		if( env.clopt.backend = FB_BACKEND_GCC ) then
+		select case env.clopt.backend
+		case FB_BACKEND_GCC, FB_BACKEND_CLANG, FB_BACKEND_LLVM
 			addbody = FALSE
 			flags or= FB_DEFINE_FLAGS_NOGCC
-		end if
+		end select
 	end if
 
 	dim as FB_DEFTOK ptr tokhead

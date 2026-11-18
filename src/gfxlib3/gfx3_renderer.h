@@ -51,8 +51,8 @@ typedef struct FB_GFX3_RENDERER {
 	const FB_GFX3_BACKEND_VTABLE *backend_vtable;
 	FB_GFX3_BACKEND backend;
 	FB_GFX3_BACKEND_CONFIG backend_config;
-#if defined(HOST_AROS) && defined(__arm__)
-	/* Keep the completion's native 64-bit sequence alignment on AROS ARM. */
+#if (defined(HOST_AROS) || defined(HOST_LINUX)) && defined(__arm__)
+	/* Keep the completion's native 64-bit sequence alignment on ARM32. */
 	uint32_t startup_alignment_padding;
 #endif
 	FB_GFX3_COMPLETION startup;
@@ -67,8 +67,8 @@ typedef struct FB_GFX3_RENDERER {
 #if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
 	/* Preserve the native atomic sequence field's original offset. */
 	unsigned char activity_epoch_alignment_padding[4];
-#elif defined(HOST_AROS) && defined(__arm__)
-	/* AROS ARM aligns uint64_t atomics to eight bytes. */
+#elif (defined(HOST_AROS) || defined(HOST_LINUX)) && defined(__arm__)
+	/* ARM32 aligns uint64_t atomics to eight bytes. */
 	uint32_t activity_epoch_alignment_padding;
 #endif
 	_Atomic uint64_t activity_epoch;

@@ -213,6 +213,9 @@ typedef struct FB_GFX3_OPENGL_FUNCTIONS {
 
 typedef struct FB_GFX3_OPENGL_FENCE {
 	GLsync sync;
+#if defined(HOST_LINUX) && defined(__arm__)
+	uint32_t sequence_alignment_padding;
+#endif
 	uint64_t sequence;
 	struct FB_GFX3_OPENGL_FENCE *next;
 } FB_GFX3_OPENGL_FENCE;
@@ -504,7 +507,8 @@ typedef struct FB_GFX3_OPENGL_STATE {
 	uint32_t maximum_compute_groups_y;
 	uint32_t maximum_compute_groups_z;
 	uint32_t palette[256];
-#if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
+	(defined(HOST_LINUX) && defined(__arm__))
 	/* Keep the 64-bit surface handle at its original offset. */
 	uint32_t visible_surface_alignment_padding;
 #endif

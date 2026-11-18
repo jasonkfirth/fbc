@@ -26,58 +26,22 @@ o Dim Byref
     like initializer lists in C++
 
 o boolean
-  - LLVM backend
   - test overload resolution?
   - add an -exx check to detect illegal boolean values on read?
-  - MacOSX/Darwin has 4-byte bool, that's the only case where gcc booleans aren't 1 byte.
-    fbc has to do it the same way to be compatible.
 
 o 64bit
   - FB includes must be adjusted for 64bit compatibility (if the corresponding
     library even is available on 64bit)
   - Windows port I/O driver? Can it be ported to 64bit? is it needed?
-  - 64bit bitfields aren't working properly - see tests/structs/bitfield-types.bas
-
-o LLVM backend
-  - _setVregDataType() currently generates code (bitcasts), unlike other backends.
-    It works for noconv casts on rvalues, but breaks for noconv casts on lvalues.
-    Maybe it should use the *(newtype*)&x trick to support it.
-  - astTypeIniAddPad() must be ignored, but in exchange all fields must be
-    initialized explicitly by specifying the data type
-    (can use "zeroinitializer" as the value at least)
-  - Check whether F2I conversions work correctly for unsigned integers (compare
-    to issues in C/ASM backends), and overall can't trigger fptosi/fptoui's
-    conditions for undefined behaviour
-  - returning structs in registers? Disabled for -gen gcc in hGetReturnType(),
-    can the same be done for -gen llvm?
-  - structs should be emitted as byte arrays, to let the FB side handle
-    packing/alignment, unless the fields must be emitted individually as with
-    the C backend due to global varinis with procptrs that can't be emitted in
-    form of raw bytes since they're not literal numbers/constants.
-     - LLVM has "type <{ fields... }>" for packed structs, but that's just
-       FIELD = 1, there is no direct way to do FIELD = 2 or 4.
-       clang uses a packed struct and then inserts padding fields (i8) manually.
-     - LLVM doesn't have unions, it'd be easier to emit them as byte arrays
-       (instead of a struct containing the biggest member only)
-  - Debugging metadata
-  - Inline ASM
-  - va_*() macros can't be implemented, so must be disallowed just like with -gen gcc
 
 o ABI
-  - review passing of short structs in registers or though hidden pointer
+  - review passing of short structs in registers or through a hidden pointer
     parameter on the stack.  fbc appears to be consistent with it-self
     for calling and returning but not when different backends are mixed
-    for example, gas/gcc32 or gas64/gcc64.  Appears that windows only
-    passes structs through hidden parameter, regardless of the size.
-  - MinGW GCC 4.7 C++ defaults to __thiscall for methods like MSVC,
-    instead of __cdecl as on Linux, even though GCC doesn't use MSVC's name
-    mangling [yet].
+    for example, gas/gcc32 or gas64/gcc64.
+  - Calling conventions and mangling
     [ ] refactor cProcCallingConv() usage and target specific checks
-    - FB can probably support __fastcall with C/LLVM backends pretty easily
     [ ] testing on other arch / targets (arm, freebsd, dos, etc)
-    [ ] preserve EDX in nested calls - it could get trashed and currently
-        we don't have a defined way to preserve
-    - FB can probably support __thiscall with C/LLVM backends pretty easily
     [ ] more tests and documentation for mangling/calling conventions, not every
         calling convention is tested or documented completely - also hard to test
 
@@ -105,24 +69,12 @@ o Allow typeless DIMs to implement EXTERNs:
     extern a as integer
     dim a
 
-o ThreadCall
-    Cannot safely pass BYREF parameters, especially not temp strings or other
-    temp objects which will be destroyed at the end of the ThreadCall statement
-    so they cannot safely be referenced from the thread...
-
 o -exx should catch...
   - add an -exx aka -eboolean check to detect illegal boolean values on read?
-  - expand on -elocation option to provide full location information or if not
-    given (or implied) optimize out calls to fb_ErrorSetFuncName() and 
-    fb_ErrorSetModName(), because we still get location from fb_ErrorThrowAt()
-	and fb_ErrorThrowEx().  Must test interaction with ON ERROR
 
 [ ] ctor/dtor
     - add 'function foo (...) as SomeObj = any', so #1682972 could be fixed AND when
       speed is important, the temporary result instance won't be cleared
-    - ArrayClear will be used instead of a loop calling the dtors to destroy
-      local non-dynamic arrays
-      - callVarDtor will have to use astAddAfter then with scope blocks..
 
 [ ] output member functions and static member data to the STABS TYPE/UDT info
     - operators must be handled as well
@@ -135,12 +87,7 @@ o -exx should catch...
 [ ] operator overloading:
     - OPERATOR foo.() ( lb1, lb2, ..... ) AS TYPE -- array indexing, not functor
 
-[ ] quirks:
-    [ ] OPEN ... FOR is not checking for mode
-    	- does QB allow that? CONS won't work without INPUT or OUTPUT
-    [ ] -exx is giving suspicious ptr assignment when module/name are been restored inside ns'
-
-[ ] add the -lang (qb|fb) cmd-line option:
+[ ] Dialect compatibility:
     - "qb":
       [ ] RESUME is not working with array bounds and null ptr checks because the labels are not passed
           - that's the reason why QB needs a cmd-line option, every line executed needs a
@@ -151,8 +98,8 @@ o -exx should catch...
       [ ] ()'s around function arguments passed to byref params should make a copy of the
           argument
       [ ] events:
-      	  - there should be a call to the event trapping function on EVERY line
-      	    emitted (we can't use threads because DOS)
+          - there should be a call to the event trapping function on EVERY line
+            emitted, including DOS builds without threading
       	  - to the above work, a new cmd-line option must be added (as in QB)
       	  [ ] on key()
       	  [ ] on timer()
@@ -168,7 +115,7 @@ o -exx should catch...
           parameters and returning a value.  Very messy.  Also, it will make any symbol
           called Fn... invalid because it allows forward refs.
 
-    - "fb" - the inverse of "qb", but show deprecated messages by now for:
+    - "fb":
       [ ] without ON ERROR, all stmts returning rt errors should be allowed to
           be used as functions too
 
@@ -177,30 +124,23 @@ o -exx should catch...
     - take care with objects..
 
 [ ] PP:
-    [ ] add #pragma cmdline="-foo bar -baz"
-        [ ] clean-up the lang compatibility options in fbc source,
-            the restart logic and option tracking is difficult to
-            follow (even with the comments and well named symbols).
-        [ ] #if( sizeof() ) and other expressions will give wrong results
-            unless user specifically adds #cmdline "-end" since the auto
-            detection of first executable line can't be determined
-            For example real command line is "fbc -target win32 file.bas"
-               #cmdline "-target win64 -gen gcc"
-               #if( sizeof(integer) = 4 ) )
-                  #print "this shouldn't happen, but will"
-               #endif
-    - macro expansion: won't work for inner macros
+    [ ] clean-up the lang compatibility options in fbc source,
+        the restart logic and option tracking is difficult to
+        follow (even with the comments and well named symbols).
+    [ ] #if( sizeof() ) and other expressions will give wrong results
+        unless user specifically adds #cmdline "-end" since the auto
+        detection of first executable line can't be determined
+        For example real command line is "fbc -target win32 file.bas"
+           #cmdline "-target win64 -gen gcc"
+           #if( sizeof(integer) = 4 ) )
+              #print "this shouldn't happen, but will"
+           #endif
     - support default arguments?
 
 [ ] SCOPE..END SCOPE:
     - can't optimize multiple MEM_CLEAR's if there's any branch to
       one of them
     - error handlers should be restored too (or not allowed at all)
-
-[ ] disallow (in -lang qb mode):
-	dim foo as foo
-	.. and later ..
-	const|dim|function|etc foo.bar
 
 [ ] fbmain - explicit main function
     - must check if anything but the init/end labels were defined already inside
@@ -215,14 +155,6 @@ o -exx should catch...
       enough? the args would have to be linked to parent (the prototype), but updating
       the mangled alias on every argument can be slow..
 
-[ ] add the wstring type:
-    - fb_ConsoleInput() won't call fb_DevScrnInit_ReadWstr( ), so an input to a
-      wstring won't work.. to not add more bloat, the compiler should have to
-      call fb_ConsoleInput(there_is_any_wstr_argument), not so simple..
-    - auto-convert literal strings to w- or z- on assignments, depending on the l-hand
-      side type
-    - fix the !!!FIXME!!!'s and write the !!!WRITEME!!!'s in the rtlib
-
 [ ] passing a temporary string to a zstring ptr should not make yet-another temporary
     assignment in hStrParamToPtrArg(), just a pointer copy that later should be
     strDelete()'d
@@ -233,14 +165,10 @@ o -exx should catch...
         prototypes don't require a name and because overloading
       - := must be a new token because the "foo bar : baz" ambiguity
 
-[ ] method pointers / delegates
-  [ ] safe-ish delegates would need to aggregate the instance and method pointer which will
-      likely requre a new built-in type to handle by the compiler.  It's possible that we
-      could build a delegate in user code, but would have to sacrifice some type safety
-      since type information about the virtual table is not exposed to the user in any way.
-      The net result is that lookups in virtual tables must be cast to the proper type and
-      we don't have a way to check in user code the function signature of the virtual table
-      in user code.
+[ ] delegates
+  [ ] allow binding an instance and a method pointer in a typed value.
+      PROCPTR can select a method's vtable index by signature, but reading
+      the method pointer from an instance's vtable still requires a cast.
 
 *** *** *** *** ***
 [ ] All functions returning STRING should actually return the FBSTRING object
@@ -273,7 +201,6 @@ o -exx should catch...
 
 [ ] full debug support
     - add dynamic arrays - couldn't get GDB to use Fortran-like arrays
-    - each overloaded function will show the locals of *ALL* functions
 
 [ ] inline functions
     - better than macros as they can be "turned off" when debugged
@@ -290,16 +217,7 @@ o rtlib
     We'd need our own float <-> string routines (PRINT USING/FORMAT may have one
     part of that already) to really fix this.
 
-o gfxlib2 thread-safety
-  - ScreenList() works like Dir(); it should use TLS instead of simple global var
-
 o classes
-  - vtable lookup should handle THIS expression with side-effects
-
-  - obvious calls to unimplemented ABSTRACTs should be disallowed,
-    i.e. if the THIS expression is a stack/global object that cannot have
-    overridden the ABSTRACT, in contrast to a object pointer or byref object
-
   - INTERFACE ... END INTERFACE
       - structs extending OBJECT, not allowing any fields, only methods
       - all methods automatically are ABSTRACT
@@ -321,7 +239,6 @@ o classes
   - what should CLASS keyword do? struct vs. class as in C++?
 
   - Down casting
-     - static (base to derived)
      - dynamic (polymorphic)
 	- dynamic_cast<toType>(ptr) is converted to: ptr = (ptr != NULL? __dynamic_cast(void *ptr, RTTI *fromType, RTTI *toType, void *nullPtr): NULL);
 

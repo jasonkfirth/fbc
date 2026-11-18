@@ -42,11 +42,28 @@ compiler-smoke: libs
 	$(call _mt_run,$(TEST_FBC_CMD) "$(TEST_TMP)/smoke.bas" -x "$(TEST_TMP)/smoke$(EXEEXT)")
 ifneq ($(CAN_RUN),)
 	@./"$(TEST_TMP)/smoke$(EXEEXT)" >/dev/null 2>&1 && echo "==> RUN OK"
+ifeq ($(TARGET_OS)/$(TARGET_ARCH),linux/x86_64)
+	$(call _mt_run,$(PYTHON) "$(rootdir)/tests/wstring/console-runtime.py" -- $(TEST_FBC_CMD))
+ifeq ($(strip $(DISABLE_FFI)),)
+ifneq ($(filter %/libfbmt.a,$(RTL_LIBS)),)
+	$(call _mt_echo,ThreadCall argument lifetime smoke test)
+	$(call _mt_run,$(TEST_FBC_CMD) "$(rootdir)/tests/threads/threadcall-lifetime.bas" -x "$(TEST_TMP)/threadcall-lifetime$(EXEEXT)")
+	$(call _mt_run,./"$(TEST_TMP)/threadcall-lifetime$(EXEEXT)")
+endif
+endif
+endif
 ifeq ($(LLVM_SMOKE_AVAILABLE),yes)
 	$(call _mt_echo,LLVM duplicate extern global smoke test)
 	$(call _mt_run,$(CC) -c "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.c" -o "$(TEST_TMP)/llvm-duplicate-extern-global.o")
 	$(call _mt_run,$(LLVM_SMOKE_TEST_FBC_CMD) -i "$(rootdir)/inc" "$(rootdir)/tests/llvm/llvm-duplicate-extern-global.bas" "$(TEST_TMP)/llvm-duplicate-extern-global.o" -x "$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
 	$(call _mt_run,./"$(TEST_TMP)/llvm-duplicate-extern-global$(EXEEXT)")
+ifeq ($(TARGET_OS)/$(TARGET_ARCH),linux/x86_64)
+	$(call _mt_echo,LLVM small struct return ABI smoke test)
+	$(call _mt_run,$(CC) -c "$(rootdir)/tests/llvm/llvm-small-struct-return-helper.c" -o "$(TEST_TMP)/llvm-small-struct-return-c.o")
+	$(call _mt_run,$(LLVM_SMOKE_TEST_FBC_CMD) -gen llvm "$(rootdir)/tests/llvm/llvm-small-struct-return.bas" "$(TEST_TMP)/llvm-small-struct-return-c.o" -x "$(TEST_TMP)/llvm-small-struct-return$(EXEEXT)")
+	$(call _mt_run,./"$(TEST_TMP)/llvm-small-struct-return$(EXEEXT)")
+	$(call _mt_run,$(PYTHON) "$(rootdir)/tests/llvm/llvm-backend-regressions.py" -- $(LLVM_SMOKE_TEST_FBC_CMD))
+endif
 else
 	$(call _mt_echo,LLVM duplicate extern global smoke test skipped; required LLVM tools are unavailable)
 endif

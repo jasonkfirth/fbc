@@ -51,6 +51,8 @@
 typedef struct {
 	char            buffer[16];
 	unsigned        length;
+	/* Second UTF-16 unit when a wide read ended in the middle of a pair. */
+	unsigned        wide_pending;
 } DEV_SCRN_INFO;
 
        void         fb_DevScrnInit              ( void );
@@ -76,6 +78,12 @@ typedef struct {
        int          fb_DevScrnReadLine      ( FB_FILE *handle, FBSTRING_ACCESS *dst );
        int          fb_DevScrnReadLineWstr  ( FB_FILE *handle, FB_WCHAR *dst, ssize_t dst_chars );
        void         fb_DevScrnFillInput     ( DEV_SCRN_INFO *info );
+       void         fb_hConsoleBytesToWstr ( FB_WCHAR *dst, ssize_t dst_chars, const char *src, ssize_t bytes );
+       int          fb_hConsoleLineInputUtf8( FBSTRING_ACCESS *text, FBSTRING_ACCESS *dst,
+                                            int addquestion, int addnewline );
+#if defined(HOST_WIN32) && !defined(HOST_WINCE)
+       int          fb_hConsoleReadWideUnits( FB_WCHAR *dst, size_t *chars, int *status );
+#endif
 
        /* STDIO */
        int          fb_DevStdIoClose        ( FB_FILE *handle );

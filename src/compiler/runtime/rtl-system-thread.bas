@@ -72,6 +72,7 @@ private function hThreadCallMapType _
 
 		'' FB transforms type with 1 element to that element's type
 		dim as FBSYMBOL ptr first = symbUdtGetFirstField( subtype )
+		if( first = NULL ) then exit function
 		'' no second field?
 		if( symbUdtGetNextField( first ) = NULL ) then
 			function = hThreadCallMapType( first, TRUE )
@@ -199,6 +200,123 @@ private function hGetExprRef( byref expr as ASTNODE ptr ) as ASTNODE ptr
 	end if
 end function
 
+'' -------------------------------------------------------------------------
+'' Lifetime of the ABI argument after ordinary call lowering
+'' -------------------------------------------------------------------------
+
+declare function hThreadCallUsesTempStorage _
+	( byval expr as ASTNODE ptr, byval storage as integer = FALSE ) as integer
+
+private function hThreadCallIifUsesTemp _
+	( byval branch as ASTNODE ptr, byval result as FBSYMBOL ptr ) as integer
+
+	if( branch = NULL ) then return FALSE
+	if( branch->class = AST_NODECLASS_LINK ) then
+		return hThreadCallIifUsesTemp( branch->l, result ) orelse _
+		       hThreadCallIifUsesTemp( branch->r, result )
+	end if
+	if( (branch->class = AST_NODECLASS_ASSIGN) andalso branch->l andalso branch->l->sym = result ) then
+		return hThreadCallUsesTempStorage( branch->r )
+	end if
+	return FALSE
+end function
+
+private function hThreadCallUsesTempStorage _
+	( byval expr as ASTNODE ptr, byval storage as integer ) as integer
+
+	if( expr = NULL ) then return FALSE
+	select case expr->class
+	case AST_NODECLASS_VAR, AST_NODECLASS_IDX, AST_NODECLASS_OFFSET
+		if( expr->sym = NULL ) then return FALSE
+		if( symbIsVar( expr->sym ) andalso symbIsDescriptor( expr->sym ) ) then
+			var array = expr->sym->var_.desc.array
+			'' A fixed array field gets a fresh descriptor at each call.
+			'' A named array has a descriptor with its own lifetime.
+			if( array andalso (symbIsField( array ) orelse symbIsTemp( array )) ) then return TRUE
+		end if
+		return symbIsTemp( expr->sym ) andalso _
+		    (storage orelse typeIsPtr( astGetFullType( expr ) ))
+	case AST_NODECLASS_ADDROF, AST_NODECLASS_ASSIGN
+		return hThreadCallUsesTempStorage( expr->l, TRUE )
+	case AST_NODECLASS_CONV, AST_NODECLASS_FIELD, AST_NODECLASS_PTRCHK
+		return hThreadCallUsesTempStorage( expr->l, storage )
+	case AST_NODECLASS_DEREF
+		return hThreadCallUsesTempStorage( expr->l )
+	case AST_NODECLASS_LINK
+		'' Initializers and index calculations can use their own temps.
+		'' Only the storage selected by the result can escape to the worker.
+		return hThreadCallUsesTempStorage( astGetEffectiveNode( expr ), storage )
+	case AST_NODECLASS_BOP
+		if( expr->op.op = AST_OP_ADD orelse expr->op.op = AST_OP_SUB ) then
+			return hThreadCallUsesTempStorage( expr->l ) orelse hThreadCallUsesTempStorage( expr->r )
+		end if
+	case AST_NODECLASS_TYPEINI, AST_NODECLASS_CALLCTOR
+		return TRUE
+	case AST_NODECLASS_IIF
+		if( storage ) then return TRUE
+		'' The two sides assign to the same generated result slot. For
+		'' a pointer-valued IIF, inspect the values assigned to that slot.
+		if( expr->l andalso expr->l->sym andalso expr->r ) then
+			return hThreadCallIifUsesTemp( expr->r->r, expr->l->sym )
+		end if
+	case AST_NODECLASS_CALL
+		if( expr->sym = NULL ) then return FALSE
+		var dtype = symbGetType( expr->sym )
+		if( symbIsReturnByRef( expr->sym ) = FALSE ) then
+			if( typeIsDynamicString( dtype ) orelse dtype = FB_DATATYPE_WCHAR orelse _
+			    dtype = FB_DATATYPE_STRUCT ) then return TRUE
+			if( typeIsPtr( dtype ) = FALSE ) then return FALSE
+		end if
+
+		'' A reference returned by another call can alias one of its
+		'' own reference or pointer arguments.
+		var arg = expr->r
+		while( arg )
+			if( arg->sym andalso (symbGetParamMode( arg->sym ) = FB_PARAMMODE_BYREF orelse _
+			    symbGetParamMode( arg->sym ) = FB_PARAMMODE_BYDESC orelse _
+			    typeIsPtr( symbGetType( arg->sym ) )) ) then
+				if( hThreadCallUsesTempStorage( arg->l ) ) then return TRUE
+			end if
+			arg = arg->r
+		wend
+	end select
+	return FALSE
+end function
+
+private function hThreadCallArgType _
+	( byval proc as FBSYMBOL ptr, byval arg as ASTNODE ptr, byval ordinal as integer ) as integer
+
+	var param = arg->sym
+	var mode = symbGetParamMode( param )
+	var dtype = symbGetType( param )
+	var can_copy_string = (env.clopt.target <> FB_COMPTARGET_NUTTX) andalso _
+	                      (env.clopt.target <> FB_COMPTARGET_XBOX)
+	select case mode
+	case FB_PARAMMODE_BYREF, FB_PARAMMODE_BYDESC
+		if( hThreadCallUsesTempStorage( arg->l ) ) then
+			if( mode = FB_PARAMMODE_BYREF andalso typeIsDynamicString( dtype ) andalso can_copy_string ) then
+				return FB_THREADCALL_STRING
+			end if
+			errReportParam( proc, ordinal, NULL, FB_ERRMSG_THREADCALLTEMPREF )
+			return -1
+		end if
+		return FB_THREADCALL_PTR
+	case FB_PARAMMODE_BYVAL
+		if( typeIsDynamicString( dtype ) ) then
+			if( can_copy_string ) then return FB_THREADCALL_STRING
+		elseif( dtype <> FB_DATATYPE_STRUCT orelse symbCompIsTrivial( symbGetSubtype( param ) ) ) then
+			if( typeIsPtr( dtype ) andalso hThreadCallUsesTempStorage( arg->l ) ) then
+				errReportParam( proc, ordinal, NULL, FB_ERRMSG_THREADCALLTEMPREF )
+				return -1
+			end if
+			var tctype = hThreadCallMapType( param )
+			if( tctype <> -1 ) then return tctype
+		end if
+	end select
+	errReportParam( proc, ordinal, NULL, FB_ERRMSG_UNSUPPORTEDFUNCTION )
+	return -1
+end function
+
 '':::::
 function rtlThreadCall(byval callexpr as ASTNODE ptr) as ASTNODE ptr
 
@@ -208,24 +326,45 @@ function rtlThreadCall(byval callexpr as ASTNODE ptr) as ASTNODE ptr
 	dim as ASTNODE ptr procmodeexpr, t
 	dim as ASTNODE ptr stacksizeexpr, argsexpr, ptrexpr
 
+	if( callexpr = NULL ) then exit function
+	if( astIsCALL( callexpr ) = FALSE ) then
+		astDelTree( callexpr )
+		exit function
+	end if
 	proc = callexpr->sym
 
-	'' copy off symbol and all the arguments
+	'' A normal SUB call copies converted writable strings back immediately
+	'' after return. The launching thread cannot do that for an async call.
+	if( callexpr->call.strtail ) then
+		errReport( FB_ERRMSG_THREADCALLCOPYBACK )
+		astDelTree( callexpr )
+		exit function
+	end if
+
+	'' Check every argument before transferring ownership of the AST nodes.
 	dim args as integer = callexpr->call.args
 	dim arg as ASTNODE ptr = callexpr->r
 	dim argupper as integer = iif( args=0, 1, args )
 	redim argexpr( 1 to argupper ) as ASTNODE ptr
-	redim argmode( 1 to argupper ) as integer
+	redim argtype( 1 to argupper ) as integer
 	for i as integer = 1 to args
-		if arg = 0 then
+		if( arg = NULL orelse arg->sym = NULL orelse arg->l = NULL ) then
+			astDelTree( callexpr )
 			exit function
 		end if
+		argtype( args-i+1 ) = hThreadCallArgType( proc, arg, args-i+1 )
+		if( argtype( args-i+1 ) = -1 ) then
+			astDelTree( callexpr )
+			exit function
+		end if
+		arg = arg->r
+	next i
 
+	arg = callexpr->r
+	for i as integer = 1 to args
 		'' Take the argument expression out of the ARG node
 		argexpr( args-i+1 ) = arg->l
 		arg->l = NULL
-
-		argmode( args-i+1 ) = arg->arg.mode
 
 		arg = arg->r
 	next i
@@ -281,41 +420,16 @@ function rtlThreadCall(byval callexpr as ASTNODE ptr) as ASTNODE ptr
 	param = symbGetProcLastParam( proc )
 	for i as integer = 1 to args
 
-		'' allow byval and byref
-		dim as FB_PARAMMODE mode
-		dim as integer tctype = -1
-		mode = symbGetParamMode( param )
-
-		tctype = hThreadCallMapType( param )
-		select case mode
-			case FB_PARAMMODE_BYVAL
-				exit select
-			case FB_PARAMMODE_BYREF, FB_PARAMMODE_BYDESC
-				if( tctype <> -1 ) then
-					tctype = FB_THREADCALL_PTR
-				end if
-			case else
-				tctype = -1
-		end select
-
 		'' push parameter type
 		dim as FBSYMBOL ptr stype = symbGetSubType( param )
-		if hThreadCallPushType( expr, tctype, stype ) = FALSE then
+		if hThreadCallPushType( expr, argtype( i ), stype ) = FALSE then
 			exit function
 		end if
 
-		'' get pointer to argument
+		'' The normal call already lowered BYREF and BYDESC to pointers.
+		'' Hand the packer one address of that ABI value, as for BYVAL.
 		ptrexpr = argexpr( i )
 		t = astNewLINK( t, hGetExprRef( ptrexpr ), AST_LINK_RETURN_RIGHT )
-
-		''byref
-		dim isstring as integer
-		isstring = typeGetDtOnly( astGetDataType( argexpr( i ) ) )
-		if( mode = FB_PARAMMODE_BYREF and _
-			argmode( i ) <> FB_PARAMMODE_BYVAL and _
-			isstring = FALSE ) then
-			t = astNewLINK( t, hGetExprRef( ptrexpr ), AST_LINK_RETURN_RIGHT )
-		end if
 
 		if( ptrexpr = NULL ) then
 			exit function

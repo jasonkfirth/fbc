@@ -331,6 +331,9 @@ static void sigwinch_handler(int sig)
 int fb_hTermOut( int code, int param1, int param2 )
 {
 #ifdef DISABLE_NCURSES
+	(void)code;
+	(void)param1;
+	(void)param2;
 	/* Never output escape sequences. */
 	return FALSE;
 #else
@@ -628,7 +631,7 @@ static void hInit( void )
 	char buffer[2048], *p;
 	struct termios tty;
 #endif
-	char *term;
+	const char *term;
 	int i;
 
 	pthread_mutexattr_t attr;

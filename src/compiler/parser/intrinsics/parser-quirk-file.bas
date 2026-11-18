@@ -418,6 +418,7 @@ function cInputStmt _
 
 	dim as ASTNODE ptr filestrexpr = NULL, dstexpr = NULL
 	dim as integer islast = FALSE, isfile = FALSE, addnewline = FALSE, addquestion = FALSE
+	dim as integer has_wstring = FALSE
 
 	function = FALSE
 
@@ -461,9 +462,13 @@ function cInputStmt _
 		end if
 	end if
 
-	''
-	if( rtlFileInput( isfile, filestrexpr, addquestion, addnewline ) = FALSE ) then
-		exit function
+	'' File-number expressions are evaluated before the destination list.
+	'' A console prompt is a literal, so its call can be inserted after
+	'' parsing has determined whether any destination needs wide input.
+	var insertion_point = astGetProc( )->r
+	if( isfile ) then
+		if( rtlFileInput( TRUE, filestrexpr, addquestion, addnewline ) = FALSE ) then _
+			exit function
 	end if
 
 	'' Variable (',' Variable)*
@@ -491,14 +496,19 @@ function cInputStmt _
 		end if
 
 		if( dstexpr <> NULL ) then
+			if( astGetDataType( dstexpr ) = FB_DATATYPE_WCHAR ) then has_wstring = TRUE
 			fbSemanticModelSetAccess( dstexpr, "write" )
 			if( rtlFileInputGet( dstexpr ) = FALSE ) then
+				if( (isfile = FALSE) andalso (filestrexpr <> NULL) ) then astDelTree( filestrexpr )
 				exit function
 			end if
 		end if
 
 	loop until( islast )
 
+	if( isfile = FALSE ) then
+		return rtlFileInput( FALSE, filestrexpr, addquestion, addnewline, has_wstring, insertion_point )
+	end if
 	function = TRUE
 
 end function
