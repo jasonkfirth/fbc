@@ -133,3 +133,4 @@ winCE/
 !/src/gfxlib2/drivers/wince/
 !/src/gfxlib2/drivers/wince/**
 win95/
+nul
