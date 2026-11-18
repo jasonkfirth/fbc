@@ -28,7 +28,7 @@
 #include "../../gfx3_platform.h"
 #include "../../gfx3_input.h"
 
-#if defined(HOST_WIN32) && !defined(DISABLE_OPENGL)
+#if !defined(DISABLE_OPENGL)
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

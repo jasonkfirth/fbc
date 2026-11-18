@@ -6,7 +6,6 @@
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
 #include "../../fb.h"
-#include <locale.h>
 #include "../../fb_private_thread.h"
 
 FB_RTLIB_CTX fb_ctx /* not initialized */;
@@ -31,26 +30,6 @@ void fb_hRtInit( void )
 #endif
 	fb_AllocateMainFBThread();
 
-	/**
-	 * With the default "C" locale (which is just plain 7-bit ASCII),
-	 * our mbstowcs() calls (from fb_wstr_ConvFromA()) fail to convert
-	 * zstrings specific to the user's locale to Unicode wstrings.
-	 *
-	 * To fix this we must tell the CRT to use the user's locale setting,
-	 * i.e. the locale given by LC_* or LANG environment variables.
-	 *
-	 * We should change the LC_CTYPE setting only, to affect the behaviour
-	 * of the codepage <-> Unicode conversion functions, but not for
-	 * example LC_NUMERIC, which would affect things like the decimal
-	 * separator used by float <-> string conversion functions.
-	 * Users should call setlocale() manually if they want localisation.
-	 *
-	 * Don't bother doing it under DJGPP - there we don't really support
-	 * wstrings anyways, and the setlocale() reference increases .exe size.
-	 */
-#if !defined( HOST_DOS ) && !defined( HOST_XBOX )
-	setlocale( LC_CTYPE, "" );
-#endif
 	/* Register once, before BASIC global constructors. The fb_Init fallback
 	   also reaches this path when a caller deliberately omits fbrt0. */
 	if( atexit( fb_hRtExit ) != 0 ) {
@@ -121,23 +100,6 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 	fb_ctx.argv = argv;
 	fb_ctx.lang = lang;
 
-#ifdef HOST_ANDROID
-	/*
-	 * Android loads the shared object and runs its constructors on the
-	 * activity thread, while the FreeBASIC program itself runs on the
-	 * NativeActivity program thread.  Bind that program thread as the
-	 * FreeBASIC main thread so ThreadSelf(), ThreadWait() and ThreadDetach()
-	 * see the same model as normal executable targets.
-	 */
-	fb_AllocateMainFBThread();
-#endif
-
-#ifdef HOST_JS
-    // global constructors and destructors are not supported by emscripten
-    fb_hRtInit();
-#endif // HOST_JS
-
-#ifdef HOST_XBOX
 	/*
 		The fbrt0 PE initializer normally prepares the runtime before BASIC
 		global constructors. Preserve startup for callers which omit fbrt0,
@@ -151,7 +113,6 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 	if( fb_runtime_init_count == 0 )
 		fb_hRtInit();
 	fb_AllocateMainFBThread();
-#endif
 }
 
 /* called by FB program,
@@ -163,11 +124,6 @@ FBCALL void fb_End( int errlevel )
 
 	if( fb_ctx.exit_gfxlib2 )
 		fb_ctx.exit_gfxlib2( );
-
-#ifdef HOST_JS
-    // global constructors and destructors are not supported by emscripten
-    fb_hRtExit();
-#endif // HOST_JS
 
 	exit( errlevel );
 }

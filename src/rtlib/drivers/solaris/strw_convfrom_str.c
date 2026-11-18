@@ -18,8 +18,6 @@
 
 #include "../../fb.h"
 
-#if !defined( HOST_DOS ) && !defined( HOST_ANDROID ) && !defined( HOST_JS )
-
 static ssize_t fb_wstr_ConvFromA_nomultibyte( FB_WCHAR *dst, ssize_t dst_chars, const char *src )
 {
 	/* mbstowcs() and wcstombs() must have failed; translate at least ASCII
@@ -38,8 +36,6 @@ static ssize_t fb_wstr_ConvFromA_nomultibyte( FB_WCHAR *dst, ssize_t dst_chars, 
 	*dst = FB_WCHAR_LITERAL('\0');
 	return dst - origdst;
 }
-
-#endif
 
 #if defined( DISABLE_WCHAR )
 

@@ -1,7 +1,7 @@
 /*
  * Project: FreeBASIC runtime library
  * File: drivers/solaris/hinit.c
- * Purpose: libfb initialization for Unix.
+ * Purpose: libfb initialization for Solaris.
  * Responsibilities: Target-specific runtime support for solaris.
  * This file intentionally does NOT contain: Compiler parsing or portable runtime policy.
  */
@@ -29,25 +29,13 @@
 
 #include "termcap.h"
 
-#if defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64)
-	/*
-	The sys/ headers are architecture and OS dependent. They
-	do not exist across all targets and io.h in particular
-	is intended for very low-level non-portable uses often
-	in coordination with the kernel. The only targets that
-	provide sys/io.h are x86*, Alpha, IA64, and 32-bit ARM.
-	No other systems provide it.
-	From https://bugzilla.redhat.com/show_bug.cgi?id=1116162
-	or http://www.hep.by/gnu/gnulib/ioperm.html#ioperm
-	*/
-	#include <sys/io.h>
-#endif
-
 #include <sys/ioctl.h>
 #include <sys/termios.h>
 #include <fcntl.h>
 
 FBCONSOLE fb_console_context;
+
+void fb_hSolarisInitArch( void );
 
 typedef void (*SIGHANDLER)(int);
 static SIGHANDLER old_sighandler[NSIG];
@@ -132,88 +120,19 @@ static void signal_handler(int sig)
 	raise(sig);
 }
 
-#ifdef HOST_LINUX
-/* Query window size or cursor position from the terminal by sending the
-   respective escape sequence to stdout and reading the answer (report) from
-   stdin.
-   That's assuming that the terminal actually supports the escape sequence and
-   sends a response. If it does not, we'll hang forever (or at least until the
-   read from stdin returns EOF).
-   Used with SEQ_QUERY_WINDOW and SEQ_QUERY_CURSOR only (but could easily be
-   extended to support more). */
-static int fb_hTermQuery( int code, int *val1, int *val2 )
-{
-	if( fb_hTermOut( code, 0, 0 ) == FALSE )
-		return FALSE;
-
-	int filled;
-	do {
-		/* The terminal should have sent its reply through stdin. However, it's
-		   possible that there's other data pending in stdin, e.g. if the user
-		   happened to press a key at the right time. */
-
-		/* Read until an '\033[' (ESC char followed by '[') is reached,
-		   it should be the begin of the terminal's answer string) */
-		int c;
-		do {
-			do {
-				c = getchar( );
-				if( c == EOF ) return FALSE;
-				if( c == '\033' ) break;
-
-				/* Add skipped char to Inkey() buffer so it's not lost */
-				fb_hAddCh( c );
-			} while (1);
-
-			c = getchar( );
-			if( c == '[' ) break;
-
-			/* ditto */
-			fb_hAddCh( c );
-		} while (1);
-
-		if( code == SEQ_QUERY_WINDOW )
-			filled = scanf( "8;%d;%dt", val1, val2 );
-		else /* SEQ_QUERY_CURSOR */
-			filled = scanf( "%d;%dR", val1, val2 );
-	} while (filled != 2);
-
-	return TRUE;
-}
-#endif
-
-/**
- * Update our cursor position with information from the terminal, if possible,
- * to make it more accurate. (It's possible that the cursor moved outside of
- * our control; e.g. if the FB program did a printf() instead of using FB's
- * PRINT)
- */
+/* Cursor-position querying is not implemented by this Solaris console driver. */
 void fb_hRecheckCursorPos( void )
 {
-#ifdef HOST_LINUX
-	int x = 0;
-	int y = 0;
-	if( fb_hTermQuery( SEQ_QUERY_CURSOR, &y, &x ) ) {
-		fb_console_context.cur_x = x;
-		fb_console_context.cur_y = y;
-	}
-#endif
 }
 
 /**
- * Check whether the SIGWINCH handler has been called, and if so, re-query
- * the terminal width/height.
- *  - Assuming BG_LOCK() is acquired, because this can be called from
- *    linux/io_mouse.c:mouse_handler() from the background thread
- *  - Assuming __fb_con.inited
- *
- *  The "requery_cursorpos" parameter allows callers to disable the cursor
- *  position update we'd normally do too in this case. This is useful if the
- *  caller wants to do it manually, regardless of whether SIGWINCH happened,
- *  while at the same time avoiding duplicate queries.
+ * Refresh terminal dimensions after SIGWINCH. The shared interface includes
+ * a cursor-requery flag, but this backend leaves the cursor position alone.
  */
 void fb_hRecheckConsoleSize( int requery_cursorpos )
 {
+	(void)requery_cursorpos;
+
 	if( __fb_console_resized == FALSE )
 		return;
 
@@ -233,16 +152,7 @@ void fb_hRecheckConsoleSize( int requery_cursorpos )
 	/* Try to query the terminal size */
 	/* Try TIOCGWINSZ */
 	struct winsize win = { 0, 0, 0, 0 };
-	if( ioctl( STDOUT_FILENO, TIOCGWINSZ, &win ) != 0 ) {
-#ifdef HOST_LINUX
-		/* Try an escape sequence */
-		int r, c;
-		if( fb_hTermQuery( SEQ_QUERY_WINDOW, &r, &c ) ) {
-			win.ws_row = r;
-			win.ws_col = c;
-		}
-#endif
-	}
+	(void)ioctl( STDOUT_FILENO, TIOCGWINSZ, &win );
 
 	/* Fallback to defaults if all above queries failed */
 	/* Besides probably being correct, this also means we don't have to
@@ -462,10 +372,6 @@ int fb_hInitConsole(void)
 	}
 	fcntl(fb_console_context.h_in, F_SETFL, fb_console_context.old_in_flags | O_NONBLOCK);
 
-#ifdef HOST_LINUX
-	if (fb_console_context.inited == INIT_CONSOLE)
-		fb_hTermOut(SEQ_INIT_CHARSET, 0, 0);
-#endif
 	fb_hTermOut(SEQ_INIT_KEYPAD, 0, 0);
 
 	/* Initialize keyboard and mouse handlers if set */
@@ -541,10 +447,6 @@ void fb_hExitConsole( void )
 		   We have to fclose() the f_in FILE* though to avoid a leak. */
 
 		/* Cleanup terminal */
-#ifdef HOST_LINUX
-		if (fb_console_context.inited == INIT_CONSOLE)
-			fb_hTermOut(SEQ_EXIT_CHARSET, 0, 0);
-#endif
 		fb_hTermOut(SEQ_RESET_COLOR, 0, 0);
 		fb_hTermOut(SEQ_SHOW_CURSOR, 0, 0);
 		fb_hTermOut(SEQ_EXIT_KEYPAD, 0, 0);
@@ -579,16 +481,7 @@ static void hInit( void )
 
 	pthread_mutexattr_t attr;
 
-#if defined(__GNUC__) && defined(__i386__)
-	unsigned int control_word;
-
-	/* Get FPU control word */
-	__asm__ __volatile__( "fstcw %0" : "=m" (control_word) : );
-	/* Set 64-bit and round to nearest */
-	control_word = (control_word & 0xF0FF) | 0x300;
-	/* Write back FPU control word */
-	__asm__ __volatile__( "fldcw %0" : : "m" (control_word) );
-#endif
+	fb_hSolarisInitArch();
 
 	/* make mutex recursive to behave the same on Win32 and Linux (if possible) */
 	pthread_mutexattr_init(&attr);
@@ -676,10 +569,6 @@ void fb_hInit( void )
 {
 	hInit( );
 
-#if defined HOST_LINUX && (defined HOST_X86 || defined HOST_X86_64)
-	/* Permissions for port I/O */
-	fb_console_context.has_perm = ioperm(0, 0x400, 1) ? FALSE : TRUE;
-#endif
 }
 
 void fb_hEnd( int unused )

@@ -27,41 +27,14 @@
 #include "../../fb_profile.h"
 #include <stdint.h>
 
-#ifdef HOST_WIN32
-	#include <windows.h>
-#endif
-
 /* choose a suitable ssize_t printf specifier */
 #if !defined(fmtssizet)
-	#if defined(HOST_CYGWIN)
-		#define fmtssizet "%18zd"
-		#define fmtssizetarg(value) ((ssize_t)(value))
-	#elif defined(HOST_WIN32)
-		#if defined(_UCRT) || __USE_MINGW_ANSI_STDIO
-			#define fmtssizet "%18zd"
-			#define fmtssizetarg(value) ((ssize_t)(value))
-		#else
-			#define fmtssizet "%18Id"
-			#define fmtssizetarg(value) ((ptrdiff_t)(value))
-		#endif
-	#else
-		#define fmtssizet "%18zd"
-		#define fmtssizetarg(value) ((ssize_t)(value))
-	#endif
+	#define fmtssizet "%18zd"
+	#define fmtssizetarg(value) ((ssize_t)(value))
 #endif
 
-#if defined(HOST_DARWIN)
-/*
-	Darwin's Mach-O assembler requires section names in "segment,section"
-	form, and section names are limited to 16 bytes.  It also exposes section
-	bounds through section$start/section$end symbols instead of the ELF
-	__start_/__stop_ symbols used by GNU ld.
-*/
-#define FB_PROFILE_CYCLE_SECTION "__DATA,fb_profcycdata"
-#else
 /* profile section data */
 #define FB_PROFILE_CYCLE_SECTION "fb_profilecycledata"
-#endif
 
 /* profiler record ids - these indicate what the record is */
 enum FB_PROFILE_REDORD_ID
@@ -101,13 +74,8 @@ typedef struct FB_PROFILE_RECORD_DATA
 	ssize_t reserved;
 } FB_PROFILE_RECORD_DATA;
 
-#if defined(HOST_DARWIN)
-extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_start[] __asm("section$start$__DATA$fb_profcycdata");
-extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_stop[] __asm("section$end$__DATA$fb_profcycdata");
-#else
 extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_start[];
 extern FB_PROFILE_RECORD_HEADER fb_profilecycledata_stop[];
-#endif
 
 typedef struct FB_PROFILE_FILE_DATA
 {

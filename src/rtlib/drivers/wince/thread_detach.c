@@ -16,11 +16,7 @@ FBCALL void fb_ThreadDetach( FBTHREAD *thread )
 		return;
 
 	flags = fb_AtomicSetThreadFlags( &thread->flags, FBTHREAD_DETACHED );
-#ifdef HOST_CYGWIN
-	pthread_detach( thread->id );
-#else
 	CloseHandle( thread->id );
-#endif
 
 	if( flags & FBTHREAD_EXITED ) {
 		free( thread );

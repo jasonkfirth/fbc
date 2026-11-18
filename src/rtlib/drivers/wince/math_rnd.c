@@ -24,12 +24,8 @@
 #include "../../math/rnd_state.h"
 
 /* Needed by FB_RND_REAL */
-#if defined HOST_WIN32
-	#include <windows.h>
-	#include <wincrypt.h>
-#elif defined HOST_LINUX || defined HOST_ANDROID
-	#include <fcntl.h>
-#endif
+#include <windows.h>
+#include <wincrypt.h>
 
 /* rtlib is initialzied so that RND & RND32 call the
    startup routines.  This allows calling RND without
@@ -44,9 +40,7 @@ static void hRndCtxInitCRT32    ( uint32_t seed );
 static void hRndCtxInitFAST32   ( uint32_t seed );
 static void hRndCtxInitMTWIST32 ( uint64_t seed );
 static void hRndCtxInitQB32     ( uint32_t seed );
-#if defined HOST_WIN32 || defined HOST_LINUX || defined HOST_ANDROID
 static void hRndCtxInitREAL32   ( uint64_t seed );
-#endif
 
 #define INITIAL_SEED	327680
 
@@ -250,24 +244,14 @@ static void hRndCtxInitQB32 ( uint32_t seed )
 
 /* FB_RND_REAL */
 
-#if defined HOST_WIN32 || defined HOST_LINUX || defined HOST_ANDROID
 static int hRefillRealRndNumber( void )
 {
 	int success = 0;
-#if defined HOST_WIN32
 	HCRYPTPROV provider = 0;
 	if( CryptAcquireContextW( &provider, NULL, 0, PROV_RSA_FULL, 0 ) == TRUE ) {
 		success = CryptGenRandom( provider, sizeof(ctx.state32), (BYTE*)ctx.state32 );
 		CryptReleaseContext( provider, 0 );
 	}
-
-#else
-	int urandom = open( "/dev/urandom", O_RDONLY );
-	if( urandom != -1 ) {
-		success = ( read( urandom, ctx.state32, sizeof(ctx.state32) ) == sizeof(ctx.state32) );
-		close( urandom );
-	}
-#endif
 	if( success ) {
 		ctx.index32 = ctx.state32;
 	}
@@ -308,7 +292,6 @@ static void hRndCtxInitREAL32 ( uint64_t seed )
 	/* initialize starting state - used by hRefillRealRndNumber() */
 	hRnd_FillFAST32( ctx.state32, MAX_STATE, (uint32_t)seed );
 }
-#endif
 
 /* RND Startup code */
 
@@ -401,11 +384,9 @@ FBCALL void fb_Randomize ( double seed, int algorithm )
 		hRndCtxInitQB32( (uint32_t)s );
 		break;
 
-#if defined HOST_WIN32 || defined HOST_LINUX || defined HOST_ANDROID
 	case FB_RND_REAL:
 		hRndCtxInitREAL32( (uint32_t)seed );
 		break;
-#endif
 
 	default:
 	case FB_RND_MTWIST:

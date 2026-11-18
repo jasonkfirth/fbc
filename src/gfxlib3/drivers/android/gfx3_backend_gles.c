@@ -35,8 +35,7 @@
 
 #include <math.h>
 
-#if (defined(HOST_ANDROID) || defined(HOST_LINUX)) && \
-	!defined(DISABLE_OPENGL)
+#ifndef DISABLE_OPENGL
 
 #include <GLES3/gl3.h>
 
@@ -4192,10 +4191,8 @@ static int gles_present_handle(FB_GFX3_GLES_STATE *state,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	viewport_width = width;
 	viewport_height = height;
-#ifdef HOST_ANDROID
 	fb_gfx3_android_usable_viewport(surface->width, surface->height,
 		&viewport_width, &viewport_height);
-#endif
 	/* GLES has a bottom-left origin; the usable Android area begins at top. */
 	glViewport(0, (GLint)(height - viewport_height), (GLsizei)viewport_width,
 		(GLsizei)viewport_height);

@@ -545,17 +545,6 @@ static void hInit( void )
 
 	pthread_mutexattr_t attr;
 
-#if defined(__GNUC__) && defined(__i386__)
-	unsigned int control_word;
-
-	/* Get FPU control word */
-	__asm__ __volatile__( "fstcw %0" : "=m" (control_word) : );
-	/* Set 64-bit and round to nearest */
-	control_word = (control_word & 0xF0FF) | 0x300;
-	/* Write back FPU control word */
-	__asm__ __volatile__( "fldcw %0" : : "m" (control_word) );
-#endif
-
 	/* make mutex recursive to behave the same on Win32 and Linux (if possible) */
 	pthread_mutexattr_init(&attr);
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);

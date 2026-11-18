@@ -25,8 +25,6 @@
 #include "../../gfx3_platform.h"
 #include "../../gfx3_input.h"
 
-#if defined(HOST_DARWIN)
-
 #include <CoreGraphics/CGDirectDisplay.h>
 #include <CoreGraphics/CGEvent.h>
 #include <CoreGraphics/CGGeometry.h>
@@ -1057,15 +1055,6 @@ static const FB_GFX3_PLATFORM_VTABLE __fb_gfx3_platform_darwin = {
 	platform_darwin_show_window,
 	platform_darwin_set_window_title
 };
-
-#else
-
-static const FB_GFX3_PLATFORM_VTABLE __fb_gfx3_platform_darwin = {
-	"Cocoa Metal unavailable",
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-};
-
-#endif
 
 int fb_gfx3_platform_keyboard_overlay(void *platform,
 	FB_GFX3_ANDROID_KEYBOARD_OVERLAY *overlay)

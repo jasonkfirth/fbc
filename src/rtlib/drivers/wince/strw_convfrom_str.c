@@ -19,8 +19,7 @@
 
 #include "../../fb.h"
 
-#if defined( DISABLE_WCHAR ) && !defined( HOST_DOS ) && \
-	!defined( HOST_ANDROID ) && !defined( HOST_JS )
+#if defined( DISABLE_WCHAR )
 
 static ssize_t fb_wstr_ConvFromA_nomultibyte( FB_WCHAR *dst, ssize_t dst_chars, const char *src )
 {

@@ -10,10 +10,6 @@
 #include "error_c_resume_internal.h"
 #include <setjmp.h>
 
-#if defined( _WIN32 ) && defined( __aarch64__ )
-void __mingw_longjmp( jmp_buf buffer, int value );
-#endif
-
 /* ------------------------------------------------------------------------- */
 /* Activation ownership and callback metadata                                 */
 /* ------------------------------------------------------------------------- */
@@ -644,11 +640,7 @@ int fb_ErrorFrameDispatch( FB_ERRORCTX *error, FB_ERRHANDLER *target, int *fatal
 		error->res_lbl = NULL;
 		error->resnxt_lbl = NULL;
 		fb_ErrorFrameRestoreState( error );
-#if defined( _WIN32 ) && defined( __aarch64__ )
-		__mingw_longjmp( owner->buffer, 1 );
-#else
 		longjmp( owner->buffer, 1 );
-#endif
 	}
 	if( action == FB_ERROR_FRAME_RETRY )
 		label = active.error.res_lbl;
@@ -755,11 +747,7 @@ int fb_ErrorCResumeToken( void *token )
         if( node->retry != token && node->next != token )
             continue;
         node->selected = token;
-#if defined( _WIN32 ) && defined( __aarch64__ )
-        __mingw_longjmp( node->buffer, 1 );
-#else
         longjmp( node->buffer, 1 );
-#endif
     }
     return FALSE;
 }

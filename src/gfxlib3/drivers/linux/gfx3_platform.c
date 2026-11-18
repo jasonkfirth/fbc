@@ -31,7 +31,7 @@
 #include "gfx3_platform_drm.h"
 #include "gfx3_platform_wayland.h"
 
-#if defined(HOST_LINUX) && !defined(DISABLE_X11)
+#if !defined(DISABLE_X11)
 
 #include <dlfcn.h>
 #include <limits.h>

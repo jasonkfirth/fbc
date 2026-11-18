@@ -139,10 +139,8 @@ static void release_gfx_mem(void)
 
 static void exit_proc(void)
 {
-#ifndef HOST_JS
 	if( fb_gfx )
 		set_mode( 0, 0, 0, 0, 0, 1, 0, 0, 0, SCREEN_EXIT, 0.0, 0, 0 );
-#endif
 }
 
 /* ------------------------------------------------------------------------- */
@@ -755,11 +753,7 @@ static int set_mode
         }
 
         if (!driver) {
-#ifdef HOST_JS
-            set_mode( 0, 0, 0, 0, 0, 1, 0, 0, 0, SCREEN_EXIT, 0.0, 0, 0 );
-#else
             exit_proc();
-#endif
             return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
         }
         fb_gfx->driver = driver;

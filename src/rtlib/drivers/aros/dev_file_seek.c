@@ -6,18 +6,18 @@
 
     Purpose:
 
-        Seek an AROS file device through its buffered POSIXC stream.
+        Seek AROS file devices through dos.library on non-ARM targets.
 
     Responsibilities:
 
         - validate the runtime file device
         - serialize position changes with the runtime file lock
-        - translate stream-positioning failures to FreeBASIC file errors
-        - track file growth caused by a seek beyond end-of-file
+        - update logical file size after a successful seek
 
-    This file intentionally does NOT contain: - generic operating-system behavior
-        - file-size discovery
-        - AROS architecture policy
+    This file intentionally does NOT contain:
+
+        - ARM POSIXC stream handling, which is in arm/dev_file_seek.c
+        - generic file-device dispatch
 */
 
 #include "../../fb.h"
@@ -36,23 +36,9 @@ int fb_DevFileSeek( FB_FILE *handle, fb_off_t offset, int whence )
 		return fb_ErrorSetNum( FB_RTERROR_ILLEGALFUNCTIONCALL );
 	}
 
-	#if defined(__arm__)
-	/* Keep ARM's POSIXC stream and its native handle paired internally. */
-	result = fseeko( fp, offset, whence );
-	#else
 	result = fb_hArosSetFilePosition( fp, offset, whence );
-	#endif
 	if( result == 0 )
-	#if defined(__arm__)
-	{
-		fb_off_t position = ftello( fp );
-
-		if( position > handle->size )
-			handle->size = position;
-	}
-	#else
-		fb_hArosGrowFileSize( handle );
-	#endif
+	fb_hArosGrowFileSize( handle );
 	result = fb_ErrorSetNum( result == 0
 				 ? FB_RTERROR_OK
 				 : FB_RTERROR_FILEIO );

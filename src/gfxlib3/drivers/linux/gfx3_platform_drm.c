@@ -46,8 +46,7 @@ int fb_gfx3_platform_drm_should_default(void)
 	return TRUE;
 }
 
-#if defined(HOST_LINUX) && !defined(DISABLE_OPENGL) && \
-	defined(__has_include)
+#if !defined(DISABLE_OPENGL) && defined(__has_include)
 #if __has_include(<xf86drm.h>) && __has_include(<xf86drmMode.h>) && \
 	__has_include(<drm_fourcc.h>) && __has_include(<gbm.h>) && \
 	__has_include(<EGL/egl.h>) && __has_include(<EGL/eglext.h>)

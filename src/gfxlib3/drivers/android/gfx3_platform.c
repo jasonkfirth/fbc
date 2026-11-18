@@ -30,8 +30,6 @@
 
 #include <string.h>
 
-#if defined(HOST_ANDROID)
-
 #include "../../gfx3_input.h"
 
 #include <EGL/egl.h>
@@ -1144,25 +1142,6 @@ static const FB_GFX3_PLATFORM_VTABLE __fb_gfx3_platform_android = {
 	android_show_window,
 	android_set_window_title
 };
-
-#else
-
-int fb_gfx3_platform_keyboard_overlay(void *platform,
-	FB_GFX3_ANDROID_KEYBOARD_OVERLAY *overlay)
-{
-	(void)platform;
-	if (overlay != NULL)
-		memset(overlay, 0, sizeof(*overlay));
-	return FB_GFX3_UNSUPPORTED;
-}
-
-/* Keep the common platform selector linkable in cross-platform archives. */
-static const FB_GFX3_PLATFORM_VTABLE __fb_gfx3_platform_android = {
-	"Android unavailable", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL
-};
-
-#endif
 
 const FB_GFX3_PLATFORM_VTABLE *fb_gfx3_platform_default(void)
 {
