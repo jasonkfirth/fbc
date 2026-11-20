@@ -366,11 +366,27 @@ install_deps() {
 # Bootstrap generation
 ##############################################################################
 
+ensure_target_bootstrap_sources() {
+    local bootstrap_srcdir="$ROOT/bootstrap/$BOOTKEY"
+
+    if find "$bootstrap_srcdir" -type f \( -name '*.c' -o -name '*.asm' \) \
+        -print -quit 2>/dev/null | grep -q .; then
+        return 0
+    fi
+
+    [ -f "$BOOTSTRAP_TAR" ] || die "missing bootstrap sources: $bootstrap_srcdir and $BOOTSTRAP_TAR"
+
+    mkdir -p "$ROOT/bootstrap"
+    run tar -xJf "$BOOTSTRAP_TAR" -C "$ROOT" --strip-components=1 \
+        "FreeBASIC-${VERSION}-source-bootstrap-${BOOTKEY}/bootstrap/${BOOTKEY}"
+}
+
 ensure_host_compiler() {
     if ! ./bin/fbc -version >/dev/null 2>&1; then
         msg "building host compiler"
-        run "$MAKE_CMD" clean
-        run "$MAKE_CMD" compiler -j"$JOBS"
+        ensure_target_bootstrap_sources
+        run "$MAKE_CMD" bootstrap-minimal -j"$JOBS"
+        run "$MAKE_CMD" compiler FBC=bootstrap/fbc -j"$JOBS"
     fi
 
     ./bin/fbc -version >/dev/null 2>&1 || die "host compiler not available"

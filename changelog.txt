@@ -2,6 +2,8 @@ Version 1.20.6
 
 [changed]
 - gfxlib3/Linux: cache Xft DPI and RandR rotation metrics for one second so responsive GUI polling does not open an X display and query RandR on every frame. Preserve display changes with a bounded refresh interval.
+- rtlib/Win32: allow the CRT import-pointer adapters to be built as strong definitions for standalone Windows 95 packages, while retaining weak fallbacks for normal MinGW CRT linking.
+- packaging/Windows 95: produce a standalone FreeBASIC 1.20.6 package with the refreshed compiler and runtime libraries, Win95-compatible tools and CRT imports, and a compiler-driven smoke test.
 - version/package metadata: start the 1.20.6 development line, synchronize distro package versions and reset package release counters for the new upstream version.
 - maintenance: review every entry in `todo.txt` against the current compiler and runtime, remove completed work, and retain outstanding cases.
 - compiler/LLVM: match the x86-64 Linux C ABI for small struct and union results, including mixed integer and SSE registers and a hidden result pointer for unaligned packed structs. Add smoke coverage for calls in both directions between C and FreeBASIC, including procedure pointers and variadic calls. Rebuild affected LLVM objects before mixing them with newly compiled code.
@@ -36,6 +38,10 @@ Version 1.20.6
 - RPM source staging: detect empty bootstrap directories and unpack the existing target bootstrap archive before starting an RPM build.
 - RPM source archives: use xz's fast preset so large source tarballs finish promptly on emulated architectures.
 - RPM matrix: invoke the package builder in build mode inside each clean target container, so the package is built once and the temporary source archive is removed afterward.
+- RPM bootstrap: restore target compiler sources from the emitted architecture archive, build the bootstrap-minimal seed, and then build the native host compiler in clean cross-architecture containers.
+- Alpine package smoke tests: recognize missing XDG_RUNTIME_DIR diagnostics as headless graphics output, consistent with the Debian package runner.
+- Alpine fbctests: mount and copy src/sfxlib for multi-module tests that include the SFX runtime header.
+- Alpine fbctests: mount the runtime ABI header required by the SFX runtime header's include chain.
 - Xbox runtime build: include the standard time declarations used by TCP socket timeout structures on the nxdk target.
 - Xbox package validation: require the base, threaded, graphics, and sound runtime archives to be complete and reject unfinished build configuration markers before packaging.
 - Linux package smoke tests: recognize SDL's missing `XDG_RUNTIME_DIR` diagnostic as a headless graphics condition so package tests can continue to compiler and example coverage.

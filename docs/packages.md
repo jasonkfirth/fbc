@@ -125,4 +125,21 @@ Run the check from the directory containing both the download and its matching
 `SHA256SUMS` entry. Do not mix a checksum file from one package directory with
 a similarly named package from another distribution or architecture.
 
+## Windows 95 standalone package
+
+The Windows 95 package is a separate 32-bit package because its native
+compiler tools and runtime compatibility requirements differ from the current
+Win32 package. Build and qualify the package tree first, then create its ZIP
+archive and checksum manifest with:
+
+```sh
+./build_scripts/win95-package-freebasic.sh \
+  --package-root out/win95/FreeBASIC-VERSION-win95
+```
+
+The package tree name supplies the release version. The packaging step checks
+for the compiler, Win95-compatible assembler and linker, tool CRT, and core
+runtime libraries before writing
+`out/win95/packages/win95_freebasic-VERSION.zip`.
+
 <!-- end of packages.md -->

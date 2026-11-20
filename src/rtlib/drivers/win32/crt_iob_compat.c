@@ -30,7 +30,12 @@
 
 #if defined( __GNUC__ )
 	#define FB_CRT_CDECL __attribute__((cdecl))
-	#define FB_CRT_WEAK __attribute__((weak))
+	#if defined( FB_WIN95_CRT )
+		/* The Win95 package has no newer CRT imports to override these fallbacks. */
+		#define FB_CRT_WEAK
+	#else
+		#define FB_CRT_WEAK __attribute__((weak))
+	#endif
 #else
 	#define FB_CRT_CDECL __cdecl
 	#define FB_CRT_WEAK
@@ -79,9 +84,9 @@ static int FB_CRT_CDECL fb_CrtWstat32( const unsigned short *path, void *status 
 
 /*
    MinGW declares the numbered functions with dllimport and therefore emits
-   references to their import-pointer symbols.  Weak definitions let a modern
-   MinGW CRT replace these pointers while retaining the local fallback when a
-   Windows 95 package links only against MSVCRT40.
+   references to their import-pointer symbols. Weak definitions let a modern
+   MinGW CRT take precedence. The Windows 95 package defines FB_WIN95_CRT so
+   these fallbacks satisfy the import pointers when linking only with MSVCRT40.
 */
 FB_CRT_STAT_PROC fb_CrtImpStat32
 	__asm__("__imp___stat32") FB_CRT_WEAK = fb_CrtStat32;
