@@ -35,6 +35,7 @@ Version 1.20.6
 - Debian source validation: remove an obsolete Lintian override for a tag no longer recognized by current Lintian releases.
 - RPM source staging: detect empty bootstrap directories and unpack the existing target bootstrap archive before starting an RPM build.
 - RPM source archives: use xz's fast preset so large source tarballs finish promptly on emulated architectures.
+- RPM matrix: invoke the package builder in build mode inside each clean target container, so the package is built once and the temporary source archive is removed afterward.
 - Xbox runtime build: include the standard time declarations used by TCP socket timeout structures on the nxdk target.
 - Xbox package validation: require the base, threaded, graphics, and sound runtime archives to be complete and reject unfinished build configuration markers before packaging.
 - Linux package smoke tests: recognize SDL's missing `XDG_RUNTIME_DIR` diagnostic as a headless graphics condition so package tests can continue to compiler and example coverage.

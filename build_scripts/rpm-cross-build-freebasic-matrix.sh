@@ -428,7 +428,7 @@ EOF
             -v "$OUT_ROOT:/work/out" \
             -w /work \
             "$image" \
-            bash -lc "/work/build_scripts/rpm-build-freebasic.sh --no-build"
+            bash -lc "/work/build_scripts/rpm-build-freebasic.sh"
     } &> "$outdir/docker_build.log"; then
         if log_has_missing_manifest "$outdir/docker_build.log"; then
             echo "SKIPPED: ${distro}/${release} (${arch}) has no Docker image for ${platform}"
