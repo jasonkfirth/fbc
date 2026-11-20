@@ -112,8 +112,7 @@ typedef struct FB_FILE_ {
     int             len;
     FB_FILE_ENCOD   encod;
 #if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
-    (defined(HOST_AROS) && defined(__arm__)) || \
-    (defined(HOST_LINUX) && defined(__arm__)) || defined(__EMSCRIPTEN__)
+    defined(__arm__) || defined(__EMSCRIPTEN__)
     /* Keep 64-bit file sizes naturally aligned on 64-bit, ARM32, and wasm32. */
     unsigned char   size_alignment_padding[4];
 #endif

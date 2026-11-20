@@ -651,7 +651,7 @@ function symbAddVar _
 
 	'' Static member var using parent UDT as dtype? Length must be
 	'' recalculated later, when UDT was fully parsed...
-	if( symbIsParentNamespace( symbGetType( s ), s->subtype ) ) then
+	if( (subtype <> NULL) andalso symbIsParentNamespace( symbGetType( s ), s->subtype ) ) then
 		symbSetUdtHasRecByvalRes( subtype )
 	end if
 

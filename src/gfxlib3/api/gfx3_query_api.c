@@ -1149,8 +1149,8 @@ FBCALL void fb_GfxControl_i(int what, ssize_t *parameter1,
 			mobile_mode = fb_gfx3_linux_mode_acquire();
 			mobile_state = mobile_mode ? fb_gfx3_api_get_draw_state_locked() : NULL;
 			if ((mobile_state != NULL) && (mobile_state->mode == mobile_mode)) {
-				active_width = mobile_state->mode->width;
-				active_height = mobile_state->mode->height;
+				active_width = query_u32_to_ssize(mobile_state->mode->width);
+				active_height = query_u32_to_ssize(mobile_state->mode->height);
 				have_active_mode = (active_width > 0) && (active_height > 0);
 			}
 			fb_gfx3_linux_mode_release();

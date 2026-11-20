@@ -41,6 +41,15 @@
 #include <unistd.h>
 #if defined(HOST_LINUX)
 #include <linux/input.h>
+#if defined(__GLIBC__)
+#define FB_XPAD_IOCTL_COMMAND(request) ((unsigned long)(uint32_t)(request))
+#else
+#define FB_XPAD_IOCTL_COMMAND(request) ((int)(uint32_t)(request))
+#endif
+#endif
+
+#ifndef FB_XPAD_IOCTL_COMMAND
+#define FB_XPAD_IOCTL_COMMAND(request) (request)
 #endif
 #endif
 
@@ -383,7 +392,7 @@ static int xpad_joydev_open(int id)
 			continue;
 
 		version = 0;
-		if ((ioctl(pad->fd, JSIOCGVERSION, &version) < 0) || (version < 0x10000)) {
+		if ((ioctl(pad->fd, FB_XPAD_IOCTL_COMMAND(JSIOCGVERSION), &version) < 0) || (version < 0x10000)) {
 			close(pad->fd);
 			pad->fd = -1;
 			continue;
@@ -395,10 +404,10 @@ static int xpad_joydev_open(int id)
 		pad->axis_map_valid = FALSE;
 		pad->button_map_valid = FALSE;
 		/* Some Linux joydev implementations return the copied map size. */
-		if (ioctl(pad->fd, FB_JSIOCGAXES, &pad->axis_count) >= 0)
-			pad->axis_map_valid = (ioctl(pad->fd, FB_JSIOCGAXMAP, pad->axis_map) >= 0);
-		if (ioctl(pad->fd, FB_JSIOCGBUTTONS, &pad->button_count) >= 0)
-			pad->button_map_valid = (ioctl(pad->fd, FB_JSIOCGBTNMAP, pad->button_map) >= 0);
+		if (ioctl(pad->fd, FB_XPAD_IOCTL_COMMAND(FB_JSIOCGAXES), &pad->axis_count) >= 0)
+			pad->axis_map_valid = (ioctl(pad->fd, FB_XPAD_IOCTL_COMMAND(FB_JSIOCGAXMAP), pad->axis_map) >= 0);
+		if (ioctl(pad->fd, FB_XPAD_IOCTL_COMMAND(FB_JSIOCGBUTTONS), &pad->button_count) >= 0)
+			pad->button_map_valid = (ioctl(pad->fd, FB_XPAD_IOCTL_COMMAND(FB_JSIOCGBTNMAP), pad->button_map) >= 0);
 #endif
 
 		memset(pad->axis, 0, sizeof(pad->axis));

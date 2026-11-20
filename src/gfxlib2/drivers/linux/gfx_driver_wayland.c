@@ -398,6 +398,9 @@ typedef struct FB_WAYLAND_WINDOW {
 	int mouse_hwheel;
 	int flags;
 	BLITTER *blitter;
+#if defined(__arm__)
+	uint32_t end_alignment_padding;
+#endif
 } FB_WAYLAND_WINDOW;
 
 static FB_WAYLAND_WINDOW fb_wayland_window;

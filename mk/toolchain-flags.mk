@@ -717,14 +717,14 @@ ALLFBRTLFLAGS += $(FBRTLFLAGS) $(FBFLAGS)
 ALLFBRTLFLAGS += $(TOOLCHAIN_FBRTLFLAGS)
 
 ##############################################################################
-# Forward C hardening flags through fbc
+# Forward C preprocessor and hardening flags through fbc
 ##############################################################################
 
-FBC_FORWARD_CFLAGS := $(filter-out -MMD -MP,$(ALLCFLAGS))
+FBC_FORWARD_CFLAGS := $(filter-out -MMD -MP,$(ALLCFLAGS) $(CPPFLAGS))
 
 # fbc does not support clang-style -Wp, forwarding from environment hardening
-# flags for preprocessor options.  Drop those entries before converting to
-# -Wc arguments so builds stay compatible with distros that inject -Wp,-D...
+# flags for preprocessor options. Drop those entries before converting to -Wc
+# arguments so builds stay compatible with distros that inject -Wp,-D...
 FBC_FORWARD_CFLAGS := $(filter-out -Wp%,$(FBC_FORWARD_CFLAGS))
 FBC_WCFLAGS := $(foreach f,$(FBC_FORWARD_CFLAGS),-Wc $(f))
 

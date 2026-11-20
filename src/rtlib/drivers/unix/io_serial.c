@@ -50,9 +50,17 @@ static int fb_hSerialSetFd(fd_set *set, int descriptor)
 	if ((set == NULL) || (descriptor < 0) || (descriptor >= FD_SETSIZE))
 		return FALSE;
 #if defined(HOST_OPENBSD)
-	FD_SET(descriptor, set);
+	#if defined(__powerpc__)
+		FD_SET((unsigned long)descriptor, set);
+	#else
+		FD_SET(descriptor, set);
+	#endif
 #else
-	FD_SET(descriptor, set);
+	#if defined(__powerpc__)
+		FD_SET((unsigned long)descriptor, set);
+	#else
+		FD_SET(descriptor, set);
+	#endif
 #endif
 	return TRUE;
 }

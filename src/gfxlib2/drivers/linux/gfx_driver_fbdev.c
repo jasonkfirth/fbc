@@ -41,6 +41,13 @@
 #include <string.h>
 #include <unistd.h>
 
+/* Linux ioctl request codes are 32-bit even where libc uses unsigned long. */
+#if defined(__GLIBC__)
+#define FB_FBDEV_IOCTL_COMMAND(request) ((unsigned long)(uint32_t)(request))
+#else
+#define FB_FBDEV_IOCTL_COMMAND(request) ((int)(uint32_t)(request))
+#endif
+
 #ifndef FB_AUX_VGA_PLANES_VGA4
 #define FB_AUX_VGA_PLANES_VGA4	0
 #endif
@@ -603,7 +610,11 @@ static void *driver_thread(void *arg)
 
 		if ((mouse_fd >= 0) && (mouse_fd < FD_SETSIZE)) {
 			FD_ZERO(&set);
+			#if defined(__powerpc__)
+			FD_SET((unsigned long)mouse_fd, &set);
+			#else
 			FD_SET(mouse_fd, &set);
+			#endif
 			if (select(FD_SETSIZE, &set, NULL, NULL, &tv) > 0) {
 				bytes_read = read(mouse_fd, &buffer[bytes_left], sizeof(buffer) - bytes_left);
 				if (bytes_read > 0) {
@@ -663,15 +674,15 @@ static void *driver_thread(void *arg)
 
 		if (vsync_flags & (FB_VBLANK_HAVE_VBLANK | FB_VBLANK_HAVE_VCOUNT)) {
 			if (vsync_flags & FB_VBLANK_HAVE_VCOUNT) {
-				ioctl(device_fd, FBIOGET_VBLANK, &vblank);
+				ioctl(device_fd, FB_FBDEV_IOCTL_COMMAND(FBIOGET_VBLANK), &vblank);
 				do {
 					count = vblank.vcount;
-				} while ((ioctl(device_fd, FBIOGET_VBLANK, &vblank) == 0) && (vblank.vcount >= count));
+				} while ((ioctl(device_fd, FB_FBDEV_IOCTL_COMMAND(FBIOGET_VBLANK), &vblank) == 0) && (vblank.vcount >= count));
 			}
 			else {
-				while ((ioctl(device_fd, FBIOGET_VBLANK, &vblank) == 0) && (vblank.flags & FB_VBLANK_VBLANKING))
+				while ((ioctl(device_fd, FB_FBDEV_IOCTL_COMMAND(FBIOGET_VBLANK), &vblank) == 0) && (vblank.flags & FB_VBLANK_VBLANKING))
 					;
-				while ((ioctl(device_fd, FBIOGET_VBLANK, &vblank) == 0) && (!(vblank.flags & FB_VBLANK_VBLANKING)))
+				while ((ioctl(device_fd, FB_FBDEV_IOCTL_COMMAND(FBIOGET_VBLANK), &vblank) == 0) && (!(vblank.flags & FB_VBLANK_VBLANKING)))
 					;
 			}
 		}
@@ -1115,7 +1126,7 @@ got_mode:
 		}
 	}
 
-	if (ioctl(device_fd, FBIOGET_VBLANK, &vblank) == 0)
+	if (ioctl(device_fd, FB_FBDEV_IOCTL_COMMAND(FBIOGET_VBLANK), &vblank) == 0)
 		vsync_flags = vblank.flags;
 
 	pthread_mutex_lock(&mutex);

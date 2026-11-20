@@ -464,8 +464,7 @@ typedef struct FB_RTLIB_CTX_ {
 	void          (*exit_sfxlib)(void);
 	int           (*idle_sfxlib)(int msecs);
 	void          (*exit_gfxlib2)(void);
-#if (defined(HOST_AROS) && defined(__arm__)) || \
-    (defined(HOST_LINUX) && defined(__arm__)) || defined(__EMSCRIPTEN__)
+#if defined(__arm__) || defined(__EMSCRIPTEN__)
     /* Preserve the runtime-context alignment on ARM32 and wasm32. */
 	unsigned char   tail_alignment_padding[4];
 #endif

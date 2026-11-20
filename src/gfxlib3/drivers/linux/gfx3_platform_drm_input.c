@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <linux/input.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +38,13 @@
 #include <unistd.h>
 
 #define FB_GFX3_DRM_INPUT_DEVICE_MAX 32u
+
+/* Linux ioctl request codes are 32-bit even where libc uses unsigned long. */
+#if defined(__GLIBC__)
+#define FB_GFX3_DRM_IOCTL_COMMAND(request) ((unsigned long)(uint32_t)(request))
+#else
+#define FB_GFX3_DRM_IOCTL_COMMAND(request) ((int)(uint32_t)(request))
+#endif
 
 typedef struct FB_GFX3_DRM_INPUT_DEVICE {
 	int descriptor;
@@ -398,15 +406,15 @@ static void drm_input_open_devices(FB_GFX3_DRM_INPUT_ADAPTER *adapter)
 		memset(key_bits, 0, sizeof(key_bits));
 		memset(key_state, 0, sizeof(key_state));
 		memset(absolute_bits, 0, sizeof(absolute_bits));
-		if ((ioctl(descriptor, EVIOCGBIT(0, sizeof(event_bits)), event_bits) < 0) ||
-		    (ioctl(descriptor, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) < 0)) {
+		if ((ioctl(descriptor, FB_GFX3_DRM_IOCTL_COMMAND(EVIOCGBIT(0, sizeof(event_bits))), event_bits) < 0) ||
+		    (ioctl(descriptor, FB_GFX3_DRM_IOCTL_COMMAND(EVIOCGBIT(EV_KEY, sizeof(key_bits))), key_bits) < 0)) {
 			close(descriptor);
 			continue;
 		}
 		if (drm_input_test_bit(EV_ABS, event_bits,
 		    sizeof(event_bits) / sizeof(event_bits[0])))
 			(void)ioctl(descriptor,
-				EVIOCGBIT(EV_ABS, sizeof(absolute_bits)), absolute_bits);
+				FB_GFX3_DRM_IOCTL_COMMAND(EVIOCGBIT(EV_ABS, sizeof(absolute_bits))), absolute_bits);
 		keyboard = drm_input_test_bit(KEY_A, key_bits,
 			sizeof(key_bits) / sizeof(key_bits[0])) &&
 			drm_input_test_bit(KEY_Z, key_bits,
@@ -451,7 +459,7 @@ static void drm_input_open_devices(FB_GFX3_DRM_INPUT_ADAPTER *adapter)
 					if (drm_input_test_bit(axis, absolute_bits,
 					    sizeof(absolute_bits) /
 					    sizeof(absolute_bits[0])))
-						(void)ioctl(descriptor, EVIOCGABS(axis),
+						(void)ioctl(descriptor, FB_GFX3_DRM_IOCTL_COMMAND(EVIOCGABS(axis)),
 							&device->absolute[axis]);
 				}
 			}
@@ -460,7 +468,7 @@ static void drm_input_open_devices(FB_GFX3_DRM_INPUT_ADAPTER *adapter)
 				returns keys currently held. Mixing those bitmaps would make
 				every advertised D-pad direction appear pressed at startup.
 			*/
-			if (ioctl(descriptor, EVIOCGKEY(sizeof(key_state)), key_state) >= 0) {
+			if (ioctl(descriptor, FB_GFX3_DRM_IOCTL_COMMAND(EVIOCGKEY(sizeof(key_state))), key_state) >= 0) {
 				for (code = 0u; code <= (unsigned int)KEY_MAX; code++) {
 					if (!drm_input_test_bit(code, key_state,
 					    sizeof(key_state) / sizeof(key_state[0])))

@@ -380,7 +380,7 @@ run_gfx_smoke() {
             if grep -Eiq 'error loading shared library|relocation error|undefined symbol|cannot execute|exec format error|no such file or directory|ld-linux|ld-musl' "$combined"; then
                 fail "gfx binary wrote a loader/linker error"
             fi
-            if grep -Eiq 'display|x11|x server|screenres|graphics' "$combined"; then
+            if grep -Eiq 'display|x11|x server|screenres|graphics|XDG_RUNTIME_DIR' "$combined"; then
                 echo "HEADLESS-RUN: gfx binary started, but no usable display is available"
                 return 0
             fi
@@ -397,7 +397,7 @@ run_gfx_smoke() {
         fail "gfx binary failed with a loader/linker error"
     fi
 
-    if grep -Eiq 'display|x11|x server|screenres|graphics' "$combined"; then
+    if grep -Eiq 'display|x11|x server|screenres|graphics|XDG_RUNTIME_DIR' "$combined"; then
         echo "HEADLESS-RUN: gfx binary started, but no usable display is available"
         return 0
     fi

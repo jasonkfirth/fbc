@@ -357,8 +357,18 @@ package_xbox() {
     local control_dir
     local installed_size
     local nxdk_rev
+    local library
+    local runtime_dir="lib/freebasic/$XBOX_TARGET_KEY"
 
     msg "packaging freebasic-xbox"
+
+    for library in libfb.a libfbmt.a libfbgfx.a libfbgfxmt.a libsfx.a libsfxmt.a; do
+        [ -s "$runtime_dir/$library" ] || die "Xbox runtime archive is missing: $runtime_dir/$library"
+    done
+
+    if find "$runtime_dir/.build-config" -type f -name '*.pending' -print -quit 2>/dev/null | grep -q .; then
+        die "Xbox runtime contains unfinished build configuration records"
+    fi
 
     rm -rf "$PKGROOT"
     mkdir -p \

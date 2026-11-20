@@ -94,9 +94,21 @@ static void mouse_handler(void)
 	fd_set set;
 	struct timeval tv = { 0, 0 };
 	int count = 0;
+	int descriptor;
+
+	/* GPM clears its descriptor pointer when the connection is unavailable. */
+	if (gpm.fd == NULL)
+		return;
+	descriptor = *gpm.fd;
+	if ((descriptor < 0) || (descriptor >= FD_SETSIZE))
+		return;
 
 	FD_ZERO(&set);
-	FD_SET(*gpm.fd, &set);
+	#if defined(__powerpc__)
+	FD_SET((unsigned long)descriptor, &set);
+	#else
+	FD_SET(descriptor, &set);
+	#endif
 
 	while ((select(FD_SETSIZE, &set, NULL, NULL, &tv) > 0) && (count < 16)) {
 		if (gpm.GetEvent(&event) > 0) {

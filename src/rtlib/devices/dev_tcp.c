@@ -50,6 +50,7 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 #else
 
 #include <limits.h>
+#include <time.h>
 
 #if !defined(HOST_DOS) && !defined(HOST_JS)
 	#if defined(HOST_WIN32) && !defined(HOST_CYGWIN)
@@ -181,7 +182,16 @@ int fb_DevTcpEocEx( FB_FILE *handle )
 	#define FB_TCP_WOULDBLOCK(err) ((err) == EAGAIN || (err) == EWOULDBLOCK)
 	#define FB_TCP_SHUT_WR SHUT_WR
 	#define FB_TCP_SELECT(n, r, w, e, t) select( n, r, w, e, t )
+	#if defined(HOST_LINUX)
+		/* Linux ioctl request codes are 32-bit; libc headers use different types. */
+		#if defined(__GLIBC__)
+			#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, (unsigned long)(uint32_t)(cmd), argp )
+		#else
+			#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, (int)(uint32_t)(cmd), argp )
+		#endif
+	#else
 	#define FB_TCP_IOCTL(s, cmd, argp) ioctl( s, cmd, argp )
+	#endif
 	/* Shared callers cap requests at INT_MAX or use smaller fixed buffers.
 	   POSIX returns -1 or a count within that requested range. */
 	#define FB_TCP_RECV(s, b, l, f) ((int)recv( s, b, (size_t)(l), f ))

@@ -39,6 +39,17 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#if defined(HOST_LINUX)
+/* Linux ioctl request codes are 32-bit even where libc uses unsigned long. */
+#if defined(__GLIBC__)
+#define FB_JOYDEV_IOCTL_COMMAND(request) ((unsigned long)(uint32_t)(request))
+#else
+#define FB_JOYDEV_IOCTL_COMMAND(request) ((int)(uint32_t)(request))
+#endif
+#else
+#define FB_JOYDEV_IOCTL_COMMAND(request) (request)
+#endif
+
 #define FB_JOYDEV_MAX_DEVICES 16
 #define FB_JOYDEV_MAX_AXES 8
 #define FB_JOYDEV_MAX_BUTTONS 32
@@ -123,7 +134,7 @@ static int fb_joydev_open_path(FB_JOYDEV_DEVICE *joy, const char *prefix, int in
 		return FALSE;
 
 	version = 0;
-	if ((ioctl(joy->fd, FB_JOYDEV_GET_VERSION, &version) < 0) ||
+	if ((ioctl(joy->fd, FB_JOYDEV_IOCTL_COMMAND(FB_JOYDEV_GET_VERSION), &version) < 0) ||
 		(version < 0x10000)) {
 		fb_joydev_close(joy);
 		return FALSE;

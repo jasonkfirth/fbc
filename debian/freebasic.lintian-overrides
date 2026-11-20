@@ -1,2 +1,4 @@
 # Diagnostic examples in the generated executable can resemble misspelled words.
-freebasic: spelling-error-in-binary IIf If [usr/bin/fbc]
+# The compiler embeds diagnostic examples that vary by target and can trigger
+# different spell-check matches in otherwise identical binaries.
+freebasic: spelling-error-in-binary * [usr/bin/fbc]

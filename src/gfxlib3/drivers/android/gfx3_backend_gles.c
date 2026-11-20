@@ -31,7 +31,9 @@
 #include "../../gfx3_platform.h"
 #include "../../gfx3_protocol.h"
 #include "../../gfx3_resource.h"
+#if defined(HOST_ANDROID)
 #include "gfx3_android_viewport.h"
+#endif
 
 #include <math.h>
 
@@ -45,11 +47,14 @@
 
 typedef struct FB_GFX3_GLES_FENCE {
 	GLsync sync;
-#if defined(HOST_LINUX) && defined(__arm__)
+#if defined(__arm__)
 	uint32_t sequence_alignment_padding;
 #endif
 	uint64_t sequence;
 	struct FB_GFX3_GLES_FENCE *next;
+#if defined(__arm__)
+	uint32_t end_alignment_padding;
+#endif
 } FB_GFX3_GLES_FENCE;
 
 struct FB_GFX3_GLES_STATE;
@@ -129,14 +134,12 @@ typedef struct FB_GFX3_GLES_STATE {
 	GLint line_batch_size_location;
 	GLuint palette_texture;
 	uint32_t palette[256];
-#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
-	(defined(HOST_LINUX) && defined(__arm__))
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || defined(__arm__)
 	uint32_t visible_surface_alignment_padding;
 #endif
 	FB_GFX3_HANDLE visible_surface;
 	uint32_t maximum_texture_size;
-#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
-	(defined(HOST_LINUX) && defined(__arm__))
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || defined(__arm__)
 	uint32_t submitted_sequence_alignment_padding;
 #endif
 	uint64_t submitted_sequence;
@@ -151,6 +154,9 @@ typedef struct FB_GFX3_GLES_STATE {
 #endif
 	FB_GFX3_GLES_FENCE *first_fence;
 	FB_GFX3_GLES_FENCE *last_fence;
+#if defined(__arm__)
+	uint32_t end_alignment_padding;
+#endif
 } FB_GFX3_GLES_STATE;
 
 #if defined(FB_GFX3_GLES_DYNAMIC)
@@ -4196,9 +4202,11 @@ static int gles_present_handle(FB_GFX3_GLES_STATE *state,
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	viewport_width = width;
 	viewport_height = height;
+	#if defined(HOST_ANDROID)
 	fb_gfx3_android_usable_viewport(surface->width, surface->height,
 		&viewport_width, &viewport_height);
 	/* GLES has a bottom-left origin; the usable Android area begins at top. */
+	#endif
 	glViewport(0, (GLint)(height - viewport_height), (GLsizei)viewport_width,
 		(GLsizei)viewport_height);
 	glDisable(GL_SCISSOR_TEST);

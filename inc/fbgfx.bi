@@ -37,12 +37,17 @@ namespace FB
 	type Gfx2Point
 		x as long
 		y as long
+	#if __FB_LANG__ = "qb"
+		color as __ulong
+		alpha as __ulong
+	#else
 		color as ulong
 		alpha as ulong
+	#endif
 	end type
 #if __FB_LANG__ = "qb"
 	declare function Gfx2DrawPoints alias "fb_GfxDrawPointBatch" _
-		( byval points as const Gfx2Point ptr, byval count as long ) as long
+		( byval points as const Gfx2Point __ptr, byval count as long ) as long
 #else
 	extern "rtlib"
 	declare function Gfx2DrawPoints alias "fb_GfxDrawPointBatch" _

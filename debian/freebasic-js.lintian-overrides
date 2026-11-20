@@ -1,4 +1,8 @@
+# The compiler embeds diagnostic examples that vary by target and can trigger
+# different spell-check matches in otherwise identical binaries.
+freebasic-js: spelling-error-in-binary * [usr/bin/fbc-js]
+# WebAssembly archives intentionally contain relocatable wasm objects without
+# native ELF code sections.
 freebasic-js: no-code-sections [usr/lib/freebasic-js/js-asmjs/libfb.a]
 freebasic-js: no-code-sections [usr/lib/freebasic-js/js-asmjs/libfbgfx.a]
 freebasic-js: no-code-sections [usr/lib/freebasic-js/js-asmjs/libsfx.a]
-freebasic-js: package-contains-documentation-outside-usr-share-doc [usr/lib/freebasic-js/js-asmjs/fb_shell.html]

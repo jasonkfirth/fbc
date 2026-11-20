@@ -401,6 +401,7 @@ build_bootstrap_tarball() {
 
 stage_source_tree() {
     local bootstrap_srcdir
+    local bootstrap_sources_present=0
 
     [ -f "$SOURCE_COPY_EXCLUDES" ] || die "missing source copy excludes: $SOURCE_COPY_EXCLUDES"
 
@@ -408,7 +409,14 @@ stage_source_tree() {
     mkdir -p "$BUILDDIR"
 
     bootstrap_srcdir="$ROOT/bootstrap/$BOOTKEY"
-    if [ ! -d "$bootstrap_srcdir" ]; then
+    if [ -d "$bootstrap_srcdir" ] &&
+        find "$bootstrap_srcdir" -maxdepth 1 -type f \
+            \( -name '*.c' -o -name '*.asm' \) -print -quit | grep -q .
+    then
+        bootstrap_sources_present=1
+    fi
+
+    if [ "$bootstrap_sources_present" -eq 0 ]; then
         [ -f "$BOOTSTRAP_TAR" ] || die "missing bootstrap sources: $bootstrap_srcdir and $BOOTSTRAP_TAR"
         mkdir -p "$WORKDIR/bootstrap-from-tar"
         run tar -xJf "$BOOTSTRAP_TAR" -C "$WORKDIR/bootstrap-from-tar" \
@@ -649,7 +657,8 @@ package_current_target() {
 
     msg "creating RPM source tarball"
     src_tar="$RPMTOP/SOURCES/freebasic-$VERSION.tar.xz"
-    run tar -C "$WORKDIR" -cJf "$src_tar" --transform "s#^package#freebasic-$VERSION#" package
+    run env XZ_OPT=-1 tar -C "$WORKDIR" -cJf "$src_tar" \
+        --transform "s#^package#freebasic-$VERSION#" package
     [ -s "$src_tar" ] || die "source tarball was not created: $src_tar"
 
     write_spec

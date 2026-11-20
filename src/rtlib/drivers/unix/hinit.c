@@ -694,8 +694,8 @@ static void hInit( void )
 	PC = p ? *p : 0;
 	if (tcgetattr(1, &tty))
 		return;
-	/* termcap exposes its encoded terminal speed through the short ospeed ABI. */
-	ospeed = (short)cfgetospeed(&tty);
+	/* termcap's ospeed type differs between libc headers. */
+	ospeed = (__typeof__(ospeed))cfgetospeed(&tty);
 	if (!fb_hTermcapGetFlag( "am" ))
 		return;
 	for (i = 0; i < SEQ_MAX; i++)

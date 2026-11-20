@@ -1,6 +1,7 @@
 Version 1.20.6
 
 [changed]
+- gfxlib3/Linux: cache Xft DPI and RandR rotation metrics for one second so responsive GUI polling does not open an X display and query RandR on every frame. Preserve display changes with a bounded refresh interval.
 - version/package metadata: start the 1.20.6 development line, synchronize distro package versions and reset package release counters for the new upstream version.
 - maintenance: review every entry in `todo.txt` against the current compiler and runtime, remove completed work, and retain outstanding cases.
 - compiler/LLVM: match the x86-64 Linux C ABI for small struct and union results, including mixed integer and SSE registers and a hidden result pointer for unaligned packed structs. Add smoke coverage for calls in both directions between C and FreeBASIC, including procedure pointers and variadic calls. Rebuild affected LLVM objects before mixing them with newly compiled code.
@@ -18,7 +19,9 @@ Version 1.20.6
 - Debian package build: detect empty bootstrap directories and unpack valid emitted sources from the bootstrap archive before building.
 - Debian package staging: extract bootstrap archives as the current build user so reused container workspaces remain removable and writable.
 - Debian source package staging: remove non-Linux prebuilt Windows DLL, EXE, CPL, SYS, OVL, COM, 386, FON, BIN and AWX payloads from the orig archive; document generated bootstrap and data-table long lines for Lintian.
-- Debian metadata: replace obsolete MySQL development package recommendations with the current MySQL development package, use groff's portable at-sign escape in the compiler manpage, and account for spelling false positives in embedded diagnostic strings.
+- Debian metadata: remove obsolete MySQL client development recommendations, use groff's portable at-sign escape in the compiler manpage, and document Lintian's generated-source, compiler-spelling and 32-bit large-file false positives.
+- Debian JS packages: account for Lintian's ELF code-section check on wasm32 archives, which intentionally contain WebAssembly relocatable objects.
+- rtlib/gfxlib2/gfxlib3 ARM32: guard explicit 64-bit alignment fields on the compiler's ARM target macro, name struct tail padding in runtime, Wayland, X11 drop, Maliit, OpenGL and GLES state, and range-check unsigned active-mode dimensions before returning them through the signed query ABI.
 - gfxlib2/Emscripten: pass an explicit empty argument to `EM_ASM_INT` blocks so Clang's C23 variadic-macro diagnostics remain clean.
 - rtlib/JavaScript and ARM32: use the standard `isnan()` classification macro for long-double inputs on Emscripten; name the natural file-size/context alignment gaps on wasm32 and Linux ARM32; and fix signed-length, enum-conversion, and unused-parameter warnings in the JavaScript runtime build.
 - rtlib/Linux: consume port-I/O callback arguments in the unsupported non-x86 stubs so arm64 builds remain warning-free.
@@ -26,6 +29,25 @@ Version 1.20.6
 - gfxlib2/ARM: pass aligned pixel temporaries to the custom blender so GCC 15 can lower the arm64 call without an internal compiler error.
 - compiler/LLVM: convert debug metadata pointer keys through the target-sized unsigned type on 32-bit builds.
 - compiler/C: check generated global-storage record and leaf allocations before dereferencing them.
+- compiler safety: verify subtype symbols before updating recursive UDT flags, and check semantic flow action lookups before reading their edge or next-action fields.
+- compiler build flags: forward Debian's CPPFLAGS through the generated-C compiler command so 32-bit compiler binaries receive the package's large-file ABI definitions.
+- Debian metadata: document that upstream does not publish OpenPGP signatures for its SourceForge release archives.
+- Debian source validation: remove an obsolete Lintian override for a tag no longer recognized by current Lintian releases.
+- RPM source staging: detect empty bootstrap directories and unpack the existing target bootstrap archive before starting an RPM build.
+- RPM source archives: use xz's fast preset so large source tarballs finish promptly on emulated architectures.
+- Xbox runtime build: include the standard time declarations used by TCP socket timeout structures on the nxdk target.
+- Xbox package validation: require the base, threaded, graphics, and sound runtime archives to be complete and reject unfinished build configuration markers before packaging.
+- Linux package smoke tests: recognize SDL's missing `XDG_RUNTIME_DIR` diagnostic as a headless graphics condition so package tests can continue to compiler and example coverage.
+- gfxlib2 headers: use the QB dialect's `__ulong` and `__ptr` spellings in `Gfx2Point` so `fbgfx.bi` compiles under `-lang qb`.
+- Alpine APK staging: detect empty bootstrap-source directories and extract the emitted sources from the matching bootstrap archive before packaging.
+- Alpine APK staging: use xz's fast preset for temporary source archives so ARM packages do not spend long periods compressing under QEMU.
+- Linux TCP/joydev/fbdev/evdev builds: pass 32-bit ioctl requests using glibc's `unsigned long` or musl's `int` type, and avoid redeclaring `environ` where Linux headers already expose it.
+- Debian source packages: remove an obsolete Lintian override for a tag no longer recognized by current Lintian releases.
+- Unix serial builds: use the file-descriptor mask's unsigned index type on PowerPC while retaining the signed descriptor type on other libc targets.
+- Linux mouse polling: check GPM's descriptor pointer and bounds before placing it in `fd_set`, then use the mask's unsigned index type on PowerPC while retaining the libc's signed descriptor type elsewhere.
+- Unix termcap setup: cast the terminal speed to the declared `ospeed` type so libc headers with signed or unsigned short declarations both compile cleanly.
+- gfxlib3 GLES: apply Android's keyboard-safe viewport only on Android, leaving Linux GLES presentation sized to its native drawable.
+- Ubuntu Resolute amd64 packages: rebuild the compiler, runtime libraries, JS and Android sidecars, Wii sidecar, and Debian binary packages; strict Lintian reports no errors or warnings in the base package set.
 - compiler/semantic flow: guard optional procedure symbols before classifying no-return and runtime-end calls.
 - gfxlib2/Linux: bound the VGA16 palette indices before packing them into a byte so s390x GCC can verify the narrowing conversion.
 - rtlib/profiling and TLS: check allocation failures before dereferencing profiler records or optional names, eliminating cross-compiler null-dereference diagnostics and preserving safe failure behavior.

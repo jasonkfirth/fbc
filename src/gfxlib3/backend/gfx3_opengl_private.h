@@ -213,11 +213,14 @@ typedef struct FB_GFX3_OPENGL_FUNCTIONS {
 
 typedef struct FB_GFX3_OPENGL_FENCE {
 	GLsync sync;
-#if defined(HOST_LINUX) && defined(__arm__)
+#if defined(__arm__)
 	uint32_t sequence_alignment_padding;
 #endif
 	uint64_t sequence;
 	struct FB_GFX3_OPENGL_FENCE *next;
+#if defined(__arm__)
+	uint32_t end_alignment_padding;
+#endif
 } FB_GFX3_OPENGL_FENCE;
 
 struct FB_GFX3_OPENGL_STATE;

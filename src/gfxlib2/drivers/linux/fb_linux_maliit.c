@@ -142,8 +142,7 @@ typedef struct FB_LINUX_MALIIT_STATE {
 	int context_active;
 	int region_dirty;
 	unsigned int context_generation;
-#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
-	(defined(HOST_LINUX) && defined(__arm__))
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || defined(__arm__)
 	uint32_t keyboard_generation_alignment_padding;
 #endif
 	uint64_t keyboard_generation;
@@ -154,8 +153,7 @@ typedef struct FB_LINUX_MALIIT_STATE {
 	int request_pending;
 	int request_visible;
 	int request_try_maliit;
-#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || \
-	(defined(HOST_LINUX) && defined(__arm__))
+#if (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)) || defined(__arm__)
 	uint32_t request_generation_alignment_padding;
 #endif
 	uint64_t request_generation;
@@ -164,13 +162,16 @@ typedef struct FB_LINUX_MALIIT_STATE {
 	int region_y;
 	int region_width;
 	int region_height;
-#if defined(HOST_LINUX) && defined(__arm__)
+#if defined(__arm__)
 	uint32_t window_id_alignment_padding;
 #endif
 	uint64_t window_id;
 	GDBusConnection *connection;
 	FB_LINUX_MALIIT_KEY_CALLBACK key_callback;
 	void *key_user_data;
+#if defined(__arm__)
+	uint32_t end_alignment_padding;
+#endif
 } FB_LINUX_MALIIT_STATE;
 
 static FB_LINUX_MALIIT_API fb_hLinuxMaliitApi;

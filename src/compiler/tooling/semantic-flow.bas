@@ -167,6 +167,10 @@ private sub hNodeOrder(byval item as SEMANTIC_FLOW_NODE ptr)
 		dim as longint auxiliary = item->first_auxiliary
 		while( auxiliary <> 0 )
 			dim as SEMANTIC_FLOW_NODE ptr action = hNode(auxiliary)
+			if( action = NULL ) then
+				fbSemanticModelFailAt("semantic-flow.bas:166")
+				exit sub
+			end if
 			if( action->edge = 4 ) then hOrder(identity, auxiliary, ordinal, "profile-begin")
 			auxiliary = action->next_auxiliary
 		wend
@@ -174,6 +178,10 @@ private sub hNodeOrder(byval item as SEMANTIC_FLOW_NODE ptr)
 		auxiliary = item->first_auxiliary
 		while( auxiliary <> 0 )
 			dim as SEMANTIC_FLOW_NODE ptr action = hNode(auxiliary)
+			if( action = NULL ) then
+				fbSemanticModelFailAt("semantic-flow.bas:176")
+				exit sub
+			end if
 			if( action->edge = 5 ) then hOrder(identity, auxiliary, ordinal + 2, "profile-end")
 			if( action->edge = 3 ) then hOrder(identity, auxiliary, ordinal + 3, "copyback")
 			auxiliary = action->next_auxiliary

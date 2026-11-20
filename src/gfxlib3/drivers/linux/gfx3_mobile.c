@@ -31,7 +31,10 @@
 #include "../../../gfxlib2/drivers/linux/fb_wayland_display.h"
 
 #include <math.h>
+#include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifndef DISABLE_X11
 #include <X11/Xlib.h>
@@ -59,7 +62,7 @@ static void gfx3_linux_maliit_post_key(void *user_data, uint32_t key,
 	fb_gfx3_input_platform_key(input, EVENT_KEY_RELEASE, scan_code, ascii);
 }
 
-void fb_gfx3_linux_display_metrics(ssize_t *dpi, ssize_t *rotation)
+static void gfx3_linux_query_display_metrics(ssize_t *dpi, ssize_t *rotation)
 {
 	if (dpi)
 		*dpi = 96;
@@ -231,6 +234,57 @@ void fb_gfx3_linux_mobile_control(int what, ssize_t *p1, ssize_t *p2,
 		if (input != NULL)
 			(void)fb_gfx3_input_request_text_region(input, 0, 0, 1, 1);
 	}
+}
+
+/*
+    omaGUI checks the usable display metrics while updating its widgets. Keep
+    the Xft DPI and RandR rotation query out of the per-frame input path while
+    still noticing display changes within one second.
+*/
+#define FB_GFX3_LINUX_DISPLAY_METRICS_TTL_NS 1000000000LL
+
+static pthread_mutex_t gfx3_linux_metrics_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int gfx3_linux_metrics_cached;
+static int64_t gfx3_linux_metrics_cached_at_ns;
+static ssize_t gfx3_linux_metrics_cached_dpi = 96;
+static ssize_t gfx3_linux_metrics_cached_rotation;
+
+void fb_gfx3_linux_display_metrics(ssize_t *dpi, ssize_t *rotation)
+{
+	struct timespec now;
+	int64_t now_ns = 0;
+	ssize_t current_dpi;
+	ssize_t current_rotation;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now) == 0) {
+		now_ns = (int64_t)now.tv_sec * 1000000000LL + now.tv_nsec;
+	}
+
+	if (pthread_mutex_lock(&gfx3_linux_metrics_mutex) != 0) {
+		if (dpi)
+			*dpi = 96;
+		if (rotation)
+			*rotation = 0;
+		return;
+	}
+
+	if (!gfx3_linux_metrics_cached || (now_ns < gfx3_linux_metrics_cached_at_ns) ||
+	    (now_ns - gfx3_linux_metrics_cached_at_ns >=
+	     FB_GFX3_LINUX_DISPLAY_METRICS_TTL_NS)) {
+		current_dpi = 96;
+		current_rotation = 0;
+		gfx3_linux_query_display_metrics(&current_dpi, &current_rotation);
+		gfx3_linux_metrics_cached_dpi = current_dpi;
+		gfx3_linux_metrics_cached_rotation = current_rotation;
+		gfx3_linux_metrics_cached_at_ns = now_ns;
+		gfx3_linux_metrics_cached = TRUE;
+	}
+
+	if (dpi)
+		*dpi = gfx3_linux_metrics_cached_dpi;
+	if (rotation)
+		*rotation = gfx3_linux_metrics_cached_rotation;
+	(void)pthread_mutex_unlock(&gfx3_linux_metrics_mutex);
 }
 
 /* end of gfx3_mobile.c */

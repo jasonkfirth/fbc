@@ -29,7 +29,7 @@
 #include <unistd.h>
 
 /* GNU unistd.h already declares the environment vector with _GNU_SOURCE. */
-#ifndef __GLIBC__
+#if !defined(__GLIBC__) && !defined(__linux__)
 extern char **environ;
 #endif
 
