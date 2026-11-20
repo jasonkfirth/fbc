@@ -551,6 +551,9 @@ build_android_target() {
 	local host_ranlib="$UCRT64_ROOT/bin/ranlib.exe"
 	local host_strip="$UCRT64_ROOT/bin/strip.exe"
 	local host_dlltool="$UCRT64_ROOT/bin/dlltool.exe"
+	local gcc_compat="$WORKTREE/tools/gcc-generated-c.exe"
+	local gcc_compat_c="$WORKTREE/tools/gcc-generated-c.c"
+	local cc_win
 	local ar
 	local ranlib
 
@@ -560,6 +563,52 @@ build_android_target() {
 
 	msg "Building fbc-android and Android runtimes"
 	cd "$WORKTREE"
+	PATH="$UCRT64_ROOT/bin:$PATH"
+	export PATH
+
+	cc_win="$(cygpath -am "$host_cc")"
+	mkdir -p "$WORKTREE/tools"
+	cat > "$gcc_compat_c" <<EOF
+#include <process.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char **argv)
+{
+	const char *gcc_path = "$cc_win";
+	const int extra_argc = 3;
+	char **args;
+	int i;
+	int status;
+
+	args = (char **)calloc((size_t)argc + (size_t)extra_argc + 1u, sizeof(char *));
+	if (args == NULL) {
+		fprintf(stderr, "gcc-generated-c: out of memory\\n");
+		return 1;
+	}
+
+	args[0] = (char *)gcc_path;
+	args[1] = (char *)"-fpermissive";
+	args[2] = (char *)"-Wno-int-conversion";
+	args[3] = (char *)"-Wno-incompatible-pointer-types";
+
+	for (i = 1; i < argc; i++) {
+		args[i + extra_argc] = argv[i];
+	}
+
+	status = _spawnv(_P_WAIT, gcc_path, (const char * const *)args);
+	if (status == -1) {
+		perror("gcc-generated-c");
+		free(args);
+		return 127;
+	}
+
+	free(args);
+	return status;
+}
+EOF
+	run "$host_cc" "$gcc_compat_c" -o "$gcc_compat"
+	host_cc="$gcc_compat"
 
 	seed_fbc="$(detect_fbc \
 		"${HOST_FBC_ROOT:+$HOST_FBC_ROOT/fbc64.exe}" \
@@ -719,7 +768,10 @@ copy_msys_runtime() {
 	copy_msys_tool sort "$dst"
 	copy_msys_tool tr "$dst"
 	copy_msys_tool mkdir "$dst"
+	copy_msys_tool mktemp "$dst"
 	copy_msys_tool dirname "$dst"
+	copy_msys_tool basename "$dst"
+	copy_msys_tool cygpath "$dst"
 	copy_msys_tool pwd "$dst"
 	copy_msys_tool cp "$dst"
 	copy_msys_tool rm "$dst"
@@ -741,6 +793,7 @@ set -euo pipefail
 
 root="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 PATH="$root/toolchain/msys2/usr/bin:$root/toolchain/java/bin:$root/toolchain/android-sdk/platform-tools:$PATH"
+TMPDIR="$root/toolchain/msys2/tmp"
 JAVA_HOME="$root/toolchain/java"
 ANDROID_HOME="$root/toolchain/android-sdk"
 ANDROID_SDK_ROOT="$ANDROID_HOME"
@@ -763,6 +816,7 @@ for ndk_entry in "$ANDROID_HOME"/ndk/* "$ANDROID_HOME"/ndk-bundle; do
 done
 export PATH JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK_HOME
 export FBANDROID_PREFIX FBANDROID_LIBROOT FBANDROID_COMPILER FBANDROID_INCDIR FBANDROID_SHARE
+export TMPDIR
 
 if [ ! -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat" ] || \
 	{ [ ! -d "$ANDROID_HOME/ndk" ] && [ ! -d "$ANDROID_HOME/ndk-bundle" ]; }; then

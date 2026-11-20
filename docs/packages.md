@@ -70,6 +70,19 @@ Windows standalone archives and installers are grouped under `mingw32/`,
 `mingw32-js/`, `mingw32-android/`, `mingw32-wii/`, and `mingw32-xbox/`. DOS,
 BSD, Haiku, illumos, Solaris, macOS, Cygwin, AROS, RISC OS, and Windows CE have
 separate top-level directories when a package or cross-target output exists.
+The core Windows package provides a combined Win32/Win64 installer and a
+separate Windows ARM64 installer. JavaScript, Android, Wii, and Xbox each have
+a dedicated Windows installer. Package directories may also contain standalone
+archives, depending on the target and release.
+
+The current Windows installers are available directly:
+
+- [Win32/Win64 GCC 16.2.0](https://deb.fbxl.net/mingw32/FreeBASIC-1.20.6-winlibs-gcc-16.2.0-setup.exe)
+- [Windows ARM64 Clang 23.1.5](https://deb.fbxl.net/mingw32/FreeBASIC-1.20.6-winlibs-arm64-clang-23.1.5-setup.exe)
+- [JavaScript target](https://deb.fbxl.net/mingw32-js/FreeBASIC-1.20.6-fbc-js-setup.exe)
+- [Android target](https://deb.fbxl.net/mingw32-android/FreeBASIC-1.20.6-fbc-android-setup.exe)
+- [Wii target](https://deb.fbxl.net/mingw32-wii/FreeBASIC-1.20.6-fbc-wii-setup.exe)
+- [Xbox target](https://deb.fbxl.net/mingw32-xbox/FreeBASIC-1.20.6-fbc-xbox-setup.exe)
 
 Always use the repository directory listing or `repo.json` to discover the
 current file. Some target families deliberately retain earlier packages, and
@@ -97,10 +110,10 @@ platform jar before extracting it.
 
 ## Integrity and release identity
 
-Each package directory contains a `SHA256SUMS` file. The repository root also
-publishes `release-1.20.4-SHA256SUMS`, which records the complete release file
-set, and `repo.json`, which records the release number, source commit, package
-families, tested platforms, and generation time.
+Each package directory contains a `SHA256SUMS` file. Complete repository
+releases also publish a versioned `release-<version>-SHA256SUMS` manifest at
+the root. The root `repo.json` records the repository release, source commit,
+package families, tested platforms, and generation time.
 
 For a downloaded file:
 

@@ -644,18 +644,8 @@ repair_emscripten_windows_launchers() {
 			base="${base%.py}"
 			exe="$dir/${base}.exe"
 			bat="$dir/${base}.bat"
-
-			# The MSYS2 Emscripten package includes small .exe launchers next
-			# to the Python frontend scripts.  Those launchers work when MSYS2
-			# owns the whole environment, but the standalone FreeBASIC package
-			# runs them from an arbitrary install tree.  In that layout they can
-			# either hang or fail before reaching python.exe.
-			#
-			# Emscripten's Windows path resolver falls back from .exe to .bat.
-			# Replacing the package-local .exe frontend launchers with batch
-			# files keeps internal calls such as shared.EMCC Windows-callable
-			# without changing Emscripten's Python code.
-			rm -f "$exe"
+			# Preserve any native frontend launchers: subprocess.Popen cannot
+			# launch the .bat wrappers generated below for interactive use.
 
 			cat > "$bat" <<EOF
 @echo off

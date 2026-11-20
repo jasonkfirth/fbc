@@ -37,6 +37,7 @@ PACMAN_CONF="${PACMAN_CONF:-/etc/pacman.conf}"
 
 DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
 DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
+PACMAN_ROOT="${PACMAN_ROOT:-$DEVKITPRO}"
 
 KEYRING_VERSION="20241017-2"
 KEYRING_PACKAGE="devkitpro-keyring-${KEYRING_VERSION}-any.pkg.tar.zst"
@@ -123,7 +124,7 @@ configure_downloader()
 		fail "pacman configuration has no [options] section"
 
 	if grep -Eq '^[[:space:]]*XferCommand[[:space:]]*=' "$PACMAN_CONF"; then
-		configured_command="$(pacman-conf XferCommand)"
+        configured_command="$(pacman-conf --config "$PACMAN_CONF" XferCommand)"
 		[ "$configured_command" = "${PACMAN_XFER_COMMAND#XferCommand = }" ] ||
 			fail "unexpected pacman XferCommand: $configured_command"
 		return 0
@@ -134,7 +135,7 @@ configure_downloader()
 	# for this class of HTTP compatibility problem. Signatures remain mandatory
 	# after curl retrieves each file.
 	sed -i "/^\[options\]$/a $PACMAN_XFER_COMMAND" "$PACMAN_CONF"
-	[ "$(pacman-conf XferCommand)" = "${PACMAN_XFER_COMMAND#XferCommand = }" ] ||
+    [ "$(pacman-conf --config "$PACMAN_CONF" XferCommand)" = "${PACMAN_XFER_COMMAND#XferCommand = }" ] ||
 		fail "failed to configure pacman's identified curl downloader"
 }
 
@@ -145,11 +146,11 @@ configure_repositories()
 	local libs_server
 	local windows_server
 
-	if pacman-conf --repo-list | grep -Fxq 'dkp-libs'; then
+    if pacman-conf --config "$PACMAN_CONF" --repo-list | grep -Fxq 'dkp-libs'; then
 		has_libs=1
 	fi
 
-	if pacman-conf --repo-list | grep -Fxq 'dkp-windows'; then
+    if pacman-conf --config "$PACMAN_CONF" --repo-list | grep -Fxq 'dkp-windows'; then
 		has_windows=1
 	fi
 
@@ -167,8 +168,8 @@ EOF
 		fail "pacman has an incomplete devkitPro repository configuration"
 	fi
 
-	libs_server="$(pacman-conf --repo dkp-libs Server)"
-	windows_server="$(pacman-conf --repo dkp-windows Server)"
+    libs_server="$(pacman-conf --config "$PACMAN_CONF" --repo dkp-libs Server)"
+    windows_server="$(pacman-conf --config "$PACMAN_CONF" --repo dkp-windows Server)"
 
 	[ "${libs_server%/}" = "${DKP_LIBS_SERVER%/}" ] ||
 		fail "unexpected dkp-libs server: $libs_server"
@@ -184,10 +185,12 @@ configure_repositories
 ##############################################################################
 
 echo "==> Synchronizing the official devkitPro repositories"
-bash "$PACMAN_RETRY" --noconfirm -Sy
+PACMAN_CONFIG="$PACMAN_CONF" PACMAN_ROOT="$PACMAN_ROOT" \
+    bash "$PACMAN_RETRY" --noconfirm -Sy
 
 echo "==> Installing the official devkitPro wii-dev package group"
-bash "$PACMAN_RETRY" --needed --noconfirm -S wii-dev
+PACMAN_CONFIG="$PACMAN_CONF" PACMAN_ROOT="$PACMAN_ROOT" \
+    bash "$PACMAN_RETRY" --needed --noconfirm -S wii-dev
 
 for tool_path in \
 	"$DEVKITPPC/bin/powerpc-eabi-gcc.exe" \

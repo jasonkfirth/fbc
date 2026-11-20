@@ -573,7 +573,7 @@ static int fb_hDevTcpApplySocketOptions( FB_TCP_SOCKET hSocket, unsigned int tim
 		#else
 			struct timeval value;
 
-			value.tv_sec = (time_t)(timeout / 1000u);
+			value.tv_sec = timeout / 1000u;
 			value.tv_usec = (int)((timeout % 1000u) * 1000u);
 
 			#if !defined(HOST_WII)

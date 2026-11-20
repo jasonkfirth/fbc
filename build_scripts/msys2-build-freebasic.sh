@@ -529,7 +529,7 @@ install_dependencies() {
 		SDL_mixer
 		SDL_net
 		SDL_ttf
-		SDL2
+		sdl2-compat
 		SDL2_gfx
 		SDL2_image
 		SDL2_mixer
@@ -596,11 +596,8 @@ install_dependencies() {
 		msys_packages+=(openssh)
 	fi
 
-	msg "Updating MSYS2 package database"
-	run bash "$SELF_DIR/msys2-pacman-retry.sh" -Sy --noconfirm
-
-	msg "Installing MSYS2 packaging dependencies"
-	run bash "$SELF_DIR/msys2-pacman-retry.sh" -S --needed --noconfirm "${msys_packages[@]}"
+	msg "Updating MSYS2 and installing packaging dependencies"
+	run bash "$SELF_DIR/msys2-pacman-retry.sh" -Syu --needed --noconfirm "${msys_packages[@]}"
 
 	if [ "$QEMU_ARM64_VALIDATE" -ne 0 ]; then
 		msg "Installing QEMU for Windows ARM64 validation"
@@ -619,7 +616,6 @@ install_dependencies() {
 			mingw-w64-x86_64-lld \
 			mingw-w64-x86_64-llvm \
 			mingw-w64-x86_64-llvm-tools \
-			mingw-w64-x86_64-tools \
 			mingw-w64-clang-aarch64-clang \
 			mingw-w64-clang-aarch64-compiler-rt \
 			mingw-w64-clang-aarch64-crt \
@@ -737,9 +733,6 @@ build_target() {
 	msg "Preparing $target worktree"
 	PATH="$tool_path_root/bin:/usr/bin:$saved_path"
 	export PATH
-	sanitize_source_tree "$target_triplet"
-	PATH="$saved_path"
-	export PATH
 	host_fbc="$(detect_external_fbc "$target" || true)"
 	if [ "$SKIP_SOURCE_SYNC" -eq 0 ] || [ ! -d "$worktree" ]; then
 		rm -rf "$worktree"
@@ -758,6 +751,7 @@ build_target() {
 	cd "$worktree"
 	PATH="$worktree/bin:$ROOT/bin:$tool_path_root/bin:/usr/bin:$saved_path"
 	export PATH
+	sanitize_source_tree "$target_triplet"
 
 	if [ -z "$host_fbc" ]; then
 		host_fbc="$(detect_fbc \
@@ -957,6 +951,7 @@ copy_arch_toolchain() {
 				libmpc-*.dll \
 				libmpfr-*.dll \
 				libwinpthread-*.dll \
+				libz-1.dll \
 				libzstd.dll \
 				zlib1.dll
 			do

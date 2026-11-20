@@ -428,17 +428,16 @@ fi
 
 STAGEDIR="${BUILDROOT}/stage"
 DISTDIR="$(dirname "${PACKAGE_ROOT}")"
-HOST_TRIPLET="$(extract_host_triplet)"
-
-DEVKITPRO="$(normalize_path "${DEVKITPRO_ARG:-${DEVKITPRO:-/opt/devkitpro}}")"
+DEVKITPRO="$(normalize_path "${DEVKITPRO_ARG:-${FBWII_DEVKITPRO:-${DEVKITPRO:-${BUILDROOT}/toolchain/devkitpro/opt/devkitpro}}}")"
 DEVKITPPC="$(normalize_path "${DEVKITPPC_ARG:-${DEVKITPPC:-${DEVKITPRO}/devkitPPC}}")"
-HOST_CC="$(first_command "${HOST_CC:-}" x86_64-pc-cygwin-gcc gcc || true)"
-HOST_CXX="$(first_command "${HOST_CXX:-}" x86_64-pc-cygwin-g++ g++ || true)"
-HOST_AS="$(first_command "${HOST_AS:-}" /usr/bin/as as || true)"
-HOST_AR="$(first_command "${HOST_AR:-}" /usr/bin/ar ar || true)"
-HOST_LD="$(first_command "${HOST_LD:-}" /usr/bin/ld ld || true)"
-HOST_RANLIB="$(first_command "${HOST_RANLIB:-}" /usr/bin/ranlib ranlib || true)"
-HOST_STRIP="$(first_command "${HOST_STRIP:-}" /usr/bin/strip strip || true)"
+HOST_CC="$(first_command "${HOST_CC:-}" /mingw64/bin/gcc gcc || true)"
+HOST_CXX="$(first_command "${HOST_CXX:-}" /mingw64/bin/g++ g++ || true)"
+HOST_AS="$(first_command "${HOST_AS:-}" /mingw64/bin/as as || true)"
+HOST_AR="$(first_command "${HOST_AR:-}" /mingw64/bin/ar ar || true)"
+HOST_LD="$(first_command "${HOST_LD:-}" /mingw64/bin/ld ld || true)"
+HOST_RANLIB="$(first_command "${HOST_RANLIB:-}" /mingw64/bin/ranlib ranlib || true)"
+HOST_STRIP="$(first_command "${HOST_STRIP:-}" /mingw64/bin/strip strip || true)"
+HOST_TRIPLET="$(${HOST_CC} -dumpmachine 2>/dev/null || extract_host_triplet)"
 POWERPC_GCC="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-gcc.exe" "${DEVKITPPC}/bin/powerpc-eabi-gcc" || true)"
 POWERPC_GXX="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-g++.exe" "${DEVKITPPC}/bin/powerpc-eabi-g++" || true)"
 POWERPC_AS="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-as.exe" "${DEVKITPPC}/bin/powerpc-eabi-as" || true)"
@@ -569,8 +568,35 @@ ensure_devkitpro()
     fi
 
     if [ "${missing}" -ne 0 ]; then
-        fail "install devkitPro devkitPPC/libogc or pass --devkitpro and --devkitppc"
+        local installer_script="${SCRIPT_DIR}/ci-install-windows-devkitpro.sh"
+        local devkitpro_root="${DEVKITPRO%/opt/devkitpro}"
+        [ -f "${installer_script}" ] || fail "devkitPro installer helper is missing: ${installer_script}"
+        [ -n "${devkitpro_root}" ] || devkitpro_root="/"
+
+        msg "Installing the missing devkitPro Wii toolchain"
+        mkdir -p "${devkitpro_root}/pacman/etc"
+        if [ ! -f "${devkitpro_root}/pacman/etc/pacman.conf" ]; then
+            cp /etc/pacman.conf "${devkitpro_root}/pacman/etc/pacman.conf"
+        fi
+        run env DEVKITPRO="${DEVKITPRO}" DEVKITPPC="${DEVKITPPC}" \
+            PACMAN_ROOT="${devkitpro_root}" \
+            PACMAN_CONF="${devkitpro_root}/pacman/etc/pacman.conf" \
+            bash "${installer_script}"
+
+        POWERPC_GCC="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-gcc.exe" "${DEVKITPPC}/bin/powerpc-eabi-gcc" || true)"
+        POWERPC_GXX="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-g++.exe" "${DEVKITPPC}/bin/powerpc-eabi-g++" || true)"
+        POWERPC_AS="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-as.exe" "${DEVKITPPC}/bin/powerpc-eabi-as" || true)"
+        POWERPC_AR="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-ar.exe" "${DEVKITPPC}/bin/powerpc-eabi-ar" || true)"
+        POWERPC_RANLIB="$(first_existing "${DEVKITPPC}/bin/powerpc-eabi-ranlib.exe" "${DEVKITPPC}/bin/powerpc-eabi-ranlib" || true)"
+        ELF2DOL="$(first_existing "${DEVKITPRO}/tools/bin/elf2dol.exe" "${DEVKITPRO}/tools/bin/elf2dol" || true)"
     fi
+
+    [ -x "${POWERPC_GCC}" ] && [ -x "${POWERPC_GXX}" ] && \
+    [ -x "${POWERPC_AS}" ] && [ -x "${POWERPC_AR}" ] && \
+    [ -x "${POWERPC_RANLIB}" ] && [ -x "${ELF2DOL}" ] && \
+    [ -d "${DEVKITPRO}/libogc/include" ] && \
+    [ -d "${DEVKITPRO}/libogc/lib/wii" ] || \
+        fail "devkitPro Wii toolchain installation did not produce all required tools"
 }
 
 # ---------------------------------------------------------------------------

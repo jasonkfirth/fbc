@@ -18,7 +18,7 @@ static int fb_hWindowDpi(ssize_t window_handle)
 	HWND window = (HWND)(intptr_t)window_handle;
 	HMODULE user = GetModuleHandleA("user32.dll");
 	FARPROC get_dpi_proc = user ?
-		GetProcAddressA(user, "GetDpiForWindow") : NULL;
+		GetProcAddress(user, "GetDpiForWindow") : NULL;
 	GET_DPI_FOR_WINDOW get_dpi = NULL;
 	HDC display;
 	int dpi;

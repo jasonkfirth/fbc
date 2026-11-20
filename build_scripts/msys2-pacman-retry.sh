@@ -74,7 +74,14 @@ attempt=1
 while [ "$attempt" -le "$PACMAN_RETRY_ATTEMPTS" ]; do
 	echo "==> pacman $* (attempt $attempt of $PACMAN_RETRY_ATTEMPTS)"
 
-	if pacman "$@"; then
+	if [ -n "${PACMAN_CONFIG:-}" ]; then
+		if [ -n "${PACMAN_ROOT:-}" ]; then
+			pacman --config "$PACMAN_CONFIG" --root "$PACMAN_ROOT" \
+				--dbpath "${PACMAN_ROOT%/}/var/lib/pacman/" "$@" && exit 0
+		else
+			pacman --config "$PACMAN_CONFIG" "$@" && exit 0
+		fi
+	elif pacman "$@"; then
 		exit 0
 	fi
 
