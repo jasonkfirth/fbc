@@ -188,6 +188,14 @@ private function hGetCId( byval sym as FBSYMBOL ptr ) as string
 	var rawname = symbGetMangledName( sym )
 	if( rawname = NULL ) then return ""
 	if( hCUseEmulatedTlsName(sym, rawname) ) then return *rawname
+	if( symbIsProc(sym) andalso irUsesClangCCompiler() ) then
+		'' Clang warns when these libc builtins are redeclared without stdio.h.
+		'' Keep the target ABI name as an asm alias and use a private C identifier.
+		select case *rawname
+		case "fopen", "fread", "fwrite"
+			return hEncodeCName(rawname, "fb_c_stdio_builtin_")
+		end select
+	end if
 	if( hCSymbolNeedsEncoding(sym) = FALSE ) then return *rawname
 	return hEncodeCName( rawname, "fb_c_sym_" )
 end function

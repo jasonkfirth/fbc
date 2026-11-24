@@ -1237,19 +1237,30 @@ private function hEmitLibcSizeParam _
 	case "realloc"
 		function = (param_index = 1)
 
+	case "fread", "fwrite"
+		'' Both item width and item count use C size_t.
+		function = (param_index = 1) or (param_index = 2)
+
 	case "memset", "memcpy", "memmove"
 		function = (param_index = 2)
 	end select
 end function
 
+private function hEmitLibcSizeResult( byref mangled as string ) as integer
+
+	'' fread/fwrite return C size_t even when crt/stdio.bi models it as UInteger.
+	function = (mangled = "fread") or (mangled = "fwrite")
+end function
+
 private function hGetLibcSizeDtype( ) as integer
 
 	'' The RTL intrinsics use uinteger for FreeBASIC's pointer-sized count,
-	'' but libc prototypes use C size_t.  On LP64 targets Clang compares the
-	'' spelling against unsigned long, not an unsigned long long typedef.
+	'' but libc prototypes use C size_t.  On LP64 targets and WebAssembly,
+	'' Clang checks the C spelling as unsigned long even when widths match.
 	dim as integer dtype = FB_DATATYPE_UINT
 
-	if( fbIs64bit( ) andalso ((env.target.options and FB_TARGETOPT_UNIX) <> 0) ) then
+	if( (fbIs64bit( ) andalso ((env.target.options and FB_TARGETOPT_UNIX) <> 0)) orelse _
+		env.clopt.target = FB_COMPTARGET_JS ) then
 		dtype = typeSetMangleDt( dtype, FB_DATATYPE_UINT )
 	elseif( env.clopt.target = FB_COMPTARGET_DOS ) then
 		dtype = typeSetMangleDt( FB_DATATYPE_ULONG, FB_DATATYPE_UINT )
@@ -1502,12 +1513,15 @@ private function hEmitProcHeader _
 	end if
 
 	'' Function result type (is 'void' for subs)
+	mangled = *symbGetMangledName( proc )
 	dim as integer cabi_clongdouble_result = _
 		hUsesCLongDoubleCABI( proc ) andalso _
 		hIsCLongDoubleType( symbGetProcRealType( proc ), _
 		                     symbGetProcRealSubtype( proc ) )
 	if( cabi_clongdouble_result ) then
 		semantic_result = "long double"
+	elseif( hEmitLibcSizeResult( mangled ) ) then
+		semantic_result = hEmitType( hGetLibcSizeDtype( ), NULL, TRUE )
 	else
 		semantic_result = hEmitType( typeUnsetIsConst( symbGetProcRealType( proc ) ), _
 						symbGetProcRealSubtype( proc ), TRUE )
@@ -1580,8 +1594,6 @@ private function hEmitProcHeader _
 		ln += " __attribute__((used))"
 	end if
 	ln += " "
-
-	mangled = *symbGetMangledName( proc )
 
 	'' Identifier
 	if( options and EMITPROC_ISPROCPTR ) then
