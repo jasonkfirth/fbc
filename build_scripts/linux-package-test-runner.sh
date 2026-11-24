@@ -233,8 +233,9 @@ install_slackware_test_deps() {
     slackpkg -batch=on -default_answer=y update || return 0
     slackpkg -batch=on -default_answer=y install \
         gcc gcc-g++ make python3 tar xz findutils diffutils which \
-        ncurses gpm libffi alsa-lib pulseaudio libX11 libXext libXpm \
-        libXrandr libXrender mesa libglvnd glu || true
+        ncurses gpm libffi alsa-lib pulseaudio dbus libasyncns libsndfile \
+        flac libvorbis libogg opus libX11 libXext libXpm libXrandr \
+        libXrender libxcb libXau libXdmcp mesa libglvnd glu || true
 }
 
 install_slackware_packages() {

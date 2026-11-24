@@ -383,10 +383,15 @@ ensure_target_bootstrap_sources() {
 
 ensure_host_compiler() {
     if ! ./bin/fbc -version >/dev/null 2>&1; then
+        local make_args=()
+
         msg "building host compiler"
         ensure_target_bootstrap_sources
-        run "$MAKE_CMD" bootstrap-minimal -j"$JOBS"
-        run "$MAKE_CMD" compiler FBC=bootstrap/fbc -j"$JOBS"
+        if [ "$USE_GPM" -eq 0 ]; then
+            make_args+=(DISABLE_GPM=YesPlease)
+        fi
+        run "$MAKE_CMD" "${make_args[@]}" bootstrap-minimal -j"$JOBS"
+        run "$MAKE_CMD" "${make_args[@]}" compiler FBC=bootstrap/fbc -j"$JOBS"
     fi
 
     ./bin/fbc -version >/dev/null 2>&1 || die "host compiler not available"

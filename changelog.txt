@@ -1,9 +1,22 @@
 Version 1.20.6
 
 [changed]
+- compiler/C: avoid Clang warnings on stdio builtin declarations by emitting private C identifiers with ABI aliases; emit libc size_t parameter and result types for fread/fwrite on Unix and JavaScript targets.
+- MSYS2 cross-target builds: add Android and Wii build setup, including the Android host-compiler wrapper and standalone runtime tools, isolated devkitPro installation, refreshed dependencies, and native Emscripten launcher preservation.
+- Windows package documentation: link the current Windows and sidecar installers, update the 1.20.6 documentation shelf, and describe versioned release checksum manifests.
+- gfxlib2/Win32 and rtlib/Wii: use the supported Win32 DPI lookup API and assign socket timeout seconds using the native timeval field type.
+- package matrix: match Debian Trixie and Sid architecture rows to the architectures supported by their family builder.
+- Debian packaging: allow source archives to omit ignored local WinCE assets before removing legacy binary compatibility files.
+- bootstrap packaging: exclude ignored local Windows CE, Windows 95, and AmigaOS assets from source archives used by cross-builds.
+- Slackware package smoke setup: install X11, DBus, and PulseAudio link dependencies so gfxlib and sfxlib smoke programs can link.
+- gfxlib2/Linux: make the VGA plane bit conversion explicit for strict GCC conversion warnings.
+- Arch Linux packaging: allow makepkg to strip native binaries, while keeping its host-side strip step disabled for cross-target packages.
+- compiler/x86: check for missing register owners before preserving values and release unowned allocator slots, avoiding null dereferences in GCC 16 bootstrap C.
+- package matrix: mark the Arch Linux matrix wrapper executable so the top-level dispatcher can launch it.
+- RPM bootstrap: carry the disabled-GPM setting into host-compiler builds on Rocky Linux and AlmaLinux, where gpm-devel is unavailable.
 - gfxlib3/Linux: cache Xft DPI and RandR rotation metrics for one second so responsive GUI polling does not open an X display and query RandR on every frame. Preserve display changes with a bounded refresh interval.
 - rtlib/Win32: allow the CRT import-pointer adapters to be built as strong definitions for standalone Windows 95 packages, while retaining weak fallbacks for normal MinGW CRT linking.
-- packaging/Windows 95: produce a standalone FreeBASIC 1.20.6 package with the refreshed compiler and runtime libraries, Win95-compatible tools and CRT imports, and a compiler-driven smoke test.
+- packaging/Windows 95: produce a standalone FreeBASIC 1.20.6 package with an i486-safe compiler and smoke-test runtime path, the MSVCRT40 runtime copy, Win95-compatible tools and CRT imports, and a compiler-driven smoke test.
 - version/package metadata: start the 1.20.6 development line, synchronize distro package versions and reset package release counters for the new upstream version.
 - maintenance: review every entry in `todo.txt` against the current compiler and runtime, remove completed work, and retain outstanding cases.
 - compiler/LLVM: match the x86-64 Linux C ABI for small struct and union results, including mixed integer and SSE registers and a hidden result pointer for unaligned packed structs. Add smoke coverage for calls in both directions between C and FreeBASIC, including procedure pointers and variadic calls. Rebuild affected LLVM objects before mixing them with newly compiled code.

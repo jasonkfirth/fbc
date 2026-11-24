@@ -40,6 +40,11 @@ dist/
 /remote_probe_temp/
 /out
 /out-*/
+# These ignored directories contain local Windows package/install assets, not
+# source inputs for compiler bootstrap archives.
+winCE/
+win95/
+AmigaOS/
 examples/**/*.a
 examples/**/*.asm
 examples/**/*.dll

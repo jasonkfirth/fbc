@@ -1221,6 +1221,7 @@ package_current_target() {
     local deb_build_options
     local changes_files=()
     local override_file
+    local compatibility_content_paths
     local target_standards_version=""
     local build_source_package=0
 
@@ -1389,7 +1390,9 @@ package_current_target() {
     rm -rf "$srcdir/contrib/winlibs-legacy"
     rm -f "$srcdir/contrib/swig/swig.exe"
     rm -f "$srcdir"/doc/manual/*.chm
-    find "$srcdir/lib" "$srcdir/winCE" -type f \
+    compatibility_content_paths=("$srcdir/lib")
+    [ ! -d "$srcdir/winCE" ] || compatibility_content_paths+=("$srcdir/winCE")
+    find "${compatibility_content_paths[@]}" -type f \
         \( -iname '*.dll' -o -iname '*.exe' -o -iname '*.cpl' -o -iname '*.sys' \
             -o -iname '*.ovl' -o -iname '*.com' -o -iname '*.386' \
             -o -iname '*.fon' -o -iname '*.bin' -o -iname '*.awx' \) -delete

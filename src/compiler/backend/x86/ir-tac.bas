@@ -1591,6 +1591,10 @@ private function hPreserveReg( byval vr as IRVREG ptr ) as integer
 	'' must be checked. If either needs to be spilled, both should be
 	'' spilled, to ensure the LONGINT's dwords stay together, either both
 	'' in regs, or both on stack.
+	'' An absent vreg has no register to preserve.
+	if( vr = NULL ) then
+		return TRUE
+	end if
 
 	hGetVREG( vr, vr_dtype, vr_dclass,  )
 
@@ -1710,20 +1714,29 @@ private sub hPreserveRegs( byval ptrvreg as IRVREG ptr = NULL )
 
 				'' get the attached vreg
 				vr = regTB(class_)->getVreg( regTB(class_), reg, vauxparent )
-				assert( irIsREG( vr ) and (vr->reg = reg) )
 
 				'' If this is a LONGINT vreg's vaux, use the main vreg instead.
 				'' This way we ensure that we'll always check both the main and
 				'' aux vregs, no matter which one is found first in this loop.
 				if( vauxparent ) then
-					assert( vauxparent->vaux = vr )
-					vr = vauxparent
+					if( vauxparent->vaux = vr ) then
+						vr = vauxparent
+					else
+						assert( vauxparent->vaux = vr )
+					end if
 				end if
 
-				'' Move to other registers if needed and possible
-				if( hPreserveReg( vr ) = FALSE ) then
-					'' Failed, no more free regs, spill to stack
-					irStoreVR( vr, NULL )
+				if( vr ) then
+					assert( irIsREG( vr ) and (vr->reg = reg) )
+
+					'' Move to other registers if needed and possible
+					if( hPreserveReg( vr ) = FALSE ) then
+						'' Failed, no more free regs, spill to stack
+						irStoreVR( vr, NULL )
+					end if
+				else
+					'' No IR value owns this reserved allocator entry.
+					regTB(class_)->free( regTB(class_), reg )
 				end if
 			end if
 

@@ -426,7 +426,7 @@ static void vga16_blitter(unsigned char *dest, int pitch)
 						}
 
 						if (color & (1 << plane))
-							pattern |= 1 << (7 - i);
+							pattern |= (unsigned char)(1U << (7 - i));
 					}
 					buffer[((fb_fbdev.w >> 3) * plane) + offset] = pattern;
 				}

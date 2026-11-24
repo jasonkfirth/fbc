@@ -91,6 +91,7 @@ VERSION="${VERSION%-win95}"
 
 for package_file in \
 	README-WIN95.TXT \
+	msvcrt40.dll \
 	fbc.exe \
 	bin/win32/as.exe \
 	bin/win32/ld.exe \

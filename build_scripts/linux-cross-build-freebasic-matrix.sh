@@ -174,12 +174,11 @@ DEB_ARCHES=(
 DEB_EXTENDED_ARCHES=(
     "${DEB_ARCHES[@]}"
     armel
-    loong64
 )
 
 DEB_SID_ARCHES=(
-    # Keep Sid aligned with the native Debian images supported by package CI.
     "${DEB_ARCHES[@]}"
+    loong64
 )
 
 APK_ARCHES=(

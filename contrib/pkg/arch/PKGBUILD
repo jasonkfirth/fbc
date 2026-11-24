@@ -27,11 +27,12 @@ depends=(
 # generated C code during bootstrap build.
 #
 # Cross packages are assembled by an x86_64 makepkg process. Its automatic strip
-# step is a host operation, so leave target ELF files and archives untouched here.
-options=(
-  '!lto'
-  '!strip'
-)
+# step is a host operation, so leave target ELF files and archives untouched there.
+if [[ -z "${FBC_ARCH_CROSS:-}" ]]; then
+  options=('!lto')
+else
+  options=('!lto' '!strip')
+fi
 makedepends=(
   'make'
   'pkgconf'
