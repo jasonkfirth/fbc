@@ -33,15 +33,9 @@
 /* Active mode and key queue helpers                                         */
 /* ------------------------------------------------------------------------- */
 
-static FB_GFX3_INPUT_STATE *input_active_locked(FB_GFX3_DRAW_STATE **state)
+static FB_GFX3_INPUT_STATE *input_active_locked(void)
 {
-	FB_GFX3_DRAW_STATE *current = fb_gfx3_api_get_draw_state_locked();
-
-	if (state != NULL)
-		*state = current;
-	if ((current == NULL) || (current->mode == NULL))
-		return NULL;
-	return &current->mode->input;
+	return fb_gfx3_api_get_input_state_locked();
 }
 
 static int input_pop_key(FB_GFX3_INPUT_STATE *input)
@@ -66,13 +60,12 @@ static int input_pop_key(FB_GFX3_INPUT_STATE *input)
 
 FBSTRING_ACCESS *fb_GfxInkey(void)
 {
-	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_INPUT_STATE *input;
 	FBSTRING_ACCESS *result = &fb_ctx.null_desc;
 	int key;
 
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(&state);
+	input = input_active_locked();
 	if (input != NULL) {
 		key = input_pop_key(input);
 		if (key != 0)
@@ -87,11 +80,10 @@ int fb_GfxGetkey(void)
 	int key = 0;
 
 	for (;;) {
-		FB_GFX3_DRAW_STATE *state;
 		FB_GFX3_INPUT_STATE *input;
 
 		FB_GRAPHICS_LOCK();
-		input = input_active_locked(&state);
+		input = input_active_locked();
 		if (input == NULL) {
 			FB_GRAPHICS_UNLOCK();
 			break;
@@ -107,12 +99,11 @@ int fb_GfxGetkey(void)
 
 int fb_GfxKeyHit(void)
 {
-	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_INPUT_STATE *input;
 	int result = FALSE;
 
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(&state);
+	input = input_active_locked();
 	if (input != NULL) {
 		fb_MutexLock(input->mutex);
 		result = input->initialized &&
@@ -125,12 +116,11 @@ int fb_GfxKeyHit(void)
 
 int fb_GfxMultikey(int scancode)
 {
-	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_INPUT_STATE *input;
 	int result = FB_FALSE;
 
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(&state);
+	input = input_active_locked();
 	/*
 		MULTIKEY is an asynchronous state query. Platform callbacks publish
 		key changes into the mutex-protected input snapshot independently of
@@ -154,12 +144,11 @@ int fb_GfxMultikey(int scancode)
 
 int fb_GfxGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 {
-	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_INPUT_STATE *input;
 	int failed = TRUE;
 
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(&state);
+	input = input_active_locked();
 	/* Mouse motion and buttons use the same asynchronous snapshot as keys. */
 	if (input != NULL) {
 		fb_MutexLock(input->mutex);
@@ -197,13 +186,12 @@ int fb_GfxGetMouse(int *x, int *y, int *z, int *buttons, int *clip)
 
 int fb_GfxSetMouse(int x, int y, int cursor, int clip)
 {
-	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_INPUT_STATE *input;
 	FB_GFX3_MOUSE_REQUEST *request;
 	int result = FB_GFX3_INVALID;
 
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(&state);
+	input = input_active_locked();
 	if ((input != NULL) && (input->mutex != NULL)) {
 		fb_MutexLock(input->mutex);
 		request = &input->mouse_request;
@@ -260,7 +248,7 @@ FBCALL int fb_GfxDropEnable(int enabled)
 	if (enabled != 0 && enabled != 1 && enabled != -1) return FB_DROP_INVALID;
 	enabled = enabled != 0;
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(NULL);
+	input = input_active_locked();
 	if (input != NULL) {
 		fb_MutexLock(input->mutex);
 		if (input->drops.supported) {
@@ -281,7 +269,7 @@ FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING_ACCESS *output)
 	int result = FB_DROP_UNAVAILABLE;
 	if (output == NULL) return FB_DROP_INVALID;
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(NULL);
+	input = input_active_locked();
 	if (input != NULL) {
 		fb_MutexLock(input->mutex);
 		result = fb_hDropCopy(&input->drops, identifier, index, &text);
@@ -299,12 +287,11 @@ FBCALL int fb_GfxDropGet(int identifier, int index, FBSTRING_ACCESS *output)
 
 FBCALL int fb_GfxEvent(EVENT *event)
 {
-	FB_GFX3_DRAW_STATE *state;
 	FB_GFX3_INPUT_STATE *input;
 	int available = FALSE;
 
 	FB_GRAPHICS_LOCK();
-	input = input_active_locked(&state);
+	input = input_active_locked();
 	/*
 		gfxlib2's SCREENEVENT reads the synchronized event queue; its window
 		thread publishes native messages independently. gfxlib3 follows the same
@@ -328,7 +315,10 @@ FBCALL int fb_GfxEvent(EVENT *event)
 		}
 		fb_MutexUnlock(input->mutex);
 	}
-	fb_gfx3_api_apply_pending_resize_locked(state);
+	/* Resize synchronization is needed only when consuming a resize event. */
+	if (available && (event != NULL) &&
+	    (event->type == EVENT_WINDOW_RESIZE))
+		(void)fb_gfx3_api_get_draw_state_locked();
 	FB_GRAPHICS_UNLOCK();
 	return available ? FB_TRUE : FB_FALSE;
 }

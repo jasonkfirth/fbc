@@ -9,6 +9,12 @@
 
 #include once "../compiler-support/c-opaque-nop.bi"
 
+#if defined(__FB_RISCV32__) or defined(__FB_RISCV64__)
+	'' GCC reserves s0 as a frame pointer in debug builds, but the opaque asm
+	'' clobber list covers all registers. Keep s0 available for that contract.
+	#cmdline "-Wc -fomit-frame-pointer"
+#endif
+
 #macro CHECK( condition )
 	if( (condition) = 0 ) then
 		end 1

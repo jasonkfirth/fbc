@@ -69,6 +69,7 @@ rm -f FreeBASIC-${VERSION}-source-bootstrap-*.tar.xz
 ##############################################################################
 
 ensure_host_compiler(){
+        fb_remove_build_tree "$PWD" "$PWD/lib/freebasic" || die "could not clear host runtime library outputs"
 
         if [ ! -x "./bin/fbc" ]; then
                 echo "==> Building host compiler..."
@@ -101,6 +102,7 @@ build_target(){
         rm -f "${PKG}.tar.xz"
         rm -rf "${PKG}"
         fb_remove_build_tree "$PWD" "$PWD/bootstrap/${DIR}" || die "could not remove bootstrap/${DIR}"
+        fb_remove_build_tree "$PWD" "$PWD/stage/bootstrap-dist" || die "could not remove bootstrap staging directory"
 
         $MAKE_CMD clean-bootstrap-sources >/dev/null 2>&1 || true
 

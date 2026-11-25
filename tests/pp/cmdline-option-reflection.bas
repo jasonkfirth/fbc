@@ -25,16 +25,30 @@
 #endif
 #endif
 
-#cmdline "-arch native -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
-
-#if defined(__FB_OPENBSD__) or defined(__FB_ANDROID__)
-#if __CMDLINE__ <> "-pic -arch native -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
-#error __CMDLINE__ should survive an FBC restart
-#endif
+#if defined(__FB_PPC__) and defined(__FB_64BIT__)
+	'' GCC's -mcpu=native detection is unreliable inside QEMU's PowerPC guest.
+	#if defined(__FB_BIGENDIAN__)
+		#cmdline "-arch powerpc64 -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
+		#if __CMDLINE__ <> "-arch powerpc64 -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
+		#error __CMDLINE__ should survive an FBC restart
+		#endif
+	#else
+		#cmdline "-arch powerpc64le -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
+		#if __CMDLINE__ <> "-arch powerpc64le -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
+		#error __CMDLINE__ should survive an FBC restart
+		#endif
+	#endif
 #else
-#if __CMDLINE__ <> "-arch native -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
-#error __CMDLINE__ should survive an FBC restart
-#endif
+	#cmdline "-arch native -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
+	#if defined(__FB_OPENBSD__) or defined(__FB_ANDROID__)
+		#if __CMDLINE__ <> "-pic -arch native -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
+		#error __CMDLINE__ should survive an FBC restart
+		#endif
+	#else
+		#if __CMDLINE__ <> "-arch native -entry custom_entry -export -z gosub-setjmp -z no-thiscall -z no-fastcall -z valist-as-ptr -z retinflts -z nobuiltins -z optabstract -z nocmdline"
+		#error __CMDLINE__ should survive an FBC restart
+		#endif
+	#endif
 #endif
 
 #if __FB_ARCH__ = ""

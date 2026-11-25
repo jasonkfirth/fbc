@@ -596,6 +596,7 @@ EOF
     ensure_host_compiler
     rm -f "$pkg"
     fb_remove_build_tree "$ROOT" "$ROOT/bootstrap/${dir_key}" || die "could not remove bootstrap/${dir_key}"
+    fb_remove_build_tree "$ROOT" "$ROOT/stage/bootstrap-dist" || die "could not remove bootstrap staging directory"
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \

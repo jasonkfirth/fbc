@@ -27,6 +27,8 @@
 #include "gfx3_compat.h"
 
 FB_GFX3_DRAW_STATE *fb_gfx3_api_get_draw_state_locked(void);
+/* Caller holds FB_GRAPHICS_LOCK; input snapshots do not need draw-state resize synchronization. */
+FB_GFX3_INPUT_STATE *fb_gfx3_api_get_input_state_locked(void);
 int fb_gfx3_api_apply_pending_resize_locked(FB_GFX3_DRAW_STATE *state);
 int fb_gfx3_api_runtime_error(int result);
 const char *fb_gfx3_api_get_window_title_locked(void);

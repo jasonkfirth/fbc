@@ -811,7 +811,10 @@ fi
 install_host_deps
 
 need_cmd docker
-fb_install_qemu_binfmt
+# Tests may run beside an emulated build. Keep its registered QEMU handlers
+# active; replacing binfmt entries can make an in-flight cross-arch compiler
+# fail with Exec format error.
+FBC_QEMU_BINFMT_RESET=0 fb_install_qemu_binfmt
 
 ##############################################################################
 # Test execution

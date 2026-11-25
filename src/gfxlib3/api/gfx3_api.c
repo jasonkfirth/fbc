@@ -280,6 +280,15 @@ FB_GFX3_DRAW_STATE *fb_gfx3_api_get_draw_state_locked(void)
 	return state;
 }
 
+/* Caller holds FB_GRAPHICS_LOCK. Input queries can read the synchronized
+   mode snapshot without allocating TLS draw state or applying a resize. */
+FB_GFX3_INPUT_STATE *fb_gfx3_api_get_input_state_locked(void)
+{
+	if (!mode_is_active)
+		return NULL;
+	return &active_mode.input;
+}
+
 static FB_GFX3_DRAW_STATE *api_get_draw_state(void)
 {
 	return fb_gfx3_api_get_draw_state_locked();

@@ -382,6 +382,7 @@ ensure_target_bootstrap_sources() {
 }
 
 ensure_host_compiler() {
+    fb_remove_build_tree "$ROOT" "$ROOT/lib/freebasic" || die "could not clear host runtime library outputs"
     if ! ./bin/fbc -version >/dev/null 2>&1; then
         local make_args=()
 
@@ -404,6 +405,7 @@ build_bootstrap_tarball() {
 
     rm -f "$BOOTSTRAP_TAR"
     fb_remove_build_tree "$ROOT" "$ROOT/bootstrap/${BOOTKEY}" || die "could not remove bootstrap/${BOOTKEY}"
+    fb_remove_build_tree "$ROOT" "$ROOT/stage/bootstrap-dist" || die "could not remove bootstrap staging directory"
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \

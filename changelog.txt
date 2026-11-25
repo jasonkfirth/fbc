@@ -7,6 +7,16 @@ Version 1.20.6
 - JS runtime and driver: preserve browser and Node command arguments, and keep the terminal code available to the HTML shell when an application uses only external graphics APIs.
 - JS packages: build SDL2, SDL3, SDL2_image, SDL2_ttf, FreeType, SQLite, libpng, libjpeg, bzip2 and Expat from pinned sources. Exercise browser rendering, font and image loading, compression, database queries and XML callbacks through Exampleageddon.
 - JS packages: ship WebAssembly archives for raylib 5.5 and zlib 1.4. Match the browser bindings to the packaged C ABI and add an Exampleageddon profile for browser drawing, audio, compression, and gzip file I/O.
+- APK package tests: add the Exampleageddon option, mount the examples tree in the test container, and fail on self-contained example failures.
+- Emulated package builds and tests: preserve registered QEMU binfmt handlers while foreign-architecture processes are active, avoiding assembler failures during concurrent test setup.
+- APK matrix cleanup: remove only the completed architecture's build directory so concurrent package targets keep their source and object trees.
+- Bootstrap matrix staging: remove stale root-owned bootstrap archives through the build-tree cleanup helper before regenerating each architecture's archive.
+- Host bootstrap preparation: remove stale root-owned runtime libraries before configuring the host compiler for the next matrix target.
+- Build cleanup: remove root-owned object trees left by package containers through the ownership-aware cleanup helper so subsequent matrix rows can clean shared sources.
+- CRT long double: expose the selected musl ABI to target headers and use the correct eight-byte CLongDouble layout on musl PPC64LE.
+- RISC-V compiler: omit GCC's unsupported -march=native flag when reflecting the native architecture option.
+- RISC-V opaque-asm regression: omit the frame pointer in its debug build so GCC accepts the conservative register clobber list.
+- PPC command-line reflection test: use an explicit 64-bit architecture in QEMU, where GCC's -mcpu=native probe reports a 32-bit CPU.
 - compiler/C: avoid Clang warnings on stdio builtin declarations by emitting private C identifiers with ABI aliases; emit libc size_t parameter and result types for fread/fwrite on Unix and JavaScript targets.
 - MSYS2 cross-target builds: add Android and Wii build setup, including the Android host-compiler wrapper and standalone runtime tools, isolated devkitPro installation, refreshed dependencies, and native Emscripten launcher preservation.
 - Windows package documentation: link the current Windows and sidecar installers, update the 1.20.6 documentation shelf, and describe versioned release checksum manifests.

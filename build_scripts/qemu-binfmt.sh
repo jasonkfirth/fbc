@@ -26,8 +26,10 @@ FB_QEMU_BINFMT_IMAGE_DEFAULT="tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838
 
 fb_install_qemu_binfmt() {
     local image
+    local reset_existing
 
     image="${FBC_QEMU_BINFMT_IMAGE:-$FB_QEMU_BINFMT_IMAGE_DEFAULT}"
+    reset_existing="${FBC_QEMU_BINFMT_RESET:-auto}"
 
     msg "installing pinned QEMU binfmt interpreters"
     run_root docker pull "$image"
@@ -40,7 +42,24 @@ fb_install_qemu_binfmt() {
     # QEMU 8.2 returns ENOSYS for that call and breaks dpkg-source.  Remove the
     # existing entries first so the pinned QEMU version is actually selected.
     #
-    run_root docker run --rm --privileged "$image" --uninstall 'qemu-*'
+    if [ "$reset_existing" = "auto" ]; then
+        if command -v pgrep >/dev/null 2>&1 && \
+            pgrep -f '[q]emu-(aarch64|arm|loongarch64|mips64|mips64el|ppc64le|riscv64|s390x)' >/dev/null 2>&1; then
+            reset_existing=0
+            msg "preserving QEMU registrations used by active emulated processes"
+        else
+            reset_existing=1
+        fi
+    fi
+
+    if [ "$reset_existing" = "1" ]; then
+        run_root docker run --rm --privileged "$image" --uninstall 'qemu-*'
+    elif [ "$reset_existing" = "0" ]; then
+        msg "preserving existing QEMU registrations"
+    else
+        echo "ERROR: FBC_QEMU_BINFMT_RESET must be auto, 0, or 1" >&2
+        return 1
+    fi
     run_root docker run --rm --privileged "$image" --install all
 }
 

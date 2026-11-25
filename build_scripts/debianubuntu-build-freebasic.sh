@@ -1171,6 +1171,7 @@ install_deps() {
 ##############################################################################
 
 ensure_host_compiler() {
+    fb_remove_build_tree "$ROOT" "$ROOT/lib/freebasic" || die "could not clear host runtime library outputs"
     if [ ! -x "./bin/fbc" ]; then
         msg "building host compiler"
         run "$MAKE_CMD" clean
@@ -1190,6 +1191,7 @@ build_bootstrap_tarball() {
 
     rm -f "$BOOTSTRAP_TAR"
     fb_remove_build_tree "$ROOT" "$ROOT/bootstrap/${BUILD_BOOTKEY}" || die "could not remove bootstrap/${BUILD_BOOTKEY}"
+    fb_remove_build_tree "$ROOT" "$ROOT/stage/bootstrap-dist" || die "could not remove bootstrap staging directory"
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \

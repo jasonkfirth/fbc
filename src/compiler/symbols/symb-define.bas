@@ -1758,6 +1758,10 @@ sub symbDefineInit _
 	if( env.clopt.target = FB_COMPTARGET_JS ) then
 		symbAddDefine( @"__FB_LINUX__", NULL, 0 )
 	end if
+	#ifdef ENABLE_MUSL_DYNAMIC_LINKER
+		'' C ABI headers may need libc-specific layouts for the selected target.
+		symbAddDefine( @"__FB_MUSL__", NULL, 0 )
+	#endif
 
 	'' add __FB_UNIX__ / __FB_PCOS__ defines, as necessary
 	if( env.target.options and FB_TARGETOPT_UNIX ) then

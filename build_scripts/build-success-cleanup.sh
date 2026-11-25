@@ -20,7 +20,13 @@ fb_cleanup_success() {
             rm -rf stage/bootstrap-dist
             rm -rf .build-*
             rm -rf .maketests-tmp maketests-log test-run-log
-            rm -rf src/*/obj
+            # Package containers can leave root-owned objects in the shared
+            # worktree. Remove each object tree through the ownership-aware
+            # helper so later matrix rows can clean and rebuild safely.
+            for fb_obj_dir in src/*/obj; do
+                [ -e "$fb_obj_dir" ] || continue
+                fb_remove_build_tree "$fb_root" "$fb_root/$fb_obj_dir" || true
+            done
             # Compiler support C is maintained source. Only BASIC modules
             # donate the names of disposable compiler emissions.
             find src/compiler -type f -name '*.bas' -exec sh -c '

@@ -27,7 +27,7 @@ cd "$ROOT"
 . "$ROOT/build_scripts/qemu-binfmt.sh"
 
 CLEANUP_SUCCESS=0
-CLEANUP_DIRS=("$ROOT/.build-alpine")
+CLEANUP_DIRS=()
 
 cleanup_build_roots() {
     local path
@@ -223,6 +223,7 @@ install_host_deps() {
 ##############################################################################
 
 ensure_host_compiler() {
+    fb_remove_build_tree "$ROOT" "$ROOT/lib/freebasic" || die "could not clear host runtime library outputs"
     if [ ! -x "./bin/fbc" ]; then
         msg "building host compiler for bootstrap emission"
         run "$MAKE_CMD" clean
@@ -263,6 +264,7 @@ EOF
 
     rm -f "$pkg"
     fb_remove_build_tree "$ROOT" "$ROOT/bootstrap/${dir_key}" || die "could not remove bootstrap/${dir_key}"
+    fb_remove_build_tree "$ROOT" "$ROOT/stage/bootstrap-dist" || die "could not remove bootstrap staging directory"
     "$MAKE_CMD" clean-bootstrap-sources >/dev/null 2>&1 || true
 
     run "$MAKE_CMD" \
@@ -435,6 +437,8 @@ EOF
     platform="$(docker_platform_for_arch "$arch")"
     build_jobs="$(make_jobs_for_platform "$platform" "$HOST_PLATFORM")"
     outdir="$ROOT/out/linux/${distro}/${codename}/${arch}"
+
+    CLEANUP_DIRS+=("$ROOT/.build-alpine/${distro}/${codename}/${arch}")
 
     mkdir -p "$outdir"
 

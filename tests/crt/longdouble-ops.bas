@@ -26,7 +26,9 @@
 SUITE( fbc_tests.crt.longdouble )
 
 	TEST( longdouble_size )
-		#if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
+		#if defined( __FB_PPC__ ) and defined( __FB_64BIT__ ) and defined( __FB_MUSL__ ) and not defined( __FB_BIGENDIAN__ )
+			CU_ASSERT( sizeof( clongdouble ) = 8 )
+		#elseif defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
 			CU_ASSERT( sizeof( clongdouble ) = 16 )
 		#elseif defined( __FB_ARM__ ) or defined( __FB_MIPS32__ ) or _
 		        defined( __FB_WII__ ) or defined( __FB_XBOX__ )
@@ -50,7 +52,11 @@ SUITE( fbc_tests.crt.longdouble )
 			value as LongDoubleValue
 		end type
 
-		#if defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
+		#if defined( __FB_PPC__ ) and defined( __FB_64BIT__ ) and defined( __FB_MUSL__ ) and not defined( __FB_BIGENDIAN__ )
+			'' musl PPC64LE long double is a double-sized field aligned to eight bytes.
+			#assert sizeof( TaggedLongDouble ) = 16
+			#assert offsetof( TaggedLongDouble, value ) = 8
+		#elseif defined( __FB_64BIT__ ) and not (defined( __FB_ARM__ ) and (defined( __FB_DARWIN__ ) or defined( __FB_WIN32__ )))
 			#assert sizeof( TaggedLongDouble ) = 32
 			#assert offsetof( TaggedLongDouble, value ) = 16
 		#elseif defined( __FB_RISCOS__ )

@@ -542,6 +542,12 @@ private function hCompileStage2Module( byval module as FBCIOFILE ptr ) as intege
 					else
 						ln += "-mcpu=" + *fbGetGccArch( ) + " "
 					end if
+				case FB_CPUFAMILY_RISCV32, FB_CPUFAMILY_RISCV64
+					'' GCC does not accept -march=native for RISC-V. Its configured
+					'' default already matches the native RISC-V target.
+					if( fbc.cputype_is_native = FALSE ) then
+						ln += "-march=" + *fbGetGccArch( ) + " "
+					end if
 				case FB_CPUFAMILY_M68K
 					'' The m68k family describes the reusable ABI, not a processor
 					'' baseline. Platform replacements select a baseline when their

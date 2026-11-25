@@ -66,6 +66,8 @@ Options:
   --fbctests-jobs N Parallel jobs for --fbctests (default: host CPU count)
   --fbctests-unit-args ARGS
                     Extra arguments passed to the fbc-tests binary
+  --exampleageddon  Compile examples/ and run self-contained examples
+  --exampleageddon-jobs N Parallel jobs for --exampleageddon (default: host CPU count)
   --skip-host-deps  Skip host dependency installation
   --list            Show package directories that would be tested
   --help            Show this help text
@@ -75,6 +77,8 @@ starts a fresh Docker container for each target, installs that target's .apk
 packages, then compiles/runs console, gfxlib, and sfxlib smoke programs.
 With --fbctests, it also copies the repository tests/ tree into the container
 and runs the FreeBASIC unit and log tests using the packaged compiler.
+With --exampleageddon, it runs the example sweep and fails on self-contained
+compile or runtime failures.
 
 Inside the guest, the only package install command is:
   apk add --allow-untrusted /packages/*.apk
@@ -94,6 +98,8 @@ KEEP_GOING=0
 RUN_FBCTESTS=0
 FBCTESTS_JOBS="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 FBCTESTS_UNIT_ARGS=""
+RUN_EXAMPLEAGEDDON=0
+EXAMPLEAGEDDON_JOBS="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 SKIP_HOST_DEPS=0
 LIST_ONLY=0
 
@@ -106,6 +112,8 @@ while [ $# -gt 0 ]; do
         --fbctests) RUN_FBCTESTS=1; shift ;;
         --fbctests-jobs) FBCTESTS_JOBS="$2"; shift 2 ;;
         --fbctests-unit-args) FBCTESTS_UNIT_ARGS="$2"; shift 2 ;;
+        --exampleageddon) RUN_EXAMPLEAGEDDON=1; shift ;;
+        --exampleageddon-jobs) EXAMPLEAGEDDON_JOBS="$2"; shift 2 ;;
         --skip-host-deps) SKIP_HOST_DEPS=1; shift ;;
         --list) LIST_ONLY=1; shift ;;
         -h|--help)
@@ -488,6 +496,30 @@ if [ "${RUN_FBCTESTS:-0}" = "1" ]; then
     run_fbctests
 fi
 
+run_exampleageddon() {
+    [ -d /source-root/examples ] || fail "examples/ tree was not mounted at /source-root/examples"
+    [ -f /exampleageddon-freebasic.py ] || fail "exampleageddon runner was not mounted"
+
+    echo "==> installing exampleageddon dependencies"
+    run apk add --no-cache python3
+
+    echo "==> running exampleageddon"
+    run python3 /exampleageddon-freebasic.py \
+        --root /source-root \
+        --outdir /results/exampleageddon \
+        --prefix /usr \
+        --include-dir /usr/include/freebasic \
+        --fbc fbc \
+        --jobs "${EXAMPLEAGEDDON_JOBS:-1}" \
+        --compile-timeout 180 \
+        --run-timeout 10 \
+        --fail-on-self-contained
+}
+
+if [ "${RUN_EXAMPLEAGEDDON:-0}" = "1" ]; then
+    run_exampleageddon
+fi
+
 echo "==> TEST PASSED"
 TEST_RUNNER_EOF
 
@@ -543,7 +575,10 @@ fi
 install_host_deps
 
 need_cmd docker
-fb_install_qemu_binfmt
+# Tests may run beside an emulated build. Keep its registered QEMU handlers
+# active; replacing binfmt entries can make an in-flight cross-arch compiler
+# fail with Exec format error.
+FBC_QEMU_BINFMT_RESET=0 fb_install_qemu_binfmt
 
 ##############################################################################
 # Test execution
@@ -596,7 +631,12 @@ EOF
             -e RUN_FBCTESTS="$RUN_FBCTESTS" \
             -e FBCTESTS_JOBS="$FBCTESTS_JOBS" \
             -e FBCTESTS_UNIT_ARGS="$FBCTESTS_UNIT_ARGS" \
+            -e RUN_EXAMPLEAGEDDON="$RUN_EXAMPLEAGEDDON" \
+            -e EXAMPLEAGEDDON_JOBS="$EXAMPLEAGEDDON_JOBS" \
             -v "$dir:/packages:ro" \
+            -v "$dir:/results" \
+            -v "$ROOT/examples:/source-root/examples:ro" \
+            -v "$ROOT/build_scripts/exampleageddon-freebasic.py:/exampleageddon-freebasic.py:ro" \
             -v "$ROOT/tests:/source-tests:ro" \
             -v "$ROOT/inc:/source-inc:ro" \
             -v "$ROOT/src/sfxlib:/source-sfxlib:ro" \
