@@ -5,6 +5,8 @@ Version 1.20.6
 - compiler and rtlib: support ByVal array parameters with independent bounds and element storage. Copy strings and use UDT copy constructors for non-trivial elements.
 - compiler: use copy construction for scalar ByVal UDTs with const copy constructors. Generated member copies use a nested object's accessible copy constructor and destructor when it supplies no copy-assignment Let overload. Rebuild objects that share a signature affected by the UDT calling convention change.
 - JS runtime and driver: preserve browser and Node command arguments, and keep the terminal code available to the HTML shell when an application uses only external graphics APIs.
+- JavaScript runtime and graphics: add Asyncify-backed browser line input and event-responsive GETKEY, retain chunked input, support virtual-filesystem DIR, correct keyboard routing, avoid clearing the terminal on WIDTH queries, and expose WebGL procedure lookups for an active context.
+- JavaScript browser corpus: add reproducible source staging, compilation, browser checks, and catalog generation for external FreeBASIC projects, including input, persistent workspaces, generated data, socket checks, and LLVM/Wasm workflows.
 - JS packages: build SDL2, SDL3, SDL2_image, SDL2_ttf, FreeType, SQLite, libpng, libjpeg, bzip2 and Expat from pinned sources. Exercise browser rendering, font and image loading, compression, database queries and XML callbacks through Exampleageddon.
 - JS packages: ship WebAssembly archives for raylib 5.5 and zlib 1.4. Match the browser bindings to the packaged C ABI and add an Exampleageddon profile for browser drawing, audio, compression, and gzip file I/O.
 - APK package tests: add the Exampleageddon option, mount the examples tree in the test container, and fail on self-contained example failures.
@@ -17,6 +19,7 @@ Version 1.20.6
 - RISC-V compiler: omit GCC's unsupported -march=native flag when reflecting the native architecture option.
 - RISC-V opaque-asm regression: omit the frame pointer in its debug build so GCC accepts the conservative register clobber list.
 - PPC command-line reflection test: use an explicit 64-bit architecture in QEMU, where GCC's -mcpu=native probe reports a 32-bit CPU.
+- gfxlib3 input: read keyboard, mouse, drop, and event state from the active-mode snapshot without allocating draw-state TLS, and apply resize synchronization only when consuming a resize event.
 - compiler/C: avoid Clang warnings on stdio builtin declarations by emitting private C identifiers with ABI aliases; emit libc size_t parameter and result types for fread/fwrite on Unix and JavaScript targets.
 - MSYS2 cross-target builds: add Android and Wii build setup, including the Android host-compiler wrapper and standalone runtime tools, isolated devkitPro installation, refreshed dependencies, and native Emscripten launcher preservation.
 - Windows package documentation: link the current Windows and sidecar installers, update the 1.20.6 documentation shelf, and describe versioned release checksum manifests.
@@ -24,7 +27,7 @@ Version 1.20.6
 - package matrix: match Debian Trixie and Sid architecture rows to the architectures supported by their family builder.
 - Debian packaging: allow source archives to omit ignored local WinCE assets before removing legacy binary compatibility files.
 - bootstrap packaging: exclude ignored local Windows CE, Windows 95, and AmigaOS assets from source archives used by cross-builds.
-- Slackware package smoke setup: install X11, DBus, and PulseAudio link dependencies so gfxlib and sfxlib smoke programs can link.
+- Slackware package smoke setup: install X11/XCB, DBus, PulseAudio, and sound codec/link dependencies so gfxlib and sfxlib smoke programs can link.
 - gfxlib2/Linux: make the VGA plane bit conversion explicit for strict GCC conversion warnings.
 - Arch Linux packaging: allow makepkg to strip native binaries, while keeping its host-side strip step disabled for cross-target packages.
 - compiler/x86: check for missing register owners before preserving values and release unowned allocator slots, avoiding null dereferences in GCC 16 bootstrap C.
