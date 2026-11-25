@@ -1,6 +1,12 @@
 Version 1.20.6
 
 [changed]
+- compiler: accept explicit ByVal on grouped arguments to value parameters, including parameters that use the default mode. Accept explicit ByRef on array parameters as the existing descriptor-passing convention.
+- compiler and rtlib: support ByVal array parameters with independent bounds and element storage. Copy strings and use UDT copy constructors for non-trivial elements.
+- compiler: use copy construction for scalar ByVal UDTs with const copy constructors. Generated member copies use a nested object's accessible copy constructor and destructor when it supplies no copy-assignment Let overload. Rebuild objects that share a signature affected by the UDT calling convention change.
+- JS runtime and driver: preserve browser and Node command arguments, and keep the terminal code available to the HTML shell when an application uses only external graphics APIs.
+- JS packages: build SDL2, SDL3, SDL2_image, SDL2_ttf, FreeType, SQLite, libpng, libjpeg, bzip2 and Expat from pinned sources. Exercise browser rendering, font and image loading, compression, database queries and XML callbacks through Exampleageddon.
+- JS packages: ship WebAssembly archives for raylib 5.5 and zlib 1.4. Match the browser bindings to the packaged C ABI and add an Exampleageddon profile for browser drawing, audio, compression, and gzip file I/O.
 - compiler/C: avoid Clang warnings on stdio builtin declarations by emitting private C identifiers with ABI aliases; emit libc size_t parameter and result types for fread/fwrite on Unix and JavaScript targets.
 - MSYS2 cross-target builds: add Android and Wii build setup, including the Android host-compiler wrapper and standalone runtime tools, isolated devkitPro installation, refreshed dependencies, and native Emscripten launcher preservation.
 - Windows package documentation: link the current Windows and sidecar installers, update the 1.20.6 documentation shelf, and describe versioned release checksum manifests.

@@ -57,6 +57,8 @@
 	' shutdown SDL
 	SDL_Quit
 
-	sleep
+	#ifndef EXAMPLEAGEDDON_BROWSER
+		sleep
+	#endif
 
 '' End of video_info.bas

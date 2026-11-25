@@ -112,7 +112,9 @@ dest = 0
 
 Print
 If Not checksum_valid Then End 1
+#ifndef EXAMPLEAGEDDON_BROWSER
 Print "Press any key to end . . . "
 Sleep
+#endif
 
 '' end of zlib.bas

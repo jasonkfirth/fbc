@@ -1,4 +1,10 @@
-'' FreeBASIC binding for zlib-1.2.8
+'' Project: FreeBASIC zlib binding
+'' File: zlib.bi
+'' Purpose: Declare the zlib C interface for native and browser targets.
+'' Responsibilities: C types, stream APIs and Emscripten file offsets.
+'' This file intentionally does not contain compression or file I/O code.
+''
+'' Native declarations based on zlib 1.2.8. The JS SDK ships zlib 1.4.
 ''
 '' based on the C header files:
 ''   zlib.h -- interface of the 'zlib' general purpose compression library
@@ -71,13 +77,22 @@ const SEEK_CUR = 1
 #ifndef SEEK_END
 const SEEK_END = 2
 #endif
-type z_off_t as clong
+#ifdef __FB_JS__
+	'' Emscripten's off_t is 64-bit even with 32-bit pointers.
+	type z_off_t as longint
+	#define ZLIB_VERSION "1.4"
+	const ZLIB_VERNUM = &h1400
+	const ZLIB_VER_MINOR = 4
+	const ZLIB_VER_REVISION = 0
+#else
+	type z_off_t as clong
+	#define ZLIB_VERSION "1.2.8"
+	const ZLIB_VERNUM = &h1280
+	const ZLIB_VER_MINOR = 2
+	const ZLIB_VER_REVISION = 8
+#endif
 type z_off64_t as z_off_t
-#define ZLIB_VERSION "1.2.8"
-const ZLIB_VERNUM = &h1280
 const ZLIB_VER_MAJOR = 1
-const ZLIB_VER_MINOR = 2
-const ZLIB_VER_REVISION = 8
 const ZLIB_VER_SUBREVISION = 0
 
 type alloc_func as function(byval opaque as voidpf, byval items as uInt, byval size as uInt) as voidpf
@@ -225,16 +240,24 @@ declare function inflateBackInit_(byval strm as z_streamp, byval windowBits as l
 type gzFile_s
 	have as ulong
 	next as ubyte ptr
-	pos as clong
+	pos as z_off64_t
 end type
 
 declare function gzgetc_(byval file as gzFile) as long
 declare function gzopen(byval as const zstring ptr, byval as const zstring ptr) as gzFile
-declare function gzseek(byval as gzFile, byval as clong, byval as long) as clong
-declare function gztell(byval as gzFile) as clong
-declare function gzoffset(byval as gzFile) as clong
-declare function adler32_combine(byval as uLong_, byval as uLong_, byval as clong) as uLong_
-declare function crc32_combine(byval as uLong_, byval as uLong_, byval as clong) as uLong_
+declare function gzseek(byval as gzFile, byval as z_off_t, byval as long) as z_off_t
+declare function gztell(byval as gzFile) as z_off_t
+declare function gzoffset(byval as gzFile) as z_off_t
+declare function adler32_combine(byval as uLong_, byval as uLong_, byval as z_off_t) as uLong_
+declare function crc32_combine(byval as uLong_, byval as uLong_, byval as z_off_t) as uLong_
+
+#ifdef __FB_JS__
+	#include once "crt/stddef.bi"
+	type z_size_t as size_t
+	declare function compress_z(byval as Bytef ptr, byval as z_size_t ptr, byval as const Bytef ptr, byval as z_size_t) as long
+	declare function compressBound_z(byval as z_size_t) as z_size_t
+	declare function uncompress2_z(byval as Bytef ptr, byval as z_size_t ptr, byval as const Bytef ptr, byval as z_size_t ptr) as long
+#endif
 
 type internal_state_
 	dummy as long
@@ -254,3 +277,5 @@ declare function deflateResetKeep(byval as z_streamp) as long
 declare function gzvprintf(byval file as gzFile, byval format as const zstring ptr, byval va as va_list) as long
 
 end extern
+
+'' end of zlib.bi

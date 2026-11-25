@@ -114,7 +114,18 @@ function cParentExpression _
 	fbSetGtInParensOnly( FALSE )
 	fbSetIdxInParensOnly( FALSE )
 
+	'' A call argument modifier can be inside leading parentheses. Stop
+	'' looking once the argument expression itself starts.
+	if( parser.arg_group_mode <> NULL ) then
+		if( lexGetToken( ) <> CHAR_LPRNT ) then
+			if( hMatch( FB_TK_BYVAL, LEXCHECK_POST_SUFFIX ) ) then
+				*parser.arg_group_mode = FB_PARAMMODE_BYVAL
+			end if
+			parser.arg_group_mode = NULL
+		end if
+	end if
 	parexpr = cExpression(  )
+	parser.arg_group_mode = NULL
 
 	fbSetEqInParensOnly( eqinparensonly )
 	fbSetGtInParensOnly( gtinparensonly )

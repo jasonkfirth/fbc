@@ -283,7 +283,8 @@ private sub hCheckPrototype _
 		end if
 
 		'' and mode
-		if( param->param.mode <> proto_param->param.mode ) then
+		if( param->param.mode <> proto_param->param.mode or _
+		    symbIsByvalArray( param ) <> symbIsByvalArray( proto_param ) ) then
 			hParamError( proc, i )
 		end if
 
@@ -445,7 +446,8 @@ private function hSamePrototype _
 			return FALSE
 		end if
 
-		if( proto_param->param.mode <> param->param.mode ) then
+		if( proto_param->param.mode <> param->param.mode or _
+		    symbIsByvalArray( proto_param ) <> symbIsByvalArray( param ) ) then
 			return FALSE
 		end if
 

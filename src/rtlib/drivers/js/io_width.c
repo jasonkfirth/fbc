@@ -10,17 +10,21 @@
 
 int fb_ConsoleWidth( int cols, int rows )
 {
-	if( cols < 40 )
-        cols = 40;
+	return EM_ASM_INT({
+		var terminal = __fb_rtlib.console;
+		var oldCols = terminal.cols;
+		var oldRows = terminal.rows;
 
-    if( rows < 10 )
-        rows = 10;
+		/* Terminal.resizeTo() clears its cell buffer, even at the same size.
+		 * WIDTH() only queries, and omitted dimensions keep their size. */
+		var newCols = $0 > 0 ? Math.max(40, $0) : oldCols;
+		var newRows = $1 > 0 ? Math.max(10, $1) : oldRows;
+		if (newCols !== oldCols || newRows !== oldRows)
+			terminal.size_set(newCols, newRows);
 
-	EM_ASM_ARGS({
-        __fb_rtlib.console.size_set($0, $1);
-    },cols, rows);
-
-	return (rows << 16) | cols;
+		/* The BASIC WIDTH() result packs columns and rows into 16 bits each. */
+		return (oldRows << 16) | (oldCols & 0xffff);
+	}, cols, rows);
 }
 
 /* end of drivers/js/io_width.c */

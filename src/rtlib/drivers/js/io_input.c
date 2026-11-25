@@ -116,9 +116,15 @@ static const unsigned char js_keycode_to_not_process_tb[256] =
     [145] = 1,             /* scrolllock */
     [173] = 1,             /* - */
     [176] = 1,             /* ~ */
+    /* Chromium assigns different keydown codes to these punctuation keys.
+     * The keypress callback supplies the character for the active layout. */
+    [186] = 1,             /* ; */
+    [187] = 1,             /* = */
     [188] = 1,             /* , */
+    [189] = 1,             /* - */
     [190] = 1,             /* . */
     [191] = 1,             /* / */
+    [192] = 1,             /* ~ */
     [219] = 1,             /* [ */
     [220] = 1,             /* \ */
     [221] = 1,             /* ] */
@@ -205,9 +211,13 @@ static const unsigned char js_keycode_to_qb_scancode_tb[256] =
     [145] = SC_SCROLLLOCK,
     [173] = SC_MINUS,
     [176] = SC_TILDE,
+    [186] = SC_SEMICOLON,
+    [187] = SC_EQUALS,
     [188] = SC_COMMA,
+    [189] = SC_MINUS,
     [190] = SC_PERIOD,
     [191] = SC_SLASH,
+    [192] = SC_TILDE,
     [219] = SC_LEFTBRACKET,
     [220] = SC_BACKSLASH,
     [221] = SC_RIGHTBRACKET,
@@ -315,11 +325,13 @@ EM_BOOL fb_hKeyEventHandler(int eventType, const EmscriptenKeyboardEvent *keyEve
 	static unsigned int scancode;
 	static unsigned int keycode;
 
-	/* The editable IME bridge commits text through input/composition events.
-	 * Feeding the same key through these window callbacks would duplicate it. */
+	/* HTML editors handle their own input. The window callback would
+	 * otherwise prevent the editor's default actions for keys like Enter. */
 	if (EM_ASM_INT({
 		var state = Module['fbSoftKeyboard'];
-		return !!(state && state.input && document.activeElement === state.input);
+		var active = document.activeElement;
+		return active === Module['fbLineInput'] ||
+		       !!(state && state.input && active === state.input);
 	}))
 		return 0;
 

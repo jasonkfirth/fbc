@@ -82,26 +82,43 @@ End If
 Dim As FT_Bitmap Ptr bitmap = @face->glyph->bitmap
 If bitmap->pixel_mode <> FT_PIXEL_MODE_GRAY Or bitmap->num_grays <> 256 Or bitmap->buffer = NULL Then
     releaseFreeType library, face
+    Screen 0
+    Print "FreeType returned an unsupported glyph bitmap"
     End 1
 End If
 Dim row_size As LongInt = Abs(CLngInt(bitmap->pitch))
-If row_size < bitmap->width Or bitmap->width > 8192 Or bitmap->rows > 8192 Then
+If row_size < bitmap->width Or bitmap->width = 0 Or bitmap->width > 8192 Or _
+   bitmap->rows = 0 Or bitmap->rows > 8192 Then
     releaseFreeType library, face
+    Screen 0
+    Print "FreeType returned an invalid glyph size or pitch"
     End 1
 End If
 Dim source_top As UByte Ptr = bitmap->buffer
 If bitmap->pitch < 0 Then source_top += row_size*(bitmap->rows-1)
 
-
+'' A glyph can touch thousands of pixels. Present the complete bitmap once
+'' instead of repeatedly uploading it to the browser canvas while drawing.
+ScreenLock
 For y As Integer = 0 To (bitmap->rows - 1)
 	For x As Integer = 0 To (bitmap->Width - 1)
 		Dim As Integer col = source_top[y * CLngInt(bitmap->pitch) + x]
 		PSet(x, y), RGB(col, col, col)
 	Next
 Next
+ScreenUnlock
 
+#ifdef EXAMPLEAGEDDON_BROWSER
+Sleep 50, 1
+#else
 Sleep
+#endif
 
 releaseFreeType library, face
+
+#ifdef EXAMPLEAGEDDON_BROWSER
+Screen 0
+End 0
+#endif
 
 '' end of freetype2.bas

@@ -1,0 +1,256 @@
+{
+  "examples/compression/bz2compress.bas": {
+    "browser_assets": {
+      "examples/compression/zlib.bas": "/zlib.bas"
+    },
+    "run": true
+  },
+  "examples/compression/zlib.bas": {
+    "run": true
+  },
+  "examples/database/sqlite3_test.bas": {
+    "browser_assets": {
+      "examples/database/sqlite3_test.db": "/sqlite3_test.db"
+    },
+    "run": true
+  },
+  "examples/files/jpeglib/example.bas": {
+    "browser_assets": {
+      "examples/fblogo.jpg": "/fblogo.jpg",
+      "examples/files/jpeglib/color.jpg": "/color.jpg"
+    },
+    "fbc_args": [
+      "-d",
+      "EXAMPLEAGEDDON_BROWSER"
+    ],
+    "run": true,
+    "run_args": [
+      "/fblogo.jpg",
+      "/color.jpg"
+    ]
+  },
+  "examples/files/libpng/png.bas": {
+    "browser_assets": {
+      "examples/fblogo.png": "/fblogo.png",
+      "examples/files/libpng/alpha.png": "/alpha.png",
+      "examples/files/libpng/color.png": "/color.png"
+    },
+    "fbc_args": [
+      "-d",
+      "EXAMPLEAGEDDON_BROWSER"
+    ],
+    "run": true
+  },
+  "examples/graphics/SDL1/core/video_info.bas": {
+    "fbc_args": [
+      "-d",
+      "EXAMPLEAGEDDON_BROWSER"
+    ],
+    "run": true
+  },
+  "examples/graphics/SDL2/core/sdl2-hello.bas": {
+    "browser_assets": {
+      "examples/graphics/SDL2/data/Vera.ttf": "/data/Vera.ttf",
+      "examples/graphics/SDL2/data/horse.tga": "/data/horse.tga"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/audio/01-simple-playback/simple-playback.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/audio/02-simple-playback-callback/simple-playback-callback.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/audio/03-load-wav/load-wav.bas": {
+    "browser_assets": {
+      "examples/graphics/SDL1/data/phaser.wav": "/sample.wav"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/audio/04-multiple-streams/multiple-streams.bas": {
+    "browser_assets": {
+      "examples/graphics/SDL1/data/phaser.wav": "/sample.wav",
+      "examples/sfxlib/media/buzzer.wav": "/sword.wav"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/audio/05-planar-data/planar-data.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/01-clear/clear.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/02-primitives/primitives.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/03-lines/lines.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/04-points/points.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/05-rectangles/rectangles.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/06-textures/textures.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/07-streaming-textures/streaming-textures.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/08-rotating-textures/rotating-textures.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/09-scaling-textures/scaling-textures.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/10-geometry/geometry.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/11-color-mods/color-mods.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/14-viewport/viewport.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/15-cliprect/cliprect.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/17-read-pixels/read-pixels.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/18-debug-text/debug-text.bas": {
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/SDL3/core/renderer/19-affine-textures/affine-textures.bas": {
+    "browser_assets": {
+      "examples/files/libpng/color.png": "/sample.png"
+    },
+    "run": true,
+    "run_args": [
+      "--smoke"
+    ]
+  },
+  "examples/graphics/raylib/audio.bas": {
+    "run": true
+  },
+  "examples/graphics/raylib/drawing.bas": {
+    "run": true
+  },
+  "examples/manual/libraries/freetype2.bas": {
+    "browser_assets": {
+      "examples/graphics/SDL2/data/Vera.ttf": "/Vera.ttf"
+    },
+    "fbc_args": [
+      "-d",
+      "EXAMPLEAGEDDON_BROWSER"
+    ],
+    "run": true,
+    "run_args": [
+      "/Vera.ttf"
+    ]
+  },
+  "examples/manual/libraries/zlib.bas": {
+    "fbc_args": [
+      "-d",
+      "EXAMPLEAGEDDON_BROWSER"
+    ],
+    "run": true
+  },
+  "examples/xml/expat.bas": {
+    "browser_assets": {
+      "examples/xml/test.xml": "/test.xml"
+    },
+    "run": true,
+    "run_args": [
+      "/test.xml"
+    ]
+  }
+}

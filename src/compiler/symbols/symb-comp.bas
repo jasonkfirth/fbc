@@ -403,6 +403,48 @@ private function hArrayDescPtr _
 	function = descexpr
 end function
 
+'' Generated assignment normally uses the member's LET operator. A member
+'' with a copy constructor and destructor can own resources even if it
+'' has no LET. Replace that member through its lifetime operations.
+private function hAssignMember _
+	( _
+		byval fld as FBSYMBOL ptr, _
+		byval lhs as ASTNODE ptr, _
+		byval rhs as ASTNODE ptr, _
+		byval source_is_const as integer _
+	) as ASTNODE ptr
+
+	if( symbIsRef( fld ) or (astGetDataType( lhs ) <> FB_DATATYPE_STRUCT) ) then
+		return astNewASSIGN( lhs, rhs )
+	end if
+
+	var subtype = astGetSubtype( lhs )
+	var dtor = symbGetCompDtor1( subtype )
+	if( dtor = NULL orelse symbCompHasCopyLetOps( subtype ) ) then
+		return astNewASSIGN( lhs, rhs )
+	end if
+
+	var ctor = subtype->udt.ext->copyctorconst
+	if( ctor = NULL andalso source_is_const = FALSE ) then
+		ctor = subtype->udt.ext->copyctor
+	end if
+	'' Generated members are built even if they're never used. Use the
+	'' lifetime operations only where the containing type may call them.
+	if( ctor = NULL orelse (symbCheckAccess( ctor ) = FALSE) orelse _
+	    (symbCheckAccess( dtor ) = FALSE) ) then
+		return astNewASSIGN( lhs, rhs )
+	end if
+
+	'' Both operands are stable generated member accesses. Preserve the
+	'' live object when the source and destination name the same member.
+	var done = symbAddLabel( NULL )
+	var tree = astNewBOP( AST_OP_EQ, astNewADDROF( astCloneTree( lhs ) ), _
+	                     astNewADDROF( astCloneTree( rhs ) ), done, AST_OPOPT_NONE )
+	tree = astNewLINK( tree, astBuildDtorCall( subtype, astCloneTree( lhs ) ), AST_LINK_RETURN_NONE )
+	tree = astNewLINK( tree, astBuildCall( ctor, lhs, rhs ), AST_LINK_RETURN_NONE )
+	return astNewLINK( tree, astNewLABEL( done ), AST_LINK_RETURN_NONE )
+end function
+
 '' Copying over a dynamic array, needed for the automatically-generated implicit
 '' LET overloads for UDTs containing dynamic array fields.
 private sub hAssignDynamicArray _
@@ -459,7 +501,7 @@ private sub hAssignDynamicArray _
 	astAdd( astBuildBranch( astNewBOP( AST_OP_GE, astNewVAR( src ), astNewVAR( limit ) ), exitlabel, TRUE ) )
 
 	'' *dst = *src
-	astAdd( astNewASSIGN( astBuildVarDeref( dst ), astBuildVarDeref( src ) ) )
+	astAdd( hAssignMember( fld, astBuildVarDeref( dst ), astBuildVarDeref( src ), typeIsConst( symbGetFullType( rhs ) ) ) )
 
 	'' dst += 1  (astBuildVarInc() does pointer arithmetic)
 	'' src += 1
@@ -515,7 +557,7 @@ private sub hAssignList _
 	astAdd( astBuildForBegin( NULL, cnt, label, 0 ) )
 
 	'' *dst = *src
-	astAdd( astNewASSIGN( astBuildVarDeref( dst ), astBuildVarDeref( src ) ) )
+	astAdd( hAssignMember( fld, astBuildVarDeref( dst ), astBuildVarDeref( src ), const_source ) )
 
 	'' dst += 1
 	astAdd( astBuildVarInc( dst, 1 ) )
@@ -621,7 +663,8 @@ private sub hAddLetOpBody _
 				if( symbGetArrayDimensions( fld ) = 0 ) then
 					fbSemanticModelObjectOperationChoice("copy-route", "scalar")
 					'' this.field = rhs.field
-					astAdd( astNewASSIGN( astBuildVarField( this_, fld ), astBuildVarField( rhs, fld ) ) )
+					astAdd( hAssignMember( fld, astBuildVarField( this_, fld ), astBuildVarField( rhs, fld ), _
+					                       typeIsConst( symbGetFullType( rhs ) ) ) )
 				else
 					fbSemanticModelObjectOperationChoice("copy-route", "fixed-array")
 					hAssignList( fld, this_, rhs )
@@ -1043,6 +1086,10 @@ end function
 private function symbGetCompCopyCtor( byval sym as FBSYMBOL ptr ) as FBSYMBOL ptr
 	assert( symbIsStruct( sym ) )
 	if( sym->udt.ext ) then
+		'' Either form makes a value copy non-trivial.
+		if( sym->udt.ext->copyctorconst <> NULL ) then
+			return sym->udt.ext->copyctorconst
+		end if
 		function = sym->udt.ext->copyctor
 	end if
 end function

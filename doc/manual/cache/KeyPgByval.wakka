@@ -1,11 +1,13 @@
 {{fbdoc item="title" value="BYVAL"}}----
-Declaration specifier to explicitly pass a parameter by value
+Pass an argument by value
 
 {{fbdoc item="syntax"}}##
 	**Byval** //param// [[KeyPgAs|as]] [[DataType|datatype]]
+	**Byval** //param// ( [ **Any** [, **Any** ...] ] ) [[KeyPgAs|as]] [[DataType|datatype]]
 ##
 {{fbdoc item="usage"}}##
 	[ [[KeyPgDeclare|declare]] ] { [[KeyPgSub|sub]] | [[KeyPgFunction|function]] } //proc_name// ( **Byval** //param// [[KeyPgAs|as]] [[DataType|datatype]]  )
+	//proc_name// ( **Byval** //expression// )
 ##
 {{fbdoc item="desc"}}
 	##**Byval**## in a parameter list of a declare statement causes a copy of the variable to be passed to the procedure (for example, a sub or function) by its value.
@@ -13,6 +15,14 @@ Declaration specifier to explicitly pass a parameter by value
 	This means that if the value of the variable //##x##// is passed, then the original variable //##x##// will not be modified in any way; however, if the variable were passed ##[[KeyPgByref|Byref]]##, the value of the original variable //##x##// could be modified by the called function.
 	
 	Opposite of ##[[KeyPgByref|ByRef]]##.
+
+	You can write ##ByVal## before an argument whose parameter is passed by value, including when the declaration uses the default passing mode. The argument and its ##ByVal## specifier can also be enclosed in parentheses.
+
+	An array parameter declared as ##ByVal values() As Integer## or ##ByVal values(Any) As Integer## receives a local dynamic copy with the caller's bounds and elements. Changes made with assignment, ##[[KeyPgRedim|Redim]]##, or ##[[KeyPgErase|Erase]]## affect the copy. Call the procedure with ##values()## or ##ByVal values()##. The element type must match. Use ##()## to accept any rank, or one ##Any## per dimension to require a particular rank.
+
+	String elements are copied as strings, and non-trivial user-defined elements use their copy constructors. The compiler can use a mutable copy constructor when the type has only that form and the source array is mutable. A pointer element copies the address it holds. A user-defined type's copy constructor controls how it copies resources reached through its pointer fields.
+
+	A compiler-generated UDT copy can use a nested member's accessible copy constructor and destructor when the member supplies no copy-assignment ##[[KeyPgOpLet|Let]]## overload. This also applies to the elements of fixed and dynamic array fields in the UDT.
 	
 	The ##**Byval**## keyword is also used in the context of ##Byref## [[KeyPgByref|parameters]] and [[KeyPgByrefFunction|function results]], where it can be used to explicitly override the by-reference semantics in order to pass or assign a pointer as-is to a ##Byref## parameter or function result. For reference:
 		- [[ProPgPassingArguments|Manually passing pointers to by-reference parameters]]
@@ -38,9 +48,37 @@ Sleep
 End
 %%
 
+{{fbdoc item="filename" value="examples/manual/procs/byval-argument.bas"}}%%(freebasic)
+sub AddTo( byref total as integer, amount as integer )
+	total += amount
+	amount = 0
+end sub
+
+dim as integer total = 10, amount = 5
+AddTo total, (byval amount)
+
+print "Total = " & total
+print "Amount = " & amount
+%%
+
+{{fbdoc item="filename" value="examples/manual/procs/byval-array.bas"}}%%(freebasic)
+sub EditCopy( byval values(any) as integer )
+	values(-1) += 10
+	redim preserve values(-1 to 2)
+	print "Inside = " & values(-1) & ", upper bound = " & ubound( values )
+end sub
+
+redim values(-1 to 1) as integer
+values(-1) = 7
+
+EditCopy( values() )
+print "Outside = " & values(-1) & ", upper bound = " & ubound( values )
+%%
+
 {{fbdoc item="lang"}}
-	- In the //[[CompilerOptlang|-lang fb]]// dialect, ##**Byval**## is the default parameter passing convention for all built-in types except ##[[KeyPgString|String]]## and user-defined ##[[KeyPgType|Type]]## which are passed ##[[KeyPgByref|Byref]]## by default. The ##[[KeyPgZstring|Zstring]]## and ##[[KeyPgWstring|Wstring]]## built-in types are also passed ##[[KeyPgByref|Byref]]## by default, but passing ##**Byval**## is forbidden. Arrays are always passed ##[[KeyPgByref|Byref]]## and the use of the specifier ##[[KeyPgByref|Byref]]## or ##**Byval**## is forbidden.
+	- In the //[[CompilerOptlang|-lang fb]]// dialect, ##**Byval**## is the default parameter passing convention for all built-in types except ##[[KeyPgString|String]]## and user-defined ##[[KeyPgType|Type]]## which are passed ##[[KeyPgByref|Byref]]## by default. The ##[[KeyPgZstring|Zstring]]## and ##[[KeyPgWstring|Wstring]]## built-in types are also passed ##[[KeyPgByref|Byref]]## by default, but passing ##**Byval**## is forbidden.
 	- In //[[CompilerOptlang|-lang qb]]// and //[[CompilerOptlang|-lang fblite]]// dialects, ##[[KeyPgByref|Byref]]## is the default parameter passing convention.
+	- An array parameter without a mode uses the same descriptor as the caller. Write ##ByVal## in its declaration to request a copy.
 
 {{fbdoc item="diff"}}
 	- QB only used ##**Byval**## in declarations to non-Basic subroutines

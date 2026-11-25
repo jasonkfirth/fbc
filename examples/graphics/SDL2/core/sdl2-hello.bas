@@ -105,6 +105,11 @@ function main() as integer
 		end if
 		SDL_RenderPresent(renderer)
 
+		'' A smoke run renders the textures and yields once for the canvas.
+		if command(1) = "--smoke" then
+			sleep 50, 1
+			exit do
+		end if
 		if SDL_WaitEvent(@event) = 0 then
 			print "SDL_WaitEvent: "; *SDL_GetError()
 			goto cleanup

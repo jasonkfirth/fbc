@@ -55,7 +55,12 @@ type __clock_t as clong
 type __rlim_t as culong
 type __rlim64_t as __u_quad_t
 type __id_t as ulong
+#ifdef __FB_JS__
+'' Emscripten's libc uses a 64-bit time_t even on wasm32.
+type __time_t as longint
+#else
 type __time_t as clong
+#endif
 type __useconds_t as ulong
 type __suseconds_t as clong
 type __daddr_t as long

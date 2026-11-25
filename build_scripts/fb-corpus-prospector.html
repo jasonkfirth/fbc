@@ -1,0 +1,36 @@
+<!doctype html>
+<!--
+    Project: FreeBASIC browser corpus
+    File: fb-corpus-prospector.html
+    Purpose: Host the Prospector framebuffer and keyboard controls.
+    The player script handles the graphics driver and browser storage.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Play Prospector</title>
+  <link rel="stylesheet" href="../site.css">
+  <style>
+    body{background:#10181e;color:#dce7e8}
+    main{max-width:820px}
+    a{color:#acdff1}
+    canvas{display:block;width:100%;height:auto;background:#000;image-rendering:pixelated}
+    canvas:focus-visible{outline:2px solid #acdff1;outline-offset:3px}
+  </style>
+</head>
+<body>
+  <main>
+    <nav><a href="./">Back to Prospector</a></nav>
+    <h1>Prospector</h1>
+    <p id="controls">Use the arrow keys to move and Enter to open the in-game commands.
+      Press Shift+Tab to leave the game screen. Save and quit from the command menu to keep your run.</p>
+    <canvas id="canvas" width="680" height="448" tabindex="0" aria-label="Prospector game screen"
+            aria-describedby="controls"></canvas>
+    <p id="status" role="status">Loading Prospector…</p>
+  </main>
+  <script src="player.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>
+<!-- end of fb-corpus-prospector.html -->

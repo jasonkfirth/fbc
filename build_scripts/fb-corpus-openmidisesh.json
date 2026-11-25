@@ -1,0 +1,93 @@
+[
+  {
+    "slug": "openmidisesh",
+    "project": "midisoft-fb",
+    "entry": "src/openmidisesh.bas",
+    "units": [
+      "src/omagui_runtime.bas",
+      "src/midi_model.bas",
+      "src/history_timeline.bas",
+      "src/document_history.bas",
+      "src/project_transaction.bas",
+      "src/note_selection.bas",
+      "src/selected_note_playback.bas",
+      "src/score_tools.bas",
+      "src/score_controls.bas",
+      "src/numeric_text.bas",
+      "src/capture_paths.bas",
+      "src/score_scroll.bas",
+      "src/score_layout.bas",
+      "src/mixer_meter.bas",
+      "src/mixer_controls.bas",
+      "src/mixer_state.bas",
+      "src/keyboard_controls.bas",
+      "src/drum_kit.bas",
+      "src/drum_phrase.bas",
+      "src/playback_mix.bas",
+      "src/playback_timing.bas",
+      "src/ui_frame_pacing.bas",
+      "src/soundfont_bank.bas",
+      "src/soundfont_synth.bas",
+      "src/software_synth.bas",
+      "src/playback_state.bas",
+      "src/master_effect.bas",
+      "src/sfx_runtime.bas",
+      "src/ui_style.bas",
+      "src/ui_icons.bas",
+      "src/ui_interaction.bas",
+      "src/touch_gesture.bas",
+      "src/user_preferences.bas",
+      "src/music_export.bas",
+      "src/wav_export_sfx.bas",
+      "src/audio_tracks.bas",
+      "src/audio_sample_slots.bas",
+      "src/midi_input_protocol.bas",
+      "src/pitch_transcriber.bas",
+      "src/music_symbols.bas",
+      "src/midi_null.bas"
+    ],
+    "files": [
+      "src/**/*.bi",
+      "vendor/omaGui/omaGUI.bi",
+      "vendor/omaGui/src/**/*.bi",
+      "vendor/omaGui/src/**/*.bas",
+      "vendor/omaGui/assets/**/*.bi"
+    ],
+    "include_dirs": [
+      "vendor/omaGui"
+    ],
+    "graphics_keyboard": true,
+    "flags": [
+      "-m",
+      "openmidisesh",
+      "-Wl",
+      "-sSTACK_SIZE=4MB",
+      "-Wl",
+      "-O0",
+      "-Wl",
+      "-sEXPORTED_RUNTIME_METHODS=FS"
+    ],
+    "replacements": [
+      [
+        "src/soundfont_synth.bas",
+        "soundfontSynth_Thread = ThreadCreate(@soundfontSynth_OutputWorker, 0)",
+        "soundfontSynth_Thread = 0 ' Native SoundFont streaming requires a worker; use the built-in synth in this browser build."
+      ],
+      [
+        "src/soundfont_synth.bas",
+        "ThreadWait soundfontSynth_Thread",
+        "' This browser build never starts a native SoundFont worker."
+      ]
+    ],
+    "workspace_aliases": [],
+    "notices": [
+      "THIRD_PARTY_NOTICES.md",
+      "vendor/omaGui/LICENSE",
+      "vendor/omaGui/LICENSES/Cascadia-Mono-OFL.txt",
+      "vendor/omaGui/LICENSES/LGPL-2.1.txt",
+      "vendor/omaGui/LICENSES/Noto-CJK-OFL.txt",
+      "vendor/omaGui/LICENSES/Noto-Sans-OFL.txt",
+      "vendor/omaGui/LICENSES/Spleen-BSD-2-Clause.txt"
+    ]
+  }
+]

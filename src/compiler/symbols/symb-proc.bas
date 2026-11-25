@@ -343,6 +343,7 @@ function symbAddProcParam _
 	param->param.mode = mode
 	param->param.optexpr = NULL
 	param->param.bydescdimensions = dimensions
+	param->param.byvalarrayvar = NULL
 	if( mode = FB_PARAMMODE_BYDESC ) then
 		param->param.bydescrealsubtype = symbAddArrayDescriptorType( dimensions, dtype, subtype )
 	else
@@ -1592,6 +1593,12 @@ sub symbGetRealParamDtype overload _
 
 end sub
 
+function symbByvalArrayNeedsMutableSource( byval param as FBSYMBOL ptr ) as integer
+	if( symbGetType( param ) <> FB_DATATYPE_STRUCT ) then return FALSE
+	var ext = param->subtype->udt.ext
+	return (ext <> NULL) andalso (ext->copyctorconst = NULL) andalso (ext->copyctor <> NULL)
+end function
+
 function symbAddVarForParam( byval param as FBSYMBOL ptr ) as FBSYMBOL ptr
 	dim as FBARRAYDIM dTB(0) = any
 	dim as FBSYMBOL ptr s = any
@@ -1625,7 +1632,12 @@ function symbAddVarForParam( byval param as FBSYMBOL ptr ) as FBSYMBOL ptr
 		attrib or= FB_SYMBATTRIB_SUFFIXED
 	end if
 
-	s = symbAddVar( symbGetName( param ), NULL, dtype, param->subtype, 0, param->param.bydescdimensions, dTB(), attrib )
+	'' A copied array reserves the source name for its local descriptor.
+	dim as const zstring ptr id = symbGetName( param )
+	if( symbIsByvalArray( param ) ) then
+		id = symbUniqueId( )
+	end if
+	s = symbAddVar( id, NULL, dtype, param->subtype, 0, param->param.bydescdimensions, dTB(), attrib )
 	if( s = NULL ) then
 		exit function
 	end if
@@ -2263,15 +2275,23 @@ private function hCheckOvlParam _
 	select case param_mode
 	'' by descriptor param?
 	case FB_PARAMMODE_BYDESC
-		'' but arg isn't?
-		if( arg_mode <> FB_PARAMMODE_BYDESC ) then
+		'' Explicit BYVAL with array syntax requires a copying parameter.
+		dim as integer copies_array = symbIsByvalArray( param )
+		if( arg_mode <> FB_PARAMMODE_BYDESC andalso _
+		    (arg_mode <> FB_PARAMMODE_BYVALARRAY orelse copies_array = FALSE) ) then
 			return fbSemanticModelResolutionArgument(semantic_candidate, semantic_ordinal, param, arg_expr, _
 				arg_mode, FB_OVLPROC_NO_MATCH, "descriptor-mode")
 		end if
 
 		var match = FB_OVLPROC_FULLMATCH
 
-		if( symbParamWasDeclaredAsAny( param ) = FALSE ) then
+		if( copies_array ) then
+			if( typeUnsetIsConst( param_dtype ) <> typeUnsetIsConst( arg_dtype ) or _
+			    param_subtype <> arg_subtype or _
+			    (typeIsConst( arg_dtype ) andalso symbByvalArrayNeedsMutableSource( param )) ) then
+				match = FB_OVLPROC_NO_MATCH
+			end if
+		elseif( symbParamWasDeclaredAsAny( param ) = FALSE ) then
 			match = typeCalcMatch( param_dtype, param_subtype, param_mode, arg_dtype, arg_subtype )
 		end if
 
@@ -2281,9 +2301,10 @@ private function hCheckOvlParam _
 				arg_mode, FB_OVLPROC_NO_MATCH, "descriptor-type")
 		end if
 
-		assert( astIsVAR( arg_expr ) or astIsFIELD( arg_expr ) or astIsNIDXARRAY( arg_expr ) )
 		array = arg_expr->sym
-		assert( symbIsArray( array ) )
+		if( array = NULL orelse symbIsArray( array ) = FALSE ) then
+			return FB_OVLPROC_NO_MATCH
+		end if
 
 
 		'' If the BYDESC parameter has unknown dimensions, any array can be passed.
@@ -2340,7 +2361,7 @@ private function hCheckOvlParam _
 	end select
 
 	'' arg passed by descriptor? refuse..
-	if( arg_mode = FB_PARAMMODE_BYDESC ) then
+	if( arg_mode = FB_PARAMMODE_BYDESC or arg_mode = FB_PARAMMODE_BYVALARRAY ) then
 		return fbSemanticModelResolutionArgument(semantic_candidate, semantic_ordinal, param, arg_expr, _
 			arg_mode, FB_OVLPROC_NO_MATCH, "argument-descriptor")
 	end if
@@ -3231,7 +3252,7 @@ private function symbCalcParamMatch _
 		return FB_OVLPROC_NO_MATCH
 	end if
 
-	if( l->param.mode <> r->param.mode ) then
+	if( l->param.mode <> r->param.mode or symbIsByvalArray( l ) <> symbIsByvalArray( r ) ) then
 		return FB_OVLPROC_NO_MATCH
 	end if
 
@@ -3574,6 +3595,9 @@ private sub hParamsToStr( byref s as string, byval proc as FBSYMBOL ptr )
 				end if
 
 			case FB_PARAMMODE_BYDESC
+				if( symbIsByvalArray( param ) ) then
+					DZstrConcatAssign( params, "byval " )
+				end if
 				DZstrConcatAssign( params, hDumpDynamicArrayDimensions( param->param.bydescdimensions ) )
 				case else
 					'' The outer dispatch accepts only BYVAL, BYREF and BYDESC.

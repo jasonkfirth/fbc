@@ -143,6 +143,17 @@
 				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ) _
 			} _
 		), _
+		( _
+			@FB_RTL_ARRAYCOPYDESC, NULL, _
+			FB_DATATYPE_LONG, FB_FUNCMODE_FBCALL, _
+			NULL, FB_RTL_OPT_NONE, _
+			3, _
+			{ _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( typeAddrOf( FB_DATATYPE_VOID ), FB_PARAMMODE_BYVAL, FALSE ), _
+				( FB_DATATYPE_LONG, FB_PARAMMODE_BYVAL, FALSE ) _
+			} _
+		), _
 		/' sub fb_ArrayDestructObj( array() as any, byval dtor as sub cdecl( ) ) '/ _
 		( _
 			@FB_RTL_ARRAYDESTRUCTOBJ, NULL, _
@@ -806,6 +817,16 @@ function rtlArrayRedimTo _
 	end if
 
 	function = rtlErrorCheck( proc )
+end function
+
+function rtlArrayCopyDesc _
+	( _
+		byval dest as ASTNODE ptr, _
+		byval source as ASTNODE ptr, _
+		byval copy_bytes as integer _
+	) as ASTNODE ptr
+
+	function = astBuildCall( PROCLOOKUP( ARRAYCOPYDESC ), dest, source, astNewCONSTi( copy_bytes ) )
 end function
 
 function rtlArrayBound _

@@ -1,7 +1,7 @@
 /*
  * Project: FreeBASIC runtime library
  * File: arrays/array_redimto.c
- * Purpose: redim function.
+ * Purpose: Initialize array storage from an existing descriptor.
  * Responsibilities: Array descriptors, bounds, allocation and element lifetimes.
  * This file intentionally does NOT contain: Compiler parsing or unrelated runtime subsystems.
  */
@@ -87,6 +87,56 @@ FBCALL int fb_ArrayRedimTo
 	}
 
 	return fb_ErrorSetNum( FB_RTERROR_OK );
+}
+
+/* Initialize a fresh descriptor for a BYVAL parameter. The destination
+   owns its allocation, even when the source has fixed storage. For elements
+   that need construction, generated code publishes the byte count as each
+   element becomes live so an unwind only destroys constructed elements. */
+FBCALL int fb_ArrayCopyDesc
+	(
+		FBARRAY_ACCESS *dest,
+		const FBARRAY_ACCESS *source,
+		int copy_bytes
+	)
+{
+	size_t dimensions = source->dimensions;
+	void *storage;
+
+	if( dimensions == 0 )
+		return FB_RTERROR_OK;
+
+	if( (dimensions > (source->flags & FBARRAY_FLAGS_DIMENSIONS)) ||
+	    (dimensions > (dest->flags & FBARRAY_FLAGS_DIMENSIONS)) ||
+	    ((dest->dimensions != 0) && (dest->dimensions != dimensions)) ||
+	    (dest->element_len != source->element_len) )
+		return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+	storage = NULL;
+	if( source->size != 0 ) {
+		if( (source->ptr == NULL) || (source->element_len == 0) ||
+		    (source->size % source->element_len != 0) )
+			return FB_RTERROR_ILLEGALFUNCTIONCALL;
+
+		storage = copy_bytes ? malloc( source->size ) : calloc( 1, source->size );
+		if( storage == NULL )
+			return FB_RTERROR_OUTOFMEM;
+	}
+
+	dest->dimensions = dimensions;
+	memcpy( &dest->dimTB[0], &source->dimTB[0], dimensions * sizeof( FBARRAYDIM ) );
+	dest->ptr = storage;
+
+	if( storage != NULL ) {
+		uintptr_t bias = (uintptr_t)source->data - (uintptr_t)source->ptr;
+		dest->data = (void *)((uintptr_t)storage + bias);
+		if( copy_bytes ) {
+			memcpy( storage, source->ptr, source->size );
+			dest->size = source->size;
+		}
+	}
+
+	return FB_RTERROR_OK;
 }
 
 /* end of arrays/array_redimto.c */

@@ -363,9 +363,11 @@ install_dependencies() {
 		unzip \
 		zip \
 		mingw-w64-ucrt-x86_64-binutils \
+		mingw-w64-ucrt-x86_64-cmake \
 		mingw-w64-ucrt-x86_64-emscripten \
 		mingw-w64-ucrt-x86_64-gcc \
 		mingw-w64-ucrt-x86_64-libffi \
+		mingw-w64-ucrt-x86_64-ninja \
 		mingw-w64-ucrt-x86_64-nodejs \
 		mingw-w64-ucrt-x86_64-python \
 		mingw-w64-x86_64-nsis
@@ -375,7 +377,7 @@ ensure_emscripten_toolchain() {
 	local runtime_dir
 	local tool
 
-	for tool in emcc em++ emar emranlib node python; do
+	for tool in emcc em++ emar emranlib emcmake cmake ninja node python; do
 		have "$tool" || fail "$tool not found after loading the UCRT64 Emscripten environment"
 	done
 
@@ -537,6 +539,24 @@ EOF
 	fi
 	ensure_emscripten_toolchain
 
+	msg "Building raylib for WebAssembly"
+	local raylib_source="$BUILDROOT/sources/raylib-5.5"
+	if [ ! -f "$raylib_source/src/raylib.h" ]; then
+		run python "$worktree/build_scripts/build-js-libraries.py" prepare "$raylib_source"
+	fi
+	run python "$worktree/build_scripts/build-js-libraries.py" build \
+		"$raylib_source" "$worktree/lib/freebasic/js-asmjs"
+	local zlib_source="$BUILDROOT/sources/zlib-1.4"
+	if [ ! -f "$zlib_source/zlib.h" ]; then
+		run python "$worktree/build_scripts/build-js-libraries.py" prepare --library zlib "$zlib_source"
+	fi
+	run python "$worktree/build_scripts/build-js-libraries.py" build --library zlib \
+		"$zlib_source" "$worktree/lib/freebasic/js-asmjs"
+	local extra_sources="$BUILDROOT/sources/extra"
+	run python "$worktree/build_scripts/build-js-libraries.py" prepare-extras "$extra_sources"
+	run python "$worktree/build_scripts/build-js-libraries.py" build-extras \
+		"$extra_sources" "$worktree/lib/freebasic/js-asmjs" --zlib-source "$zlib_source" --jobs "$JOBS"
+
 	run make -j"$JOBS" \
 		rtlib fbrt gfxlib2 sfxlib \
 		FBC="$build_fbc" \
@@ -562,6 +582,8 @@ EOF
 	[ -f "$stagedir/fbc-js.exe" ] || fail "staged fbc-js.exe is missing"
 	[ -f "$stagedir/fbc-js-app" ] || fail "staged fbc-js-app is missing"
 	[ -d "$stagedir/lib/freebasic-js/js-asmjs" ] || fail "staged js-asmjs runtime is missing"
+	[ -s "$stagedir/lib/freebasic-js/js-asmjs/libraylib.a" ] || fail "staged raylib archive is missing"
+	[ -s "$stagedir/lib/freebasic-js/js-asmjs/libz.a" ] || fail "staged zlib archive is missing"
 
 	cd "$ROOT"
 	PATH="$saved_path"

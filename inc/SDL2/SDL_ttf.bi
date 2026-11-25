@@ -27,6 +27,11 @@
 
 #inclib "SDL2_ttf"
 
+#ifdef __FB_JS__
+	'' The browser SDK links the font engine as a separate static archive.
+	#inclib "freetype"
+#endif
+
 #include once "crt/long.bi"
 #include once "SDL.bi"
 

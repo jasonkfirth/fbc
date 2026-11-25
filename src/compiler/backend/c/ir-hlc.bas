@@ -4993,10 +4993,11 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			var inputname = "fb_c_codeptr_input_" + str(ctx.codeptrid)
 			var resultname = "fb_c_codeptr_result_" + str(ctx.codeptrid)
 			var inputsubtype = n->l->subtype
-			if( typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION) ) then
+			if( (typeGetDtAndPtrOnly(n->l->dtype) = typeAddrOf(FB_DATATYPE_FUNCTION)) andalso _
+			    (symbGetIsFuncPtr(inputsubtype) = FALSE) ) then
 				'' A direct procedure address names the procedure symbol, not
-				'' a procedure-pointer typedef. Intern its complete signature
-				'' before declaring the source representation carrier.
+				'' a procedure-pointer typedef. Keep an existing typedef so
+				'' its descriptor parameter types stay in their original scope.
 				inputsubtype = symbAddProcPtrFromFunction(inputsubtype)
 			end if
 			hWriteDeclaration( hEmitType(typeUnsetIsConst(n->l->dtype), inputsubtype, TRUE) + " " + inputname + ";" )

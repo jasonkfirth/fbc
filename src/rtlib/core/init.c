@@ -115,6 +115,12 @@ void fb_hRtExit( void )
 /* called by FB program */
 FBCALL void fb_Init( int argc, char **argv, int lang )
 {
+#ifdef HOST_JS
+	/* The JS target initializes the runtime here instead of through fbrt0.
+	   That initialization clears fb_ctx, so publish arguments afterwards. */
+	fb_hRtInit();
+#endif
+
 	fb_ctx.argc = argc;
 	fb_ctx.argv = argv;
 	fb_ctx.lang = lang;
@@ -129,11 +135,6 @@ FBCALL void fb_Init( int argc, char **argv, int lang )
 	 */
 	fb_AllocateMainFBThread();
 #endif
-
-#ifdef HOST_JS
-    // global constructors and destructors are not supported by emscripten
-    fb_hRtInit();
-#endif // HOST_JS
 }
 
 /* called by FB program,

@@ -221,6 +221,7 @@ enum FB_SYMBATTRIB
 	FB_SYMBATTRIB_ANONYMOUS        = &h01000000  '' anonymous / unnamed id
 	FB_SYMBATTRIB_THREADLOCAL      = &h02000000  '' VARs: one instance per thread
 	FB_SYMBATTRIB_THREADLOCALC     = &h04000000  '' VARs: external C TLS declaration
+	FB_SYMBATTRIB_BYVALARRAY       = &h08000000  '' PARAMs: copy the incoming descriptor's array
 end enum
 
 '' proc symbol attributes mask
@@ -251,6 +252,7 @@ enum FB_PARAMMODE
 	FB_PARAMMODE_BYREF
 	FB_PARAMMODE_BYDESC
 	FB_PARAMMODE_VARARG
+	FB_PARAMMODE_BYVALARRAY                     '' explicit call argument, lowered to BYDESC
 end enum
 
 '' call conventions
@@ -616,6 +618,7 @@ type FBS_PARAM
 	optexpr         as ASTNODE_ ptr             '' default value
 	bydescdimensions    as integer
 	bydescrealsubtype   as FBSYMBOL_ ptr        '' bydesc array descriptor type
+	byvalarrayvar       as FBSYMBOL_ ptr        '' owned local for a copying parameter
 	regnum          as integer                  '' register number (1 is first, 0 is not in register)
 end type
 
@@ -2612,6 +2615,10 @@ declare sub symbProcRecalcRealType( byval proc as FBSYMBOL ptr )
 #define symbGetParamMode(a) ((a)->param.mode)
 
 #define symbGetParamVar(a) ((a)->param.var)
+
+#define symbIsByvalArray(a) (((a)->attrib and FB_SYMBATTRIB_BYVALARRAY) <> 0)
+
+declare function symbByvalArrayNeedsMutableSource( byval param as FBSYMBOL ptr ) as integer
 
 #define symbGetParamOptExpr(a) ((a)->param.optexpr)
 

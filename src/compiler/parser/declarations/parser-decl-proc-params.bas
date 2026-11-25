@@ -447,10 +447,10 @@ private function hParamDecl _
 	if( lexGetToken( ) = CHAR_LPRNT ) then
 		lexSkipToken( )
 
-		'' BYVAL/BYREF cannot be used; array() parameters always
-		'' implicitly are BYDESC
-		if( mode <> INVALID ) then
-			hParamError( proc, id )
+		'' Both array forms receive a descriptor. BYVAL gives the body
+		'' its own array, initialized from that descriptor on entry.
+		if( mode = FB_PARAMMODE_BYVAL ) then
+			attrib or= FB_SYMBATTRIB_BYVALARRAY
 		end if
 		mode = FB_PARAMMODE_BYDESC
 
@@ -515,7 +515,7 @@ private function hParamDecl _
 
 		semantic_type_alias = parserGetLastTypeAlias( )
 
-		if( mode = FB_PARAMMODE_BYVAL ) then
+		if( mode = FB_PARAMMODE_BYVAL or (attrib and FB_SYMBATTRIB_BYVALARRAY) ) then
 			'' Disallow BYVAL passing of objects of abstract classes
 			hComplainIfAbstractClass( dtype, subtype )
 		end if
@@ -558,7 +558,8 @@ private function hParamDecl _
 	select case as const typeGet( dtype )
 	'' can't be a fixed-len string
 	case FB_DATATYPE_FIXSTR, FB_DATATYPE_CHAR, FB_DATATYPE_WCHAR
-		if( mode = FB_PARAMMODE_BYVAL or typeGet( dtype ) = FB_DATATYPE_FIXSTR ) then
+		if( mode = FB_PARAMMODE_BYVAL or (attrib and FB_SYMBATTRIB_BYVALARRAY) or _
+		    typeGet( dtype ) = FB_DATATYPE_FIXSTR ) then
 			hParamError( proc, id )
 			'' error recovery: fake correct type
 			dtype = fbSemanticModelRecoveryType( _
@@ -575,7 +576,7 @@ private function hParamDecl _
 				typeAddrOf( dtype ), "pointer", __FUNCTION__, _
 				"parser/declarations/parser-decl-proc-params.bas", __LINE__)
 		else
-			if( mode = FB_PARAMMODE_BYVAL ) then
+			if( mode = FB_PARAMMODE_BYVAL or (attrib and FB_SYMBATTRIB_BYVALARRAY) ) then
 				hParamError( proc, id )
 				'' error recovery: fake correct param
 				dtype = fbSemanticModelRecoveryType( _
@@ -622,7 +623,7 @@ private function hParamDecl _
 	if( cAssignToken( ) ) then
 		if( mode = FB_PARAMMODE_BYDESC ) then
 			'' ANY?
-			if( lexGetToken( ) = FB_TK_ANY ) then
+			if( lexGetToken( ) = FB_TK_ANY andalso symbIsByvalArray( param ) = FALSE ) then
 				lexSkipToken( LEXCHECK_POST_SUFFIX )
 				symbSetDontInit( param )
 			else

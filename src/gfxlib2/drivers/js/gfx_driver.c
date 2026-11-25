@@ -8,6 +8,7 @@
 #include "../../fb_gfx.h"
 #include "fb_gfx_js.h"
 #include "../../fb_gfx_gl.h"
+#include <emscripten/html5_webgl.h>
 
 JS_GFXDRIVER_CTX __fb_js_ctx =
 {
@@ -420,13 +421,11 @@ ssize_t fb_hGetDisplayHandle(void)
 
 void *fb_hGL_GetProcAddress(const char *proc)
 {
-	/*
-		WebGL entry points are mediated by Emscripten's GL layer and are
-		not available as native function pointers.  Returning NULL is the
-		same observable result used when no GL context is active.
-	*/
-	(void)proc;
-	return NULL;
+	/* Emscripten supplies Wasm-callable entry points through its GL table.
+	 * ScreenGLProc needs the table address after a context is current. */
+	if( proc == NULL || *proc == '\0' || !emscripten_webgl_get_current_context() )
+		return NULL;
+	return emscripten_webgl_get_proc_address(proc);
 }
 
 FBCALL int fb_GfxGetJoystick(int id, ssize_t *buttons, float *a1, float *a2, float *a3, float *a4, float *a5, float *a6, float *a7, float *a8)

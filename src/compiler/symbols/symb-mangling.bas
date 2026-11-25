@@ -719,6 +719,9 @@ sub symbMangleParam( byref mangled as string, byval param as FBSYMBOL ptr )
 		'' Mangling array params as 'FBARRAY[1-8]<dtype>&' because
 		'' that's what they really are from C++'s point of view.
 		assert( symbIsDescriptor( param->param.bydescrealsubtype ) )
+		'' The ABI still passes a descriptor pointer. The qualifier keeps
+		'' copying and aliasing procedure pointer types distinct.
+		if( symbIsByvalArray( param ) ) then mangled += "U5byval"
 		symbMangleType( mangled, typeSetIsRef( FB_DATATYPE_STRUCT ), param->param.bydescrealsubtype, FB_MANGLEOPT_KEEPTOPCONST )
 
 	case FB_PARAMMODE_VARARG

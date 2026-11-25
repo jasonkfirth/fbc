@@ -18,7 +18,7 @@ Procedure "abc", 123
 %%
 The parameters have the values: abc and 123
 %%
-	There are two ways to pass arguments to procedures: by value and by reference. By default, arguments are passed by value unless otherwise specified.
+	Procedures can receive arguments by value or by reference. The scalar default depends on the type and language dialect. An array parameter with no passing mode shares the caller's array.
 
 {{fbdoc item="section" value="Passing arguments by value"}}
 	Arguments that are passed by value are not actually passed to procedures; a copy of the argument is made and passed instead. This allows the procedure to modify the copy, and the original variable or object remains unchanged.
@@ -46,6 +46,46 @@ The parameter 'param' = 20
 The variable 'arg' after the call = 10
 %%
 	Notice how parenthesis surround the arguments - in this case only one, ##//arg//## - in the procedure call. These parenthesis are optional, but are a common convention to signify a procedure call.
+
+	An explicit ##ByVal## at the call site is valid for a value parameter even when the procedure declaration relies on the default. See the examples on the ##[[KeyPgByval|ByVal]]## page.
+
+{{fbdoc item="filename" value="examples/manual/procs/byval-object.bas"}}%%(freebasic)
+type Record
+	title as string
+	scores(any) as integer
+end type
+
+sub EditCopy( byval item as Record )
+	item.title = "Edited"
+	item.scores(0) += 10
+	print "Inside = " & item.title & ", " & item.scores(0)
+end sub
+
+dim as Record item
+item.title = "Original"
+redim item.scores(0 to 1)
+item.scores(0) = 7
+
+EditCopy( (byval item) )
+print "Outside = " & item.title & ", " & item.scores(0)
+%%
+
+{{fbdoc item="section" value="Passing arrays"}}
+	An array parameter shares the caller's array by default. You can also write ##ByRef## explicitly. Element changes and changes to the bounds of a dynamic array are visible to the caller.
+
+{{fbdoc item="filename" value="examples/manual/procs/byref-array.bas"}}%%(freebasic)
+sub EditOriginal( byref values(any) as integer )
+	values(-1) += 10
+	redim preserve values(-1 to 2)
+end sub
+
+redim values(-1 to 1) as integer
+values(-1) = 7
+
+EditOriginal( values() )
+print "Outside = " & values(-1) & ", upper bound = " & ubound( values )
+%%
+	Declare the array parameter ##ByVal## to copy its elements and bounds on entry. The copy is a local dynamic array, even when the source has fixed bounds. Its storage is released when the procedure exits. See ##[[KeyPgByval|ByVal]]## for a runnable example.
 
 {{fbdoc item="section" value="Passing arguments by reference"}}
 	Unlike arguments that are passed by value, arguments that are passed to procedures by reference really do get passed; no copy is made. This allows the procedure to modify the original variable or object that was passed to it.

@@ -470,7 +470,7 @@ private function hCheckByDescParam _
 
 	'' is arg a pointer?
 	if( n->arg.mode = FB_PARAMMODE_BYVAL ) then
-		return TRUE
+		return (symbIsByvalArray( param ) = FALSE)
 	end if
 
 	'' for a non-indexed array reference, perform the checks
@@ -487,6 +487,17 @@ private function hCheckByDescParam _
 	s = astGetSymbol( l )
 	if( s = NULL ) then
 		exit function
+	end if
+
+	'' The descriptor must describe storage with exactly the element
+	'' representation the callee will copy and eventually destroy.
+	if( symbIsByvalArray( param ) ) then
+		if( n->arg.mode <> FB_PARAMMODE_BYDESC orelse _
+		    typeUnsetIsConst( astGetFullType( l ) ) <> typeUnsetIsConst( symbGetFullType( param ) ) orelse _
+		    astGetSubtype( l ) <> symbGetSubtype( param ) orelse _
+		    (typeIsConst( astGetFullType( l ) ) andalso symbByvalArrayNeedsMutableSource( param )) ) then
+			exit function
+		end if
 	end if
 
 	'' same type? (don't check if it's a rtl proc, or a forward call)
@@ -958,6 +969,18 @@ private function hCheckParam _
 	param_dtype = symbGetType( param )
 	arg_dtype   = astGetDatatype( n->l )
 
+	if( n->arg.mode = FB_PARAMMODE_BYVALARRAY ) then
+		if( symbIsByvalArray( param ) = FALSE ) then
+			errReport( FB_ERRMSG_PARAMTYPEMISMATCHAT )
+			return FALSE
+		end if
+		n->arg.mode = FB_PARAMMODE_BYDESC
+	elseif( symbGetParamMode( param ) = FB_PARAMMODE_BYVAL ) then
+		'' Once selected, an explicit BYVAL uses the same conversions
+		'' and copy construction as an unmarked value argument.
+		if( n->arg.mode = FB_PARAMMODE_BYVAL ) then n->arg.mode = INVALID
+	end if
+
 	'' Diagnose the selected argument before conversions hide its original
 	'' qualifiers. A value temporary has no caller-owned slot to alias; real
 	'' BYREF results and variables retain their storage and the stricter check.
@@ -1279,7 +1302,8 @@ function astNewARG _
 		dtype = astGetFullType( arg )
 	end if
 	if( (semantic_defaulted = FALSE) and (semantic_source_range <> NULL) ) then
-		if( (symbGetParamMode(param) = FB_PARAMMODE_BYREF) or (symbGetParamMode(param) = FB_PARAMMODE_BYDESC) ) then
+		if( (symbGetParamMode(param) = FB_PARAMMODE_BYREF) or _
+		    ((symbGetParamMode(param) = FB_PARAMMODE_BYDESC) andalso (symbIsByvalArray(param) = FALSE)) ) then
 			fbSemanticModelSetAccess(arg, "byref")
 		end if
 	end if
@@ -1292,7 +1316,9 @@ function astNewARG _
 	'' dtor don't matter)
 	if( ((not symbIsInstanceParam( param )) or _
 		((sym->pattrib and FB_PROCATTRIB_NOTHISCONSTNESS) = 0)) ) then
-		if( symbCheckConstAssignTopLevel( symbGetFullType( param ), dtype, symbGetParamMode( param ) ) = FALSE ) then
+		dim as FB_PARAMMODE qualification_mode = symbGetParamMode( param )
+		if( symbIsByvalArray( param ) ) then qualification_mode = FB_PARAMMODE_BYVAL
+		if( symbCheckConstAssignTopLevel( symbGetFullType( param ), dtype, qualification_mode ) = FALSE ) then
 			if( symbIsInstanceParam( param ) ) then
 				errReportParam( parent->sym, 0, NULL, FB_ERRMSG_CONSTUDTTONONCONSTMETHOD )
 			else

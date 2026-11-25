@@ -225,6 +225,7 @@
 #define FB_RTL_ARRAYREDIMPRESV          "fb_ArrayRedimPresvEx"
 #define FB_RTL_ARRAYREDIMPRESV_OBJ      "fb_ArrayRedimPresvObj"
 #define FB_RTL_ARRAYREDIMTO             "fb_ArrayRedimTo"
+#define FB_RTL_ARRAYCOPYDESC            "fb_ArrayCopyDesc"
 #define FB_RTL_ARRAYLBOUND              "fb_ArrayLBound"
 #define FB_RTL_ARRAYUBOUND              "fb_ArrayUBound"
 #define FB_RTL_ARRAYSNGBOUNDCHK         "fb_ArraySngBoundChkEx"
@@ -764,6 +765,7 @@ enum FB_RTL_IDX
 	FB_RTL_IDX_ARRAYREDIMPRESV
 	FB_RTL_IDX_ARRAYREDIMPRESV_OBJ
 	FB_RTL_IDX_ARRAYREDIMTO
+	FB_RTL_IDX_ARRAYCOPYDESC
 	FB_RTL_IDX_ARRAYLBOUND
 	FB_RTL_IDX_ARRAYUBOUND
 	FB_RTL_IDX_ARRAYSNGBOUNDCHK
@@ -1565,6 +1567,13 @@ declare function rtlArrayRedimTo _
 		byval subtype as FBSYMBOL ptr _
 	) as ASTNODE ptr
 
+declare function rtlArrayCopyDesc _
+	( _
+		byval dest as ASTNODE ptr, _
+		byval source as ASTNODE ptr, _
+		byval copy_bytes as integer _
+	) as ASTNODE ptr
+
 declare function rtlArrayBound _
 	( _
 		byval arrayexpr as ASTNODE ptr, _
@@ -1953,7 +1962,8 @@ declare sub rtlErrorThrow _
 	( _
 		byval errexpr as ASTNODE ptr, _
 		byval linenum as integer, _
-		byval module as zstring ptr _
+		byval module as zstring ptr, _
+		byval can_resume_here as integer = TRUE _
 	)
 
 declare sub rtlErrorSetHandler _

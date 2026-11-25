@@ -3,6 +3,7 @@ Declaration specifier to explicitly pass a parameter by reference
 
 {{fbdoc item="syntax"}}##
 	**Byref** //param// [[KeyPgAs|as]] [[DataType|datatype]]
+	**Byref** //param// ( [ **Any** [, **Any** ...] ] ) [[KeyPgAs|as]] [[DataType|datatype]]
 ##
 {{fbdoc item="usage"}}##
 	[ [[KeyPgDeclare|declare]] ] { [[KeyPgSub|sub]] | [[KeyPgFunction|function]] } //proc_name// ( **Byref** //param// [[KeyPgAs|as]] [[DataType|datatype]]  )
@@ -37,7 +38,8 @@ end
 %%
 
 {{fbdoc item="lang"}}
-	- In //[[CompilerOptlang|-lang fb]]// dialect, ##[[KeyPgByval|Byval]]## is the default parameter passing convention for all built-in types except ##[[KeyPgString|String]]## and user-defined ##[[KeyPgType|Type]]## which are passed ##**Byref**## by default. The ##[[KeyPgZstring|Zstring]]## and ##[[KeyPgWstring|Wstring]]## built-in types are also passed ##**Byref**## by default, but passing ##[[KeyPgByval|Byval]]## is forbidden. Arrays are always passed ##**Byref**## and the use of the specifier ##**Byref**## or ##[[KeyPgByval|Byval]]## is forbidden.
+	- In //[[CompilerOptlang|-lang fb]]// dialect, ##[[KeyPgByval|Byval]]## is the default parameter passing convention for all built-in types except ##[[KeyPgString|String]]## and user-defined ##[[KeyPgType|Type]]## which are passed ##**Byref**## by default. The ##[[KeyPgZstring|Zstring]]## and ##[[KeyPgWstring|Wstring]]## built-in types are also passed ##**Byref**## by default, but passing ##[[KeyPgByval|Byval]]## is forbidden.
+	- An array parameter declared as ##ByRef values() As Integer## shares the caller's array descriptor. Omitting ##ByRef## gives the same behavior. Use ##[[KeyPgByval|ByVal]]## to give the procedure a local copy.
 	- In //[[CompilerOptlang|-lang qb]]// and //[[CompilerOptlang|-lang fblite]]// dialects, ##**Byref**## is the default parameter passing convention.
 
 {{fbdoc item="diff"}}

@@ -22,6 +22,8 @@ Build-Depends:
  libxrandr-dev,
  libxpm-dev,
  emscripten <!pkg.freebasic.nojs>,
+ cmake <!pkg.freebasic.nojs>,
+ ninja-build <!pkg.freebasic.nojs>,
  nodejs <!pkg.freebasic.nojs>,
  openjdk-17-jdk-headless <pkg.freebasic.android>,
  android-sdk <pkg.freebasic.android>,

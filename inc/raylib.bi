@@ -1,4 +1,11 @@
-'' FreeBASIC binding for raylib-3.0.0
+'' Project: FreeBASIC raylib binding
+'' File: raylib.bi
+'' Purpose: Select the packaged web ABI or expose the legacy native ABI.
+'' Responsibilities: Choose raylib 5.5 for JS and preserve raylib 3.0 for
+'' existing native projects. Native 5.5 projects can include raylib55.bi.
+'' This file intentionally does not contain raylib implementation code.
+''
+'' FreeBASIC binding for raylib-3.0.0 (legacy native)
 ''
 '' based on the C header files:
 ''    LICENSE: zlib/libpng
@@ -27,6 +34,10 @@
 ''   FreeBASIC development team
 
 #pragma once
+
+#ifdef __FB_JS__
+	#include once "raylib55.bi"
+#else
 
 #inclib "raylib"
 
@@ -1158,3 +1169,7 @@ declare sub SetAudioStreamPitch(byval stream as AudioStream, byval pitch as sing
 declare sub SetAudioStreamBufferSizeDefault(byval size as long)
 
 end extern
+
+#endif
+
+'' end of raylib.bi

@@ -45,9 +45,16 @@
 extern "C"
 
 #define SQLITE3_H
+#ifdef __FB_JS__
+'' Match the SQLite release shipped by the browser SDK.
+#define SQLITE_VERSION "3.53.4"
+const SQLITE_VERSION_NUMBER = 3053004
+#define SQLITE_SOURCE_ID "2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc"
+#else
 #define SQLITE_VERSION "3.39.4"
 const SQLITE_VERSION_NUMBER = 3039004
 #define SQLITE_SOURCE_ID "2022-09-29 15:55:41 a29f9949895322123f7c38fbe94c649a9d6e6c9cd0c3b41c96d694552f26b309"
+#endif
 extern __sqlite3_version alias "sqlite3_version" as const byte
 #define sqlite3_version (*cptr(const zstring ptr, @__sqlite3_version))
 

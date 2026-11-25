@@ -965,7 +965,7 @@ install_deps() {
         lintian_deps=(lintian)
     fi
     if [ "$NO_JS" -eq 0 ]; then
-        js_deps=(emscripten nodejs)
+        js_deps=(emscripten nodejs cmake ninja-build)
     fi
     local android_deps=()
     if [ "$ANDROID" -eq 1 ]; then
@@ -1363,6 +1363,11 @@ package_current_target() {
 
     if [ "$NO_JS" -eq 0 ]; then
         [ -f src/tools/js/fbc-js-app ] || die "missing JS app helper: src/tools/js/fbc-js-app"
+        # Ship editable sources in the orig tarball so debian/rules
+        # can build the WebAssembly archives without network access.
+        run python3 build_scripts/build-js-libraries.py prepare contrib/js/raylib-5.5
+        run python3 build_scripts/build-js-libraries.py prepare --library zlib contrib/js/zlib-1.4
+        run python3 build_scripts/build-js-libraries.py prepare-extras contrib/js/extra
     fi
     if [ "$ANDROID" -eq 1 ]; then
         [ -f src/tools/android/fbc-android ] || die "missing Android package helper: src/tools/android/fbc-android"

@@ -387,6 +387,10 @@ endif
 		LDFLAGS="$(LDFLAGS)"
 
 ifeq ($(BUILD_JS),yes)
+	python3 build_scripts/build-js-libraries.py build contrib/js/raylib-5.5 lib/freebasic/js-asmjs
+	python3 build_scripts/build-js-libraries.py build --library zlib contrib/js/zlib-1.4 lib/freebasic/js-asmjs
+	python3 build_scripts/build-js-libraries.py build-extras contrib/js/extra lib/freebasic/js-asmjs --zlib-source contrib/js/zlib-1.4
+
 	$(PARMAKE) TARGET_TRIPLET="$(TARGET_TRIPLET)" TARGET="$(TARGET)" MULTILIB="$(MULTILIB)" \
 		$(ARM_CPU_MAKE_ARGS) \
 		compiler-js \

@@ -131,7 +131,11 @@ const JPEG_MAX_DIMENSION = cast(clong, 65500)
 #elseif __JPEGLIB_VER__ = 9
 	const JPEG_LIB_VERSION = 90
 	const JPEG_LIB_VERSION_MAJOR = 9
+	#ifdef __FB_JS__
+		const JPEG_LIB_VERSION_MINOR = 6
+	#else
 	const JPEG_LIB_VERSION_MINOR = 1
+	#endif
 #else
 	#error "unsupported __JPEGLIB_VER__ value (it may be one of 6,7,8,9)"
 #endif

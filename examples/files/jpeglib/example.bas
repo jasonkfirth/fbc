@@ -72,7 +72,11 @@ declare function imageread_jpg _
 
 		put (0, 0), img1, pset
 
-		sleep
+		#ifdef EXAMPLEAGEDDON_BROWSER
+			sleep 50, 1
+		#else
+			sleep
+		#endif
 
 		imagedestroy( img1 )
 	#else
@@ -93,10 +97,18 @@ declare function imageread_jpg _
 		put (0, 0), img1, pset
 		put (320, 0), img2, pset
 
-		sleep
+		#ifdef EXAMPLEAGEDDON_BROWSER
+			sleep 50, 1
+		#else
+			sleep
+		#endif
 
 		imagedestroy( img2 )
 		imagedestroy( img1 )
+	#endif
+	#ifdef EXAMPLEAGEDDON_BROWSER
+		screen 0
+		end 0
 	#endif
 #endif
 

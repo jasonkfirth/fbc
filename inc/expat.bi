@@ -303,7 +303,11 @@ end type
 
 declare function XML_GetFeatureList() as const XML_Feature ptr
 const XML_MAJOR_VERSION = 2
+#ifdef __FB_JS__
+const XML_MINOR_VERSION = 8
+#else
 const XML_MINOR_VERSION = 1
+#endif
 const XML_MICRO_VERSION = 0
 
 end extern

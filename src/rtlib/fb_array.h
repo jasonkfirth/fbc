@@ -134,6 +134,7 @@ FBCALL void       fb_ArrayStrErase     ( FBARRAY_ACCESS *array );
        int        fb_ArrayRedimPresvEx ( FBARRAY_ACCESS *array, size_t element_len, int doclear, int isvarlen, size_t dimensions, ... );
        int        fb_ArrayRedimPresvObj( FBARRAY_ACCESS *array, size_t element_len, FB_DEFCTOR ctor, FB_DEFCTOR dtor, size_t dimensions, ... );
 FBCALL int        fb_ArrayRedimTo      ( FBARRAY_ACCESS *dest, const FBARRAY_ACCESS *source, int isvarlen, FB_DEFCTOR ctor, FB_DEFCTOR dtor );
+FBCALL int        fb_ArrayCopyDesc     ( FBARRAY_ACCESS *dest, const FBARRAY_ACCESS *source, int copy_bytes );
 FBCALL void       fb_ArrayResetDesc    ( FBARRAY_ACCESS *array );
 FBCALL ssize_t    fb_ArrayLBound       ( FBARRAY_ACCESS *array, ssize_t dimension );
 FBCALL ssize_t    fb_ArrayUBound       ( FBARRAY_ACCESS *array, ssize_t dimension );

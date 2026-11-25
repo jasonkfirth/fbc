@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+    Project: FreeBASIC browser corpus
+    File: fb-corpus-fblint.html
+    Purpose: Collect one source file and display the local fblint report.
+    The worker runs the linter and owns its virtual filesystem.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreeBASIC Source Linter</title>
+<style>
+  body{margin:0;background:#edf2f4;color:#172831;font:1rem/1.5 system-ui,sans-serif}
+  main{max-width:72ch;margin:0 auto;padding:1.5rem 1rem}
+  form{display:grid;gap:.7rem;padding:1rem;background:#fff;border:1px solid #b5c6cc;border-radius:.5rem}
+  textarea{width:100%;min-height:14rem;box-sizing:border-box;resize:vertical;font:1rem/1.45 monospace}
+  .options{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+  select,button{font:inherit;padding:.25rem .5rem}
+  button{justify-self:start;background:#185b69;color:#fff;border:1px solid #185b69;border-radius:.25rem}
+  button:disabled{opacity:.6}
+  table{width:100%;border-collapse:collapse;overflow-wrap:anywhere}
+  th,td{text-align:left;padding:.45rem;border-bottom:1px solid #b5c6cc;vertical-align:top}
+  th:first-child,td:first-child{white-space:nowrap}
+</style>
+</head>
+<body>
+<main>
+  <h1>FreeBASIC Source Linter</h1>
+  <p>Check a single BASIC file in this browser. The local rules check the supplied source. Compiler-backed analysis needs an installed compiler.</p>
+  <form id="lint-form">
+    <label>Open a BASIC file <input id="lint-file" type="file" accept=".bas,.bi"></label>
+    <label for="lint-source">BASIC source</label>
+    <textarea id="lint-source" spellcheck="false" required>Print "Hello, FreeBASIC!"</textarea>
+    <div class="options">
+      <label>Target <select id="lint-target"><option value="js">Browser</option><option value="windows">Windows</option><option value="linux">Linux</option><option value="dos">DOS</option></select></label>
+      <label>Profile <select id="lint-profile"><option value="portable">Portable</option><option value="strict">Strict</option><option value="style">Style</option></select></label>
+      <label><input id="lint-suppressions" type="checkbox" checked> Honor suppressions</label>
+    </div>
+    <button id="lint-submit" type="submit">Check source</button>
+  </form>
+  <p id="lint-status" role="status"></p>
+  <table id="lint-findings" aria-label="Diagnostics" hidden>
+    <thead><tr><th scope="col">Line</th><th scope="col">Severity</th><th scope="col">Rule</th><th scope="col">Message</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</main>
+<script src="lint.js"></script>
+</body>
+</html>
+<!-- end of fb-corpus-fblint.html -->

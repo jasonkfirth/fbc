@@ -31,12 +31,19 @@ FBSTRING_ACCESS *fb_ConsoleInkey( void )
 
 int fb_ConsoleGetkey( void )
 {
-    /*
-    	Do not block the JavaScript event loop.  Keyboard events are delivered
-    	asynchronously, so an empty buffer means no key is currently available.
-    */
-	if( fb_console_context.key_head == fb_console_context.key_tail)
-        return 0;
+	if( !fb_ConsoleKeyHit() )
+	{
+		/* The DOM callbacks supply keys only when we're hosted in a browser.
+		 * Keep the empty-buffer result for headless JS hosts. */
+		if( !EM_ASM_INT({ return typeof window !== 'undefined'; }) )
+			return 0;
+
+		/* GetKey blocks BASIC code, but the browser must stay responsive.
+		 * A 10 ms delay lets key events arrive without a busy wait. */
+		do
+			fb_Delay( 10 );
+		while( !fb_ConsoleKeyHit() );
+	}
 
 	int key = fb_console_context.key_buffer[fb_console_context.key_head];
 	fb_console_context.key_head = (fb_console_context.key_head + 1) % KEY_BUFFER_LEN;

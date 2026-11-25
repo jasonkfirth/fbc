@@ -11,6 +11,11 @@ JavaScript/Emscripten target runtime.
 .PP
 Most compiler options are the same as for
 .BR fbc (1).
+.PP
+The JS SDK includes WebAssembly archives for raylib, SDL2, SDL3, SDL2_image,
+SDL2_ttf, FreeType, SQLite, libpng, libjpeg, bzip2, Expat, and zlib.
+Include the corresponding FreeBASIC binding to link each library.
+The driver selects Emscripten's GLFW 3 implementation when linking raylib.
 .SH OPTIONS
 .TP
 .B --help

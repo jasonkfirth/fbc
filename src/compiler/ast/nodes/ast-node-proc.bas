@@ -61,6 +61,7 @@ end type
 declare function hModLevelIsEmpty( byval p as ASTNODE ptr ) as integer
 declare sub hLoadProcResult( byval proc as FBSYMBOL ptr )
 declare function hDeclVarsForProcParams( byval proc as FBSYMBOL ptr ) as integer
+declare sub hInitByvalArrays( byval proc as FBSYMBOL ptr )
 declare function hInitVptr _
 	( _
 		byval parent as FBSYMBOL ptr, _
@@ -1164,11 +1165,11 @@ sub astProcBegin( byval sym as FBSYMBOL ptr, byval ismain as integer )
 	' at ebp-N, which won't exist, no result is needed either
 	if( enable_implicit_code ) then
 		'' alloc parameters
-		hDeclVarsForProcParams( sym )
-		if( ismain = FALSE ) then
+		if( hDeclVarsForProcParams( sym ) andalso (ismain = FALSE) ) then
 			var param = symbGetProcHeadParam(sym)
 			while( param <> NULL )
-				if( symbGetName(param) <> NULL and symbIsInstanceParam(param) = FALSE ) then
+				if( symbGetName(param) <> NULL and symbIsInstanceParam(param) = FALSE and _
+				    symbIsByvalArray(param) = FALSE ) then
 					astWarnDeclareVariable(param->param.var)
 				end if
 				param = param->next
@@ -1231,6 +1232,19 @@ sub astProcBegin( byval sym as FBSYMBOL ptr, byval ismain as integer )
 
 	'' Label at beginning of lexical block, used by debug stabs output
 	astAdd( astNewLABEL( n->block.initlabel ) )
+
+	if( enable_implicit_code ) then
+		if( errGetCount( ) = 0 ) then hInitByvalArrays( sym )
+	else
+		var param = symbGetProcHeadParam( sym )
+		while( param <> NULL )
+			if( symbIsByvalArray( param ) ) then
+				errReport( FB_ERRMSG_PARAMTYPEMISMATCHAT )
+				exit while
+			end if
+			param = symbGetParamNext( param )
+		wend
+	end if
 end sub
 
 '':::::
@@ -1602,6 +1616,122 @@ private function hDeclVarsForProcParams( byval proc as FBSYMBOL ptr ) as integer
 
 	function = TRUE
 end function
+
+'' The procedure owns a dynamic local with the parameter's source name.
+'' Leave the incoming descriptor untouched, including on REDIM or ERASE.
+private function hDeclByvalArray( byval param as FBSYMBOL ptr ) as FBSYMBOL ptr
+	dim as FBARRAYDIM bounds(0)
+	dim as FB_SYMBATTRIB attrib = FB_SYMBATTRIB_DYNAMIC or (param->attrib and FB_SYMBATTRIB_SUFFIXED)
+	if( symbGetType( param ) = FB_DATATYPE_STRUCT ) then
+		var dtor = symbGetCompDtor1( param->subtype )
+		if( (dtor <> NULL) andalso (symbCheckAccess( dtor ) = FALSE) ) then
+			errReport( FB_ERRMSG_NOACCESSTODTOR )
+		end if
+	end if
+	var dest = symbAddVar( symbGetName( param ), NULL, param->typ, param->subtype, _
+	                      0, param->param.bydescdimensions, bounds(), attrib )
+	if( dest = NULL ) then return NULL
+
+	var desc = symbGetArrayDescriptor( dest )
+	astAdd( astNewDECL( dest, FALSE ) )
+	astAdd( astNewDECL( desc, FALSE ) )
+	astAdd( astTypeIniFlush( desc, symbGetTypeIniTree( desc ), FALSE, AST_OPOPT_ISINI ) )
+	symbSetTypeIniTree( desc, NULL )
+	symbSetIsDeclared( dest )
+	return dest
+end function
+
+private function hIncomingArrayDesc( byval param as FBSYMBOL ptr ) as ASTNODE ptr
+	return astNewVAR( symbGetParamVar( param ), 0, typeAddrOf( FB_DATATYPE_STRUCT ), param->param.bydescrealsubtype )
+end function
+
+private sub hCopyByvalArray( byval param as FBSYMBOL ptr, byval dest as FBSYMBOL ptr )
+	var desc = symbGetArrayDescriptor( dest )
+	dim as integer dtype = typeUnsetIsConst( param->typ )
+	var subtype = param->subtype
+	dim as integer copy_bytes = typeIsTrivial( dtype, subtype )
+
+	'' Argument copies have to finish before the body can run. Leave
+	'' resumption to the caller because this frame has incomplete parameters.
+	var status = symbAddTempVar( FB_DATATYPE_LONG )
+	var copied = symbAddLabel( NULL )
+	astAdd( astBuildVarAssign( status, rtlArrayCopyDesc( astBuildVarAddrof( desc ), _
+	                          hIncomingArrayDesc( param ), copy_bytes ), AST_OPOPT_ISINI ) )
+	astAdd( astNewBOP( AST_OP_EQ, astNewVAR( status ), astNewCONSTi( 0 ), copied, AST_OPOPT_NONE ) )
+	rtlErrorThrow( astNewVAR( status ), lexLineNum( ), env.inf.name, FALSE )
+	astAdd( astNewLABEL( copied ) )
+
+	if( copy_bytes ) then exit sub
+
+	'' The descriptor's PTR is the physical origin. DATA is the biased
+	'' address used when indexing with the BASIC bounds.
+	dim as integer source_dtype = typeSetIsConst( dtype )
+	if( symbByvalArrayNeedsMutableSource( param ) ) then source_dtype = dtype
+	var src = symbAddTempVar( typeAddrOf( source_dtype ), subtype )
+	var dst = symbAddTempVar( typeAddrOf( dtype ), subtype )
+	var remaining = symbAddTempVar( FB_DATATYPE_UINT )
+	astAdd( astBuildVarAssign( src, astBuildDerefAddrOf( astNewDEREF( hIncomingArrayDesc( param ) ), _
+	                         symb.fbarray_ptr, src->typ, subtype ), AST_OPOPT_ISINI ) )
+	astAdd( astBuildVarAssign( dst, astBuildDerefAddrOf( astNewVAR( desc ), _
+	                         symb.fbarray_ptr, dst->typ, subtype ), AST_OPOPT_ISINI ) )
+	astAdd( astBuildVarAssign( remaining, astBuildDerefAddrOf( astNewDEREF( hIncomingArrayDesc( param ) ), _
+	                         symb.fbarray_size, FB_DATATYPE_UINT, NULL ), AST_OPOPT_ISINI ) )
+
+	var again = symbAddLabel( NULL )
+	var finished = symbAddLabel( NULL )
+	astAdd( astNewLABEL( again ) )
+	astAdd( astNewBOP( AST_OP_EQ, astNewVAR( remaining ), astNewCONSTi( 0 ), finished, AST_OPOPT_NONE ) )
+
+	if( dtype = FB_DATATYPE_STRUCT ) then
+		dim as integer is_ctorcall = FALSE
+		var ctor = astBuildImplicitCtorCall( subtype, astBuildVarDeref( src ), INVALID, is_ctorcall )
+		if( is_ctorcall = FALSE ) then
+			if( ctor <> NULL ) then
+				astDelTree( ctor )
+				errReport( FB_ERRMSG_NEEDEXPLICITCOPYCTORCONST )
+			end if
+			return
+		end if
+		astAdd( astPatchCtorCall( ctor, astBuildVarDeref( dst ) ) )
+	else
+		astAdd( astNewASSIGN( astBuildVarDeref( dst ), astBuildVarDeref( src ), AST_OPOPT_ISINI ) )
+	end if
+
+	'' Cleanup sees only the elements whose copy construction completed.
+	var element_len = symbGetSizeOf( dest )
+	astAdd( astNewSelfBOP( AST_OP_ADD_SELF, _
+	                      astBuildDerefAddrOf( astNewVAR( desc ), symb.fbarray_size, FB_DATATYPE_UINT, NULL ), _
+	                      astNewCONSTi( element_len, FB_DATATYPE_UINT ) ) )
+	astAdd( astBuildVarInc( src, 1 ) )
+	astAdd( astBuildVarInc( dst, 1 ) )
+	astAdd( astNewSelfBOP( AST_OP_SUB_SELF, astNewVAR( remaining ), astNewCONSTi( element_len, FB_DATATYPE_UINT ) ) )
+	astAdd( astNewBRANCH( AST_OP_JMP, again ) )
+	astAdd( astNewLABEL( finished ) )
+end sub
+
+private sub hInitByvalArrays( byval proc as FBSYMBOL ptr )
+	'' Declare all copies before running their code. An early error can
+	'' then clean up earlier copies and the still-empty descriptors alike.
+	var param = symbGetProcHeadParam( proc )
+	while( param <> NULL )
+		if( symbIsByvalArray( param ) ) then
+			param->param.byvalarrayvar = hDeclByvalArray( param )
+			if( param->param.byvalarrayvar = NULL ) then
+				errReport( FB_ERRMSG_DUPDEFINITION )
+				exit sub
+			end if
+		end if
+		param = symbGetParamNext( param )
+	wend
+
+	param = symbGetProcHeadParam( proc )
+	while( param <> NULL )
+		if( symbIsByvalArray( param ) ) then
+			hCopyByvalArray( param, param->param.byvalarrayvar )
+		end if
+		param = symbGetParamNext( param )
+	wend
+end sub
 
 private sub hLoadProcResult( byval proc as FBSYMBOL ptr )
 	dim as FBSYMBOL ptr s = any

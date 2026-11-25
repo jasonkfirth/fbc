@@ -57,196 +57,105 @@ sub parserProcCallEnd( )
 end sub
 
 '':::::
-''ProcArg        =   BYVAL? (ID(('(' ')')? | Expression) .
-''
+private function hArgExpression _
+	( _
+		byref mode as FB_PARAMMODE, _
+		byref semantic_range as AST_SEMANTIC_SOURCE_RANGE _
+	) as ASTNODE ptr
+
+	dim as FB_PARAMMODE ptr old_group_mode = parser.arg_group_mode
+	parser.arg_group_mode = NULL
+	mode = INVALID
+
+	if( hMatch( FB_TK_BYVAL, LEXCHECK_POST_SUFFIX ) ) then
+		mode = FB_PARAMMODE_BYVAL
+	elseif( lexGetToken( ) = CHAR_LPRNT ) then
+		parser.arg_group_mode = @mode
+	end if
+
+	function = cExpression( @semantic_range )
+	parser.arg_group_mode = old_group_mode
+	fbSetPrntOptional( FALSE )
+end function
+
+private sub hArrayArgMode( byval expr as ASTNODE ptr, byref mode as FB_PARAMMODE )
+	if( lexGetToken( ) = CHAR_LPRNT andalso lexGetLookAhead( 1 ) = CHAR_RPRNT ) then
+		lexSkipToken( )
+		lexSkipToken( )
+	elseif( astIsNIDXARRAY( expr ) = FALSE ) then
+		exit sub
+	end if
+
+	if( mode = FB_PARAMMODE_BYVAL ) then
+		mode = FB_PARAMMODE_BYVALARRAY
+	else
+		mode = FB_PARAMMODE_BYDESC
+	end if
+end sub
+
 private function hProcArg _
 	( _
 		byval param as FBSYMBOL ptr, _
-		byval argnum as integer, _
 		byref expr as ASTNODE ptr, _
-		byref amode as integer, _
+		byref amode as FB_PARAMMODE, _
 		byref have_eq_outside_parens as integer, _
-		byval options as FB_PARSEROPT, _
 		byref semantic_range as AST_SEMANTIC_SOURCE_RANGE _
 	) as integer
 
-	dim as integer pmode = any, old_dtype = any
-	dim as FBSYMBOL ptr oldsym = any
+	dim as integer pmode = symbGetParamMode( param )
+	dim as integer old_dtype = parser.ctx_dtype
+	dim as FBSYMBOL ptr oldsym = parser.ctxsym
 
-	function = FALSE
-
-	pmode = symbGetParamMode( param )
-	amode = INVALID
-	expr = NULL
-
-	'' BYVAL?
-	if( lexGetToken( ) = FB_TK_BYVAL ) then
-		lexSkipToken( LEXCHECK_POST_SUFFIX )
-		amode = FB_PARAMMODE_BYVAL
-	end if
-
-	oldsym    = parser.ctxsym
-	old_dtype = parser.ctx_dtype
 	parser.ctxsym    = symbGetSubType( param )
 	parser.ctx_dtype = symbGetType( param )
 	parser.have_eq_outside_parens = FALSE
 
-	'' Expression
-	expr = cExpression( @semantic_range )
-
+	expr = hArgExpression( amode, semantic_range )
 	have_eq_outside_parens or= parser.have_eq_outside_parens
-
-	'' disable optional opening '{' after first parameter
-	fbSetPrntOptional( FALSE )
-
-	if( expr = NULL ) then
-		if( (options and FB_PARSEROPT_ISFUNC) <> 0 ) then
-			expr = NULL
-		else
-			'' check for BYVAL if it's the first param, due the optional ()'s
-			if( (argnum = 0) and (amode = INVALID) ) then
-				'' BYVAL?
-				if( hMatch( FB_TK_BYVAL, LEXCHECK_POST_SUFFIX ) ) then
-					amode = FB_PARAMMODE_BYVAL
-					expr = cExpression( @semantic_range )
-				end if
-			end if
-		end if
-	end if
 
 	parser.ctxsym    = oldsym
 	parser.ctx_dtype = old_dtype
 
 	if( expr = NULL ) then
-		'' check if argument is optional
 		if( symbParamIsOptional( param ) = FALSE ) then
 			if( pmode = FB_PARAMMODE_VARARG ) then
-				exit function
+				return FALSE
 			end if
 			errReport( FB_ERRMSG_ARGCNTMISMATCH )
-			'' error recovery: fake an expr
 			expr = fbSemanticModelRecoveryNode( _
 				astNewCONSTz( symbGetType( param ), symbGetSubType( param ) ), "replacement-zero", __FUNCTION__, _
 				"parser/procedures/parser-proccall-args.bas", __LINE__)
 		end if
-	else
-		'' '('')'?
-		if( pmode = FB_PARAMMODE_BYDESC ) then
-			if( lexGetToken( ) = CHAR_LPRNT ) then
-				if( lexGetLookAhead( 1 ) = CHAR_RPRNT ) then
-					if( amode <> INVALID ) then
-						errReport( FB_ERRMSG_PARAMTYPEMISMATCH )
-					end if
-					lexSkipToken( )
-					lexSkipToken( )
-					amode = FB_PARAMMODE_BYDESC
-				end if
-			else
-				'' already a non-indexed array?
-				if( astIsNIDXARRAY( expr ) ) then
-					if( amode <> INVALID ) then
-						errReport( FB_ERRMSG_PARAMTYPEMISMATCH )
-					end if
-					amode = FB_PARAMMODE_BYDESC
-				end if
-			end if
-		end if
-	end if
-
-	''
-	if( amode <> INVALID ) then
-		if( amode <> pmode ) then
-			if( pmode <> FB_PARAMMODE_VARARG ) then
-				'' allow BYVAL params passed to BYREF/BYDESC args
-				'' (to pass NULL to pointers and so on)
-				if( amode <> FB_PARAMMODE_BYVAL ) then
-					if( amode <> pmode ) then
-						errReport( FB_ERRMSG_PARAMTYPEMISMATCH )
-						'' error recovery: discard arg mode
-						amode = pmode
-					end if
-				end if
-			end if
-		end if
+	elseif( pmode = FB_PARAMMODE_BYDESC or amode = FB_PARAMMODE_BYVAL ) then
+		hArrayArgMode( expr, amode )
 	end if
 
 	function = TRUE
-
 end function
 
-'':::::
-''ProcParam         =   BYVAL? (ID(('(' ')')? | Expression) .
-''
 private sub hOvlProcArg _
 	( _
-		byval argnum as integer, _
 		byval arg as FB_CALL_ARG ptr, _
-		byref have_eq_outside_parens as integer, _
-		byval options as FB_PARSEROPT _
+		byref have_eq_outside_parens as integer _
 	)
 
-	dim as FBSYMBOL ptr oldsym = any
-	dim as integer old_dtype = any
+	dim as FBSYMBOL ptr oldsym = parser.ctxsym
+	dim as integer old_dtype = parser.ctx_dtype
 	dim as AST_SEMANTIC_SOURCE_RANGE semantic_range
 
-	arg->expr = NULL
-	arg->mode = INVALID
-
-	'' BYVAL?
-	if( hMatch( FB_TK_BYVAL, LEXCHECK_POST_SUFFIX ) ) then
-		arg->mode = FB_PARAMMODE_BYVAL
-	end if
-
-	oldsym    = parser.ctxsym
-	old_dtype = parser.ctx_dtype
 	parser.ctxsym    = NULL
 	parser.ctx_dtype = FB_DATATYPE_INVALID
 	parser.have_eq_outside_parens = FALSE
 
-	'' Expression
-	arg->expr = cExpression( @semantic_range )
-	if( arg->expr = NULL ) then
-		'' function? assume as optional..
-		if( (options and FB_PARSEROPT_ISFUNC) <> 0 ) then
-			arg->expr = NULL
-		else
-			'' check for BYVAL if it's the first param, due the optional ()'s
-			if( (argnum = 0) and (arg->mode = INVALID) ) then
-				'' BYVAL?
-				if( hMatch( FB_TK_BYVAL, LEXCHECK_POST_SUFFIX ) ) then
-					arg->mode = FB_PARAMMODE_BYVAL
-					arg->expr = cExpression( @semantic_range )
-				end if
-			end if
-		end if
-	end if
+	arg->expr = hArgExpression( arg->mode, semantic_range )
 
 	parser.ctxsym    = oldsym
 	parser.ctx_dtype = old_dtype
 	have_eq_outside_parens or= parser.have_eq_outside_parens
 
-	'' not optional?
 	if( arg->expr <> NULL ) then
 		fbSemanticModelCaptureArgumentSource(arg, semantic_range)
-		'' '('')'?
-		if( lexGetToken( ) = CHAR_LPRNT ) then
-			if( lexGetLookAhead( 1 ) = CHAR_RPRNT ) then
-				if( arg->mode <> INVALID ) then
-					errReport( FB_ERRMSG_PARAMTYPEMISMATCH )
-				end if
-				lexSkipToken( )
-				lexSkipToken( )
-				arg->mode = FB_PARAMMODE_BYDESC
-			end if
-		else
-			'' already a non-indexed array?
-			if( astIsNIDXARRAY( arg->expr ) ) then
-				if( arg->mode <> INVALID ) then
-					errReport( FB_ERRMSG_PARAMTYPEMISMATCH )
-				end if
-				arg->mode = FB_PARAMMODE_BYDESC
-			end if
-		end if
+		hArrayArgMode( arg->expr, arg->mode )
 	end if
 end sub
 
@@ -380,7 +289,6 @@ private function hOvlProcArgList _
 	end if
 
 	if( (options and FB_PARSEROPT_OPTONLY) = 0 ) then
-		dim as integer init_args = args
 
 		do
 			'' count mismatch?
@@ -400,7 +308,7 @@ private function hOvlProcArgList _
 			'' alloc a new arg
 			arg = symbAllocOvlCallArg( @parser.ovlarglist, arg_list, FALSE )
 
-			hOvlProcArg( args - init_args, arg, have_eq_outside_parens, options )
+			hOvlProcArg( arg, have_eq_outside_parens )
 
 			'' ','?
 			if( lexGetToken( ) <> CHAR_COMMA ) then
@@ -581,7 +489,8 @@ function cProcArgList _
 		byval semantic_site as LEX_LOCATION ptr _
 	) as ASTNODE ptr
 
-	dim as integer args = any, params = any, mode = any, have_eq_outside_parens = any
+	dim as integer args = any, params = any, have_eq_outside_parens = any
+	dim as FB_PARAMMODE mode = any
 	dim as FBSYMBOL ptr param = any
 	dim as ASTNODE ptr procexpr = any, expr = any
 	dim as FB_CALL_ARG ptr arg = any
@@ -730,7 +639,7 @@ function cProcArgList _
 			end if
 
 			dim as AST_SEMANTIC_SOURCE_RANGE semantic_range
-			if( hProcArg( param, args, expr, mode, have_eq_outside_parens, options, semantic_range ) = FALSE ) then
+			if( hProcArg( param, expr, mode, have_eq_outside_parens, semantic_range ) = FALSE ) then
 				exit do
 			end if
 

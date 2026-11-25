@@ -491,7 +491,8 @@ sub rtlErrorThrow _
 	( _
 		byval errexpr as ASTNODE ptr, _
 		byval linenum as integer, _
-		byval module as zstring ptr _
+		byval module as zstring ptr, _
+		byval can_resume_here as integer _
 	)
 
 	dim as ASTNODE ptr proc = any, param = any
@@ -524,7 +525,7 @@ sub rtlErrorThrow _
 	end if
 
 	'' reslabel
-	if( env.clopt.resumeerr ) then
+	if( env.clopt.resumeerr and can_resume_here ) then
 		param = astNewADDROF( astNewVAR( reslabel ) )
 	else
 		param = astNewCONSTi( NULL, FB_DATATYPE_UINT )
@@ -534,7 +535,7 @@ sub rtlErrorThrow _
 	end if
 
 	'' resnxtlabel
-	if( env.clopt.resumeerr ) then
+	if( env.clopt.resumeerr and can_resume_here ) then
 		param = astNewADDROF( astNewVAR( nxtlabel ) )
 	else
 		param = astNewCONSTi( NULL, FB_DATATYPE_UINT )

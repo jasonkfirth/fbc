@@ -531,11 +531,14 @@ private sub hAddJsLinkOptions( byref ldcline as string )
 	if( hGetFileExt( fbc.outname ) = "html" ) then
 		ldcline += " --shell-file" + hFindLib( "fb_shell.html" )
 	end if
-	ldcline += " --post-js" + hFindLib( "fb_rtlib.js" )
+	'' The HTML shell references these globals even when the Wasm program
+	'' never calls a BASIC console routine. Keep them outside Emscripten's
+	'' optimizer and initialize them before its startup callbacks run.
+	ldcline += " --extern-pre-js" + hFindLib( "fb_rtlib.js" )
 	if( ((len( fbc.subsystem ) = 0) and _
 	     (fbGetOption( FB_COMPOPT_MODEVIEW ) = FB_MODEVIEW_CONSOLE)) or _
 	    (fbc.subsystem = "console") ) then
-		ldcline += " --post-js" + hFindLib( "termlib_min.js" )
+		ldcline += " --extern-pre-js" + hFindLib( "termlib_min.js" )
 	end if
 end sub
 
@@ -1172,6 +1175,12 @@ function fbcDriverLinkFiles( ) as integer
 					dim as string libname = i->s
 					dim as string frameworkname = _
 						fbcDarwinPlatformGetFrameworkName( libname )
+
+					if( (fbGetOption( FB_COMPOPT_TARGET ) = FB_COMPTARGET_JS) andalso _
+					    (libname = "raylib") ) then
+						'' The packaged raylib 5.5 web archive uses Emscripten's GLFW 3 shim.
+						DZstrConcatAssign( args, " -sUSE_GLFW=3" )
+					end if
 
 					if( len( frameworkname ) > 0 ) then
 						DZstrConcatAssign( args, " -framework " + frameworkname )

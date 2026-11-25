@@ -223,6 +223,7 @@ type PARSERCTX
 
 	'' hacks
 	prntcnt         as integer                  '' ()'s count, to allow optional ()'s on SUB's
+	arg_group_mode  as FB_PARAMMODE ptr         '' leading parentheses of a call argument
 	options         as FB_PARSEROPT
 	ctx_dtype       as integer                  '' used to resolve the address of overloaded procs
 	ctxsym          as FBSYMBOL ptr             '' /
