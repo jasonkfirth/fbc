@@ -19,8 +19,6 @@
 #define FB_FALLTHROUGH ((void)0)
 #endif
 
-#define FB_NAN		((intptr_t)0x80000000)
-
 static float base_scale = 1.0;
 static int base_angle = 0;
 
@@ -70,7 +68,7 @@ static float dcos(int angle)
 }
 
 /* Returns a value wrapped to the range 0..359 - avoids '%' in the range 0..719 for speed */
-static int mod360(intptr_t angle)
+static int mod360(int64_t angle)
 {
 	if( angle < 0 )
 	{
@@ -90,12 +88,12 @@ static int mod360(intptr_t angle)
     Accumulate negatively so the most negative intptr_t value can be parsed
     without first forming its unrepresentable positive magnitude.
 */
-static intptr_t parse_number(char **str, int *overflow)
+static int parse_number(char **str, int64_t *value)
 {
 	char *c = *str;
-	intptr_t n = 0;
-	intptr_t limit;
-	intptr_t multiply_limit;
+	int64_t n = 0;
+	int64_t limit;
+	int64_t multiply_limit;
 	int negative = FALSE;
 	int has_digits = FALSE;
 	int too_large = FALSE;
@@ -106,10 +104,10 @@ static intptr_t parse_number(char **str, int *overflow)
 			negative = !negative;
 		c++;
 	}
-	limit = negative ? INTPTR_MIN : -INTPTR_MAX;
+	limit = negative ? INT64_MIN : -INT64_MAX;
 	multiply_limit = limit / 10;
 	while ((*c >= '0') && (*c <= '9')) {
-		intptr_t digit = (intptr_t)(*c - '0');
+		int64_t digit = (int64_t)(*c - '0');
 		has_digits = TRUE;
 		if (!too_large) {
 			if (n < multiply_limit) {
@@ -126,11 +124,14 @@ static intptr_t parse_number(char **str, int *overflow)
 		c++;
 	}
 	*str = c;
-	*overflow = too_large;
 
-	if (!has_digits || too_large)
-		return FB_NAN;
-	return negative ? n : -n;
+	if (too_large)
+		return -1;
+	if (!has_digits)
+		return 0;
+
+	*value = negative ? n : -n;
+	return 1;
 }
 
 FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
@@ -139,8 +140,8 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 	float x, y, dx, dy, ax, ay, x2, y2;
 	int angle = 0, diagonal = FALSE;
 	char *c;
-	intptr_t value1, value2;
-	int draw = TRUE, move = TRUE, length = 0, flags, rel, parse_overflow;
+	int64_t value1, value2;
+	int draw = TRUE, move = TRUE, length = 0, flags, rel, parse_result;
 	int draw_x1, draw_y1, draw_x2, draw_y2;
 
 	FB_GRAPHICS_LOCK( );
@@ -178,24 +179,24 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 
 			case 'C':
 				c++;
-				value1 = parse_number(&c, &parse_overflow);
-				if ((value1 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result != 1)
 					goto error;
 				context->fg_color = fb_hFixColor(context->target_bpp, (unsigned int)value1);
 				break;
 
 			case 'S':
 				c++;
-				value1 = parse_number(&c, &parse_overflow);
-				if ((value1 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result != 1)
 					goto error;
 				base_scale = (float)((double)(float)value1 / 4.0);
 				break;
 
 			case 'A':
 				c++;
-				value1 = parse_number(&c, &parse_overflow);
-				if ((value1 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result != 1)
 					goto error;
 				base_angle = (value1 & 0x3) * 90;
 				break;
@@ -205,18 +206,16 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 				if (toupper(*c) != 'A')
 					goto error;
 				c++;
-				value1 = parse_number(&c, &parse_overflow);
-				if ((value1 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result != 1)
 					goto error;
 				base_angle = mod360( value1 );
 				break;
 
 			case 'X':
 				c++;
-				/* Here we could be more severe with checking, but it's unlikely our substring
-				 * resides at location FB_NAN (0x80000000) */
-				value1 = parse_number(&c, &parse_overflow);
-				if ((value1 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result != 1)
 					goto error;
 
 				/* Store our current x/y for the recursive fb_GfxDraw() call */
@@ -224,7 +223,7 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 				context->last_y = y;
 
 				DRIVER_UNLOCK();
-				fb_GfxDraw(target, (FBSTRING_ACCESS *)value1);
+				fb_GfxDraw(target, (FBSTRING_ACCESS *)(uintptr_t)value1);
 				DRIVER_LOCK();
 
 				/* And update to x/y produced by the recursive fb_GfxDraw() call */
@@ -235,20 +234,20 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 
 			case 'P':
 				c++;
-				value1 = parse_number(&c, &parse_overflow);
-				if ((value1 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result != 1)
 					goto error;
 				value2 = value1;
 				if (*c == ',') {
 					c++;
-					value2 = parse_number(&c, &parse_overflow);
-					if ((value2 == FB_NAN) || parse_overflow)
+					parse_result = parse_number(&c, &value2);
+					if (parse_result != 1)
 						goto error;
 				}
 				DRIVER_UNLOCK();
 				fb_GfxPaint(target, x, y,
-				            (unsigned int)(value1 & fb_gfx->color_mask),
-				            (unsigned int)(value2 & fb_gfx->color_mask),
+				            (unsigned int)((uint64_t)value1 & (uint64_t)fb_gfx->color_mask),
+				            (unsigned int)((uint64_t)value2 & (uint64_t)fb_gfx->color_mask),
 				            NULL, PAINT_TYPE_FILL, COORD_TYPE_A);
 				DRIVER_LOCK();
 				break;
@@ -258,13 +257,13 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 				while ((*c == ' ') || (*c == '\t'))
 					c++;
 				rel = ((*c == '+') || (*c == '-'));
-				value1 = parse_number(&c, &parse_overflow);
-				if ((value1 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result != 1)
 					goto error;
 				if (*c++ != ',')
 					goto error;
-				value2 = parse_number(&c, &parse_overflow);
-				if ((value2 == FB_NAN) || parse_overflow)
+				parse_result = parse_number(&c, &value2);
+				if (parse_result != 1)
 					goto error;
 				x2 = (float)value1;
 				y2 = (float)value2;
@@ -303,15 +302,13 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 			case 'E': case 'R':
 				diagonal = ((toupper(*c) >= 'E') && (toupper(*c) <= 'H'));
 				c++;
-				value1 = parse_number(&c, &parse_overflow);
-				if (parse_overflow)
+				parse_result = parse_number(&c, &value1);
+				if (parse_result < 0)
 					goto error;
-				if (value1 != FB_NAN) {
+				if (parse_result == 1) {
 					/* The integer rasterizer cannot represent a wider length. */
-				#if defined(HOST_64BIT)
 					if ((value1 < INT_MIN) || (value1 > INT_MAX))
 						goto error;
-				#endif
 					length = (int)value1;
 				}
 				else {

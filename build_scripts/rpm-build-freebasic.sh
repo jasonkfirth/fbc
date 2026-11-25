@@ -394,7 +394,7 @@ ensure_host_compiler() {
             make_args+=(DISABLE_GPM=YesPlease)
         fi
         run "$MAKE_CMD" "${make_args[@]}" bootstrap-minimal -j"$JOBS"
-        run "$MAKE_CMD" "${make_args[@]}" compiler FBC=bootstrap/fbc -j"$JOBS"
+        run "$MAKE_CMD" "${make_args[@]}" compiler BUILD_FBC=bootstrap/fbc -j"$JOBS"
     fi
 
     fb_host_compiler_is_usable "$ROOT" || die "host compiler not available"
@@ -601,7 +601,7 @@ export LDFLAGS=
 export RPM_OPT_FLAGS=
 
 $MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args bootstrap-minimal -j"$JOBS"
-$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args all FBC=bootstrap/fbc BUILD_FBC_TARGET="$FBC_TARGET" -j"$JOBS"
+$MAKE_CMD TARGET_TRIPLET="$TARGET_TRIPLET" FBC_TARGET="$FBC_TARGET" FBTARGET_DIR_OVERRIDE="$BOOTKEY" CXXFLAGS= CPPFLAGS= LDFLAGS= $rpm_make_args all BUILD_FBC=bootstrap/fbc BUILD_FBC_TARGET="$FBC_TARGET" -j"$JOBS"
 
 mkdir -p .package-smoke
 cat > .package-smoke/console.bas <<'SMOKEEOF'

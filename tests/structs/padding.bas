@@ -1548,10 +1548,19 @@ SUITE( fbc_tests.structs.padding )
 		#assert sizeof( AlignedInt ) = sizeof( long )
 		#assert offsetof( AlignedRecord, value ) = 8
 		#assert offsetof( AlignedRecord, suffix ) = 12
+		#ifdef __FB_M68K__
+			'' The classic m68k ABI caps aggregate tail alignment at a word.
+			#assert sizeof( AlignedRecord ) = 14
+		#else
 		#assert sizeof( AlignedRecord ) = 16
+		#endif
 		#assert offsetof( AlignedAliasRecord, value ) = 8
 		#assert offsetof( AlignedAliasRecord, suffix ) = 12
+		#ifdef __FB_M68K__
+			#assert sizeof( AlignedAliasRecord ) = 14
+		#else
 		#assert sizeof( AlignedAliasRecord ) = 16
+		#endif
 
 		#ifdef __FB_64BIT__
 		dim localValue as AlignedInt

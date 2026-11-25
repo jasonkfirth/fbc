@@ -20,6 +20,7 @@
 */
 
 #include "fb.h"
+#include "str_int64_to_decimal.h"
 
 
 /* ------------------------------------------------------------------------- */
@@ -35,7 +36,8 @@ FBCALL FBSTRING_ACCESS *fb_LongintToStr ( long long num )
 	dst = fb_hStrAllocTemp( NULL, sizeof( long long ) * 3 );
 	if( dst != NULL )
 	{
-		written = snprintf( dst->data, (size_t)dst->size + 1, "%lld", num );
+		written = fb_hInt64ToDecimal( dst->data, (size_t)dst->size + 1,
+		                             (int64_t)num );
 		if( (written < 0) || (written > dst->size) ) {
 			fb_hStrDelTemp( dst );
 			return &fb_ctx.null_desc;
@@ -59,7 +61,8 @@ FBCALL FBSTRING_ACCESS *fb_ULongintToStr ( unsigned long long num )
 	dst = fb_hStrAllocTemp( NULL, sizeof( long long ) * 3 );
 	if( dst != NULL )
 	{
-		written = snprintf( dst->data, (size_t)dst->size + 1, "%llu", num );
+		written = fb_hUInt64ToDecimal( dst->data, (size_t)dst->size + 1,
+		                              (uint64_t)num );
 		if( (written < 0) || (written > dst->size) ) {
 			fb_hStrDelTemp( dst );
 			return &fb_ctx.null_desc;

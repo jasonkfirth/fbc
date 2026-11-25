@@ -86,6 +86,10 @@
 */
 int fb_hWin32IsWin9x( void );
 
+/* Win9x path adapters preserve UTF-8 names through reversible ASCII aliases. */
+char *fb_hConvertPathToAC( const char *path );
+char *fb_hConvertPathFromAC( const char *name );
+
 #ifdef HOST_CYGWIN
 typedef off_t fb_off_t;
 #else

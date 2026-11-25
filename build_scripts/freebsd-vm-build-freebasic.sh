@@ -41,6 +41,7 @@ IMAGE_URL=""
 IMAGE_FILE=""
 PACKAGE_FILE=""
 TEST_ONLY=0
+REUSE_VM=0
 GUEST_USER="freebsd"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 CPUS="$JOBS"
@@ -70,6 +71,7 @@ Options:
   --image FILE             Existing FreeBSD qcow2 or qcow2.xz image.
   --package FILE           Existing FreeBSD package to test.
   --test-only              Test --package without rebuilding FreeBASIC.
+  --reuse-vm                Reuse out/freebsd-vm/run/freebsd and its installed tools.
   --workroot DIR           Work directory. Default: out/freebsd-vm
   --archive-dir DIR        Final archive directory. Default: out/freebsd/x86-64
   --jobs N                 Build jobs inside FreeBSD. Default: host CPU count
@@ -91,6 +93,7 @@ while [ "$#" -gt 0 ]; do
 		--image) IMAGE_FILE="$2"; shift 2 ;;
 		--package) PACKAGE_FILE="$2"; shift 2 ;;
 		--test-only) TEST_ONLY=1; shift ;;
+		--reuse-vm) REUSE_VM=1; shift ;;
 		--workroot)
 			WORKROOT="$2"
 			CACHE_DIR="$WORKROOT/cache"
@@ -534,6 +537,86 @@ send_source_tree() {
 		"$ROOT/" "$GUEST_USER@127.0.0.1:$target/"
 }
 
+prepare_freebsd_bootstrap_sources() {
+	local build_root="build/freebsd-bootstrap-emission"
+	local bootstrap_dir="$ROOT/$build_root/bootstrap/freebsd-x86_64"
+	local host_fbc
+	local host_version
+	local source_version
+	local host_build_root="build/freebsd-host-toolchain"
+	local host_seed
+
+	source_version="$(sed -n 's/^FBVERSION[[:space:]]*:=[[:space:]]*//p' "$ROOT/mk/version.mk" | sed -n '1p')"
+	host_fbc="$ROOT/$host_build_root/bin/fbc"
+	host_version=""
+	if [ -x "$host_fbc" ]; then
+		host_version="$("$host_fbc" -version 2>/dev/null | sed -n '1s/.*Version \([^ ]*\).*/\1/p')"
+	fi
+
+	case "$host_version" in
+		"$source_version"*) ;;
+		*)
+			host_seed="$(command -v fbc || true)"
+			[ -n "$host_seed" ] || die "a runnable host FreeBASIC compiler is required to build the FreeBSD bootstrap compiler"
+			"$host_seed" -version >/dev/null 2>&1 || die "host FreeBASIC compiler is not runnable: $host_seed"
+
+			msg "Building a current host compiler for FreeBSD bootstrap emission"
+			make bootstrap-emit \
+				BUILD_ROOT="$host_build_root" \
+				AVAILABLE_FBC="$host_seed" \
+				FBC_TARGET=linux-x86_64 \
+				FBTARGET_DIR_OVERRIDE=linux-x86_64
+			make bootstrap-minimal \
+				BUILD_ROOT="$host_build_root" \
+				FBC_TARGET=linux-x86_64 \
+				FBTARGET_DIR_OVERRIDE=linux-x86_64
+			make all \
+				BUILD_ROOT="$host_build_root" \
+				BUILD_FBC="$host_build_root/bootstrap/fbc" \
+				FBC_TARGET=linux-x86_64 \
+				FBTARGET_DIR_OVERRIDE=linux-x86_64 \
+				-j "$JOBS"
+			host_fbc="$ROOT/$host_build_root/bin/fbc"
+			host_version="$("$host_fbc" -version 2>/dev/null | sed -n '1s/.*Version \([^ ]*\).*/\1/p')"
+			case "$host_version" in
+				"$source_version"*) ;;
+				*) die "host compiler $host_version does not match source version $source_version" ;;
+			esac
+			;;
+	esac
+
+	msg "Emitting FreeBSD x86_64 bootstrap sources with the host compiler"
+	"$host_fbc" -version >/dev/null 2>&1 || die "host FreeBASIC compiler is not runnable: $host_fbc"
+	make bootstrap-emit \
+		BUILD_ROOT="$build_root" \
+		AVAILABLE_FBC="$host_fbc" \
+		FBC_TARGET=freebsd-x86_64 \
+		FBTARGET_DIR_OVERRIDE=freebsd-x86_64
+
+	if ! find "$bootstrap_dir" -maxdepth 1 -type f \
+		\( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then
+		die "FreeBSD bootstrap source emission produced no source files"
+	fi
+}
+
+send_freebsd_bootstrap_sources() {
+	local key="$1"
+	local port="$2"
+	local target="$3"
+	local source_dir="$ROOT/build/freebsd-bootstrap-emission/bootstrap/freebsd-x86_64"
+
+	if [ ! -d "$source_dir" ] ||
+	   ! find "$source_dir" -maxdepth 1 -type f \
+		   \( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then
+		die "FreeBSD bootstrap source emission did not produce source files"
+	fi
+
+	msg "Copying FreeBSD bootstrap sources"
+	rsync -a --delete \
+		-e "$(rsync_ssh "$key" "$port")" \
+		"$source_dir/" "$GUEST_USER@127.0.0.1:$target/bootstrap/freebsd-x86_64/"
+}
+
 send_tests_tree() {
 	local key="$1"
 	local port="$2"
@@ -579,7 +662,9 @@ build_package_in_vm() {
 	msg "Preparing FreeBSD build VM"
 	install_guest_tools "$key" "$port"
 	ssh_guest "$key" "$port" "mkdir -p /work"
+	prepare_freebsd_bootstrap_sources
 	send_source_tree "$key" "$port" "$source_dir"
+	send_freebsd_bootstrap_sources "$key" "$port" "$source_dir"
 
 	msg "Building FreeBSD package"
 	mkdir -p "$LOG_DIR"
@@ -587,6 +672,7 @@ build_package_in_vm() {
 set -euo pipefail
 
 mkdir -p /work/packages
+rm -f /work/packages/freebasic-*.pkg
 cd "$source_dir"
 rm -f /work/freebasic-freebsd-build.log
 
@@ -1283,12 +1369,24 @@ main() {
 
 	download_image
 
-	rm -rf "$RUN_DIR"
+	if [ "$REUSE_VM" -eq 0 ]; then
+		rm -rf "$RUN_DIR"
+	fi
 	mkdir -p "$RUN_DIR" "$LOG_DIR"
 
 	local vm_dir pkg
 
-	vm_dir="$(prepare_vm)"
+	if [ "$REUSE_VM" -eq 1 ]; then
+		vm_dir="$RUN_DIR/freebsd"
+		[ -f "$vm_dir/freebsd.qcow2" ] || die "reused FreeBSD VM disk not found: $vm_dir/freebsd.qcow2"
+		[ -f "$vm_dir/seed.iso" ] || die "reused FreeBSD VM seed ISO not found: $vm_dir/seed.iso"
+		[ -f "$vm_dir/id_ed25519" ] || die "reused FreeBSD VM SSH key not found: $vm_dir/id_ed25519"
+		start_vm "$vm_dir" "$SSH_PORT" "$VNC_DISPLAY"
+		wait_for_ssh "$vm_dir/id_ed25519" "$SSH_PORT" "$vm_dir"
+		wait_for_guest_ready "$vm_dir/id_ed25519" "$SSH_PORT"
+	else
+		vm_dir="$(prepare_vm)"
+	fi
 
 	if [ "$TEST_ONLY" -eq 1 ]; then
 		pkg="$PACKAGE_FILE"

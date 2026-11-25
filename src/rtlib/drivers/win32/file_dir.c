@@ -12,7 +12,7 @@
 
         - maintain per-thread directory enumeration state
         - select ANSI enumeration on Windows 95, 98 and ME
-        - preserve Unicode enumeration on Windows NT systems
+        - decode Win9x long-name aliases and preserve NT Unicode names
         - filter entries using FreeBASIC file attributes
 
     This file intentionally does NOT contain: - current-directory management
@@ -76,7 +76,7 @@ static DWORD current_attributes( const FB_DIRCTX *ctx )
 static char *copy_current_name( const FB_DIRCTX *ctx )
 {
 	if( ctx->use_ansi )
-		return strdup( ctx->data_a.cFileName );
+		return fb_hConvertPathFromAC( ctx->data_a.cFileName );
 
 	return fb_hConvertPathFromWC( ctx->data_w.cFileName, ctx->return_utf8 );
 }
@@ -163,13 +163,12 @@ FBCALL FBSTRING_ACCESS *fb_Dir( FBSTRING_ACCESS *filespec, int attrib, int *out_
 			char *afilespec;
 
 			ctx->return_utf8 = FALSE;
-			afilespec = strdup( filespec->data );
+			afilespec = fb_hConvertPathToAC( filespec->data );
 			if( afilespec != NULL ) {
-				fb_hConvertPath( afilespec );
 				ctx->handle = FindFirstFileA( afilespec, &ctx->data_a );
 				free( afilespec );
 			} else {
-				ctx->handle = FindFirstFileA( filespec->data, &ctx->data_a );
+				ctx->handle = INVALID_HANDLE_VALUE;
 			}
 			handle_ok = ctx->handle != INVALID_HANDLE_VALUE;
 		} else {

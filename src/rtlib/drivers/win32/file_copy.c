@@ -29,16 +29,14 @@ FBCALL int fb_FileCopy( const char *source, const char *destination )
 	if (!source || !*source || !destination || !*destination)
 		return fb_ErrorSetNum(FB_RTERROR_ILLEGALFUNCTIONCALL);
 	if (fb_hWin32IsWin9x()) {
-		/* fb_hConvertPath changes separators in place for the Win9x ANSI APIs. */
-		source_ansi = strdup(source);
-		destination_ansi = strdup(destination);
+		/* Match OPEN, attributes, and DIR path handling on Win9x. */
+		source_ansi = fb_hConvertPathToAC(source);
+		destination_ansi = fb_hConvertPathToAC(destination);
 		if (!source_ansi || !destination_ansi) {
 			free(destination_ansi);
 			free(source_ansi);
 			return fb_ErrorSetNum(FB_RTERROR_OUTOFMEM);
 		}
-		fb_hConvertPath(source_ansi);
-		fb_hConvertPath(destination_ansi);
 		res = CopyFileA(source_ansi, destination_ansi, FALSE);
 		free(destination_ansi);
 		free(source_ansi);

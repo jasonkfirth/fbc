@@ -18,8 +18,21 @@ int fb_FileRename( const char *oldname, const char *newname )
 {
 #if defined(HOST_MINGW) && !defined(HOST_WINCE)
 	FB_WCHAR *oldpath, *newpath;
+	char *old_ansi, *new_ansi;
 	int result;
-	if( fb_hWin32IsWin9x() ) return rename(oldname, newname);
+	if( fb_hWin32IsWin9x() ) {
+		old_ansi = fb_hConvertPathToAC( oldname );
+		new_ansi = fb_hConvertPathToAC( newname );
+		if( old_ansi == NULL || new_ansi == NULL ) {
+			free( old_ansi );
+			free( new_ansi );
+			return -1;
+		}
+		result = rename( old_ansi, new_ansi );
+		free( old_ansi );
+		free( new_ansi );
+		return result;
+	}
 	oldpath = fb_hConvertPathToWC(oldname, NULL);
 	newpath = fb_hConvertPathToWC(newname, NULL);
 	if( oldpath == NULL || newpath == NULL ) result = -1;

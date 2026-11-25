@@ -98,6 +98,7 @@ for package_file in \
 	bin/win32/msvcrt.dll \
 	lib/win32/libfb.a \
 	lib/win32/libfbmt.a \
+	lib/win32/libffi.a \
 	lib/win32/libfbgfx.a \
 	lib/win32/libsfx.a; do
 	[ -s "$PACKAGE_ROOT/$package_file" ] ||

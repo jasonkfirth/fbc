@@ -20,6 +20,7 @@
 */
 
 #include "../../fb.h"
+#include "../../strings/str_int64_to_decimal.h"
 
 /* ------------------------------------------------------------------------- */
 /* MinGW decimal conversion                                                  */
@@ -45,7 +46,7 @@ static int fb_hLongintToWstr( FB_WCHAR *dst, size_t dst_chars, long long num )
 	char buffer[sizeof( long long ) * 3 + 1];
 	int chars;
 
-	chars = snprintf( buffer, sizeof( buffer ), "%lld", num );
+	chars = fb_hInt64ToDecimal( buffer, sizeof( buffer ), (int64_t)num );
 	return fb_hCopyLongintToWstr( dst, dst_chars, buffer, chars );
 }
 
@@ -55,7 +56,7 @@ static int fb_hULongintToWstr( FB_WCHAR *dst, size_t dst_chars,
 	char buffer[sizeof( unsigned long long ) * 3 + 1];
 	int chars;
 
-	chars = snprintf( buffer, sizeof( buffer ), "%llu", num );
+	chars = fb_hUInt64ToDecimal( buffer, sizeof( buffer ), (uint64_t)num );
 	return fb_hCopyLongintToWstr( dst, dst_chars, buffer, chars );
 }
 #endif

@@ -49,11 +49,10 @@ static int file_attributes( const char *filename, int requested )
 		goto done;
 	}
 	/* Windows 9x has no usable W filesystem APIs. NT uses the existing
-	   UTF-8-first, system-codepage-fallback conversion shared by file I/O. */
+	   UTF-8-first conversion shared by file I/O. Win9x maps UTF-8 path
+	   components to reversible ASCII long-name aliases. */
 	if( fb_hWin32IsWin9x() ) {
-		ansi_path = strdup( filename );
-		if( ansi_path )
-			fb_hConvertPath( ansi_path );
+		ansi_path = fb_hConvertPathToAC( filename );
 	} else {
 		wide_path = fb_hConvertPathToWC( filename, NULL );
 	}

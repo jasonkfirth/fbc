@@ -28,17 +28,22 @@
 
 #if defined( __i386__ ) || defined( _M_IX86 )
 
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+
 #if defined( __GNUC__ )
 	#define FB_CRT_CDECL __attribute__((cdecl))
+	#define FB_CRT_WEAK __attribute__((weak))
 	#if defined( FB_WIN95_CRT )
-		/* The Win95 package has no newer CRT imports to override these fallbacks. */
-		#define FB_CRT_WEAK
+		#define FB_CRT_REQUIRED
 	#else
-		#define FB_CRT_WEAK __attribute__((weak))
+		#define FB_CRT_REQUIRED __attribute__((weak))
 	#endif
 #else
 	#define FB_CRT_CDECL __cdecl
 	#define FB_CRT_WEAK
+	#define FB_CRT_REQUIRED
 #endif
 
 extern int FB_CRT_CDECL _stat( const char *path, void *status );
@@ -83,10 +88,33 @@ static int FB_CRT_CDECL fb_CrtWstat32( const unsigned short *path, void *status 
 }
 
 /*
-   MinGW declares the numbered functions with dllimport and therefore emits
-   references to their import-pointer symbols. Weak definitions let a modern
-   MinGW CRT take precedence. The Windows 95 package defines FB_WIN95_CRT so
-   these fallbacks satisfy the import pointers when linking only with MSVCRT40.
+   The Win95 graphics runtime uses MinGW's __ms_vsnprintf entry point.  The
+   MSVCRT40 library does not provide it, so route bounded formatting through
+   its _vsnprintf implementation.  Preserve the terminating NUL when the
+   legacy CRT reports a full or truncated destination.
+*/
+int FB_CRT_CDECL __ms_vsnprintf( char *buffer, size_t count,
+                                 const char *format, va_list args ) FB_CRT_REQUIRED;
+int FB_CRT_CDECL __ms_vsnprintf( char *buffer, size_t count,
+                                 const char *format, va_list args )
+{
+	int result;
+
+	if( count == 0 )
+		return 0;
+
+	result = _vsnprintf( buffer, count, format, args );
+	if( result < 0 || (size_t)result >= count )
+		buffer[count - 1] = '\0';
+
+	return result;
+}
+
+/*
+   MinGW declares these helpers with dllimport and therefore emits references
+   to their import-pointer symbols. Weak definitions let the selected target
+   CRT provide its own implementation when available; the fallbacks satisfy
+   symbols that MSVCRT40 does not export.
 */
 FB_CRT_STAT_PROC fb_CrtImpStat32
 	__asm__("__imp___stat32") FB_CRT_WEAK = fb_CrtStat32;
@@ -96,6 +124,7 @@ FB_CRT_IOB_PROC fb_CrtImpAcrtIobFunc
 	__asm__("__imp____acrt_iob_func") FB_CRT_WEAK = fb_CrtAcrtIobFunc;
 
 #undef FB_CRT_CDECL
+#undef FB_CRT_REQUIRED
 #undef FB_CRT_WEAK
 
 #else

@@ -53,13 +53,13 @@ static int fb_hSerialSetFd(fd_set *set, int descriptor)
 	#if defined(__powerpc__)
 		FD_SET((unsigned long)descriptor, set);
 	#else
-		FD_SET(descriptor, set);
+		FD_SET((unsigned int)descriptor, set);
 	#endif
 #else
 	#if defined(__powerpc__)
 		FD_SET((unsigned long)descriptor, set);
 	#else
-		FD_SET(descriptor, set);
+		FD_SET((unsigned int)descriptor, set);
 	#endif
 #endif
 	return TRUE;

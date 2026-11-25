@@ -4850,14 +4850,16 @@ private sub hExprFlush( byval n as EXPRNODE ptr, byval need_parens as integer )
 			exit sub
 		end if
 		if( n->member_view = C_MEMBER_VIEW_VALUE andalso hCMemberViewIsAggregate(n) ) then
-			var tempname = hCUnalignedTempName()
-			ctx.exprtext += "__extension__ ({ " + hEmitType(typeUnsetIsConst(n->dtype), n->subtype) + _
-			                " " + tempname + "; __builtin_memcpy( &" + tempname + ", (void const*) &("
+			var valuetype = hEmitType(typeUnsetIsConst(n->dtype), n->subtype)
+			'' A statement-expression local expires before a C array parameter consumes
+			'' its decayed pointer. A block-scope compound literal keeps the copied
+			'' aggregate alive through the enclosing call expression.
+			ctx.exprtext += "*( (" + valuetype + "*)__builtin_memcpy( &(" + valuetype + "){0}, (void const*)&("
 			'' Emit this owned storage as an address, not as another value copy.
 			n->member_view = C_MEMBER_VIEW_STORAGE
 			hExprFlush(n, FALSE)
 			n->member_view = C_MEMBER_VIEW_VALUE
-			ctx.exprtext += "), sizeof(" + tempname + ") ); " + tempname + "; })"
+			ctx.exprtext += "), sizeof(" + valuetype + ") ) )"
 			exit sub
 		end if
 		'' A whole-record value uses the same view as a field path. This keeps
@@ -5500,7 +5502,6 @@ private function exprNewUnalignedLoad _
 	dim as string s
 
 	typename = hEmitType( typeUnsetIsConst( dtype ), subtype, TRUE )
-	var tempname = hCUnalignedTempName()
 	var member = exprTryCMember( addr, 0, dtype, subtype, TRUE )
 	if( member <> NULL ) then addr = exprNewCAddress( member )
 	addrtext = exprFlush( hCUnalignedAddress(addr) )
@@ -5508,12 +5509,11 @@ private function exprNewUnalignedLoad _
 	'' Packed fields can be reached through byte offsets that are not aligned
 	'' for their declared type.  memcpy lets the C compiler choose an access
 	'' sequence that is valid on targets where unaligned scalar loads fault.
-	s = "__extension__ ({ "
-	s += typename + " " + tempname + "; "
-	s += "__builtin_memcpy( &" + tempname + ", (void const*)("
+	'' Compound-literal storage lasts through the enclosing call expression,
+	'' including when an array-like value decays to a pointer.
+	s = "*( (" + typename + "*)__builtin_memcpy( &(" + typename + "){0}, (void const*)("
 	s += addrtext
-	s += "), sizeof( " + tempname + " ) ); "
-	s += tempname + "; })"
+	s += "), sizeof( " + typename + " ) ) )"
 
 	function = exprNewTEXT( dtype, subtype, s )
 
@@ -8431,6 +8431,21 @@ private sub _emitProcBegin _
 	hCResumeDeclarationStart()
 	sectionIndent( )
 	sectionBegin( )
+
+	'' A parameter can be used only by diagnostics or metadata that are
+	'' compiled out in the generated C. Keep strict C builds warning-free
+	'' without removing any warning classes from the compiler profile.
+	dim as FBSYMBOL ptr unused_param = symbGetProcLastParam( proc )
+	do while( unused_param <> NULL )
+		if( symbGetParamMode( unused_param ) <> FB_PARAMMODE_VARARG ) then
+			dim as integer unused_dtype = any
+			dim as FBSYMBOL ptr unused_subtype = any
+			symbGetRealParamDtype( unused_param, unused_dtype, unused_subtype )
+			hWriteLine( "(void)" + hCNativeParameterName( proc, unused_param, _
+			                                            unused_dtype, unused_subtype ) + ";" )
+		end if
+		unused_param = symbGetProcPrevParam( proc, unused_param )
+	loop
 
 	'' CLongDouble is stored as a byte-backed UDT in FreeBASIC, while the
 	'' CDecl boundary receives native C long double values.

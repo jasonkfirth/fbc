@@ -43,11 +43,36 @@
 #include "longdouble_parse.h"
 #endif
 
+#if defined(__AMIGA__) && defined(__m68k__) && \
+	(LDBL_MANT_DIG > DBL_MANT_DIG)
+static void longdouble_check_storage(const void *address,
+				     unsigned int storage_size);
+
+static void longdouble_store_m68k_strtold(void *destination,
+					  unsigned int storage_size,
+					  long double value)
+{
+	uint8_t returned[12];
+	uint8_t stored[12];
+
+	/* newlib returns m68k extended values as exponent, significand, padding.
+	   GCC's in-memory long-double object uses exponent, padding, significand. */
+	longdouble_check_storage(destination, storage_size);
+	memcpy(returned, &value, sizeof(returned));
+	memcpy(stored, returned, 2);
+	memcpy(stored + 2, returned + 10, 2);
+	memcpy(stored + 4, returned + 2, 8);
+	memcpy(destination, stored, sizeof(stored));
+}
+#endif
+
 /* CLongDouble comparisons implement exact language equality semantics. */
+#if !defined(__m68k__) || (LDBL_MANT_DIG <= DBL_MANT_DIG)
 static int longdouble_equal(long double left, long double right)
 {
 	return (left <= right) && (left >= right);
 }
+#endif
 
 enum {
 	FB_LONGDOUBLE_BOP_ADD = 1,
@@ -93,6 +118,144 @@ static void longdouble_store(void *destination,
 	longdouble_check_storage(destination, storage_size);
 	memcpy(destination, &value, sizeof(value));
 }
+
+#if defined(__m68k__) && (LDBL_MANT_DIG > DBL_MANT_DIG)
+typedef struct FB_M68K_LONGDOUBLE {
+	int negative;
+	uint16_t exponent;
+	uint64_t significand;
+} FB_M68K_LONGDOUBLE;
+
+static FB_M68K_LONGDOUBLE longdouble_load_m68k(const void *source,
+					       unsigned int storage_size)
+{
+	const uint8_t *bytes = source;
+	FB_M68K_LONGDOUBLE value;
+	int byte_index;
+
+	longdouble_check_storage(source, storage_size);
+	value.negative = (bytes[0] & UINT8_C(0x80)) != 0;
+	value.exponent = (uint16_t)(((uint16_t)(bytes[0] & UINT8_C(0x7f)) << 8) |
+				     bytes[1]);
+	value.significand = 0;
+	for (byte_index = 0; byte_index < 8; byte_index++)
+		value.significand = (value.significand << 8) | bytes[4 + byte_index];
+
+	return value;
+}
+
+static int longdouble_m68k_is_nan(FB_M68K_LONGDOUBLE value)
+{
+	return (value.exponent == UINT16_C(0x7fff)) &&
+		(value.significand != UINT64_C(0x8000000000000000));
+}
+
+static uint64_t longdouble_m68k_to_unsigned(FB_M68K_LONGDOUBLE value)
+{
+	int exponent;
+	int shift;
+
+	if (longdouble_m68k_is_nan(value) || value.negative)
+		return 0;
+	if (value.exponent == UINT16_C(0x7fff))
+		return UINT64_MAX;
+	if ((value.exponent == 0) || (value.significand == 0))
+		return 0;
+
+	exponent = (int)value.exponent - 16383;
+	if (exponent < 0)
+		return 0;
+	if (exponent >= 64)
+		return UINT64_MAX;
+
+	shift = 63 - exponent;
+	return value.significand >> shift;
+}
+
+static int longdouble_m68k_compare_magnitude(FB_M68K_LONGDOUBLE left,
+					    FB_M68K_LONGDOUBLE right)
+{
+	if (left.exponent < right.exponent)
+		return -1;
+	if (left.exponent > right.exponent)
+		return 1;
+	if (left.significand < right.significand)
+		return -1;
+	if (left.significand > right.significand)
+		return 1;
+	return 0;
+}
+
+static int longdouble_compare_m68k(FB_M68K_LONGDOUBLE left,
+				   FB_M68K_LONGDOUBLE right, int operation)
+{
+	int order;
+	int is_unordered = longdouble_m68k_is_nan(left) ||
+		longdouble_m68k_is_nan(right);
+
+	if (is_unordered) {
+		return operation == FB_LONGDOUBLE_CMP_NE;
+	}
+
+	order = longdouble_m68k_compare_magnitude(left, right);
+	if (order == 0 && left.exponent == 0 && right.exponent == 0 &&
+	    left.significand == 0 && right.significand == 0) {
+		left.negative = 0;
+		right.negative = 0;
+	}
+	if (left.negative != right.negative)
+		order = left.negative ? -1 : 1;
+	else if (left.negative)
+		order = -order;
+
+	switch (operation) {
+	case FB_LONGDOUBLE_CMP_EQ: return order == 0;
+	case FB_LONGDOUBLE_CMP_NE: return order != 0;
+	case FB_LONGDOUBLE_CMP_GT: return order > 0;
+	case FB_LONGDOUBLE_CMP_LT: return order < 0;
+	case FB_LONGDOUBLE_CMP_LE: return order <= 0;
+	case FB_LONGDOUBLE_CMP_GE: return order >= 0;
+	default: abort();
+	}
+}
+
+static void longdouble_store_m68k_integer(void *destination, uint64_t value,
+					  int negative,
+					  unsigned int storage_size)
+{
+	uint8_t representation[12] = { 0 };
+	uint64_t significand = 0;
+	uint16_t exponent = 0;
+	int highest_bit = 63;
+	int byte_index;
+
+	/* GCC's m68k 96-bit extended format stores exponent, two padding bytes,
+	 * then the 64-bit significand, all in big-endian order. */
+	longdouble_check_storage(destination, storage_size);
+
+	if (value != 0) {
+		while (((value >> highest_bit) & UINT64_C(1)) == 0)
+			highest_bit--;
+
+		/* Bias 16383 is the IEEE extended-precision exponent bias. */
+		exponent = (uint16_t)(16383 + highest_bit);
+		significand = value << (63 - highest_bit);
+	}
+
+	if (negative)
+		exponent |= UINT16_C(0x8000);
+
+	representation[0] = (uint8_t)(exponent >> 8);
+	representation[1] = (uint8_t)exponent;
+	for (byte_index = 0; byte_index < 8; byte_index++) {
+		int shift = 56 - (byte_index * 8);
+		representation[4 + byte_index] =
+			(uint8_t)(significand >> shift);
+	}
+
+	memcpy(destination, representation, sizeof(representation));
+}
+#endif
 
 void fb_LongDoubleBop(void *destination, const void *lhs, const void *rhs,
 		      int operation, unsigned int storage_size)
@@ -141,6 +304,11 @@ void fb_LongDoubleUop(void *destination, const void *source, int operation,
 int fb_LongDoubleCompare(const void *lhs, const void *rhs, int operation,
 		 unsigned int storage_size)
 {
+#if defined(__m68k__) && (LDBL_MANT_DIG > DBL_MANT_DIG)
+	return longdouble_compare_m68k(longdouble_load_m68k(lhs, storage_size),
+					longdouble_load_m68k(rhs, storage_size),
+					operation);
+#else
 	long double left = longdouble_load(lhs, storage_size);
 	long double right = longdouble_load(rhs, storage_size);
 
@@ -153,18 +321,34 @@ int fb_LongDoubleCompare(const void *lhs, const void *rhs, int operation,
 	case FB_LONGDOUBLE_CMP_GE: return left >= right;
 	default: abort();
 	}
+#endif
 }
 
 void fb_LongDoubleFromSigned(void *destination, int64_t value,
 			     unsigned int storage_size)
 {
+#if defined(__m68k__) && (LDBL_MANT_DIG > DBL_MANT_DIG)
+	uint64_t magnitude;
+	int negative = value < 0;
+	if (negative)
+		magnitude = (uint64_t)(-(value + 1)) + 1;
+	else
+		magnitude = (uint64_t)value;
+	longdouble_store_m68k_integer(destination, magnitude, negative,
+				      storage_size);
+#else
 	longdouble_store(destination, storage_size, (long double)value);
+#endif
 }
 
 void fb_LongDoubleFromUnsigned(void *destination, uint64_t value,
 			       unsigned int storage_size)
 {
+#if defined(__m68k__) && (LDBL_MANT_DIG > DBL_MANT_DIG)
+	longdouble_store_m68k_integer(destination, value, 0, storage_size);
+#else
 	longdouble_store(destination, storage_size, (long double)value);
+#endif
 }
 
 void fb_LongDoubleFromDouble(void *destination, double value,
@@ -180,10 +364,12 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 
 	if (text == NULL) abort();
 #ifdef FB_LONGDOUBLE_LOCAL_PARSER
-	/* AROS and Haiku narrow strtold through double. nxdk has no locale-taking
-	 * conversion API, and legacy MinGW/MSVCRT cannot isolate its numeric locale
-	 * with UCRT's thread-locale API. The local
-	 * parser keeps native precision without reading or changing locale state. */
+	/* AROS and Haiku narrow strtold through double. Classic Amiga newlib
+	 * returns extended values in a register layout that differs from the C
+	 * object's padded memory layout. nxdk has no locale-taking conversion API,
+	 * and legacy MinGW/MSVCRT cannot isolate its numeric locale with UCRT's
+	 * thread-locale API. The local parser keeps native precision without
+	 * depending on those CRT behaviors. */
 	size_t consumed;
 	value = fb_hParseLongDouble(text, &consumed);
 	if ((consumed == 0) || (text[consumed] != '\0')) abort();
@@ -253,12 +439,28 @@ void fb_LongDoubleFromString(void *destination, const char *text,
 #endif
 	if ((end == text) || (*end != '\0')) abort();
 #endif
+#if defined(__AMIGA__) && defined(__m68k__) && \
+	(LDBL_MANT_DIG > DBL_MANT_DIG)
+	longdouble_store_m68k_strtold(destination, storage_size, value);
+#else
 	longdouble_store(destination, storage_size, value);
+#endif
 }
 
 int64_t fb_LongDoubleToSigned(const void *source,
 			      unsigned int storage_size)
 {
+#if defined(__m68k__) && (LDBL_MANT_DIG > DBL_MANT_DIG)
+	FB_M68K_LONGDOUBLE value = longdouble_load_m68k(source, storage_size);
+	uint64_t magnitude;
+	int negative = value.negative;
+	if (longdouble_m68k_is_nan(value)) return 0;
+	value.negative = 0;
+	magnitude = longdouble_m68k_to_unsigned(value);
+	if (magnitude >= (UINT64_C(1) << 63))
+		return negative ? INT64_MIN : INT64_MAX;
+	return negative ? -(int64_t)magnitude : (int64_t)magnitude;
+#else
 	long double value = longdouble_load(source, storage_size);
 
 	/* Avoid undefined C float-to-integer conversions at and beyond the limits. */
@@ -266,16 +468,22 @@ int64_t fb_LongDoubleToSigned(const void *source,
 	if (value >= 0x1p63L) return INT64_MAX;
 	if (value <= -0x1p63L) return INT64_MIN;
 	return (int64_t)value;
+#endif
 }
 
 uint64_t fb_LongDoubleToUnsigned(const void *source,
 				unsigned int storage_size)
 {
+#if defined(__m68k__) && (LDBL_MANT_DIG > DBL_MANT_DIG)
+	return longdouble_m68k_to_unsigned(
+		longdouble_load_m68k(source, storage_size));
+#else
 	long double value = longdouble_load(source, storage_size);
 
 	if (FB_LONGDOUBLE_IS_NAN(value) || (value <= 0.0L)) return 0;
 	if (value >= 0x1p64L) return UINT64_MAX;
 	return (uint64_t)value;
+#endif
 }
 
 double fb_LongDoubleToDouble(const void *source,

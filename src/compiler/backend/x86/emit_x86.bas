@@ -1489,7 +1489,15 @@ private sub _emitCALLPTR _
 	dim src as string
 	dim ostr as string
 
-	hPrepOperand( svreg, src )
+	if( svreg->typ = IR_VREGTYPE_OFS ) then
+		'' GAS Intel syntax accepts a direct symbol call, but not "call offset symbol".
+		src = *symbGetMangledName( svreg->sym )
+		if( svreg->ofs <> 0 ) then
+			src += " + " + str( svreg->ofs )
+		end if
+	else
+		hPrepOperand( svreg, src )
+	end if
 
 	ostr = "call " + src
 	outp( ostr )

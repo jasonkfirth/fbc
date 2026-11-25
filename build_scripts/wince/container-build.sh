@@ -234,6 +234,8 @@ install -m 0644 "$LIBFFI_BUILD_ROOT/stage/include/ffitarget.h" \
 	"$LIBFFI_RUNTIME/include/ffitarget.h"
 install -m 0644 "$LIBFFI_BUILD_ROOT/source/LICENSE" \
 	"$LIBFFI_RUNTIME/licenses/libffi/LICENSE"
+install -m 0644 "$ROOT/build_scripts/wince/include/errno.h" \
+	"$LIBFFI_RUNTIME/include/errno.h"
 
 cleanup_libffi
 trap - EXIT

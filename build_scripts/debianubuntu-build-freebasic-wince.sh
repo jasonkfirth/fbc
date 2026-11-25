@@ -120,6 +120,29 @@ emulator_work_requested() {
 	[ "$SKIP_PACKAGE" -eq 0 ]
 }
 
+prepare_host_bootstrap_sources() {
+	local bootstrap_dir="$ROOT/bootstrap/linux-x86_64"
+	local host_fbc
+
+	host_fbc="$(command -v fbc || true)"
+	if [ -x "$ROOT/bin/fbc" ]; then
+		host_fbc="$ROOT/bin/fbc"
+	fi
+	[ -n "$host_fbc" ] && [ -x "$host_fbc" ] ||
+		die "a runnable Linux x86_64 FreeBASIC compiler is required to emit bootstrap sources"
+
+	msg "emitting Linux host bootstrap sources before copying the isolated tree"
+	make -C "$ROOT" bootstrap-emit \
+		AVAILABLE_FBC="$host_fbc" \
+		FBC_TARGET=linux-x86_64 \
+		FBTARGET_DIR_OVERRIDE=linux-x86_64
+
+	if ! find "$bootstrap_dir" -maxdepth 1 -type f \
+		\( -name '*.c' -o -name '*.asm' \) -print | sed -n '1p' | grep -q .; then
+		die "Linux host bootstrap source emission produced no source files"
+	fi
+}
+
 usage() {
 	cat <<EOF
 Usage: ./build_scripts/debianubuntu-build-freebasic-wince.sh [options]
@@ -293,6 +316,7 @@ run docker run --rm \
 
 if [ "$REUSE_WORKTREE" -eq 0 ]; then
 	msg "refreshing the isolated Windows CE source tree"
+	prepare_host_bootstrap_sources
 	run rsync -a --delete --delete-excluded \
 		--exclude-from="$SOURCE_EXCLUDES" \
 		"$ROOT_REAL/" "$WORK_REAL/"
