@@ -20,13 +20,7 @@ fb_cleanup_success() {
             rm -rf stage/bootstrap-dist
             rm -rf .build-*
             rm -rf .maketests-tmp maketests-log test-run-log
-            # Package containers can leave root-owned objects in the shared
-            # worktree. Remove each object tree through the ownership-aware
-            # helper so later matrix rows can clean and rebuild safely.
-            for fb_obj_dir in src/*/obj; do
-                [ -e "$fb_obj_dir" ] || continue
-                fb_remove_build_tree "$fb_root" "$fb_root/$fb_obj_dir" || true
-            done
+            fb_remove_object_trees "$fb_root" || true
             # Compiler support C is maintained source. Only BASIC modules
             # donate the names of disposable compiler emissions.
             find src/compiler -type f -name '*.bas' -exec sh -c '
@@ -130,4 +124,33 @@ fb_remove_build_tree() {
     fi
 
     return 1
+}
+
+fb_remove_object_trees() {
+    fb_obj_root="$1"
+
+    [ -n "$fb_obj_root" ] || return 1
+    [ -d "$fb_obj_root/src" ] || return 0
+
+    for fb_obj_dir in "$fb_obj_root"/src/*/obj; do
+        [ -e "$fb_obj_dir" ] || continue
+        fb_remove_build_tree "$fb_obj_root" "$fb_obj_dir" || return 1
+    done
+}
+
+fb_prepare_host_compiler_rebuild() {
+    fb_host_rebuild_root="$1"
+
+    [ -n "$fb_host_rebuild_root" ] || return 1
+    fb_remove_object_trees "$fb_host_rebuild_root" || return 1
+    fb_remove_build_tree "$fb_host_rebuild_root" "$fb_host_rebuild_root/bin" || return 1
+    fb_remove_build_tree "$fb_host_rebuild_root" "$fb_host_rebuild_root/bootstrap/fbc" || return 1
+    fb_remove_build_tree "$fb_host_rebuild_root" "$fb_host_rebuild_root/bootstrap/obj" || return 1
+    fb_remove_build_tree "$fb_host_rebuild_root" "$fb_host_rebuild_root/lib/freebasic" || return 1
+}
+
+fb_host_compiler_is_usable() {
+    fb_host_compiler_root="$1"
+    [ -x "$fb_host_compiler_root/bin/fbc" ] || return 1
+    "$fb_host_compiler_root/bin/fbc" -version >/dev/null 2>&1
 }

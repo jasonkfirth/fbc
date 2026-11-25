@@ -26,6 +26,12 @@ Version 1.20.6
 - gfxlib2/Win32 and rtlib/Wii: use the supported Win32 DPI lookup API and assign socket timeout seconds using the native timeval field type.
 - package matrix: match Debian Trixie and Sid architecture rows to the architectures supported by their family builder.
 - Debian packaging: allow source archives to omit ignored local WinCE assets before removing legacy binary compatibility files.
+- Debian bindings package: install the new raylib 5.5 API header alongside the existing raylib headers so dh_missing accepts the complete installed include tree.
+- Linux cross-package bootstrap: verify the in-tree compiler runs on the build host before reusing it; rebuild stale target-architecture compiler binaries before emitting another target's bootstrap sources.
+- Linux cross-package bootstrap: remove stale host binaries, bootstrap objects, and root-owned shared object trees through the ownership-aware helper before rebuilding a native host compiler for the next package target.
+- Linux matrix target transitions: clear root-owned object trees before each host-compiler/bootstrap preparation, even when the cached compiler is already host-runnable.
+- Haiku i386 VM qualification: detect the guest's launch_daemon boot failure from the serial log and stop the SSH readiness wait promptly while preserving the failure diagnostics.
+- Haiku VM restart handling: stop with captured guest diagnostics when QEMU cannot start the post-first-boot retry, instead of waiting for an SSH timeout with no VM running.
 - bootstrap packaging: exclude ignored local Windows CE, Windows 95, and AmigaOS assets from source archives used by cross-builds.
 - Slackware package smoke setup: install X11/XCB, DBus, PulseAudio, and sound codec/link dependencies so gfxlib and sfxlib smoke programs can link.
 - gfxlib2/Linux: make the VGA plane bit conversion explicit for strict GCC conversion warnings.

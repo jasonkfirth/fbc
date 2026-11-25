@@ -478,14 +478,16 @@ run_makepkg() {
 ##############################################################################
 
 ensure_host_compiler() {
+    fb_remove_object_trees "$ROOT" || die "could not clear root-owned object trees"
     fb_remove_build_tree "$ROOT" "$ROOT/lib/freebasic" || die "could not clear host runtime library outputs"
-    if ! ./bin/fbc -version >/dev/null 2>&1; then
+    if ! fb_host_compiler_is_usable "$ROOT"; then
         msg "building host compiler"
+        fb_prepare_host_compiler_rebuild "$ROOT" || die "could not prepare host compiler rebuild"
         run "$MAKE_CMD" clean
         run "$MAKE_CMD" compiler -j"$JOBS"
     fi
 
-    ./bin/fbc -version >/dev/null 2>&1 || die "host compiler not available"
+    fb_host_compiler_is_usable "$ROOT" || die "host compiler not available"
 }
 
 build_bootstrap_tarball() {

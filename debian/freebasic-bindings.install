@@ -108,6 +108,7 @@ usr/include/freebasic/postgresql
 usr/include/freebasic/pspell.bi
 usr/include/freebasic/quicklz.bi
 usr/include/freebasic/raylib.bi
+usr/include/freebasic/raylib55.bi
 usr/include/freebasic/raymath.bi
 usr/include/freebasic/regex.bi
 usr/include/freebasic/sndfile.bi

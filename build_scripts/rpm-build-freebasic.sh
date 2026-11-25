@@ -382,11 +382,13 @@ ensure_target_bootstrap_sources() {
 }
 
 ensure_host_compiler() {
+    fb_remove_object_trees "$ROOT" || die "could not clear root-owned object trees"
     fb_remove_build_tree "$ROOT" "$ROOT/lib/freebasic" || die "could not clear host runtime library outputs"
-    if ! ./bin/fbc -version >/dev/null 2>&1; then
+    if ! fb_host_compiler_is_usable "$ROOT"; then
         local make_args=()
 
         msg "building host compiler"
+        fb_prepare_host_compiler_rebuild "$ROOT" || die "could not prepare host compiler rebuild"
         ensure_target_bootstrap_sources
         if [ "$USE_GPM" -eq 0 ]; then
             make_args+=(DISABLE_GPM=YesPlease)
@@ -395,7 +397,7 @@ ensure_host_compiler() {
         run "$MAKE_CMD" "${make_args[@]}" compiler FBC=bootstrap/fbc -j"$JOBS"
     fi
 
-    ./bin/fbc -version >/dev/null 2>&1 || die "host compiler not available"
+    fb_host_compiler_is_usable "$ROOT" || die "host compiler not available"
 }
 
 build_bootstrap_tarball() {

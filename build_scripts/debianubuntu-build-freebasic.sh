@@ -1171,9 +1171,11 @@ install_deps() {
 ##############################################################################
 
 ensure_host_compiler() {
+    fb_remove_object_trees "$ROOT" || die "could not clear root-owned object trees"
     fb_remove_build_tree "$ROOT" "$ROOT/lib/freebasic" || die "could not clear host runtime library outputs"
-    if [ ! -x "./bin/fbc" ]; then
+    if ! fb_host_compiler_is_usable "$ROOT"; then
         msg "building host compiler"
+        fb_prepare_host_compiler_rebuild "$ROOT" || die "could not prepare host compiler rebuild"
         run "$MAKE_CMD" clean
         run "$MAKE_CMD" bootstrap-minimal -j"$JOBS"
         run "$MAKE_CMD" compiler -j"$JOBS" BUILD_FBCFLAGS="-d __FB_BOOTSTRAP_COMPAT__"
@@ -1181,7 +1183,7 @@ ensure_host_compiler() {
         run "$MAKE_CMD" compiler -j"$JOBS"
     fi
 
-    [ -x "./bin/fbc" ] || die "host compiler not available"
+    fb_host_compiler_is_usable "$ROOT" || die "host compiler not available"
 }
 
 build_bootstrap_tarball() {

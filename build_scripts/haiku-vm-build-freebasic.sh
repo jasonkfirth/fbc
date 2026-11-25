@@ -665,6 +665,12 @@ wait_for_ssh() {
 
 	msg "Waiting for Haiku SSH on localhost:$port"
 	for attempt in $(seq 1 "$attempts"); do
+		if grep -q 'error starting "/boot/system/servers/launch_daemon"' \
+				"$vm_dir/serial.log" 2>/dev/null; then
+			warn "Haiku launch_daemon failed during boot; SSH cannot become ready" >&2
+			return 1
+		fi
+
 		if timeout 4 ssh -i "$key" \
 				-o BatchMode=yes \
 				-o StrictHostKeyChecking=no \
@@ -865,7 +871,10 @@ prepare_vm() {
 		fi
 		sleep 2
 		mv "$vm_dir/serial.log" "$vm_dir/serial-first-boot.log" 2>/dev/null || true
-		start_vm "$vm_dir" "$ssh_port" "$vnc_display" "$audio_wav"
+		start_vm "$vm_dir" "$ssh_port" "$vnc_display" "$audio_wav" || {
+			print_vm_failure_logs "$vm_dir"
+			die "could not restart Haiku VM after first-boot failure"
+		}
 		if ! wait_for_ssh "$key" "$ssh_port" "$vm_dir" 120 >&2; then
 			print_vm_failure_logs "$vm_dir"
 			die "timed out waiting for Haiku SSH"

@@ -527,13 +527,15 @@ ensure_build_bootstrap_tarball() {
 }
 
 ensure_host_compiler() {
-    if [ ! -x "$ROOT/bin/fbc" ]; then
+    fb_remove_object_trees "$ROOT" || die "could not clear root-owned object trees"
+    if ! fb_host_compiler_is_usable "$ROOT"; then
         echo "==> building host compiler for bootstrap emission"
+        fb_prepare_host_compiler_rebuild "$ROOT" || die "could not prepare host compiler rebuild"
         run "$MAKE_CMD" clean
         run "$MAKE_CMD" compiler -j"$MAKE_JOBS"
     fi
 
-    [ -x "$ROOT/bin/fbc" ] || die "host compiler not available"
+    fb_host_compiler_is_usable "$ROOT" || die "host compiler not available"
 }
 
 bootstrap_mapping() {

@@ -219,13 +219,15 @@ ensure_nxdk() {
 }
 
 ensure_host_compiler() {
-    if [ ! -x "./bin/fbc" ]; then
+    fb_remove_object_trees "$ROOT" || die "could not clear root-owned object trees"
+    if ! fb_host_compiler_is_usable "$ROOT"; then
         msg "building host compiler"
+        fb_prepare_host_compiler_rebuild "$ROOT" || die "could not prepare host compiler rebuild"
         run "$MAKE_CMD" clean
         run "$MAKE_CMD" compiler -j"$JOBS"
     fi
 
-    [ -x "./bin/fbc" ] || die "host compiler not available"
+    fb_host_compiler_is_usable "$ROOT" || die "host compiler not available"
 }
 
 clean_xbox_target_outputs() {

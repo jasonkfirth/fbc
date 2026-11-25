@@ -69,15 +69,17 @@ rm -f FreeBASIC-${VERSION}-source-bootstrap-*.tar.xz
 ##############################################################################
 
 ensure_host_compiler(){
+        fb_remove_object_trees "$ROOT" || die "could not clear root-owned object trees"
         fb_remove_build_tree "$PWD" "$PWD/lib/freebasic" || die "could not clear host runtime library outputs"
 
-        if [ ! -x "./bin/fbc" ]; then
+        if ! fb_host_compiler_is_usable "$ROOT"; then
                 echo "==> Building host compiler..."
+                fb_prepare_host_compiler_rebuild "$ROOT" || die "could not prepare host compiler rebuild"
                 $MAKE_CMD clean || die "clean failed"
                 $MAKE_CMD compiler -j"$JOBS" || die "compiler build failed"
         fi
 
-        [ -x "./bin/fbc" ] || die "host compiler not available"
+        fb_host_compiler_is_usable "$ROOT" || die "host compiler not available"
 }
 
 ##############################################################################
