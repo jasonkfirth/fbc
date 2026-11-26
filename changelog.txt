@@ -28,6 +28,9 @@ Version 1.20.6
 - gfxlib3 input: read keyboard, mouse, drop, and event state from the active-mode snapshot without allocating draw-state TLS, and apply resize synchronization only when consuming a resize event.
 - compiler/C: avoid Clang warnings on stdio builtin declarations by emitting private C identifiers with ABI aliases; emit libc size_t parameter and result types for fread/fwrite on Unix and JavaScript targets.
 - compiler/C: keep byte-copied aggregate arguments and unaligned loads alive through enclosing C calls when array types decay to pointers, avoiding GCC dangling-pointer diagnostics for va_list arguments.
+- compiler/C: preserve FreeBASIC's 16-byte Integer<128> field alignment when GCC's s390x ABI aligns __int128 to eight bytes, keeping generated C record offsets consistent with BASIC layout.
+- s390x test coverage: keep the opaque-assembly regression compatible with GCC debug frame pointers and check union byte views against the target endianness.
+- Fedora 44 s390x package: install the rebuilt RPM and pass fbctests (2,463 suites, 1,160,838 assertions) and Exampleageddon (1,781 entries, zero runtime or self-contained failures).
 - MSYS2 cross-target builds: add Android and Wii build setup, including the Android host-compiler wrapper and standalone runtime tools, isolated devkitPro installation, refreshed dependencies, and native Emscripten launcher preservation.
 - Windows package documentation: link the current Windows and sidecar installers, update the 1.20.6 documentation shelf, and describe versioned release checksum manifests.
 - gfxlib2/Win32 and rtlib/Wii: use the supported Win32 DPI lookup API and assign socket timeout seconds using the native timeval field type.
@@ -39,6 +42,9 @@ Version 1.20.6
 - Linux matrix target transitions: clear root-owned object trees before each host-compiler/bootstrap preparation, even when the cached compiler is already host-runnable.
 - FreeBSD VM packaging: build or select a host compiler matching the source version, emit FreeBSD x86_64 bootstrap sources in isolated build roots, and transfer them before the guest build; allow reusing a provisioned VM and remove stale guest package files before rebuilding.
 - RPM cross builds: keep the bootstrap compiler selected explicitly while rebuilding the target compiler so make does not invoke an unavailable in-tree compiler.
+- RPM matrix transitions: use the ownership-aware host-compiler cleanup before rebuilding, so root-owned compiler binaries from a prior package container do not stop the next target.
+- Linux package tests: recognize XDG_RUNTIME_DIR diagnostics as an unavailable headless graphics backend, and copy the runtime ABI header into the SFX test tree.
+- compiler/C backend: use glibc IEEE-128 stdio symbols on PPC64 when GCC selects the IEEE long-double ABI.
 - Haiku i386 VM qualification: detect the guest's launch_daemon boot failure from the serial log and stop the SSH readiness wait promptly while preserving the failure diagnostics.
 - Haiku VM restart handling: stop with captured guest diagnostics when QEMU cannot start the post-first-boot retry, instead of waiting for an SSH timeout with no VM running.
 - bootstrap packaging: exclude ignored local Windows CE, Windows 95, and AmigaOS assets from source archives used by cross-builds.

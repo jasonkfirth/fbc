@@ -6,13 +6,12 @@
 
     Purpose:
 
-        Apply the m68k AROS BMP stream and 24-bit pixel byte-lane contract to
-        the shared gfxlib2 BLOAD implementation.
+        Apply the m68k AROS BMP stream contract to the shared gfxlib2 BLOAD
+        implementation.
 
     Responsibilities:
 
         - retain a probed file-signature byte without seeking an AROS volume
-        - normalize m68k AROS RGB bytes before generic BMP conversion
         - reuse the generic BMP validation and image-buffer implementation
 
     This file intentionally does NOT contain:
@@ -21,21 +20,15 @@
         - graphics presentation or Intuition window management
         - OMA game-specific image handling
 
-    m68k AROS BMP contract:
+    m68k AROS BMP stream contract:
 
         Mounted AROS streams cannot reliably rewind through fseek() after a
-        format probe, so the first byte is returned through ungetc().  The
-        AROS m68k C runtime presents the corpus' RGB triplets through rotated
-        32-bit conversion lanes.  This wrapper restores the R, G, B order
-        before the shared decoder stores 0xAARRGGBB framebuffer pixels.
+        format probe, so the first byte is returned through ungetc(). The
+        shared decoder retains BMP's standard B, G, R order and packs the
+        destination as 0xAARRGGBB on both little- and big-endian targets.
 */
 
-#include <stdint.h>
 #include <stdio.h>
-
-#define FB_GFX_BMP24_PACK(source) \
-    (((uint32_t)(source)[1]) | ((uint32_t)(source)[2] << 8) | \
-     ((uint32_t)(source)[0] << 16))
 
 #define FB_GFX_BLOAD_REWIND(file, first_byte) \
     (ungetc((first_byte), (file)) == EOF)

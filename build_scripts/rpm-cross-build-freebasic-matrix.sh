@@ -330,7 +330,7 @@ ensure_host_compiler() {
     fb_remove_build_tree "$ROOT" "$ROOT/lib/freebasic" || die "could not clear host runtime library outputs"
     if ! fb_host_compiler_is_usable "$ROOT"; then
         msg "building host compiler for bootstrap emission"
-        run "$MAKE_CMD" clean
+        fb_prepare_host_compiler_rebuild "$ROOT" || die "could not prepare host compiler rebuild"
         run "$MAKE_CMD" compiler -j"$MAKE_JOBS"
     fi
 

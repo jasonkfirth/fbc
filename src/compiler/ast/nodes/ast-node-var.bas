@@ -60,10 +60,12 @@ function astNewVAR _
 		end select
 	end if
 
-	'' DJGPP has no native C TLS; libogc's LWP threads do not install the
-	'' compiler's native TLS template either. Both use runtime-owned slots.
+	'' DJGPP lacks native C TLS, Wii LWP threads don't install GCC TLS, and
+	'' AROS's m68k GCC build disables native TLS. Those targets use pthread keys.
 	var runtime_c_tls = (env.clopt.target = FB_COMPTARGET_DOS) or _
-	                    (env.clopt.target = FB_COMPTARGET_WII)
+	                    (env.clopt.target = FB_COMPTARGET_WII) or _
+	                    ((env.clopt.target = FB_COMPTARGET_AROS) and _
+	                     (env.clopt.cputype = FB_CPUTYPE_M68K))
 	if( sym andalso symbIsThreadLocal( sym ) andalso (no_thread_local = FALSE) andalso _
 	    ((env.clopt.backend = FB_BACKEND_GAS) or _
 	     (env.clopt.backend = FB_BACKEND_GAS64) or _

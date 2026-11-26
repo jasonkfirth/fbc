@@ -2014,10 +2014,12 @@ private sub hEmitVarDecl _
 		ln += "static "
 		static_storage = TRUE
 	end if
-	'' DOS and libogc use this object as the runtime TLS initializer.
+	'' AROS m68k uses runtime-owned slots because its GCC build has no native TLS.
 	if( symbIsThreadLocal( sym ) and _
 	    (env.clopt.target <> FB_COMPTARGET_DOS) and _
-	    (env.clopt.target <> FB_COMPTARGET_WII) ) then ln += "__thread "
+	    (env.clopt.target <> FB_COMPTARGET_WII) and _
+	    ((env.clopt.target <> FB_COMPTARGET_AROS) or _
+	     (env.clopt.cputype <> FB_CPUTYPE_M68K)) ) then ln += "__thread "
 
 	dim dtype as integer
 	dim subtype as FBSYMBOL ptr
@@ -2663,6 +2665,16 @@ private sub hEmitCRecordField _
 	DZstrAssign( ln, hEmitType( dtype, subtype, TRUE ) )
 	DZstrConcatAssign( ln, " " + hGetCFieldId( fld ) )
 	DZstrConcatAssign( ln, hEmitArrayDecl( fld ) )
+	'' GCC on s390x gives __int128 an eight-byte ABI alignment, while
+	'' FreeBASIC's 128-bit integer layout uses sixteen-byte alignment.
+	'' Raise the C field alignment so generated records keep FB offsets.
+	if( typeGetDtOnly(dtype) = FB_DATATYPE_INTEGER128 or _
+	    typeGetDtOnly(dtype) = FB_DATATYPE_UINTEGER128 ) then
+		if( typeCalcNaturalAlign(dtype, subtype) > 8 ) then
+			DZstrConcatAssign( ln, " __attribute__((aligned(" + _
+				str(typeCalcNaturalAlign(dtype, subtype)) + ")))" )
+		end if
+	end if
 
 	'' Field alignment (FIELD = N)?
 	if( explicitlayout ) then

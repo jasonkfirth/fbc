@@ -406,31 +406,19 @@ EOF
 MakeDir RAM:NativeBuild
 MakeDir RAM:NativeBuild/T
 MakeDir RAM:NativeBuild/ENV
-MakeDir RAM:NativeBuild/Developer
-MakeDir RAM:NativeBuild/Developer/bin
 MakeDir RAM:NativeBuild/Developer/lib
-MakeDir RAM:NativeBuild/Developer/libexec
-MakeDir RAM:NativeBuild/Developer/libexec/gcc
-MakeDir RAM:NativeBuild/Developer/libexec/gcc/m68k-aros
-MakeDir RAM:NativeBuild/Developer/libexec/gcc/m68k-aros/6.5.0
 MakeDir RAM:NativeBuild/FreeBASIC
 MakeDir RAM:NativeBuild/FreeBASIC/bin
 MakeDir RAM:NativeBuild/FreeBASIC/lib
 Assign T: RAM:NativeBuild/T
 Assign ENV: RAM:NativeBuild/ENV
-Copy Developer:bin/gcc RAM:NativeBuild/Developer/bin/gcc CLONE QUIET
-Copy Developer:bin/as RAM:NativeBuild/Developer/bin/as CLONE QUIET
-Copy Developer:bin/ld RAM:NativeBuild/Developer/bin/ld CLONE QUIET
-Copy Developer:bin/ar RAM:NativeBuild/Developer/bin/ar CLONE QUIET
-Copy Developer:bin/collect-aros RAM:NativeBuild/Developer/bin/collect-aros CLONE QUIET
-Copy Developer:bin/elf2hunk RAM:NativeBuild/Developer/bin/elf2hunk CLONE QUIET
+; Keep native tools and cc1 on the installed package volume. Copy only the
+; link archives to the fast RAM stage so loading cc1 retains contiguous RAM.
 Copy Developer:lib/#?.a RAM:NativeBuild/Developer/lib CLONE QUIET
 Copy Developer:lib/#?.o RAM:NativeBuild/Developer/lib CLONE QUIET
 Copy Developer:lib/gcc/m68k-aros/6.5.0/libgcc.a RAM:NativeBuild/Developer/lib/libgcc.a CLONE QUIET
-Copy Developer:libexec/gcc/m68k-aros/6.5.0/cc1 RAM:NativeBuild/Developer/libexec/gcc/m68k-aros/6.5.0/cc1 CLONE QUIET
 Copy FreeBASIC:bin RAM:NativeBuild/FreeBASIC/bin ALL CLONE QUIET
 Copy FreeBASIC:lib RAM:NativeBuild/FreeBASIC/lib ALL CLONE QUIET
-Assign Developer: RAM:NativeBuild/Developer
 Assign FreeBASIC: RAM:NativeBuild/FreeBASIC
 Path C: SYS:System S: SYS:Prefs SYS:Tools SYS:Utilities Developer:bin FreeBASIC:bin QUIET
 SetEnv GCC Developer:bin/gcc

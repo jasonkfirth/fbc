@@ -104,6 +104,28 @@ private function hCStdioDeclaration( ) as string
 		end if
 		declaration += ";" + NEWLINE
 	end if
+	'' GCC's IEEE-128 PowerPC ABI uses separate glibc symbols for long-double
+	'' formatted I/O. Generated C declarations bypass the system redirections.
+	declaration += "#if defined(__powerpc64__) && defined(__LDBL_MANT_DIG__) && (__LDBL_MANT_DIG__ == 113)" + NEWLINE
+	declaration += "#define fprintf __fprintfieee128" + NEWLINE
+	declaration += "#define printf __printfieee128" + NEWLINE
+	declaration += "#define sprintf __sprintfieee128" + NEWLINE
+	declaration += "#define snprintf __snprintfieee128" + NEWLINE
+	declaration += "#define vfprintf __vfprintfieee128" + NEWLINE
+	declaration += "#define vprintf __vprintfieee128" + NEWLINE
+	declaration += "#define vsprintf __vsprintfieee128" + NEWLINE
+	declaration += "#define vsnprintf __vsnprintfieee128" + NEWLINE
+	declaration += "#define dprintf __dprintfieee128" + NEWLINE
+	declaration += "#define vdprintf __vdprintfieee128" + NEWLINE
+	declaration += "#define asprintf __asprintfieee128" + NEWLINE
+	declaration += "#define vasprintf __vasprintfieee128" + NEWLINE
+	declaration += "#define fscanf __isoc99_fscanfieee128" + NEWLINE
+	declaration += "#define scanf __isoc99_scanfieee128" + NEWLINE
+	declaration += "#define sscanf __isoc99_sscanfieee128" + NEWLINE
+	declaration += "#define vfscanf __isoc99_vfscanfieee128" + NEWLINE
+	declaration += "#define vscanf __isoc99_vscanfieee128" + NEWLINE
+	declaration += "#define vsscanf __isoc99_vsscanfieee128" + NEWLINE
+	declaration += "#endif" + NEWLINE
 	c_stdio_file_type = ""
 	c_stdio_file_conflict = FALSE
 	return declaration

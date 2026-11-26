@@ -279,7 +279,7 @@ run_gfx_smoke() {
             if grep -Eiq 'error loading shared library|relocation error|undefined symbol|cannot execute|exec format error|no such file or directory|ld-linux|ld-musl' "$combined"; then
                 fail "gfx binary wrote a loader/linker error"
             fi
-            if grep -Eiq 'display|x11|x server|screenres|graphics' "$combined"; then
+            if grep -Eiq 'display|x11|x server|screenres|graphics|XDG_RUNTIME_DIR' "$combined"; then
                 echo "HEADLESS-RUN: gfx binary started, but no usable display is available"
                 return 0
             fi
@@ -296,7 +296,7 @@ run_gfx_smoke() {
         fail "gfx binary failed with a loader/linker error"
     fi
 
-    if grep -Eiq 'display|x11|x server|screenres|graphics' "$combined"; then
+    if grep -Eiq 'display|x11|x server|screenres|graphics|XDG_RUNTIME_DIR' "$combined"; then
         echo "HEADLESS-RUN: gfx binary started, but no usable display is available"
         return 0
     fi
@@ -444,6 +444,7 @@ run_fbctests() {
     [ -d /source-tests ] || fail "tests/ tree was not mounted at /source-tests"
     [ -d /source-inc ] || fail "inc/ tree was not mounted at /source-inc"
     [ -d /source-sfxlib ] || fail "src/sfxlib/ was not mounted at /source-sfxlib"
+    [ -f /source-fb-abi.h ] || fail "src/rtlib/fb_abi.h was not mounted at /source-fb-abi.h"
 
     jobs="$(job_count "${FBCTESTS_JOBS:-}")"
 
@@ -481,6 +482,8 @@ run_fbctests() {
         cd /tmp/fbctests-source/src/sfxlib
         tar xf -
     )
+    mkdir -p /tmp/fbctests-source/src/rtlib
+    cp /source-fb-abi.h /tmp/fbctests-source/src/rtlib/fb_abi.h
 
     cd /tmp/fbctests-source/tests
 

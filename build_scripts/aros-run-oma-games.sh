@@ -425,15 +425,27 @@ EOF
 write_graphics_startup() {
     local destination="$1"
 
+    # Recreate the live CD's initial assigns without launching Wanderer.
     cat > "$destination" <<'EOF'
+SetClock LOAD
 FailAt 21
 
-MakeDir RAM:T
-MakeDir RAM:ENV
+If NOT EXISTS "RAM:Clipboards"
+    MakeDir RAM:Clipboards
+EndIf
+If NOT EXISTS "RAM:T"
+    MakeDir RAM:T
+EndIf
+If NOT EXISTS "RAM:ENV"
+    MakeDir RAM:ENV
+    Assign ENV: RAM:ENV
+EndIf
+
 Assign T: RAM:T
-Assign ENV: RAM:ENV
+Assign CLIPS: RAM:Clipboards
 Assign KEYMAPS: DEVS:Keymaps
 Assign LOCALE: SYS:Locale
+Assign LIBS: SYS:Libs
 Assign LIBS: SYS:Classes ADD
 Assign FONTS: SYS:Fonts
 Assign THEMES: SYS:Prefs/Presets/Themes

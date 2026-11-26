@@ -133,10 +133,17 @@ if( child.count + child.extra <> 52 ) then end 17
 dim as member_overlay overlay
 overlay.prefix = 41
 overlay.whole = &h1122334455667788ull
-'' These native runs target the little-endian Windows ABIs.
+	#if defined( __FB_BIGENDIAN__ )
+		if( overlay.low <> &h11223344ul or overlay.high <> &h55667788ul ) then end 18
+	#else
 if( overlay.low <> &h55667788ul or overlay.high <> &h11223344ul ) then end 18
+	#endif
 overlay.high = &hAABBCCDDul
+	#if defined( __FB_BIGENDIAN__ )
+		if( overlay.whole <> &h11223344AABBCCDDull or overlay.prefix <> 41 ) then end 19
+	#else
 if( overlay.whole <> &hAABBCCDD55667788ull or overlay.prefix <> 41 ) then end 19
+	#endif
 
 dim as member_packed packed_value
 packed_value.lead = 3
