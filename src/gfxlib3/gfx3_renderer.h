@@ -67,8 +67,8 @@ typedef struct FB_GFX3_RENDERER {
 #if defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8)
 	/* Preserve the native atomic sequence field's original offset. */
 	unsigned char activity_epoch_alignment_padding[4];
-#elif defined(__arm__)
-	/* ARM32 aligns uint64_t atomics to eight bytes. */
+#elif defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 4)
+	/* GCC aligns 64-bit atomics to eight bytes on 32-bit targets. */
 	uint32_t activity_epoch_alignment_padding;
 #endif
 	_Atomic uint64_t activity_epoch;

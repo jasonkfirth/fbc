@@ -10,15 +10,21 @@
 
 char *fb_hGetExePath( char *dst, ssize_t maxlen )
 {
-	size_t length = maxlen;
+	size_t length;
 	char *p;
 	int mib[4];
+
+	if( maxlen <= 1 )
+		return NULL;
+	length = (size_t)maxlen - 1;
+
 	mib[0] = CTL_KERN;
 	mib[1] = KERN_PROC;
 	mib[2] = KERN_PROC_PATHNAME;
 	mib[3] = -1;
 	
 	if (sysctl(mib, 4, dst, &length, NULL, 0) == 0) {
+		dst[length] = '\0';
 		p = strrchr(dst, '/');
 		if (p == dst) /* keep the "/" rather than returning "" */
 			*(p + 1) = '\0';

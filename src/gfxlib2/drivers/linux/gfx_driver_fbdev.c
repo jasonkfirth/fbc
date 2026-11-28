@@ -478,7 +478,8 @@ static void vga16_blitter(unsigned char *dest, int pitch)
 				}
 				else
 				{
-					buffer[offset] = ((s[0] << 4) & 0xF0) | (s[1] & 0xF);
+					buffer[offset] = (unsigned char)(
+						((s[0] << 4) & 0xF0) | (s[1] & 0x0F));
 				}
 
 				offset++;

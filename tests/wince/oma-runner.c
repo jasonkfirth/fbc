@@ -37,6 +37,7 @@
 #define MAX_CONTROL_VALUE 96
 #define MAX_PROGRAM_ARGUMENTS 96
 #define MAX_PROGRAM_PATH 260
+#define MAX_COMMAND_LINE (MAX_PROGRAM_PATH + MAX_PROGRAM_ARGUMENTS + 1)
 #define OBJECT_STORE_FLOOR_BYTES (16UL * 1024UL * 1024UL)
 #define PROGRAM_MEMORY_IMAGE_FLOOR_BYTES (900UL * 1024UL)
 
@@ -64,11 +65,8 @@ typedef struct InputScript {
 	DWORD settle_ms;
 } InputScript;
 
-/* CeGCC omits these coredll declarations even though Windows CE exports them. */
-WINBASEAPI BOOL WINAPI GetSystemMemoryDivision( LPDWORD store_pages,
-	                                             LPDWORD ram_pages,
-	                                             LPDWORD page_size );
-WINBASEAPI DWORD WINAPI SetSystemMemoryDivision( DWORD store_pages );
+typedef BOOL (WINAPI *GETSYSTEMMEMORYDIVISION)( LPDWORD, LPDWORD, LPDWORD );
+typedef DWORD (WINAPI *SETSYSTEMMEMORYDIVISION)( DWORD );
 
 static const char control_path[] = "\\Storage Card\\oma-launch.txt";
 static const char result_path[] = "\\Storage Card\\oma.result";
@@ -91,12 +89,25 @@ static void write_checkpoint( const char *checkpoint )
 
 static void rebalance_program_memory( void )
 {
+	HMODULE core_dll;
+	GETSYSTEMMEMORYDIVISION get_memory_division;
+	SETSYSTEMMEMORYDIVISION set_memory_division;
 	DWORD page_size = 0;
 	DWORD ram_pages = 0;
 	DWORD store_pages = 0;
 	DWORD target_store_pages;
 
-	if( !GetSystemMemoryDivision( &store_pages, &ram_pages, &page_size ) ||
+	core_dll = GetModuleHandleW( L"coredll.dll" );
+	if( core_dll == NULL )
+		return;
+	get_memory_division = (GETSYSTEMMEMORYDIVISION)GetProcAddress(
+		core_dll, L"GetSystemMemoryDivision" );
+	set_memory_division = (SETSYSTEMMEMORYDIVISION)GetProcAddress(
+		core_dll, L"SetSystemMemoryDivision" );
+	if( get_memory_division == NULL || set_memory_division == NULL )
+		return;
+
+	if( !get_memory_division( &store_pages, &ram_pages, &page_size ) ||
 	    page_size == 0 )
 		return;
 
@@ -110,7 +121,7 @@ static void rebalance_program_memory( void )
 	    substantial statically-linked game image.
 	*/
 	if( target_store_pages > 0 && store_pages > target_store_pages )
-		SetSystemMemoryDivision( target_store_pages );
+		set_memory_division( target_store_pages );
 }
 
 static void prepare_program_memory( const wchar_t *program_path,
@@ -496,6 +507,7 @@ static DWORD launch_game( const char *game_directory,
 	                      unsigned int *input_count, int *window_seen )
 {
 	char program_path[MAX_PROGRAM_PATH];
+	wchar_t wide_command_line[MAX_COMMAND_LINE];
 	wchar_t wide_program_arguments[MAX_PROGRAM_ARGUMENTS];
 	wchar_t wide_program_path[MAX_PROGRAM_PATH];
 	LPWSTR command_line = NULL;
@@ -506,8 +518,8 @@ static DWORD launch_game( const char *game_directory,
 	int written;
 
 	written = snprintf( program_path, sizeof( program_path ),
-	                    "\\Storage Card\\oma\\%s\\game.exe",
-	                    game_directory );
+	                    "\\Storage Card\\oma\\%s\\%s.exe",
+	                    game_directory, game_directory );
 	if( written < 0 || (size_t)written >= sizeof( program_path ) ) {
 		*status = "error";
 		return ERROR_BUFFER_OVERFLOW;
@@ -525,8 +537,27 @@ static DWORD launch_game( const char *game_directory,
 			*status = "error";
 			return ERROR_BUFFER_OVERFLOW;
 		}
-		command_line = wide_program_arguments;
 	}
+	/*
+	    Some Windows CE C runtimes need argv[0] in the command line even when
+	    lpApplicationName is supplied. Keep the launcher's explicit path there
+	    so the child resolves its executable directory and packaged assets.
+	*/
+	memcpy( wide_command_line, wide_program_path,
+	        (wcslen( wide_program_path ) + 1) * sizeof( wchar_t ) );
+	if( program_arguments[0] != '\0' ) {
+		size_t command_length = wcslen( wide_command_line );
+		size_t argument_length = wcslen( wide_program_arguments );
+		if( command_length + argument_length + 2 >
+		    ARRAY_COUNT(wide_command_line) ) {
+			*status = "error";
+			return ERROR_BUFFER_OVERFLOW;
+		}
+		wide_command_line[command_length++] = L' ';
+		memcpy( wide_command_line + command_length, wide_program_arguments,
+		        (argument_length + 1) * sizeof( wchar_t ) );
+	}
+	command_line = wide_command_line;
 
 	memset( &startup_info, 0, sizeof( startup_info ) );
 	memset( &process_info, 0, sizeof( process_info ) );

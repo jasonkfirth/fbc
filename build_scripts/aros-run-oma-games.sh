@@ -469,11 +469,23 @@ EOF
 write_arm_startup() {
     local destination="$3"
     local key="$1"
+    local gfx_debug=""
+    local debug_relay=""
+
+    if [ "${AROS_OMA_GFX_DEBUG:-0}" != "0" ]; then
+        gfx_debug='SetEnv FB_GFX_AROS_DEBUG 1'
+    fi
+    if [ "$key" = rambo ]; then
+        debug_relay='If EXISTS "SYS:Tests/OMA/rambo-arm-debug.log"
+    SYS:Tests/OMA/log-relay SYS:Tests/OMA/rambo-arm-debug.log
+EndIf'
+    fi
 
     cat > "$destination" <<EOF
 FailAt 21
 Assign T: SYS:Tests/OMA/T
 Assign ENV: SYS:Tests/OMA/ENV
+$gfx_debug
 Echo "AROS_OMA_TEST: arm $key BEGIN" >SYS:Tests/OMA/marker.log
 SYS:Tests/OMA/log-relay SYS:Tests/OMA/marker.log
 CD SYS:Tests/OMA/game
@@ -481,9 +493,10 @@ Stack 1048576
 game >SYS:Tests/OMA/game.log
 Set OMAGameRC \$RC
 SYS:Tests/OMA/log-relay SYS:Tests/OMA/game.log
+$debug_relay
 Echo "AROS_OMA_TEST: arm $key RETURNED rc=\$OMAGameRC" >SYS:Tests/OMA/marker.log
 SYS:Tests/OMA/log-relay SYS:Tests/OMA/marker.log
-Wait 120
+Wait 2
 Shutdown
 EOF
 }
@@ -629,6 +642,11 @@ run_x86_game() {
     QEMU_PID="$!"
     GAME_LIVENESS_PASSED=0
     wait_for_game_liveness "$key" "$log_file" "$QEMU_PID" "" || true
+    if [ "$GAME_LIVENESS_PASSED" -eq 0 ]; then
+        # Let the startup script finish relaying diagnostics and flush its
+        # small FAT-backed result files before QEMU is stopped.
+        sleep 3
+    fi
     if kill -0 "$QEMU_PID" 2>/dev/null; then
         capture_emulator_window "$QEMU_PID" "$screenshot" "AROS x86_64 $key"
     fi
@@ -651,13 +669,13 @@ prepare_arm_base_image() {
     aros_system="$MAP_AROS_BUILD/bin/raspi-arm/AROS"
     [ -d "$aros_system" ] || die "ARM AROS Workbench tree not found: $aros_system"
 
-    msg "building reusable 512 MiB ARM AROS OMA image"
+    msg "building reusable 2048 MiB ARM AROS OMA image"
     truncate -s 0 "$base_image"
-    truncate -s 512M "$base_image"
+    truncate -s 2048M "$base_image"
     printf '%s\n' 'label: dos' 'unit: sectors' 'first-lba: 2048' \
-        '1 : start=2048, size=1046528, type=c, bootable' |
+        '1 : start=2048, size=4192256, type=c, bootable' |
         sfdisk "$base_image" >/dev/null
-    mkfs.vfat -F 32 -n AROS --offset=2048 "$base_image" 523264 >/dev/null
+    mkfs.vfat -F 32 -n AROS --offset=2048 "$base_image" 2096128 >/dev/null
     mcopy -i "$base_image@@1M" -spm "$aros_system"/* ::
     mmd -i "$base_image@@1M" ::/S
     mmd -i "$base_image@@1M" ::/Tests

@@ -539,7 +539,9 @@ stage_game_assets() {
 
 write_readme() {
 	local display_name="$1"
-	local game_stage="$2"
+	local game_directory="$2"
+	local game_stage="$3"
+	local executable_name="$game_directory.exe"
 
 	cat > "$game_stage/README.txt" <<EOF
 $display_name for Windows CE $TARGET_ARCH
@@ -547,8 +549,8 @@ $display_name for Windows CE $TARGET_ARCH
 Install:
 
 1. Extract this package on a compatible Windows CE $TARGET_ARCH device.
-2. Keep game.exe and all packaged data files in the same directory.
-3. Start game.exe from File Explorer.
+2. Keep $executable_name and all packaged data files in the same directory.
+3. Start $executable_name from File Explorer.
 
 The executable is statically linked with the FreeBASIC Windows CE
 runtime, gfxlib2, and sfxlib. Graphics use GDI and audio uses waveOut.
@@ -621,8 +623,8 @@ for row in "${GAME_ROWS[@]}"; do
 
 	compile_game "$key" "$program"
 	stage_game_assets "$key" "$game_stage"
-	cp "$program" "$game_stage/game.exe"
-	write_readme "$display_name" "$game_stage"
+	cp "$program" "$game_stage/$game_directory.exe"
+	write_readme "$display_name" "$game_directory" "$game_stage"
 	if [ "$PACKAGE_GAMES" -eq 1 ]; then
 		package_game "$game_directory" "$game_stage" "$package_base"
 	else

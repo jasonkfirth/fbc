@@ -7,7 +7,12 @@
 #include once "fbnetwire.bi"
 #include once "file.bi"
 
+#ifdef __FB_WINCE__
+'' CERF's host-backed Storage Card accepts only ASCII filenames.
+dim as ustring filename = "ustring-wince.tmp"
+#else
 dim as ustring filename = "ustring-" + uchr(&hE9) + ".tmp"
+#endif
 dim as ustring text = uchr(&hE9, &h1F600, 65), received
 dim as wstring * 32 wide = wstr(text), wideResult
 dim as string bytes = cast(string, text)

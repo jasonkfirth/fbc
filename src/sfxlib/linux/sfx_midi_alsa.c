@@ -9,19 +9,42 @@
 
 #include <alsa/asoundlib.h>
 #include <stdio.h>
+#include <string.h>
 
 static snd_rawmidi_t *g_fb_sfx_linux_midi = NULL;
 static int g_fb_sfx_linux_midi_open = 0;
 
 static void fb_sfxLinuxMidiDeviceName(int device, char *buffer, size_t buffer_size)
 {
+    char device_name[32];
+    size_t name_length;
+    int result;
+
     if (!buffer || buffer_size == 0)
         return;
 
-    if (device <= 0)
-        snprintf(buffer, buffer_size, "default");
-    else
-        snprintf(buffer, buffer_size, "hw:%d,0,0", device);
+    if (device <= 0) {
+        name_length = sizeof("default");
+        if (buffer_size < name_length) {
+            buffer[0] = '\0';
+            return;
+        }
+        memcpy(buffer, "default", name_length);
+        return;
+    }
+
+    result = snprintf(device_name, sizeof(device_name), "hw:%d,0,0", device);
+    if (result < 0 || (size_t)result >= sizeof(device_name)) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    name_length = (size_t)result + 1;
+    if (buffer_size < name_length) {
+        buffer[0] = '\0';
+        return;
+    }
+    memcpy(buffer, device_name, name_length);
 }
 
 int fb_sfxMidiDriverOpen(int device)

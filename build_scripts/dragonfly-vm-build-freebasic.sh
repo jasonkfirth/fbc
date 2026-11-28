@@ -251,6 +251,9 @@ make_source_archive() {
 		--exclude='./remote_probe_temp' \
 		--exclude='./nuttx-suite-logs' \
 		--exclude='./package-root' \
+		--exclude='./FreeBASIC-*-source-bootstrap-*' \
+		--exclude='./win95' \
+		--exclude='./winCE' \
 		--exclude='./bin/fbc*' \
 		--exclude='./bootstrap/fbc*' \
 		--exclude='*/obj' \
@@ -489,8 +492,9 @@ pkg-static update -f
 pkg-static install -f -y openssl libssh2 curl
 curl --version >/dev/null
 
-fetch -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
-tar -xzf /tmp/freebasic-source.tar.gz -C /work/freebasic-source
+fetch -o /work/tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
+tar -xzf /work/tmp/freebasic-source.tar.gz -C /work/freebasic-source
+rm -f /work/tmp/freebasic-source.tar.gz
 
 cd /work/freebasic-source
 BUILDROOT=/work/freebasic-build \\
@@ -760,8 +764,9 @@ pkg install -y \\
 	xorg-vfbserver \\
 	xorgproto
 
-fetch -o /tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
-tar -xzf /tmp/freebasic-source.tar.gz -C /work/freebasic-source
+fetch -o /work/tmp/freebasic-source.tar.gz "http://10.0.2.2:$HTTP_PORT/freebasic-source.tar.gz"
+tar -xzf /work/tmp/freebasic-source.tar.gz -C /work/freebasic-source
+rm -f /work/tmp/freebasic-source.tar.gz
 
 pkg_url="http://10.0.2.2:$HTTP_PORT/upload/$DRAGONFLY_PACKAGE_BASENAME"
 fetch -o "/work/package/$DRAGONFLY_PACKAGE_BASENAME" "\$pkg_url"

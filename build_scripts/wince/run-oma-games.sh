@@ -237,7 +237,7 @@ stage_game() {
 
 	printf '%s\r\n%s\r\n' "$key" "$game_directory" \
 		> "$SHARE_ROOT/oma-launch.txt"
-	cp "$OUTPUT_ROOT/oma-runner.exe" "$SHARE_ROOT/oma-runner.exe"
+	cp "$OUTPUT_ROOT/oma-runner.exe" "$SHARE_ROOT/oma-runner-$key.exe"
 	rm -f -- "$SHARE_ROOT/oma.result" "$SHARE_ROOT/oma.done"
 }
 
@@ -325,7 +325,7 @@ for row in "${RUN_ROWS[@]}"; do
 	# process, window, input, gameplay, or stability requirement.
 	#
 	"$SCRIPT_DIR/run-arm-emulator.sh" \
-		--program oma-runner.exe \
+		--program "oma-runner-$key.exe" \
 		--completion oma.done \
 		--log-stem "oma-arm-$key" \
 		--boot-seconds "$BOOT_SECONDS" \

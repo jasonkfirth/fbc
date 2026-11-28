@@ -34,6 +34,8 @@ typedef HANDLE (WINAPI *FB_WINCE_CREATE_SNAPSHOT)( DWORD, DWORD );
 typedef BOOL (WINAPI *FB_WINCE_PROCESS_FIRST)( HANDLE, LPPROCESSENTRY32 );
 typedef BOOL (WINAPI *FB_WINCE_PROCESS_NEXT)( HANDLE, LPPROCESSENTRY32 );
 typedef BOOL (WINAPI *FB_WINCE_CLOSE_SNAPSHOT)( HANDLE );
+typedef BOOL (WINAPI *FB_WINCE_MODULE_FIRST)( HANDLE, LPMODULEENTRY32 );
+typedef BOOL (WINAPI *FB_WINCE_MODULE_NEXT)( HANDLE, LPMODULEENTRY32 );
 
 #define FB_WINCE_LOAD_PROC(target, module, name) \
 	do { \
@@ -184,6 +186,69 @@ static int fb_hWinCEGetProcessFilename( wchar_t *filename,
 	return found;
 }
 
+static int fb_hWinCEGetCurrentModulePath( wchar_t *destination,
+	                                     size_t destination_length )
+{
+	FB_WINCE_CLOSE_SNAPSHOT close_snapshot;
+	FB_WINCE_CREATE_SNAPSHOT create_snapshot;
+	FB_WINCE_MODULE_FIRST module_first;
+	FB_WINCE_MODULE_NEXT module_next;
+	MODULEENTRY32 entry;
+	HMODULE main_module;
+	HMODULE toolhelp;
+	HANDLE snapshot;
+	size_t path_length;
+	int found = FALSE;
+
+	if( destination == NULL || destination_length == 0 ||
+	    destination_length > UINT_MAX ) {
+		return FALSE;
+	}
+
+	toolhelp = LoadLibraryW( L"toolhelp.dll" );
+	if( toolhelp == NULL )
+		return FALSE;
+
+	FB_WINCE_LOAD_PROC( create_snapshot, toolhelp,
+	                    L"CreateToolhelp32Snapshot" );
+	FB_WINCE_LOAD_PROC( close_snapshot, toolhelp,
+	                    L"CloseToolhelp32Snapshot" );
+	FB_WINCE_LOAD_PROC( module_first, toolhelp, L"Module32First" );
+	FB_WINCE_LOAD_PROC( module_next, toolhelp, L"Module32Next" );
+	if( create_snapshot == NULL || close_snapshot == NULL ||
+	    module_first == NULL || module_next == NULL ) {
+		FreeLibrary( toolhelp );
+		return FALSE;
+	}
+
+	main_module = GetModuleHandleW( NULL );
+	snapshot = create_snapshot( TH32CS_SNAPMODULE, GetCurrentProcessId() );
+	if( snapshot == INVALID_HANDLE_VALUE ) {
+		FreeLibrary( toolhelp );
+		return FALSE;
+	}
+
+	memset( &entry, 0, sizeof( entry ) );
+	entry.dwSize = sizeof( entry );
+	if( module_first( snapshot, &entry ) ) {
+		do {
+			if( entry.hModule == main_module ) {
+				path_length = wcslen( entry.szExePath );
+				if( path_length > 0 && path_length < destination_length ) {
+					memcpy( destination, entry.szExePath,
+					        (path_length + 1) * sizeof( wchar_t ) );
+					found = TRUE;
+				}
+				break;
+			}
+		} while( module_next( snapshot, &entry ) );
+	}
+
+	close_snapshot( snapshot );
+	FreeLibrary( toolhelp );
+	return found;
+}
+
 int fb_hWinCEGetExecutablePathWC( wchar_t *destination,
 	                              size_t destination_length )
 {
@@ -205,6 +270,14 @@ int fb_hWinCEGetExecutablePathWC( wchar_t *destination,
 	    destination_length > UINT_MAX ) {
 		return FALSE;
 	}
+
+	/*
+	    Some CE loaders report only a basename through GetModuleFileNameW.
+	    The current process module record retains the installed path and
+	    disambiguates common package names such as game.exe.
+	*/
+	if( fb_hWinCEGetCurrentModulePath( destination, destination_length ) )
+		return TRUE;
 
 	length = GetModuleFileNameW( NULL, destination,
 	                             (DWORD)destination_length );

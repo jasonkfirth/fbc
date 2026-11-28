@@ -50,16 +50,16 @@ static int fb_hSerialSetFd(fd_set *set, int descriptor)
 	if ((set == NULL) || (descriptor < 0) || (descriptor >= FD_SETSIZE))
 		return FALSE;
 #if defined(HOST_OPENBSD)
-	#if defined(__powerpc__)
+	#if defined(__powerpc__) || defined(HOST_HAIKU)
 		FD_SET((unsigned long)descriptor, set);
 	#else
-		FD_SET((unsigned int)descriptor, set);
+		FD_SET((long)descriptor, set);
 	#endif
 #else
-	#if defined(__powerpc__)
+	#if defined(__powerpc__) || defined(HOST_HAIKU)
 		FD_SET((unsigned long)descriptor, set);
 	#else
-		FD_SET((unsigned int)descriptor, set);
+		FD_SET((long)descriptor, set);
 	#endif
 #endif
 	return TRUE;
@@ -197,7 +197,7 @@ static int fb_hSerialDefaultDevice( int port, char *device, size_t size )
 static int fb_hSerialDeviceName( int port, const char *requested,
 	char *device, size_t size )
 {
-	int written;
+	size_t name_length;
 
 	if( (requested == NULL) || (device == NULL) || (size == 0) )
 		return FALSE;
@@ -223,8 +223,12 @@ static int fb_hSerialDeviceName( int port, const char *requested,
 #endif
 	}
 
-	written = snprintf( device, size, "%s", requested );
-	return (written >= 0) && ((size_t)written < size);
+	name_length = strlen( requested );
+	if( name_length >= size )
+		return FALSE;
+
+	memcpy( device, requested, name_length + 1 );
+	return TRUE;
 }
 
 /* ------------------------------------------------------------------------- */

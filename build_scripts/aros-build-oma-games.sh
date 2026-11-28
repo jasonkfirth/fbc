@@ -44,6 +44,7 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 AROS_ROOT="${AROS_ROOT:-$ROOT/out/aros}"
 OUTPUT_ROOT="${AROS_OMA_OUTDIR:-$AROS_ROOT/oma}"
 PACKAGE_OUTDIR="${AROS_PACKAGE_OUTDIR:-$AROS_ROOT/packages/oma}"
+AROS_RUNTIME_LIBDIR="${AROS_RUNTIME_LIBDIR:-}"
 TARGETS="${AROS_TARGETS:-x86_64,m68k,arm}"
 SELECTED_GAMES_TEXT=""
 PACKAGE_REVISION="${AROS_OMA_PACKAGE_REVISION:-1}"
@@ -337,6 +338,7 @@ map_target() {
         x86_64)
             MAP_FBC_TARGET="aros-x86_64"
             MAP_TARGET_TRIPLET="x86_64-aros"
+            MAP_RUNTIME_LIBDIR="${AROS_RUNTIME_LIBDIR:-$ROOT/lib/freebasic/aros-x86_64}"
             MAP_TOOLCHAIN="$AROS_ROOT/toolchain-pc-x86_64"
             MAP_TOOL_PREFIX="x86_64-aros"
             MAP_AROS_BUILD="$AROS_ROOT/build-pc-x86_64"
@@ -344,6 +346,7 @@ map_target() {
         m68k)
             MAP_FBC_TARGET="aros-m68k"
             MAP_TARGET_TRIPLET="m68k-aros"
+            MAP_RUNTIME_LIBDIR="${AROS_RUNTIME_LIBDIR:-$ROOT/lib/freebasic/aros-m68k}"
             MAP_TOOLCHAIN="$AROS_ROOT/toolchain-amiga-m68k"
             MAP_TOOL_PREFIX="m68k-aros"
             MAP_AROS_BUILD="$AROS_ROOT/build-amiga-m68k"
@@ -351,6 +354,7 @@ map_target() {
         arm)
             MAP_FBC_TARGET="aros-arm"
             MAP_TARGET_TRIPLET="arm-aros"
+            MAP_RUNTIME_LIBDIR="${AROS_RUNTIME_LIBDIR:-$ROOT/lib/freebasic/aros-arm}"
             MAP_TOOLCHAIN="$AROS_ROOT/toolchain-raspi-armhf"
             MAP_TOOL_PREFIX="arm-aros"
             MAP_AROS_BUILD="$AROS_ROOT/build-raspi-armhf"
@@ -393,7 +397,7 @@ for tool in base64 diff file find grep make python3 zip; do
     require_command "$tool"
 done
 
-FBC="$ROOT/bin/fbc"
+FBC="${AROS_HOST_FBC:-$ROOT/bin/fbc}"
 PKG_TOOL="$SCRIPT_DIR/aros-pkg.py"
 [ -x "$FBC" ] || die "host FreeBASIC compiler not found: $FBC"
 [ -f "$PKG_TOOL" ] || die "AROS package tool not found: $PKG_TOOL"
@@ -548,6 +552,7 @@ compile_game() {
                 -target "$MAP_FBC_TARGET" \
                 -mt \
                 -i "$ROOT/inc" \
+                -p "$MAP_RUNTIME_LIBDIR" \
                 "${extra_arguments[@]}" \
                 "${sources[@]}" \
                 -x "$output"

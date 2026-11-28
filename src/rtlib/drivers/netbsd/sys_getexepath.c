@@ -14,7 +14,7 @@ char *fb_hGetExePath( char *dst, ssize_t maxlen )
 	struct stat finfo;
 	ssize_t len;
 
-	if ((stat("/proc/curproc/exe", &finfo) == 0) && ((len = readlink("/proc/curproc/exe", dst, maxlen - 1)) > -1)) {
+	if ((stat("/proc/curproc/exe", &finfo) == 0) && (maxlen > 1) && ((len = readlink("/proc/curproc/exe", dst, (size_t)(maxlen - 1))) > -1)) {
 		/* NetBSD-like proc fs is available */
 		dst[len] = '\0';
 		p = strrchr(dst, '/');

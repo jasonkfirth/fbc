@@ -347,7 +347,7 @@ if [ "$COMPILE_ONLY" -eq 0 ]; then
     require_command fs-uae
 fi
 
-FBC="$ROOT/bin/fbc"
+FBC="${AROS_HOST_FBC:-$ROOT/bin/fbc}"
 [ -x "$FBC" ] || die "host FreeBASIC compiler not found: $FBC"
 mkdir -p "$OUTPUT_ROOT"
 OUTPUT_ROOT="$(cd "$OUTPUT_ROOT" && pwd)"
@@ -645,13 +645,13 @@ prepare_arm_base_image() {
     local base_image="$OUTPUT_ROOT/arm/base.img"
     local boot_architecture="$OUTPUT_ROOT/arm/AROS.boot"
 
-    msg "building reusable 512 MiB ARM Exampleageddon image"
+    msg "building reusable 2048 MiB ARM Exampleageddon image"
     truncate -s 0 "$base_image"
-    truncate -s 512M "$base_image"
+    truncate -s 2048M "$base_image"
     printf '%s\n' 'label: dos' 'unit: sectors' 'first-lba: 2048' \
-        '1 : start=2048, size=1046528, type=c, bootable' |
+        '1 : start=2048, size=4192256, type=c, bootable' |
         sfdisk "$base_image" >/dev/null
-    mkfs.vfat -F 32 -n AROS --offset=2048 "$base_image" 523264 >/dev/null
+    mkfs.vfat -F 32 -n AROS --offset=2048 "$base_image" 2096128 >/dev/null
     mcopy -i "$base_image@@1M" -spm "$aros_system"/* ::
     mmd -i "$base_image@@1M" ::/S
     mmd -i "$base_image@@1M" ::/Tests

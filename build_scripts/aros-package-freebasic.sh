@@ -176,7 +176,7 @@ esac
 VERSION_FILE="$ROOT/mk/version.mk"
 PKG_TOOL="$SCRIPT_DIR/aros-pkg.py"
 COMPILER="$AROS_ROOT/freebasic/$TARGET/fbc"
-RUNTIME_DIR="$ROOT/lib/freebasic/aros-$TARGET"
+RUNTIME_DIR="${AROS_RUNTIME_LIBDIR:-$ROOT/lib/freebasic/aros-$TARGET}"
 
 [ -f "$VERSION_FILE" ] || die "version file not found: $VERSION_FILE"
 [ -f "$PKG_TOOL" ] || die "AROS package tool not found: $PKG_TOOL"

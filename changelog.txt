@@ -47,9 +47,38 @@ Version 1.20.6
 - compiler/C backend: use glibc IEEE-128 stdio symbols on PPC64 when GCC selects the IEEE long-double ABI.
 - Haiku i386 VM qualification: detect the guest's launch_daemon boot failure from the serial log and stop the SSH readiness wait promptly while preserving the failure diagnostics.
 - Haiku VM restart handling: stop with captured guest diagnostics when QEMU cannot start the post-first-boot retry, instead of waiting for an SSH timeout with no VM running.
+- Haiku VM exampleageddon fallback: quote SSH connection options when constructing the host-driven remote shell, so the fallback uses the active test VM's identity and port.
+- Haiku gfxlib smoke tests: declare the bitmap helper with its C ABI and link standalone window resize, input and mode helpers against libbe.
+- Haiku fbctests: keep the BFS-compatible grep helper within the POSIX awk subset so Haiku mawk can count test result records.
+- Haiku gfxlib smoke setup: pass `libbe` as a separate FreeBASIC `-l` argument, which the compiler accepts on x86_gcc2.
+- Haiku gfxlib resize smoke client: match the C++ linkage of the private BBitmap factory to the backend declaration.
+- Haiku x86 gfxlib smoke setup: compile resize, input, and window-mode C++ test helpers with the secondary x86 GCC toolchain so their ABI matches the installed x86_gcc2h libraries. Add a smoke-only rerun option for targeted diagnosis.
+- Haiku audio smoke: match the exact `Haiku` driver name with the BFS-compatible grep helper, avoiding its unsupported case-insensitive mode.
+- NetBSD VM source staging: exclude ignored versioned bootstrap source archives so guest package builds transfer only the required project sources.
+- NetBSD strict GCC build: initialize the UTF-8 decode result, mark parameters unused in unsupported console stubs, and validate/cast readlink buffer lengths before passing them to libc.
+- BSD build flags: mark pkgsrc, DragonFly ports, and X11 include directories as system headers so strict project warning checks report project code rather than third-party header layout.
+- DragonFly build flags: remove the stale `/usr/X11R7` include and library paths; DragonFly packages provide X11 headers and libraries under `/usr/local`.
+- gfxlib2 DRAW: pass command bytes to ctype through unsigned char, avoiding undefined behavior and strict GCC char-subscript diagnostics.
+- NetBSD sound stub: declare the platform teardown entry point when sound support is disabled so strict prototype checks remain clean.
+- DragonFly VM source staging: exclude ignored versioned bootstrap source archives to keep guest package transfers limited to required project sources.
+- DragonFly VM staging: download source archives onto the attached work disk instead of the small base disk, and remove each archive after extraction.
+- rtlib/DragonFly: mark unsupported mouse and multikey arguments unused, validate signed memory-size inputs before conversion, and bound executable-path buffers before calling sysctl.
+- gfxlib2/X11: match DragonFly's unsigned-int XGetKeyboardMapping prototype, and declare the DragonFly sound teardown entry point when sound support is disabled.
+- sfxlib/BSD: declare the shared sound teardown prototype before platform-specific headers so strict prototype checks pass in every runtime configuration.
+- BSD VM source staging: omit local Windows 95 and Windows CE disk images and firmware that are unrelated to BSD guest builds.
+- rtlib/Unix: cast validated millisecond timeout conversions and serial descriptors to their signed system API types for clean strict GCC builds.
+- rtlib/Unix serial: verify the complete device-name length before copying into the caller buffer, avoiding strict GCC format-truncation warnings.
+- rtlib/Haiku serial: pass validated descriptors to FD_SET using Haiku's unsigned-long parameter type.
+- compiler C comparison folding: copy operation-node fields individually so strict GCC array-bounds analysis does not mistake the larger operation payload for the constant union member.
+- compiler/C: use the Haiku 32-bit unsigned-long spelling for libc `size_t` parameters and results, matching the platform ABI and GCC's builtin declarations.
 - bootstrap packaging: exclude ignored local Windows CE, Windows 95, and AmigaOS assets from source archives used by cross-builds.
 - Slackware package smoke setup: install X11/XCB, DBus, PulseAudio, and sound codec/link dependencies so gfxlib and sfxlib smoke programs can link.
 - gfxlib2/Linux: make the VGA plane bit conversion explicit for strict GCC conversion warnings.
+- gfxlib2/Linux: explicitly narrow the packed 4-bit VGA blitter result after masking both pixels to their nibble widths.
+- gfxlib3: reserve the 32-bit alignment word before the activity epoch on all 32-bit targets, avoiding compiler-inserted padding while preserving its field offset.
+- sfxlib/Linux ALSA: check the complete MIDI device-name length before copying it into the caller buffer, keeping strict format-truncation diagnostics clean.
+- Arch Linux package builds: retain optimization in makepkg C/C++ flags so glibc fortify checks are active without emitting the unoptimized-build warning.
+- Arch Linux cross packages: mark target sysroot headers as system includes so strict project warnings remain enabled without reporting padding and duplicate declarations from libc headers.
 - gfxlib2 and rtlib/FreeBSD: make color-mask and validated file-descriptor conversions explicit for GCC sign-conversion checks.
 - compiler C backend: emit void-use statements for procedure parameters so warning-clean generated C remains independent of diagnostic-only or compiled-out parameter uses.
 - Arch Linux packaging: allow makepkg to strip native binaries, while keeping its host-side strip step disabled for cross-target packages.

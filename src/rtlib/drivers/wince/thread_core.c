@@ -24,6 +24,8 @@
 
 #include <windows.h>
 
+void fb_hWinCEEmutlsFreeThread( void );
+
 static DWORD WINAPI hThreadProcedure( LPVOID parameter )
 {
 	FBTHREADINFO *info = (FBTHREADINFO *)parameter;
@@ -35,6 +37,7 @@ static DWORD WINAPI hThreadProcedure( LPVOID parameter )
 	info->proc( info->param );
 	free( info );
 
+	fb_hWinCEEmutlsFreeThread( );
 	fb_TlsFreeCtxTb();
 
 	flags = fb_AtomicSetThreadFlags( &thread->flags, FBTHREAD_EXITED );

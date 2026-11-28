@@ -217,7 +217,10 @@ private function hCComparisonFold(byval n as ASTNODE ptr, byval removed as THASH
 		if( n->class = AST_NODECLASS_CONST ) then
 			folded->val = n->val
 		else
-			folded->op = n->op
+			folded->op.op = n->op.op
+			folded->op.options = n->op.options
+			folded->op.ex = n->op.ex
+			folded->op.semantic_scope_exit = n->op.semantic_scope_exit
 		end if
 		n->class = AST_NODECLASS_LINK
 		n->l = evaluation

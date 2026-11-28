@@ -382,7 +382,7 @@ done
 # Paths and host prerequisites
 ##############################################################################
 
-FBC="$ROOT/bin/fbc"
+FBC="${AROS_HOST_FBC:-$ROOT/bin/fbc}"
 RESOURCE_ROOT="$OUTPUT_ROOT/resources"
 CONTROL_ROOT="$OUTPUT_ROOT/control"
 
@@ -716,6 +716,15 @@ EOF
 write_arm_startup() {
     local batch_id="$1"
     local destination="$2"
+    local xml_option=""
+    local xml_relay=""
+
+    if [ "${AROS_FBCTESTS_XML:-0}" != "0" ]; then
+        xml_option='--verbose --show-console --xml SYS:Tests/FreeBASIC/fbctests.xml'
+        xml_relay='If EXISTS "SYS:Tests/FreeBASIC/fbctests.xml"
+    SYS:Tests/FreeBASIC/log-relay SYS:Tests/FreeBASIC/fbctests.xml
+EndIf'
+    fi
 
     cat > "$destination" <<EOF
 FailAt 21
@@ -725,9 +734,10 @@ Echo "FBC_AROS_TEST: arm $batch_id directories: ${BATCH_DIRS[*]}" >SYS:Tests/Fre
 SYS:Tests/FreeBASIC/log-relay SYS:Tests/FreeBASIC/start.log
 CD SYS:Tests/FreeBASIC/resources
 Stack 1048576
-SYS:Tests/FreeBASIC/fbc-tests --brief-summary --hide-cases >SYS:Tests/FreeBASIC/fbctests.log
+SYS:Tests/FreeBASIC/fbc-tests --brief-summary --hide-cases $xml_option >SYS:Tests/FreeBASIC/fbctests.log
 Set FBCTestRC \$RC
 SYS:Tests/FreeBASIC/log-relay SYS:Tests/FreeBASIC/fbctests.log " Total "
+$xml_relay
 Set RelayRC \$RC
 If 0 EQ \$RelayRC VAL
     If 0 EQ \$FBCTestRC VAL
@@ -848,16 +858,16 @@ prepare_arm_base_image() {
     aros_system="$MAP_AROS_BUILD/bin/raspi-arm/AROS"
     [ -d "$aros_system" ] || die "ARM AROS Workbench tree not found: $aros_system"
 
-    msg "building reusable 512 MiB ARM AROS fbctests image"
+    msg "building reusable 2048 MiB ARM AROS fbctests image"
     mkdir -p "$OUTPUT_ROOT/arm"
     # Reset an existing image before recreating its partition table.  Merely
     # extending or shrinking with truncate retains old filesystem signatures.
     truncate -s 0 "$base_image"
-    truncate -s 512M "$base_image"
+    truncate -s 2048M "$base_image"
     printf '%s\n' 'label: dos' 'unit: sectors' 'first-lba: 2048' \
-        '1 : start=2048, size=1046528, type=c, bootable' |
+        '1 : start=2048, size=4192256, type=c, bootable' |
         sfdisk "$base_image" >/dev/null
-    mkfs.vfat -F 32 -n AROS --offset=2048 "$base_image" 523264 >/dev/null
+    mkfs.vfat -F 32 -n AROS --offset=2048 "$base_image" 2096128 >/dev/null
 
     mcopy -i "$base_image@@1M" -spm "$aros_system"/* ::
     # The raspi Workbench staging tree omits S because the ROM normally owns

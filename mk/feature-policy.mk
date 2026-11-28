@@ -179,7 +179,8 @@ endif
 # stages the matching static libffi and its generated architecture header in
 # the target runtime directory so THREADCALL remains fully functional.
 ifeq ($(TARGET_OS),aros)
-  CPPFLAGS += -isystem $(rootdir)/lib/freebasic/aros-$(TARGET_ARCH)/include
+  AROS_RUNTIME_LIBDIR ?= $(rootdir)/lib/freebasic/aros-$(TARGET_ARCH)
+  CPPFLAGS += -isystem $(AROS_RUNTIME_LIBDIR)/include
   ALLCFLAGS += \
     -DDISABLE_NCURSES \
     -DDISABLE_LANGINFO \

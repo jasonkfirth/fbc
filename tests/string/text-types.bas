@@ -232,9 +232,9 @@ SUITE( fbc_tests.string_.text_types )
 	TEST( paths_and_file_helpers )
 		dim as string filenameStem = "text-types-" + textTypesTempFileTag()
 		dim as string tempExtension = textTypesTempFileExtension()
-		#if sizeof(wstring) = 1
-			'' A byte-wide DOS path and a UTF-8 path share the same spelling only
-			'' in the ASCII range. Unicode USTRING paths have their own test below.
+		#if sizeof(wstring) = 1 or defined(__FB_WINCE__)
+			'' Keep DOS and CERF-backed CE fixture names in the ASCII range; the
+			'' string operations below still compare the UTF-8 and wide forms.
 			dim as wstring * 128 wide = wstr(filenameStem + "-wide" + tempExtension)
 			dim as ustring utf8 = filenameStem + "-wide" + tempExtension
 		#else
@@ -316,6 +316,9 @@ SUITE( fbc_tests.string_.text_types )
 		if FileExists(filename) then CU_ASSERT_EQUAL( kill(filename), 0 )
 	END_TEST
 
+	'' CERF's host-backed Storage Card rejects Unicode filenames before the
+	'' Windows CE filesystem can handle them.
+	#if not defined(__FB_WINCE__)
 	TEST( unicode_paths )
 		'' Exercise Unicode paths independently of the range of WSTRING.
 		dim as ustring original = "text-types-unicode-" + textTypesTempFileTag() + uchr(&h4E2D, &h1F600)
@@ -336,6 +339,7 @@ SUITE( fbc_tests.string_.text_types )
 		if FileExists(copied) then CU_ASSERT_EQUAL( kill(copied), 0 )
 		if FileExists(renamed) then CU_ASSERT_EQUAL( kill(renamed), 0 )
 	END_TEST
+	#endif
 
 	TEST( long_unicode_formats )
 		dim as string filename = "text-types-long-using-" + textTypesTempFileTag()

@@ -62,7 +62,7 @@ build() {
   local build_fbc="${srcdir}/${pkgname}-${pkgver}/.fbc-build/bin/fbc"
   local build_fbc_with_inc="${build_fbc} -i ${srcdir}/${pkgname}-${pkgver}/inc"
   local sysroot_flag="--sysroot=${FBC_ARCH_SYSROOT}"
-  local sysroot_cppflags="${sysroot_flag} -I${FBC_ARCH_SYSROOT}/usr/include"
+  local sysroot_cppflags="${sysroot_flag} -isystem ${FBC_ARCH_SYSROOT}/usr/include"
   local sysroot_ldflags="${sysroot_flag} -L${FBC_ARCH_SYSROOT}/usr/lib -Wl,-rpath-link,${FBC_ARCH_SYSROOT}/usr/lib"
   local target_cc="${FBC_ARCH_TARGET_TRIPLET}-gcc"
   local target_cxx="${FBC_ARCH_TARGET_TRIPLET}-g++"

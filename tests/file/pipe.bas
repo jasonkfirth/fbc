@@ -23,7 +23,8 @@
 
 # include "fbcunit.bi"
 
-#if (not defined( __FB_JS__ )) and (not defined( __FB_WII__ ))
+#if (not defined( __FB_JS__ )) and (not defined( __FB_WII__ )) _
+	and (not defined( __FB_WINCE__ ))
 
 SUITE( fbc_tests.file_.pipe_ )
 

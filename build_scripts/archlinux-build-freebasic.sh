@@ -435,7 +435,7 @@ run_makepkg() {
     local makepkg_uid="${FBC_MAKEPKG_UID:-1000}"
     local makepkg_gid="${FBC_MAKEPKG_GID:-1000}"
     local makepkg_user
-    local makepkg_opts="MAKEFLAGS=\"-j$JOBS\" CFLAGS= CXXFLAGS= CPPFLAGS= LDFLAGS= LTOFLAGS="
+    local makepkg_opts="MAKEFLAGS=\"-j$JOBS\" CFLAGS=-O2 CXXFLAGS=-O2 CPPFLAGS= LDFLAGS= LTOFLAGS="
     makepkg_opts="$makepkg_opts CARCH=\"$ARCH\" CHOST=\"$TARGET_TRIPLET\""
 
     if [ "$CROSS_PACKAGE_BUILD" -eq 1 ]; then

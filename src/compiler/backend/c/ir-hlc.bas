@@ -1262,6 +1262,9 @@ private function hGetLibcSizeDtype( ) as integer
 	if( (fbIs64bit( ) andalso ((env.target.options and FB_TARGETOPT_UNIX) <> 0)) orelse _
 		env.clopt.target = FB_COMPTARGET_JS ) then
 		dtype = typeSetMangleDt( dtype, FB_DATATYPE_UINT )
+	elseif( env.clopt.target = FB_COMPTARGET_HAIKU ) then
+		'' Haiku's 32-bit ABI uses unsigned long for size_t, unlike Linux i386.
+		dtype = typeSetMangleDt( FB_DATATYPE_ULONG, FB_DATATYPE_UINT )
 	elseif( env.clopt.target = FB_COMPTARGET_DOS ) then
 		dtype = typeSetMangleDt( FB_DATATYPE_ULONG, FB_DATATYPE_UINT )
 	end if

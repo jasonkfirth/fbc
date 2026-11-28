@@ -255,6 +255,9 @@ make_source_archive() {
 		--exclude='./remote_probe_temp' \
 		--exclude='./nuttx-suite-logs' \
 		--exclude='./package-root' \
+		--exclude='./FreeBASIC-*-source-bootstrap-*' \
+		--exclude='./win95' \
+		--exclude='./winCE' \
 		--exclude='./bin/fbc*' \
 		--exclude='./bootstrap/fbc*' \
 		--exclude='*/obj' \

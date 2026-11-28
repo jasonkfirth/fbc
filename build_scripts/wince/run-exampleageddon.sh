@@ -412,6 +412,8 @@ stage_batch() {
 	local program
 	local compile_directory
 	local case_directory
+	local guest_program
+	local guest_arguments
 
 	SHARE_STAGE="$(mktemp -d "$SHARE_ROOT/.exampleageddon-stage.XXXXXX")"
 	: > "$SHARE_STAGE/manifest.txt"
@@ -426,7 +428,17 @@ stage_batch() {
 			\( -name '*.o' -o -name '*.obj' -o -name '*.asm' \
 			   -o -name '*.exe' \) -delete
 		cp "$program" "$case_directory/runner.exe"
-		printf '%s\r\n' "$case_id" >> "$SHARE_STAGE/manifest.txt"
+		if [ "$source_path" = "examples/manual/fileio/serialization.bas" ]; then
+			# This example round-trips a named file, so provide an empty fixture
+			# and pass its absolute shared-storage path as Command(1).
+			: > "$case_directory/serialization.dat"
+			guest_program="exampleageddon/$case_id/runner.exe"
+			guest_arguments="\"\\Storage Card\\exampleageddon\\$case_id\\serialization.dat\""
+			printf '%s\t%s\t15\t%s\r\n' "$case_id" "$guest_program" \
+				"$guest_arguments" >> "$SHARE_STAGE/manifest.txt"
+		else
+			printf '%s\r\n' "$case_id" >> "$SHARE_STAGE/manifest.txt"
+		fi
 	done
 
 	install_share_stage

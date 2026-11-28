@@ -69,6 +69,7 @@ SUITE( fbc_tests.file_.path_attributes )
 		CU_ASSERT_EQUAL( GetAttr( first_path ) and vbReadOnly, 0 )
 
 #if defined(__FB_WIN32__) and not defined(__FB_CYGWIN__)
+	#if not defined(__FB_WINCE__)
 		'' UTF-8 pathname conversion must match OPEN, including the extended
 		'' path prefix whose question mark is not a wildcard.
 		dim unicode_path as string = root_path & "/" & Chr(&hC3, &hA9) & ".txt"
@@ -84,6 +85,7 @@ SUITE( fbc_tests.file_.path_attributes )
 			CU_ASSERT_EQUAL( SetAttr( unicode_path, fbFileAttrNormal ), 0 )
 			CU_ASSERT_EQUAL( Kill( unicode_path ), 0 )
 		end if
+	#endif
 		attributes = GetAttr( root_path & "/*.txt" )
 		saved_error = Err
 		CU_ASSERT_EQUAL( attributes, -1 )
@@ -93,7 +95,13 @@ SUITE( fbc_tests.file_.path_attributes )
 		CU_ASSERT_EQUAL( GetAttr( first_path ), vbHidden or vbSystem or vbArchive )
 		status = SetAttr( first_path, fbFileAttrNormal )
 		CU_ASSERT_EQUAL( status, 0 )
+		#if defined(__FB_WINCE__)
+			'' The CE storage card filesystem may automatically retain/archive files.
+			CU_ASSERT_EQUAL( GetAttr( first_path ) and _
+				(vbReadOnly or vbHidden or vbSystem), 0 )
+		#else
 		CU_ASSERT_EQUAL( GetAttr( first_path ), fbFileAttrNormal )
+		#endif
 #else
 		status = SetAttr( first_path, vbHidden )
 		CU_ASSERT_EQUAL( status, 1 )

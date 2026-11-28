@@ -224,7 +224,15 @@ int fb_DevFileOpenEncod
 	}
 
 	/* calc file size */
+#if defined(__AROS__) && defined(__arm__)
+	/*
+	    The ARM FAT handler's UTF-encoded stream has already consumed its BOM
+	    in hCheckBOM(). A second skip would discard the first input character.
+	*/
+	handle->size = fb_DevFileGetSize( fp, handle->mode, handle->encod, FALSE );
+#else
 	handle->size = fb_DevFileGetSize( fp, handle->mode, handle->encod, TRUE );
+#endif
 	if( handle->size == -1 )
 	{
 		fclose( fp );

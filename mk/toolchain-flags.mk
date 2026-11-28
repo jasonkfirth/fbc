@@ -65,23 +65,18 @@ endif
 
 ifeq ($(TARGET_OS),dragonfly)
   # Ports
-  CPPFLAGS += -I/usr/local/include
-  CFLAGS   += -I/usr/local/include
+  CPPFLAGS += -isystem /usr/local/include
+  CFLAGS   += -isystem /usr/local/include
   LDFLAGS  += -L/usr/local/lib
   LDFLAGS += -Wl,-R/usr/local/lib
 
   # Ports
-  CPPFLAGS += -I/usr/local/include/ncurses
-  CFLAGS   += -I/usr/local/include/ncurses
+  CPPFLAGS += -isystem /usr/local/include/ncurses
+  CFLAGS   += -isystem /usr/local/include/ncurses
   LDFLAGS  += -L/usr/local/lib/ncurses
   LDFLAGS += -Wl,-R/usr/local/lib/ncurses
 
 
-  # X11
-  CPPFLAGS += -I/usr/X11R7/include
-  CFLAGS   += -I/usr/X11R7/include
-  LDFLAGS  += -L/usr/X11R7/lib
- 
   # libexecinfo (needed on OpenBSD)
 #  LDFLAGS  += -lexecinfo
 endif
@@ -89,14 +84,14 @@ endif
 ifeq ($(TARGET_OS),netbsd)
 
   # pkgsrc
-  CPPFLAGS += -I/usr/pkg/include
-  CFLAGS   += -I/usr/pkg/include
+  CPPFLAGS += -isystem /usr/pkg/include
+  CFLAGS   += -isystem /usr/pkg/include
   LDFLAGS  += -L/usr/pkg/lib
   LDFLAGS += -Wl,-R/usr/pkg/lib
 
   # X11
-  CPPFLAGS += -I/usr/X11R7/include
-  CFLAGS   += -I/usr/X11R7/include
+  CPPFLAGS += -isystem /usr/X11R7/include
+  CFLAGS   += -isystem /usr/X11R7/include
   LDFLAGS  += -L/usr/X11R7/lib
 
   # libexecinfo (needed on OpenBSD)

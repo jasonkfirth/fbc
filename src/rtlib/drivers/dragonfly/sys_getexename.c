@@ -10,9 +10,14 @@
 
 char *fb_hGetExeName( char *dst, ssize_t maxlen )
 {
-	size_t len = maxlen;
+	size_t len;
 	char *p;
 	int mib[4];
+
+	if( maxlen <= 1 )
+		return NULL;
+	len = (size_t)maxlen - 1;
+
 	mib[0] = CTL_KERN;
 	mib[1] = KERN_PROC;
 	mib[2] = KERN_PROC_PATHNAME;

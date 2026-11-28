@@ -9,6 +9,8 @@
         Provide DragonFly BSD-specific shared sfxlib teardown.
 */
 
+void fb_sfxPlatformExit(void);
+
 #ifndef DISABLE_DRAGONFLY
 #include "fb_sfx_dragonfly.h"
 #endif

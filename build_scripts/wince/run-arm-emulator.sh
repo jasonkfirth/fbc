@@ -77,7 +77,8 @@ usage() {
 Usage: ./build_scripts/wince/run-arm-emulator.sh [options]
 
 Options:
-  --program NAME     Executable in CERF's share folder.
+  --program PATH     Executable in CERF's share folder. A relative subpath
+                     is allowed, for example oma/OMA-Behold/OMA-Behold.exe.
                      Default: wince-emulator-runner.exe
   --arguments TEXT   Command-line arguments passed to the guest executable.
   --completion NAME  Shared file whose appearance ends the run wait early.
@@ -144,11 +145,16 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-case "$PROGRAM" in
-    ""|*/*|*\\*|.|..)
-        die "--program must be one file name from the CERF share folder"
-        ;;
-esac
+[[ "$PROGRAM" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ ]] ||
+	die "--program must be a relative path using letters, digits, dot, underscore, and hyphen"
+IFS='/' read -r -a PROGRAM_COMPONENTS <<< "$PROGRAM"
+for component in "${PROGRAM_COMPONENTS[@]}"; do
+	case "$component" in
+		.|..)
+			die "--program path must not contain . or .. components"
+			;;
+	esac
+done
 
 case "$PROGRAM_ARGUMENTS" in
     *$'\n'*|*$'\r'*)
@@ -280,12 +286,30 @@ if [ "$boot_only" -eq 1 ]; then
     exit 0
 fi
 
-# Open Actions, hover Guest Additions, and select Task Manager.
-xdotool mousemove --window "$main_window" 27 11 click 1 2>/dev/null
+# CERF 6.7 places Task Manager in the Guest Additions status icon menu.
+# The icon stays 91 pixels from the right edge and 11 pixels from the bottom
+# of the emulator window.  Use absolute coordinates because the popup menu is
+# a separate window outside the guest client coordinate space.
+main_geometry="$(xdotool getwindowgeometry --shell "$main_window")"
+main_x="$(printf '%s\n' "$main_geometry" | sed -n 's/^X=//p')"
+main_y="$(printf '%s\n' "$main_geometry" | sed -n 's/^Y=//p')"
+main_width="$(printf '%s\n' "$main_geometry" | sed -n 's/^WIDTH=//p')"
+main_height="$(printf '%s\n' "$main_geometry" | sed -n 's/^HEIGHT=//p')"
+for value in "$main_x" "$main_y" "$main_width" "$main_height"; do
+	case "$value" in
+		""|*[!0-9]*)
+			echo "ERROR: unable to read CERF window geometry" >&2
+			exit 1
+			;;
+	esac
+done
+
+guest_additions_x=$((main_x + main_width - 91))
+guest_additions_y=$((main_y + main_height - 11))
+xdotool mousemove "$guest_additions_x" "$guest_additions_y" click 3
 sleep 1
-xdotool mousemove --window "$main_window" 150 150 2>/dev/null
-sleep 1
-xdotool mousemove --window "$main_window" 386 176 click 1 2>/dev/null
+xdotool mousemove "$((guest_additions_x + 50))" \
+	"$((guest_additions_y + 37))" click 1
 sleep 3
 
 task_window="$(xdotool search --name 'Task Manager' 2>/dev/null | tail -n 1 || true)"
@@ -305,7 +329,8 @@ esac
 
 # The Run edit control occupies the bottom row of the guest Task Manager.
 run_y=$((task_height - 31))
-guest_command="\\Storage Card\\${program}"
+guest_program_path="${program//\//\\}"
+guest_command="\\Storage Card\\${guest_program_path}"
 if [ -n "$program_arguments" ]; then
     guest_command="$guest_command $program_arguments"
 fi
@@ -315,6 +340,8 @@ xdotool type --window "$task_window" --delay 15 \
     "$guest_command" 2>/dev/null
 xdotool key --window "$task_window" Return 2>/dev/null
 sleep 1
+printf '%s\n' "$guest_command" >"/cerf/logs/${log_stem}.command"
+import -window "$task_window" "/cerf/logs/${log_stem}-task.png"
 
 # The host-side Task Manager is only a launch bridge.  Leaving it mapped
 # obscures the guest display and can flash through framebuffer updates.

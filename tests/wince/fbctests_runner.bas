@@ -64,6 +64,10 @@ Dim As String command_line = _
 	" --xml " & Chr( 34 ) & xml_path & Chr( 34 ) & _
 	" --brief-summary --hide-cases"
 
+'' Relative test fixtures must be created on the writable shared storage card,
+'' not in the ROM-backed directory inherited from the shell.
+If ChDir( SharedRoot ) <> 0 Then End 5
+
 If Dir( xml_path ) <> "" Then Kill xml_path
 If Dir( result_path ) <> "" Then Kill result_path
 

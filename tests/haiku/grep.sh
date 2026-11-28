@@ -85,9 +85,8 @@ fi
 	exit 2
 }
 
-# The supported Haiku images provide GNU awk.  IGNORECASE and nextfile let the
-# helper preserve grep's case-folding and one-name-per-matching-file behavior
-# without opening the files through the failing GNU grep code path.
+# Haiku provides mawk on some images, so keep this program within the POSIX awk
+# subset while avoiding the GNU grep code path that fails on populated BFS.
 FB_TEST_GREP_PATTERN="$pattern" "${AWK:-awk}" \
 	-v ignore_case="$ignore_case" \
 	-v list_only="$list_only" \
@@ -140,6 +139,10 @@ BEGIN {
 
 	file_count = ARGC - 1
 	found = 0
+	for (i = 1; i < ARGC; i++) {
+		file_names[i] = ARGV[i]
+		match_counts[ARGV[i]] = 0
+	}
 }
 
 function line_matches(line) {
@@ -149,49 +152,51 @@ function line_matches(line) {
 	return line ~ pattern
 }
 
-function display_filename() {
-	if (FILENAME == "-")
+function display_filename(name) {
+	if (name == "-")
 		return "(standard input)"
 
-	return FILENAME
-}
-
-# Counts belong to each input file, including empty files and nonmatches.
-# BEGINFILE/ENDFILE are provided by the same GNU awk required for nextfile.
-BEGINFILE {
-	match_count = 0
-}
-
-ENDFILE {
-	if (count_only != 0 && quiet == 0 && list_only == 0) {
-		if (file_count > 1 || force_filename != 0)
-			print display_filename() ":" match_count
-		else
-			print match_count
-	}
+	return name
 }
 
 line_matches($0) {
 	found = 1
-	match_count++
+	match_counts[FILENAME]++
 
 	if (quiet != 0)
 		exit 0
 
 	if (list_only != 0) {
-		print FILENAME
-		nextfile
+		if (listed[FILENAME] == 0) {
+			print FILENAME
+			listed[FILENAME] = 1
+		}
+		next
 	}
 
 	if (count_only == 0) {
 		if (file_count > 1 || force_filename != 0)
-			print display_filename() ":" $0
+			print display_filename(FILENAME) ":" $0
 		else
 			print $0
 	}
 }
 
 END {
+	if (count_only != 0 && quiet == 0 && list_only == 0) {
+		if (file_count == 0) {
+			print match_counts["-"]
+		} else {
+			for (i = 1; i <= file_count; i++) {
+				name = file_names[i]
+				if (file_count > 1 || force_filename != 0)
+					print display_filename(name) ":" match_counts[name]
+				else
+					print match_counts[name]
+			}
+		}
+	}
+
 	if (found != 0)
 		exit 0
 

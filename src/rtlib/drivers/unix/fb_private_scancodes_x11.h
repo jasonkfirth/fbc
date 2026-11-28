@@ -17,7 +17,7 @@ typedef Display *(*XOPENDISPLAY)(const char *);
 typedef int (*XCLOSEDISPLAY)(Display *);
 typedef int (*XQUERYKEYMAP)(Display *, char *);
 typedef int (*XDISPLAYKEYCODES)(Display *, int *, int *);
-#ifdef HOST_SOLARIS
+#if defined(HOST_SOLARIS) || defined(HOST_DRAGONFLY)
 typedef KeySym* (*XGETKEYBOARDMAPPING)(Display *, unsigned int, int, int *);
 #else
 typedef KeySym* (*XGETKEYBOARDMAPPING)(Display *, KeyCode, int, int *);

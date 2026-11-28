@@ -9,11 +9,22 @@ SUITE( fbc_tests.file_.copy_pathnames )
 #if defined(__FB_UNIX__) or defined(__FB_WIN32__) or defined(__FB_CYGWIN__)
 	TEST( copy_files )
 		const root_path = "fb-copy-pathnames-test.tmp"
-		dim as long status = mkdir( root_path )
+		#if defined( __FB_WINCE__ )
+			dim as long status = MkDir( root_path )
+		#else
+			dim as long status = mkdir( root_path )
+		#endif
 		CU_ASSERT_EQUAL( status, 0 )
 		if status <> 0 then exit sub
-		dim as string source = root_path & "/" & chr( &hC3, &hA9 ) & ".txt"
-		dim as string destination = root_path & "/" & chr( &hE6, &h97, &hA5 ) & ".txt"
+		#if defined( __FB_WINCE__ )
+			'' CERF exposes this target's storage card through a host folder and
+			'' rejects non-ASCII names at that device filesystem boundary.
+			dim as string source = root_path & "/source.txt"
+			dim as string destination = root_path & "/destination.txt"
+		#else
+			dim as string source = root_path & "/" & chr( &hC3, &hA9 ) & ".txt"
+			dim as string destination = root_path & "/" & chr( &hE6, &h97, &hA5 ) & ".txt"
+		#endif
 		dim as string contents = "source" & chr( 0 ) & string( 33000, "x" )
 		dim as integer file_number = freefile
 		status = open( source for binary as #file_number )
@@ -42,7 +53,11 @@ SUITE( fbc_tests.file_.copy_pathnames )
 			CU_ASSERT_EQUAL( kill( destination ), 0 )
 			CU_ASSERT_EQUAL( kill( source ), 0 )
 		end if
-		CU_ASSERT_EQUAL( rmdir( root_path ), 0 )
+		#if defined( __FB_WINCE__ )
+			CU_ASSERT_EQUAL( RmDir( root_path ), 0 )
+		#else
+			CU_ASSERT_EQUAL( rmdir( root_path ), 0 )
+		#endif
 	END_TEST
 #endif
 END_SUITE

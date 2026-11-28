@@ -9,6 +9,8 @@
         Provide NetBSD-specific shared sfxlib teardown.
 */
 
+void fb_sfxPlatformExit(void);
+
 #ifndef DISABLE_NETBSD
 #include "fb_sfx_netbsd.h"
 #endif

@@ -11,7 +11,7 @@
 #include <stdint.h>
 #include <limits.h>
 
-/* Internal allocation entry point, also used by driver initialization. */
+/* Match the C++ linkage used by the graphics driver's BBitmap factory. */
 BBitmap *fb_hHaikuCreateBitmap(int width, int height);
 
 extern "C" int fb_test_haiku_bitmap_boundaries(void)

@@ -62,7 +62,7 @@ static int hReadScalar( void *source, READ_BYTE next_byte, UNREAD_BYTE put_back 
 	unsigned char bytes[4];
 	ssize_t consumed;
 	int width, i, next;
-	unsigned int scalar;
+	unsigned int scalar = FB_UTF8_REPLACEMENT;
 
 	if( first < 0x80 )
 		return first; /* EOF or ASCII */

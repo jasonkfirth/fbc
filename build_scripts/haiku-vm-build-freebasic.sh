@@ -42,6 +42,7 @@ ISO_FILE=""
 PACKAGE_FILE=""
 PYTHON_HPKG=""
 TEST_ONLY=0
+SMOKE_ONLY=0
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
 CPUS="$JOBS"
 CPUS_EXPLICIT=0
@@ -113,6 +114,7 @@ while [ "$#" -gt 0 ]; do
 		--package) PACKAGE_FILE="$2"; shift 2 ;;
 		--python-hpkg) PYTHON_HPKG="$2"; shift 2 ;;
 		--test-only) TEST_ONLY=1; shift ;;
+		--smoke-only) SMOKE_ONLY=1; shift ;;
 		--workroot)
 			WORKROOT="$2"
 			CACHE_DIR="$WORKROOT/cache"
@@ -1858,12 +1860,17 @@ echo "==> running gfxlib SCREEN mode smoke"
 run_gfx_smoke /Work/smoke/gfx-screen-modes.out /Work/smoke/gfx-screen-modes.err /Work/smoke/gfx-screen-modes
 
 echo "==> compiling native gfxlib resize smoke helper"
-run g++ -c /Work/fbctests-source/tests/gfx3/haiku-resize-client.cpp -o /Work/smoke/haiku-resize-client.o
+	if using_secondary_x86; then
+	resize_cxx_cmd="g++-x86"
+else
+	resize_cxx_cmd="g++"
+fi
+run "$resize_cxx_cmd" -c /Work/fbctests-source/tests/gfx3/haiku-resize-client.cpp -o /Work/smoke/haiku-resize-client.o
 
 for resize_threads in single mt; do
 	resize_flags=""
 	[ "$resize_threads" != mt ] || resize_flags="-mt"
-	run fbc_command $resize_flags /Work/fbctests-source/tests/gfx3/resizable-screen-haiku-smoke.bas /Work/smoke/haiku-resize-client.o -x "/Work/smoke/gfx-resize-$resize_threads"
+	run fbc_command $resize_flags /Work/fbctests-source/tests/gfx3/resizable-screen-haiku-smoke.bas /Work/smoke/haiku-resize-client.o -l be -x "/Work/smoke/gfx-resize-$resize_threads"
 	for resize_depth in 8 16 32; do
 		echo "==> running native gfxlib resize smoke ($resize_threads, $resize_depth-bit)"
 		run_gfx_smoke "/Work/smoke/gfx-resize-$resize_threads-$resize_depth.out" "/Work/smoke/gfx-resize-$resize_threads-$resize_depth.err" "/Work/smoke/gfx-resize-$resize_threads" "$resize_depth"
@@ -1871,20 +1878,20 @@ for resize_threads in single mt; do
 done
 
 echo "==> compiling native gfxlib input smoke helper"
-run g++ -c /Work/fbctests-source/tests/gfx3/haiku-input-client.cpp -o /Work/smoke/haiku-input-client.o
+run "$resize_cxx_cmd" -c /Work/fbctests-source/tests/gfx3/haiku-input-client.cpp -o /Work/smoke/haiku-input-client.o
 for input_threads in single mt; do
 	input_flags=""
 	[ "$input_threads" != mt ] || input_flags="-mt"
-	run fbc_command $input_flags /Work/fbctests-source/tests/gfx3/input-events-haiku-smoke.bas /Work/smoke/haiku-input-client.o -x "/Work/smoke/gfx-input-$input_threads"
+	run fbc_command $input_flags /Work/fbctests-source/tests/gfx3/input-events-haiku-smoke.bas /Work/smoke/haiku-input-client.o -l be -x "/Work/smoke/gfx-input-$input_threads"
 	run_gfx_smoke "/Work/smoke/gfx-input-$input_threads.out" "/Work/smoke/gfx-input-$input_threads.err" "/Work/smoke/gfx-input-$input_threads"
 done
 
 echo "==> compiling native gfxlib mode smoke helper"
-run g++ -c /Work/fbctests-source/tests/gfx3/haiku-mode-client.cpp -o /Work/smoke/haiku-mode-client.o
+run "$resize_cxx_cmd" -c /Work/fbctests-source/tests/gfx3/haiku-mode-client.cpp -o /Work/smoke/haiku-mode-client.o
 for mode_threads in single mt; do
 	mode_flags=""
 	[ "$mode_threads" != mt ] || mode_flags="-mt"
-	run fbc_command $mode_flags /Work/fbctests-source/tests/gfx3/window-modes-haiku-smoke.bas /Work/smoke/haiku-mode-client.o /Work/smoke/haiku-resize-client.o -x "/Work/smoke/gfx-modes-$mode_threads"
+	run fbc_command $mode_flags /Work/fbctests-source/tests/gfx3/window-modes-haiku-smoke.bas /Work/smoke/haiku-mode-client.o /Work/smoke/haiku-resize-client.o -l be -x "/Work/smoke/gfx-modes-$mode_threads"
 	run_gfx_smoke "/Work/smoke/gfx-modes-$mode_threads.out" "/Work/smoke/gfx-modes-$mode_threads.err" "/Work/smoke/gfx-modes-$mode_threads"
 done
 
@@ -1912,7 +1919,7 @@ SFXLIB_DRIVER=Haiku timeout 20 /Work/smoke/sfx > /Work/smoke/sfx.out 2> /Work/sm
 cat /Work/smoke/sfx.out || true
 /Work/fbctests-source/tests/haiku/grep.sh -q -x 'sfx-start' /Work/smoke/sfx.out || fail "sfx smoke did not start"
 /Work/fbctests-source/tests/haiku/grep.sh -q -x 'sfx-end' /Work/smoke/sfx.out || fail "sfx smoke did not finish"
-/Work/fbctests-source/tests/haiku/grep.sh -q -i '^sfx-driver=haiku' /Work/smoke/sfx.out || fail "sfx smoke did not use Haiku"
+/Work/fbctests-source/tests/haiku/grep.sh -q -x 'sfx-driver=Haiku' /Work/smoke/sfx.out || fail "sfx smoke did not use Haiku"
 [ ! -s /Work/smoke/sfx.err ] || {
 	cat /Work/smoke/sfx.err
 	fail "sfx smoke wrote stderr"
@@ -1988,6 +1995,16 @@ print_secondary_x86_tools
 test_status=0
 for phase in smoke fbctests exampleageddon; do
 	echo "==> starting Haiku test phase: $phase"
+	if [ "$phase" = smoke ] && [ "${HAIKU_SMOKE_ONLY:-0}" -eq 1 ]; then
+		if /bin/sh "$0" --smoke; then
+			echo "==> Haiku smoke phase passed"
+		else
+			phase_status=$?
+			echo "ERROR: Haiku smoke phase failed with status $phase_status" >&2
+			test_status=1
+		fi
+		break
+	fi
 	if /bin/sh "$0" "--$phase"; then
 		echo "==> Haiku test phase passed: $phase"
 	else
@@ -2011,7 +2028,7 @@ run_host_exampleageddon() {
 	local log="$LOG_DIR/freebasic-haiku-exampleageddon-host.log"
 	local remote_shell
 
-	remote_shell="ssh $(ssh_opts "$key" "$port") user@127.0.0.1"
+	printf -v remote_shell 'ssh -i %q -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p %q user@127.0.0.1' "$key" "$port"
 
 	msg "Running host-driven exampleageddon against Haiku"
 	rm -rf "$outdir"
@@ -2056,6 +2073,14 @@ test_package_in_vm() {
 	send_exampleageddon_tree "$key" "$port"
 
 	write_test_runner "$runner"
+	if [ "$SMOKE_ONLY" -eq 1 ]; then
+		scp_to_guest "$key" "$port" "$runner" "/Work/test-freebasic-haiku.sh"
+		msg "Running Haiku package smoke tests"
+		ssh_guest "$key" "$port" "HAIKU_SMOKE_ONLY=1 /bin/sh -s" <<'EOF'
+/bin/sh /Work/test-freebasic-haiku.sh
+EOF
+		return
+	fi
 	scp_to_guest "$key" "$port" "$runner" "/Work/test-freebasic-haiku.sh"
 
 	msg "Running Haiku package smoke tests, fbctests, and exampleageddon"
@@ -2234,6 +2259,10 @@ main() {
 	test_dir="$(prepare_vm test "$SSH_PORT" "$HTTP_PORT" "$VNC_DISPLAY" "$RUN_DIR/test/freebasic-haiku-audio.wav")"
 	test_package_in_vm "$test_dir" "$SSH_PORT" "$hpkg"
 	stop_vm "$test_dir"
+	if [ "$SMOKE_ONLY" -eq 1 ]; then
+		msg "Haiku package smoke tests completed"
+		exit 0
+	fi
 	verify_audio_capture "$test_dir/freebasic-haiku-audio.wav" "$LOG_DIR/freebasic-haiku-audio.log"
 	archive_results "$hpkg"
 

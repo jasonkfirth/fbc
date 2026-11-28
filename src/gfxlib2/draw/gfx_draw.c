@@ -13,6 +13,12 @@
 #include <limits.h>
 #include <stdint.h>
 
+/* The ctype API is only defined for EOF or values representable as unsigned char. */
+static int draw_toupper(char value)
+{
+	return toupper((unsigned char)value);
+}
+
 #if defined(__clang__) || (defined(__GNUC__) && (__GNUC__ >= 7))
 #define FB_FALLTHROUGH __attribute__((fallthrough))
 #else
@@ -166,7 +172,7 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 	context->flags |= CTX_VIEW_SCREEN;
 
 	for (c = command->data; *c;) {
-		switch (toupper(*c)) {
+		switch (draw_toupper(*c)) {
 			case 'B':
 				c++;
 				draw = FALSE;
@@ -203,7 +209,7 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 
 			case 'T':
 				c++;
-				if (toupper(*c) != 'A')
+				if (draw_toupper(*c) != 'A')
 					goto error;
 				c++;
 				parse_result = parse_number(&c, &value1);
@@ -300,7 +306,7 @@ FBCALL void fb_GfxDraw(void *target, FBSTRING_ACCESS *command)
 			case 'G': case 'L': angle += 90; FB_FALLTHROUGH;
 			case 'H': case 'U': angle += 90; FB_FALLTHROUGH;
 			case 'E': case 'R':
-				diagonal = ((toupper(*c) >= 'E') && (toupper(*c) <= 'H'));
+				diagonal = ((draw_toupper(*c) >= 'E') && (draw_toupper(*c) <= 'H'));
 				c++;
 				parse_result = parse_number(&c, &value1);
 				if (parse_result < 0)
